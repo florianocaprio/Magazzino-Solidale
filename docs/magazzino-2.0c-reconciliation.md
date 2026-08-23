@@ -92,3 +92,16 @@ Il confronto usa riferimenti contabili e codici operativi, non nomi, contatti,
 codici fiscali, indirizzi o note sociali. I test coprono link diretto, exact,
 multinsieme, ambiguità, mismatch, record locali/esterni, resi, rettifiche,
 storni, ricalcolo, stale version, chiusura e assenza di mutazioni sulle fonti.
+
+## Lifecycle righe R2
+
+Le righe espongono `active`, `resolutionGroupId`, `companionRowId` e
+`supersededByRowId`. Indici parziali consentono al massimo una riga attiva per
+Movimento e una per riga AGEA. `ABBINA` consuma le sorgenti e lascia una coppia
+attiva; `DISABBINA` lascia due companion; `RIAPRI` disattiva i companion e
+ripristina atomicamente la coppia calcolata. Audit e conteggi considerano solo
+righe attive.
+
+Il delta segnala `MOVIMENTO_AGEA_SCOMPARSO`. I Movimenti locali registrati dopo
+la baseline sono selezionati tramite il precedente cutoff ID, anche se hanno
+data evento retrodatata.

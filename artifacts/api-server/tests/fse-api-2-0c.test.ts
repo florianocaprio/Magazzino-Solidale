@@ -3,10 +3,13 @@
 import {
   db,
   esportazioniFseEventiTable,
+  esportazioniFseIndicatoriTable,
   esportazioniFseRigheTable,
+  esportazioniFseSaldiTable,
   esportazioniFseTable,
   lottiTable,
   movimentiTable,
+  operazioniDistribuzioneMagazzinoTable,
   pool,
   rilevazioniMonitoraggioFseTable,
 } from "@workspace/db";
@@ -22,6 +25,7 @@ import {
   createLotto,
   createProdotto,
   createUtente,
+  insertMovimento,
   makeScopedApp,
   newScope,
 } from "./scope-helpers";
@@ -71,6 +75,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (exportIds.length > 0) {
+    await db
+      .delete(esportazioniFseIndicatoriTable)
+      .where(inArray(esportazioniFseIndicatoriTable.esportazioneId, exportIds));
+    await db
+      .delete(esportazioniFseSaldiTable)
+      .where(inArray(esportazioniFseSaldiTable.esportazioneId, exportIds));
     const events = await db
       .select({ id: esportazioniFseEventiTable.id })
       .from(esportazioniFseEventiTable)
@@ -159,7 +169,31 @@ describe("Magazzino 2.0C — API FSE+", () => {
     ).toBe(403);
   });
 
+  it("non crea un export amministrativo vuoto", async () => {
+    const response = await request(
+      app(centroB, ["magazzino.fse.view", "magazzino.fse.export"], areaB),
+    )
+      .post("/fse/exportazioni")
+      .send({
+        magazzinoId: magazzinoB,
+        dataDa: "2026-08-01",
+        dataA: "2026-08-31",
+        dataAsOf: "2026-08-31",
+        formatCode: "FSE_CANONICAL_AUDIT_XLSX_V1",
+      });
+    expect(response.status).toBe(409);
+    expect(response.body.error).toBe("NESSUN_DATO_DA_RENDICONTARE");
+  });
+
   it("impedisce IDOR di dettaglio e download tra Centri della stessa Area Operativa", async () => {
+    const productId = await createProdotto(scope);
+    await insertMovimento(scope, {
+      magazzinoId: magazzinoSameArea,
+      prodottoId: productId,
+      tipoMovimento: "scarico",
+      naturaContabile: "DISTRIBUZIONE_FINALE",
+      fondoOrigine: "FSE_PLUS",
+    });
     const permissions = ["magazzino.fse.view", "magazzino.fse.export"];
     const created = await request(app(centroSameArea, permissions))
       .post("/fse/exportazioni")
@@ -195,7 +229,15 @@ describe("Magazzino 2.0C — API FSE+", () => {
     expect(response.status).toBe(403);
   });
 
-  it("rifiuta versione assente e conflitto optimistic-lock sugli export", async () => {
+  it("rifiuta versione assente e impedisce l'inserimento di export con blocker", async () => {
+    const productId = await createProdotto(scope);
+    await insertMovimento(scope, {
+      magazzinoId: magazzinoA,
+      prodottoId: productId,
+      tipoMovimento: "scarico",
+      naturaContabile: "DISTRIBUZIONE_FINALE",
+      fondoOrigine: "FSE_PLUS",
+    });
     const permissions = ["magazzino.fse.view", "magazzino.fse.export"];
     const client = app(centroA, permissions);
     const created = await request(client).post("/fse/exportazioni").send({
@@ -226,8 +268,7 @@ describe("Magazzino 2.0C — API FSE+", () => {
         data: "2026-08-20",
         riferimentoEsterno: "SIFEAD-TEST",
       });
-    expect(updated.status).toBe(200);
-    expect(updated.body.versione).toBe(2);
+    expect(updated.status).toBe(409);
 
     expect(
       (
@@ -268,30 +309,86 @@ describe("Magazzino 2.0C — API FSE+", () => {
           .send({ donne: 5 })
       ).status,
     ).toBe(400);
-    const updated = await request(client)
-      .patch(`/fse/monitoraggio/${created.body.id}`)
-      .send({
+    const concurrentUpdates = await Promise.all([
+      request(client).patch(`/fse/monitoraggio/${created.body.id}`).send({
         versione: 1,
         donne: 5,
         noteAudit: "Rilevazione verificata",
-      });
+      }),
+      request(client).patch(`/fse/monitoraggio/${created.body.id}`).send({
+        versione: 1,
+        donne: 6,
+        noteAudit: "Rilevazione concorrente",
+      }),
+    ]);
+    expect(concurrentUpdates.map((response) => response.status).sort()).toEqual(
+      [200, 409],
+    );
+    const updated = concurrentUpdates.find(
+      (response) => response.status === 200,
+    )!;
     expect(updated.status).toBe(200);
     expect(updated.body).toMatchObject({
       versione: 2,
       minori18: 0,
       giovani18_29: null,
-      donne: 5,
+      donne: expect.any(Number),
     });
+  });
+
+  it("rifiuta monitoraggio cross-Magazzino, canale/mese ed enum non validi", async () => {
+    const [foreignOperation] = await db
+      .insert(operazioniDistribuzioneMagazzinoTable)
+      .values({
+        magazzinoId: magazzinoSameArea,
+        dataDistribuzione: "2026-09-10",
+        canaleOperativo: "MENSA",
+        dominioOrigine: "R2_MONITORING",
+        entitaOrigineTipo: "TEST",
+        entitaOrigineId: Number(String(Date.now()).slice(-8)),
+        numeroPasti: 1,
+        indigentiSaltuari: 0,
+        indigentiContinuativi: 1,
+        creatoDa: userId,
+      })
+      .returning({ id: operazioniDistribuzioneMagazzinoTable.id });
+    const client = app(centroA, ["magazzino.fse.monitoring.manage"]);
+    const base = {
+      magazzinoId: magazzinoA,
+      annoMese: "2026-09",
+      canaleUfficiale: "MENSA",
+      dataRiferimento: "2026-09-30",
+      fonte: "RILEVAZIONE_MANUALE_VERIFICATA",
+      completezza: "PARZIALE",
+    };
     expect(
       (
         await request(client)
-          .patch(`/fse/monitoraggio/${created.body.id}`)
-          .send({
-            versione: 1,
-            donne: 6,
-          })
+          .post("/fse/monitoraggio")
+          .send({ ...base, operazioneDistribuzioneId: foreignOperation.id })
       ).status,
-    ).toBe(409);
+    ).toBe(400);
+    expect(
+      (
+        await request(client)
+          .post("/fse/monitoraggio")
+          .send({ ...base, fonte: "ARBITRARIA" })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(client)
+          .post("/fse/monitoraggio")
+          .send({ ...base, completezza: "IGNOTA" })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(client)
+          .post("/fse/monitoraggio")
+          .send({ ...base, dataRiferimento: "2026-10-01" })
+      ).status,
+    ).toBe(400);
   });
 
   it("valida il limite massimo della paginazione", async () => {
@@ -337,7 +434,16 @@ describe("Magazzino 2.0C — API FSE+", () => {
     ).toBe(400);
 
     const client = app(centroA, ["magazzino.fse.return"]);
-    const created = await request(client).post("/fse/resi-opc").send(payload);
+    const concurrentSamePayload = await Promise.all([
+      request(client).post("/fse/resi-opc").send(payload),
+      request(client).post("/fse/resi-opc").send(payload),
+    ]);
+    expect(
+      concurrentSamePayload.map((response) => response.status).sort(),
+    ).toEqual([200, 201]);
+    const created = concurrentSamePayload.find(
+      (response) => response.status === 201,
+    )!;
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({
       magazzinoId: magazzinoA,
@@ -356,6 +462,44 @@ describe("Magazzino 2.0C — API FSE+", () => {
       versione: 1,
       idempotentReplay: true,
     });
+    const differentPayload = await request(client)
+      .post("/fse/resi-opc")
+      .send({
+        ...payload,
+        righe: [{ prodottoId, lottoId, quantita: 3 }],
+      });
+    expect(differentPayload.status).toBe(409);
+
+    const conflictLotId = await createLotto(scope, {
+      prodottoId,
+      magazzinoId: magazzinoA,
+      quantita: 10,
+      fsePlus: true,
+    });
+    const conflictKey = `${payload.idempotencyKey}-conflict`;
+    const concurrentDifferentPayload = await Promise.all([
+      request(client)
+        .post("/fse/resi-opc")
+        .send({
+          ...payload,
+          idempotencyKey: conflictKey,
+          righe: [{ prodottoId, lottoId: conflictLotId, quantita: 1 }],
+        }),
+      request(client)
+        .post("/fse/resi-opc")
+        .send({
+          ...payload,
+          idempotencyKey: conflictKey,
+          righe: [{ prodottoId, lottoId: conflictLotId, quantita: 2 }],
+        }),
+    ]);
+    expect(
+      concurrentDifferentPayload.map((response) => response.status).sort(),
+    ).toEqual([201, 409]);
+    scope.scaricoIds.push(
+      concurrentDifferentPayload.find((response) => response.status === 201)!
+        .body.id,
+    );
 
     const [afterReturn] = await db
       .select({ quantity: lottiTable.quantitaResidua })

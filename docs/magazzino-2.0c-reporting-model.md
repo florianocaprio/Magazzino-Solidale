@@ -20,18 +20,18 @@ formattazione possono arrotondare la proiezione, mai il valore decisionale.
 
 ## Fonti e formule principali
 
-| KPI                         | Fonte                    | Formula                                                  |
-| --------------------------- | ------------------------ | -------------------------------------------------------- |
-| giacenza corrente           | residui Partite          | somma residui per dimensione                             |
-| giacenza as-of              | Movimenti                | somma algebrica fino a data/cutoff                       |
-| Fondo                       | Movimento                | `movimenti.fondo_origine`                                |
-| distribuzione lorda         | Movimenti                | `DISTRIBUZIONE_FINALE` nel periodo                       |
-| storni                      | Movimenti                | nature `STORNO` con lineage                              |
-| distribuzione netta         | ledger                   | lordo meno compensazioni                                 |
-| eventi/pacchi/pasti/persone | Operazione distribuzione | evento distinto; statistiche una volta                   |
+| KPI                         | Fonte                    | Formula                                                     |
+| --------------------------- | ------------------------ | ----------------------------------------------------------- |
+| giacenza corrente           | residui Partite          | somma residui per dimensione                                |
+| giacenza as-of              | Movimenti                | somma algebrica fino a data/cutoff                          |
+| Fondo                       | Movimento                | `movimenti.fondo_origine`                                   |
+| distribuzione lorda         | Movimenti                | `DISTRIBUZIONE_FINALE` nel periodo                          |
+| storni                      | Movimenti                | nature `STORNO` con lineage                                 |
+| distribuzione netta         | ledger                   | lordo meno compensazioni                                    |
+| eventi/pacchi/pasti/persone | Operazione distribuzione | evento distinto; statistiche una volta                      |
 | scadenze                    | ledger + Partite         | saldo Partita ricostruito as-of e scadenza alla data finale |
-| trasferimenti               | Movimenti                | entrata e uscita separate                                |
-| persone uniche note         | sorgenti modulo          | beneficiario distinto affidabile; anonimi esclusi        |
+| trasferimenti               | Movimenti                | entrata e uscita separate                                   |
+| persone uniche note         | sorgenti modulo          | beneficiario distinto affidabile; anonimi esclusi           |
 
 Il report Magazzino/Logistica distingue stock corrente/as-of Pezzi/KgLt,
 Partite, scadenze, carichi/scarichi, storni, resi, rettifiche e trasferimenti.
@@ -57,11 +57,11 @@ canale.
 
 ## Matrice endpoint legacy
 
-| Endpoint legacy | Builder autorevole | Stato |
-| --- | --- | --- |
-| `/report/fse-plus` | `buildFsePlusReport` / `/report/fse-plus/integrato` | deprecato, header `Deprecation` e `Link` |
-| pagine report legacy | builder integrati | delega, nessuna formula UI parallela |
-| endpoint logistici specialistici | service del proprio dominio | mantenuti quando non duplicano KPI integrati |
+| Endpoint legacy                  | Builder autorevole                                  | Stato                                        |
+| -------------------------------- | --------------------------------------------------- | -------------------------------------------- |
+| `/report/fse-plus`               | `buildFsePlusReport` / `/report/fse-plus/integrato` | deprecato, header `Deprecation` e `Link`     |
+| pagine report legacy             | builder integrati                                   | delega, nessuna formula UI parallela         |
+| endpoint logistici specialistici | service del proprio dominio                         | mantenuti quando non duplicano KPI integrati |
 
 ## Frontend FSE+
 
@@ -83,3 +83,11 @@ e FSE+ non sono mascherate da zeri. Export e drill-down escludono nominativi,
 codice fiscale, contatti, indirizzi e note riservate; il codice operativo può
 essere usato solo quando necessario al controllo e non consente di ampliare lo
 scope.
+
+## Coerenza R2
+
+Preview e generazione condividono cutoff, arretrati, esclusione coverage e
+quality gate. La preview separa totale storico, da rendicontare, arretrati,
+bloccati, già coperti e righe generabili. I carichi FSE locali non provenienti
+da AGEA sono `CARICO_FSE_DA_VERIFICARE`: visibili in audit/anomalie, ma non
+dichiarati attestati né inseriti nella coda DdC.

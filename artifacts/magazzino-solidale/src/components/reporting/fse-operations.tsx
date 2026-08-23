@@ -32,6 +32,7 @@ import {
   useMarkFseExportManuallyEntered,
   useUpdateFseMonitoring,
   type FseRecord,
+  type FseQueueStatoParameter,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -95,7 +96,7 @@ function text(record: FseRecord, key: string): string {
   return value == null ? "—" : String(value);
 }
 
-function RecordList({
+export function RecordList({
   rows,
   downloadExports = false,
   onSelect,
@@ -107,6 +108,7 @@ function RecordList({
   selectedId?: number | null;
 }) {
   const { t } = useTranslation();
+  const [page, setPage] = useState(0);
   if (!rows?.length)
     return (
       <p className="text-sm text-muted-foreground">
@@ -115,7 +117,7 @@ function RecordList({
     );
   return (
     <div className="space-y-2">
-      {rows.slice(0, 20).map((row, index) => (
+      {rows.slice(page * 20, page * 20 + 20).map((row, index) => (
         <div
           className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border p-3 text-sm"
           key={text(row, "id") === "—" ? index : text(row, "id")}
@@ -168,9 +170,30 @@ function RecordList({
         </div>
       ))}
       {rows.length > 20 && (
-        <p className="text-xs text-muted-foreground">
-          20 / {rows.length} {t("fseOperations.records")}
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            {page * 20 + 1}–{Math.min((page + 1) * 20, rows.length)} /{" "}
+            {rows.length} {t("fseOperations.records")}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page === 0}
+              onClick={() => setPage((current) => Math.max(0, current - 1))}
+            >
+              ‹
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={(page + 1) * 20 >= rows.length}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              ›
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -183,14 +206,20 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
   const queryClient = useQueryClient();
   const warehouseId = filters.magazzinoId ?? 0;
   const enabled = warehouseId > 0;
+  const [reportingStateFilter, setReportingStateFilter] = useState<
+    "" | FseQueueStatoParameter
+  >("");
   const params = useMemo(
     () => ({
       magazzinoId: warehouseId,
       dataCompetenzaDa: filters.da,
       dataCompetenzaA: filters.a,
       includeArretrati: true,
+      ...(reportingStateFilter
+        ? { statoRendicontazione: reportingStateFilter }
+        : {}),
     }),
-    [warehouseId, filters.da, filters.a],
+    [warehouseId, filters.da, filters.a, reportingStateFilter],
   );
   const previewParams = { ...params, dataAsOf: filters.a };
   const listParams = {
@@ -445,7 +474,24 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
             </a>
           )}
         </TabsContent>
-        <TabsContent value="queue">
+        <TabsContent value="queue" className="space-y-3">
+          <select
+            aria-label="Filtro stato rendicontazione"
+            className="h-10 rounded-md border bg-background px-3 text-sm"
+            value={reportingStateFilter}
+            onChange={(event) =>
+              setReportingStateFilter(
+                event.target.value as "" | FseQueueStatoParameter,
+              )
+            }
+          >
+            <option value="">Tutti gli stati</option>
+            <option value="DA_RENDICONTARE">DA_RENDICONTARE</option>
+            <option value="ARRETRATO_NON_RENDICONTATO">
+              ARRETRATO_NON_RENDICONTATO
+            </option>
+            <option value="BLOCCATO">BLOCCATO</option>
+          </select>
           <RecordList rows={events.data?.rows} />
         </TabsContent>
         <TabsContent value="exports" className="grid gap-4 lg:grid-cols-2">
@@ -552,8 +598,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                           !fseExportActionAvailability(
                             selectedExport.data,
                             exportActionText,
-                          ).canMarkEntered ||
-                          markExport.isPending
+                          ).canMarkEntered || markExport.isPending
                         }
                         onClick={() =>
                           markExport.mutate({
@@ -574,8 +619,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                           !fseExportActionAvailability(
                             selectedExport.data,
                             exportActionText,
-                          ).canCancel ||
-                          cancelExport.isPending
+                          ).canCancel || cancelExport.isPending
                         }
                         onClick={() =>
                           cancelExport.mutate({
@@ -749,8 +793,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                           targetMovementId,
                           targetAgeaRowId,
                           hasHeader: selectedReconciliation.data != null,
-                        }) ||
-                        resolveLine.isPending
+                        }) || resolveLine.isPending
                       }
                       onClick={() =>
                         resolveLine.mutate({

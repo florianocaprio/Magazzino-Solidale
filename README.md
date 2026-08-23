@@ -276,3 +276,13 @@ queste estensioni restano candidate per la 5-5.2.
 - I segreti vanno **solo** nel file `.env`, che è escluso dal versionamento.
   Non committare mai credenziali.
 - Per i dettagli su architettura, moduli e convenzioni vedi `replit.md`.
+
+### Magazzino 2.0C-R2
+
+R2 usa `scopeRequestHash` prima del calcolo della coda e rifiuta con
+`NESSUN_DATO_DA_RENDICONTARE` i pacchetti amministrativi vuoti. La copertura
+confronta chiave e contenuto; le righe tardive diventano correzioni
+deterministiche. Operazioni già collegate a Movimenti sono immutabili, i saldi
+progressivi fixed-point sono congelati nello snapshot e il lifecycle delle
+righe di riconciliazione garantisce target attivi univoci. Resta valido
+`EXTERNAL_FORMAT_UNVERIFIED`.

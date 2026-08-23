@@ -11,18 +11,24 @@ import {
   pool,
   prodottiTable,
   riconciliazioniFseRigheTable,
+  riconciliazioniFseRisoluzioniTable,
   riconciliazioniFseTable,
   utentiTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import request from "supertest";
 import {
   calculateFseReconciliation,
+  currentExternalDelta,
   recalculateFseReconciliation,
   reconcileFseLines,
+  selectLocalReconciliationDelta,
   type ReconciliationExternalLine,
   type ReconciliationLocalLine,
 } from "../src/lib/fseReconciliation";
+import fseRouter from "../src/routes/fse";
+import { makeScopedApp } from "./scope-helpers";
 
 function local(
   overrides: Partial<ReconciliationLocalLine> = {},
@@ -145,6 +151,24 @@ describe("Magazzino 2.0C — matching riconciliazione", () => {
         "PRODOTTO_NON_MAPPATO",
       ]),
     );
+  });
+
+  it("rileva AGEA scomparsi e Movimenti locali retrodatati successivi al cutoff", () => {
+    const rowA = external({ importRowId: 20, externalMovementId: 30 });
+    const rowB = external({ importRowId: 21, externalMovementId: 31 });
+    const delta = currentExternalDelta([rowA], [rowA, rowB]);
+    expect(delta.added).toHaveLength(0);
+    expect(delta.missing).toEqual([rowB]);
+    expect(
+      selectLocalReconciliationDelta(
+        [
+          local({ movementId: 10, date: "2026-08-01" }),
+          local({ movementId: 11, date: "2026-07-01" }),
+        ],
+        "2026-08-15",
+        10,
+      ).map((row) => row.movementId),
+    ).toEqual([11]);
   });
 });
 
@@ -289,6 +313,14 @@ beforeAll(async () => {
 afterAll(async () => {
   if (reconciliationId) {
     await db
+      .delete(riconciliazioniFseRisoluzioniTable)
+      .where(
+        eq(
+          riconciliazioniFseRisoluzioniTable.riconciliazioneId,
+          reconciliationId,
+        ),
+      );
+    await db
       .delete(riconciliazioniFseRigheTable)
       .where(
         eq(riconciliazioniFseRigheTable.riconciliazioneId, reconciliationId),
@@ -328,12 +360,21 @@ describe("Magazzino 2.0C — snapshot riconciliazione PostgreSQL", () => {
       .select()
       .from(importazioniAgeaRigheTable)
       .where(eq(importazioniAgeaRigheTable.id, importRowId));
-    const result = await calculateFseReconciliation({
+    const requestInput = {
       magazzinoId,
       importazioneAgeaId: importId,
       dataRiferimento: "2026-08-20",
       creatoDa: userId,
-    });
+    };
+    const concurrent = await Promise.all([
+      calculateFseReconciliation(requestInput),
+      calculateFseReconciliation(requestInput),
+    ]);
+    expect(new Set(concurrent.map((item) => item.reconciliation.id)).size).toBe(
+      1,
+    );
+    expect(concurrent.filter((item) => item.replayed)).toHaveLength(1);
+    const result = concurrent.find((item) => !item.replayed)!;
     reconciliationId = result.reconciliation.id;
     expect(result.rows).toEqual(
       expect.arrayContaining([
@@ -378,5 +419,146 @@ describe("Magazzino 2.0C — snapshot riconciliazione PostgreSQL", () => {
           .where(eq(importazioniAgeaRigheTable.id, importRowId))
       )[0],
     ).toEqual(beforeRaw);
+  });
+
+  it("gestisce DISABBINA, RIAPRI e doppio ABBINA con una sola riga attiva", async () => {
+    const api = makeScopedApp(fseRouter, {
+      id: userId,
+      centroAscoltoId: null,
+      aree: ["magazzino"],
+      permessi: [
+        "magazzino.fse.view",
+        "magazzino.fse.reconcile",
+        "magazzino.fse.reconcile.manage",
+      ],
+      isAdmin: true,
+    });
+    let [header] = await db
+      .select()
+      .from(riconciliazioniFseTable)
+      .where(eq(riconciliazioniFseTable.id, reconciliationId));
+    let [pair] = await db
+      .select()
+      .from(riconciliazioniFseRigheTable)
+      .where(
+        and(
+          eq(riconciliazioniFseRigheTable.riconciliazioneId, reconciliationId),
+          eq(riconciliazioniFseRigheTable.movimentoId, movementId),
+          eq(riconciliazioniFseRigheTable.active, true),
+        ),
+      );
+    const disjoined = await request(api)
+      .patch(`/fse/riconciliazioni/${reconciliationId}/righe/${pair.id}`)
+      .send({
+        versione: header.versione,
+        azione: "DISABBINA",
+        motivazione: "test lifecycle R2",
+      });
+    expect(disjoined.status, disjoined.text).toBe(200);
+    let active = await db
+      .select()
+      .from(riconciliazioniFseRigheTable)
+      .where(
+        and(
+          eq(riconciliazioniFseRigheTable.riconciliazioneId, reconciliationId),
+          eq(riconciliazioniFseRigheTable.active, true),
+        ),
+      );
+    expect(
+      active.filter((row) => row.tipoRiga !== "SALDO_PARTITA"),
+    ).toHaveLength(2);
+    [header] = await db
+      .select()
+      .from(riconciliazioniFseTable)
+      .where(eq(riconciliazioniFseTable.id, reconciliationId));
+    const localCompanion = active.find(
+      (row) => row.movimentoId === movementId,
+    )!;
+    const reopened = await request(api)
+      .patch(
+        `/fse/riconciliazioni/${reconciliationId}/righe/${localCompanion.id}`,
+      )
+      .send({
+        versione: header.versione,
+        azione: "RIAPRI",
+        motivazione: "ripristino atomico R2",
+      });
+    expect(reopened.status, reopened.text).toBe(200);
+    active = await db
+      .select()
+      .from(riconciliazioniFseRigheTable)
+      .where(
+        and(
+          eq(riconciliazioniFseRigheTable.riconciliazioneId, reconciliationId),
+          eq(riconciliazioniFseRigheTable.active, true),
+        ),
+      );
+    expect(
+      active.filter((row) => row.tipoRiga !== "SALDO_PARTITA"),
+    ).toHaveLength(1);
+
+    [header] = await db
+      .select()
+      .from(riconciliazioniFseTable)
+      .where(eq(riconciliazioniFseTable.id, reconciliationId));
+    pair = active.find((row) => row.movimentoId === movementId)!;
+    await request(api)
+      .patch(`/fse/riconciliazioni/${reconciliationId}/righe/${pair.id}`)
+      .send({
+        versione: header.versione,
+        azione: "DISABBINA",
+        motivazione: "prepara doppio ABBINA",
+      });
+    [header] = await db
+      .select()
+      .from(riconciliazioniFseTable)
+      .where(eq(riconciliazioniFseTable.id, reconciliationId));
+    active = await db
+      .select()
+      .from(riconciliazioniFseRigheTable)
+      .where(
+        and(
+          eq(riconciliazioniFseRigheTable.riconciliazioneId, reconciliationId),
+          eq(riconciliazioniFseRigheTable.active, true),
+        ),
+      );
+    const local = active.find((row) => row.movimentoId === movementId)!;
+    const external = active.find(
+      (row) => row.importazioneAgeaRigaId === importRowId,
+    )!;
+    const matchPayload = {
+      versione: header.versione,
+      azione: "ABBINA",
+      motivazione: "concorrenza ABBINA R2",
+      movimentoId: movementId,
+      importazioneAgeaRigaId: importRowId,
+    };
+    const matches = await Promise.all([
+      request(api)
+        .patch(`/fse/riconciliazioni/${reconciliationId}/righe/${local.id}`)
+        .send(matchPayload),
+      request(api)
+        .patch(`/fse/riconciliazioni/${reconciliationId}/righe/${external.id}`)
+        .send(matchPayload),
+    ]);
+    expect(matches.map((response) => response.status).sort()).toEqual([
+      200, 409,
+    ]);
+    active = await db
+      .select()
+      .from(riconciliazioniFseRigheTable)
+      .where(
+        and(
+          eq(riconciliazioniFseRigheTable.riconciliazioneId, reconciliationId),
+          eq(riconciliazioniFseRigheTable.active, true),
+        ),
+      );
+    expect(
+      active.filter((row) => row.tipoRiga !== "SALDO_PARTITA"),
+    ).toHaveLength(1);
+    expect(active.find((row) => row.movimentoId === movementId)).toMatchObject({
+      importazioneAgeaRigaId: importRowId,
+      matchMethod: "ABBINAMENTO_MANUALE_STRUTTURATO",
+    });
   });
 });

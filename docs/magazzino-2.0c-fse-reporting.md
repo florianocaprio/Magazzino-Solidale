@@ -148,3 +148,18 @@ Permessi: `magazzino.fse.view`, `magazzino.fse.export`,
 `magazzino.fse.monitoring.manage` e `magazzino.fse.return`; la sola view non
 abilita mutazioni. Tutte le mutazioni versionate rifiutano versione
 assente/malformata con 400 e stale con 409.
+
+## Chiusura 2.0C-R2
+
+`scopeRequestHash` identifica Magazzino, periodo, arretrati, cutoff e scopo
+amministrativo prima che la copertura influenzi la query. Uno scope attivo
+identico è replay; dopo annullamento è una nuova generazione auditata. Se non
+restano elementi amministrativi scoperti e non esistono blocker, la creazione
+termina con `409 NESSUN_DATO_DA_RENDICONTARE` senza testata vuota.
+
+La coverage confronta `eventKey/contentHash` e `lineKey/contentHash`. Una linea
+tardiva sotto un evento inserito non ripropone le precedenti: produce
+`CORREZIONE_DA_GESTIRE_MANUALMENTE`. Le statistiche di un'operazione con
+Movimenti collegati sono immutabili. Il registro osservato usa saldi
+progressivi snapshot fixed-point per Magazzino/Fondo/prodotto/lotto, con Pezzi
+e Kg/Lt separati e senza `Number`, `parseFloat` o `toFixed` contabili.

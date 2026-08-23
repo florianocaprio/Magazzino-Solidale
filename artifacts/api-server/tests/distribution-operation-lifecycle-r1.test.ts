@@ -119,10 +119,8 @@ describe("Magazzino 2.0A-R1 — lifecycle operazione distribuzione", () => {
   });
 
   it("passa da confermata a parzialmente_stornata e poi stornata", async () => {
-    const operation = await ensure(
-      9_100_000 + Math.floor(Math.random() * 100_000),
-      2,
-    );
+    const sourceId = 9_100_000 + Math.floor(Math.random() * 100_000);
+    const operation = await ensure(sourceId, 2);
     const originals = await db
       .insert(movimentiTable)
       .values([
@@ -154,6 +152,10 @@ describe("Magazzino 2.0A-R1 — lifecycle operazione distribuzione", () => {
         },
       ])
       .returning({ id: movimentiTable.id });
+    expect((await ensure(sourceId, 2)).id).toBe(operation.id);
+    await expect(ensure(sourceId, 3)).rejects.toThrow(
+      /OPERAZIONE_DISTRIBUZIONE_IMMUTABILE/,
+    );
     await db.insert(movimentiTable).values({
       tipoMovimento: "storno",
       tipoDettaglio: "test_r1",

@@ -13,6 +13,7 @@ import {
   operazioniDistribuzioneMagazzinoTable,
   pool,
   prodottiTable,
+  rilevazioniMonitoraggioFseTable,
   utentiTable,
 } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
@@ -39,6 +40,7 @@ let magazzinoId: number;
 let prodottoId: number;
 let lottoId: number;
 let operationId: number;
+let monitoringId: number;
 const movementIds: number[] = [];
 const exportIds: number[] = [];
 
@@ -110,6 +112,20 @@ beforeAll(async () => {
       creatoDa: userId,
     })
     .returning({ id: operazioniDistribuzioneMagazzinoTable.id });
+  [{ id: monitoringId }] = await db
+    .insert(rilevazioniMonitoraggioFseTable)
+    .values({
+      magazzinoId,
+      annoMese: "2026-08",
+      canaleUfficiale: "PACCHI",
+      dataRiferimento: "2026-08-31",
+      minori18: 0,
+      fonte: "RILEVAZIONE_MANUALE_VERIFICATA",
+      completezza: "PARZIALE",
+      creatoDa: userId,
+      aggiornatoDa: userId,
+    })
+    .returning({ id: rilevazioniMonitoraggioFseTable.id });
   const inserted = await db
     .insert(movimentiTable)
     .values([
@@ -323,6 +339,9 @@ afterAll(async () => {
       .delete(movimentiTable)
       .where(inArray(movimentiTable.id, movementIds));
   await db
+    .delete(rilevazioniMonitoraggioFseTable)
+    .where(eq(rilevazioniMonitoraggioFseTable.id, monitoringId));
+  await db
     .delete(operazioniDistribuzioneMagazzinoTable)
     .where(eq(operazioniDistribuzioneMagazzinoTable.id, operationId));
   await db.delete(lottiTable).where(eq(lottiTable.id, lottoId));
@@ -410,11 +429,6 @@ describe("Magazzino 2.0C — canonical reporting ed export", () => {
           count: 1,
           blocking: true,
         }),
-        expect.objectContaining({
-          code: "SNAPSHOT_INDICATORI_STORICI_MANCANTE",
-          count: 1,
-          blocking: true,
-        }),
       ]),
     );
     expect(
@@ -470,6 +484,7 @@ describe("Magazzino 2.0C — canonical reporting ed export", () => {
     const replay = await createFseExport(input);
     expect(replay.replayed).toBe(true);
     expect(replay.export.id).toBe(first.export.id);
+    expect(replay.report).toBeNull();
     const workbook = await generateFseExportWorkbook(first.export.id);
     expect(workbook.buffer.subarray(0, 2).toString()).toBe("PK");
     const parsedWorkbook = XLSX.read(workbook.buffer);
@@ -494,6 +509,75 @@ describe("Magazzino 2.0C — canonical reporting ed export", () => {
       pieces: "89.000000",
       kgLt: "44.500000",
     });
+    const observedWorkbook = XLSX.read(
+      (
+        await generateFseExportWorkbook(
+          first.export.id,
+          "SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1",
+        )
+      ).buffer,
+    );
+    const observedRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      observedWorkbook.Sheets["Registro controllo"],
+    );
+    expect(
+      observedRows.find((row) => row["Carico / scarico pezzi"] === "'-10.00")?.[
+        "Giacenza pezzi alla movimentazione"
+      ],
+    ).toBe("90.00");
+    const [progressiveSnapshot] = await db
+      .select({
+        opening: esportazioniFseRigheTable.openingBalancePieces,
+        after: esportazioniFseRigheTable.balanceAfterPieces,
+      })
+      .from(esportazioniFseRigheTable)
+      .where(eq(esportazioniFseRigheTable.movimentoId, movementIds[0]));
+    expect(progressiveSnapshot).toEqual({
+      opening: "100.00",
+      after: "90.00",
+    });
+    const normalizeWorkbook = (buffer: Buffer) => {
+      const parsed = XLSX.read(buffer);
+      return Object.fromEntries(
+        parsed.SheetNames.map((name) => [
+          name,
+          XLSX.utils.sheet_to_json(parsed.Sheets[name], { defval: null }),
+        ]),
+      );
+    };
+    const normalizedBefore = normalizeWorkbook(workbook.buffer);
+    await db
+      .update(prodottiTable)
+      .set({ nome: "Prodotto rinominato dopo snapshot" })
+      .where(eq(prodottiTable.id, prodottoId));
+    await db
+      .update(magazziniTable)
+      .set({ nome: "Magazzino rinominato dopo snapshot" })
+      .where(eq(magazziniTable.id, magazzinoId));
+    await db
+      .update(rilevazioniMonitoraggioFseTable)
+      .set({ minori18: 99, versione: 2 })
+      .where(eq(rilevazioniMonitoraggioFseTable.id, monitoringId));
+    const [laterMovement] = await db
+      .insert(movimentiTable)
+      .values({
+        tipoMovimento: "carico",
+        tipoDettaglio: "post_cutoff",
+        dataMovimento: "2026-09-01",
+        magazzinoId,
+        prodottoId,
+        lottoId,
+        quantita: "1",
+        quantitaPezzi: "1",
+        unitaMisura: "pz",
+        fondoOrigine: "FSE_PLUS",
+        naturaContabile: "CARICO",
+      })
+      .returning({ id: movimentiTable.id });
+    movementIds.push(laterMovement.id);
+    const stableDownload = await generateFseExportWorkbook(first.export.id);
+    expect(normalizeWorkbook(stableDownload.buffer)).toEqual(normalizedBefore);
+    expect(first.export.canonicalHash).toBe(replay.export.canonicalHash);
     expect(safeExcelText("=2+2")).toBe("'=2+2");
     const cancelled = await deactivateExportCoverage(
       first.export.id,
