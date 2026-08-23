@@ -86,6 +86,9 @@ controllo dopo il restart del container.
 
 ## Debito architetturale
 
-Un migration ledger con checksum eviterebbe il replay globale e renderebbe
-esplicito lo stato applicato di ogni database. Rimane `ARCHITECTURAL_DEBT`: non
-viene introdotto da questo hotfix, che conserva runner e deploy esistenti.
+Il debito del runner replay-all è stato chiuso dalla fase infrastrutturale
+**Pre-2.0C — DB Migration Ledger 1.0**. Il replay guard Logistica resta nel
+manifest storico e viene eseguito un'ultima volta durante l'adozione
+`REPLAY_AND_REGISTER`; in seguito il ledger ne verifica il checksum e lo salta.
+Architettura e procedure operative sono documentate in
+[`db-migration-ledger.md`](db-migration-ledger.md).

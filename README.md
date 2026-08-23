@@ -29,7 +29,6 @@ multilingua (it/es/en/fr/de/ar).
    ```
 
    Variabili richieste:
-
    - `DATABASE_URL` — stringa di connessione PostgreSQL
    - `SESSION_SECRET` — segreto per la firma delle sessioni (usa una stringa
      lunga e casuale, es. `openssl rand -hex 32`)
@@ -67,9 +66,24 @@ multilingua (it/es/en/fr/de/ar).
    docker compose up -d --remove-orphans
    ```
 
-Il comando `update` esegue in ordine gli script SQL in `lib/db/updates`, ognuno
-in una transazione e sotto lock advisory. Gli script devono essere idempotenti e
-non devono riconciliare automaticamente altre differenze dello schema.
+Il comando `update` usa il DB Migration Ledger in `app_meta`: verifica il
+manifest SHA-256 della storia legacy, acquisisce un lock advisory globale e
+applica in ordine soltanto i file pendenti, registrando SQL e ledger nella
+stessa transazione. Alla prima adozione su un database esistente esegue un
+ultimo replay sicuro di tutta la storia e la registra; i run successivi
+verificano i checksum e saltano le migration già applicate.
+
+Comandi diagnostici non distruttivi:
+
+```bash
+pnpm --filter @workspace/db run migrations:status
+pnpm --filter @workspace/db run migrations:verify
+```
+
+Una migration applicata non deve essere modificata, rimossa o rinominata. Le
+nuove migration devono essere append-only secondo l'ordine lessicografico. Non
+esistono comandi automatici di repair o rebaseline. La procedura completa è in
+[`docs/db-migration-ledger.md`](docs/db-migration-ledger.md).
 
 ### Aggiornamento Fase 5-4 — Mensa
 
