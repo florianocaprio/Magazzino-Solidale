@@ -1,35 +1,11 @@
 import { afterAll, describe, expect, it } from "vitest";
 import type { Request } from "express";
-import {
-  db,
-  pool,
-  beneficiariTable,
-  bolleTable,
-  bollaRigheTable,
-  areeOperativeTable,
-  centriAscoltoTable,
-  lottiTable,
-  magazziniTable,
-  movimentiTable,
-  prodottiTable,
-  consegneTable,
-  sessioniCassaEmporioTable,
-  speseEmporioTable,
-  speseEmporioRigheTable,
-  interventiTable,
-  menseTable,
-} from "@workspace/db";
+import { db, pool, beneficiariTable, bolleTable, bollaRigheTable, areeOperativeTable, centriAscoltoTable, lottiTable, magazziniTable, movimentiTable, prodottiTable, consegneTable, sessioniCassaEmporioTable, speseEmporioTable, speseEmporioRigheTable, interventiTable, menseTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
-import {
-  parseReportFilters,
-  ReportingError,
-} from "../src/lib/reporting/filters";
+import { parseReportFilters, ReportingError } from "../src/lib/reporting/filters";
 import { reportingAgeBand } from "../src/lib/reporting/ageBands";
 import { buildPacchiReport } from "../src/lib/reporting/pacchi";
-import {
-  buildCentroAscoltoReport,
-  isSocialPlannedExpired,
-} from "../src/lib/reporting/centroAscolto";
+import { buildCentroAscoltoReport, isSocialPlannedExpired } from "../src/lib/reporting/centroAscolto";
 import { buildEmporioReport } from "../src/lib/reporting/emporio";
 import { buildMensaReport } from "../src/lib/reporting/mensa";
 import { buildUdsReport } from "../src/lib/reporting/uds";
@@ -41,6 +17,7 @@ import { requireSourceArea } from "../src/routes/report-integrato";
 import { buildDrilldown } from "../src/lib/reporting/drilldown";
 import { dateTimeEuropeRomeToUtc } from "../src/lib/interventiViste";
 import { buildReportFilterOptions } from "../src/lib/reporting/filterOptions";
+import { kpi as reportKpi } from "../src/lib/reporting/shared";
 
 function requestFor(
   query: Record<string, unknown>,
@@ -82,14 +59,7 @@ function fullFilters(): ReportFilters {
     areaOperativaMode: "all",
     centroMode: "all",
     zonaMode: "all",
-    callerAreas: [
-      "sociale",
-      "emporio",
-      "mensa",
-      "uds",
-      "magazzino",
-      "logistica",
-    ],
+    callerAreas: ["sociale", "emporio", "mensa", "uds", "magazzino", "logistica"],
     callerPermissions: ["mensa.reports.view"],
     callerIsAdmin: true,
   };
@@ -101,37 +71,19 @@ afterAll(async () => {
 
 describe("filtri condivisi dei report", () => {
   it("valida date, ordine e anno", () => {
-    expect(() =>
-      parseReportFilters(requestFor({ da: "2026-02-30", a: "2026-03-01" })),
-    ).toThrowError(ReportingError);
-    expect(() =>
-      parseReportFilters(requestFor({ da: "2026-03-02", a: "2026-03-01" })),
-    ).toThrowError(/successiva/);
-    expect(() => parseReportFilters(requestFor({ anno: "1999" }))).toThrowError(
-      /anno/,
-    );
+    expect(() => parseReportFilters(requestFor({ da: "2026-02-30", a: "2026-03-01" }))).toThrowError(ReportingError);
+    expect(() => parseReportFilters(requestFor({ da: "2026-03-02", a: "2026-03-01" }))).toThrowError(/successiva/);
+    expect(() => parseReportFilters(requestFor({ anno: "1999" }))).toThrowError(/anno/);
     const parsed = parseReportFilters(requestFor({ anno: "2025" }));
     expect(parsed.da).toBe("2025-01-01");
     expect(parsed.a).toBe("2025-12-31");
   });
 
   it("impedisce a area operativa, centro e zona scoped di allargare il perimetro", () => {
-    expect(() =>
-      parseReportFilters(
-        requestFor({ areaOperativaId: "2" }, { areaOperativaId: 1 }),
-      ),
-    ).toThrowError(/perimetro/);
-    expect(() =>
-      parseReportFilters(
-        requestFor({ centroAscoltoId: "3" }, { centroAscoltoId: 2 }),
-      ),
-    ).toThrowError(/perimetro/);
-    expect(() =>
-      parseReportFilters(requestFor({ zonaUdsId: "4" }, { zonaUdsId: 3 })),
-    ).toThrowError(/perimetro/);
-    const parsed = parseReportFilters(
-      requestFor({}, { areaOperativaId: 1, centroAscoltoId: 2, zonaUdsId: 3 }),
-    );
+    expect(() => parseReportFilters(requestFor({ areaOperativaId: "2" }, { areaOperativaId: 1 }))).toThrowError(/perimetro/);
+    expect(() => parseReportFilters(requestFor({ centroAscoltoId: "3" }, { centroAscoltoId: 2 }))).toThrowError(/perimetro/);
+    expect(() => parseReportFilters(requestFor({ zonaUdsId: "4" }, { zonaUdsId: 3 }))).toThrowError(/perimetro/);
+    const parsed = parseReportFilters(requestFor({}, { areaOperativaId: 1, centroAscoltoId: 2, zonaUdsId: 3 }));
     expect(parsed).toMatchObject({
       areaOperativaId: 1,
       centroAscoltoId: 2,
@@ -153,10 +105,28 @@ describe("filtri condivisi dei report", () => {
       ),
     ).toMatchObject({ areaOperativaId: 5, centroAscoltoId: 6, zonaUdsId: 7 });
     for (const value of ["x", "0", "-2", "1.5"]) {
-      expect(() =>
-        parseReportFilters(requestFor({ areaOperativaId: value })),
-      ).toThrowError(/areaOperativaId/);
+      expect(() => parseReportFilters(requestFor({ areaOperativaId: value }))).toThrowError(/areaOperativaId/);
     }
+  });
+});
+
+describe("contratto reporting Magazzino 2.0C", () => {
+  it("versiona ogni builder integrato e pubblica exactValue per ogni KPI", async () => {
+    const filters = fullFilters();
+    const reports = await Promise.all([buildGeneralReport(filters), buildPacchiReport(filters), buildCentroAscoltoReport(filters), buildEmporioReport(filters), buildMensaReport(filters), buildUdsReport(filters), buildLogisticaReport(filters), buildFsePlusReport(filters)]);
+    for (const report of reports) {
+      expect(report.reportingModelVersion).toBe("MAGAZZINO_2_0C_V1");
+      expect(report.kpi.every((item) => Object.hasOwn(item, "exactValue"))).toBe(true);
+    }
+  });
+
+  it("conserva null e decimali esatti senza usarli per la proiezione grafica", () => {
+    expect(reportKpi("mancante", null)).toMatchObject({
+      value: null,
+      exactValue: null,
+      availability: "missing",
+    });
+    expect(reportKpi("decimale", 1.234568, "kgLt", null, "ok", "1.234567")).toMatchObject({ value: 1.234568, exactValue: "1.234567", unit: "kgLt" });
   });
 });
 
@@ -190,9 +160,7 @@ describe("RBAC delle sorgenti report", () => {
       callerAreas: ["analisi", "mensa"],
       callerPermissions: [],
     });
-    expect(
-      withoutPermission.kpi.some((item) => item.key === "pastiErogati"),
-    ).toBe(false);
+    expect(withoutPermission.kpi.some((item) => item.key === "pastiErogati")).toBe(false);
 
     const withPermission = await buildGeneralReport({
       ...fullFilters(),
@@ -200,9 +168,7 @@ describe("RBAC delle sorgenti report", () => {
       callerAreas: ["analisi", "mensa"],
       callerPermissions: ["mensa.reports.view"],
     });
-    expect(withPermission.kpi.some((item) => item.key === "pastiErogati")).toBe(
-      true,
-    );
+    expect(withPermission.kpi.some((item) => item.key === "pastiErogati")).toBe(true);
 
     const admin = await buildGeneralReport({
       ...fullFilters(),
@@ -222,12 +188,9 @@ describe("fasce di età centralizzate", () => {
     ["1996-08-15", "2026-08-15", "30_64"],
     ["1961-08-16", "2026-08-15", "30_64"],
     ["1961-08-15", "2026-08-15", "65_plus"],
-  ])(
-    "classifica %s alla data %s come %s",
-    (birthDate, referenceDate, expected) => {
-      expect(reportingAgeBand(birthDate, null, referenceDate)).toBe(expected);
-    },
-  );
+  ])("classifica %s alla data %s come %s", (birthDate, referenceDate, expected) => {
+    expect(reportingAgeBand(birthDate, null, referenceDate)).toBe(expected);
+  });
 
   it("usa la fascia presunta solo in assenza della data e distingue il dato mancante", () => {
     expect(reportingAgeBand(null, "18_29", "2026-08-15")).toBe("18_29");
@@ -270,9 +233,7 @@ describe("semantica dei servizi Centro di Ascolto", () => {
       ])
       .returning({ id: beneficiariTable.id, codice: beneficiariTable.codice });
     const served = beneficiaries.find((row) => row.codice.startsWith("SRV"))!;
-    const plannedOnly = beneficiaries.find((row) =>
-      row.codice.startsWith("PLN"),
-    )!;
+    const plannedOnly = beneficiaries.find((row) => row.codice.startsWith("PLN"))!;
     const now = new Date();
     const past = new Date(now.getTime() - 60 * 60 * 1000);
     const future = new Date(now.getTime() + 60 * 60 * 1000);
@@ -336,22 +297,12 @@ describe("semantica dei servizi Centro di Ascolto", () => {
         centroMode: "query" as const,
       };
       const report = await buildCentroAscoltoReport(filters);
-      expect(
-        report.kpi.find((item) => item.key === "personeServite")?.value,
-      ).toBe(1);
-      expect(
-        report.kpi.find((item) => item.key === "interventiEffettuati")?.value,
-      ).toBe(1);
-      expect(report.kpi.find((item) => item.key === "annullati")?.value).toBe(
-        1,
-      );
-      expect(
-        report.kpi.find((item) => item.key === "mancatePresentazioni")?.value,
-      ).toBe(1);
+      expect(report.kpi.find((item) => item.key === "personeServite")?.value).toBe(1);
+      expect(report.kpi.find((item) => item.key === "interventiEffettuati")?.value).toBe(1);
+      expect(report.kpi.find((item) => item.key === "annullati")?.value).toBe(1);
+      expect(report.kpi.find((item) => item.key === "mancatePresentazioni")?.value).toBe(1);
       expect(report.kpi.find((item) => item.key === "scaduti")?.value).toBe(1);
-      expect(report.kpi.find((item) => item.key === "pianificati")?.value).toBe(
-        2,
-      );
+      expect(report.kpi.find((item) => item.key === "pianificati")?.value).toBe(2);
       const peopleDetails = await buildDrilldown({
         section: "centro-ascolto",
         metric: "personeServite",
@@ -369,22 +320,15 @@ describe("semantica dei servizi Centro di Ascolto", () => {
       expect(peopleDetails.total).toBe(1);
       expect(interventionDetails.total).toBe(1);
     } finally {
-      if (interventionIds.length)
-        await db
-          .delete(interventiTable)
-          .where(inArray(interventiTable.id, interventionIds));
+      if (interventionIds.length) await db.delete(interventiTable).where(inArray(interventiTable.id, interventionIds));
       await db.delete(beneficiariTable).where(
         inArray(
           beneficiariTable.id,
           beneficiaries.map((row) => row.id),
         ),
       );
-      await db
-        .delete(centriAscoltoTable)
-        .where(inArray(centriAscoltoTable.id, [centre.id]));
-      await db
-        .delete(areeOperativeTable)
-        .where(inArray(areeOperativeTable.id, [areaOperativa.id]));
+      await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, [centre.id]));
+      await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, [areaOperativa.id]));
     }
   });
 
@@ -398,7 +342,7 @@ describe("semantica dei servizi Centro di Ascolto", () => {
 });
 
 describe("regole di conteggio Pacchi e FSE+", () => {
-  it("conta solo bolle consegnate, non duplica il pacco per riga e usa il lotto per FSE+", async () => {
+  it("conta solo bolle consegnate, non duplica il pacco e usa il Fondo del Movimento per FSE+", async () => {
     const suffix = Math.random().toString(36).slice(2, 9);
     const ids = {
       bolle: [] as number[],
@@ -505,12 +449,8 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         ])
         .returning({ id: bolleTable.id, numeroBolla: bolleTable.numeroBolla });
       ids.bolle.push(...createdBolle.map((row) => row.id));
-      const finalBolla = createdBolle.find((row) =>
-        row.numeroBolla.endsWith("-3"),
-      )!;
-      const emporioBolla = createdBolle.find((row) =>
-        row.numeroBolla.endsWith("-4"),
-      )!;
+      const finalBolla = createdBolle.find((row) => row.numeroBolla.endsWith("-3"))!;
+      const emporioBolla = createdBolle.find((row) => row.numeroBolla.endsWith("-4"))!;
       const createdRows = await db
         .insert(bollaRigheTable)
         .values([
@@ -594,6 +534,7 @@ describe("regole di conteggio Pacchi e FSE+", () => {
             beneficiarioId: beneficiary.id,
             bollaId: finalBolla.id,
             bollaRigaId: createdRows[0].id,
+            fondoOrigine: "FSE_PLUS",
           },
           {
             tipoMovimento: "scarico",
@@ -601,9 +542,7 @@ describe("regole di conteggio Pacchi e FSE+", () => {
             dataMovimento: "2026-06-01",
             magazzinoId: warehouse.id,
             prodottoId: productKg.id,
-            lottoId: lots.find(
-              (row) => !row.fsePlus && row.prodottoId === productKg.id,
-            )!.id,
+            lottoId: lots.find((row) => !row.fsePlus && row.prodottoId === productKg.id)!.id,
             quantita: "3",
             unitaMisura: "kg",
             beneficiarioId: beneficiary.id,
@@ -695,44 +634,18 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         centroMode: "query" as const,
       };
       const parcelReport = await buildPacchiReport(filters);
-      expect(
-        parcelReport.kpi.find((item) => item.key === "pacchiDistribuiti")
-          ?.value,
-      ).toBe(1);
-      expect(
-        parcelReport.kpi.find((item) => item.key === "nucleiServiti")?.value,
-      ).toBe(1);
-      expect(
-        parcelReport.kpi.find((item) => item.key === "prodottiDistinti")?.value,
-      ).toBe(2);
-      expect(
-        parcelReport.kpi.find((item) => item.key === "righeProdotto")?.value,
-      ).toBe(3);
-      expect(
-        parcelReport.kpi.find((item) => item.key === "kgCalcolabili")?.value,
-      ).toBe(5);
-      expect(
-        parcelReport.kpi.some((item) => item.key === "quantitaProdotti"),
-      ).toBe(false);
-      const parcelProducts =
-        parcelReport.tables.find((table) => table.key === "prodotti")?.rows ??
-        [];
-      expect(parcelProducts).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ unitaMisura: "kg", quantita: 5 }),
-          expect.objectContaining({ unitaMisura: "pz", quantita: 7 }),
-        ]),
-      );
+      expect(parcelReport.kpi.find((item) => item.key === "pacchiDistribuiti")?.value).toBe(1);
+      expect(parcelReport.kpi.find((item) => item.key === "nucleiServiti")?.value).toBe(1);
+      expect(parcelReport.kpi.find((item) => item.key === "prodottiDistinti")?.value).toBe(2);
+      expect(parcelReport.kpi.find((item) => item.key === "righeProdotto")?.value).toBe(3);
+      expect(parcelReport.kpi.find((item) => item.key === "kgCalcolabili")?.value).toBe(5);
+      expect(parcelReport.kpi.some((item) => item.key === "quantitaProdotti")).toBe(false);
+      const parcelProducts = parcelReport.tables.find((table) => table.key === "prodotti")?.rows ?? [];
+      expect(parcelProducts).toEqual(expect.arrayContaining([expect.objectContaining({ unitaMisura: "kg", quantita: 5 }), expect.objectContaining({ unitaMisura: "pz", quantita: 7 })]));
 
       const emporioReport = await buildEmporioReport(filters);
-      expect(
-        emporioReport.kpi.find((item) => item.key === "speseConcluse")?.value,
-      ).toBe(1);
-      expect(
-        emporioReport.kpi.find(
-          (item) => item.key === "prodottiDistintiDistribuiti",
-        )?.value,
-      ).toBe(1);
+      expect(emporioReport.kpi.find((item) => item.key === "speseConcluse")?.value).toBe(1);
+      expect(emporioReport.kpi.find((item) => item.key === "prodottiDistintiDistribuiti")?.value).toBe(1);
       const emporioDistinctDetails = await buildDrilldown({
         section: "emporio",
         metric: "prodottiDistintiDistribuiti",
@@ -740,36 +653,22 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         page: 1,
         pageSize: 25,
       });
-      expect(emporioDistinctDetails.total).toBe(
-        emporioReport.kpi.find(
-          (item) => item.key === "prodottiDistintiDistribuiti",
-        )?.value,
-      );
+      expect(emporioDistinctDetails.total).toBe(emporioReport.kpi.find((item) => item.key === "prodottiDistintiDistribuiti")?.value);
       expect(emporioDistinctDetails.rows[0]).toMatchObject({
         prodottoId: productPz.id,
         unita: "pz",
       });
 
       const generalReport = await buildGeneralReport(filters);
-      expect(
-        generalReport.kpi.find((item) => item.key === "pacchiDistribuiti")
-          ?.value,
-      ).toBe(1);
-      expect(
-        generalReport.kpi.find((item) => item.key === "speseEmporio")?.value,
-      ).toBe(1);
-      expect(
-        generalReport.kpi.find((item) => item.key === "nucleiPacchi")?.value,
-      ).toBe(1);
+      expect(generalReport.kpi.find((item) => item.key === "pacchiDistribuiti")?.value).toBe(1);
+      expect(generalReport.kpi.find((item) => item.key === "speseEmporio")?.value).toBe(1);
+      expect(generalReport.kpi.find((item) => item.key === "nucleiPacchi")?.value).toBe(1);
 
       const fseReport = await buildFsePlusReport(filters);
-      expect(
-        fseReport.kpi.find((item) => item.key === "prodottiFseDistinti")?.value,
-      ).toBe(1);
-      expect(
-        fseReport.tables.find((table) => table.key === "01_Prodotti_FSE")
-          ?.rows[0],
-      ).toMatchObject({
+      expect(fseReport.reportingModelVersion).toBe("MAGAZZINO_2_0C_V1");
+      expect(fseReport.kpi.find((item) => item.key === "prodottiFseDistinti")?.value).toBe(1);
+      expect(fseReport.kpi.find((item) => item.key === "giacenzaFseCorrenteKgLt")?.exactValue).toMatch(/^\d+(?:\.\d+)?$/);
+      expect(fseReport.tables.find((table) => table.key === "01_Prodotti_FSE")?.rows[0]).toMatchObject({
         quantitaFse: 2,
         quantitaTotale: 5,
         percentualeFse: 40,
@@ -781,17 +680,7 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         page: 1,
         pageSize: 25,
       });
-      expect(fseDetails.columns).toEqual([
-        "id",
-        "data",
-        "documento",
-        "beneficiarioCodice",
-        "prodotto",
-        "lotto",
-        "quantita",
-        "unita",
-        "canale",
-      ]);
+      expect(fseDetails.columns).toEqual(["id", "data", "documento", "beneficiarioCodice", "prodotto", "lotto", "quantita", "unita", "canale"]);
       expect(fseDetails.rows[0]).toMatchObject({
         beneficiarioCodice: `RB-${suffix}`,
         canale: "pacchi",
@@ -806,9 +695,7 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         page: 1,
         pageSize: 25,
       });
-      expect(fseDistinctDetails.total).toBe(
-        fseReport.kpi.find((item) => item.key === "prodottiFseDistinti")?.value,
-      );
+      expect(fseDistinctDetails.total).toBe(fseReport.kpi.find((item) => item.key === "prodottiFseDistinti")?.value);
       expect(fseDistinctDetails.rows[0]).toMatchObject({
         prodottoId: productKg.id,
         unita: "kg",
@@ -819,16 +706,8 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         callerAreas: ["mensa"],
         callerPermissions: ["mensa.reports.view"],
       });
-      expect(
-        mensaOnlyFseReport.kpi.find(
-          (item) => item.key === "prodottiFseDistinti",
-        )?.value,
-      ).toBe(0);
-      expect(
-        mensaOnlyFseReport.tables.find(
-          (table) => table.key === "01_Prodotti_FSE",
-        )?.rows,
-      ).toHaveLength(0);
+      expect(mensaOnlyFseReport.kpi.find((item) => item.key === "prodottiFseDistinti")?.value).toBe(0);
+      expect(mensaOnlyFseReport.tables.find((table) => table.key === "01_Prodotti_FSE")?.rows).toHaveLength(0);
       await expect(
         buildDrilldown({
           section: "pacchi",
@@ -855,24 +734,10 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       expect(parcelDetails.total).toBe(1);
       expect(householdDetails.total).toBe(1);
       const logisticsReport = await buildLogisticaReport(filters);
-      const stockRows =
-        logisticsReport.tables.find((table) => table.key === "giacenze")
-          ?.rows ?? [];
-      expect(stockRows).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ unitaMisura: "kg", quantita: 15 }),
-          expect.objectContaining({ unitaMisura: "pz", quantita: 16 }),
-        ]),
-      );
+      const stockRows = logisticsReport.tables.find((table) => table.key === "giacenze")?.rows ?? [];
+      expect(stockRows).toEqual(expect.arrayContaining([expect.objectContaining({ unitaMisura: "kg", quantita: 15 }), expect.objectContaining({ unitaMisura: "pz", quantita: 16 })]));
 
-      const pacchiOptions = await buildReportFilterOptions(
-        requestFor(
-          {},
-          { areaOperativaId: areaOperativa.id, aree: ["analisi", "sociale"] },
-        ),
-        "pacchi",
-        areaOperativa.id,
-      );
+      const pacchiOptions = await buildReportFilterOptions(requestFor({}, { areaOperativaId: areaOperativa.id, aree: ["analisi", "sociale"] }), "pacchi", areaOperativa.id);
       expect(pacchiOptions.warehouses).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -881,23 +746,12 @@ describe("regole di conteggio Pacchi e FSE+", () => {
           }),
         ]),
       );
-      expect(pacchiOptions.areeOperative.map((item) => item.id)).toEqual([
-        areaOperativa.id,
-      ]);
-      expect(pacchiOptions.areeOperative.map((item) => item.id)).not.toContain(
-        otherAreaOperativa.id,
-      );
+      expect(pacchiOptions.areeOperative.map((item) => item.id)).toEqual([areaOperativa.id]);
+      expect(pacchiOptions.areeOperative.map((item) => item.id)).not.toContain(otherAreaOperativa.id);
       expect(pacchiOptions.mense).toEqual([]);
       expect(pacchiOptions.zones).toEqual([]);
 
-      const unauthorizedPacchiOptions = await buildReportFilterOptions(
-        requestFor(
-          {},
-          { areaOperativaId: areaOperativa.id, aree: ["analisi"] },
-        ),
-        "pacchi",
-        areaOperativa.id,
-      );
+      const unauthorizedPacchiOptions = await buildReportFilterOptions(requestFor({}, { areaOperativaId: areaOperativa.id, aree: ["analisi"] }), "pacchi", areaOperativa.id);
       expect(unauthorizedPacchiOptions).toMatchObject({
         areeOperative: [],
         centres: [],
@@ -938,57 +792,26 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         }),
       ]);
     } finally {
-      if (ids.mense.length)
-        await db.delete(menseTable).where(inArray(menseTable.id, ids.mense));
-      if (ids.spesaRighe.length)
-        await db
-          .delete(speseEmporioRigheTable)
-          .where(inArray(speseEmporioRigheTable.id, ids.spesaRighe));
-      if (ids.spese.length)
-        await db
-          .delete(speseEmporioTable)
-          .where(inArray(speseEmporioTable.id, ids.spese));
-      if (ids.sessioni.length)
-        await db
-          .delete(sessioniCassaEmporioTable)
-          .where(inArray(sessioniCassaEmporioTable.id, ids.sessioni));
-      if (ids.accessi.length)
-        await db
-          .delete(consegneTable)
-          .where(inArray(consegneTable.id, ids.accessi));
-      if (ids.movimenti.length)
-        await db
-          .delete(movimentiTable)
-          .where(inArray(movimentiTable.id, ids.movimenti));
-      if (ids.righe.length)
-        await db
-          .delete(bollaRigheTable)
-          .where(inArray(bollaRigheTable.id, ids.righe));
-      if (ids.bolle.length)
-        await db.delete(bolleTable).where(inArray(bolleTable.id, ids.bolle));
-      if (ids.lotti.length)
-        await db.delete(lottiTable).where(inArray(lottiTable.id, ids.lotti));
+      if (ids.mense.length) await db.delete(menseTable).where(inArray(menseTable.id, ids.mense));
+      if (ids.spesaRighe.length) await db.delete(speseEmporioRigheTable).where(inArray(speseEmporioRigheTable.id, ids.spesaRighe));
+      if (ids.spese.length) await db.delete(speseEmporioTable).where(inArray(speseEmporioTable.id, ids.spese));
+      if (ids.sessioni.length) await db.delete(sessioniCassaEmporioTable).where(inArray(sessioniCassaEmporioTable.id, ids.sessioni));
+      if (ids.accessi.length) await db.delete(consegneTable).where(inArray(consegneTable.id, ids.accessi));
+      if (ids.movimenti.length) await db.delete(movimentiTable).where(inArray(movimentiTable.id, ids.movimenti));
+      if (ids.righe.length) await db.delete(bollaRigheTable).where(inArray(bollaRigheTable.id, ids.righe));
+      if (ids.bolle.length) await db.delete(bolleTable).where(inArray(bolleTable.id, ids.bolle));
+      if (ids.lotti.length) await db.delete(lottiTable).where(inArray(lottiTable.id, ids.lotti));
       await db.delete(prodottiTable).where(
         inArray(
           prodottiTable.id,
           products.map((row) => row.id),
         ),
       );
-      await db
-        .delete(beneficiariTable)
-        .where(inArray(beneficiariTable.id, [beneficiary.id]));
-      await db
-        .delete(magazziniTable)
-        .where(inArray(magazziniTable.id, [warehouse.id]));
-      await db
-        .delete(centriAscoltoTable)
-        .where(inArray(centriAscoltoTable.id, [centre.id]));
-      await db
-        .delete(areeOperativeTable)
-        .where(inArray(areeOperativeTable.id, [areaOperativa.id]));
-      await db
-        .delete(areeOperativeTable)
-        .where(inArray(areeOperativeTable.id, [otherAreaOperativa.id]));
+      await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, [beneficiary.id]));
+      await db.delete(magazziniTable).where(inArray(magazziniTable.id, [warehouse.id]));
+      await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, [centre.id]));
+      await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, [areaOperativa.id]));
+      await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, [otherAreaOperativa.id]));
     }
   });
 });
@@ -996,26 +819,8 @@ describe("regole di conteggio Pacchi e FSE+", () => {
 describe("query aggregate reali", () => {
   it("esegue tutte le dashboard sullo schema PostgreSQL corrente", async () => {
     const filters = fullFilters();
-    const reports = await Promise.all([
-      buildPacchiReport(filters),
-      buildCentroAscoltoReport(filters),
-      buildEmporioReport(filters),
-      buildMensaReport(filters),
-      buildUdsReport(filters),
-      buildLogisticaReport(filters),
-      buildFsePlusReport(filters),
-      buildGeneralReport(filters),
-    ]);
-    expect(reports.map((report) => report.section)).toEqual([
-      "pacchi",
-      "centro-ascolto",
-      "emporio",
-      "mensa",
-      "uds",
-      "magazzino-logistica",
-      "fse-plus",
-      "generale",
-    ]);
+    const reports = await Promise.all([buildPacchiReport(filters), buildCentroAscoltoReport(filters), buildEmporioReport(filters), buildMensaReport(filters), buildUdsReport(filters), buildLogisticaReport(filters), buildFsePlusReport(filters), buildGeneralReport(filters)]);
+    expect(reports.map((report) => report.section)).toEqual(["pacchi", "centro-ascolto", "emporio", "mensa", "uds", "magazzino-logistica", "fse-plus", "generale"]);
     for (const report of reports) {
       expect(report.timezone).toBe("Europe/Rome");
       expect(report.filters).not.toHaveProperty("callerAreas");
@@ -1027,37 +832,13 @@ describe("query aggregate reali", () => {
   it("esegue ogni drill-down dichiarato sullo schema corrente", async () => {
     const filters = fullFilters();
     const metrics = {
-      pacchi: [
-        "pacchiDistribuiti",
-        "nucleiServiti",
-        "personeRaggiunte",
-        "prodottiFse",
-      ],
-      "centro-ascolto": [
-        "personePreseInCarico",
-        "personeServite",
-        "interventi",
-      ],
-      emporio: [
-        "utentiServiti",
-        "accessi",
-        "speseConcluse",
-        "prodottiDistribuiti",
-        "prodottiDistintiDistribuiti",
-      ],
+      pacchi: ["pacchiDistribuiti", "nucleiServiti", "personeRaggiunte", "prodottiFse"],
+      "centro-ascolto": ["personePreseInCarico", "personeServite", "interventi"],
+      emporio: ["utentiServiti", "accessi", "speseConcluse", "prodottiDistribuiti", "prodottiDistintiDistribuiti"],
       mensa: ["pastiErogati", "personeUniche", "accessiNegati"],
       uds: ["interventi", "personeUniche", "primiContatti"],
-      "magazzino-logistica": [
-        "movimentiCarico",
-        "movimentiScarico",
-        "trasferimenti",
-      ],
-      "fse-plus": [
-        "prodottiFse",
-        "prodottiFseDistinti",
-        "nucleiRaggiunti",
-        "personeRaggiunte",
-      ],
+      "magazzino-logistica": ["movimentiCarico", "movimentiScarico", "trasferimenti"],
+      "fse-plus": ["prodottiFse", "prodottiFseDistinti", "nucleiRaggiunti", "personeRaggiunte"],
     } as const;
     for (const [section, sectionMetrics] of Object.entries(metrics)) {
       for (const metric of sectionMetrics) {

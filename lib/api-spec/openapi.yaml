@@ -13,6 +13,7 @@ tags:
   - name: prodotti
   - name: carichi
   - name: agea
+  - name: fse
   - name: lotti
   - name: movimenti
   - name: giacenze
@@ -744,6 +745,634 @@ paths:
         "403": { $ref: "#/components/responses/AgeaForbidden" }
         "404": { $ref: "#/components/responses/AgeaNotFound" }
         "409": { $ref: "#/components/responses/AgeaConflict" }
+
+  # ─── RENDICONTAZIONE FSE+ 2.0C ─────────────────────────────────────────────
+  /fse/rendicontazione/preview:
+    get:
+      operationId: getFseReportingPreview
+      tags: [fse]
+      summary: Preview canonica FSE+ con cutoff immutabile
+      parameters:
+        - { $ref: "#/components/parameters/FseMagazzinoId" }
+        - { $ref: "#/components/parameters/FseDataDa" }
+        - { $ref: "#/components/parameters/FseDataA" }
+        - { $ref: "#/components/parameters/FseDataAsOf" }
+      responses:
+        "200":
+          {
+            description: Preview,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+  /fse/rendicontazione/eventi:
+    get:
+      operationId: listFseReportingEvents
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FseMagazzinoId" }
+        - { $ref: "#/components/parameters/FseDataDa" }
+        - { $ref: "#/components/parameters/FseDataA" }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          {
+            description: Eventi canonici,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+  /fse/rendicontazione/righe:
+    get:
+      operationId: listFseReportingLines
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FseMagazzinoId" }
+        - { $ref: "#/components/parameters/FseDataDa" }
+        - { $ref: "#/components/parameters/FseDataA" }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          {
+            description: Righe prodotto-lotto,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+  /fse/rendicontazione/qualita:
+    get:
+      operationId: listFseReportingQuality
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FseMagazzinoId" }
+        - { $ref: "#/components/parameters/FseDataDa" }
+        - { $ref: "#/components/parameters/FseDataA" }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          {
+            description: Qualità e blocchi,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+
+  /fse/exportazioni:
+    get:
+      operationId: listFseExports
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          {
+            description: Esportazioni visibili,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+    post:
+      operationId: createFseExport
+      tags: [fse]
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/FseExportInput" } },
+          }
+      responses:
+        "201":
+          {
+            description: Snapshot creato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+        "413": { $ref: "#/components/responses/FsePayloadTooLarge" }
+  /fse/exportazioni/{id}:
+    get:
+      operationId: getFseExport
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "200":
+          {
+            description: Esportazione,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/exportazioni/{id}/eventi:
+    get:
+      operationId: listFseExportEvents
+      tags: [fse]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          {
+            description: Eventi snapshot,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/exportazioni/{id}/righe:
+    get:
+      operationId: listFseExportLines
+      tags: [fse]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          {
+            description: Righe snapshot,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/exportazioni/{id}/download:
+    get:
+      operationId: downloadFseExport
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "200":
+          description: XLSX generato dallo snapshot
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/exportazioni/{id}/marca-inserita:
+    post:
+      operationId: markFseExportManuallyEntered
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema: { $ref: "#/components/schemas/FseMarkEnteredInput" },
+                },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Marcatura auditata,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/exportazioni/{id}/annulla:
+    post:
+      operationId: cancelFseExport
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseCancelInput" } },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: "Copertura disattivata, snapshot conservato",
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+
+  /fse/riconciliazioni:
+    get:
+      operationId: listFseReconciliations
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          {
+            description: Riconciliazioni visibili,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+    post:
+      operationId: createFseReconciliation
+      tags: [fse]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    { $ref: "#/components/schemas/FseReconciliationInput" },
+                },
+            },
+        }
+      responses:
+        "201":
+          {
+            description: Riconciliazione calcolata,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/riconciliazioni/{id}:
+    get:
+      operationId: getFseReconciliation
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "200":
+          {
+            description: Riconciliazione,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/riconciliazioni/{id}/righe:
+    get:
+      operationId: listFseReconciliationLines
+      tags: [fse]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: page,
+            in: query,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200, default: 50 },
+          }
+      responses:
+        "200":
+          {
+            description: Righe paginata,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        $ref: "#/components/schemas/FseReconciliationRowsPage",
+                      },
+                  },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/riconciliazioni/{id}/ricalcola:
+    post:
+      operationId: recalculateFseReconciliation
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseVersionInput" } },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Snapshot ricalcolato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/riconciliazioni/{id}/righe/{rigaId}:
+    patch:
+      operationId: resolveFseReconciliationLine
+      tags: [fse]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: rigaId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseResolutionInput" } },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Risoluzione auditata,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/riconciliazioni/{id}/chiudi:
+    post:
+      operationId: closeFseReconciliation
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseVersionInput" } },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Snapshot chiuso,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/riconciliazioni/{id}/annulla:
+    post:
+      operationId: cancelFseReconciliation
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseVersionInput" } },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Riconciliazione annullata,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+
+  /fse/monitoraggio:
+    get:
+      operationId: listFseMonitoring
+      tags: [fse]
+      parameters:
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          {
+            description: Rilevazioni mensili,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecordList" } },
+              },
+          }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+    post:
+      operationId: createFseMonitoring
+      tags: [fse]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FseMonitoringInput" } },
+            },
+        }
+      responses:
+        "201":
+          {
+            description: Snapshot mensile creato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/monitoraggio/{id}:
+    patch:
+      operationId: updateFseMonitoring
+      tags: [fse]
+      parameters:
+        [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema: { $ref: "#/components/schemas/FseMonitoringUpdate" },
+                },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: Snapshot mensile aggiornato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+
+  /fse/resi-opc:
+    post:
+      operationId: createFseOpcReturn
+      tags: [fse]
+      summary: Registra un reso FSE+ verso OpC nel ledger condiviso
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/FseOpcReturnInput" } },
+          }
+      responses:
+        "200":
+          {
+            description: Replay idempotente,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "201":
+          {
+            description: Reso registrato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "409": { $ref: "#/components/responses/FseConflict" }
+  /fse/resi-opc/{id}/storno:
+    post:
+      operationId: reverseFseOpcReturn
+      tags: [fse]
+      summary: Storna un reso OpC mediante movimento compensativo
+      parameters:
+        [
+          {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: integer, minimum: 1 },
+          },
+        ]
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  { $ref: "#/components/schemas/FseOpcReturnReversalInput" },
+              },
+          }
+      responses:
+        "200":
+          {
+            description: Reso stornato,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FseRecord" } },
+              },
+          }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+        "409": { $ref: "#/components/responses/FseConflict" }
 
   # ─── LOTTI ───────────────────────────────────────────────────────────────────
   /lotti:
@@ -5806,7 +6435,8 @@ paths:
     get:
       operationId: reportFsePlus
       tags: [report]
-      summary: FSE+ annual distribution report
+      deprecated: true
+      summary: FSE+ annual distribution report (legacy; use /report/fse-plus/integrato)
       parameters:
         - name: anno
           in: query
@@ -7147,6 +7777,33 @@ paths:
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
   parameters:
+    FseMagazzinoId:
+      name: magazzinoId
+      in: query
+      required: true
+      schema: { type: integer, minimum: 1 }
+    FseDataDa:
+      name: dataDa
+      in: query
+      required: true
+      schema: { type: string, format: date }
+    FseDataA:
+      name: dataA
+      in: query
+      required: true
+      schema: { type: string, format: date }
+    FseDataAsOf:
+      name: dataAsOf
+      in: query
+      schema: { type: string, format: date }
+    FsePage:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    FsePageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
     PageParam:
       name: page
       in: query
@@ -7216,6 +7873,41 @@ components:
       description: Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
       schema: { type: string, format: date }
   responses:
+    FseBadRequest:
+      description: Richiesta FSE+ non valida
+      content:
+        {
+          application/json:
+            { schema: { $ref: "#/components/schemas/FseErrorResponse" } },
+        }
+    FseForbidden:
+      description: Permesso o scope FSE+ non consentito
+      content:
+        {
+          application/json:
+            { schema: { $ref: "#/components/schemas/FseErrorResponse" } },
+        }
+    FseNotFound:
+      description: Risorsa FSE+ non trovata
+      content:
+        {
+          application/json:
+            { schema: { $ref: "#/components/schemas/FseErrorResponse" } },
+        }
+    FseConflict:
+      description: Versione, cutoff, copertura o concorrenza non validi
+      content:
+        {
+          application/json:
+            { schema: { $ref: "#/components/schemas/FseErrorResponse" } },
+        }
+    FsePayloadTooLarge:
+      description: Payload FSE+ oltre il limite operativo
+      content:
+        {
+          application/json:
+            { schema: { $ref: "#/components/schemas/FseErrorResponse" } },
+        }
     AgeaBadRequest:
       description: Richiesta AGEA non valida
       content:
@@ -7247,6 +7939,150 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
   schemas:
+    FseErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    FseRecord:
+      type: object
+      additionalProperties: true
+    FseRecordList:
+      type: array
+      items: { $ref: "#/components/schemas/FseRecord" }
+    FseReconciliationRowsPage:
+      type: object
+      required: [page, pageSize, rows]
+      properties:
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 200 }
+        rows: { $ref: "#/components/schemas/FseRecordList" }
+    FseExportInput:
+      type: object
+      required: [magazzinoId, dataDa, dataA, dataAsOf, formatCode]
+      properties:
+        magazzinoId: { type: integer, minimum: 1 }
+        dataDa: { type: string, format: date }
+        dataA: { type: string, format: date }
+        dataAsOf: { type: string, format: date }
+        formatCode:
+          type: string
+          enum:
+            [
+              FSE_CANONICAL_AUDIT_XLSX_V1,
+              SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1,
+            ]
+        maxMovimentoId: { type: integer, minimum: 1 }
+        maxOperazioneDistribuzioneId: { type: integer, minimum: 1 }
+    FseVersionInput:
+      type: object
+      required: [versione]
+      properties:
+        versione: { type: integer, minimum: 1 }
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+        data: { type: string, format: date-time }
+        riferimentoEsterno: { type: string, minLength: 3, maxLength: 500 }
+        conScostamenti: { type: boolean }
+    FseMarkEnteredInput:
+      type: object
+      required: [versione, data, riferimentoEsterno]
+      properties:
+        versione: { type: integer, minimum: 1 }
+        data: { type: string, format: date-time }
+        riferimentoEsterno: { type: string, minLength: 3, maxLength: 500 }
+    FseCancelInput:
+      type: object
+      required: [versione, motivazione]
+      properties:
+        versione: { type: integer, minimum: 1 }
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+    FseReconciliationInput:
+      type: object
+      required: [magazzinoId, importazioneAgeaId, dataRiferimento]
+      properties:
+        magazzinoId: { type: integer, minimum: 1 }
+        importazioneAgeaId: { type: integer, minimum: 1 }
+        importazioneAgeaPrecedenteId: { type: [integer, "null"], minimum: 1 }
+        dataRiferimento: { type: string, format: date }
+        maxMovimentoId: { type: integer, minimum: 1 }
+        maxOperazioneDistribuzioneId: { type: integer, minimum: 1 }
+    FseResolutionInput:
+      type: object
+      required: [versione, azione, motivazione]
+      properties:
+        versione: { type: integer, minimum: 1 }
+        azione:
+          type: string
+          enum:
+            [
+              ABBINA,
+              DISABBINA,
+              ACCETTA_SCOSTAMENTO,
+              SEGNALA_DA_CORREGGERE,
+              RIAPRI,
+            ]
+        motivazione: { type: string, minLength: 3, maxLength: 500 }
+    FseMonitoringInput:
+      type: object
+      required: [magazzinoId, annoMese, canaleUfficiale, dataRiferimento]
+      additionalProperties: true
+      properties:
+        magazzinoId: { type: integer, minimum: 1 }
+        annoMese: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+        canaleUfficiale: { type: string, enum: [PACCHI, MENSA, STRADA] }
+        dataRiferimento: { type: string, format: date }
+    FseMonitoringUpdate:
+      type: object
+      required: [versione]
+      additionalProperties: true
+      properties:
+        versione: { type: integer, minimum: 1 }
+    FseOpcReturnLineInput:
+      type: object
+      required: [prodottoId, quantita]
+      properties:
+        prodottoId: { type: integer, minimum: 1 }
+        lottoId: { type: integer, minimum: 1 }
+        quantita:
+          {
+            oneOf:
+              [
+                { type: number, exclusiveMinimum: 0 },
+                { type: string, pattern: "^[0-9]+([.][0-9]{1,6})?$" },
+              ],
+          }
+    FseOpcReturnInput:
+      type: object
+      required:
+        [
+          versione,
+          idempotencyKey,
+          magazzinoId,
+          dataReso,
+          destinazioneOpc,
+          motivazione,
+          modalitaSelezione,
+          righe,
+        ]
+      properties:
+        versione: { type: integer, enum: [1] }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 100 }
+        magazzinoId: { type: integer, minimum: 1 }
+        dataReso: { type: string, format: date }
+        destinazioneOpc: { type: string, minLength: 3, maxLength: 500 }
+        motivazione: { type: string, minLength: 3, maxLength: 2000 }
+        modalitaSelezione: { type: string, enum: [FEFO, PARTITA_ESATTA] }
+        righe:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/FseOpcReturnLineInput" }
+    FseOpcReturnReversalInput:
+      type: object
+      required: [versione, data, motivazione]
+      properties:
+        versione: { type: integer, minimum: 1 }
+        data: { type: string, format: date }
+        motivazione: { type: string, minLength: 3, maxLength: 2000 }
     MapsLayerCode:
       type: string
       enum:
@@ -7319,6 +8155,7 @@ components:
       required:
         [
           section,
+          reportingModelVersion,
           filters,
           kpi,
           series,
@@ -7329,6 +8166,9 @@ components:
           timezone,
         ]
       properties:
+        reportingModelVersion:
+          type: string
+          enum: [MAGAZZINO_2_0C_V1]
         section:
           type: string
           enum:
@@ -7393,12 +8233,29 @@ components:
 
     ReportKpi:
       type: object
-      required: [key, value, unit, availability, drilldownMetric]
+      required: [key, value, exactValue, unit, availability, drilldownMetric]
       properties:
         key: { type: string }
         value: { type: [number, "null"] }
+        exactValue:
+          type: [string, "null"]
+          description: Valore decimale esatto; le decisioni non usano la proiezione number.
         unit:
-          { type: string, enum: [count, quantity, kg, credit, days, average] }
+          {
+            type: string,
+            enum:
+              [
+                count,
+                pieces,
+                kgLt,
+                percentage,
+                credit,
+                days,
+                average,
+                quantity,
+                kg,
+              ],
+          }
         availability: { type: string, enum: [ok, derivable, missing] }
         drilldownMetric: { type: [string, "null"] }
 
@@ -7442,8 +8299,19 @@ components:
 
     ReportDrilldown:
       type: object
-      required: [section, metric, page, pageSize, total, columns, rows]
+      required:
+        [
+          reportingModelVersion,
+          section,
+          metric,
+          page,
+          pageSize,
+          total,
+          columns,
+          rows,
+        ]
       properties:
+        reportingModelVersion: { type: string, enum: [MAGAZZINO_2_0C_V1] }
         section: { type: string }
         metric: { type: string }
         page: { type: integer }

@@ -5,23 +5,7 @@ import request from "supertest";
 import { pool } from "@workspace/db";
 import dashboardRouter from "../src/routes/dashboard";
 import reportRouter from "../src/routes/report";
-import {
-  makeScopedApp,
-  newScope,
-  cleanup,
-  type SeedScope,
-  createCentro,
-  createMagazzino,
-  createMagazzinoRec,
-  createProdotto,
-  createBeneficiario,
-  createUtente,
-  createLotto,
-  insertConsegna,
-  insertMovimento,
-  insertBolla,
-  insertBollaRiga,
-} from "./scope-helpers";
+import { makeScopedApp, newScope, cleanup, type SeedScope, createCentro, createMagazzino, createMagazzinoRec, createProdotto, createBeneficiario, createUtente, createLotto, insertConsegna, insertMovimento, insertBolla, insertBollaRiga } from "./scope-helpers";
 
 /**
  * Centro scoping for the aggregate/read-only screens (Dashboard + Report).
@@ -46,8 +30,7 @@ let magNull: number;
 let magB: number;
 let prod: number;
 
-const appAs = (router: Parameters<typeof makeScopedApp>[0], centro: number | null) =>
-  makeScopedApp(router, { id: operatoreId, centroAscoltoId: centro });
+const appAs = (router: Parameters<typeof makeScopedApp>[0], centro: number | null) => makeScopedApp(router, { id: operatoreId, centroAscoltoId: centro });
 
 beforeAll(async () => {
   bootScope = newScope();
@@ -147,9 +130,7 @@ describe("Report — scoping via beneficiario", () => {
   it("consegne-per-centro: A vede il proprio centro, non quello B", async () => {
     await insertConsegna(scope, { beneficiarioId: await createBeneficiario(scope, centroA), magazzinoId: magNull, stato: "effettuata" });
     await insertConsegna(scope, { beneficiarioId: await createBeneficiario(scope, centroB), magazzinoId: magNull, stato: "effettuata" });
-    const res = await request(appAs(reportRouter, centroA)).get(
-      "/report/consegne-per-centro?da=2026-01-01&a=2026-12-31",
-    );
+    const res = await request(appAs(reportRouter, centroA)).get("/report/consegne-per-centro?da=2026-01-01&a=2026-12-31");
     expect(res.status).toBe(200);
     const centroIds = (res.body as Array<{ centroId: number | null }>).map((r) => r.centroId);
     expect(centroIds).toContain(centroA);
@@ -159,16 +140,13 @@ describe("Report — scoping via beneficiario", () => {
   it("consegne-per-centro: un caller globale vede entrambi i centri", async () => {
     await insertConsegna(scope, { beneficiarioId: await createBeneficiario(scope, centroA), magazzinoId: magNull, stato: "effettuata" });
     await insertConsegna(scope, { beneficiarioId: await createBeneficiario(scope, centroB), magazzinoId: magNull, stato: "effettuata" });
-    const res = await request(appAs(reportRouter, null)).get(
-      "/report/consegne-per-centro?da=2026-01-01&a=2026-12-31",
-    );
+    const res = await request(appAs(reportRouter, null)).get("/report/consegne-per-centro?da=2026-01-01&a=2026-12-31");
     const centroIds = (res.body as Array<{ centroId: number | null }>).map((r) => r.centroId);
     expect(centroIds).toEqual(expect.arrayContaining([centroA, centroB]));
   });
 
   it("consegne-per-mese: una consegna del centro B è invisibile ad A ma conta per un globale", async () => {
-    const monthTotal = (body: Array<{ mese: string; totConsegne: number }>, mese: string) =>
-      body.find((r) => r.mese === mese)?.totConsegne ?? 0;
+    const monthTotal = (body: Array<{ mese: string; totConsegne: number }>, mese: string) => body.find((r) => r.mese === mese)?.totConsegne ?? 0;
     const q = "/report/consegne-per-mese?da=2026-01-01&a=2026-12-31";
 
     const beforeA = monthTotal((await request(appAs(reportRouter, centroA)).get(q)).body, "2026-06");
@@ -212,7 +190,16 @@ describe("Report — scoping via beneficiario", () => {
     const benB = await createBeneficiario(scope, centroB);
     const lotB = await createLotto(scope, { prodottoId: prod, magazzinoId: magNull, quantita: 5, fsePlus: true });
     const bolB = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magNull, stato: "consegnato" });
-    await insertBollaRiga(scope, { bollaId: bolB, prodottoId: prod, lottoId: lotB, quantita: 5 });
+    const rowB = await insertBollaRiga(scope, { bollaId: bolB, prodottoId: prod, lottoId: lotB, quantita: 5 });
+    await insertMovimento(scope, {
+      magazzinoId: magNull,
+      prodottoId: prod,
+      lottoId: lotB,
+      bollaRigaId: rowB,
+      tipoMovimento: "scarico",
+      naturaContabile: "DISTRIBUZIONE_FINALE",
+      fondoOrigine: "FSE_PLUS",
+    });
 
     const afterA = (await request(appAs(reportRouter, centroA)).get(q)).body.beneficiariTotali as number;
     const afterG = (await request(appAs(reportRouter, null)).get(q)).body.beneficiariTotali as number;

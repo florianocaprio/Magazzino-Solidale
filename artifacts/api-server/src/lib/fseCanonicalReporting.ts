@@ -1,25 +1,13 @@
-import {
-  db,
-  esportazioniFseEventiTable,
-  esportazioniFseRigheTable,
-  esportazioniFseTable,
-  FSE_REPORTING_MODEL_VERSION,
-} from "@workspace/db";
+import { db, esportazioniFseEventiTable, esportazioniFseRigheTable, esportazioniFseTable, FSE_REPORTING_MODEL_VERSION } from "@workspace/db";
 import { createHash } from "node:crypto";
 import { and, eq, sql, type SQL } from "drizzle-orm";
 import { InventoryDecimal } from "./inventoryDecimal";
 
 export const FSE_CANONICAL_FORMAT = "FSE_CANONICAL_AUDIT_XLSX_V1";
-export const FSE_OBSERVED_CONTROL_FORMAT =
-  "SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1";
+export const FSE_OBSERVED_CONTROL_FORMAT = "SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1";
 export const FSE_TIMEZONE = "Europe/Rome" as const;
 
-export type FseOfficialActivity =
-  | "PACCHI"
-  | "DOMICILIARE"
-  | "EMPORIO"
-  | "MENSA"
-  | "STRADA";
+export type FseOfficialActivity = "PACCHI" | "DOMICILIARE" | "EMPORIO" | "MENSA" | "STRADA";
 
 export const FSE_CHANNEL_MAP = {
   PACCHI: "PACCHI",
@@ -95,7 +83,10 @@ export type FseCanonicalReport = {
 };
 
 export class FseReportingError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
     super(message);
   }
 }
@@ -113,6 +104,7 @@ type LedgerRow = {
   prodotto_nome: string;
   lotto_id: number | null;
   codice_lotto: string | null;
+  lotto_fse_plus: boolean | null;
   data_scadenza: string | null;
   quantita: string;
   quantita_pezzi: string | null;
@@ -173,32 +165,14 @@ function withSign(raw: string | null, sign: -1 | 1): string | null {
   const value = exact(raw);
   if (value == null) return null;
   const absolute = InventoryDecimal.parse(value, { allowNegative: true }).abs();
-  return sign === -1 && !absolute.isZero()
-    ? `-${absolute.toDb()}`
-    : absolute.toDb();
+  return sign === -1 && !absolute.isZero() ? `-${absolute.toDb()}` : absolute.toDb();
 }
 
 function movementSign(row: LedgerRow): -1 | 1 {
   if (row.natura_contabile === "STORNO") {
-    return [
-      "DISTRIBUZIONE_FINALE",
-      "TRASFERIMENTO_INTERNO_USCITA",
-      "RETTIFICA_NEGATIVA",
-      "SCARTO",
-      "RESO",
-    ].includes(row.natura_originale ?? "")
-      ? 1
-      : -1;
+    return ["DISTRIBUZIONE_FINALE", "TRASFERIMENTO_INTERNO_USCITA", "RETTIFICA_NEGATIVA", "SCARTO", "RESO"].includes(row.natura_originale ?? "") ? 1 : -1;
   }
-  return [
-    "DISTRIBUZIONE_FINALE",
-    "TRASFERIMENTO_INTERNO_USCITA",
-    "RETTIFICA_NEGATIVA",
-    "SCARTO",
-    "RESO",
-  ].includes(row.natura_contabile)
-    ? -1
-    : 1;
+  return ["DISTRIBUZIONE_FINALE", "TRASFERIMENTO_INTERNO_USCITA", "RETTIFICA_NEGATIVA", "SCARTO", "RESO"].includes(row.natura_contabile) ? -1 : 1;
 }
 
 function eventType(row: LedgerRow): string {
@@ -222,64 +196,43 @@ function disposition(row: LedgerRow): string {
 }
 
 function eventKey(row: LedgerRow): string {
-  if (row.operazione_distribuzione_id != null)
-    return `DISTRIBUZIONE:${row.operazione_distribuzione_id}`;
+  if (row.operazione_distribuzione_id != null) return `DISTRIBUZIONE:${row.operazione_distribuzione_id}`;
   if (row.carico_magazzino_id != null) return `CARICO:${row.carico_magazzino_id}`;
   return `MOVIMENTO:${row.id}`;
 }
 
 function activity(channel: string | null): FseOfficialActivity | null {
-  return channel == null
-    ? null
-    : (FSE_CHANNEL_MAP[channel as keyof typeof FSE_CHANNEL_MAP] ?? null);
+  return channel == null ? null : (FSE_CHANNEL_MAP[channel as keyof typeof FSE_CHANNEL_MAP] ?? null);
 }
 
-const BLOCKING_QUALITY = new Set([
-  "OPERAZIONE_DISTRIBUZIONE_MANCANTE",
-  "CANALE_FSE_NON_CLASSIFICATO",
-  "STATISTICHE_DDC_MANCANTI",
-  "LOTTO_MANCANTE",
-]);
+const BLOCKING_QUALITY = new Set(["FONDO_LEGACY_NON_DETERMINATO", "OPERAZIONE_DISTRIBUZIONE_MANCANTE", "CANALE_FSE_NON_CLASSIFICATO", "STATISTICHE_DDC_MANCANTI", "LOTTO_MANCANTE", "SNAPSHOT_INDICATORI_STORICI_MANCANTE"]);
 
 function qualityForEvent(row: LedgerRow, mixedFund: boolean): string[] {
   const result: string[] = [];
-  if (row.natura_contabile === "DISTRIBUZIONE_FINALE" && row.operazione_distribuzione_id == null)
-    result.push("OPERAZIONE_DISTRIBUZIONE_MANCANTE");
-  if (row.operazione_distribuzione_id != null && activity(row.canale_operativo) == null)
-    result.push("CANALE_FSE_NON_CLASSIFICATO");
+  if (row.natura_contabile === "DISTRIBUZIONE_FINALE" && row.operazione_distribuzione_id == null) result.push("OPERAZIONE_DISTRIBUZIONE_MANCANTE");
+  if (row.operazione_distribuzione_id != null && activity(row.canale_operativo) == null) result.push("CANALE_FSE_NON_CLASSIFICATO");
   if (mixedFund) result.push("EVENTO_FONDI_MISTI");
   const channel = row.canale_operativo;
   const peopleMissing = row.op_saltuari == null && row.op_continuativi == null;
-  if (
-    ((channel === "PACCHI" || channel === "RITIRO_SEDE") &&
-      (row.op_pacchi == null || row.op_saltuari == null || row.op_continuativi == null)) ||
-    ((channel === "DOMICILIARE" || channel === "EMPORIO") && peopleMissing) ||
-    (channel === "MENSA" && (row.op_pasti == null || peopleMissing)) ||
-    (channel === "UDS_STRADA" && row.op_saltuari == null)
-  ) result.push("STATISTICHE_DDC_MANCANTI");
-  if (row.op_stato === "parzialmente_stornata")
-    result.push("STATISTICHE_STORNO_PARZIALE_NON_RIPARTIBILI");
+  if (((channel === "PACCHI" || channel === "RITIRO_SEDE") && (row.op_pacchi == null || row.op_saltuari == null || row.op_continuativi == null)) || ((channel === "DOMICILIARE" || channel === "EMPORIO") && peopleMissing) || (channel === "MENSA" && (row.op_pasti == null || peopleMissing)) || (channel === "UDS_STRADA" && row.op_saltuari == null)) result.push("STATISTICHE_DDC_MANCANTI");
+  if (row.op_stato === "parzialmente_stornata") result.push("STATISTICHE_STORNO_PARZIALE_NON_RIPARTIBILI");
   return [...new Set(result)].sort();
 }
 
 function qualityForLine(row: LedgerRow): string[] {
   const result: string[] = [];
   if (row.lotto_id == null) result.push("LOTTO_MANCANTE");
-  if (row.quantita_pezzi != null && row.quantita_kg_lt == null && row.fattore_kg_lt_pezzo == null)
-    result.push("FATTORE_MANCANTE");
-  if (["RETTIFICA_POSITIVA", "RETTIFICA_NEGATIVA", "SCARTO"].includes(row.natura_contabile) && !row.documento_riferimento)
-    result.push("MOTIVAZIONE_MODIFICA_GIACENZA_MANCANTE");
+  if (row.quantita_pezzi != null && row.quantita_kg_lt == null && row.fattore_kg_lt_pezzo == null) result.push("FATTORE_MANCANTE");
+  if (["RETTIFICA_POSITIVA", "RETTIFICA_NEGATIVA", "SCARTO"].includes(row.natura_contabile) && !row.documento_riferimento) result.push("MOTIVAZIONE_MODIFICA_GIACENZA_MANCANTE");
   return result.sort();
 }
 
-async function ledgerRows(
-  executor: DbExecutor,
-  input: { magazzinoId: number; dataDa: string; dataA: string; maxMovimentoId: number },
-): Promise<LedgerRow[]> {
+async function ledgerRows(executor: DbExecutor, input: { magazzinoId: number; dataDa: string; dataA: string; maxMovimentoId: number }): Promise<LedgerRow[]> {
   const result = await executor.execute(sql`
     SELECT mv.id, mv.data_movimento, mv.magazzino_id, mg.area_operativa_id,
            mg.centro_ascolto_id, mv.prodotto_id, p.codice AS prodotto_codice,
            p.nome AS prodotto_nome, mv.lotto_id, l.codice_lotto, l.data_scadenza,
+           l.fse_plus AS lotto_fse_plus,
            mv.quantita, mv.quantita_pezzi, mv.quantita_kg_lt,
            mv.fattore_kg_lt_pezzo, mv.unita_misura, mv.fondo_origine,
            mv.natura_contabile, original.natura_contabile AS natura_originale,
@@ -308,11 +261,7 @@ async function ledgerRows(
   return result.rows as LedgerRow[];
 }
 
-export async function currentFseCutoff(
-  executor: DbExecutor,
-  magazzinoId: number,
-  dataA: string,
-): Promise<{ maxMovimentoId: number; maxOperazioneDistribuzioneId: number }> {
+export async function currentFseCutoff(executor: DbExecutor, magazzinoId: number, dataA: string): Promise<{ maxMovimentoId: number; maxOperazioneDistribuzioneId: number }> {
   const result = await executor.execute(sql`
     SELECT COALESCE((SELECT MAX(id) FROM movimenti WHERE magazzino_id = ${magazzinoId} AND data_movimento <= ${dataA}), 0)::int AS max_movimento_id,
            COALESCE((SELECT MAX(id) FROM operazioni_distribuzione_magazzino WHERE magazzino_id = ${magazzinoId} AND data_distribuzione <= ${dataA}), 0)::int AS max_operazione_id
@@ -324,16 +273,9 @@ export async function currentFseCutoff(
   };
 }
 
-export async function buildFseCanonicalReport(input: {
-  magazzinoId: number;
-  dataDa: string;
-  dataA: string;
-  dataAsOf?: string;
-  cutoff?: { maxMovimentoId: number; maxOperazioneDistribuzioneId: number };
-  executor?: DbExecutor;
-}): Promise<FseCanonicalReport> {
+export async function buildFseCanonicalReport(input: { magazzinoId: number; dataDa: string; dataA: string; dataAsOf?: string; cutoff?: { maxMovimentoId: number; maxOperazioneDistribuzioneId: number }; executor?: DbExecutor }): Promise<FseCanonicalReport> {
   const executor = input.executor ?? db;
-  const cutoff = input.cutoff ?? await currentFseCutoff(executor, input.magazzinoId, input.dataA);
+  const cutoff = input.cutoff ?? (await currentFseCutoff(executor, input.magazzinoId, input.dataA));
   const source = await ledgerRows(executor, { ...input, maxMovimentoId: cutoff.maxMovimentoId });
   const operationFunds = new Map<number, Set<string>>();
   for (const row of source) {
@@ -349,8 +291,7 @@ export async function buildFseCanonicalReport(input: {
   for (const row of fseRows) {
     const key = eventKey(row);
     if (!eventMap.has(key)) {
-      const mixed = row.operazione_distribuzione_id != null &&
-        (operationFunds.get(row.operazione_distribuzione_id)?.size ?? 0) > 1;
+      const mixed = row.operazione_distribuzione_id != null && (operationFunds.get(row.operazione_distribuzione_id)?.size ?? 0) > 1;
       const qualityCodes = qualityForEvent(row, mixed);
       const base = {
         eventKey: key,
@@ -373,7 +314,7 @@ export async function buildFseCanonicalReport(input: {
         occasionalPeople: row.op_saltuari,
         continuousPeople: row.op_continuativi,
         grossStatistics: true,
-        netStatisticsStatus: row.op_stato === "parzialmente_stornata" ? "GROSS_ONLY" as const : row.operazione_distribuzione_id == null ? "NOT_APPLICABLE" as const : "NET" as const,
+        netStatisticsStatus: row.op_stato === "parzialmente_stornata" ? ("GROSS_ONLY" as const) : row.operazione_distribuzione_id == null ? ("NOT_APPLICABLE" as const) : ("NET" as const),
         qualityCodes,
       };
       eventMap.set(key, { ...base, contentHash: canonicalSha256(base) });
@@ -414,10 +355,29 @@ export async function buildFseCanonicalReport(input: {
   const events = [...eventMap.values()].sort((left, right) => left.eventKey.localeCompare(right.eventKey));
   lines.sort((left, right) => left.movementId - right.movementId);
   const qualityCounts = new Map<string, { count: number; blocking: boolean }>();
-  for (const code of [...events.flatMap((item) => item.qualityCodes), ...lines.flatMap((item) => item.qualityCodes)]) {
+  const addQualityCount = (code: string, count: number) => {
+    if (count <= 0) return;
     const current = qualityCounts.get(code) ?? { count: 0, blocking: BLOCKING_QUALITY.has(code) };
-    current.count += 1;
+    current.count += count;
     qualityCounts.set(code, current);
+  };
+  for (const code of [...events.flatMap((item) => item.qualityCodes), ...lines.flatMap((item) => item.qualityCodes)]) {
+    addQualityCount(code, 1);
+  }
+  addQualityCount("FONDO_LEGACY_NON_DETERMINATO", source.filter((row) => row.fondo_origine === "NESSUN_FONDO" && row.lotto_fse_plus === true).length);
+  const monitoredChannels = new Set(["PACCHI", "MENSA", "STRADA"]);
+  const requiredMonitoring = new Set(events.filter((event) => event.officialActivity && monitoredChannels.has(event.officialActivity)).map((event) => `${event.eventDate.slice(0, 7)}|${event.officialActivity}`));
+  if (requiredMonitoring.size > 0) {
+    const monitoringResult = await executor.execute(sql`
+      SELECT anno_mese, canale_ufficiale
+      FROM rilevazioni_monitoraggio_fse
+      WHERE magazzino_id = ${input.magazzinoId}
+        AND data_riferimento <= ${input.dataAsOf ?? input.dataA}
+        AND (operazione_distribuzione_id IS NULL
+          OR operazione_distribuzione_id <= ${cutoff.maxOperazioneDistribuzioneId})
+    `);
+    const availableMonitoring = new Set((monitoringResult.rows as Array<{ anno_mese: string; canale_ufficiale: string }>).map((row) => `${row.anno_mese}|${row.canale_ufficiale}`));
+    addQualityCount("SNAPSHOT_INDICATORI_STORICI_MANCANTE", [...requiredMonitoring].filter((key) => !availableMonitoring.has(key)).length);
   }
   const reportBase = {
     modelVersion: FSE_REPORTING_MODEL_VERSION,
@@ -434,15 +394,7 @@ export async function buildFseCanonicalReport(input: {
   return { ...reportBase, canonicalHash: canonicalSha256(reportBase) };
 }
 
-export async function createFseExport(input: {
-  magazzinoId: number;
-  dataDa: string;
-  dataA: string;
-  dataAsOf: string;
-  formatCode: typeof FSE_CANONICAL_FORMAT | typeof FSE_OBSERVED_CONTROL_FORMAT;
-  creatoDa: number;
-  cutoff?: { maxMovimentoId: number; maxOperazioneDistribuzioneId: number };
-}) {
+export async function createFseExport(input: { magazzinoId: number; dataDa: string; dataA: string; dataAsOf: string; formatCode: typeof FSE_CANONICAL_FORMAT | typeof FSE_OBSERVED_CONTROL_FORMAT; creatoDa: number; cutoff?: { maxMovimentoId: number; maxOperazioneDistribuzioneId: number } }) {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-export:${input.magazzinoId}`}, 0))`);
     const report = await buildFseCanonicalReport({ ...input, executor: tx });
@@ -459,43 +411,49 @@ export async function createFseExport(input: {
     if (existing) return { export: existing, report, replayed: true };
     const blocking = report.quality.filter((item) => item.blocking).reduce((sum, item) => sum + item.count, 0);
     const warnings = report.quality.filter((item) => !item.blocking).reduce((sum, item) => sum + item.count, 0);
-    const [created] = await tx.insert(esportazioniFseTable).values({
-      magazzinoId: input.magazzinoId,
-      dataDa: input.dataDa,
-      dataA: input.dataA,
-      dataAsOf: input.dataAsOf,
-      formatCode: input.formatCode,
-      modelVersion: FSE_REPORTING_MODEL_VERSION,
-      stato: blocking === 0 ? "PRONTA_PER_INSERIMENTO_MANUALE" : "GENERATA",
-      maxMovimentoId: report.cutoff.maxMovimentoId,
-      maxOperazioneDistribuzioneId: report.cutoff.maxOperazioneDistribuzioneId,
-      canonicalHash: report.canonicalHash,
-      idempotencyKey,
-      eventiTotali: report.events.length,
-      righeTotali: report.lines.length,
-      righeBloccanti: blocking,
-      righeWarning: warnings,
-      creatoDa: input.creatoDa,
-    }).returning();
+    const [created] = await tx
+      .insert(esportazioniFseTable)
+      .values({
+        magazzinoId: input.magazzinoId,
+        dataDa: input.dataDa,
+        dataA: input.dataA,
+        dataAsOf: input.dataAsOf,
+        formatCode: input.formatCode,
+        modelVersion: FSE_REPORTING_MODEL_VERSION,
+        stato: blocking === 0 ? "PRONTA_PER_INSERIMENTO_MANUALE" : "GENERATA",
+        maxMovimentoId: report.cutoff.maxMovimentoId,
+        maxOperazioneDistribuzioneId: report.cutoff.maxOperazioneDistribuzioneId,
+        canonicalHash: report.canonicalHash,
+        idempotencyKey,
+        eventiTotali: report.events.length,
+        righeTotali: report.lines.length,
+        righeBloccanti: blocking,
+        righeWarning: warnings,
+        creatoDa: input.creatoDa,
+      })
+      .returning();
     const eventIds = new Map<string, number>();
     for (const event of report.events) {
-      const [snapshot] = await tx.insert(esportazioniFseEventiTable).values({
-        esportazioneId: created.id,
-        eventKey: event.eventKey,
-        contentHash: event.contentHash,
-        sourceType: event.sourceEntityType,
-        sourceId: event.sourceEntityId,
-        eventDate: event.eventDate,
-        officialActivity: event.officialActivity,
-        internalChannel: event.internalChannel,
-        documentNumber: event.documentNumber,
-        packs: event.packs,
-        meals: event.meals,
-        occasionalPeople: event.occasionalPeople,
-        continuousPeople: event.continuousPeople,
-        status: event.status,
-        qualityCodesJson: event.qualityCodes,
-      }).returning({ id: esportazioniFseEventiTable.id });
+      const [snapshot] = await tx
+        .insert(esportazioniFseEventiTable)
+        .values({
+          esportazioneId: created.id,
+          eventKey: event.eventKey,
+          contentHash: event.contentHash,
+          sourceType: event.sourceEntityType,
+          sourceId: event.sourceEntityId,
+          eventDate: event.eventDate,
+          officialActivity: event.officialActivity,
+          internalChannel: event.internalChannel,
+          documentNumber: event.documentNumber,
+          packs: event.packs,
+          meals: event.meals,
+          occasionalPeople: event.occasionalPeople,
+          continuousPeople: event.continuousPeople,
+          status: event.status,
+          qualityCodesJson: event.qualityCodes,
+        })
+        .returning({ id: esportazioniFseEventiTable.id });
       eventIds.set(event.eventKey, snapshot.id);
     }
     for (const line of report.lines) {
@@ -538,12 +496,20 @@ export function exportScopeCondition(magazzinoIds: number[] | null): SQL | undef
 
 export async function deactivateExportCoverage(exportId: number, actorId: number, motivation: string, version: number) {
   return db.transaction(async (tx) => {
-    const [current] = await tx.select().from(esportazioniFseTable).where(and(eq(esportazioniFseTable.id, exportId), eq(esportazioniFseTable.versione, version))).for("update");
+    const [current] = await tx
+      .select()
+      .from(esportazioniFseTable)
+      .where(and(eq(esportazioniFseTable.id, exportId), eq(esportazioniFseTable.versione, version)))
+      .for("update");
     if (!current) throw new FseReportingError(409, "Versione esportazione non corrente");
     if (current.stato === "ANNULLATA") return current;
     await tx.execute(sql`UPDATE esportazioni_fse_righe r SET active_coverage = false FROM esportazioni_fse_eventi e WHERE r.esportazione_evento_id = e.id AND e.esportazione_id = ${exportId}`);
     await tx.update(esportazioniFseEventiTable).set({ activeCoverage: false }).where(eq(esportazioniFseEventiTable.esportazioneId, exportId));
-    const [updated] = await tx.update(esportazioniFseTable).set({ stato: "ANNULLATA", annullatoDa: actorId, dataAnnullamento: new Date(), motivazioneAnnullamento: motivation, versione: version + 1 }).where(eq(esportazioniFseTable.id, exportId)).returning();
+    const [updated] = await tx
+      .update(esportazioniFseTable)
+      .set({ stato: "ANNULLATA", annullatoDa: actorId, dataAnnullamento: new Date(), motivazioneAnnullamento: motivation, versione: version + 1 })
+      .where(eq(esportazioniFseTable.id, exportId))
+      .returning();
     return updated;
   });
 }

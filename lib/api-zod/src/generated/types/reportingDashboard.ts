@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ReportAppliedFilters } from './reportAppliedFilters';
+import type { ReportingDashboardReportingModelVersion } from './reportingDashboardReportingModelVersion';
 import type { ReportingDashboardSection } from './reportingDashboardSection';
 import type { ReportingDashboardTimezone } from './reportingDashboardTimezone';
 import type { ReportKpi } from './reportKpi';
@@ -14,6 +15,7 @@ import type { ReportSeries } from './reportSeries';
 import type { ReportTable } from './reportTable';
 
 export interface ReportingDashboard {
+  reportingModelVersion: ReportingDashboardReportingModelVersion;
   section: ReportingDashboardSection;
   filters: ReportAppliedFilters;
   kpi: ReportKpi[];

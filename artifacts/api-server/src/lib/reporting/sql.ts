@@ -8,19 +8,15 @@ export async function rows<T extends Record<string, unknown>>(query: SQL): Promi
 }
 
 export function number(value: unknown): number {
-  const parsed = Number(value ?? 0);
+  // Solo proiezione visuale/count: i KPI contabili passano anche exactValue.
+  if (value == null) return 0;
+  const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function scopeCondition(
-  column: SQL,
-  value: number | null,
-  mode: "all" | "caller" | "query",
-): SQL | null {
+export function scopeCondition(column: SQL, value: number | null, mode: "all" | "caller" | "query"): SQL | null {
   if (value == null || mode === "all") return null;
-  return mode === "caller"
-    ? sql`(${column} = ${value} OR ${column} IS NULL)`
-    : sql`${column} = ${value}`;
+  return mode === "caller" ? sql`(${column} = ${value} OR ${column} IS NULL)` : sql`${column} = ${value}`;
 }
 
 export function reportScope(
@@ -36,27 +32,15 @@ export function reportScope(
 ): SQL[] {
   const conditions: SQL[] = [];
   if (columns.areaOperativa) {
-    const condition = scopeCondition(
-      columns.areaOperativa,
-      filters.areaOperativaId,
-      filters.areaOperativaMode,
-    );
+    const condition = scopeCondition(columns.areaOperativa, filters.areaOperativaId, filters.areaOperativaMode);
     if (condition) conditions.push(condition);
   }
   if (columns.centro) {
-    const condition = scopeCondition(
-      columns.centro,
-      filters.centroAscoltoId,
-      filters.centroMode,
-    );
+    const condition = scopeCondition(columns.centro, filters.centroAscoltoId, filters.centroMode);
     if (condition) conditions.push(condition);
   }
   if (columns.zona) {
-    const condition = scopeCondition(
-      columns.zona,
-      filters.zonaUdsId,
-      filters.zonaMode,
-    );
+    const condition = scopeCondition(columns.zona, filters.zonaUdsId, filters.zonaMode);
     if (condition) conditions.push(condition);
   }
   if (columns.magazzino && filters.magazzinoId != null) {
@@ -75,15 +59,10 @@ export function andSql(conditions: SQL[]): SQL {
   return conditions.length === 0 ? sql`true` : sql.join(conditions, sql` AND `);
 }
 
-export function monthSeries(
-  input: Array<Record<string, unknown>>,
-  valueKey = "totale",
-  secondaryKey?: string,
-) {
+export function monthSeries(input: Array<Record<string, unknown>>, valueKey = "totale", secondaryKey?: string) {
   return input.map((row) => ({
     label: String(row.mese),
     value: number(row[valueKey]),
     ...(secondaryKey ? { secondaryValue: number(row[secondaryKey]) } : {}),
   }));
 }
-

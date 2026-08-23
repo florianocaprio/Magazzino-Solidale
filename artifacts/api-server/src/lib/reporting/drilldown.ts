@@ -23,13 +23,7 @@ const ALLOWED_METRICS: Record<ReportSection, Set<string>> = {
   "fse-plus": new Set(["prodottiFse", "prodottiFseDistinti", "nucleiRaggiunti", "personeRaggiunte"]),
 };
 
-function detailDefinition(
-  section: ReportSection,
-  metric: string,
-  filters: ReportFilters,
-  limit: number,
-  offset: number,
-): DetailDefinition {
+function detailDefinition(section: ReportSection, metric: string, filters: ReportFilters, limit: number, offset: number): DetailDefinition {
   if (!ALLOWED_METRICS[section].has(metric)) {
     throw new ReportingError(400, "Drill-down non disponibile per la metrica richiesta");
   }
@@ -75,10 +69,11 @@ function detailDefinition(
                  be.codice AS beneficiario_codice, p.nome AS prodotto, l.codice_lotto AS lotto,
                  abs(mv.quantita::numeric) AS quantita, mv.unita_misura AS unita,
                  COUNT(*) OVER() AS full_count
-          FROM movimenti mv JOIN lotti l ON l.id = mv.lotto_id AND l.fse_plus = true
+          FROM movimenti mv JOIN lotti l ON l.id = mv.lotto_id
           JOIN bolla_righe br ON br.id = mv.bolla_riga_id JOIN bolle b ON b.id = br.bolla_id
           JOIN beneficiari be ON be.id = b.beneficiario_id JOIN prodotti p ON p.id = br.prodotto_id
-          WHERE mv.tipo_movimento = 'scarico' AND ${andSql(pacchiConditions(filters))}
+          WHERE mv.tipo_movimento = 'scarico' AND mv.fondo_origine = 'FSE_PLUS'
+            AND ${andSql(pacchiConditions(filters))}
           ORDER BY b.data_bolla DESC, mv.id DESC ${pagination}
         `,
       };
@@ -331,10 +326,11 @@ function detailDefinition(
       const peopleCte = sql`
         WITH famiglie AS (
           SELECT DISTINCT be.id, be.codice
-          FROM movimenti mv JOIN lotti l ON l.id = mv.lotto_id AND l.fse_plus = true
+          FROM movimenti mv JOIN lotti l ON l.id = mv.lotto_id
           JOIN bolla_righe br ON br.id = mv.bolla_riga_id JOIN bolle b ON b.id = br.bolla_id
           JOIN beneficiari be ON be.id = b.beneficiario_id
-          WHERE mv.tipo_movimento = 'scarico' AND b.stato = 'consegnato'
+          WHERE mv.tipo_movimento = 'scarico' AND mv.fondo_origine = 'FSE_PLUS'
+            AND b.stato = 'consegnato'
             AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
             AND ${andSql(reportScope(filters, { areaOperativa: sql`be.area_operativa_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
             AND ${fseBollaSourceCondition(filters)}
@@ -370,12 +366,13 @@ function detailDefinition(
                  COUNT(DISTINCT mv.id) AS movimenti,
                  COUNT(*) OVER() AS full_count
           FROM movimenti mv
-          JOIN lotti l ON l.id = mv.lotto_id AND l.fse_plus = true
+          JOIN lotti l ON l.id = mv.lotto_id
           JOIN bolla_righe br ON br.id = mv.bolla_riga_id
           JOIN bolle b ON b.id = br.bolla_id
           JOIN beneficiari be ON be.id = b.beneficiario_id
           JOIN prodotti p ON p.id = br.prodotto_id
-          WHERE mv.tipo_movimento = 'scarico' AND b.stato = 'consegnato'
+          WHERE mv.tipo_movimento = 'scarico' AND mv.fondo_origine = 'FSE_PLUS'
+            AND b.stato = 'consegnato'
             AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
             AND ${andSql(reportScope(filters, { areaOperativa: sql`be.area_operativa_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
             AND ${fseBollaSourceCondition(filters)}
@@ -395,12 +392,13 @@ function detailDefinition(
                     WHEN c.tipo_consegna = 'domicilio' THEN 'domiciliare'
                     ELSE 'pacchi' END AS canale,
                COUNT(*) OVER() AS full_count
-        FROM movimenti mv JOIN lotti l ON l.id = mv.lotto_id AND l.fse_plus = true
+        FROM movimenti mv JOIN lotti l ON l.id = mv.lotto_id
         JOIN bolla_righe br ON br.id = mv.bolla_riga_id JOIN bolle b ON b.id = br.bolla_id
         JOIN beneficiari be ON be.id = b.beneficiario_id JOIN prodotti p ON p.id = br.prodotto_id
         LEFT JOIN spese_emporio se ON se.bolla_id = b.id AND se.stato_spesa = 'chiusa'
         LEFT JOIN consegne c ON c.id = b.consegna_id
-        WHERE mv.tipo_movimento = 'scarico' AND b.stato = 'consegnato'
+        WHERE mv.tipo_movimento = 'scarico' AND mv.fondo_origine = 'FSE_PLUS'
+          AND b.stato = 'consegnato'
           AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
           AND ${andSql(reportScope(filters, { areaOperativa: sql`be.area_operativa_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
           AND ${fseBollaSourceCondition(filters)}
@@ -411,37 +409,17 @@ function detailDefinition(
   throw new ReportingError(400, "Drill-down non disponibile per la metrica richiesta");
 }
 
-export async function buildDrilldown(input: {
-  section: ReportSection;
-  metric: string;
-  filters: ReportFilters;
-  page: number;
-  pageSize: number;
-}): Promise<ReportDrilldown> {
-  const definition = detailDefinition(
-    input.section,
-    input.metric,
-    input.filters,
-    input.pageSize,
-    (input.page - 1) * input.pageSize,
-  );
+export async function buildDrilldown(input: { section: ReportSection; metric: string; filters: ReportFilters; page: number; pageSize: number }): Promise<ReportDrilldown> {
+  const definition = detailDefinition(input.section, input.metric, input.filters, input.pageSize, (input.page - 1) * input.pageSize);
   const result = await rows<Record<string, unknown>>(definition.query);
   return {
+    reportingModelVersion: "MAGAZZINO_2_0C_V1",
     section: input.section,
     metric: input.metric,
     page: input.page,
     pageSize: input.pageSize,
     total: number(result[0]?.full_count),
     columns: definition.columns,
-    rows: result.map(({ full_count: _fullCount, ...row }) =>
-      Object.fromEntries(
-        Object.entries(row).map(([key, value]) => [
-          key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
-          value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean"
-            ? (value ?? null)
-            : String(value),
-        ]),
-      ),
-    ),
+    rows: result.map(({ full_count: _fullCount, ...row }) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()), value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? (value ?? null) : String(value)]))),
   };
 }

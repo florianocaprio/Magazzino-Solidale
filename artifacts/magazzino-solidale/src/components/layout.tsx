@@ -512,6 +512,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "analisi",
     area: "analisi",
     moduloCodice: "REPORT",
+    permission: "magazzino.fse.view",
   },
 
   {

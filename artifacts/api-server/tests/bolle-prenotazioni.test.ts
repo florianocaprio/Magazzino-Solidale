@@ -1,17 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
-import {
-  db,
-  pool,
-  bolleTable,
-  bollaRigheTable,
-  lottiTable,
-  movimentiTable,
-  prenotazioniMagazzinoTable,
-  consegneTable,
-  interventiTable,
-  interventiStoricoStatiTable,
-} from "@workspace/db";
+import { db, pool, bolleTable, bollaRigheTable, lottiTable, movimentiTable, prenotazioniMagazzinoTable, consegneTable, interventiTable, interventiStoricoStatiTable } from "@workspace/db";
 import { and, asc, eq } from "drizzle-orm";
 import bolleRouter from "../src/routes/bolle";
 import consegneRouter from "../src/routes/consegne";
@@ -19,22 +8,7 @@ import preparazioneConsegneRouter from "../src/routes/preparazione-consegne";
 import reportRouter from "../src/routes/report";
 import { annullaInterventoDaBollaTx, stornoRigaTx } from "../src/lib/bollaDelivery";
 import { dataOperativaEuropeRome } from "../src/lib/lottoPolicy";
-import {
-  makeScopedApp,
-  newScope,
-  cleanup,
-  type SeedScope,
-  createBeneficiario,
-  createCentro,
-  createLotto,
-  createMagazzino,
-  createProdotto,
-  createUtente,
-  insertConsegna,
-  insertBolla,
-  insertBollaRiga,
-  insertPrenotazioneMagazzino,
-} from "./scope-helpers";
+import { makeScopedApp, newScope, cleanup, type SeedScope, createBeneficiario, createCentro, createLotto, createMagazzino, createProdotto, createUtente, insertConsegna, insertBolla, insertBollaRiga, insertMovimento, insertPrenotazioneMagazzino } from "./scope-helpers";
 
 let bootScope: SeedScope;
 let scope: SeedScope;
@@ -47,29 +21,17 @@ let magA: number;
 let magB: number;
 let prod: number;
 
-const appAs = (centro: number | null) =>
-  makeScopedApp(bolleRouter, { id: operatoreId, centroAscoltoId: centro });
-const consegneAppAs = (centro: number | null) =>
-  makeScopedApp(consegneRouter, { id: operatoreId, centroAscoltoId: centro });
-const preparazioneAppAs = (centro: number | null) =>
-  makeScopedApp(preparazioneConsegneRouter, { id: operatoreId, centroAscoltoId: centro });
-const reportAppAs = (centro: number | null) =>
-  makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: centro });
+const appAs = (centro: number | null) => makeScopedApp(bolleRouter, { id: operatoreId, centroAscoltoId: centro });
+const consegneAppAs = (centro: number | null) => makeScopedApp(consegneRouter, { id: operatoreId, centroAscoltoId: centro });
+const preparazioneAppAs = (centro: number | null) => makeScopedApp(preparazioneConsegneRouter, { id: operatoreId, centroAscoltoId: centro });
+const reportAppAs = (centro: number | null) => makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: centro });
 
 async function prenotazioniBolla(bollaId: number) {
-  return db
-    .select()
-    .from(prenotazioniMagazzinoTable)
-    .where(eq(prenotazioniMagazzinoTable.bollaId, bollaId))
-    .orderBy(asc(prenotazioniMagazzinoTable.id));
+  return db.select().from(prenotazioniMagazzinoTable).where(eq(prenotazioniMagazzinoTable.bollaId, bollaId)).orderBy(asc(prenotazioniMagazzinoTable.id));
 }
 
 async function movimentiBolla(bollaId: number) {
-  return db
-    .select()
-    .from(movimentiTable)
-    .where(eq(movimentiTable.bollaId, bollaId))
-    .orderBy(asc(movimentiTable.id));
+  return db.select().from(movimentiTable).where(eq(movimentiTable.bollaId, bollaId)).orderBy(asc(movimentiTable.id));
 }
 
 async function lottoResidua(lottoId: number): Promise<number> {
@@ -123,9 +85,7 @@ describe("Bolle — prenotazione merce su conferma", () => {
 
     const altroBeneficiario = await createBeneficiario(scope, centroA);
     const delivered = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "consegnato" });
-    const patch = await request(appAs(centroA))
-      .patch(`/bolle/${delivered}`)
-      .send({ beneficiarioId: altroBeneficiario });
+    const patch = await request(appAs(centroA)).patch(`/bolle/${delivered}`).send({ beneficiarioId: altroBeneficiario });
     expect([400, 409]).toContain(patch.status);
     const [unchanged] = await db.select().from(bolleTable).where(eq(bolleTable.id, delivered));
     expect(unchanged.beneficiarioId).toBe(benA);
@@ -261,17 +221,12 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       quantita: 4,
     });
 
-    const res = await request(appAs(centroA))
-      .post(`/bolle/${bollaId}/conferma`)
-      .send({});
+    const res = await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({});
 
     expect(res.status).toBe(200);
-    expect((await prenotazioniBolla(bollaId)).map((p) => p.lottoId)).toEqual([
-      valido,
-    ]);
+    expect((await prenotazioniBolla(bollaId)).map((p) => p.lottoId)).toEqual([valido]);
     expect(await lottoResidua(scaduto)).toBe(8);
   });
-
 
   it("rifiuta conferma con lotto esplicito scaduto e quando esiste solo stock scaduto", async () => {
     const scaduto = await createLotto(scope, {
@@ -301,12 +256,8 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       quantita: 1,
     });
 
-    const explicitResult = await request(appAs(centroA))
-      .post(`/bolle/${esplicita}/conferma`)
-      .send({});
-    const automaticResult = await request(appAs(centroA))
-      .post(`/bolle/${automatica}/conferma`)
-      .send({});
+    const explicitResult = await request(appAs(centroA)).post(`/bolle/${esplicita}/conferma`).send({});
+    const automaticResult = await request(appAs(centroA)).post(`/bolle/${automatica}/conferma`).send({});
 
     expect(explicitResult.status).toBe(409);
     expect(explicitResult.body.error).toMatch(/scaduto/i);
@@ -317,7 +268,6 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
 });
 
 describe("Bolle — inserimento righe con scope operativo", () => {
-
   it("valida Bolla e magazzino prima di leggere il lotto e non espone dati fuori scope", async () => {
     const lottoB = await createLotto(scope, {
       prodottoId: prod,
@@ -325,29 +275,21 @@ describe("Bolle — inserimento righe con scope operativo", () => {
       quantita: 5,
       dataScadenza: "2099-12-31",
     });
-    const [lotto] = await db
-      .select()
-      .from(lottiTable)
-      .where(eq(lottiTable.id, lottoB));
+    const [lotto] = await db.select().from(lottiTable).where(eq(lottiTable.id, lottoB));
     const bollaFuoriScope = await insertBolla(scope, {
       beneficiarioId: benA,
       magazzinoId: magB,
     });
 
-    const res = await request(appAs(centroA))
-      .post(`/bolle/${bollaFuoriScope}/righe`)
-      .send({
-        prodottoId: prod,
-        lottoId: lottoB,
-        quantita: 1,
-      });
+    const res = await request(appAs(centroA)).post(`/bolle/${bollaFuoriScope}/righe`).send({
+      prodottoId: prod,
+      lottoId: lottoB,
+      quantita: 1,
+    });
 
     expect(res.status).toBe(403);
-    expect(JSON.stringify(res.body)).not.toContain(
-      lotto.codiceLotto ?? "codice-impossibile",
-    );
+    expect(JSON.stringify(res.body)).not.toContain(lotto.codiceLotto ?? "codice-impossibile");
   });
-
 
   it("rifiuta lotto inesistente, scaduto o non coerente con prodotto/magazzino e accetta un lotto valido", async () => {
     const altroProdotto = await createProdotto(scope);
@@ -375,37 +317,11 @@ describe("Bolle — inserimento righe con scope operativo", () => {
     });
     const path = `/bolle/${bollaId}/righe`;
 
-    expect(
-      (
-        await request(appAs(centroA))
-          .post(path)
-          .send({ prodottoId: prod, lottoId: 2_000_000_000, quantita: 1 })
-      ).status,
-    ).toBe(404);
-    expect(
-      (
-        await request(appAs(centroA))
-          .post(path)
-          .send({ prodottoId: prod, lottoId: scaduto, quantita: 1 })
-      ).status,
-    ).toBe(409);
-    expect(
-      (
-        await request(appAs(centroA))
-          .post(path)
-          .send({ prodottoId: altroProdotto, lottoId: valido, quantita: 1 })
-      ).status,
-    ).toBe(400);
-    expect(
-      (
-        await request(appAs(centroA))
-          .post(path)
-          .send({ prodottoId: prod, lottoId: altroMagazzino, quantita: 1 })
-      ).status,
-    ).toBe(404);
-    const accepted = await request(appAs(centroA))
-      .post(path)
-      .send({ prodottoId: prod, lottoId: valido, quantita: 1 });
+    expect((await request(appAs(centroA)).post(path).send({ prodottoId: prod, lottoId: 2_000_000_000, quantita: 1 })).status).toBe(404);
+    expect((await request(appAs(centroA)).post(path).send({ prodottoId: prod, lottoId: scaduto, quantita: 1 })).status).toBe(409);
+    expect((await request(appAs(centroA)).post(path).send({ prodottoId: altroProdotto, lottoId: valido, quantita: 1 })).status).toBe(400);
+    expect((await request(appAs(centroA)).post(path).send({ prodottoId: prod, lottoId: altroMagazzino, quantita: 1 })).status).toBe(404);
+    const accepted = await request(appAs(centroA)).post(path).send({ prodottoId: prod, lottoId: valido, quantita: 1 });
     expect(accepted.status).toBe(201);
     expect(accepted.body).toMatchObject({
       prodottoId: prod,
@@ -413,7 +329,6 @@ describe("Bolle — inserimento righe con scope operativo", () => {
       quantita: 1,
     });
   });
-
 
   it("consente a un operatore Sociale con bolle.manage la propria Bolla senza permettere probe su altri magazzini", async () => {
     const socialApp = makeScopedApp(bolleRouter, {
@@ -443,25 +358,12 @@ describe("Bolle — inserimento righe con scope operativo", () => {
       magazzinoId: magB,
     });
 
-    expect(
-      (
-        await request(socialApp)
-          .post(`/bolle/${propria}/righe`)
-          .send({ prodottoId: prod, lottoId: lottoA, quantita: 1 })
-      ).status,
-    ).toBe(201);
-    expect(
-      (
-        await request(socialApp)
-          .post(`/bolle/${altrui}/righe`)
-          .send({ prodottoId: prod, lottoId: lottoB, quantita: 1 })
-      ).status,
-    ).toBe(403);
+    expect((await request(socialApp).post(`/bolle/${propria}/righe`).send({ prodottoId: prod, lottoId: lottoA, quantita: 1 })).status).toBe(201);
+    expect((await request(socialApp).post(`/bolle/${altrui}/righe`).send({ prodottoId: prod, lottoId: lottoB, quantita: 1 })).status).toBe(403);
   });
 });
 
 describe("Bolle — consegna e annullo prenotazioni", () => {
-
   it("consegna una bolla confermata convertendo prenotazioni in scarico fisico", async () => {
     const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
     const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
@@ -521,32 +423,18 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       lottoId,
       quantita: 4,
     });
-    expect(
-      (
-        await request(appAs(centroA))
-          .post(`/bolle/${bollaId}/conferma`)
-          .send({})
-      ).status,
-    ).toBe(200);
-    await db
-      .update(lottiTable)
-      .set({ dataScadenza: "2000-01-01" })
-      .where(eq(lottiTable.id, lottoId));
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
+    await db.update(lottiTable).set({ dataScadenza: "2000-01-01" }).where(eq(lottiTable.id, lottoId));
 
-    const res = await request(appAs(centroA))
-      .post(`/bolle/${bollaId}/consegna`)
-      .send({});
+    const res = await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({});
 
     expect(res.status).toBe(409);
     expect(res.body.error).toMatch(/scaduto/i);
     expect(await bollaStato(bollaId)).toBe("confermato");
     expect(await lottoResidua(lottoId)).toBe(10);
-    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual([
-      "attiva",
-    ]);
+    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["attiva"]);
     expect(await movimentiBolla(bollaId)).toHaveLength(0);
   });
-
 
   it("annulla una bolla confermata nuova rilasciando prenotazioni senza scalare lotti o creare movimenti", async () => {
     const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
@@ -579,34 +467,17 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       lottoId,
       quantita: 4,
     });
-    expect(
-      (
-        await request(appAs(centroA))
-          .post(`/bolle/${bollaId}/conferma`)
-          .send({})
-      ).status,
-    ).toBe(200);
-    expect(
-      (
-        await request(appAs(centroA))
-          .post(`/bolle/${bollaId}/consegna`)
-          .send({ confermaRicezione: true })
-      ).status,
-    ).toBe(200);
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({ confermaRicezione: true })).status).toBe(200);
     expect(await lottoResidua(lottoId)).toBe(6);
-    const [interventoConsegnato] = await db
-      .select()
-      .from(interventiTable)
-      .where(eq(interventiTable.bollaId, bollaId));
+    const [interventoConsegnato] = await db.select().from(interventiTable).where(eq(interventiTable.bollaId, bollaId));
     expect(interventoConsegnato).toMatchObject({
       bollaId,
       beneficiarioId: benA,
       stato: "concluso",
     });
 
-    const cancelled = await request(appAs(centroA))
-      .post(`/bolle/${bollaId}/annulla`)
-      .send({ motivo: "Consegna annullata dal test" });
+    const cancelled = await request(appAs(centroA)).post(`/bolle/${bollaId}/annulla`).send({ motivo: "Consegna annullata dal test" });
     expect(cancelled.status).toBe(200);
     expect(await lottoResidua(lottoId)).toBe(10);
     const movements = await movimentiBolla(bollaId);
@@ -617,10 +488,7 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       movimentoOrigineId: movements[0].id,
       operatoreId,
     });
-    const [interventoAnnullato] = await db
-      .select()
-      .from(interventiTable)
-      .where(eq(interventiTable.bollaId, bollaId));
+    const [interventoAnnullato] = await db.select().from(interventiTable).where(eq(interventiTable.bollaId, bollaId));
     expect(interventoAnnullato).toMatchObject({
       id: interventoConsegnato.id,
       bollaId,
@@ -628,15 +496,8 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       stato: "annullato",
       operatoreId,
     });
-    expect(interventoAnnullato.motivoAnnullamento).toContain(
-      "Consegna annullata dal test",
-    );
-    const storico = await db
-      .select()
-      .from(interventiStoricoStatiTable)
-      .where(
-        eq(interventiStoricoStatiTable.interventoId, interventoConsegnato.id),
-      );
+    expect(interventoAnnullato.motivoAnnullamento).toContain("Consegna annullata dal test");
+    const storico = await db.select().from(interventiStoricoStatiTable).where(eq(interventiStoricoStatiTable.interventoId, interventoConsegnato.id));
     expect(storico).toHaveLength(1);
     expect(storico[0]).toMatchObject({
       statoPrecedente: "concluso",
@@ -644,20 +505,11 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       operatoreId,
     });
 
-    const duplicate = await request(appAs(centroA))
-      .post(`/bolle/${bollaId}/annulla`)
-      .send({});
+    const duplicate = await request(appAs(centroA)).post(`/bolle/${bollaId}/annulla`).send({});
     expect(duplicate.status).toBe(400);
     expect(await lottoResidua(lottoId)).toBe(10);
     expect(await movimentiBolla(bollaId)).toHaveLength(2);
-    expect(
-      await db
-        .select()
-        .from(interventiStoricoStatiTable)
-        .where(
-          eq(interventiStoricoStatiTable.interventoId, interventoConsegnato.id),
-        ),
-    ).toHaveLength(1);
+    expect(await db.select().from(interventiStoricoStatiTable).where(eq(interventiStoricoStatiTable.interventoId, interventoConsegnato.id))).toHaveLength(1);
   });
 
   it("rollbacka storno e stato Intervento se l'audit dell'annullamento fallisce", async () => {
@@ -676,57 +528,26 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       lottoId,
       quantita: 4,
     });
-    expect(
-      (
-        await request(appAs(centroA))
-          .post(`/bolle/${bollaId}/conferma`)
-          .send({})
-      ).status,
-    ).toBe(200);
-    expect(
-      (
-        await request(appAs(centroA))
-          .post(`/bolle/${bollaId}/consegna`)
-          .send({})
-      ).status,
-    ).toBe(200);
-    const [interventoPrima] = await db
-      .select()
-      .from(interventiTable)
-      .where(eq(interventiTable.bollaId, bollaId));
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({})).status).toBe(200);
+    const [interventoPrima] = await db.select().from(interventiTable).where(eq(interventiTable.bollaId, bollaId));
 
     await expect(
       db.transaction(async (tx) => {
         await stornoRigaTx(tx, { id: rigaId }, bollaId, operatoreId);
-        await annullaInterventoDaBollaTx(
-          tx,
-          bollaId,
-          2_000_000_000,
-          "Errore simulato",
-        );
+        await annullaInterventoDaBollaTx(tx, bollaId, 2_000_000_000, "Errore simulato");
       }),
     ).rejects.toBeDefined();
 
     expect(await lottoResidua(lottoId)).toBe(6);
     expect(await movimentiBolla(bollaId)).toHaveLength(1);
-    const [interventoDopo] = await db
-      .select()
-      .from(interventiTable)
-      .where(eq(interventiTable.bollaId, bollaId));
+    const [interventoDopo] = await db.select().from(interventiTable).where(eq(interventiTable.bollaId, bollaId));
     expect(interventoDopo).toMatchObject({
       id: interventoPrima.id,
       stato: "concluso",
     });
-    expect(
-      await db
-        .select()
-        .from(interventiStoricoStatiTable)
-        .where(
-          eq(interventiStoricoStatiTable.interventoId, interventoPrima.id),
-        ),
-    ).toHaveLength(0);
+    expect(await db.select().from(interventiStoricoStatiTable).where(eq(interventiStoricoStatiTable.interventoId, interventoPrima.id))).toHaveLength(0);
   });
-
 
   it("tratta una bolla legacy confermata con movimenti scarico come gia scaricata e non scala di nuovo alla consegna", async () => {
     const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
@@ -841,7 +662,16 @@ describe("Report e preparazione — semantica merce impegnata/consegnata", () =>
     const bollaConfermata = await insertBolla(scope, { beneficiarioId: benConfermato, magazzinoId: magA, stato: "confermato" });
     const bollaConsegnata = await insertBolla(scope, { beneficiarioId: benConsegnato, magazzinoId: magA, stato: "consegnato" });
     await insertBollaRiga(scope, { bollaId: bollaConfermata, prodottoId: prod, lottoId: lottoConfermato, quantita: 5 });
-    await insertBollaRiga(scope, { bollaId: bollaConsegnata, prodottoId: prod, lottoId: lottoConsegnato, quantita: 5 });
+    const rigaConsegnata = await insertBollaRiga(scope, { bollaId: bollaConsegnata, prodottoId: prod, lottoId: lottoConsegnato, quantita: 5 });
+    await insertMovimento(scope, {
+      magazzinoId: magA,
+      prodottoId: prod,
+      lottoId: lottoConsegnato,
+      bollaRigaId: rigaConsegnata,
+      tipoMovimento: "scarico",
+      naturaContabile: "DISTRIBUZIONE_FINALE",
+      fondoOrigine: "FSE_PLUS",
+    });
 
     const after = (await request(reportAppAs(null)).get("/report/fse-plus?anno=2026")).body.beneficiariTotali as number;
 

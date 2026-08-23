@@ -5,9 +5,11 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ReportDrilldownReportingModelVersion } from './reportDrilldownReportingModelVersion';
 import type { ReportDrilldownRowsItem } from './reportDrilldownRowsItem';
 
 export interface ReportDrilldown {
+  reportingModelVersion: ReportDrilldownReportingModelVersion;
   section: string;
   metric: string;
   page: number;

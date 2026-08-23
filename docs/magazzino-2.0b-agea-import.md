@@ -86,9 +86,9 @@ partita di preview. La chiave idempotente è un SHA-256 stabile, indipendente da
 ID importazione e ordine righe, e non tronca il documento sorgente prima del
 calcolo.
 
-## Perimetro
+## Perimetro 2.0B
 
-La 2.0B importa localmente il registro informatico AGEA/SIFEAD nel tracciato osservato `SIFEAD_REGISTRO_XLSX_OSSERVATO_V1`. Non trasmette dati a SIFEAD, non esporta registri, non riconcilia gli scarichi locali e non aggiunge dashboard AGEA. Il file binario non viene conservato: restano nome sanitizzato, MIME, dimensione, SHA-256, foglio, data di riferimento, versione parser e valori raw di ogni riga.
+La 2.0B importa localmente il registro informatico AGEA/SIFEAD nel tracciato osservato `SIFEAD_REGISTRO_XLSX_OSSERVATO_V1`. Non trasmette dati a SIFEAD e, nel proprio perimetro, non esporta registri, non riconcilia gli scarichi locali e non aggiunge dashboard AGEA. La successiva 2.0C riusa le importazioni confermate come baseline di una riconciliazione separata, non mutante, descritta in [Magazzino 2.0C — riconciliazione](./magazzino-2.0c-reconciliation.md). Il file binario non viene conservato: restano nome sanitizzato, MIME, dimensione, SHA-256, foglio, data di riferimento, versione parser e valori raw di ogni riga.
 
 ## Tracciato e parser
 
@@ -197,3 +197,7 @@ positivo. Il bootstrap atteso crea 1 `SALDO_INIZIALE`, 7 righe e 7 movimenti
 positivi, senza movimenti negativi o scarichi locali. La seconda importazione
 identica produce 239 identity duplicate, zero nuovi Carichi e zero variazioni di
 stock.
+
+La 2.0C non modifica parser, bootstrap o trattamento dei negativi. Usa testata,
+righe e indice canonico esterno soltanto in lettura per la riconciliazione; il
+formato upload ufficiale resta `EXTERNAL_FORMAT_UNVERIFIED`.

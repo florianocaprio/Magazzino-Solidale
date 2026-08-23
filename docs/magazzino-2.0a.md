@@ -34,10 +34,12 @@ La migration è additiva e ripetibile. Esegue il backfill del Fondo dal flag sto
 
 ## Compatibilità
 
-Gli endpoint storici di Lotto restano disponibili e delegano al nuovo motore per i carichi singoli. Il `PATCH /lotti/{id}` consente soltanto le note: identità, quantità, Fondo, fattore, magazzino, prodotto e date non sono modificabili. Le variazioni di stock passano dalla rettifica append-only. I report FSE+ possono continuare a leggere il flag compatibile, che ora è vincolato al Fondo della Partita. Gli alias numerici restano solo per compatibilità di visualizzazione; le decisioni contabili usano i campi precisi.
+Gli endpoint storici di Lotto restano disponibili e delegano al nuovo motore per i carichi singoli. Il `PATCH /lotti/{id}` consente soltanto le note: identità, quantità, Fondo, fattore, magazzino, prodotto e date non sono modificabili. Le variazioni di stock passano dalla rettifica append-only. Il flag FSE+ della Partita resta soltanto compatibilità legacy. Dalla 2.0C la rendicontazione e il reporting autorevole leggono lo snapshot `movimenti.fondo_origine`; non riclassificano retroattivamente il Fondo dal lotto. Gli alias numerici restano solo per compatibilità di visualizzazione; le decisioni contabili e gli export usano i campi decimali precisi.
 
 ## Qualità dati nota
 
 Il modello corrente non contiene una classificazione strutturata saltuario/continuativo per il destinatario UDS. I relativi conteggi dell'evento restano quindi `NULL` (`NON_DETERMINATO` concettuale): non vengono inferiti da nomi, note, frequenza degli accessi o stato anagrafico.
 
 La fase 2.0B aggiunge il solo import del tracciato AGEA/SIFEAD osservato. Staging, mapping e indice canonico esterno sono separati dalla giacenza; il bootstrap e i nuovi carichi positivi delegano sempre al motore `createWarehouseLoad()` della 2.0A. I movimenti negativi del registro non generano scarichi locali. Dettagli e limiti sono in [Magazzino 2.0B — Import AGEA/SIFEAD](./magazzino-2.0b-agea-import.md).
+
+La fase 2.0C aggiunge snapshot non operativi di export, monitoraggio e riconciliazione. La giacenza corrente resta nei residui delle Partite e lo storico nel ledger. Vedere [Rendicontazione FSE+ 2.0C](./magazzino-2.0c-fse-reporting.md).

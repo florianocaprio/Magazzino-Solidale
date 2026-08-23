@@ -190,14 +190,35 @@ Il modulo `REPORT` espone in `/report` la landing della reportistica integrata:
 Dashboard generale, Pacchi Alimentari, Centro di Ascolto, Emporio, Mensa, UDS,
 Magazzino/Logistica e rendicontazione trasversale FSE+. I calcoli sono eseguiti
 dal reporting service server-side; grafici, tabelle, drill-down paginato ed
-export XLSX/PDF consumano lo stesso payload aggregato. Area Operativa, Centro e Zona UDS
+export XLSX/PDF consumano lo stesso payload `MAGAZZINO_2_0C_V1`. I KPI
+contabili espongono `exactValue` decimale per decisioni/export e una proiezione
+numerica separata per i grafici; `null` non viene trasformato in zero. Area Operativa, Centro e Zona UDS
 sono sempre riapplicati dal backend; per Mensa resta necessario anche il
 permesso `mensa.reports.view`.
 
-Le route storiche `/report-uds`, `/mensa/report` e gli endpoint legacy sotto
-`/report` restano disponibili per compatibilità. La nuova fase non introduce
-modifiche allo schema database. Le limitazioni del modello SIFEAD sono mostrate
+Le route storiche `/report-uds`, `/mensa/report` e i componenti legacy delegano
+ai builder integrati. La dashboard iniziale usa lo stesso builder generale e
+non conserva KPI paralleli. Le limitazioni del modello SIFEAD sono mostrate
 come dati mancanti, mai convertite in zeri o inferenze da note libere.
+
+### Magazzino 2.0C — FSE+
+
+La route `/report/fse-plus` aggiunge la sezione operativa Rendicontazione FSE+
+con tab di coda, esportazioni, riconciliazioni, indicatori e anomalie. Il
+sistema genera snapshot auditabili ma non trasmette automaticamente dati a
+SIFEAD. `SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1` è soltanto un file di
+controllo: il formato upload resta `EXTERNAL_FORMAT_UNVERIFIED`.
+
+L'update append-only `20260824_magazzino_2_0c_fse_reporting.sql` aggiunge
+soltanto snapshot di monitoraggio, export e riconciliazione. Non aggiunge una
+tabella di saldo e non modifica la contabilità 2.0A/2.0B. Applicarlo tramite il
+Migration Ledger dopo backup e preflight; verificare poi zero pending e
+riavviare soltanto la nuova versione applicativa. Dettagli:
+
+- [rendicontazione ed export FSE+](docs/magazzino-2.0c-fse-reporting.md);
+- [riconciliazione AGEA/SIFEAD](docs/magazzino-2.0c-reconciliation.md);
+- [modello reporting](docs/magazzino-2.0c-reporting-model.md);
+- [impact map](docs/magazzino-2.0c-impact-map.md).
 
 ## MAPS operativo
 

@@ -26,6 +26,7 @@ import { todayEuropeRome } from "@/lib/europe-rome";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { localizeReportingText } from "@/lib/reporting-text";
+import { FseOperations } from "@/components/reporting/fse-operations";
 
 type Section = ReportingDashboardSection;
 
@@ -181,6 +182,7 @@ export default function ReportingDashboardPage({ section }: { section: Section }
         <p className="mt-1 text-muted-foreground">{t(`reporting.sections.${section}.description`)}</p>
       </header>
       <ReportFilters section={section} value={filters} onChange={updateFilters} />
+      {section === "fse-plus" && <FseOperations filters={filters} />}
       <ReportLoader section={section} filters={filters} />
     </div>
   );

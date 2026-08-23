@@ -1,43 +1,5 @@
-import express, {
-  type Express,
-  type RequestHandler,
-  type Router,
-} from "express";
-import {
-  db,
-  centriAscoltoTable,
-  magazziniTable,
-  beneficiariTable,
-  prodottiTable,
-  fornitoriTable,
-  volontariTable,
-  mezziTable,
-  ruoliTable,
-  utentiTable,
-  lottiTable,
-  scarichiTable,
-  scaricoRigheTable,
-  approvvigionamentiTable,
-  approvvigionamentoRigheTable,
-  consegneTable,
-  bolleTable,
-  bollaRigheTable,
-  prenotazioniMagazzinoTable,
-  interventiTable,
-  trasferimentiTable,
-  trasferimentoRigheTable,
-  movimentiTable,
-  turniTable,
-  turniConsegneTable,
-  turniVolontariTable,
-  areeOperativeTable,
-  zoneUdsTable,
-  auditConfigurazioniTable,
-  ruoliVolontariTable,
-  carichiMagazzinoRigheTable,
-  carichiMagazzinoTable,
-  operazioniDistribuzioneMagazzinoTable,
-} from "@workspace/db";
+import express, { type Express, type RequestHandler, type Router } from "express";
+import { db, centriAscoltoTable, magazziniTable, beneficiariTable, prodottiTable, fornitoriTable, volontariTable, mezziTable, ruoliTable, utentiTable, lottiTable, scarichiTable, scaricoRigheTable, approvvigionamentiTable, approvvigionamentoRigheTable, consegneTable, bolleTable, bollaRigheTable, prenotazioniMagazzinoTable, interventiTable, trasferimentiTable, trasferimentoRigheTable, movimentiTable, turniTable, turniConsegneTable, turniVolontariTable, areeOperativeTable, zoneUdsTable, auditConfigurazioniTable, ruoliVolontariTable, carichiMagazzinoRigheTable, carichiMagazzinoTable, operazioniDistribuzioneMagazzinoTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 
 /**
@@ -87,49 +49,7 @@ export function makeScopedApp(
       zonaUdsId: user.zonaUdsId ?? null,
       aree: user.aree ?? ["sociale", "uds", "magazzino"],
       // Questi test isolano lo scoping territoriale, non l'RBAC.
-      permessi: user.permessi ?? [
-        "beneficiari.view",
-        "beneficiari.manage",
-        "beneficiari.sensitive.view",
-        "beneficiari.deactivate",
-        "sociale.interventi.view",
-        "sociale.interventi.create",
-        "sociale.interventi.update",
-        "sociale.interventi.complete",
-        "sociale.interventi.cancel",
-        "uds.directory.view",
-        "uds.interventi.view",
-        "uds.interventi.create",
-        "uds.interventi.update",
-        "uds.interventi.note",
-        "uds.bisogni.manage",
-        "uds.reports.view",
-        "magazzino.view",
-        "magazzino.products.manage",
-        "magazzino.stock.receive",
-        "magazzino.stock.issue",
-        "magazzino.stock.adjust",
-        "magazzino.transfers.create",
-        "magazzino.transfers.dispatch",
-        "magazzino.transfers.receive",
-        "bolle.view",
-        "bolle.manage",
-        "bolle.deliver",
-        "bolle.cancel",
-        "approvvigionamenti.view",
-        "approvvigionamenti.manage",
-        "approvvigionamenti.receive",
-        "logistica.volontari.view",
-        "logistica.volontari.manage",
-        "logistica.volontari.export",
-        "logistica.mezzi.view",
-        "logistica.mezzi.manage",
-        "logistica.mezzi.export",
-        "logistica.turni.view",
-        "logistica.turni.manage",
-        "logistica.approvazioni.view",
-        "logistica.approvazioni.manage",
-      ],
+      permessi: user.permessi ?? ["beneficiari.view", "beneficiari.manage", "beneficiari.sensitive.view", "beneficiari.deactivate", "sociale.interventi.view", "sociale.interventi.create", "sociale.interventi.update", "sociale.interventi.complete", "sociale.interventi.cancel", "uds.directory.view", "uds.interventi.view", "uds.interventi.create", "uds.interventi.update", "uds.interventi.note", "uds.bisogni.manage", "uds.reports.view", "magazzino.view", "magazzino.products.manage", "magazzino.stock.receive", "magazzino.stock.issue", "magazzino.stock.adjust", "magazzino.transfers.create", "magazzino.transfers.dispatch", "magazzino.transfers.receive", "bolle.view", "bolle.manage", "bolle.deliver", "bolle.cancel", "approvvigionamenti.view", "approvvigionamenti.manage", "approvvigionamenti.receive", "logistica.volontari.view", "logistica.volontari.manage", "logistica.volontari.export", "logistica.mezzi.view", "logistica.mezzi.manage", "logistica.mezzi.export", "logistica.turni.view", "logistica.turni.manage", "logistica.approvazioni.view", "logistica.approvazioni.manage"],
       isAdmin: user.isAdmin ?? false,
       isSuperAdmin: user.isSuperAdmin ?? false,
     };
@@ -210,23 +130,14 @@ export function newScope(): SeedScope {
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
-export async function createCentro(
-  scope: SeedScope,
-  nome = `Centro ${rnd()}`,
-): Promise<number> {
-  const [c] = await db
-    .insert(centriAscoltoTable)
-    .values({ nome })
-    .returning({ id: centriAscoltoTable.id });
+export async function createCentro(scope: SeedScope, nome = `Centro ${rnd()}`): Promise<number> {
+  const [c] = await db.insert(centriAscoltoTable).values({ nome }).returning({ id: centriAscoltoTable.id });
   scope.centroIds.push(c.id);
   return c.id;
 }
 
 /** Like {@link createCentro} but accepts a area operativa and returns id + nome. */
-export async function createCentroRec(
-  scope: SeedScope,
-  opts: { areaOperativaId?: number | null; nome?: string } = {},
-): Promise<{ id: number; nome: string }> {
+export async function createCentroRec(scope: SeedScope, opts: { areaOperativaId?: number | null; nome?: string } = {}): Promise<{ id: number; nome: string }> {
   const nome = opts.nome ?? `Centro ${rnd()}`;
   const [c] = await db
     .insert(centriAscoltoTable)
@@ -236,11 +147,7 @@ export async function createCentroRec(
   return { id: c.id, nome };
 }
 
-export async function createMagazzino(
-  scope: SeedScope,
-  centroId: number | null,
-  opts: { areaOperativaId?: number | null } = {},
-): Promise<number> {
+export async function createMagazzino(scope: SeedScope, centroId: number | null, opts: { areaOperativaId?: number | null } = {}): Promise<number> {
   const [m] = await db
     .insert(magazziniTable)
     .values({
@@ -255,11 +162,7 @@ export async function createMagazzino(
 }
 
 /** Like {@link createMagazzino} but also returns the generated unique nome. */
-export async function createMagazzinoRec(
-  scope: SeedScope,
-  centroId: number | null,
-  opts: { areaOperativaId?: number | null } = {},
-): Promise<{ id: number; nome: string }> {
+export async function createMagazzinoRec(scope: SeedScope, centroId: number | null, opts: { areaOperativaId?: number | null } = {}): Promise<{ id: number; nome: string }> {
   const nome = `Mag ${rnd()}`;
   const [m] = await db
     .insert(magazziniTable)
@@ -310,15 +213,9 @@ export async function createAreaOperativa(scope: SeedScope): Promise<number> {
   return c.id;
 }
 
-export async function createZona(
-  scope: SeedScope,
-  areaOperativaId: number,
-): Promise<{ id: number; nome: string }> {
+export async function createZona(scope: SeedScope, areaOperativaId: number): Promise<{ id: number; nome: string }> {
   const nome = `Zona ${rnd()}`;
-  const [z] = await db
-    .insert(zoneUdsTable)
-    .values({ areaOperativaId, nome })
-    .returning({ id: zoneUdsTable.id });
+  const [z] = await db.insert(zoneUdsTable).values({ areaOperativaId, nome }).returning({ id: zoneUdsTable.id });
   scope.zonaIds.push(z.id);
   return { id: z.id, nome };
 }
@@ -338,10 +235,7 @@ export async function createProdotto(scope: SeedScope): Promise<number> {
   return p.id;
 }
 
-export async function createFornitore(
-  scope: SeedScope,
-  areaOperativaId: number | null,
-): Promise<number> {
+export async function createFornitore(scope: SeedScope, areaOperativaId: number | null): Promise<number> {
   const [f] = await db
     .insert(fornitoriTable)
     .values({ nome: `Fornitore ${rnd()}`, tipo: "azienda", areaOperativaId })
@@ -350,10 +244,7 @@ export async function createFornitore(
   return f.id;
 }
 
-export async function createVolontario(
-  scope: SeedScope,
-  centroId: number | null,
-): Promise<number> {
+export async function createVolontario(scope: SeedScope, centroId: number | null): Promise<number> {
   const [v] = await db
     .insert(volontariTable)
     .values({
@@ -369,10 +260,7 @@ export async function createVolontario(
   return v.id;
 }
 
-export async function createRuoloVolontario(
-  scope: SeedScope,
-  opts: { nome?: string; attivo?: boolean } = {},
-): Promise<number> {
+export async function createRuoloVolontario(scope: SeedScope, opts: { nome?: string; attivo?: boolean } = {}): Promise<number> {
   const [ruolo] = await db
     .insert(ruoliVolontariTable)
     .values({
@@ -384,10 +272,7 @@ export async function createRuoloVolontario(
   return ruolo.id;
 }
 
-export async function createMezzo(
-  scope: SeedScope,
-  opts: { centroId?: number | null; volontarioId?: number | null } = {},
-): Promise<number> {
+export async function createMezzo(scope: SeedScope, opts: { centroId?: number | null; volontarioId?: number | null } = {}): Promise<number> {
   const [m] = await db
     .insert(mezziTable)
     .values({
@@ -404,10 +289,7 @@ export async function createMezzo(
   return m.id;
 }
 
-export async function createRuolo(
-  scope: SeedScope,
-  opts: { isAdmin?: boolean } = {},
-): Promise<number> {
+export async function createRuolo(scope: SeedScope, opts: { isAdmin?: boolean } = {}): Promise<number> {
   const [r] = await db
     .insert(ruoliTable)
     .values({
@@ -420,10 +302,7 @@ export async function createRuolo(
   return r.id;
 }
 
-export async function createUtente(
-  scope: SeedScope,
-  opts: { centroId?: number | null; ruoloId?: number | null } = {},
-): Promise<number> {
+export async function createUtente(scope: SeedScope, opts: { centroId?: number | null; ruoloId?: number | null } = {}): Promise<number> {
   const [u] = await db
     .insert(utentiTable)
     .values({
@@ -468,10 +347,7 @@ export async function createLotto(
   return l.id;
 }
 
-export async function insertScarico(
-  scope: SeedScope,
-  opts: { magazzinoId: number; centroId: number | null },
-): Promise<number> {
+export async function insertScarico(scope: SeedScope, opts: { magazzinoId: number; centroId: number | null }): Promise<number> {
   const [s] = await db
     .insert(scarichiTable)
     .values({
@@ -486,10 +362,7 @@ export async function insertScarico(
   return s.id;
 }
 
-export async function insertApprovvigionamento(
-  scope: SeedScope,
-  opts: { magazzinoId: number; centroId: number | null },
-): Promise<number> {
+export async function insertApprovvigionamento(scope: SeedScope, opts: { magazzinoId: number; centroId: number | null }): Promise<number> {
   const [a] = await db
     .insert(approvvigionamentiTable)
     .values({
@@ -663,10 +536,7 @@ export async function insertIntervento(
   return i.id;
 }
 
-export async function insertTrasferimento(
-  scope: SeedScope,
-  opts: { origineId: number; destinoId: number },
-): Promise<number> {
+export async function insertTrasferimento(scope: SeedScope, opts: { origineId: number; destinoId: number }): Promise<number> {
   const [t] = await db
     .insert(trasferimentiTable)
     .values({
@@ -683,19 +553,31 @@ export async function insertTrasferimento(
 /** Inserts a movimento row (cleaned up via its magazzino in {@link cleanup}). */
 export async function insertMovimento(
   scope: SeedScope,
-  opts: { magazzinoId: number; prodottoId: number },
+  opts: {
+    magazzinoId: number;
+    prodottoId: number;
+    lottoId?: number | null;
+    bollaRigaId?: number | null;
+    tipoMovimento?: typeof movimentiTable.$inferInsert.tipoMovimento;
+    naturaContabile?: typeof movimentiTable.$inferInsert.naturaContabile;
+    fondoOrigine?: typeof movimentiTable.$inferInsert.fondoOrigine;
+  },
 ): Promise<number> {
   void scope;
   const [m] = await db
     .insert(movimentiTable)
     .values({
-      tipoMovimento: "carico",
+      tipoMovimento: opts.tipoMovimento ?? "carico",
       tipoDettaglio: "donazione",
       dataMovimento: "2026-06-01",
       magazzinoId: opts.magazzinoId,
       prodottoId: opts.prodottoId,
+      lottoId: opts.lottoId ?? null,
+      bollaRigaId: opts.bollaRigaId ?? null,
       quantita: "1.00",
       unitaMisura: "kg",
+      naturaContabile: opts.naturaContabile,
+      fondoOrigine: opts.fondoOrigine,
     })
     .returning({ id: movimentiTable.id });
   return m.id;
@@ -704,104 +586,43 @@ export async function insertMovimento(
 /** Deletes every row created under this scope, in FK-safe (child→parent) order. */
 export async function cleanup(scope: SeedScope): Promise<void> {
   if (scope.magazzinoIds.length > 0) {
-    await db
-      .delete(movimentiTable)
-      .where(inArray(movimentiTable.magazzinoId, scope.magazzinoIds));
-    await db
-      .delete(carichiMagazzinoRigheTable)
-      .where(
-        inArray(
-          carichiMagazzinoRigheTable.lottoId,
-          db
-            .select({ id: lottiTable.id })
-            .from(lottiTable)
-            .where(inArray(lottiTable.magazzinoId, scope.magazzinoIds)),
-        ),
-      );
-    await db
-      .delete(carichiMagazzinoTable)
-      .where(inArray(carichiMagazzinoTable.magazzinoId, scope.magazzinoIds));
-    await db
-      .delete(operazioniDistribuzioneMagazzinoTable)
-      .where(
-        inArray(
-          operazioniDistribuzioneMagazzinoTable.magazzinoId,
-          scope.magazzinoIds,
-        ),
-      );
+    await db.delete(movimentiTable).where(inArray(movimentiTable.magazzinoId, scope.magazzinoIds));
+    await db.delete(carichiMagazzinoRigheTable).where(inArray(carichiMagazzinoRigheTable.lottoId, db.select({ id: lottiTable.id }).from(lottiTable).where(inArray(lottiTable.magazzinoId, scope.magazzinoIds))));
+    await db.delete(carichiMagazzinoTable).where(inArray(carichiMagazzinoTable.magazzinoId, scope.magazzinoIds));
+    await db.delete(operazioniDistribuzioneMagazzinoTable).where(inArray(operazioniDistribuzioneMagazzinoTable.magazzinoId, scope.magazzinoIds));
   }
   if (scope.trasferimentoIds.length > 0) {
-    await db
-      .delete(trasferimentoRigheTable)
-      .where(
-        inArray(
-          trasferimentoRigheTable.trasferimentoId,
-          scope.trasferimentoIds,
-        ),
-      );
-    await db
-      .delete(trasferimentiTable)
-      .where(inArray(trasferimentiTable.id, scope.trasferimentoIds));
+    await db.delete(trasferimentoRigheTable).where(inArray(trasferimentoRigheTable.trasferimentoId, scope.trasferimentoIds));
+    await db.delete(trasferimentiTable).where(inArray(trasferimentiTable.id, scope.trasferimentoIds));
   }
   if (scope.interventoIds.length > 0) {
-    await db
-      .delete(interventiTable)
-      .where(inArray(interventiTable.id, scope.interventoIds));
+    await db.delete(interventiTable).where(inArray(interventiTable.id, scope.interventoIds));
   }
   if (scope.turnoIds.length > 0) {
-    await db
-      .delete(turniConsegneTable)
-      .where(inArray(turniConsegneTable.turnoId, scope.turnoIds));
-    await db
-      .delete(turniVolontariTable)
-      .where(inArray(turniVolontariTable.turnoId, scope.turnoIds));
+    await db.delete(turniConsegneTable).where(inArray(turniConsegneTable.turnoId, scope.turnoIds));
+    await db.delete(turniVolontariTable).where(inArray(turniVolontariTable.turnoId, scope.turnoIds));
     await db.delete(turniTable).where(inArray(turniTable.id, scope.turnoIds));
   }
   if (scope.prenotazioneIds.length > 0) {
-    await db
-      .delete(prenotazioniMagazzinoTable)
-      .where(inArray(prenotazioniMagazzinoTable.id, scope.prenotazioneIds));
+    await db.delete(prenotazioniMagazzinoTable).where(inArray(prenotazioniMagazzinoTable.id, scope.prenotazioneIds));
   }
   if (scope.bollaIds.length > 0) {
-    await db
-      .delete(interventiTable)
-      .where(inArray(interventiTable.bollaId, scope.bollaIds));
-    await db
-      .delete(prenotazioniMagazzinoTable)
-      .where(inArray(prenotazioniMagazzinoTable.bollaId, scope.bollaIds));
-    await db
-      .delete(bollaRigheTable)
-      .where(inArray(bollaRigheTable.bollaId, scope.bollaIds));
+    await db.delete(interventiTable).where(inArray(interventiTable.bollaId, scope.bollaIds));
+    await db.delete(prenotazioniMagazzinoTable).where(inArray(prenotazioniMagazzinoTable.bollaId, scope.bollaIds));
+    await db.delete(bollaRigheTable).where(inArray(bollaRigheTable.bollaId, scope.bollaIds));
     await db.delete(bolleTable).where(inArray(bolleTable.id, scope.bollaIds));
   }
   if (scope.consegnaIds.length > 0) {
-    await db
-      .delete(turniConsegneTable)
-      .where(inArray(turniConsegneTable.consegnaId, scope.consegnaIds));
-    await db
-      .delete(consegneTable)
-      .where(inArray(consegneTable.id, scope.consegnaIds));
+    await db.delete(turniConsegneTable).where(inArray(turniConsegneTable.consegnaId, scope.consegnaIds));
+    await db.delete(consegneTable).where(inArray(consegneTable.id, scope.consegnaIds));
   }
   if (scope.scaricoIds.length > 0) {
-    await db
-      .delete(scaricoRigheTable)
-      .where(inArray(scaricoRigheTable.scaricoId, scope.scaricoIds));
-    await db
-      .delete(scarichiTable)
-      .where(inArray(scarichiTable.id, scope.scaricoIds));
+    await db.delete(scaricoRigheTable).where(inArray(scaricoRigheTable.scaricoId, scope.scaricoIds));
+    await db.delete(scarichiTable).where(inArray(scarichiTable.id, scope.scaricoIds));
   }
   if (scope.approvvigionamentoIds.length > 0) {
-    await db
-      .delete(approvvigionamentoRigheTable)
-      .where(
-        inArray(
-          approvvigionamentoRigheTable.approvvigionamentoId,
-          scope.approvvigionamentoIds,
-        ),
-      );
-    await db
-      .delete(approvvigionamentiTable)
-      .where(inArray(approvvigionamentiTable.id, scope.approvvigionamentoIds));
+    await db.delete(approvvigionamentoRigheTable).where(inArray(approvvigionamentoRigheTable.approvvigionamentoId, scope.approvvigionamentoIds));
+    await db.delete(approvvigionamentiTable).where(inArray(approvvigionamentiTable.id, scope.approvvigionamentoIds));
   }
   if (scope.lottoIds.length > 0) {
     await db.delete(lottiTable).where(inArray(lottiTable.id, scope.lottoIds));
@@ -810,62 +631,38 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(mezziTable).where(inArray(mezziTable.id, scope.mezzoIds));
   }
   if (scope.prodottoIds.length > 0) {
-    await db
-      .delete(prodottiTable)
-      .where(inArray(prodottiTable.id, scope.prodottoIds));
+    await db.delete(prodottiTable).where(inArray(prodottiTable.id, scope.prodottoIds));
   }
   if (scope.fornitoreIds.length > 0) {
-    await db
-      .delete(fornitoriTable)
-      .where(inArray(fornitoriTable.id, scope.fornitoreIds));
+    await db.delete(fornitoriTable).where(inArray(fornitoriTable.id, scope.fornitoreIds));
   }
   if (scope.volontarioIds.length > 0) {
-    await db
-      .delete(volontariTable)
-      .where(inArray(volontariTable.id, scope.volontarioIds));
+    await db.delete(volontariTable).where(inArray(volontariTable.id, scope.volontarioIds));
   }
   if (scope.ruoloVolontarioIds.length > 0) {
-    await db
-      .delete(ruoliVolontariTable)
-      .where(inArray(ruoliVolontariTable.id, scope.ruoloVolontarioIds));
+    await db.delete(ruoliVolontariTable).where(inArray(ruoliVolontariTable.id, scope.ruoloVolontarioIds));
   }
   if (scope.beneficiarioIds.length > 0) {
-    await db
-      .delete(beneficiariTable)
-      .where(inArray(beneficiariTable.id, scope.beneficiarioIds));
+    await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, scope.beneficiarioIds));
   }
   if (scope.magazzinoIds.length > 0) {
-    await db
-      .delete(magazziniTable)
-      .where(inArray(magazziniTable.id, scope.magazzinoIds));
+    await db.delete(magazziniTable).where(inArray(magazziniTable.id, scope.magazzinoIds));
   }
   if (scope.utenteIds.length > 0) {
-    await db
-      .delete(interventiTable)
-      .where(inArray(interventiTable.operatoreId, scope.utenteIds));
-    await db
-      .delete(auditConfigurazioniTable)
-      .where(inArray(auditConfigurazioniTable.utenteId, scope.utenteIds));
-    await db
-      .delete(utentiTable)
-      .where(inArray(utentiTable.id, scope.utenteIds));
+    await db.delete(interventiTable).where(inArray(interventiTable.operatoreId, scope.utenteIds));
+    await db.delete(auditConfigurazioniTable).where(inArray(auditConfigurazioniTable.utenteId, scope.utenteIds));
+    await db.delete(utentiTable).where(inArray(utentiTable.id, scope.utenteIds));
   }
   if (scope.ruoloIds.length > 0) {
     await db.delete(ruoliTable).where(inArray(ruoliTable.id, scope.ruoloIds));
   }
   if (scope.centroIds.length > 0) {
-    await db
-      .delete(centriAscoltoTable)
-      .where(inArray(centriAscoltoTable.id, scope.centroIds));
+    await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, scope.centroIds));
   }
   if (scope.zonaIds.length > 0) {
-    await db
-      .delete(zoneUdsTable)
-      .where(inArray(zoneUdsTable.id, scope.zonaIds));
+    await db.delete(zoneUdsTable).where(inArray(zoneUdsTable.id, scope.zonaIds));
   }
   if (scope.areaOperativaIds.length > 0) {
-    await db
-      .delete(areeOperativeTable)
-      .where(inArray(areeOperativeTable.id, scope.areaOperativaIds));
+    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, scope.areaOperativaIds));
   }
 }

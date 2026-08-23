@@ -5,6 +5,207 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+export interface FseErrorResponse {
+  error: string;
+}
+
+export interface FseRecord { [key: string]: unknown }
+
+export type FseRecordList = FseRecord[];
+
+export interface FseReconciliationRowsPage {
+  /** @minimum 1 */
+  page: number;
+  /**
+     * @minimum 1
+     * @maximum 200
+     */
+  pageSize: number;
+  rows: FseRecordList;
+}
+
+export type FseExportInputFormatCode = typeof FseExportInputFormatCode[keyof typeof FseExportInputFormatCode];
+
+
+export const FseExportInputFormatCode = {
+  FSE_CANONICAL_AUDIT_XLSX_V1: 'FSE_CANONICAL_AUDIT_XLSX_V1',
+  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1: 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1',
+} as const;
+
+export interface FseExportInput {
+  /** @minimum 1 */
+  magazzinoId: number;
+  dataDa: string;
+  dataA: string;
+  dataAsOf: string;
+  formatCode: FseExportInputFormatCode;
+  /** @minimum 1 */
+  maxMovimentoId?: number;
+  /** @minimum 1 */
+  maxOperazioneDistribuzioneId?: number;
+}
+
+export interface FseVersionInput {
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione?: string;
+  data?: string;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  riferimentoEsterno?: string;
+  conScostamenti?: boolean;
+}
+
+export interface FseMarkEnteredInput {
+  /** @minimum 1 */
+  versione: number;
+  data: string;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  riferimentoEsterno: string;
+}
+
+export interface FseCancelInput {
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione: string;
+}
+
+export interface FseReconciliationInput {
+  /** @minimum 1 */
+  magazzinoId: number;
+  /** @minimum 1 */
+  importazioneAgeaId: number;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  importazioneAgeaPrecedenteId?: number | null;
+  dataRiferimento: string;
+  /** @minimum 1 */
+  maxMovimentoId?: number;
+  /** @minimum 1 */
+  maxOperazioneDistribuzioneId?: number;
+}
+
+export type FseResolutionInputAzione = typeof FseResolutionInputAzione[keyof typeof FseResolutionInputAzione];
+
+
+export const FseResolutionInputAzione = {
+  ABBINA: 'ABBINA',
+  DISABBINA: 'DISABBINA',
+  ACCETTA_SCOSTAMENTO: 'ACCETTA_SCOSTAMENTO',
+  SEGNALA_DA_CORREGGERE: 'SEGNALA_DA_CORREGGERE',
+  RIAPRI: 'RIAPRI',
+} as const;
+
+export interface FseResolutionInput {
+  /** @minimum 1 */
+  versione: number;
+  azione: FseResolutionInputAzione;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  motivazione: string;
+}
+
+export type FseMonitoringInputCanaleUfficiale = typeof FseMonitoringInputCanaleUfficiale[keyof typeof FseMonitoringInputCanaleUfficiale];
+
+
+export const FseMonitoringInputCanaleUfficiale = {
+  PACCHI: 'PACCHI',
+  MENSA: 'MENSA',
+  STRADA: 'STRADA',
+} as const;
+
+export interface FseMonitoringInput {
+  /** @minimum 1 */
+  magazzinoId: number;
+  /** @pattern ^[0-9]{4}-(0[1-9]|1[0-2])$ */
+  annoMese: string;
+  canaleUfficiale: FseMonitoringInputCanaleUfficiale;
+  dataRiferimento: string;
+  [key: string]: unknown;
+ }
+
+export interface FseMonitoringUpdate {
+  /** @minimum 1 */
+  versione: number;
+  [key: string]: unknown;
+ }
+
+export interface FseOpcReturnLineInput {
+  /** @minimum 1 */
+  prodottoId: number;
+  /** @minimum 1 */
+  lottoId?: number;
+  quantita: number | string;
+}
+
+export type FseOpcReturnInputVersione = typeof FseOpcReturnInputVersione[keyof typeof FseOpcReturnInputVersione];
+
+
+export const FseOpcReturnInputVersione = {
+  NUMBER_1: 1,
+} as const;
+
+export type FseOpcReturnInputModalitaSelezione = typeof FseOpcReturnInputModalitaSelezione[keyof typeof FseOpcReturnInputModalitaSelezione];
+
+
+export const FseOpcReturnInputModalitaSelezione = {
+  FEFO: 'FEFO',
+  PARTITA_ESATTA: 'PARTITA_ESATTA',
+} as const;
+
+export interface FseOpcReturnInput {
+  versione: FseOpcReturnInputVersione;
+  /**
+     * @minLength 8
+     * @maxLength 100
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  magazzinoId: number;
+  dataReso: string;
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  destinazioneOpc: string;
+  /**
+     * @minLength 3
+     * @maxLength 2000
+     */
+  motivazione: string;
+  modalitaSelezione: FseOpcReturnInputModalitaSelezione;
+  /** @minItems 1 */
+  righe: FseOpcReturnLineInput[];
+}
+
+export interface FseOpcReturnReversalInput {
+  /** @minimum 1 */
+  versione: number;
+  data: string;
+  /**
+     * @minLength 3
+     * @maxLength 2000
+     */
+  motivazione: string;
+}
+
 export type MapsLayerCode = typeof MapsLayerCode[keyof typeof MapsLayerCode];
 
 
@@ -88,6 +289,13 @@ export interface MapsRoute {
   url: string;
 }
 
+export type ReportingDashboardReportingModelVersion = typeof ReportingDashboardReportingModelVersion[keyof typeof ReportingDashboardReportingModelVersion];
+
+
+export const ReportingDashboardReportingModelVersion = {
+  MAGAZZINO_2_0C_V1: 'MAGAZZINO_2_0C_V1',
+} as const;
+
 export type ReportingDashboardSection = typeof ReportingDashboardSection[keyof typeof ReportingDashboardSection];
 
 
@@ -136,11 +344,14 @@ export type ReportKpiUnit = typeof ReportKpiUnit[keyof typeof ReportKpiUnit];
 
 export const ReportKpiUnit = {
   count: 'count',
-  quantity: 'quantity',
-  kg: 'kg',
+  pieces: 'pieces',
+  kgLt: 'kgLt',
+  percentage: 'percentage',
   credit: 'credit',
   days: 'days',
   average: 'average',
+  quantity: 'quantity',
+  kg: 'kg',
 } as const;
 
 export type ReportKpiAvailability = typeof ReportKpiAvailability[keyof typeof ReportKpiAvailability];
@@ -156,6 +367,11 @@ export interface ReportKpi {
   key: string;
   /** @nullable */
   value: number | null;
+  /**
+     * Valore decimale esatto; le decisioni non usano la proiezione number.
+     * @nullable
+     */
+  exactValue: string | null;
   unit: ReportKpiUnit;
   availability: ReportKpiAvailability;
   /** @nullable */
@@ -201,6 +417,7 @@ export interface ReportQualityItem {
 }
 
 export interface ReportingDashboard {
+  reportingModelVersion: ReportingDashboardReportingModelVersion;
   section: ReportingDashboardSection;
   filters: ReportAppliedFilters;
   kpi: ReportKpi[];
@@ -212,9 +429,17 @@ export interface ReportingDashboard {
   timezone: ReportingDashboardTimezone;
 }
 
+export type ReportDrilldownReportingModelVersion = typeof ReportDrilldownReportingModelVersion[keyof typeof ReportDrilldownReportingModelVersion];
+
+
+export const ReportDrilldownReportingModelVersion = {
+  MAGAZZINO_2_0C_V1: 'MAGAZZINO_2_0C_V1',
+} as const;
+
 export type ReportDrilldownRowsItem = { [key: string]: unknown };
 
 export interface ReportDrilldown {
+  reportingModelVersion: ReportDrilldownReportingModelVersion;
   section: string;
   metric: string;
   page: number;
@@ -6668,6 +6893,31 @@ export interface RuoloUpdate {
 }
 
 /**
+ * Richiesta FSE+ non valida
+ */
+export type FseBadRequestResponse = FseErrorResponse;
+
+/**
+ * Permesso o scope FSE+ non consentito
+ */
+export type FseForbiddenResponse = FseErrorResponse;
+
+/**
+ * Risorsa FSE+ non trovata
+ */
+export type FseNotFoundResponse = FseErrorResponse;
+
+/**
+ * Versione, cutoff, copertura o concorrenza non validi
+ */
+export type FseConflictResponse = FseErrorResponse;
+
+/**
+ * Payload FSE+ oltre il limite operativo
+ */
+export type FsePayloadTooLargeResponse = FseErrorResponse;
+
+/**
  * Richiesta AGEA non valida
  */
 export type AgeaBadRequestResponse = AgeaErrorResponse;
@@ -6696,6 +6946,18 @@ export type AgeaPayloadTooLargeResponse = AgeaErrorResponse;
  * MIME XLSX richiesto
  */
 export type AgeaUnsupportedMediaTypeResponse = AgeaErrorResponse;
+
+export type FseMagazzinoIdParameter = number;
+
+export type FseDataDaParameter = string;
+
+export type FseDataAParameter = string;
+
+export type FseDataAsOfParameter = string;
+
+export type FsePageParameter = number;
+
+export type FsePageSizeParameter = number;
 
 /**
  * Pagina richiesta, indicizzata da 1
@@ -6794,6 +7056,142 @@ tipo?: AgeaTipoMovimento;
  * @maxLength 100
  */
 q?: string;
+};
+
+export type GetFseReportingPreviewParams = {
+/**
+ * @minimum 1
+ */
+magazzinoId: FseMagazzinoIdParameter;
+dataDa: FseDataDaParameter;
+dataA: FseDataAParameter;
+dataAsOf?: FseDataAsOfParameter;
+};
+
+export type ListFseReportingEventsParams = {
+/**
+ * @minimum 1
+ */
+magazzinoId: FseMagazzinoIdParameter;
+dataDa: FseDataDaParameter;
+dataA: FseDataAParameter;
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+};
+
+export type ListFseReportingLinesParams = {
+/**
+ * @minimum 1
+ */
+magazzinoId: FseMagazzinoIdParameter;
+dataDa: FseDataDaParameter;
+dataA: FseDataAParameter;
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+};
+
+export type ListFseReportingQualityParams = {
+/**
+ * @minimum 1
+ */
+magazzinoId: FseMagazzinoIdParameter;
+dataDa: FseDataDaParameter;
+dataA: FseDataAParameter;
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+};
+
+export type ListFseExportsParams = {
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+};
+
+export type ListFseExportEventsParams = {
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+};
+
+export type ListFseExportLinesParams = {
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+};
+
+export type ListFseReconciliationsParams = {
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
+};
+
+export type ListFseReconciliationLinesParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+};
+
+export type ListFseMonitoringParams = {
+/**
+ * @minimum 1
+ */
+page?: FsePageParameter;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: FsePageSizeParameter;
 };
 
 export type ListLottiParams = {

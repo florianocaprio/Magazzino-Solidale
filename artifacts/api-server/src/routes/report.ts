@@ -12,9 +12,7 @@ const requireReportCentro = requireAllModuli(["CENTRO_ASCOLTO", "REPORT"]);
 const requireReportUds = requireAllModuli(["UDS", "REPORT"]);
 
 router.use("/report", (req, res, next) => {
-  const guard = isUdsReportRequest(req)
-    ? requireReportUds
-    : requireReportCentro;
+  const guard = isUdsReportRequest(req) ? requireReportUds : requireReportCentro;
   guard(req, res, next);
 });
 router.use("/report/uds", requirePermission("uds.reports.view"));
@@ -48,11 +46,23 @@ function parseDateRange(req: { query: Record<string, unknown> }): DateRange {
   const anno = parseIntParam(req.query.anno) ?? new Date().getFullYear();
   const daRaw = req.query.da ? String(req.query.da) : "";
   const aRaw = req.query.a ? String(req.query.a) : "";
-  if (daRaw && !isValidIsoDate(daRaw)) return { ok: false, message: "Parametro 'da' non è una data valida (atteso YYYY-MM-DD)." };
-  if (aRaw && !isValidIsoDate(aRaw)) return { ok: false, message: "Parametro 'a' non è una data valida (atteso YYYY-MM-DD)." };
+  if (daRaw && !isValidIsoDate(daRaw))
+    return {
+      ok: false,
+      message: "Parametro 'da' non è una data valida (atteso YYYY-MM-DD).",
+    };
+  if (aRaw && !isValidIsoDate(aRaw))
+    return {
+      ok: false,
+      message: "Parametro 'a' non è una data valida (atteso YYYY-MM-DD).",
+    };
   const da = daRaw || `${anno}-01-01`;
   const a = aRaw || `${anno}-12-31`;
-  if (da > a) return { ok: false, message: "L'intervallo di date non è valido: 'da' è successivo ad 'a'." };
+  if (da > a)
+    return {
+      ok: false,
+      message: "L'intervallo di date non è valido: 'da' è successivo ad 'a'.",
+    };
   return { ok: true, da, a };
 }
 
@@ -85,12 +95,14 @@ router.get("/report/giacenze-per-magazzino", async (req, res) => {
   `);
   const rows = result1.rows as Array<Record<string, unknown>>;
 
-  res.json(rows.map((r: Record<string, unknown>) => ({
-    magazzinoNome: r.magazzino_nome,
-    totProdotti: Number(r.tot_prodotti),
-    prodottiSottoscorta: Number(r.prodotti_sottoscorta),
-    lottiInScadenza: Number(r.lotti_in_scadenza),
-  })));
+  res.json(
+    rows.map((r: Record<string, unknown>) => ({
+      magazzinoNome: r.magazzino_nome,
+      totProdotti: Number(r.tot_prodotti),
+      prodottiSottoscorta: Number(r.prodotti_sottoscorta),
+      lottiInScadenza: Number(r.lotti_in_scadenza),
+    })),
+  );
 });
 
 router.get("/report/consegne-per-mese", async (req, res) => {
@@ -129,12 +141,14 @@ router.get("/report/consegne-per-mese", async (req, res) => {
   `);
   const rows2 = result2.rows as Array<Record<string, unknown>>;
 
-  res.json(rows2.map((r: Record<string, unknown>) => ({
-    mese: r.mese,
-    totConsegne: Number(r.tot_consegne),
-    consegneEffettuate: Number(r.consegne_effettuate),
-    consegneMancate: Number(r.consegne_mancate),
-  })));
+  res.json(
+    rows2.map((r: Record<string, unknown>) => ({
+      mese: r.mese,
+      totConsegne: Number(r.tot_consegne),
+      consegneEffettuate: Number(r.consegne_effettuate),
+      consegneMancate: Number(r.consegne_mancate),
+    })),
+  );
 });
 
 router.get("/report/consegne-per-centro", async (req, res) => {
@@ -171,13 +185,15 @@ router.get("/report/consegne-per-centro", async (req, res) => {
   `);
   const rows = result.rows as Array<Record<string, unknown>>;
 
-  res.json(rows.map((r: Record<string, unknown>) => ({
-    centroId: r.centro_id === null || r.centro_id === undefined ? null : Number(r.centro_id),
-    centroNome: r.centro_nome as string,
-    dirette: Number(r.dirette),
-    conVolontari: Number(r.con_volontari),
-    totale: Number(r.totale),
-  })));
+  res.json(
+    rows.map((r: Record<string, unknown>) => ({
+      centroId: r.centro_id === null || r.centro_id === undefined ? null : Number(r.centro_id),
+      centroNome: r.centro_nome as string,
+      dirette: Number(r.dirette),
+      conVolontari: Number(r.con_volontari),
+      totale: Number(r.totale),
+    })),
+  );
 });
 
 router.get("/report/allocazione-mezzi", async (req, res) => {
@@ -197,11 +213,7 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
   // axis, by their centro's area operativa (derived via centri_di_ascolto; NULL = a
   // universal mezzo or a centro without area operativa, kept visible like magazzini).
   const mezzoConds: SQL[] = [];
-  const effectiveMezzoCentro = effectiveMezzoCentroSql(
-    sql`m.volontario_id`,
-    sql`mv.centro_ascolto_id`,
-    sql`m.centro_ascolto_id`,
-  );
+  const effectiveMezzoCentro = effectiveMezzoCentroSql(sql`m.volontario_id`, sql`mv.centro_ascolto_id`, sql`m.centro_ascolto_id`);
   if (centroAscoltoId) mezzoConds.push(sql`${effectiveMezzoCentro} = ${centroAscoltoId}`);
   const mCentroCond = ownOrNullSql(effectiveMezzoCentro, caller);
   if (mCentroCond) mezzoConds.push(mCentroCond);
@@ -302,6 +314,8 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
 });
 
 router.get("/report/fse-plus", async (req, res) => {
+  res.setHeader("Deprecation", "true");
+  res.setHeader("Link", '</api/report/fse-plus/integrato>; rel="successor-version"');
   const parsedAnno = req.query.anno ? parseInt(req.query.anno as string, 10) : new Date().getFullYear();
   if (Number.isNaN(parsedAnno) || parsedAnno < 2000 || parsedAnno > 2100) {
     res.status(400).json({ message: "Parametro 'anno' non valido." });
@@ -310,29 +324,23 @@ router.get("/report/fse-plus", async (req, res) => {
   const anno = parsedAnno;
   const caller = callerCentroId(req);
   const areaOperativa = callerAreaOperativaId(req);
-  const centroSub = caller == null
-    ? sql``
-    : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE centro_ascolto_id = ${caller} OR centro_ascolto_id IS NULL)`;
-  const areaOperativaSub = areaOperativa == null
-    ? sql``
-    : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${areaOperativa} OR area_operativa_id IS NULL)`;
+  const centroSub = caller == null ? sql`` : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE centro_ascolto_id = ${caller} OR centro_ascolto_id IS NULL)`;
+  const areaOperativaSub = areaOperativa == null ? sql`` : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${areaOperativa} OR area_operativa_id IS NULL)`;
   const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
-  const areaOperativaQSub = qAreaOperativa == null
-    ? sql``
-    : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${qAreaOperativa})`;
+  const areaOperativaQSub = qAreaOperativa == null ? sql`` : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${qAreaOperativa})`;
   const centroCond = sql`${centroSub}${areaOperativaSub}${areaOperativaQSub}`;
 
   const prodRes = await db.execute(sql`
     SELECT p.id as prodotto_id,
            p.nome as prodotto_nome,
            p.unita_misura,
-           SUM(br.quantita::numeric) as quantita_totale,
-           SUM(CASE WHEN p.unita_misura = 'kg' THEN br.quantita::numeric ELSE 0 END) as peso_kg
+           SUM(abs(mv.quantita::numeric)) as quantita_totale,
+           SUM(CASE WHEN p.unita_misura = 'kg' THEN abs(mv.quantita::numeric) ELSE 0 END) as peso_kg
     FROM bolle b
     JOIN bolla_righe br ON br.bolla_id = b.id
-    JOIN lotti l ON br.lotto_id = l.id
+    JOIN movimenti mv ON mv.bolla_riga_id = br.id
     JOIN prodotti p ON br.prodotto_id = p.id
-    WHERE l.fse_plus = true
+    WHERE mv.fondo_origine = 'FSE_PLUS'
       AND b.stato = 'consegnato'
       AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
     GROUP BY p.id, p.nome, p.unita_misura
@@ -344,8 +352,8 @@ router.get("/report/fse-plus", async (req, res) => {
     SELECT COUNT(DISTINCT b.beneficiario_id) as tot
     FROM bolle b
     JOIN bolla_righe br ON br.bolla_id = b.id
-    JOIN lotti l ON br.lotto_id = l.id
-    WHERE l.fse_plus = true
+    JOIN movimenti mv ON mv.bolla_riga_id = br.id
+    WHERE mv.fondo_origine = 'FSE_PLUS'
       AND b.stato = 'consegnato'
       AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
   `);
@@ -356,8 +364,8 @@ router.get("/report/fse-plus", async (req, res) => {
       SELECT DISTINCT b.beneficiario_id
       FROM bolle b
       JOIN bolla_righe br ON br.bolla_id = b.id
-      JOIN lotti l ON br.lotto_id = l.id
-      WHERE l.fse_plus = true
+      JOIN movimenti mv ON mv.bolla_riga_id = br.id
+      WHERE mv.fondo_origine = 'FSE_PLUS'
         AND b.stato = 'consegnato'
         AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
     ),
@@ -374,8 +382,8 @@ router.get("/report/fse-plus", async (req, res) => {
     classificate AS (
       SELECT sesso,
              area_provenienza,
-             (data_nascita IS NOT NULL AND data_nascita <= (CURRENT_DATE - INTERVAL '18 years')) as adulto,
-             (data_nascita IS NOT NULL AND data_nascita > (CURRENT_DATE - INTERVAL '18 years')) as minore
+             (data_nascita IS NOT NULL AND data_nascita <= (make_date(${anno}, 12, 31) - INTERVAL '18 years')) as adulto,
+             (data_nascita IS NOT NULL AND data_nascita > (make_date(${anno}, 12, 31) - INTERVAL '18 years')) as minore
       FROM persone
     )
     SELECT
@@ -477,10 +485,12 @@ router.get("/report/uds/interventi-per-mese", async (req, res) => {
     ORDER BY mese
   `);
   const rows = result.rows as Array<Record<string, unknown>>;
-  res.json(rows.map((r) => ({
-    mese: r.mese as string,
-    totInterventi: Number(r.tot_interventi),
-  })));
+  res.json(
+    rows.map((r) => ({
+      mese: r.mese as string,
+      totInterventi: Number(r.tot_interventi),
+    })),
+  );
 });
 
 /**
@@ -544,27 +554,29 @@ router.get("/report/uds/interventi-giornalieri", async (req, res) => {
     ORDER BY s.data_intervento ASC, s.zona_nome NULLS LAST, s.cognome, s.nome, s.id
   `);
   const rows = result.rows as Array<Record<string, unknown>>;
-  res.json(rows.map((r) => {
-    const numero = Number(r.numero);
-    const cognome = r.cognome as string | null;
-    const nome = r.nome as string | null;
-    return {
-      id: Number(r.id),
-      beneficiarioId: Number(r.beneficiario_id),
-      beneficiarioNome: cognome && nome ? `${cognome} ${nome}` : (cognome ?? nome ?? null),
-      soprannome: (r.soprannome as string | null) ?? null,
-      zonaUdsId: r.zona_uds_id_snapshot === null || r.zona_uds_id_snapshot === undefined ? null : Number(r.zona_uds_id_snapshot),
-      zonaNome: (r.zona_nome as string | null) ?? null,
-      dataIntervento: r.data_intervento as string,
-      tipoIntervento: r.tipo_intervento as string,
-      descrizione: (r.descrizione as string | null) ?? null,
-      note: (r.note as string | null) ?? null,
-      noteUds: (r.note_uds as string | null) ?? null,
-      operatoreCodice: (r.operatore_matricola as string | null) ?? (r.operatore_username as string | null) ?? null,
-      numeroIntervento: numero,
-      primoIntervento: numero === 1,
-    };
-  }));
+  res.json(
+    rows.map((r) => {
+      const numero = Number(r.numero);
+      const cognome = r.cognome as string | null;
+      const nome = r.nome as string | null;
+      return {
+        id: Number(r.id),
+        beneficiarioId: Number(r.beneficiario_id),
+        beneficiarioNome: cognome && nome ? `${cognome} ${nome}` : (cognome ?? nome ?? null),
+        soprannome: (r.soprannome as string | null) ?? null,
+        zonaUdsId: r.zona_uds_id_snapshot === null || r.zona_uds_id_snapshot === undefined ? null : Number(r.zona_uds_id_snapshot),
+        zonaNome: (r.zona_nome as string | null) ?? null,
+        dataIntervento: r.data_intervento as string,
+        tipoIntervento: r.tipo_intervento as string,
+        descrizione: (r.descrizione as string | null) ?? null,
+        note: (r.note as string | null) ?? null,
+        noteUds: (r.note_uds as string | null) ?? null,
+        operatoreCodice: (r.operatore_matricola as string | null) ?? (r.operatore_username as string | null) ?? null,
+        numeroIntervento: numero,
+        primoIntervento: numero === 1,
+      };
+    }),
+  );
 });
 
 router.get("/report/uds/interventi-per-tipo", async (req, res) => {
@@ -588,10 +600,12 @@ router.get("/report/uds/interventi-per-tipo", async (req, res) => {
     ORDER BY tot_interventi DESC, tipo
   `);
   const rows = result.rows as Array<Record<string, unknown>>;
-  res.json(rows.map((r) => ({
-    tipo: r.tipo as string,
-    totInterventi: Number(r.tot_interventi),
-  })));
+  res.json(
+    rows.map((r) => ({
+      tipo: r.tipo as string,
+      totInterventi: Number(r.tot_interventi),
+    })),
+  );
 });
 
 router.get("/report/uds/interventi-per-zona", async (req, res) => {
@@ -617,11 +631,13 @@ router.get("/report/uds/interventi-per-zona", async (req, res) => {
     ORDER BY tot_interventi DESC, zona_nome
   `);
   const rows = result.rows as Array<Record<string, unknown>>;
-  res.json(rows.map((r) => ({
-    zonaId: r.zona_id === null || r.zona_id === undefined ? null : Number(r.zona_id),
-    zonaNome: r.zona_nome as string,
-    totInterventi: Number(r.tot_interventi),
-  })));
+  res.json(
+    rows.map((r) => ({
+      zonaId: r.zona_id === null || r.zona_id === undefined ? null : Number(r.zona_id),
+      zonaNome: r.zona_nome as string,
+      totInterventi: Number(r.tot_interventi),
+    })),
+  );
 });
 
 router.get("/report/uds/persone-per-zona", async (req, res) => {
@@ -641,13 +657,15 @@ router.get("/report/uds/persone-per-zona", async (req, res) => {
     ORDER BY totale DESC, zona_nome
   `);
   const rows = result.rows as Array<Record<string, unknown>>;
-  res.json(rows.map((r) => ({
-    zonaId: r.zona_id === null || r.zona_id === undefined ? null : Number(r.zona_id),
-    zonaNome: r.zona_nome as string,
-    totale: Number(r.totale),
-    soloUds: Number(r.solo_uds),
-    udsConCentro: Number(r.uds_con_centro),
-  })));
+  res.json(
+    rows.map((r) => ({
+      zonaId: r.zona_id === null || r.zona_id === undefined ? null : Number(r.zona_id),
+      zonaNome: r.zona_nome as string,
+      totale: Number(r.totale),
+      soloUds: Number(r.solo_uds),
+      udsConCentro: Number(r.uds_con_centro),
+    })),
+  );
 });
 
 export default router;

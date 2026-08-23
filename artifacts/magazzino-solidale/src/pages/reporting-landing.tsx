@@ -40,6 +40,7 @@ const CARDS: LandingCard[] = [
     icon: Boxes,
     areas: ["sociale", "emporio", "mensa", "uds", "magazzino", "logistica"],
     anyModule: ["MAGAZZINO_SOLIDALE", "BOLLE", "EMPORIO_SOLIDALE", "MENSA", "UDS"],
+    permission: "magazzino.fse.view",
   },
 ];
 

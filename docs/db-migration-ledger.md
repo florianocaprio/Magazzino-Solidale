@@ -228,6 +228,30 @@ un ledger inizializzato e `status` riporta zero pending, zero checksum mismatch,
 zero file applicati mancanti e zero out-of-order. Un `verify` verde con ledger
 non inizializzato non è sufficiente.
 
+## Migration Magazzino 2.0C
+
+`20260824_magazzino_2_0c_fse_reporting.sql` è append-only, additiva e
+idempotente. Aggiunge rilevazioni monitoraggio, testate/eventi/righe export e
+testate/righe/risoluzioni di riconciliazione, con FK, check, indici e versioni.
+Sono snapshot di audit: non costituiscono una seconda giacenza, non modificano
+`movimenti`, `lotti` o gli staging AGEA e non richiedono dual compatibility.
+
+Procedura di rilascio controllata:
+
+1. backup DB verificato;
+2. `migrations:verify`, `migrations:status` e test migration;
+3. fermare tutte le istanze applicative della versione precedente;
+4. eseguire `pnpm --filter @workspace/db run update`;
+5. verificare schema, FK, indici, cardinalità business e `pending=0`;
+6. distribuire e avviare soltanto la nuova versione;
+7. smoke test API/web, export e health;
+8. riaprire il servizio solo dopo esito positivo.
+
+Rollback operativo: fermare la nuova versione, ripristinare il backup/rollback
+DB approvato, verificare schema e cardinalità, quindi avviare la vecchia
+versione. Non modificare il file già applicato né checksum/ledger; una nuova
+correzione richiede una migration successiva.
+
 ## Impact map
 
 | Area               | Impatto                                                 |

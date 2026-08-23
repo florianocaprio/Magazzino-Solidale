@@ -58,6 +58,7 @@ import { sostieniProgetto } from "./namespaces/sostieniProgetto";
 import { mensa } from "./namespaces/mensa";
 import { reporting } from "./namespaces/reporting";
 import { maps } from "./namespaces/maps";
+import { fseOperations } from "./namespaces/fseOperations";
 
 export { LANGUAGES, isRtl, applyDirection } from "./languages";
 export type { LanguageCode } from "./languages";
@@ -119,6 +120,7 @@ const PAGE_NAMESPACES = {
   mensa,
   reporting,
   maps,
+  fseOperations,
 } as const;
 
 function buildResources() {
