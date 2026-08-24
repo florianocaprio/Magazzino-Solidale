@@ -21,6 +21,10 @@ import {
 import { eq } from "drizzle-orm";
 import scarichiRouter from "../src/routes/scarichi";
 import {
+  beneficiaryReportingSnapshotTx,
+  isReportingSnapshotConcurrencyError,
+} from "../src/lib/reporting/eventSnapshots";
+import {
   ensureAmbienteModuli,
   listModuliFunzionali,
   updateModuloAmbiente,
@@ -34,6 +38,8 @@ let lottoId: number;
 let beneficiarioId: number;
 let areaOperativaId: number;
 let centroAscoltoId: number;
+let areaOperativaAlternativaId: number;
+let centroAscoltoAlternativoId: number;
 let originalScarichiAttivo = true;
 const suffix = `${process.pid}${Date.now().toString(36)}`;
 
@@ -61,6 +67,17 @@ beforeAll(async () => {
     .values({
       nome: `Centro scarico ${suffix}`,
       areaOperativaId,
+    })
+    .returning({ id: centriAscoltoTable.id });
+  [{ id: areaOperativaAlternativaId }] = await db
+    .insert(areeOperativeTable)
+    .values({ nome: `Area scarico alternativa ${suffix}` })
+    .returning({ id: areeOperativeTable.id });
+  [{ id: centroAscoltoAlternativoId }] = await db
+    .insert(centriAscoltoTable)
+    .values({
+      nome: `Centro scarico alternativo ${suffix}`,
+      areaOperativaId: areaOperativaAlternativaId,
     })
     .returning({ id: centriAscoltoTable.id });
   [{ id: magazzinoId }] = await db
@@ -152,14 +169,82 @@ afterAll(async () => {
     .delete(centriAscoltoTable)
     .where(eq(centriAscoltoTable.id, centroAscoltoId));
   await db
+    .delete(centriAscoltoTable)
+    .where(eq(centriAscoltoTable.id, centroAscoltoAlternativoId));
+  await db
     .delete(areeOperativeTable)
     .where(eq(areeOperativeTable.id, areaOperativaId));
+  await db
+    .delete(areeOperativeTable)
+    .where(eq(areeOperativeTable.id, areaOperativaAlternativaId));
   await db.delete(utentiTable).where(eq(utentiTable.id, userId));
   await updateModuloAmbiente("SCARICHI", originalScarichiAttivo, null);
   await pool.end();
 });
 
 describe("scarico manuale beneficiario 2.0A", () => {
+  it("serializza il cambio territoriale e acquisisce uno snapshot Beneficiario coerente", async () => {
+    const client = await pool.connect();
+    let committed = false;
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `UPDATE beneficiari
+         SET area_operativa_id = $1, centro_ascolto_id = $2, num_componenti = 4
+         WHERE id = $3`,
+        [areaOperativaAlternativaId, centroAscoltoAlternativoId, beneficiarioId],
+      );
+
+      const snapshotPromise = db.transaction((tx) =>
+        beneficiaryReportingSnapshotTx(tx, beneficiarioId),
+      );
+      const beforeCommit = await Promise.race([
+        snapshotPromise.then(() => "resolved" as const),
+        new Promise<"blocked">((resolve) =>
+          setTimeout(() => resolve("blocked"), 50),
+        ),
+      ]);
+      expect(beforeCommit).toBe("blocked");
+
+      await client.query("COMMIT");
+      committed = true;
+      const snapshot = await Promise.race([
+        snapshotPromise,
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Lo snapshot Beneficiario è rimasto in attesa")),
+            5_000,
+          ),
+        ),
+      ]);
+      expect(snapshot).toEqual({
+        areaOperativaIdSnapshot: areaOperativaAlternativaId,
+        centroAscoltoIdSnapshot: centroAscoltoAlternativoId,
+        numeroComponentiNucleoSnapshot: 4,
+      });
+    } finally {
+      if (!committed) await client.query("ROLLBACK");
+      client.release();
+    }
+
+    await db
+      .update(beneficiariTable)
+      .set({
+        areaOperativaId,
+        centroAscoltoId,
+        numComponenti: 1,
+      })
+      .where(eq(beneficiariTable.id, beneficiarioId));
+  });
+
+  it("classifica deadlock e serializzazione per una risposta 409 applicativa", () => {
+    expect(isReportingSnapshotConcurrencyError({ code: "40P01" })).toBe(true);
+    expect(
+      isReportingSnapshotConcurrencyError({ cause: { code: "40001" } }),
+    ).toBe(true);
+    expect(isReportingSnapshotConcurrencyError({ code: "23505" })).toBe(false);
+  });
+
   it("crea una distribuzione PACCHI strutturata e un movimento sulla Partita reale", async () => {
     const response = await request(app)
       .post("/scarichi")
