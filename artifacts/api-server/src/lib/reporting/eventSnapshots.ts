@@ -6,7 +6,7 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type BeneficiaryReportingSnapshot = {
   areaOperativaIdSnapshot: number | null;
   centroAscoltoIdSnapshot: number | null;
-  numeroComponentiNucleoSnapshot: number;
+  numeroComponentiNucleoSnapshot: number | null;
 };
 
 /**
@@ -31,6 +31,9 @@ export async function beneficiaryReportingSnapshotTx(
   return {
     areaOperativaIdSnapshot: beneficiario.areaOperativaId,
     centroAscoltoIdSnapshot: beneficiario.centroAscoltoId,
-    numeroComponentiNucleoSnapshot: Math.max(1, beneficiario.numComponenti),
+    numeroComponentiNucleoSnapshot:
+      Number.isInteger(beneficiario.numComponenti) && beneficiario.numComponenti > 0
+        ? beneficiario.numComponenti
+        : null,
   };
 }

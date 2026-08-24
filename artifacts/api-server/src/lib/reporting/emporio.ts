@@ -2,6 +2,11 @@ import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
 import { dashboard, kpi, quality } from "./shared";
+import {
+  effectiveBollaRigaId,
+  fseDistributionNatureCondition,
+  fseNetDistributedQuantity,
+} from "./fseCanonicalFacts";
 
 function speseConditions(filters: ReportFilters): SQL[] {
   return [
@@ -121,19 +126,27 @@ export async function buildEmporioReport(filters: ReportFilters) {
       GROUP BY 1 ORDER BY 1
     `),
     rows<Record<string, unknown>>(sql`
-      WITH fse_movimenti AS (
-        SELECT bolla_riga_id, SUM(abs(quantita::numeric)) AS quantita_fse
-        FROM movimenti
-        WHERE bolla_riga_id IS NOT NULL AND fondo_origine = 'FSE_PLUS'
-        GROUP BY bolla_riga_id
+      WITH movimenti_distribuzione AS (
+        SELECT ${effectiveBollaRigaId} AS bolla_riga_id,
+               SUM(${fseNetDistributedQuantity(sql`mv.quantita`)}) AS quantita_totale,
+               SUM(${fseNetDistributedQuantity(sql`mv.quantita`)})
+                 FILTER (WHERE mv.fondo_origine = 'FSE_PLUS') AS quantita_fse,
+               SUM(${fseNetDistributedQuantity(sql`mv.quantita`)})
+                 FILTER (WHERE mv.fondo_origine <> 'FSE_PLUS') AS quantita_non_fse
+        FROM movimenti mv
+        LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+        WHERE ${effectiveBollaRigaId} IS NOT NULL
+          AND ${fseDistributionNatureCondition}
+        GROUP BY ${effectiveBollaRigaId}
       )
       SELECT p.id AS prodotto_id, p.nome AS prodotto_nome, p.unita_misura,
-             COALESCE(SUM(ser.quantita::numeric), 0) AS quantita,
-             COALESCE(SUM(fm.quantita_fse), 0) AS quantita_fse
+             COALESCE(SUM(md.quantita_totale), 0) AS quantita,
+             COALESCE(SUM(md.quantita_fse), 0) AS quantita_fse,
+             COALESCE(SUM(md.quantita_non_fse), 0) AS quantita_non_fse
       FROM spese_emporio se
       JOIN spese_emporio_righe ser ON ser.spesa_emporio_id = se.id
       JOIN prodotti p ON p.id = ser.prodotto_id
-      LEFT JOIN fse_movimenti fm ON fm.bolla_riga_id = ser.bolla_riga_id
+      LEFT JOIN movimenti_distribuzione md ON md.bolla_riga_id = ser.bolla_riga_id
       WHERE ${where}
       GROUP BY p.id, p.nome, p.unita_misura ORDER BY quantita DESC, p.nome
     `),
@@ -176,13 +189,14 @@ export async function buildEmporioReport(filters: ReportFilters) {
     tables: [
       {
         key: "prodotti",
-        columns: ["prodottoId", "prodottoNome", "unitaMisura", "quantita", "quantitaFse"],
+        columns: ["prodottoId", "prodottoNome", "unitaMisura", "quantita", "quantitaFse", "quantitaNonFse"],
         rows: products.map((r) => ({
           prodottoId: number(r.prodotto_id),
           prodottoNome: String(r.prodotto_nome),
           unitaMisura: String(r.unita_misura),
           quantita: number(r.quantita),
           quantitaFse: number(r.quantita_fse),
+          quantitaNonFse: number(r.quantita_non_fse),
         })),
       },
       {

@@ -703,6 +703,12 @@ export async function chiudiSessioneCassaEmporio(opts: {
       dominioOrigine: "EMPORIO",
       entitaOrigineTipo: "spesa_emporio",
       entitaOrigineId: spesa.id,
+      areaOperativaIdSnapshot: reportingSnapshot.areaOperativaIdSnapshot,
+      centroAscoltoIdSnapshot: reportingSnapshot.centroAscoltoIdSnapshot,
+      territorioClassificazione:
+        reportingSnapshot.areaOperativaIdSnapshot == null
+          ? "legacy_sconosciuto"
+          : "attribuito",
       numeroDocumento: numeroSpesa,
       creatoDa: operationActorId,
     });

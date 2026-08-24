@@ -1263,6 +1263,12 @@ async function replaceOperativita(
             dominioOrigine: intervento.ambito === "uds" ? "UDS" : "SOCIALE",
             entitaOrigineTipo: `intervento_materiali_${magazzinoId}`,
             entitaOrigineId: interventoId,
+            areaOperativaIdSnapshot: intervento.areaOperativaIdSnapshot,
+            centroAscoltoIdSnapshot: intervento.centroAscoltoIdSnapshot,
+            territorioClassificazione:
+              intervento.areaOperativaIdSnapshot == null
+                ? "legacy_sconosciuto"
+                : "attribuito",
             numeroDocumento: `INTERVENTO-${interventoId}`,
           },
           righe,

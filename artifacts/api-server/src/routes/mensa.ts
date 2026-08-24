@@ -2754,6 +2754,10 @@ router.post(
                   dominioOrigine: "MENSA",
                   entitaOrigineTipo: "mensa_giornata_servizio",
                   entitaOrigineId: giornata.id,
+                  areaOperativaIdSnapshot: mensa.mensa.areaOperativaId,
+                  centroAscoltoIdSnapshot:
+                    mensa.magazzino?.centroAscoltoId ?? null,
+                  territorioClassificazione: "attribuito",
                   numeroDocumento: `MENSA-${giornata.id}`,
                   numeroPasti: Number(numeroPasti),
                 }
@@ -3069,6 +3073,9 @@ router.post(
           dominioOrigine: "MENSA",
           entitaOrigineTipo: "mensa_giornata_servizio",
           entitaOrigineId: id,
+          areaOperativaIdSnapshot: current.areaOperativaId,
+          centroAscoltoIdSnapshot: null,
+          territorioClassificazione: "attribuito",
           numeroPasti: snapshot.pasti,
           creatoDa: req.user!.id,
         });

@@ -208,6 +208,9 @@ export const fseFascicoliSocialiSnapshotTable = pgTable(
       table.dataRiferimento,
       table.hashCanonico,
     ),
+    uniqueIndex("fse_fascicoli_snapshot_authoritative_version_uidx")
+      .on(table.beneficiarioId, table.versioneProfilo)
+      .where(sql`${table.origineSnapshot} <> 'export_fse'`),
     check(
       "fse_fascicoli_snapshot_origin_check",
       sql`${table.origineSnapshot} in ('import_fse','aggiornamento_manuale','export_fse','migrazione_esplicita')`,

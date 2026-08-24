@@ -54,7 +54,7 @@ export const interventiTable = pgTable(
     ),
     centroAscoltoIdSnapshot: integer("centro_ascolto_id_snapshot").references(
       () => centriAscoltoTable.id,
-      { onDelete: "set null" },
+      { onDelete: "restrict" },
     ),
     zonaUdsIdSnapshot: integer("zona_uds_id_snapshot").references(
       () => zoneUdsTable.id,
@@ -140,6 +140,9 @@ export const insertInterventoSchema = createInsertSchema(interventiTable).omit({
   id: true,
   dataCreazione: true,
   dataAggiornamento: true,
+  areaOperativaIdSnapshot: true,
+  centroAscoltoIdSnapshot: true,
+  zonaUdsIdSnapshot: true,
 });
 export type InsertIntervento = z.infer<typeof insertInterventoSchema>;
 export type Intervento = typeof interventiTable.$inferSelect;

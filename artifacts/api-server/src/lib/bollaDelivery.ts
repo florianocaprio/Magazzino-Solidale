@@ -304,6 +304,10 @@ async function convertiPrenotazioniAttiveInScarico(
     dominioOrigine: "BOLLA",
     entitaOrigineTipo: "bolla",
     entitaOrigineId: bolla.id,
+    areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+    centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
+    territorioClassificazione:
+      bolla.areaOperativaIdSnapshot == null ? "legacy_sconosciuto" : "attribuito",
     numeroDocumento: bolla.numeroBolla,
     numeroPacchi: 1,
     creatoDa: opts.operatoreId,

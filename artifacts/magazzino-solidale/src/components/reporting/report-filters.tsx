@@ -89,8 +89,23 @@ export function ReportFilters({
   useEffect(() => {
     if (!options) return;
     const patch = reconcileReportingFilterSelection(value, options, { areaOperativaLocked, centreLocked, zoneLocked });
-    if (Object.keys(patch).length) update(patch);
-  }, [options]);
+    const changed = (Object.keys(patch) as Array<keyof ReportingFilterState>)
+      .some((key) => patch[key] !== value[key]);
+    if (changed) onChange({ ...value, ...patch });
+  }, [
+    options,
+    value.da,
+    value.a,
+    value.areaOperativaId,
+    value.centroAscoltoId,
+    value.magazzinoId,
+    value.mensaId,
+    value.zonaUdsId,
+    areaOperativaLocked,
+    centreLocked,
+    zoneLocked,
+    onChange,
+  ]);
   const lockHint = (locked: boolean) => locked ? <p className="text-xs text-muted-foreground">{t("reporting.filters.lockedByRole")}</p> : null;
   const emptyHint = (count: number) => !isLoading && !isError && count === 0 ? <p className="text-xs text-muted-foreground">{t("reporting.filters.noOptions")}</p> : null;
   return (

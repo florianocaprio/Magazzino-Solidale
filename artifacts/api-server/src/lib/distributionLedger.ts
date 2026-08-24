@@ -14,6 +14,9 @@ export interface DistributionOperationInput {
   dominioOrigine: string;
   entitaOrigineTipo: string;
   entitaOrigineId: number;
+  areaOperativaIdSnapshot?: number | null;
+  centroAscoltoIdSnapshot?: number | null;
+  territorioClassificazione?: "attribuito" | "universale" | "legacy_sconosciuto";
   numeroDocumento?: string | null;
   numeroPacchi?: number | null;
   numeroPasti?: number | null;
@@ -58,7 +61,13 @@ export async function ensureDistributionOperation(
     if (
       existing.magazzinoId !== input.magazzinoId ||
       existing.dataDistribuzione !== input.dataDistribuzione ||
-      existing.canaleOperativo !== input.canaleOperativo
+      existing.canaleOperativo !== input.canaleOperativo ||
+      (input.areaOperativaIdSnapshot !== undefined &&
+        existing.areaOperativaIdSnapshot !== input.areaOperativaIdSnapshot) ||
+      (input.centroAscoltoIdSnapshot !== undefined &&
+        existing.centroAscoltoIdSnapshot !== input.centroAscoltoIdSnapshot) ||
+      (input.territorioClassificazione !== undefined &&
+        existing.territorioClassificazione !== input.territorioClassificazione)
     ) {
       throw new DistributionLedgerError(
         "La sorgente è già collegata a una diversa operazione di distribuzione",
@@ -116,6 +125,10 @@ export async function ensureDistributionOperation(
       dominioOrigine: input.dominioOrigine,
       entitaOrigineTipo: input.entitaOrigineTipo,
       entitaOrigineId: input.entitaOrigineId,
+      areaOperativaIdSnapshot: input.areaOperativaIdSnapshot ?? null,
+      centroAscoltoIdSnapshot: input.centroAscoltoIdSnapshot ?? null,
+      territorioClassificazione:
+        input.territorioClassificazione ?? "legacy_sconosciuto",
       numeroDocumento: input.numeroDocumento ?? null,
       numeroPacchi: input.numeroPacchi ?? null,
       numeroPasti: input.numeroPasti ?? null,

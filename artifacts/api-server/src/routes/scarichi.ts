@@ -385,6 +385,8 @@ router.post(
     }
     let beneficiarioId: number | null = null;
     let canaleOperativo: CanaleOperativo | null = null;
+    let beneficiarioAreaOperativaId: number | null = null;
+    let beneficiarioCentroAscoltoId: number | null = null;
     if (body.causale === "consegna_beneficiario") {
       if (
         !Number.isSafeInteger(body.beneficiarioId) ||
@@ -426,6 +428,8 @@ router.post(
         return;
       }
       beneficiarioId = beneficiario.id;
+      beneficiarioAreaOperativaId = beneficiario.areaOperativaId;
+      beneficiarioCentroAscoltoId = beneficiario.centroAscoltoId;
       canaleOperativo = body.canaleOperativo as CanaleOperativo;
     }
 
@@ -536,6 +540,12 @@ router.post(
                     dominioOrigine: "MAGAZZINO",
                     entitaOrigineTipo: "scarico_manual_beneficiario",
                     entitaOrigineId: 0,
+                    areaOperativaIdSnapshot: beneficiarioAreaOperativaId,
+                    centroAscoltoIdSnapshot: beneficiarioCentroAscoltoId,
+                    territorioClassificazione:
+                      beneficiarioAreaOperativaId == null
+                        ? "legacy_sconosciuto"
+                        : "attribuito",
                     numeroPacchi: canaleOperativo === "PACCHI" ? 1 : null,
                   }
                 : undefined,

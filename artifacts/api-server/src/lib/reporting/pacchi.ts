@@ -2,6 +2,11 @@ import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
 import { dashboard, kpi, quality } from "./shared";
+import {
+  effectiveBollaRigaId,
+  fseDistributionNatureCondition,
+  fseNetDistributedQuantity,
+} from "./fseCanonicalFacts";
 
 function pacchiConditions(filters: ReportFilters): SQL[] {
   return [
@@ -67,21 +72,22 @@ export async function buildPacchiReport(filters: ReportFilters) {
     `),
     rows<Record<string, unknown>>(sql`
       WITH consumo_lotti AS (
-        SELECT mv.bolla_riga_id,
-               SUM(CASE
-                 WHEN mv.natura_contabile = 'DISTRIBUZIONE_FINALE' THEN abs(mv.quantita::numeric)
-                 WHEN mv.natura_contabile = 'STORNO' AND original.natura_contabile = 'DISTRIBUZIONE_FINALE' THEN -abs(mv.quantita::numeric)
-                 WHEN mv.natura_contabile = 'LEGACY' AND mv.tipo_movimento = 'scarico' THEN abs(mv.quantita::numeric)
-                 ELSE 0 END) FILTER (WHERE mv.fondo_origine = 'FSE_PLUS') AS quantita_fse
+        SELECT ${effectiveBollaRigaId} AS bolla_riga_id,
+               SUM(${fseNetDistributedQuantity(sql`mv.quantita`)}) AS quantita_totale,
+               SUM(${fseNetDistributedQuantity(sql`mv.quantita`)})
+                 FILTER (WHERE mv.fondo_origine = 'FSE_PLUS') AS quantita_fse,
+               SUM(${fseNetDistributedQuantity(sql`mv.quantita`)})
+                 FILTER (WHERE mv.fondo_origine <> 'FSE_PLUS') AS quantita_non_fse
         FROM movimenti mv
         LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
-        WHERE mv.bolla_riga_id IS NOT NULL
-        GROUP BY mv.bolla_riga_id
+        WHERE ${effectiveBollaRigaId} IS NOT NULL
+          AND ${fseDistributionNatureCondition}
+        GROUP BY ${effectiveBollaRigaId}
       )
       SELECT p.id AS prodotto_id, p.nome AS prodotto_nome, br.unita_misura,
-             SUM(br.quantita::numeric) AS quantita,
+             SUM(COALESCE(cl.quantita_totale, 0)) AS quantita,
              SUM(COALESCE(cl.quantita_fse, 0)) AS quantita_fse,
-             SUM(br.quantita::numeric - COALESCE(cl.quantita_fse, 0)) AS quantita_non_fse,
+             SUM(COALESCE(cl.quantita_non_fse, 0)) AS quantita_non_fse,
              COUNT(*) AS righe
       FROM bolle b
       JOIN beneficiari be ON be.id = b.beneficiario_id
@@ -107,17 +113,32 @@ export async function buildPacchiReport(filters: ReportFilters) {
         SELECT DISTINCT be.id
         FROM bolle b JOIN beneficiari be ON be.id = b.beneficiario_id
         WHERE ${where}
+      ), qualita_nuclei AS (
+        SELECT COUNT(*) FILTER (WHERE be.data_nascita IS NULL) AS nascita_mancante,
+               COUNT(*) FILTER (WHERE be.sesso IS NULL OR trim(be.sesso) = '') AS sesso_mancante,
+               COUNT(*) FILTER (WHERE be.num_componenti > 1 AND NOT EXISTS (
+                 SELECT 1 FROM nucleo_familiare nf WHERE nf.beneficiario_id = be.id
+               )) AS nucleo_incompleto
+        FROM beneficiari be JOIN famiglie f ON f.id = be.id
+      ), qualita_eventi AS (
+        SELECT COUNT(DISTINCT b.id) FILTER (
+                 WHERE b.area_operativa_id_snapshot IS NULL
+                    OR b.centro_ascolto_id_snapshot IS NULL
+               ) AS territorio_legacy,
+               COUNT(DISTINCT b.id) FILTER (
+                 WHERE b.numero_componenti_nucleo_snapshot IS NULL
+               ) AS nucleo_storico_legacy,
+               COUNT(DISTINCT b.id) FILTER (WHERE NOT EXISTS (
+                 SELECT 1 FROM movimenti mv
+                 WHERE mv.bolla_id = b.id
+                   OR mv.bolla_riga_id IN (
+                     SELECT br.id FROM bolla_righe br WHERE br.bolla_id = b.id
+                   )
+               )) AS evento_senza_lineage
+        FROM bolle b JOIN beneficiari be ON be.id = b.beneficiario_id
+        WHERE ${where}
       )
-      SELECT COUNT(*) FILTER (WHERE be.data_nascita IS NULL) AS nascita_mancante,
-             COUNT(*) FILTER (WHERE be.sesso IS NULL OR trim(be.sesso) = '') AS sesso_mancante,
-             COUNT(*) FILTER (WHERE be.num_componenti > 1 AND NOT EXISTS (
-               SELECT 1 FROM nucleo_familiare nf WHERE nf.beneficiario_id = be.id
-             )) AS nucleo_incompleto,
-             COUNT(*) FILTER (WHERE b.area_operativa_id_snapshot IS NULL OR b.centro_ascolto_id_snapshot IS NULL) AS territorio_legacy,
-             COUNT(*) FILTER (WHERE b.numero_componenti_nucleo_snapshot IS NULL) AS nucleo_storico_legacy
-      FROM beneficiari be JOIN famiglie f ON f.id = be.id
-      JOIN bolle b ON b.beneficiario_id = be.id
-      WHERE ${where}
+      SELECT qn.*, qe.* FROM qualita_nuclei qn CROSS JOIN qualita_eventi qe
     `),
   ]);
 
@@ -187,6 +208,12 @@ export async function buildPacchiReport(filters: ReportFilters) {
         number(dq.nucleo_storico_legacy),
         number(dq.nucleo_storico_legacy) ? "derivable" : "ok",
         "Numero del nucleo derivato dall'anagrafica corrente per Bolle legacy prive di snapshot.",
+      ),
+      quality(
+        "eventoSenzaLineage",
+        number(dq.evento_senza_lineage),
+        number(dq.evento_senza_lineage) ? "missing" : "ok",
+        "Bolle distinte prive di Movimenti collegati al ledger canonico.",
       ),
     ],
     definitions: [

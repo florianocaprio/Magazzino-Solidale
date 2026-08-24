@@ -34,11 +34,11 @@ export const consegneTable = pgTable(
     magazzinoId: integer("magazzino_id").notNull(),
     areaOperativaIdSnapshot: integer("area_operativa_id_snapshot").references(
       () => areeOperativeTable.id,
-      { onDelete: "set null" },
+      { onDelete: "restrict" },
     ),
     centroAscoltoIdSnapshot: integer("centro_ascolto_id_snapshot").references(
       () => centriAscoltoTable.id,
-      { onDelete: "set null" },
+      { onDelete: "restrict" },
     ),
     volontarioId: integer("volontario_id").references(() => volontariTable.id, {
       onDelete: "restrict",
@@ -80,6 +80,8 @@ export const consegneTable = pgTable(
 export const insertConsegnaSchema = createInsertSchema(consegneTable).omit({
   id: true,
   dataCreazione: true,
+  areaOperativaIdSnapshot: true,
+  centroAscoltoIdSnapshot: true,
 });
 export type InsertConsegna = z.infer<typeof insertConsegnaSchema>;
 export type Consegna = typeof consegneTable.$inferSelect;

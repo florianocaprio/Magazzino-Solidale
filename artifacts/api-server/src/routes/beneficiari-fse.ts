@@ -1,6 +1,6 @@
 import { createHash, randomInt } from "node:crypto";
 import express, { Router, type IRouter, type Request } from "express";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   auditConfigurazioniTable,
   beneficiariTable,
@@ -775,6 +775,12 @@ router.post(
             );
           };
 
+          const normalizedCode = normalizeFseCode(row.codiceFascicolo)!;
+          // Serializza sia il primo inserimento sia gli aggiornamenti successivi
+          // dello stesso codice. La rilettura avviene soltanto dopo il lock.
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-profile:${normalizedCode}`}, 0))`,
+          );
           const [existing] = await tx
             .select({
               profilo: fseFascicoliSocialiTable,
@@ -788,9 +794,10 @@ router.post(
             .where(
               eq(
                 fseFascicoliSocialiTable.codiceFascicoloNormalizzato,
-                normalizeFseCode(row.codiceFascicolo)!,
+                normalizedCode,
               ),
-            );
+            )
+            .for("update");
           if (existing) {
             if (
               existing.beneficiario.centroAscoltoId !== scoped.centro.id ||

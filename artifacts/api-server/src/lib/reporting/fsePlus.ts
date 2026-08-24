@@ -10,6 +10,7 @@ import {
   fseNetDistributedQuantity,
   fseSignedQuantity,
 } from "./fseCanonicalFacts";
+import { authoritativeSnapshotOrderForAliasS } from "./fseSnapshotOrder";
 
 function fseScope(filters: ReportFilters) {
   return andSql(
@@ -49,8 +50,22 @@ export function fseAuthorizedMovementCondition(
         ]);
   const bollaScope = fseScope(filters);
   const bollaSource = fseBollaSourceCondition(filters);
+  const territorialScope = filters.areaOperativaId == null
+    ? sql`true`
+    : sql`EXISTS (
+        SELECT 1
+        FROM operazioni_distribuzione_magazzino territory_op
+        WHERE territory_op.id = COALESCE(
+          mv.operazione_distribuzione_id,
+          original.operazione_distribuzione_id
+        )
+          AND territory_op.territorio_classificazione = 'attribuito'
+          AND territory_op.area_operativa_id_snapshot = ${filters.areaOperativaId}
+          AND (${filters.centroAscoltoId}::integer IS NULL
+            OR territory_op.centro_ascolto_id_snapshot = ${filters.centroAscoltoId})
+      )`;
   return sql`(
-    (mv.natura_contabile <> 'LEGACY' AND ${
+    (mv.natura_contabile <> 'LEGACY' AND ${territorialScope} AND ${
       filters.callerIsAdmin || warehouseOversight
         ? sql`true`
         : allowedChannels.length
@@ -60,7 +75,7 @@ export function fseAuthorizedMovementCondition(
             )})`
           : sql`false`
     })
-    OR (mv.natura_contabile = 'LEGACY' AND EXISTS (
+    OR (mv.natura_contabile = 'LEGACY' AND ${filters.areaOperativaId == null ? sql`true` : sql`false`} AND EXISTS (
       SELECT 1 FROM bolle b
       JOIN beneficiari be ON be.id = b.beneficiario_id
       WHERE b.id = mv.bolla_id AND ${bollaScope} AND ${bollaSource}
@@ -192,8 +207,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
         SELECT s.* FROM fse_fascicoli_sociali_snapshot s
         WHERE s.beneficiario_id = f.beneficiario_id
           AND s.data_riferimento <= ${filters.a}
-        ORDER BY s.data_riferimento DESC, s.versione_profilo DESC,
-                 s.data_creazione DESC, s.id DESC
+        ORDER BY ${authoritativeSnapshotOrderForAliasS}
         LIMIT 1
       ) fs ON true
     )`;
@@ -276,6 +290,10 @@ export async function buildFsePlusReport(filters: ReportFilters) {
              SUM(senza_tetto_esclusione_abitativa) AS esclusione_abitativa,
              COUNT(*) FILTER (WHERE id IS NOT NULL) AS con_snapshot,
              COUNT(*) FILTER (WHERE id IS NULL) AS senza_snapshot,
+             COUNT(*) FILTER (WHERE numero_componenti IS NOT NULL) AS copertura_numero_componenti,
+             COUNT(*) FILTER (WHERE donne IS NOT NULL AND uomini IS NOT NULL) AS copertura_sesso,
+             COUNT(*) FILTER (WHERE eta_0_17 IS NOT NULL AND eta_18_29 IS NOT NULL
+               AND eta_30_64 IS NOT NULL AND eta_65_plus IS NOT NULL) AS copertura_eta,
              COUNT(*) FILTER (WHERE origine_straniera_minoranze IS NOT NULL) AS copertura_origine,
              COUNT(*) FILTER (WHERE persone_disabilita IS NOT NULL) AS copertura_disabilita,
              COUNT(*) FILTER (WHERE cittadini_paesi_terzi IS NOT NULL) AS copertura_paesi_terzi,
@@ -468,6 +486,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
   const householdsWithSnapshot = number(persons.con_snapshot);
   const householdsWithoutSnapshot = number(persons.senza_snapshot);
   const peopleValue = persons.persone == null ? null : number(persons.persone);
+  const peopleCoverage = number(persons.copertura_numero_componenti);
   const snapshotAvailability =
     householdsWithSnapshot === 0
       ? "MANCANTE"
@@ -495,13 +514,13 @@ export async function buildFsePlusReport(filters: ReportFilters) {
     ],
     [
       "Sesso",
-      snapshotAvailability,
+      dimensionAvailability(persons.copertura_sesso),
       "Snapshot FSE Beneficiari as-of",
       `Data finale ${filters.a}`,
     ],
     [
       "Fasce d'età",
-      snapshotAvailability,
+      dimensionAvailability(persons.copertura_eta),
       "Snapshot FSE Beneficiari as-of",
       `Data finale ${filters.a}`,
     ],
@@ -688,7 +707,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
         canViewIndividualFse && peopleValue != null ? "personeRaggiunte" : null,
         peopleValue == null
           ? "missing"
-          : householdsWithoutSnapshot > 0
+          : peopleCoverage < totalFseHouseholds
             ? "derivable"
             : "ok",
       ),
@@ -833,8 +852,16 @@ export async function buildFsePlusReport(filters: ReportFilters) {
           "nucleiCoperti",
           "nucleiTotali",
           "nucleiSenzaDato",
+          "disponibilita",
         ],
         rows: [
+          [
+            "numeroComponenti",
+            persons.persone,
+            persons.copertura_numero_componenti,
+          ],
+          ["sesso", null, persons.copertura_sesso],
+          ["fasceEta", null, persons.copertura_eta],
           [
             "origineStranieraMinoranze",
             persons.origine_straniera_minoranze,
@@ -861,6 +888,12 @@ export async function buildFsePlusReport(filters: ReportFilters) {
           nucleiCoperti: number(copertura),
           nucleiTotali: totalFseHouseholds,
           nucleiSenzaDato: Math.max(0, totalFseHouseholds - number(copertura)),
+          disponibilita:
+            number(copertura) === 0
+              ? "MANCANTE"
+              : number(copertura) < totalFseHouseholds
+                ? "PARZIALE"
+                : "DISPONIBILE",
         })),
       },
       {
@@ -916,6 +949,9 @@ export async function buildFsePlusReport(filters: ReportFilters) {
       "La provenienza FSE+ è determinata esclusivamente dallo snapshot Fondo del Movimento.",
       "Le dimensioni Beneficiari usano lo snapshot FSE più recente con data di riferimento non successiva alla data finale del report.",
       `Snapshot futuri rispetto a ${filters.a} sono esclusi; assenze e copertura parziale non vengono trasformate in zero.`,
+      peopleCoverage < totalFseHouseholds
+        ? `Persone note: il valore somma soltanto ${peopleCoverage} nuclei coperti su ${totalFseHouseholds}.`
+        : "Persone raggiunte: copertura completa del numero componenti per tutti i nuclei.",
       "Le sorgenti FSE+ sono incluse solo quando modulo, area e permessi del chiamante lo consentono.",
       "I canali comprendono Pacchi/Ritiro sede, Domiciliare, Emporio, Mensa e UDS Strada dal ledger canonico; i nuclei anonimi restano null e le quantità restano separate per unità di misura.",
       `Ultima esportazione: ${String(administrative.ultima_esportazione ?? "mai")}; ultima importazione AGEA: ${String(administrative.ultima_importazione ?? "mai")}; ultima riconciliazione: ${String(administrative.ultima_riconciliazione ?? "mai")}.`,

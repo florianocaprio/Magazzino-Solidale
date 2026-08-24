@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { FileDown, Upload } from "lucide-react";
 import { todayEuropeRome } from "@/lib/europe-rome";
+import { useTranslation } from "react-i18next";
 
 type Centro = {
   id: number;
@@ -81,6 +82,7 @@ export function FseBeneficiariActions({
   canExport: boolean;
   onImported: () => void;
 }) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const previewMutation = usePreviewBeneficiariFse();
   const importMutation = useImportBeneficiariFse();
@@ -162,13 +164,13 @@ export function FseBeneficiariActions({
       setImportResult(result);
       onImported();
       toast({
-        title: "Import FSE+ completato",
+        title: t("reporting.fse.importCompleted"),
         description: `${result.creati} creati, ${result.collegati} collegati, ${result.aggiornati} aggiornati, ${result.invariati} invariati, ${result.errori} errori.`,
       });
     } catch (error) {
       toast({
-        title: "Import FSE+",
-        description: apiErrorMessage(error, "Import non riuscito."),
+        title: t("reporting.fse.import"),
+        description: apiErrorMessage(error, t("reporting.fse.importFailed")),
         variant: "destructive",
       });
     }
@@ -185,8 +187,8 @@ export function FseBeneficiariActions({
       }));
     } catch (error) {
       toast({
-        title: "Export FSE+",
-        description: apiErrorMessage(error, "Preflight non riuscito."),
+        title: t("reporting.fse.export"),
+        description: apiErrorMessage(error, t("reporting.fse.preflightFailed")),
         variant: "destructive",
       });
     }
@@ -211,8 +213,8 @@ export function FseBeneficiariActions({
       reset();
     } catch (error) {
       toast({
-        title: "Export FSE+",
-        description: apiErrorMessage(error, "Export non riuscito."),
+        title: t("reporting.fse.export"),
+        description: apiErrorMessage(error, t("reporting.fse.exportFailed")),
         variant: "destructive",
       });
     }
@@ -230,20 +232,20 @@ export function FseBeneficiariActions({
   return <>
     {canImport && (
       <Button variant="outline" className="gap-2" onClick={() => setMode("import")}>
-        <Upload className="h-4 w-4" />Importa FSE+
+        <Upload className="h-4 w-4" />{t("reporting.fse.import")}
       </Button>
     )}
     {canExport && (
       <Button variant="outline" className="gap-2" onClick={() => setMode("export")}>
-        <FileDown className="h-4 w-4" />Esporta FSE+
+        <FileDown className="h-4 w-4" />{t("reporting.fse.export")}
       </Button>
     )}
     <Dialog open={mode !== null} onOpenChange={(open) => { if (!open) reset(); }}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{mode === "import" ? "Importa FSE+" : "Esporta FSE+"}</DialogTitle>
+          <DialogTitle>{mode === "import" ? t("reporting.fse.import") : t("reporting.fse.export")}</DialogTitle>
           <DialogDescription>
-            Il Centro determina automaticamente l’Area Operativa; il server verifica nuovamente lo scope.
+            {t("reporting.fse.scopeDescription")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -257,8 +259,8 @@ export function FseBeneficiariActions({
             }}
             disabled={lockedCentroId != null || busy}
           >
-            <SelectTrigger aria-label="Centro di Ascolto FSE+">
-              <SelectValue placeholder="Centro di Ascolto" />
+            <SelectTrigger aria-label={t("reporting.fse.centre")}>
+              <SelectValue placeholder={t("reporting.fse.centre")} />
             </SelectTrigger>
             <SelectContent>
               {centri.filter((centro) => centro.attivo !== false).map((centro) => (
@@ -266,22 +268,22 @@ export function FseBeneficiariActions({
               ))}
             </SelectContent>
           </Select>
-          <div className="rounded-md bg-muted p-3 text-sm" aria-label="Area Operativa FSE+">
-            Area Operativa: <strong>
+          <div className="rounded-md bg-muted p-3 text-sm" aria-label={t("reporting.fse.operationalArea")}>
+            {t("reporting.filters.areaOperativa")}: <strong>
               {selected?.areaOperativaNome ??
-                (selected?.areaOperativaId ? `ID ${selected.areaOperativaId}` : "non disponibile")}
+                (selected?.areaOperativaId ? `ID ${selected.areaOperativaId}` : t("reporting.fse.unavailable"))}
             </strong>
           </div>
             {mode === "import" && !importResult && (
               <>
-                <Input type="date" aria-label="Data di riferimento import FSE+"
+                <Input type="date" aria-label={t("reporting.fse.referenceDate")}
                   value={date} disabled={busy} onChange={(event) => {
                     setDate(event.target.value);
                     setFilePayload(null);
                     setPreview(null);
                   }} />
                 <p className="text-sm text-muted-foreground">
-                  La data di riferimento determina da quando questi dati sono validi nei report storici. Verificala prima di confermare l’import.
+                  {t("reporting.fse.referenceDateHistory")}
                 </p>
                 <Input type="file" accept=".xlsx" aria-label="File FSE+"
                   disabled={!centroId || busy}
@@ -291,18 +293,18 @@ export function FseBeneficiariActions({
           {mode === "export" && <>
             <Input
               type="date"
-              aria-label="Data di riferimento FSE+"
+              aria-label={t("reporting.fse.referenceDate")}
               value={date}
               onChange={(event) => {
                 setDate(event.target.value);
                 setExportPreflight(null);
               }}
             />
-            <Badge variant="outline">Filtro: solo beneficiari attivi</Badge>
+            <Badge variant="outline">{t("reporting.fse.activeOnly")}</Badge>
           </>}
 
           {preview && <>
-            <div className="text-sm font-medium">{preview.numeroRighe} righe lette</div>
+            <div className="text-sm font-medium">{t("reporting.fse.rowsRead", { count: preview.numeroRighe })}</div>
             <div className="flex flex-wrap gap-2">
               {Object.entries(preview.conteggi).map(([key, value]) => (
                 <Badge
@@ -315,7 +317,7 @@ export function FseBeneficiariActions({
             </div>
             {(preview.conteggi.errore ?? 0) > 0 && (
               <div className="rounded border border-amber-400/60 p-2 text-sm">
-                Le righe non valide saranno escluse; le altre verranno importate con esito parziale.
+                {t("reporting.fse.partialImport")}
               </div>
             )}
             {preview.warningHeader.map((warning) => (
@@ -409,16 +411,16 @@ export function FseBeneficiariActions({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={reset}>
-            {importResult ? "Chiudi" : "Annulla"}
+            {importResult ? t("reporting.fse.close") : t("reporting.fse.cancel")}
           </Button>
           {mode === "import" && !importResult && (
             <Button onClick={() => void confirmImport()} disabled={importBlocked || busy}>
-              Conferma importazione
+              {t("reporting.fse.confirmImport")}
             </Button>
           )}
           {mode === "export" && !exportPreflight && (
             <Button onClick={() => void preflight()} disabled={!centroId || !date || busy}>
-              Esegui preflight
+              {t("reporting.fse.runPreflight")}
             </Button>
           )}
           {mode === "export" && exportPreflight && (
@@ -426,7 +428,7 @@ export function FseBeneficiariActions({
               onClick={() => void download()}
               disabled={busy || exportPreflight.bloccati.length > 0 || exportPreflight.candidati === 0}
             >
-              Scarica Excel
+              {t("reporting.fse.download")}
             </Button>
           )}
         </DialogFooter>

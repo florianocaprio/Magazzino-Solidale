@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql, type SQL } from "drizzle-orm";
 import { callerCentroId, callerAreaOperativaId } from "../lib/centroScope";
-import { requireAllModuli } from "../lib/featureFlags";
+import { requireAllModuli, requireAnyModulo } from "../lib/featureFlags";
 import { isUdsReportRequest, requirePermission } from "../middlewares/auth";
 import { effectiveMezzoCentroSql } from "../lib/logisticaPolicy";
 import { buildFsePlusReport } from "../lib/reporting/fsePlus";
@@ -15,11 +15,21 @@ const router: IRouter = Router();
 
 const requireReportCentro = requireAllModuli(["CENTRO_ASCOLTO", "REPORT"]);
 const requireReportUds = requireAllModuli(["UDS", "REPORT"]);
+const requireReportOnly = requireAllModuli(["REPORT"]);
+const requireAnyFseSource = requireAnyModulo([
+  "MAGAZZINO_SOLIDALE",
+  "BOLLE",
+  "EMPORIO_SOLIDALE",
+  "MENSA",
+  "UDS",
+]);
 
 router.use("/report", (req, res, next) => {
-  const guard = isUdsReportRequest(req)
-    ? requireReportUds
-    : requireReportCentro;
+  const guard = req.path === "/fse-plus"
+    ? requireReportOnly
+    : isUdsReportRequest(req)
+      ? requireReportUds
+      : requireReportCentro;
   guard(req, res, next);
 });
 router.use("/report", (req, res, next) => {
@@ -408,6 +418,7 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
 router.get(
   "/report/fse-plus",
   requirePermission("magazzino.fse.view"),
+  requireAnyFseSource,
   async (req, res) => {
     res.setHeader("Deprecation", "true");
     res.setHeader(

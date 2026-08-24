@@ -14,6 +14,7 @@ import {
   fseCanonicalPeriodCondition,
   fseNetDistributedQuantity,
 } from "./fseCanonicalFacts";
+import { authoritativeSnapshotOrderForAliasS } from "./fseSnapshotOrder";
 
 type DetailDefinition = { columns: string[]; query: SQL };
 
@@ -372,7 +373,7 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
           LEFT JOIN LATERAL (
             SELECT s.* FROM fse_fascicoli_sociali_snapshot s
             WHERE s.beneficiario_id = f.id AND s.data_riferimento <= ${filters.a}
-            ORDER BY s.data_riferimento DESC, s.versione_profilo DESC, s.data_creazione DESC, s.id DESC
+            ORDER BY ${authoritativeSnapshotOrderForAliasS}
             LIMIT 1
           ) fs ON true
         )`;

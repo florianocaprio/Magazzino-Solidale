@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   pgTable,
   serial,
@@ -27,11 +29,11 @@ export const bolleTable = pgTable(
     magazzinoId: integer("magazzino_id").notNull(),
     areaOperativaIdSnapshot: integer("area_operativa_id_snapshot").references(
       () => areeOperativeTable.id,
-      { onDelete: "set null" },
+      { onDelete: "restrict" },
     ),
     centroAscoltoIdSnapshot: integer("centro_ascolto_id_snapshot").references(
       () => centriAscoltoTable.id,
-      { onDelete: "set null" },
+      { onDelete: "restrict" },
     ),
     numeroComponentiNucleoSnapshot: integer(
       "numero_componenti_nucleo_snapshot",
@@ -65,6 +67,10 @@ export const bolleTable = pgTable(
       table.areaOperativaIdSnapshot,
       table.centroAscoltoIdSnapshot,
     ),
+    check(
+      "bolle_numero_componenti_nucleo_snapshot_check",
+      sql`${table.numeroComponentiNucleoSnapshot} is null or ${table.numeroComponentiNucleoSnapshot} > 0`,
+    ),
   ],
 );
 
@@ -79,7 +85,13 @@ export const bollaRigheTable = pgTable("bolla_righe", {
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
 });
 
-export const insertBollaSchema = createInsertSchema(bolleTable).omit({ id: true, dataCreazione: true });
+export const insertBollaSchema = createInsertSchema(bolleTable).omit({
+  id: true,
+  dataCreazione: true,
+  areaOperativaIdSnapshot: true,
+  centroAscoltoIdSnapshot: true,
+  numeroComponentiNucleoSnapshot: true,
+});
 export type InsertBolla = z.infer<typeof insertBollaSchema>;
 export type Bolla = typeof bolleTable.$inferSelect;
 

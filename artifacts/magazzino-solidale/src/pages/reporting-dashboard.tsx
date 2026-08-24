@@ -23,7 +23,7 @@ import { ReportDrilldown } from "@/components/reporting/report-drilldown";
 import { ReportEmptyState } from "@/components/reporting/report-empty-state";
 import { useAuth } from "@/lib/auth";
 import { todayEuropeRome } from "@/lib/europe-rome";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { localizeReportingText } from "@/lib/reporting-text";
 import { FseOperations } from "@/components/reporting/fse-operations";
@@ -186,10 +186,10 @@ export default function ReportingDashboardPage({ section }: { section: Section }
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
   }, [user]);
-  const updateFilters = (next: ReportingFilterState) => {
+  const updateFilters = useCallback((next: ReportingFilterState) => {
     setFilters(next);
     writeFiltersToUrl(next);
-  };
+  }, []);
   return (
     <div className="space-y-6 p-4 md:p-8">
       <header>

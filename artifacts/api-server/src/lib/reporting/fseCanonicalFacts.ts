@@ -14,6 +14,21 @@ export const fseDistributionNatureCondition = sql`(
   OR (mv.natura_contabile = 'LEGACY' AND mv.tipo_movimento = 'scarico')
 )`;
 
+export const effectiveBollaRigaId = sql`COALESCE(
+  mv.bolla_riga_id,
+  original.bolla_riga_id
+)`;
+
+export const effectiveDistributionOperationId = sql`COALESCE(
+  mv.operazione_distribuzione_id,
+  original.operazione_distribuzione_id
+)`;
+
+export const effectiveDistributionChannel = sql`COALESCE(
+  mv.canale_operativo,
+  original.canale_operativo
+)`;
+
 export function fseSignedQuantity(quantity: SQL): SQL {
   return signedMovementSql(
     quantity,

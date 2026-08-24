@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { formatDateOrDateTimeEuropeRome, todayEuropeRome } from "@/lib/europe-rome";
 import { Pencil } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const DEMOGRAPHY_ROWS = [
   ["Componenti", "numeroComponenti"],
@@ -57,6 +58,7 @@ export function BeneficiarioFseCard({
   beneficiarioId: number;
   canManage: boolean;
 }) {
+  const { t } = useTranslation();
   const { data, isLoading, isError } = useGetBeneficiarioFse(beneficiarioId);
   const update = useUpdateBeneficiarioFse();
   const queryClient = useQueryClient();
@@ -95,7 +97,7 @@ export function BeneficiarioFseCard({
   }
   if (isError || !data) {
     return <Card><CardContent className="p-6 text-sm text-destructive">
-      Impossibile caricare il fascicolo FSE+.
+      {t("reporting.fse.loadError")}
     </CardContent></Card>;
   }
 
@@ -115,19 +117,19 @@ export function BeneficiarioFseCard({
       await update.mutateAsync({ id: beneficiarioId, data: payload });
       await queryClient.invalidateQueries({ queryKey: getGetBeneficiarioFseQueryKey(beneficiarioId) });
       setEditing(false);
-      toast({ title: "Fascicolo FSE+ aggiornato" });
+      toast({ title: t("reporting.fse.updated") });
     } catch (error) {
-      toast({ title: "Fascicolo FSE+", description: errorMessage(error), variant: "destructive" });
+      toast({ title: t("reporting.fse.dossier"), description: errorMessage(error), variant: "destructive" });
     }
   };
 
   return <>
     <Card>
       <CardHeader className="flex flex-row items-center justify-between py-4">
-        <CardTitle className="text-base">Fascicolo FSE+</CardTitle>
+        <CardTitle className="text-base">{t("reporting.fse.dossier")}</CardTitle>
         {canManage && (
           <Button size="sm" variant="outline" className="gap-2" onClick={() => setEditing(true)}>
-            <Pencil className="h-4 w-4" />Modifica
+            <Pencil className="h-4 w-4" />{t("reporting.fse.edit")}
           </Button>
         )}
       </CardHeader>
@@ -215,13 +217,13 @@ export function BeneficiarioFseCard({
 
     <Dialog open={editing} onOpenChange={setEditing}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Modifica fascicolo FSE+</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t("reporting.fse.edit")} {t("reporting.fse.dossier")}</DialogTitle></DialogHeader>
         <div className="space-y-4">
-          <div><Label htmlFor="fse-reference-date">Data di riferimento</Label>
+          <div><Label htmlFor="fse-reference-date">{t("reporting.fse.dossierReferenceDate")}</Label>
             <Input id="fse-reference-date" type="date" value={form.dataRiferimento}
               onChange={(event) => setForm({ ...form, dataRiferimento: event.target.value })} />
             <p className="mt-1 text-xs text-muted-foreground">
-              Determina la validità storica dei dati. Conferma che rappresenti la data effettiva dell’informazione.
+              {t("reporting.fse.referenceDateHistory")}
             </p>
           </div>
           <div><Label htmlFor="fse-code">Codice fascicolo</Label>
@@ -235,13 +237,13 @@ export function BeneficiarioFseCard({
           ] as const).map(([key, label]) => (
             <div key={key}><Label htmlFor={`fse-${key}`}>{label}</Label>
               <Input id={`fse-${key}`} type="number" min={0} max={data.componentiDichiarati}
-                placeholder="Non valorizzato"
+                placeholder={t("reporting.fse.notSet")}
                 value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} />
             </div>
           ))}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setEditing(false)}>Annulla</Button>
+          <Button variant="outline" onClick={() => setEditing(false)}>{t("reporting.fse.cancel")}</Button>
           <Button onClick={() => void save()} disabled={update.isPending}>
             Salva
           </Button>
