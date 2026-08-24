@@ -59,6 +59,14 @@ import {
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import {
+  applyAllAreaPermissions,
+  applyAreaSelection,
+  applyPermissionSelection,
+  areaCheckboxState,
+  existingRoleSelection,
+  permissionsForArea,
+} from "@/lib/area-permissions";
 
 const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
 
@@ -105,25 +113,38 @@ export default function Ruoli() {
 
   const openEdit = (r: Ruolo) => {
     if (r.nome === SUPER_ADMIN_ROLE_NAME && !user?.isSuperAdmin) return;
+    const selection = existingRoleSelection({
+      aree: r.aree ?? [],
+      permessi: r.permessi ?? [],
+    });
     setEditing(r);
     setNome(r.nome);
     setDescrizione(r.descrizione ?? "");
-    setAree(r.aree ?? []);
-    setPermessi(r.permessi ?? []);
+    setAree(selection.aree);
+    setPermessi(selection.permessi);
     setIsAdmin(r.isAdmin);
     setFormError(null);
     setIsFormOpen(true);
   };
 
   const toggleArea = (key: string, checked: boolean) => {
-    setAree((prev) =>
-      checked ? [...prev, key] : prev.filter((a) => a !== key),
+    const selection = applyAreaSelection(
+      { aree, permessi },
+      key,
+      checked,
+      catalogoAree,
     );
+    setAree(selection.aree);
+    setPermessi(selection.permessi);
   };
 
   const togglePermesso = (key: string, checked: boolean) => {
+    setPermessi((prev) => applyPermissionSelection(prev, key, checked));
+  };
+
+  const toggleAllAreaPermissions = (key: string, checked: boolean) => {
     setPermessi((prev) =>
-      checked ? [...new Set([...prev, key])] : prev.filter((p) => p !== key),
+      applyAllAreaPermissions(prev, key, checked, catalogoAree),
     );
   };
 
@@ -354,33 +375,120 @@ export default function Ruoli() {
             {!isAdmin && (
               <div className="space-y-4">
                 <div className="space-y-2">
-                <Label>{t("ruoli.accessibleAreas")}</Label>
-                <div className="space-y-2 rounded-md border p-3">
-                  {catalogoAree
-                    .filter((a) => a.key !== "amministrazione")
-                    .map((a) => (
-                      <div key={a.key} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`area-${a.key}`}
-                          checked={aree.includes(a.key)}
-                          onCheckedChange={(c) => toggleArea(a.key, c === true)}
-                        />
-                        <Label
-                          htmlFor={`area-${a.key}`}
-                          className="font-normal cursor-pointer"
-                        >
-                          {a.label}
-                        </Label>
-                      </div>
-                    ))}
-                </div>
+                  <Label>{t("ruoli.accessibleAreas")}</Label>
+                  <div className="space-y-2 rounded-md border p-3">
+                    {catalogoAree
+                      .filter((a) => a.key !== "amministrazione")
+                      .map((a) => {
+                        const areaPermissions = permissionsForArea(
+                          catalogoAree,
+                          a.key,
+                        );
+                        const selectedCount = areaPermissions.filter(
+                          (permission) => permessi.includes(permission),
+                        ).length;
+                        return (
+                          <div key={a.key} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`area-${a.key}`}
+                              checked={areaCheckboxState(
+                                a.key,
+                                aree,
+                                permessi,
+                                catalogoAree,
+                              )}
+                              onCheckedChange={() =>
+                                toggleArea(a.key, !aree.includes(a.key))
+                              }
+                            />
+                            <Label
+                              htmlFor={`area-${a.key}`}
+                              className="font-normal cursor-pointer"
+                            >
+                              {a.label}
+                            </Label>
+                            {aree.includes(a.key) &&
+                              areaPermissions.length > 0 && (
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  {selectedCount}/{areaPermissions.length}
+                                </span>
+                              )}
+                          </div>
+                        );
+                      })}
+                  </div>
                 </div>
                 {catalogoPermessi.length > 0 && (
                   <div className="space-y-2">
-                    <Label>{t("ruoli.permissions", "Permessi operativi")}</Label>
+                    <Label>
+                      {t("ruoli.permissions", "Permessi operativi")}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t(
+                        "ruoli.permissionsHint",
+                        "La selezione dell'Area propone i permessi associati; puoi personalizzarli singolarmente.",
+                      )}
+                    </p>
+                    {aree.some(
+                      (area) =>
+                        permissionsForArea(catalogoAree, area).length > 0,
+                    ) && (
+                      <div className="space-y-1 rounded-md border p-2">
+                        {aree.map((areaKey) => {
+                          const area = catalogoAree.find(
+                            (candidate) => candidate.key === areaKey,
+                          );
+                          const areaPermissions = permissionsForArea(
+                            catalogoAree,
+                            areaKey,
+                          );
+                          if (!area || areaPermissions.length === 0)
+                            return null;
+                          return (
+                            <div
+                              key={areaKey}
+                              className="flex items-center justify-between gap-2"
+                            >
+                              <span className="truncate text-xs font-medium">
+                                {area.label}
+                              </span>
+                              <div className="flex shrink-0 gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  data-testid={`all-permissions-${areaKey}`}
+                                  onClick={() =>
+                                    toggleAllAreaPermissions(areaKey, true)
+                                  }
+                                >
+                                  {t("ruoli.allPermissions", "Tutti")}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  data-testid={`no-permissions-${areaKey}`}
+                                  onClick={() =>
+                                    toggleAllAreaPermissions(areaKey, false)
+                                  }
+                                >
+                                  {t("ruoli.noPermissions", "Nessuno")}
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                     <div className="space-y-2 rounded-md border p-3">
                       {catalogoPermessi.map((permission) => (
-                        <div key={permission.key} className="flex items-center gap-2">
+                        <div
+                          key={permission.key}
+                          className="flex items-center gap-2"
+                        >
                           <Checkbox
                             id={`permission-${permission.key}`}
                             checked={permessi.includes(permission.key)}

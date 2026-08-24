@@ -39,8 +39,14 @@ export const BENEFICIARI_PERMISSIONS = [
     label: "Beneficiari: disattivazione e riattivazione",
   },
   { key: "beneficiari.export", label: "Beneficiari: esportazione dati" },
-  { key: "beneficiari.fse.view", label: "Beneficiari FSE+: consultazione fascicolo" },
-  { key: "beneficiari.fse.manage", label: "Beneficiari FSE+: modifica dati interoperabili" },
+  {
+    key: "beneficiari.fse.view",
+    label: "Beneficiari FSE+: consultazione fascicolo",
+  },
+  {
+    key: "beneficiari.fse.manage",
+    label: "Beneficiari FSE+: modifica dati interoperabili",
+  },
   { key: "beneficiari.fse.import", label: "Beneficiari FSE+: importazione" },
   { key: "beneficiari.fse.export", label: "Beneficiari FSE+: esportazione" },
   {
@@ -245,6 +251,90 @@ export const ALL_PERMISSIONS = [
   ...BOLLE_PERMISSIONS,
   ...APPROVVIGIONAMENTI_PERMISSIONS,
 ] as const;
-export const ALL_PERMISSION_KEYS = ALL_PERMISSIONS.map((item) => item.key);
 
 export type PermissionKey = (typeof ALL_PERMISSIONS)[number]["key"];
+export const ALL_PERMISSION_KEYS: PermissionKey[] = ALL_PERMISSIONS.map(
+  (item) => item.key,
+);
+
+const permissionKeys = <T extends readonly { readonly key: PermissionKey }[]>(
+  catalog: T,
+): PermissionKey[] => catalog.map((item) => item.key);
+
+/**
+ * Catalogo esplicito Area -> permessi usato esclusivamente dalla UX Ruoli.
+ *
+ * Non è un enforcement implicito: il ruolo continua a persistere `aree` e
+ * `permessi` separatamente e ogni route continua ad applicare areaGuard e
+ * requirePermission. Le associazioni trasversali seguono le route e la UI:
+ * - Bolle è condiviso fra Sociale e Magazzino;
+ * - MAPS usa le aree sorgente Sociale/Magazzino, non il gruppo menu Logistica;
+ * - Analisi condivide i permessi dei report che hanno già un gate dedicato;
+ * - UDS riceve solo i permessi Beneficiari realmente usati dai suoi flussi.
+ */
+export const AREA_PERMISSION_MAP = {
+  generale: [],
+  magazzino: [
+    ...permissionKeys(MAGAZZINO_PERMISSIONS),
+    ...permissionKeys(BOLLE_PERMISSIONS),
+    "maps.operational",
+  ],
+  sociale: [
+    ...permissionKeys(BENEFICIARI_PERMISSIONS),
+    "credito.view",
+    "credito.quota.manage",
+    "credito.adjust",
+    ...permissionKeys(EMPORIO_ACCESS_PERMISSIONS),
+    ...permissionKeys(SOCIALE_INTERVENTI_PERMISSIONS),
+    ...permissionKeys(BOLLE_PERMISSIONS),
+    "logistica.turni.view",
+    "logistica.turni.manage",
+    "logistica.volontari.view",
+    "logistica.volontari.manage",
+    "logistica.mezzi.view",
+    "logistica.mezzi.manage",
+    "maps.route",
+    "maps.operational",
+  ],
+  emporio: [
+    ...permissionKeys(CREDITO_PERMISSIONS),
+    ...permissionKeys(EMPORIO_ACCESS_PERMISSIONS),
+    ...permissionKeys(EMPORIO_CASSA_SALES_PERMISSIONS),
+  ],
+  mensa: [
+    ...permissionKeys(MENSA_PERMISSIONS),
+    // La vista rifornimenti Mensa espone la spedizione solo con questo grant.
+    "magazzino.transfers.dispatch",
+  ],
+  uds: [
+    ...permissionKeys(UDS_PERMISSIONS),
+    "beneficiari.view",
+    "beneficiari.manage",
+    "beneficiari.sensitive.view",
+    "beneficiari.export",
+    "beneficiari.fse.view",
+    "beneficiari.fse.manage",
+    "beneficiari.duplicates.search",
+    "beneficiari.cards.manage",
+    "credito.view",
+    "credito.quota.manage",
+    "credito.adjust",
+    ...permissionKeys(EMPORIO_ACCESS_PERMISSIONS),
+  ],
+  logistica: [
+    ...permissionKeys(LOGISTICA_PERMISSIONS),
+    ...permissionKeys(APPROVVIGIONAMENTI_PERMISSIONS),
+  ],
+  analisi: [
+    "mensa.reports.view",
+    "uds.reports.view",
+    "magazzino.fse.view",
+    "magazzino.fse.export",
+    "magazzino.fse.reconcile",
+    "magazzino.fse.reconcile.manage",
+    "magazzino.fse.monitoring.manage",
+    "magazzino.fse.return",
+  ],
+  // L'Area amministrazione resta riservata agli admin e non assegna grant UX.
+  amministrazione: [],
+} as const satisfies Record<string, readonly PermissionKey[]>;

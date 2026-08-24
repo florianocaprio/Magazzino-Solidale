@@ -3,7 +3,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { db, ruoliTable, utentiTable } from "@workspace/db";
 import { CreateRuoloBody, UpdateRuoloBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
-import { ALL_AREA_KEYS } from "../lib/areas";
+import { ALL_AREA_KEYS, sanitizeRoleAreas } from "../lib/areas";
 import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 import { ALL_PERMISSION_KEYS } from "../lib/permissions";
 
@@ -14,7 +14,12 @@ router.use("/ruoli", requireAuth, requireAdmin);
 
 function rejectLimitedAdminRoleMutation(req: Request, res: Response): boolean {
   if (req.user?.isSuperAdmin || req.user?.areaOperativaId == null) return false;
-  res.status(403).json({ error: "Un amministratore limitato non può modificare ruoli e permessi condivisi" });
+  res
+    .status(403)
+    .json({
+      error:
+        "Un amministratore limitato non può modificare ruoli e permessi condivisi",
+    });
   return true;
 }
 
@@ -27,11 +32,6 @@ const fmt = (r: typeof ruoliTable.$inferSelect) => ({
   isAdmin: r.isAdmin,
   dataCreazione: r.dataCreazione.toISOString(),
 });
-
-function sanitizeAree(aree: string[] | undefined): string[] {
-  if (!aree) return [];
-  return aree.filter((a) => ALL_AREA_KEYS.includes(a));
-}
 
 function sanitizePermessi(permessi: string[] | undefined): string[] {
   if (!permessi) return [];
@@ -100,8 +100,12 @@ router.post("/ruoli", async (req, res): Promise<void> => {
     .values({
       nome,
       descrizione: descrizione ?? null,
-      aree: creatingSuperAdminRole ? ALL_AREA_KEYS : sanitizeAree(aree),
-      permessi: creatingSuperAdminRole ? ALL_PERMISSION_KEYS : sanitizePermessi(permessi),
+      aree: creatingSuperAdminRole
+        ? ALL_AREA_KEYS
+        : sanitizeRoleAreas(aree, isAdmin ?? false),
+      permessi: creatingSuperAdminRole
+        ? ALL_PERMISSION_KEYS
+        : sanitizePermessi(permessi),
       isAdmin: creatingSuperAdminRole ? true : (isAdmin ?? false),
     })
     .returning();
@@ -143,8 +147,12 @@ router.patch("/ruoli/:id", async (req, res): Promise<void> => {
     return;
   }
   const isProtectedSuperAdminRole = isSuperAdminRoleName(current.nome);
-  const nextNameIsSuperAdmin = body.nome !== undefined && isSuperAdminRoleName(body.nome);
-  if ((isProtectedSuperAdminRole || nextNameIsSuperAdmin) && !req.user?.isSuperAdmin) {
+  const nextNameIsSuperAdmin =
+    body.nome !== undefined && isSuperAdminRoleName(body.nome);
+  if (
+    (isProtectedSuperAdminRole || nextNameIsSuperAdmin) &&
+    !req.user?.isSuperAdmin
+  ) {
     res.status(403).json({ error: "Operazione riservata ai Super Admin" });
     return;
   }
@@ -176,10 +184,15 @@ router.patch("/ruoli/:id", async (req, res): Promise<void> => {
   }
   if (body.descrizione !== undefined)
     updates.descrizione = body.descrizione ?? null;
-  if (!isProtectedSuperAdminRole && body.aree !== undefined) updates.aree = sanitizeAree(body.aree);
+  const nextIsAdmin = body.isAdmin ?? current.isAdmin;
+  if (!isProtectedSuperAdminRole && body.aree !== undefined)
+    updates.aree = sanitizeRoleAreas(body.aree, nextIsAdmin);
+  else if (!isProtectedSuperAdminRole && body.isAdmin === false)
+    updates.aree = sanitizeRoleAreas(current.aree, false);
   if (!isProtectedSuperAdminRole && body.permessi !== undefined)
     updates.permessi = sanitizePermessi(body.permessi);
-  if (!isProtectedSuperAdminRole && body.isAdmin !== undefined) updates.isAdmin = body.isAdmin;
+  if (!isProtectedSuperAdminRole && body.isAdmin !== undefined)
+    updates.isAdmin = body.isAdmin;
 
   const [row] = await db
     .update(ruoliTable)
@@ -205,7 +218,9 @@ router.delete("/ruoli/:id", async (req, res): Promise<void> => {
     .from(ruoliTable)
     .where(eq(ruoliTable.id, id));
   if (current && isSuperAdminRoleName(current.nome)) {
-    res.status(409).json({ error: "Il ruolo SuperAdmin non può essere eliminato" });
+    res
+      .status(409)
+      .json({ error: "Il ruolo SuperAdmin non può essere eliminato" });
     return;
   }
 

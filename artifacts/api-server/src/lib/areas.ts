@@ -15,6 +15,17 @@ export const ALL_AREAS = [
 
 export const ALL_AREA_KEYS: string[] = ALL_AREAS.map((a) => a.key);
 
+export function sanitizeRoleAreas(
+  areas: string[] | undefined,
+  isAdmin: boolean,
+): string[] {
+  if (!areas) return [];
+  return areas.filter(
+    (area) =>
+      ALL_AREA_KEYS.includes(area) && (isAdmin || area !== "amministrazione"),
+  );
+}
+
 /**
  * Maps the first URL segment (under `/api`) to the access area(s) that govern it.
  * Used by the area-guard middleware to enforce role-based area access server-side.

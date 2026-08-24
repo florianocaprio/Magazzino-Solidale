@@ -11756,7 +11756,8 @@ export const GetMensaReportResponse = zod.object({
 
 export const ListAreeResponseItem = zod.object({
   "key": zod.string(),
-  "label": zod.string()
+  "label": zod.string(),
+  "permessi": zod.array(zod.string()).describe('Permessi operativi suggeriti dalla UX quando l\'Area viene selezionata')
 })
 export const ListAreeResponse = zod.array(ListAreeResponseItem)
 

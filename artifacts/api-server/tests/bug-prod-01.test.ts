@@ -24,6 +24,7 @@ import {
 } from "../src/lib/demoEnvironment";
 import { updateImpostazioniModuli } from "../src/lib/impostazioniModuli";
 import { EMPORIO_AREA_KEY } from "../src/lib/areas";
+import { AREA_PERMISSION_MAP } from "../src/lib/permissions";
 import { SUPER_ADMIN_ROLE_NAME } from "../src/lib/seedRoles";
 import { errorMessage } from "../../magazzino-solidale/src/lib/api-error";
 
@@ -161,6 +162,7 @@ describe("BUG-PROD-01 - catalogo aree e autenticazione", () => {
     expect(response.body).toContainEqual({
       key: EMPORIO_AREA_KEY,
       label: "Emporio",
+      permessi: [...AREA_PERMISSION_MAP.emporio],
     });
   });
 
