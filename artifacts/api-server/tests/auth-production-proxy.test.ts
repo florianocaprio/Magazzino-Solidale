@@ -34,9 +34,10 @@ beforeAll(async () => {
   const [role] = await db
     .insert(ruoliTable)
     .values({
-      nome: `BUG-PROD-01 Auth Admin ${suffix}`,
-      aree: ["amministrazione"],
-      isAdmin: true,
+      nome: `BUG-PROD-01 Auth Non Admin ${suffix}`,
+      aree: ["magazzino"],
+      permessi: ["magazzino.view"],
+      isAdmin: false,
     })
     .returning({ id: ruoliTable.id });
   roleId = role.id;
@@ -46,7 +47,7 @@ beforeAll(async () => {
     .values({
       username,
       passwordHash: await bcrypt.hash(password, 4),
-      nome: "Admin Auth Produzione",
+      nome: "Utente Auth Produzione",
       ruoloId: roleId,
       attivo: true,
     })
@@ -90,6 +91,12 @@ describe("BUG-PROD-01 - sessione dietro reverse proxy HTTPS", () => {
       .send({ username, password });
 
     expect(login.status).toBe(200);
+    expect(login.body).toMatchObject({
+      username,
+      isAdmin: false,
+      aree: ["magazzino"],
+      permessi: ["magazzino.view"],
+    });
     const rawCookie = login.headers["set-cookie"];
     const setCookie = Array.isArray(rawCookie) ? rawCookie[0] : rawCookie;
     expect(setCookie).toContain("magazzino.sid=");
@@ -103,7 +110,12 @@ describe("BUG-PROD-01 - sessione dietro reverse proxy HTTPS", () => {
       .set("Cookie", sessionCookie!);
 
     expect(me.status).toBe(200);
-    expect(me.body.username).toBe(username);
+    expect(me.body).toMatchObject({
+      username,
+      isAdmin: false,
+      aree: ["magazzino"],
+      permessi: ["magazzino.view"],
+    });
   });
 
   it("mantiene il 401 esplicito senza cookie di sessione", async () => {

@@ -27,6 +27,27 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const CURRENT_USER_KEY = getGetCurrentUserQueryKey();
 const BOOTSTRAP_KEY = getGetBootstrapStatusQueryKey();
 
+type AuthAccessUser = Pick<AuthUser, "isAdmin"> &
+  Partial<Pick<AuthUser, "aree" | "permessi">>;
+
+export function authUserHasArea(
+  user: AuthAccessUser | null | undefined,
+  area: string,
+): boolean {
+  if (!user) return false;
+  if (user.isAdmin) return true;
+  if (area === "amministrazione") return false;
+  return (user.aree ?? []).includes(area);
+}
+
+export function authUserHasPermission(
+  user: AuthAccessUser | null | undefined,
+  permission: string,
+): boolean {
+  if (!user) return false;
+  return user.isAdmin || (user.permessi ?? []).includes(permission);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useGetCurrentUser({
@@ -50,15 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const bootstrap = bootstrapData?.bootstrap ?? false;
 
   const hasArea = (area: string): boolean => {
-    if (!user) return false;
-    if (user.isAdmin) return true;
-    if (area === "amministrazione") return false;
-    return user.aree.includes(area);
+    return authUserHasArea(user, area);
   };
 
   const hasPermission = (permission: string): boolean => {
-    if (!user) return false;
-    return user.isAdmin || user.permessi.includes(permission);
+    return authUserHasPermission(user, permission);
   };
 
   const setUser = (next: AuthUser) => {
