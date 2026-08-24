@@ -81,6 +81,7 @@ import {
   InventoryError,
 } from "../lib/scaricoInventory";
 import { canAccessUdsInterventoTerritory } from "../lib/udsInterventoPolicy";
+import { beneficiaryReportingSnapshotTx } from "../lib/reporting/eventSnapshots";
 import {
   InventoryDecimal,
   InventoryDecimalError,
@@ -3429,6 +3430,10 @@ router.post("/interventi/:id/concludi", async (req, res) => {
         );
       }
       await replaceOperativita(tx, current, body, req, conclusionDate);
+      const reportingSnapshot = await beneficiaryReportingSnapshotTx(
+        tx,
+        current.beneficiarioId,
+      );
       const [concluso] = await tx
         .update(interventiTable)
         .set({
@@ -3440,6 +3445,12 @@ router.post("/interventi/:id/concludi", async (req, res) => {
             : current.note,
           dataOraConclusione: conclusionDate,
           dataAggiornamento: conclusionDate,
+          areaOperativaIdSnapshot:
+            current.areaOperativaIdSnapshot ??
+            reportingSnapshot.areaOperativaIdSnapshot,
+          centroAscoltoIdSnapshot:
+            current.centroAscoltoIdSnapshot ??
+            reportingSnapshot.centroAscoltoIdSnapshot,
         })
         .where(
           and(

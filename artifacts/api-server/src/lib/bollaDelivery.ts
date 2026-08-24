@@ -21,6 +21,7 @@ import {
   markDistributionOperationReversed,
 } from "./distributionLedger";
 import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
+import { beneficiaryReportingSnapshotTx } from "./reporting/eventSnapshots";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 const PRENOTAZIONE_CONVERTITA = "convertita_in_scarico";
@@ -131,6 +132,10 @@ async function syncInterventoBollaTx(tx: Tx, bollaId: number) {
         beneficiarioId: bolla.beneficiarioId,
         dataIntervento: bolla.dataBolla,
         operatoreId: bolla.operatoreId,
+        areaOperativaIdSnapshot:
+          esistente.areaOperativaIdSnapshot ?? bolla.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot:
+          esistente.centroAscoltoIdSnapshot ?? bolla.centroAscoltoIdSnapshot,
       })
       .where(eq(interventiTable.id, esistente.id));
   } else {
@@ -141,6 +146,8 @@ async function syncInterventoBollaTx(tx: Tx, bollaId: number) {
       tipoIntervento,
       descrizione,
       operatoreId: bolla.operatoreId,
+      areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+      centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
     });
   }
 }
@@ -384,7 +391,12 @@ async function syncConsegnaDaBollaTx(
       if (consegna.stato !== "effettuata") {
         await tx
           .update(consegneTable)
-          .set({ stato: "effettuata", dataEffettuata: now })
+          .set({
+            stato: "effettuata",
+            dataEffettuata: now,
+            areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+            centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
+          })
           .where(eq(consegneTable.id, bolla.consegnaId));
       }
       return;
@@ -403,6 +415,8 @@ async function syncConsegnaDaBollaTx(
       magazzinoId: bolla.magazzinoId,
       stato: "effettuata",
       dataEffettuata: now,
+      areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+      centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
       noteOperative: `Consegna diretta registrata dalla bolla ${bolla.numeroBolla}`,
     })
     .returning();
@@ -457,6 +471,11 @@ export async function completeBollaDelivery(opts: {
       }
     }
 
+    const reportingSnapshot = await beneficiaryReportingSnapshotTx(
+      tx,
+      current.beneficiarioId,
+    );
+
     const [updated] = await tx
       .update(bolleTable)
       .set({
@@ -464,6 +483,15 @@ export async function completeBollaDelivery(opts: {
         confermaRicezione: opts.confermaRicezione ?? true,
         noteRicezione: opts.noteRicezione ?? null,
         operatoreId: opts.userId,
+        areaOperativaIdSnapshot:
+          current.areaOperativaIdSnapshot ??
+          reportingSnapshot.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot:
+          current.centroAscoltoIdSnapshot ??
+          reportingSnapshot.centroAscoltoIdSnapshot,
+        numeroComponentiNucleoSnapshot:
+          current.numeroComponentiNucleoSnapshot ??
+          reportingSnapshot.numeroComponentiNucleoSnapshot,
       })
       .where(eq(bolleTable.id, opts.bollaId))
       .returning();

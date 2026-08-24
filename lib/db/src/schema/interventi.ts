@@ -19,6 +19,7 @@ import { beneficiariTable } from "./beneficiari";
 import { bolleTable } from "./bolle";
 import { areeOperativeTable } from "./areeOperative";
 import { zoneUdsTable } from "./zoneUds";
+import { centriAscoltoTable } from "./centri";
 
 export const interventiTable = pgTable(
   "interventi",
@@ -50,6 +51,10 @@ export const interventiTable = pgTable(
     areaOperativaIdSnapshot: integer("area_operativa_id_snapshot").references(
       () => areeOperativeTable.id,
       { onDelete: "restrict" },
+    ),
+    centroAscoltoIdSnapshot: integer("centro_ascolto_id_snapshot").references(
+      () => centriAscoltoTable.id,
+      { onDelete: "set null" },
     ),
     zonaUdsIdSnapshot: integer("zona_uds_id_snapshot").references(
       () => zoneUdsTable.id,
@@ -83,6 +88,13 @@ export const interventiTable = pgTable(
       table.areaOperativaIdSnapshot,
       table.zonaUdsIdSnapshot,
       table.dataIntervento,
+    ),
+    index("interventi_reporting_snapshot_idx").on(
+      table.ambito,
+      table.stato,
+      table.dataIntervento,
+      table.areaOperativaIdSnapshot,
+      table.centroAscoltoIdSnapshot,
     ),
     index("interventi_priorita_idx").on(table.priorita),
     index("interventi_data_ora_pianificata_idx").on(table.dataOraPianificata),

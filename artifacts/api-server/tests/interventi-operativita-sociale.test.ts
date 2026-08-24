@@ -628,6 +628,39 @@ describe("gestione operativa degli interventi Sociali", () => {
         versione: response.body.operativita.versione,
       });
     expect(immutable.status).toBe(409);
+    const [historical] = await db
+      .select()
+      .from(interventiTable)
+      .where(eq(interventiTable.id, id));
+    expect(historical).toMatchObject({
+      areaOperativaIdSnapshot: roma,
+      centroAscoltoIdSnapshot: centroRoma,
+    });
+    await db
+      .update(beneficiariTable)
+      .set({
+        areaOperativaId: milano,
+        centroAscoltoId: centroMilano,
+      })
+      .where(eq(beneficiariTable.id, beneficiarioRoma));
+    try {
+      const [stillHistorical] = await db
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, id));
+      expect(stillHistorical).toMatchObject({
+        areaOperativaIdSnapshot: roma,
+        centroAscoltoIdSnapshot: centroRoma,
+      });
+    } finally {
+      await db
+        .update(beneficiariTable)
+        .set({
+          areaOperativaId: roma,
+          centroAscoltoId: centroRoma,
+        })
+        .where(eq(beneficiariTable.id, beneficiarioRoma));
+    }
   });
 
   it("annulla con motivo e registra la mancata presentazione senza falso avvio", async () => {

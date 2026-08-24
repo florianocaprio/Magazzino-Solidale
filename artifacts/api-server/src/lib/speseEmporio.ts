@@ -52,6 +52,7 @@ import {
   isLottoDistribuibile,
   lottoDistribuibileCondition,
 } from "./lottoPolicy";
+import { beneficiaryReportingSnapshotTx } from "./reporting/eventSnapshots";
 import {
   InventoryDecimal,
   InventoryDecimalError,
@@ -625,6 +626,10 @@ export async function chiudiSessioneCassaEmporio(opts: {
     const numeroSpesa = await generateNumeroSpesa(tx, dataDocumento);
     const numeroBolla = await generateNumeroBolla(tx, dataDocumento);
     const codiceScarico = generateCodiceScarico(dataDocumento);
+    const reportingSnapshot = await beneficiaryReportingSnapshotTx(
+      tx,
+      beneficiario.id,
+    );
 
     const [scarico] = await tx
       .insert(scarichiTable)
@@ -648,6 +653,10 @@ export async function chiudiSessioneCassaEmporio(opts: {
         beneficiarioId: sessione.beneficiarioId,
         consegnaId: accesso.id,
         magazzinoId: sessione.magazzinoEmporioId,
+        areaOperativaIdSnapshot: reportingSnapshot.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot: reportingSnapshot.centroAscoltoIdSnapshot,
+        numeroComponentiNucleoSnapshot:
+          reportingSnapshot.numeroComponentiNucleoSnapshot,
         operatoreId: opts.operatoreId,
         stato: "consegnato",
         noteConsegna: `Bolla Emporio da Spesa ${numeroSpesa}`,
@@ -780,6 +789,12 @@ export async function chiudiSessioneCassaEmporio(opts: {
           accesso.dataOraEffettivaAccesso ?? dataChiusura,
         operatoreAccessoEmporioId:
           accesso.operatoreAccessoEmporioId ?? opts.operatoreId,
+        areaOperativaIdSnapshot:
+          accesso.areaOperativaIdSnapshot ??
+          reportingSnapshot.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot:
+          accesso.centroAscoltoIdSnapshot ??
+          reportingSnapshot.centroAscoltoIdSnapshot,
       })
       .where(eq(consegneTable.id, accesso.id));
 

@@ -43,6 +43,7 @@ import { requirePermission } from "../middlewares/auth";
 import { auditEmporioTx } from "../lib/emporioAudit";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
+import { beneficiaryReportingSnapshotTx } from "../lib/reporting/eventSnapshots";
 
 const router: IRouter = Router();
 router.use(
@@ -928,6 +929,10 @@ router.patch(
             `Transizione Accesso Emporio non consentita: ${current} → ${stato}.`,
           );
         }
+        const reportingSnapshot =
+          stato === "effettuato"
+            ? await beneficiaryReportingSnapshotTx(tx, locked.beneficiarioId)
+            : null;
         await tx
           .update(consegneTable)
           .set({
@@ -937,6 +942,16 @@ router.patch(
               stato === "annullato"
                 ? motivoAnnullamento
                 : locked.motivoAnnullamento,
+            areaOperativaIdSnapshot:
+              reportingSnapshot == null
+                ? locked.areaOperativaIdSnapshot
+                : (locked.areaOperativaIdSnapshot ??
+                  reportingSnapshot.areaOperativaIdSnapshot),
+            centroAscoltoIdSnapshot:
+              reportingSnapshot == null
+                ? locked.centroAscoltoIdSnapshot
+                : (locked.centroAscoltoIdSnapshot ??
+                  reportingSnapshot.centroAscoltoIdSnapshot),
           })
           .where(eq(consegneTable.id, id));
         if (stato !== current) {
