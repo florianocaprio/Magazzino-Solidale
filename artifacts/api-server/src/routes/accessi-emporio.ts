@@ -43,7 +43,11 @@ import { requirePermission } from "../middlewares/auth";
 import { auditEmporioTx } from "../lib/emporioAudit";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
-import { beneficiaryReportingSnapshotTx } from "../lib/reporting/eventSnapshots";
+import { beneficiarioAccessScopeFromRequest } from "../lib/beneficiarioPolicy";
+import {
+  BeneficiaryReportingScopeError,
+  lockAndAuthorizeBeneficiaryReportingContextTx,
+} from "../lib/reporting/eventSnapshots";
 
 const router: IRouter = Router();
 router.use(
@@ -931,7 +935,13 @@ router.patch(
         }
         const reportingSnapshot =
           stato === "effettuato"
-            ? await beneficiaryReportingSnapshotTx(tx, locked.beneficiarioId)
+            ? (
+                await lockAndAuthorizeBeneficiaryReportingContextTx(
+                  tx,
+                  locked.beneficiarioId,
+                  beneficiarioAccessScopeFromRequest(req),
+                )
+              ).snapshot
             : null;
         await tx
           .update(consegneTable)
@@ -968,6 +978,10 @@ router.patch(
         }
       });
     } catch (error) {
+      if (error instanceof BeneficiaryReportingScopeError) {
+        res.status(403).json({ error: MSG_RISORSA_NON_ACCESSIBILE });
+        return;
+      }
       if (error instanceof SpesaAccessoError) {
         res.status(error.status).json({ error: error.message });
         return;

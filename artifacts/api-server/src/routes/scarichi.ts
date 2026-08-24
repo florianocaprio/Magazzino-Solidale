@@ -38,15 +38,19 @@ import {
 import { withDocumentCodeRetry } from "../lib/documentCode";
 import { isDateOnly } from "../lib/interventiWorkflow";
 import type { LottoSelectionPolicy } from "../lib/lottoPolicy";
-import { canAccessBeneficiarioRecord } from "../lib/beneficiarioPolicy";
+import {
+  beneficiarioAccessScopeFromRequest,
+  canAccessBeneficiarioRecord,
+} from "../lib/beneficiarioPolicy";
 import {
   InventoryDecimal,
   InventoryDecimalError,
   positiveInventoryDecimal,
 } from "../lib/inventoryDecimal";
 import {
-  beneficiaryReportingSnapshotTx,
+  BeneficiaryReportingScopeError,
   isReportingSnapshotConcurrencyError,
+  lockAndAuthorizeBeneficiaryReportingContextTx,
 } from "../lib/reporting/eventSnapshots";
 
 const router: IRouter = Router();
@@ -341,6 +345,7 @@ router.post(
   requirePermission("magazzino.stock.issue"),
   async (req, res) => {
     const body = req.body ?? {};
+    const beneficiaryAccessScope = beneficiarioAccessScopeFromRequest(req);
 
     if (!Number.isInteger(body.magazzinoId) || body.magazzinoId <= 0) {
       res.status(400).json({ error: "Magazzino non valido" });
@@ -512,7 +517,13 @@ router.post(
           const reportingSnapshot =
             beneficiarioId == null
               ? null
-              : await beneficiaryReportingSnapshotTx(tx, beneficiarioId);
+              : (
+                  await lockAndAuthorizeBeneficiaryReportingContextTx(
+                    tx,
+                    beneficiarioId,
+                    beneficiaryAccessScope,
+                  )
+                ).snapshot;
           await requireOperationalMagazzino(tx, body.magazzinoId);
           return creaScaricoInventariale(tx, {
             codice,
@@ -565,6 +576,10 @@ router.post(
         }),
       );
     } catch (error) {
+      if (error instanceof BeneficiaryReportingScopeError) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
       if (isReportingSnapshotConcurrencyError(error)) {
         res.status(409).json({
           error: "Finalizzazione concorrente: ricarica i dati e riprova",

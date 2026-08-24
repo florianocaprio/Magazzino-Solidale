@@ -82,8 +82,9 @@ import {
 } from "../lib/scaricoInventory";
 import { canAccessUdsInterventoTerritory } from "../lib/udsInterventoPolicy";
 import {
-  beneficiaryReportingSnapshotTx,
+  BeneficiaryReportingScopeError,
   isReportingSnapshotConcurrencyError,
+  lockBeneficiaryReportingContextTx,
 } from "../lib/reporting/eventSnapshots";
 import {
   InventoryDecimal,
@@ -949,11 +950,24 @@ function assertExpectedVersion(
 async function snapshotInterventoReportingContext(
   tx: DbTransaction,
   current: InterventoRow,
+  req: Request,
 ): Promise<InterventoRow> {
-  const beneficiarySnapshot = await beneficiaryReportingSnapshotTx(
+  const beneficiaryContext = await lockBeneficiaryReportingContextTx(
     tx,
     current.beneficiarioId,
   );
+  const authorized =
+    beneficiaryContext.attivo &&
+    (current.ambito === "uds"
+      ? canUseInterventoArea(req, "uds") &&
+        canAccessUdsInterventoTerritory(
+          req,
+          current,
+          beneficiaryContext.areaOperativaId,
+        )
+      : canAccessSensitiveSocialBeneficiary(beneficiaryContext, req));
+  if (!authorized) throw new BeneficiaryReportingScopeError();
+  const beneficiarySnapshot = beneficiaryContext.snapshot;
   let areaOperativaIdSnapshot = current.areaOperativaIdSnapshot;
   let centroAscoltoIdSnapshot = current.centroAscoltoIdSnapshot;
 
@@ -1883,6 +1897,10 @@ function sendRouteError(
   error: unknown,
   res: { status: (status: number) => { json: (body: unknown) => void } },
 ) {
+  if (error instanceof BeneficiaryReportingScopeError) {
+    res.status(403).json({ error: error.message });
+    return true;
+  }
   if (isReportingSnapshotConcurrencyError(error)) {
     res.status(409).json({
       error: "Finalizzazione concorrente: ricarica i dati e riprova",
@@ -3344,7 +3362,7 @@ router.post("/interventi/:id/salva-operativita", async (req, res) => {
         );
       }
       const effectiveCurrent = hasOwn(body, "materiali")
-        ? await snapshotInterventoReportingContext(tx, current)
+        ? await snapshotInterventoReportingContext(tx, current, req)
         : current;
       await replaceOperativita(tx, effectiveCurrent, body, req, now);
       const updates: Partial<typeof interventiTable.$inferInsert> = {
@@ -3484,6 +3502,7 @@ router.post("/interventi/:id/concludi", async (req, res) => {
       const effectiveCurrent = await snapshotInterventoReportingContext(
         tx,
         current,
+        req,
       );
       await replaceOperativita(tx, effectiveCurrent, body, req, conclusionDate);
       const [concluso] = await tx
@@ -3571,6 +3590,7 @@ router.post("/interventi/:id/concludi", async (req, res) => {
         const effectiveSuccessivo = await snapshotInterventoReportingContext(
           tx,
           successivo,
+          req,
         );
         await replaceOperativita(
           tx,

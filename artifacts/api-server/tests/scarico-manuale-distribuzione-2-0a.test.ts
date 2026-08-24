@@ -20,10 +20,7 @@ import {
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import scarichiRouter from "../src/routes/scarichi";
-import {
-  beneficiaryReportingSnapshotTx,
-  isReportingSnapshotConcurrencyError,
-} from "../src/lib/reporting/eventSnapshots";
+import { isReportingSnapshotConcurrencyError } from "../src/lib/reporting/eventSnapshots";
 import {
   ensureAmbienteModuli,
   listModuliFunzionali,
@@ -131,8 +128,8 @@ beforeAll(async () => {
       isSuperAdmin: false,
       aree: ["magazzino"],
       permessi: ["magazzino.view", "magazzino.stock.issue"],
-      centroAscoltoId: null,
-      areaOperativaId: null,
+      centroAscoltoId,
+      areaOperativaId,
       zonaUdsId: null,
     };
     next();
@@ -183,7 +180,26 @@ afterAll(async () => {
 });
 
 describe("scarico manuale beneficiario 2.0A", () => {
-  it("serializza il cambio territoriale e acquisisce uno snapshot Beneficiario coerente", async () => {
+  it("nega atomicamente lo Scarico scoped se il Beneficiario cambia Area mentre attende il lock", async () => {
+    const scarichiPrima = await db
+      .select({ id: scarichiTable.id })
+      .from(scarichiTable)
+      .where(eq(scarichiTable.magazzinoId, magazzinoId));
+    const operazioniPrima = await db
+      .select({ id: operazioniDistribuzioneMagazzinoTable.id })
+      .from(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        eq(operazioniDistribuzioneMagazzinoTable.magazzinoId, magazzinoId),
+      );
+    const movimentiPrima = await db
+      .select({ id: movimentiTable.id })
+      .from(movimentiTable)
+      .where(eq(movimentiTable.magazzinoId, magazzinoId));
+    const [lottoPrima] = await db
+      .select({ quantitaResidua: lottiTable.quantitaResidua })
+      .from(lottiTable)
+      .where(eq(lottiTable.id, lottoId));
+
     const client = await pool.connect();
     let committed = false;
     try {
@@ -195,11 +211,20 @@ describe("scarico manuale beneficiario 2.0A", () => {
         [areaOperativaAlternativaId, centroAscoltoAlternativoId, beneficiarioId],
       );
 
-      const snapshotPromise = db.transaction((tx) =>
-        beneficiaryReportingSnapshotTx(tx, beneficiarioId),
+      const responsePromise = Promise.resolve(
+        request(app)
+          .post("/scarichi")
+          .send({
+            magazzinoId,
+            beneficiarioId,
+            dataScarico: "2026-08-22",
+            causale: "consegna_beneficiario",
+            canaleOperativo: "PACCHI",
+            righe: [{ prodottoId, quantita: 1, unitaMisura: "kg" }],
+          }),
       );
       const beforeCommit = await Promise.race([
-        snapshotPromise.then(() => "resolved" as const),
+        responsePromise.then(() => "resolved" as const),
         new Promise<"blocked">((resolve) =>
           setTimeout(() => resolve("blocked"), 50),
         ),
@@ -208,20 +233,25 @@ describe("scarico manuale beneficiario 2.0A", () => {
 
       await client.query("COMMIT");
       committed = true;
-      const snapshot = await Promise.race([
-        snapshotPromise,
+      const response = await Promise.race([
+        responsePromise,
         new Promise<never>((_, reject) =>
           setTimeout(
-            () => reject(new Error("Lo snapshot Beneficiario è rimasto in attesa")),
+            () => reject(new Error("Lo Scarico scoped è rimasto in attesa")),
             5_000,
           ),
         ),
       ]);
-      expect(snapshot).toEqual({
-        areaOperativaIdSnapshot: areaOperativaAlternativaId,
-        centroAscoltoIdSnapshot: centroAscoltoAlternativoId,
-        numeroComponentiNucleoSnapshot: 4,
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({
+        error: "Risorsa non accessibile per il tuo profilo",
       });
+      expect(JSON.stringify(response.body)).not.toContain(
+        String(areaOperativaAlternativaId),
+      );
+      expect(JSON.stringify(response.body)).not.toContain(
+        String(centroAscoltoAlternativoId),
+      );
     } finally {
       if (!committed) await client.query("ROLLBACK");
       client.release();
@@ -235,6 +265,29 @@ describe("scarico manuale beneficiario 2.0A", () => {
         numComponenti: 1,
       })
       .where(eq(beneficiariTable.id, beneficiarioId));
+
+    const scarichiDopo = await db
+      .select({ id: scarichiTable.id })
+      .from(scarichiTable)
+      .where(eq(scarichiTable.magazzinoId, magazzinoId));
+    const operazioniDopo = await db
+      .select({ id: operazioniDistribuzioneMagazzinoTable.id })
+      .from(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        eq(operazioniDistribuzioneMagazzinoTable.magazzinoId, magazzinoId),
+      );
+    const movimentiDopo = await db
+      .select({ id: movimentiTable.id })
+      .from(movimentiTable)
+      .where(eq(movimentiTable.magazzinoId, magazzinoId));
+    const [lottoDopo] = await db
+      .select({ quantitaResidua: lottiTable.quantitaResidua })
+      .from(lottiTable)
+      .where(eq(lottiTable.id, lottoId));
+    expect(scarichiDopo).toHaveLength(scarichiPrima.length);
+    expect(operazioniDopo).toHaveLength(operazioniPrima.length);
+    expect(movimentiDopo).toHaveLength(movimentiPrima.length);
+    expect(lottoDopo.quantitaResidua).toBe(lottoPrima.quantitaResidua);
   });
 
   it("classifica deadlock e serializzazione per una risposta 409 applicativa", () => {

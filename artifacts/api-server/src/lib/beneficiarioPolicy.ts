@@ -22,13 +22,44 @@ export function hasPermission(req: Request, permission: PermissionKey): boolean 
   return Boolean(req.user?.isAdmin || req.user?.permessi?.includes(permission));
 }
 
+export type BeneficiarioAccessScope = {
+  areaOperativaId: number | null;
+  centroAscoltoId: number | null;
+  zonaUdsId: number | null;
+};
+
+type BeneficiarioScopeRecord = Pick<
+  typeof beneficiariTable.$inferSelect,
+  "areaOperativaId" | "centroAscoltoId" | "zonaUdsId"
+>;
+
+export function beneficiarioAccessScopeFromRequest(
+  req: Request,
+): BeneficiarioAccessScope {
+  return {
+    areaOperativaId: callerAreaOperativaId(req),
+    centroAscoltoId: callerCentroId(req),
+    zonaUdsId: callerZonaUdsId(req),
+  };
+}
+
+export function canAccessBeneficiarioScope(
+  beneficiario: BeneficiarioScopeRecord,
+  scope: BeneficiarioAccessScope,
+): boolean {
+  return canAccessCentro(beneficiario.centroAscoltoId, scope.centroAscoltoId)
+    && canAccessAreaOperativa(beneficiario.areaOperativaId, scope.areaOperativaId)
+    && canAccessZonaUds(beneficiario.zonaUdsId, scope.zonaUdsId);
+}
+
 export function canAccessBeneficiarioRecord(
-  beneficiario: Pick<typeof beneficiariTable.$inferSelect, "areaOperativaId" | "centroAscoltoId" | "zonaUdsId">,
+  beneficiario: BeneficiarioScopeRecord,
   req: Request,
 ): boolean {
-  return canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req))
-    && canAccessAreaOperativa(beneficiario.areaOperativaId, callerAreaOperativaId(req))
-    && canAccessZonaUds(beneficiario.zonaUdsId, callerZonaUdsId(req));
+  return canAccessBeneficiarioScope(
+    beneficiario,
+    beneficiarioAccessScopeFromRequest(req),
+  );
 }
 
 /**

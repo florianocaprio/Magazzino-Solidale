@@ -22,9 +22,11 @@ import {
 } from "./distributionLedger";
 import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
 import {
-  beneficiaryReportingSnapshotTx,
+  BeneficiaryReportingScopeError,
   isReportingSnapshotConcurrencyError,
+  lockAndAuthorizeBeneficiaryReportingContextTx,
 } from "./reporting/eventSnapshots";
+import type { BeneficiarioAccessScope } from "./beneficiarioPolicy";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 const PRENOTAZIONE_CONVERTITA = "convertita_in_scarico";
@@ -41,6 +43,10 @@ export class BollaActionError extends Error {
 }
 
 export function handleBollaActionError(err: unknown, res: Response): boolean {
+  if (err instanceof BeneficiaryReportingScopeError) {
+    res.status(403).json({ error: err.message });
+    return true;
+  }
   if (isReportingSnapshotConcurrencyError(err)) {
     res.status(409).json({
       error: "Finalizzazione concorrente: ricarica i dati e riprova",
@@ -445,12 +451,19 @@ export async function completeBollaDelivery(opts: {
   noteRicezione?: string | null;
   confermaRicezione?: boolean;
   allowAlreadyConsegnata?: boolean;
+  beneficiaryAccessScope: BeneficiarioAccessScope;
 }): Promise<{ alreadyConsegnata: boolean }> {
   const dataMovimento = dataCivileEuropeRome(new Date());
   let alreadyConsegnata = false;
 
   await db.transaction(async (tx) => {
     const current = await lockBolla(tx, opts.bollaId);
+    const reportingContext =
+      await lockAndAuthorizeBeneficiaryReportingContextTx(
+        tx,
+        current.beneficiarioId,
+        opts.beneficiaryAccessScope,
+      );
 
     if (current.stato === "consegnato") {
       await requireOperationalMagazzino(tx, current.magazzinoId);
@@ -470,10 +483,7 @@ export async function completeBollaDelivery(opts: {
       );
     }
 
-    const reportingSnapshot = await beneficiaryReportingSnapshotTx(
-      tx,
-      current.beneficiarioId,
-    );
+    const reportingSnapshot = reportingContext.snapshot;
     let areaOperativaIdSnapshot = current.areaOperativaIdSnapshot;
     let centroAscoltoIdSnapshot = current.centroAscoltoIdSnapshot;
     if (areaOperativaIdSnapshot == null && centroAscoltoIdSnapshot == null) {

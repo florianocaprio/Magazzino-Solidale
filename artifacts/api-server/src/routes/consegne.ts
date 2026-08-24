@@ -41,7 +41,10 @@ import {
   isPlanningConcurrencyError,
   PLANNING_CONCURRENCY_MESSAGE,
 } from "../lib/logisticaPolicy";
-import { isBeneficiarioActive } from "../lib/beneficiarioPolicy";
+import {
+  beneficiarioAccessScopeFromRequest,
+  isBeneficiarioActive,
+} from "../lib/beneficiarioPolicy";
 
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
 
@@ -443,6 +446,7 @@ router.post("/consegne/:id/completa", async (req, res) => {
       userId: req.user!.id,
       confermaRicezione: true,
       allowAlreadyConsegnata: true,
+      beneficiaryAccessScope: beneficiarioAccessScopeFromRequest(req),
     });
   } catch (err) {
     if (handleBollaActionError(err, res)) return;

@@ -43,6 +43,10 @@ import {
   InventoryDecimalError,
   positiveInventoryDecimal,
 } from "../lib/inventoryDecimal";
+import {
+  beneficiarioAccessScopeFromRequest,
+  isBeneficiarioActive,
+} from "../lib/beneficiarioPolicy";
 import { requireAllModuli } from "../lib/featureFlags";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
@@ -59,7 +63,6 @@ import {
   PLANNING_CONCURRENCY_MESSAGE,
 } from "../lib/logisticaPolicy";
 import { logger } from "../lib/logger";
-import { isBeneficiarioActive } from "../lib/beneficiarioPolicy";
 import { requirePermission } from "../middlewares/auth";
 import { InventoryLedgerError, requireOperationalMagazzino } from "../lib/inventoryLedger";
 import {
@@ -958,6 +961,7 @@ router.post("/bolle/:id/consegna", requirePermission("bolle.deliver"), async (re
       userId: req.user!.id,
       noteRicezione,
       confermaRicezione,
+      beneficiaryAccessScope: beneficiarioAccessScopeFromRequest(req),
     });
   } catch (err) {
     if (handleBollaActionError(err, res)) return;

@@ -54,6 +54,10 @@ import {
 } from "./lottoPolicy";
 import { beneficiaryReportingSnapshotTx } from "./reporting/eventSnapshots";
 import {
+  canAccessBeneficiarioScope,
+  type BeneficiarioAccessScope,
+} from "./beneficiarioPolicy";
+import {
   InventoryDecimal,
   InventoryDecimalError,
   positiveInventoryDecimal,
@@ -537,6 +541,7 @@ export async function chiudiSessioneCassaEmporio(opts: {
   operatoreId: number | null;
   note?: string | null;
   ip?: string | null;
+  beneficiaryAccessScope: BeneficiarioAccessScope;
 }): Promise<{ spesaId: number }> {
   return db.transaction(async (tx) => {
     const sessione = await lockSessione(tx, opts.sessioneId);
@@ -589,6 +594,14 @@ export async function chiudiSessioneCassaEmporio(opts: {
     const beneficiario = await lockBeneficiario(tx, sessione.beneficiarioId);
     if (
       !beneficiario ||
+      !canAccessBeneficiarioScope(beneficiario, opts.beneficiaryAccessScope)
+    ) {
+      throw new SpesaEmporioError(
+        403,
+        "Risorsa non accessibile per il tuo profilo",
+      );
+    }
+    if (
       !beneficiario.attivo ||
       !beneficiario.creditoSolidaleAbilitato ||
       beneficiario.creditoSolidaleStato !== "attivo"
