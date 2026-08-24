@@ -7,6 +7,10 @@ const nullableDate = z.preprocess(
   emptyToNull,
   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 );
+const nullableBirthDate = nullableDate.refine(
+  (value) => value == null || calcolaEta(value) != null,
+  { message: "La data di nascita deve essere reale e non futura." },
+);
 const booleanValue = z.preprocess((value) => {
   if (value === "true" || value === "1" || value === 1) return true;
   if (value === "false" || value === "0" || value === 0) return false;
@@ -20,7 +24,7 @@ const beneficiarioFields = {
   cognome: z.string().trim().min(1).max(80),
   nome: z.string().trim().min(1).max(80),
   soprannome: nullableText(80),
-  dataNascita: nullableDate,
+  dataNascita: nullableBirthDate,
   fasciaEtaPresunta: z.preprocess(emptyToNull, z.enum(["0_17", "18_29", "30_64", "65_plus"]).nullable().optional()),
   sesso: z.enum(["M", "F", "ALTRO"]),
   cittadinanza: nullableText(60),
@@ -82,7 +86,7 @@ export const AuthorizeBeneficiariExportInput = z.object({
 const NucleoFamiliareBaseInput = z.object({
   nome: nullableText(80),
   cognome: nullableText(80),
-  dataNascita: nullableDate,
+  dataNascita: nullableBirthDate,
   sesso: z.preprocess(emptyToNull, z.enum(["M", "F", "ALTRO"]).nullable().optional()),
   areaProvenienza: nullableText(10),
   relazione: nullableText(60),
@@ -93,6 +97,8 @@ const NucleoFamiliareBaseInput = z.object({
 }).strict();
 export const NucleoFamiliareInput = NucleoFamiliareBaseInput.refine((value) => Boolean(value.nome || value.cognome || value.relazione), {
   message: "Indica almeno nome, cognome o relazione del membro del nucleo.",
+}).refine((value) => Boolean(value.nome && value.relazione && value.dataNascita && value.sesso), {
+  message: "Nome, relazione, data di nascita e sesso sono obbligatori per un nuovo componente.",
 });
 export const NucleoFamiliareUpdateInput = NucleoFamiliareBaseInput.partial().strict();
 

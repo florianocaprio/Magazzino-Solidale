@@ -3499,6 +3499,247 @@ export const BulkBeneficiariResponse = zod.object({
 })
 
 
+/**
+ * Richiede beneficiari.fse.import. Il server calcola SHA-256, apre il workbook e valida foglio e colonne; il Centro è verificato server-side e l'Area è sempre derivata dal Centro.
+ * @summary Valida e classifica il workbook FSE+ reale senza scrivere dati di dominio
+ */
+
+
+
+export const PreviewBeneficiariFseBody = zod.object({
+  "centroAscoltoId": zod.number().min(1),
+  "file": zod.custom<Uint8Array>((value) => value instanceof Uint8Array).describe('Workbook XLSX reale; non viene conservato dal server.')
+})
+
+export const PreviewBeneficiariFseResponse = zod.object({
+  "centroAscoltoId": zod.number(),
+  "areaOperativaId": zod.number(),
+  "areaOperativaDerivata": zod.boolean(),
+  "warningHeader": zod.array(zod.string()),
+  "righe": zod.array(zod.object({
+  "numeroRiga": zod.number(),
+  "codiceFascicolo": zod.string().nullable(),
+  "classificazione": zod.enum(['nuovo', 'da_collegare', 'da_aggiornare', 'invariato', 'possibile_duplicato', 'conflitto', 'errore']),
+  "errori": zod.array(zod.string()),
+  "warning": zod.array(zod.string()),
+  "beneficiarioId": zod.number().optional(),
+  "duplicati": zod.array(zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "centroAscoltoId": zod.number().nullable()
+})).optional()
+})),
+  "conteggi": zod.record(zod.string(), zod.number()),
+  "numeroRighe": zod.number()
+})
+
+
+/**
+ * Richiede beneficiari.fse.import. Il server ricalcola SHA-256 e rivalida il workbook; ogni fascicolo è atomico e Area/scope sono risolti server-side.
+ * @summary Conferma un import FSE+ rivalidando il workbook reale
+ */
+
+
+
+export const ImportBeneficiariFseBody = zod.object({
+  "centroAscoltoId": zod.number().min(1),
+  "file": zod.custom<Uint8Array>((value) => value instanceof Uint8Array).describe('Lo stesso workbook XLSX reale viene rivalidato dal server.'),
+  "risoluzioni": zod.string().optional().describe('Array JSON di BeneficiariFseImportResolution.')
+})
+
+export const ImportBeneficiariFseResponse = zod.object({
+  "batchId": zod.number(),
+  "stato": zod.enum(['confermato', 'parziale']),
+  "creati": zod.number(),
+  "collegati": zod.number(),
+  "aggiornati": zod.number(),
+  "invariati": zod.number(),
+  "conflitti": zod.number(),
+  "errori": zod.number(),
+  "dettagli": zod.array(zod.object({
+  "numeroRiga": zod.number(),
+  "codiceFascicolo": zod.string().nullable(),
+  "esito": zod.enum(['creato', 'collegato', 'aggiornato', 'invariato', 'conflitto', 'errore']),
+  "errori": zod.array(zod.string())
+}))
+})
+
+
+/**
+ * Richiede beneficiari.fse.export. Non esclude silenziosamente record non esportabili.
+ * @summary Verifica tutti i beneficiari candidati prima dell'export
+ */
+
+export const preflightBeneficiariFseExportBodySoloAttiviDefault = true;
+
+export const PreflightBeneficiariFseExportBody = zod.object({
+  "centroAscoltoId": zod.number().min(1),
+  "dataRiferimento": zod.coerce.date(),
+  "soloAttivi": zod.boolean().default(preflightBeneficiariFseExportBodySoloAttiviDefault)
+})
+
+export const PreflightBeneficiariFseExportResponse = zod.object({
+  "candidati": zod.number(),
+  "esportabili": zod.number(),
+  "bloccati": zod.array(zod.object({
+  "beneficiarioId": zod.number(),
+  "codice": zod.string(),
+  "errori": zod.array(zod.string()).optional(),
+  "warning": zod.array(zod.string()).optional()
+})),
+  "warning": zod.array(zod.object({
+  "beneficiarioId": zod.number(),
+  "codice": zod.string(),
+  "errori": zod.array(zod.string()).optional(),
+  "warning": zod.array(zod.string()).optional()
+})),
+  "centroAscoltoId": zod.number(),
+  "areaOperativaId": zod.number(),
+  "dataRiferimento": zod.coerce.date(),
+  "soloAttivi": zod.boolean()
+})
+
+
+/**
+ * Richiede beneficiari.fse.export. L'export è bloccato se il preflight contiene errori.
+ * @summary Genera il workbook FSE+ canonico
+ */
+
+export const exportBeneficiariFseBodySoloAttiviDefault = true;
+
+export const ExportBeneficiariFseBody = zod.object({
+  "centroAscoltoId": zod.number().min(1),
+  "dataRiferimento": zod.coerce.date(),
+  "soloAttivi": zod.boolean().default(exportBeneficiariFseBodySoloAttiviDefault)
+})
+
+
+/**
+ * Richiede beneficiari.fse.view e applica scope Area, Centro e Zona UDS.
+ */
+
+
+
+export const GetBeneficiarioFseParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const GetBeneficiarioFseResponse = zod.object({
+  "profilo": zod.union([zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "codiceFascicolo": zod.string().nullable(),
+  "codiceFascicoloNormalizzato": zod.string().nullable(),
+  "origineFascicolo": zod.enum(['interno', 'import_fse']),
+  "numeroComponentiImportato": zod.number().nullish(),
+  "donneImportate": zod.number().nullish(),
+  "uominiImportati": zod.number().nullish(),
+  "eta017Importata": zod.number().nullish(),
+  "eta1829Importata": zod.number().nullish(),
+  "eta3064Importata": zod.number().nullish(),
+  "eta65PlusImportata": zod.number().nullish(),
+  "origineStranieraMinoranze": zod.number().nullable(),
+  "cittadiniPaesiTerzi": zod.number().nullable(),
+  "senzaTettoEsclusioneAbitativa": zod.number().nullable(),
+  "tipologiaAttivitaImportata": zod.string().nullish(),
+  "statoAttualeImportato": zod.string().nullish(),
+  "ultimoImportBatchId": zod.number().nullish(),
+  "ultimoImportAt": zod.coerce.date().nullish(),
+  "ultimoExportAt": zod.coerce.date().nullish(),
+  "hashUltimaRigaImportata": zod.string().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+}),zod.null()]),
+  "snapshot": zod.union([zod.object({
+  "numeroComponenti": zod.number(),
+  "donne": zod.number(),
+  "uomini": zod.number(),
+  "eta017": zod.number(),
+  "eta1829": zod.number(),
+  "eta3064": zod.number(),
+  "eta65Plus": zod.number()
+}),zod.null()]),
+  "disabili": zod.number(),
+  "componentiDichiarati": zod.number(),
+  "componentiDettagliati": zod.number(),
+  "demografia": zod.object({
+  "numeroComponenti": zod.number(),
+  "donne": zod.number(),
+  "uomini": zod.number(),
+  "eta017": zod.number(),
+  "eta1829": zod.number(),
+  "eta3064": zod.number(),
+  "eta65Plus": zod.number()
+}).and(zod.object({
+  "origine": zod.enum(['anagrafica_calcolata', 'snapshot_fse']),
+  "dettaglioCompleto": zod.boolean(),
+  "problemi": zod.array(zod.string())
+})),
+  "confronto": zod.object({
+  "stato": zod.enum(['coerente', 'non_allineato', 'non_confrontabile']),
+  "differenze": zod.array(zod.object({
+  "dato": zod.string(),
+  "snapshot": zod.number(),
+  "calcolato": zod.number()
+}))
+})
+})
+
+
+/**
+ * Richiede beneficiari.fse.manage e applica scope Area, Centro e Zona UDS.
+ */
+
+
+
+export const UpdateBeneficiarioFseParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const updateBeneficiarioFseBodyCodiceFascicoloMax = 255;
+
+export const updateBeneficiarioFseBodyOrigineStranieraMinoranzeMin = 0;
+
+export const updateBeneficiarioFseBodyCittadiniPaesiTerziMin = 0;
+
+export const updateBeneficiarioFseBodySenzaTettoEsclusioneAbitativaMin = 0;
+
+
+
+export const UpdateBeneficiarioFseBody = zod.object({
+  "codiceFascicolo": zod.string().min(1).max(updateBeneficiarioFseBodyCodiceFascicoloMax).optional(),
+  "origineStranieraMinoranze": zod.number().min(updateBeneficiarioFseBodyOrigineStranieraMinoranzeMin).nullish(),
+  "cittadiniPaesiTerzi": zod.number().min(updateBeneficiarioFseBodyCittadiniPaesiTerziMin).nullish(),
+  "senzaTettoEsclusioneAbitativa": zod.number().min(updateBeneficiarioFseBodySenzaTettoEsclusioneAbitativaMin).nullish()
+})
+
+export const UpdateBeneficiarioFseResponse = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "codiceFascicolo": zod.string().nullable(),
+  "codiceFascicoloNormalizzato": zod.string().nullable(),
+  "origineFascicolo": zod.enum(['interno', 'import_fse']),
+  "numeroComponentiImportato": zod.number().nullish(),
+  "donneImportate": zod.number().nullish(),
+  "uominiImportati": zod.number().nullish(),
+  "eta017Importata": zod.number().nullish(),
+  "eta1829Importata": zod.number().nullish(),
+  "eta3064Importata": zod.number().nullish(),
+  "eta65PlusImportata": zod.number().nullish(),
+  "origineStranieraMinoranze": zod.number().nullable(),
+  "cittadiniPaesiTerzi": zod.number().nullable(),
+  "senzaTettoEsclusioneAbitativa": zod.number().nullable(),
+  "tipologiaAttivitaImportata": zod.string().nullish(),
+  "statoAttualeImportato": zod.string().nullish(),
+  "ultimoImportBatchId": zod.number().nullish(),
+  "ultimoImportAt": zod.coerce.date().nullish(),
+  "ultimoExportAt": zod.coerce.date().nullish(),
+  "hashUltimaRigaImportata": zod.string().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})
+
+
 export const GetBeneficiarioParams = zod.object({
   "id": zod.coerce.number()
 })
@@ -3853,6 +4094,9 @@ export const AuthorizeBeneficiariExportResponse = zod.object({
 })
 
 
+/**
+ * Richiede beneficiari.sensitive.view e applica scope Area, Centro e Zona UDS.
+ */
 export const GetNucleoFamiliareParams = zod.object({
   "id": zod.coerce.number()
 })
@@ -3874,17 +4118,20 @@ export const GetNucleoFamiliareResponseItem = zod.object({
 export const GetNucleoFamiliareResponse = zod.array(GetNucleoFamiliareResponseItem)
 
 
+/**
+ * Richiede beneficiari.manage e beneficiari.sensitive.view; data di nascita e sesso sono obbligatori.
+ */
 export const AddNucleoFamiliareParams = zod.object({
   "id": zod.coerce.number()
 })
 
 export const AddNucleoFamiliareBody = zod.object({
-  "nome": zod.string().optional(),
+  "nome": zod.string(),
   "cognome": zod.string().optional(),
-  "dataNascita": zod.string().optional(),
-  "sesso": zod.enum(['M', 'F', 'ALTRO']).optional(),
+  "dataNascita": zod.string(),
+  "sesso": zod.enum(['M', 'F', 'ALTRO']),
   "areaProvenienza": zod.string().optional(),
-  "relazione": zod.string().optional(),
+  "relazione": zod.string(),
   "tagliaVestiti": zod.string().optional(),
   "numeroScarpe": zod.string().optional(),
   "esigenzeParticolari": zod.string().optional(),
@@ -3892,22 +4139,25 @@ export const AddNucleoFamiliareBody = zod.object({
 })
 
 
+/**
+ * Richiede beneficiari.manage e beneficiari.sensitive.view; verifica appartenenza e scope territoriale.
+ */
 export const UpdateNucleoFamiliareParams = zod.object({
   "id": zod.coerce.number(),
   "membroId": zod.coerce.number()
 })
 
 export const UpdateNucleoFamiliareBody = zod.object({
-  "nome": zod.string().optional(),
-  "cognome": zod.string().optional(),
-  "dataNascita": zod.string().optional(),
-  "sesso": zod.enum(['M', 'F', 'ALTRO']).optional(),
-  "areaProvenienza": zod.string().optional(),
-  "relazione": zod.string().optional(),
-  "tagliaVestiti": zod.string().optional(),
-  "numeroScarpe": zod.string().optional(),
-  "esigenzeParticolari": zod.string().optional(),
-  "note": zod.string().optional()
+  "nome": zod.string().nullish(),
+  "cognome": zod.string().nullish(),
+  "dataNascita": zod.coerce.date().nullish(),
+  "sesso": zod.union([zod.enum(['M', 'F', 'ALTRO']),zod.null()]).optional(),
+  "areaProvenienza": zod.string().nullish(),
+  "relazione": zod.string().nullish(),
+  "tagliaVestiti": zod.string().nullish(),
+  "numeroScarpe": zod.string().nullish(),
+  "esigenzeParticolari": zod.string().nullish(),
+  "note": zod.string().nullish()
 })
 
 export const UpdateNucleoFamiliareResponse = zod.object({

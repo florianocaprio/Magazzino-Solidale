@@ -2415,6 +2415,139 @@ paths:
               schema:
                 $ref: "#/components/schemas/BulkImportResult"
 
+  /beneficiari/fse/preview:
+    post:
+      operationId: previewBeneficiariFse
+      tags: [beneficiari]
+      summary: Valida e classifica il workbook FSE+ reale senza scrivere dati di dominio
+      description: Richiede beneficiari.fse.import. Il server calcola SHA-256, apre il workbook e valida foglio e colonne; il Centro è verificato server-side e l'Area è sempre derivata dal Centro.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/BeneficiariFseWorkbookUpload" }
+      responses:
+        "200":
+          description: Preview e classificazione righe
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BeneficiariFsePreviewResult" }
+        "400": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
+        "401": { $ref: "#/components/responses/BeneficiariFseUnauthorized" }
+        "403": { $ref: "#/components/responses/BeneficiariFseForbidden" }
+        "415": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
+
+  /beneficiari/fse/import:
+    post:
+      operationId: importBeneficiariFse
+      tags: [beneficiari]
+      summary: Conferma un import FSE+ rivalidando il workbook reale
+      description: Richiede beneficiari.fse.import. Il server ricalcola SHA-256 e rivalida il workbook; ogni fascicolo è atomico e Area/scope sono risolti server-side.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/BeneficiariFseWorkbookImportUpload" }
+      responses:
+        "200":
+          description: Esito batch
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BeneficiariFseImportResult" }
+        "400": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
+        "401": { $ref: "#/components/responses/BeneficiariFseUnauthorized" }
+        "403": { $ref: "#/components/responses/BeneficiariFseForbidden" }
+        "415": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
+
+  /beneficiari/fse/export/preflight:
+    post:
+      operationId: preflightBeneficiariFseExport
+      tags: [beneficiari]
+      summary: Verifica tutti i beneficiari candidati prima dell'export
+      description: Richiede beneficiari.fse.export. Non esclude silenziosamente record non esportabili.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BeneficiariFseExportInput" }
+      responses:
+        "200":
+          description: Candidati, esportabili e blocchi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BeneficiariFseExportPreflight" }
+        "400": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
+        "401": { $ref: "#/components/responses/BeneficiariFseUnauthorized" }
+        "403": { $ref: "#/components/responses/BeneficiariFseForbidden" }
+
+  /beneficiari/fse/export:
+    post:
+      operationId: exportBeneficiariFse
+      tags: [beneficiari]
+      summary: Genera il workbook FSE+ canonico
+      description: Richiede beneficiari.fse.export. L'export è bloccato se il preflight contiene errori.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BeneficiariFseExportInput" }
+      responses:
+        "200":
+          description: Workbook FSE+ con 17 colonne canoniche
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
+        "401": { $ref: "#/components/responses/BeneficiariFseUnauthorized" }
+        "403": { $ref: "#/components/responses/BeneficiariFseForbidden" }
+        "422": { $ref: "#/components/responses/BeneficiariFseUnprocessable" }
+
+  /beneficiari/{id}/fse:
+    get:
+      operationId: getBeneficiarioFse
+      tags: [beneficiari]
+      description: Richiede beneficiari.fse.view e applica scope Area, Centro e Zona UDS.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Profilo, snapshot e demografia del fascicolo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BeneficiarioFseDetail" }
+        "400": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
+        "401": { $ref: "#/components/responses/BeneficiariFseUnauthorized" }
+        "403": { $ref: "#/components/responses/BeneficiariFseForbidden" }
+        "404": { $ref: "#/components/responses/BeneficiariFseNotFound" }
+    patch:
+      operationId: updateBeneficiarioFse
+      tags: [beneficiari]
+      description: Richiede beneficiari.fse.manage e applica scope Area, Centro e Zona UDS.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BeneficiarioFseUpdate" }
+      responses:
+        "200":
+          description: Fascicolo aggiornato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BeneficiarioFseProfile" }
+        "400": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
+        "401": { $ref: "#/components/responses/BeneficiariFseUnauthorized" }
+        "403": { $ref: "#/components/responses/BeneficiariFseForbidden" }
+        "404": { $ref: "#/components/responses/BeneficiariFseNotFound" }
+        "409": { $ref: "#/components/responses/BeneficiariFseConflict" }
+
   /beneficiari/{id}:
     get:
       operationId: getBeneficiario
@@ -2522,6 +2655,7 @@ paths:
     get:
       operationId: getNucleoFamiliare
       tags: [beneficiari]
+      description: Richiede beneficiari.sensitive.view e applica scope Area, Centro e Zona UDS.
       parameters:
         - name: id
           in: path
@@ -2540,6 +2674,7 @@ paths:
     post:
       operationId: addNucleoFamiliare
       tags: [beneficiari]
+      description: Richiede beneficiari.manage e beneficiari.sensitive.view; data di nascita e sesso sono obbligatori.
       parameters:
         - name: id
           in: path
@@ -2564,6 +2699,7 @@ paths:
     patch:
       operationId: updateNucleoFamiliare
       tags: [beneficiari]
+      description: Richiede beneficiari.manage e beneficiari.sensitive.view; verifica appartenenza e scope territoriale.
       parameters:
         - name: id
           in: path
@@ -2578,7 +2714,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/NucleoFamiliareInput"
+              $ref: "#/components/schemas/NucleoFamiliareUpdate"
       responses:
         "200":
           description: Membro aggiornato
@@ -8022,7 +8158,285 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/AgeaErrorResponse" }
+    BeneficiariFseBadRequest:
+      description: Contratto, file, data o identificativo non valido
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/BeneficiariFseError" }
+    BeneficiariFseUnauthorized:
+      description: Sessione non autenticata
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/BeneficiariFseError" }
+    BeneficiariFseForbidden:
+      description: Permesso FSE+ o scope territoriale non consentito
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/BeneficiariFseError" }
+    BeneficiariFseNotFound:
+      description: Beneficiario o fascicolo non trovato
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/BeneficiariFseError" }
+    BeneficiariFseConflict:
+      description: Codice fascicolo già associato o conflitto di riconciliazione
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/BeneficiariFseError" }
+    BeneficiariFseUnprocessable:
+      description: Preflight export non superato
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/BeneficiariFseError" }
   schemas:
+    BeneficiariFseRowInput:
+      type: object
+      additionalProperties: true
+      properties:
+        "Nome Referente fascicolo": { type: string }
+        "Cognome Referente fascicolo": { type: string }
+        "Codice fascicolo": { type: string }
+        "Data di presa in carico": { anyOf: [{ type: string }, { type: number }] }
+        "Numero componenti fascicolo": { anyOf: [{ type: string }, { type: number }] }
+        "Tipologia di Attività": { type: string }
+        "Stato attuale": { type: string }
+        "Donne": { anyOf: [{ type: string }, { type: number }] }
+        "Uomini": { anyOf: [{ type: string }, { type: number }] }
+        "Età<18": { anyOf: [{ type: string }, { type: number }] }
+        "Età 18-29": { anyOf: [{ type: string }, { type: number }] }
+        "Età 30-64": { anyOf: [{ type: string }, { type: number }] }
+        "Età>=65": { anyOf: [{ type: string }, { type: number }] }
+        "Origine straniera e minoranze": { anyOf: [{ type: string }, { type: number }] }
+        "Disabili": { anyOf: [{ type: string }, { type: number }] }
+        "Cittadini di Paesi Terzi": { anyOf: [{ type: string }, { type: number }] }
+        "Senzatetto o colpiti da esclusione abitativa": { anyOf: [{ type: string }, { type: number }] }
+      required:
+        [
+          "Nome Referente fascicolo",
+          "Cognome Referente fascicolo",
+          "Codice fascicolo",
+          "Data di presa in carico",
+          "Numero componenti fascicolo",
+          "Tipologia di Attività",
+          "Stato attuale",
+          "Donne",
+          "Uomini",
+          "Età<18",
+          "Età 18-29",
+          "Età 30-64",
+          "Età>=65",
+          "Origine straniera e minoranze",
+          "Disabili",
+          "Cittadini di Paesi Terzi",
+          "Senzatetto o colpiti da esclusione abitativa",
+        ]
+    BeneficiariFseWorkbookUpload:
+      type: object
+      additionalProperties: false
+      properties:
+        centroAscoltoId: { type: integer, minimum: 1 }
+        file:
+          type: string
+          format: binary
+          description: Workbook XLSX reale; non viene conservato dal server.
+      required: [centroAscoltoId, file]
+    BeneficiariFseImportResolution:
+      type: object
+      additionalProperties: false
+      properties:
+        numeroRiga: { type: integer, minimum: 2 }
+        azione: { type: string, enum: [crea, collega] }
+        beneficiarioId: { type: integer, minimum: 1 }
+      required: [numeroRiga, azione]
+    BeneficiariFseWorkbookImportUpload:
+      type: object
+      additionalProperties: false
+      properties:
+        centroAscoltoId: { type: integer, minimum: 1 }
+        file:
+          type: string
+          format: binary
+          description: Lo stesso workbook XLSX reale viene rivalidato dal server.
+        risoluzioni:
+          type: string
+          description: Array JSON di BeneficiariFseImportResolution.
+      required: [centroAscoltoId, file]
+    BeneficiariFseDuplicateCandidate:
+      type: object
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        centroAscoltoId: { type: [integer, "null"] }
+      required: [id, codice, centroAscoltoId]
+    BeneficiariFsePreviewRow:
+      type: object
+      properties:
+        numeroRiga: { type: integer }
+        codiceFascicolo: { type: [string, "null"] }
+        classificazione:
+          type: string
+          enum: [nuovo, da_collegare, da_aggiornare, invariato, possibile_duplicato, conflitto, errore]
+        errori: { type: array, items: { type: string } }
+        warning: { type: array, items: { type: string } }
+        beneficiarioId: { type: integer }
+        duplicati:
+          type: array
+          items: { $ref: "#/components/schemas/BeneficiariFseDuplicateCandidate" }
+      required: [numeroRiga, codiceFascicolo, classificazione, errori, warning]
+    BeneficiariFsePreviewResult:
+      type: object
+      properties:
+        centroAscoltoId: { type: integer }
+        areaOperativaId: { type: integer }
+        areaOperativaDerivata: { type: boolean, const: true }
+        warningHeader: { type: array, items: { type: string } }
+        righe: { type: array, items: { $ref: "#/components/schemas/BeneficiariFsePreviewRow" } }
+        conteggi: { type: object, additionalProperties: { type: integer } }
+        numeroRighe: { type: integer }
+      required: [centroAscoltoId, areaOperativaId, areaOperativaDerivata, warningHeader, righe, conteggi, numeroRighe]
+    BeneficiariFseImportDetail:
+      type: object
+      properties:
+        numeroRiga: { type: integer }
+        codiceFascicolo: { type: [string, "null"] }
+        esito: { type: string, enum: [creato, collegato, aggiornato, invariato, conflitto, errore] }
+        errori: { type: array, items: { type: string } }
+      required: [numeroRiga, codiceFascicolo, esito, errori]
+    BeneficiariFseImportResult:
+      type: object
+      properties:
+        batchId: { type: integer }
+        stato: { type: string, enum: [confermato, parziale] }
+        creati: { type: integer }
+        collegati: { type: integer }
+        aggiornati: { type: integer }
+        invariati: { type: integer }
+        conflitti: { type: integer }
+        errori: { type: integer }
+        dettagli: { type: array, items: { $ref: "#/components/schemas/BeneficiariFseImportDetail" } }
+      required: [batchId, stato, creati, collegati, aggiornati, invariati, conflitti, errori, dettagli]
+    BeneficiariFseExportInput:
+      type: object
+      additionalProperties: false
+      properties:
+        centroAscoltoId: { type: integer, minimum: 1 }
+        dataRiferimento: { type: string, format: date }
+        soloAttivi: { type: boolean, default: true }
+      required: [centroAscoltoId, dataRiferimento]
+    BeneficiariFseExportIssue:
+      type: object
+      properties:
+        beneficiarioId: { type: integer }
+        codice: { type: string }
+        errori: { type: array, items: { type: string } }
+        warning: { type: array, items: { type: string } }
+      required: [beneficiarioId, codice]
+    BeneficiariFseExportPreflight:
+      type: object
+      properties:
+        candidati: { type: integer }
+        esportabili: { type: integer }
+        bloccati: { type: array, items: { $ref: "#/components/schemas/BeneficiariFseExportIssue" } }
+        warning: { type: array, items: { $ref: "#/components/schemas/BeneficiariFseExportIssue" } }
+        centroAscoltoId: { type: integer }
+        areaOperativaId: { type: integer }
+        dataRiferimento: { type: string, format: date }
+        soloAttivi: { type: boolean, const: true }
+      required: [candidati, esportabili, bloccati, warning, centroAscoltoId, areaOperativaId, dataRiferimento, soloAttivi]
+    BeneficiarioFseUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        codiceFascicolo: { type: string, minLength: 1, maxLength: 255 }
+        origineStranieraMinoranze: { type: [integer, "null"], minimum: 0 }
+        cittadiniPaesiTerzi: { type: [integer, "null"], minimum: 0 }
+        senzaTettoEsclusioneAbitativa: { type: [integer, "null"], minimum: 0 }
+    BeneficiarioFseSnapshot:
+      type: object
+      properties:
+        numeroComponenti: { type: integer }
+        donne: { type: integer }
+        uomini: { type: integer }
+        eta017: { type: integer }
+        eta1829: { type: integer }
+        eta3064: { type: integer }
+        eta65Plus: { type: integer }
+      required: [numeroComponenti, donne, uomini, eta017, eta1829, eta3064, eta65Plus]
+    BeneficiarioFseDemografia:
+      allOf:
+        - $ref: "#/components/schemas/BeneficiarioFseSnapshot"
+        - type: object
+          properties:
+            origine: { type: string, enum: [anagrafica_calcolata, snapshot_fse] }
+            dettaglioCompleto: { type: boolean }
+            problemi: { type: array, items: { type: string } }
+          required: [origine, dettaglioCompleto, problemi]
+    BeneficiarioFseDifference:
+      type: object
+      properties:
+        dato: { type: string }
+        snapshot: { type: integer }
+        calcolato: { type: integer }
+      required: [dato, snapshot, calcolato]
+    BeneficiarioFseComparison:
+      type: object
+      properties:
+        stato: { type: string, enum: [coerente, non_allineato, non_confrontabile] }
+        differenze: { type: array, items: { $ref: "#/components/schemas/BeneficiarioFseDifference" } }
+      required: [stato, differenze]
+    BeneficiarioFseProfile:
+      type: object
+      properties:
+        id: { type: integer }
+        beneficiarioId: { type: integer }
+        codiceFascicolo: { type: [string, "null"] }
+        codiceFascicoloNormalizzato: { type: [string, "null"] }
+        origineFascicolo: { type: string, enum: [interno, import_fse] }
+        numeroComponentiImportato: { type: [integer, "null"] }
+        donneImportate: { type: [integer, "null"] }
+        uominiImportati: { type: [integer, "null"] }
+        eta017Importata: { type: [integer, "null"] }
+        eta1829Importata: { type: [integer, "null"] }
+        eta3064Importata: { type: [integer, "null"] }
+        eta65PlusImportata: { type: [integer, "null"] }
+        origineStranieraMinoranze: { type: [integer, "null"] }
+        cittadiniPaesiTerzi: { type: [integer, "null"] }
+        senzaTettoEsclusioneAbitativa: { type: [integer, "null"] }
+        tipologiaAttivitaImportata: { type: [string, "null"] }
+        statoAttualeImportato: { type: [string, "null"] }
+        ultimoImportBatchId: { type: [integer, "null"] }
+        ultimoImportAt: { type: [string, "null"], format: date-time }
+        ultimoExportAt: { type: [string, "null"], format: date-time }
+        hashUltimaRigaImportata: { type: [string, "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+      required: [id, beneficiarioId, codiceFascicolo, codiceFascicoloNormalizzato, origineFascicolo, origineStranieraMinoranze, cittadiniPaesiTerzi, senzaTettoEsclusioneAbitativa, dataCreazione, dataAggiornamento]
+    BeneficiarioFseDetail:
+      type: object
+      properties:
+        profilo:
+          anyOf:
+            - $ref: "#/components/schemas/BeneficiarioFseProfile"
+            - type: "null"
+        snapshot:
+          anyOf:
+            - $ref: "#/components/schemas/BeneficiarioFseSnapshot"
+            - type: "null"
+        disabili: { type: integer }
+        componentiDichiarati: { type: integer }
+        componentiDettagliati: { type: integer }
+        demografia: { $ref: "#/components/schemas/BeneficiarioFseDemografia" }
+        confronto: { $ref: "#/components/schemas/BeneficiarioFseComparison" }
+      required: [profilo, snapshot, disabili, componentiDichiarati, componentiDettagliati, demografia, confronto]
+    BeneficiariFseError:
+      type: object
+      properties:
+        error: { type: string }
+        errori: { type: array, items: { type: string } }
+        warning: { type: array, items: { type: string } }
+        bloccati: { type: array, items: { $ref: "#/components/schemas/BeneficiariFseExportIssue" } }
+      required: [error]
     FseErrorResponse:
       type: object
       required: [error]
@@ -12711,6 +13125,7 @@ components:
 
     NucleoFamiliareInput:
       type: object
+      additionalProperties: false
       properties:
         nome:
           type: string
@@ -12733,6 +13148,27 @@ components:
           type: string
         note:
           type: string
+      required: [nome, relazione, dataNascita, sesso]
+
+    NucleoFamiliareUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        nome: { type: [string, "null"] }
+        cognome: { type: [string, "null"] }
+        dataNascita: { type: [string, "null"], format: date }
+        sesso:
+          anyOf:
+            - type: string
+              enum: [M, F, ALTRO]
+            - type: "null"
+        areaProvenienza: { type: [string, "null"] }
+        relazione: { type: [string, "null"] }
+        tagliaVestiti: { type: [string, "null"] }
+        numeroScarpe: { type: [string, "null"] }
+        esigenzeParticolari: { type: [string, "null"] }
+        note: { type: [string, "null"] }
 
     # ── Interventi ────────────────────────────────────────────────────────
     InterventoStato:

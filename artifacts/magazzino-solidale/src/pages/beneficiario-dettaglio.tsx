@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "wouter";
-import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useDeleteNucleoFamiliare, useListAreeOperative, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListAreeOperativeQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, useUpdateCreditoSolidaleBeneficiarioConfigurazione, useCreateTesseraBeneficiarioDaAnagrafica, useListTessereBeneficiarioDaAnagrafica, getListTessereBeneficiarioDaAnagraficaQueryKey, type TesseraBeneficiario, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type Intervento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
+import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQueryKey, useListAccessiEmporio, useListCentriAscolto, useListMagazzini, useUpdateBeneficiario, useAddNucleoFamiliare, useUpdateNucleoFamiliare, useDeleteNucleoFamiliare, useListAreeOperative, useListZoneUds, useCalcolaCreditoSolidaleBeneficiario, getCalcolaCreditoSolidaleBeneficiarioQueryKey, getGetCreditoSolidaleBeneficiarioSaldoQueryKey, getListBeneficiariQueryKey, getListAreeOperativeQueryKey, getListCreditoSolidaleBeneficiarioMovimentiQueryKey, useCreateCreditoSolidaleRettifica, useCreateCreditoSolidaleRicaricaManuale, useGetCreditoSolidaleBeneficiarioSaldo, useListCreditoSolidaleBeneficiarioMovimenti, useUpdateCreditoSolidaleBeneficiarioConfigurazione, useCreateTesseraBeneficiarioDaAnagrafica, useListTessereBeneficiarioDaAnagrafica, getListTessereBeneficiarioDaAnagraficaQueryKey, type TesseraBeneficiario, type BeneficiarioDettaglio as BeneficiarioDettaglioType, type CreditoSolidaleMovimento, type Intervento, type NucleoFamiliareInputSesso } from "@workspace/api-client-react";
+import { calcolaEta, fasciaEtaDaEta } from "@workspace/api-zod";
 import { useAuth } from "@/lib/auth";
 import { useAuthorizeBeneficiariExport } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,20 +35,10 @@ import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { fasciaEtaLabel, fasciaEtaOrigineLabel } from "@/lib/fascia-eta";
 import { InterventoStatoBadge, interventoDataLabel } from "@/components/intervento-workflow";
 import { BeneficiarioMensaSection } from "@/components/beneficiario-mensa-card";
+import { BeneficiarioFseCard } from "@/components/beneficiario-fse-card";
 
 const NONE_VALUE = "__none__";
 const STATI_CREDITO_SOLIDALE = ["non_abilitato", "attivo", "sospeso", "revocato"] as const;
-
-function calcEta(dataNascita?: string | null): number | null {
-  if (!dataNascita) return null;
-  const d = new Date(dataNascita);
-  if (isNaN(d.getTime())) return null;
-  const now = new Date();
-  let eta = now.getFullYear() - d.getFullYear();
-  const m = now.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) eta--;
-  return eta;
-}
 
 const SESSO_LABEL: Record<string, string> = { M: "Maschio", F: "Femmina", ALTRO: "Altro" };
 
@@ -72,6 +63,8 @@ export default function BeneficiarioDettaglio() {
   const canManage = hasPermission("beneficiari.manage");
   const canViewSensitive = hasPermission("beneficiari.sensitive.view");
   const canExport = hasPermission("beneficiari.export");
+  const canViewFse = hasPermission("beneficiari.fse.view");
+  const canManageFse = hasPermission("beneficiari.fse.manage");
   const canViewEmporioAccess = hasPermission("emporio.access.view");
   const canManageEmporioAccess = hasPermission("emporio.access.manage");
   const authorizeExport = useAuthorizeBeneficiariExport();
@@ -397,6 +390,9 @@ export default function BeneficiarioDettaglio() {
           </CardContent>
         </Card>
 
+        {canViewFse && <div className="md:col-span-2">
+          <BeneficiarioFseCard beneficiarioId={numId} canManage={canManageFse} />
+        </div>}
         {canViewSensitive && <div className="md:col-span-2">
           <Tabs defaultValue="nucleo">
             <TabsList className="grid w-full grid-cols-3">
@@ -408,6 +404,7 @@ export default function BeneficiarioDettaglio() {
             <TabsContent value="nucleo" className="mt-4">
               <NucleoSection
                 b={b}
+                canManage={canManage}
                 onChanged={() => queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(numId) })}
               />
             </TabsContent>
@@ -1286,19 +1283,21 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
 const makeMembroSchema = (t: (k: string) => string) => z.object({
   nome: z.string().min(1, t("beneficiarioDettaglio.required")),
   cognome: z.string().optional(),
-  relazione: z.string().optional(),
-  dataNascita: z.string().optional(),
-  sesso: z.string().optional(),
+  relazione: z.string().min(1, t("beneficiarioDettaglio.required")),
+  dataNascita: z.string().min(1, t("beneficiarioDettaglio.required")).refine(isNotFutureDateOnly, "La data di nascita non può essere futura."),
+  sesso: z.string().min(1, t("beneficiarioDettaglio.required")),
   areaProvenienza: z.string().optional(),
   note: z.string().optional(),
 });
 type MembroValues = z.infer<ReturnType<typeof makeMembroSchema>>;
 
-function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChanged: () => void }) {
+function NucleoSection({ b, canManage, onChanged }: { b: BeneficiarioDettaglioType; canManage: boolean; onChanged: () => void }) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const addMembro = useAddNucleoFamiliare();
+  const updateMembro = useUpdateNucleoFamiliare();
   const deleteMembro = useDeleteNucleoFamiliare();
   const membroSchema = useMemo(() => makeMembroSchema(t), [t]);
 
@@ -1308,28 +1307,25 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
   });
 
   const onAdd = (data: MembroValues) => {
+    const payload = {
+      nome: data.nome, cognome: data.cognome || undefined, relazione: data.relazione,
+      dataNascita: data.dataNascita, sesso: data.sesso as NucleoFamiliareInputSesso,
+      areaProvenienza: data.areaProvenienza || undefined, note: data.note || undefined,
+    };
+    const options = {
+      onSuccess: () => { setAdding(false); setEditingId(null); form.reset(); onChanged(); toast({ title: editingId ? "Componente aggiornato" : t("beneficiarioDettaglio.toastMembroAdded") }); },
+      onError: () => toast({ title: t("beneficiarioDettaglio.error"), description: "Impossibile salvare il componente.", variant: "destructive" as const }),
+    };
+    if (editingId) {
+      updateMembro.mutate({ id: b.id, membroId: editingId, data: payload }, options);
+      return;
+    }
     addMembro.mutate(
       {
         id: b.id,
-        data: {
-          nome: data.nome,
-          cognome: data.cognome || undefined,
-          relazione: data.relazione || undefined,
-          dataNascita: data.dataNascita || undefined,
-          sesso: data.sesso ? data.sesso as NucleoFamiliareInputSesso : undefined,
-          areaProvenienza: data.areaProvenienza || undefined,
-          note: data.note || undefined,
-        },
+        data: payload,
       },
-      {
-        onSuccess: () => {
-          setAdding(false);
-          form.reset();
-          onChanged();
-          toast({ title: t("beneficiarioDettaglio.toastMembroAdded") });
-        },
-        onError: () => toast({ title: t("beneficiarioDettaglio.error"), description: t("beneficiarioDettaglio.errorMembroAdd"), variant: "destructive" }),
-      },
+      options,
     );
   };
 
@@ -1350,11 +1346,15 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
     <Card>
       <CardHeader className="py-4 flex flex-row items-center justify-between">
         <CardTitle className="text-base">{t("beneficiarioDettaglio.composizione")}</CardTitle>
-        <Button size="sm" variant="outline" className="gap-2" onClick={() => setAdding(true)}>
+        {canManage && <Button size="sm" variant="outline" className="gap-2" onClick={() => setAdding(true)}>
           <Plus className="w-4 h-4" /> {t("beneficiarioDettaglio.aggiungiComponente")}
-        </Button>
+        </Button>}
       </CardHeader>
       <CardContent>
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Badge variant="outline">Componenti dichiarati: {b.numComponenti}</Badge>
+          <Badge variant={1 + (b.nucleo?.length ?? 0) === b.numComponenti ? "default" : "secondary"}>Componenti dettagliati: {1 + (b.nucleo?.length ?? 0)}/{b.numComponenti}</Badge>
+        </div>
         <div className="flex gap-4 mb-6">
           <Badge variant="secondary">{t("beneficiarioDettaglio.minori")}: {b.numMinori}</Badge>
           <Badge variant="secondary">{t("beneficiarioDettaglio.anziani")}: {b.numAnziani}</Badge>
@@ -1364,7 +1364,7 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
         {b.nucleo && b.nucleo.length > 0 ? (
           <div className="space-y-4">
             {b.nucleo.map((m) => {
-              const eta = calcEta(m.dataNascita);
+              const eta = calcolaEta(m.dataNascita);
               return (
                 <div key={m.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
                   <div>
@@ -1372,10 +1372,13 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
                       {m.nome} {m.cognome}
                       {m.sesso && <Badge variant="outline" className="text-[10px]">{SESSO_LABEL[m.sesso] ?? m.sesso}</Badge>}
                       {m.areaProvenienza && <Badge variant="outline" className="text-[10px]">{m.areaProvenienza}</Badge>}
+                      {(!m.dataNascita || !m.sesso) && <Badge variant="destructive" className="text-[10px]">Dati anagrafici incompleti</Badge>}
                     </div>
                     <div className="text-xs text-muted-foreground flex gap-3">
                       <span>{t("beneficiarioDettaglio.relazione")}: {m.relazione || '-'}</span>
                       {eta !== null && <span>{t("beneficiarioDettaglio.eta", { eta })}</span>}
+                      {eta !== null && <span>Fascia: {fasciaEtaDaEta(eta)}</span>}
+                      {m.dataNascita && <span>{format(new Date(`${m.dataNascita}T12:00:00`), "dd/MM/yyyy")}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1383,15 +1386,17 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
                       {m.tagliiaVestiti && <div>{t("beneficiarioDettaglio.taglia")}: <span className="font-medium">{m.tagliiaVestiti}</span></div>}
                       {m.numeroScarpe && <div>{t("beneficiarioDettaglio.scarpe")}: <span className="font-medium">{m.numeroScarpe}</span></div>}
                     </div>
+                    {canManage && <><Button size="icon" variant="ghost" aria-label="Modifica componente" onClick={() => { setEditingId(m.id); form.reset({ nome: m.nome ?? "", cognome: m.cognome ?? "", relazione: m.relazione ?? "", dataNascita: m.dataNascita ?? "", sesso: m.sesso ?? "", areaProvenienza: m.areaProvenienza ?? "", note: m.note ?? "" }); setAdding(true); }}><Pencil className="w-4 h-4" /></Button>
                     <Button
                       size="icon"
                       variant="ghost"
+                      aria-label="Elimina componente"
                       className="text-muted-foreground hover:text-destructive"
                       onClick={() => onDelete(m.id)}
                       disabled={deleteMembro.isPending}
                     >
                       <Trash2 className="w-4 h-4" />
-                    </Button>
+                    </Button></>}
                   </div>
                 </div>
               );
@@ -1402,9 +1407,9 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
         )}
       </CardContent>
 
-      <Dialog open={adding} onOpenChange={(open) => { if (!open) { setAdding(false); form.reset(); } }}>
+      <Dialog open={adding} onOpenChange={(open) => { if (!open) { setAdding(false); setEditingId(null); form.reset(); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{t("beneficiarioDettaglio.aggiungiComponente")}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingId ? "Modifica componente" : t("beneficiarioDettaglio.aggiungiComponente")}</DialogTitle></DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onAdd)} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -1455,7 +1460,9 @@ function NucleoSection({ b, onChanged }: { b: BeneficiarioDettaglioType; onChang
               )} />
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => { setAdding(false); form.reset(); }}>{t("common.cancel")}</Button>
-                <Button type="submit" disabled={addMembro.isPending}>{t("common.add")}</Button>
+                <Button type="submit" disabled={addMembro.isPending || updateMembro.isPending}>
+                  {editingId ? "Salva" : t("common.add")}
+                </Button>
               </DialogFooter>
             </form>
           </Form>

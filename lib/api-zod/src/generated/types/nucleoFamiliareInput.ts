@@ -8,12 +8,12 @@
 import type { NucleoFamiliareInputSesso } from './nucleoFamiliareInputSesso';
 
 export interface NucleoFamiliareInput {
-  nome?: string;
+  nome: string;
   cognome?: string;
-  dataNascita?: string;
-  sesso?: NucleoFamiliareInputSesso;
+  dataNascita: string;
+  sesso: NucleoFamiliareInputSesso;
   areaProvenienza?: string;
-  relazione?: string;
+  relazione: string;
   tagliaVestiti?: string;
   numeroScarpe?: string;
   esigenzeParticolari?: string;

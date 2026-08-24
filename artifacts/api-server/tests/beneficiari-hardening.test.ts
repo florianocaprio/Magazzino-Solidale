@@ -363,10 +363,35 @@ describe("hardening Beneficiari: nucleo e bulk", () => {
     expect((await request(socialAreaA()).post(`/beneficiari/${foreign.id}/nucleo`).send({ relazione: "figlio" })).status).toBe(403);
     const local = await insertBeneficiary();
     expect((await request(socialAreaA()).post(`/beneficiari/${local.id}/nucleo`).send({})).status).toBe(400);
-    const created = await request(socialAreaA()).post(`/beneficiari/${local.id}/nucleo`).send({ nome: "Membro" });
+    const created = await request(socialAreaA()).post(`/beneficiari/${local.id}/nucleo`).send({ nome: "Membro", relazione: "figlio", dataNascita: "2015-01-15", sesso: "M" });
     expect(created.status).toBe(201);
     const orphanRows = await db.select().from(nucleoFamiliareTable).where(eq(nucleoFamiliareTable.beneficiarioId, 2147483647));
     expect(orphanRows).toHaveLength(0);
+  });
+
+  it("valida le date e impedisce patch/delete di membri appartenenti a un altro nucleo", async () => {
+    const owner = await insertBeneficiary();
+    const other = await insertBeneficiary();
+    const endpoint = `/beneficiari/${owner.id}/nucleo`;
+    const base = { nome: "Componente", relazione: "figlio", sesso: "M" };
+    expect((await request(socialAreaA()).post(endpoint).send({ ...base, dataNascita: "2026-02-31" })).status).toBe(400);
+    expect((await request(socialAreaA()).post(endpoint).send({ ...base, dataNascita: "2999-01-01" })).status).toBe(400);
+    const created = await request(socialAreaA()).post(endpoint).send({ ...base, dataNascita: "2012-04-03" });
+    expect(created.status).toBe(201);
+
+    expect((await request(socialAreaA()).patch(`/beneficiari/${other.id}/nucleo/${created.body.id}`).send({ nome: "Spostamento" })).status).toBe(404);
+    expect((await request(socialAreaA()).delete(`/beneficiari/${other.id}/nucleo/${created.body.id}`)).status).toBe(404);
+    expect((await request(socialAreaA()).patch(`/beneficiari/${owner.id}/nucleo/${created.body.id}`).send({ nome: "Aggiornato" })).status).toBe(200);
+
+    const wrongZone = makeApp({
+      areaOperativaId: areaA,
+      centroAscoltoId: null,
+      zonaUdsId: zoneA,
+      aree: ["sociale", "uds"],
+      permessi: SOCIAL_PERMISSIONS,
+    });
+    expect((await request(wrongZone).get(endpoint)).status).toBe(403);
+    expect((await request(socialAreaA()).delete(`/beneficiari/${owner.id}/nucleo/${created.body.id}`)).status).toBe(204);
   });
 
   it("impone limite e preserva partial success con la validazione del create", async () => {

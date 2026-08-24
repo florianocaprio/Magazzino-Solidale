@@ -2,7 +2,10 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createCardMutate } = vi.hoisted(() => ({ createCardMutate: vi.fn() }));
+const { createCardMutate, updateNucleoMutate } = vi.hoisted(() => ({
+  createCardMutate: vi.fn(),
+  updateNucleoMutate: vi.fn(),
+}));
 
 vi.mock("@workspace/api-client-react", () => ({
   useGetBeneficiario: () => ({ data: {
@@ -11,7 +14,7 @@ vi.mock("@workspace/api-client-react", () => ({
     fasciaEtaPresunta: "30_64", fasciaEtaCorrente: "30_64", fasciaEtaOrigine: "presunta",
     sesso: "M", cittadinanza: null, areaProvenienza: null, residenza: null, domicilio: null,
     comune: null, zonaMunicipio: null, telefono: null, email: null, statoCivile: null,
-    numComponenti: 1, numFigliMaschi: 0, numFiglieFemmine: 0, numMinori: 0,
+    numComponenti: 2, numFigliMaschi: 0, numFiglieFemmine: 1, numMinori: 0,
     numAnziani: 0, numDisabili: 0, restrizioniAlimentari: null, allergie: null,
     notePaccoAlimentare: null, priorita: "media", consegnaDomicilio: false,
     motivoConsegnaDomicilio: null, centroAscoltoId: 7, centroAscoltoNome: "Centro Roma",
@@ -22,7 +25,12 @@ vi.mock("@workspace/api-client-react", () => ({
     creditoSolidaleMotivoModifica: null, creditoSolidaleDataUltimaModificaQuota: null,
     creditoSolidaleSaldo: 0, creditoSolidaleDataUltimoMovimento: null,
     uds: false, areaOperativaId: 1, areaOperativaNome: "Roma", zonaUdsId: null, attivo: true,
-    dataPresaInCarico: null, noteInterne: null, nucleo: [], interventi: [], consegne: [],
+    dataPresaInCarico: null, noteInterne: null, nucleo: [{
+      id: 77, beneficiarioId: 42, nome: "Giulia", cognome: "Rossi",
+      dataNascita: "2000-01-01", sesso: "F", areaProvenienza: "UE",
+      relazione: "Figlia", tagliiaVestiti: null, numeroScarpe: null,
+      esigenzeParticolari: null, note: null,
+    }], interventi: [], consegne: [],
     dataCreazione: "2026-08-15T00:00:00.000Z",
   }, isLoading: false }),
   useListTessereBeneficiarioDaAnagrafica: () => ({ data: [{
@@ -42,7 +50,11 @@ vi.mock("@workspace/api-client-react", () => ({
   useUpdateCreditoSolidaleBeneficiarioConfigurazione: () => ({ mutate: vi.fn(), isPending: false }),
   useAuthorizeBeneficiariExport: () => ({ mutateAsync: vi.fn().mockResolvedValue({ autorizzato: true }) }),
   useAddNucleoFamiliare: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateNucleoFamiliare: () => ({ mutate: updateNucleoMutate, isPending: false }),
   useDeleteNucleoFamiliare: () => ({ mutate: vi.fn(), isPending: false }),
+  useGetBeneficiarioFse: () => ({ data: null, isLoading: false, isError: false }),
+  useUpdateBeneficiarioFse: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  getGetBeneficiarioFseQueryKey: (id: number) => ["beneficiario-fse", id],
   useListAreeOperative: () => ({ data: [] }),
   useListZoneUds: () => ({ data: [] }),
   useCalcolaCreditoSolidaleBeneficiario: () => ({ data: undefined, isLoading: false, isError: false }),
@@ -123,4 +135,39 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
     ).toHaveLength(2);
     expect(document.body.textContent).toContain("Abilita alla Mensa");
   });
+
+  it("modifica un componente e mostra la fascia calcolata senza renderla editabile", async () => {
+    await act(async () => root.render(<BeneficiarioDettaglio />));
+    expect(document.body.textContent).toContain("Fascia: 18_29");
+    expect(document.querySelector('[name="fasciaEta"]')).toBeNull();
+
+    const editMember = document.querySelector<HTMLButtonElement>('button[aria-label="Modifica componente"]')!;
+    await act(async () => editMember.click());
+    expect(document.body.textContent).toContain("Modifica componente");
+    expect(document.querySelector('[name="fasciaEta"]')).toBeNull();
+
+    const relation = Array.from(document.querySelectorAll<HTMLInputElement>("input"))
+      .find((input) => input.value === "Figlia")!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(relation, "Convivente");
+      relation.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => buttonByText("Salva")?.click());
+    expect(updateNucleoMutate).toHaveBeenCalledWith(
+      {
+        id: 42,
+        membroId: 77,
+        data: expect.objectContaining({
+          relazione: "Convivente",
+          dataNascita: "2000-01-01",
+        }),
+      },
+      expect.any(Object),
+    );
+  });
 });
+
+function buttonByText(label: string) {
+  return Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.includes(label));
+}

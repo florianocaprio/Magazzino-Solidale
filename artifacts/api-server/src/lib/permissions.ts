@@ -39,6 +39,10 @@ export const BENEFICIARI_PERMISSIONS = [
     label: "Beneficiari: disattivazione e riattivazione",
   },
   { key: "beneficiari.export", label: "Beneficiari: esportazione dati" },
+  { key: "beneficiari.fse.view", label: "Beneficiari FSE+: consultazione fascicolo" },
+  { key: "beneficiari.fse.manage", label: "Beneficiari FSE+: modifica dati interoperabili" },
+  { key: "beneficiari.fse.import", label: "Beneficiari FSE+: importazione" },
+  { key: "beneficiari.fse.export", label: "Beneficiari FSE+: esportazione" },
   {
     key: "beneficiari.duplicates.search",
     label: "Beneficiari: ricerca anti-duplicato",

@@ -1380,6 +1380,18 @@ router.patch("/beneficiari/:id/nucleo/:membroId", requirePermission("beneficiari
   if (!Number.isSafeInteger(membroId) || membroId <= 0) { res.status(400).json({ error: "Membro non valido." }); return; }
   const parsed = NucleoFamiliareUpdateInput.safeParse(req.body);
   if (!parsed.success || Object.keys(parsed.data).length === 0) { res.status(400).json({ error: parsed.success ? "Nessun campo da aggiornare." : zodErrorMessage(parsed.error) }); return; }
+  const [existingMember] = await db.select().from(nucleoFamiliareTable).where(and(
+    eq(nucleoFamiliareTable.id, membroId), eq(nucleoFamiliareTable.beneficiarioId, id),
+  ));
+  if (!existingMember) { res.status(404).json({ error: "Membro del nucleo non trovato." }); return; }
+  const anagraphicKeys = new Set(["nome", "cognome", "relazione", "dataNascita", "sesso"]);
+  if (Object.keys(parsed.data).some((key) => anagraphicKeys.has(key))) {
+    const resultingMember = { ...existingMember, ...parsed.data };
+    if (!resultingMember.nome?.trim() || !resultingMember.relazione?.trim() || !resultingMember.dataNascita || !resultingMember.sesso) {
+      res.status(400).json({ error: "Nome, relazione, data di nascita e sesso sono obbligatori per modificare l'anagrafica del componente." });
+      return;
+    }
+  }
   const row = await db.transaction(async (tx) => {
     const [updated] = await tx.update(nucleoFamiliareTable).set(parsed.data).where(and(
       eq(nucleoFamiliareTable.id, membroId), eq(nucleoFamiliareTable.beneficiarioId, id),
@@ -1401,14 +1413,16 @@ router.delete("/beneficiari/:id/nucleo/:membroId", requirePermission("beneficiar
   const membroId = Number(req.params.membroId);
   const access = Number.isSafeInteger(id) && id > 0 ? await scopedBeneficiario(id, req) : { status: 400, error: "Beneficiario non valido." } as const;
   if ("error" in access) { res.status(access.status).json({ error: access.error }); return; }
-  await db.transaction(async (tx) => {
+  const deleted = await db.transaction(async (tx) => {
     const [deleted] = await tx.delete(nucleoFamiliareTable)
       .where(and(eq(nucleoFamiliareTable.id, membroId), eq(nucleoFamiliareTable.beneficiarioId, id))).returning({ id: nucleoFamiliareTable.id });
     if (deleted) await tx.insert(auditConfigurazioniTable).values({
       area: "beneficiari", chiave: `beneficiario:${id}:nucleo`, azione: "rimozione-membro-nucleo",
       valorePrecedente: { membroId }, utenteId: req.user?.id ?? null, ip: req.ip ?? req.socket.remoteAddress ?? null,
     });
+    return deleted ?? null;
   });
+  if (!deleted) { res.status(404).json({ error: "Membro del nucleo non trovato." }); return; }
   res.status(204).send();
 });
 

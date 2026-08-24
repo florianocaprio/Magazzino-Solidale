@@ -5,6 +5,303 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+export interface BeneficiariFseRowInput {
+  'Nome Referente fascicolo': string;
+  'Cognome Referente fascicolo': string;
+  'Codice fascicolo': string;
+  'Data di presa in carico': string | number;
+  'Numero componenti fascicolo': string | number;
+  'Tipologia di Attività': string;
+  'Stato attuale': string;
+  Donne: string | number;
+  Uomini: string | number;
+  'Età<18': string | number;
+  'Età 18-29': string | number;
+  'Età 30-64': string | number;
+  'Età>=65': string | number;
+  'Origine straniera e minoranze': string | number;
+  Disabili: string | number;
+  'Cittadini di Paesi Terzi': string | number;
+  'Senzatetto o colpiti da esclusione abitativa': string | number;
+  [key: string]: unknown;
+ }
+
+export interface BeneficiariFseWorkbookUpload {
+  /** @minimum 1 */
+  centroAscoltoId: number;
+  /** Workbook XLSX reale; non viene conservato dal server. */
+  file: Blob;
+}
+
+export type BeneficiariFseImportResolutionAzione = typeof BeneficiariFseImportResolutionAzione[keyof typeof BeneficiariFseImportResolutionAzione];
+
+
+export const BeneficiariFseImportResolutionAzione = {
+  crea: 'crea',
+  collega: 'collega',
+} as const;
+
+export interface BeneficiariFseImportResolution {
+  /** @minimum 2 */
+  numeroRiga: number;
+  azione: BeneficiariFseImportResolutionAzione;
+  /** @minimum 1 */
+  beneficiarioId?: number;
+}
+
+export interface BeneficiariFseWorkbookImportUpload {
+  /** @minimum 1 */
+  centroAscoltoId: number;
+  /** Lo stesso workbook XLSX reale viene rivalidato dal server. */
+  file: Blob;
+  /** Array JSON di BeneficiariFseImportResolution. */
+  risoluzioni?: string;
+}
+
+export interface BeneficiariFseDuplicateCandidate {
+  id: number;
+  codice: string;
+  /** @nullable */
+  centroAscoltoId: number | null;
+}
+
+export type BeneficiariFsePreviewRowClassificazione = typeof BeneficiariFsePreviewRowClassificazione[keyof typeof BeneficiariFsePreviewRowClassificazione];
+
+
+export const BeneficiariFsePreviewRowClassificazione = {
+  nuovo: 'nuovo',
+  da_collegare: 'da_collegare',
+  da_aggiornare: 'da_aggiornare',
+  invariato: 'invariato',
+  possibile_duplicato: 'possibile_duplicato',
+  conflitto: 'conflitto',
+  errore: 'errore',
+} as const;
+
+export interface BeneficiariFsePreviewRow {
+  numeroRiga: number;
+  /** @nullable */
+  codiceFascicolo: string | null;
+  classificazione: BeneficiariFsePreviewRowClassificazione;
+  errori: string[];
+  warning: string[];
+  beneficiarioId?: number;
+  duplicati?: BeneficiariFseDuplicateCandidate[];
+}
+
+export type BeneficiariFsePreviewResultConteggi = {[key: string]: number};
+
+export interface BeneficiariFsePreviewResult {
+  centroAscoltoId: number;
+  areaOperativaId: number;
+  areaOperativaDerivata: true;
+  warningHeader: string[];
+  righe: BeneficiariFsePreviewRow[];
+  conteggi: BeneficiariFsePreviewResultConteggi;
+  numeroRighe: number;
+}
+
+export type BeneficiariFseImportDetailEsito = typeof BeneficiariFseImportDetailEsito[keyof typeof BeneficiariFseImportDetailEsito];
+
+
+export const BeneficiariFseImportDetailEsito = {
+  creato: 'creato',
+  collegato: 'collegato',
+  aggiornato: 'aggiornato',
+  invariato: 'invariato',
+  conflitto: 'conflitto',
+  errore: 'errore',
+} as const;
+
+export interface BeneficiariFseImportDetail {
+  numeroRiga: number;
+  /** @nullable */
+  codiceFascicolo: string | null;
+  esito: BeneficiariFseImportDetailEsito;
+  errori: string[];
+}
+
+export type BeneficiariFseImportResultStato = typeof BeneficiariFseImportResultStato[keyof typeof BeneficiariFseImportResultStato];
+
+
+export const BeneficiariFseImportResultStato = {
+  confermato: 'confermato',
+  parziale: 'parziale',
+} as const;
+
+export interface BeneficiariFseImportResult {
+  batchId: number;
+  stato: BeneficiariFseImportResultStato;
+  creati: number;
+  collegati: number;
+  aggiornati: number;
+  invariati: number;
+  conflitti: number;
+  errori: number;
+  dettagli: BeneficiariFseImportDetail[];
+}
+
+export interface BeneficiariFseExportInput {
+  /** @minimum 1 */
+  centroAscoltoId: number;
+  dataRiferimento: string;
+  soloAttivi?: boolean;
+}
+
+export interface BeneficiariFseExportIssue {
+  beneficiarioId: number;
+  codice: string;
+  errori?: string[];
+  warning?: string[];
+}
+
+export interface BeneficiariFseExportPreflight {
+  candidati: number;
+  esportabili: number;
+  bloccati: BeneficiariFseExportIssue[];
+  warning: BeneficiariFseExportIssue[];
+  centroAscoltoId: number;
+  areaOperativaId: number;
+  dataRiferimento: string;
+  soloAttivi: true;
+}
+
+export interface BeneficiarioFseUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  codiceFascicolo?: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  origineStranieraMinoranze?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  cittadiniPaesiTerzi?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  senzaTettoEsclusioneAbitativa?: number | null;
+}
+
+export interface BeneficiarioFseSnapshot {
+  numeroComponenti: number;
+  donne: number;
+  uomini: number;
+  eta017: number;
+  eta1829: number;
+  eta3064: number;
+  eta65Plus: number;
+}
+
+export type BeneficiarioFseDemografiaOrigine = typeof BeneficiarioFseDemografiaOrigine[keyof typeof BeneficiarioFseDemografiaOrigine];
+
+
+export const BeneficiarioFseDemografiaOrigine = {
+  anagrafica_calcolata: 'anagrafica_calcolata',
+  snapshot_fse: 'snapshot_fse',
+} as const;
+
+export type BeneficiarioFseDemografia = BeneficiarioFseSnapshot & {
+  origine: BeneficiarioFseDemografiaOrigine;
+  dettaglioCompleto: boolean;
+  problemi: string[];
+};
+
+export interface BeneficiarioFseDifference {
+  dato: string;
+  snapshot: number;
+  calcolato: number;
+}
+
+export type BeneficiarioFseComparisonStato = typeof BeneficiarioFseComparisonStato[keyof typeof BeneficiarioFseComparisonStato];
+
+
+export const BeneficiarioFseComparisonStato = {
+  coerente: 'coerente',
+  non_allineato: 'non_allineato',
+  non_confrontabile: 'non_confrontabile',
+} as const;
+
+export interface BeneficiarioFseComparison {
+  stato: BeneficiarioFseComparisonStato;
+  differenze: BeneficiarioFseDifference[];
+}
+
+export type BeneficiarioFseProfileOrigineFascicolo = typeof BeneficiarioFseProfileOrigineFascicolo[keyof typeof BeneficiarioFseProfileOrigineFascicolo];
+
+
+export const BeneficiarioFseProfileOrigineFascicolo = {
+  interno: 'interno',
+  import_fse: 'import_fse',
+} as const;
+
+export interface BeneficiarioFseProfile {
+  id: number;
+  beneficiarioId: number;
+  /** @nullable */
+  codiceFascicolo: string | null;
+  /** @nullable */
+  codiceFascicoloNormalizzato: string | null;
+  origineFascicolo: BeneficiarioFseProfileOrigineFascicolo;
+  /** @nullable */
+  numeroComponentiImportato?: number | null;
+  /** @nullable */
+  donneImportate?: number | null;
+  /** @nullable */
+  uominiImportati?: number | null;
+  /** @nullable */
+  eta017Importata?: number | null;
+  /** @nullable */
+  eta1829Importata?: number | null;
+  /** @nullable */
+  eta3064Importata?: number | null;
+  /** @nullable */
+  eta65PlusImportata?: number | null;
+  /** @nullable */
+  origineStranieraMinoranze: number | null;
+  /** @nullable */
+  cittadiniPaesiTerzi: number | null;
+  /** @nullable */
+  senzaTettoEsclusioneAbitativa: number | null;
+  /** @nullable */
+  tipologiaAttivitaImportata?: string | null;
+  /** @nullable */
+  statoAttualeImportato?: string | null;
+  /** @nullable */
+  ultimoImportBatchId?: number | null;
+  /** @nullable */
+  ultimoImportAt?: string | null;
+  /** @nullable */
+  ultimoExportAt?: string | null;
+  /** @nullable */
+  hashUltimaRigaImportata?: string | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export interface BeneficiarioFseDetail {
+  profilo: BeneficiarioFseProfile | null;
+  snapshot: BeneficiarioFseSnapshot | null;
+  disabili: number;
+  componentiDichiarati: number;
+  componentiDettagliati: number;
+  demografia: BeneficiarioFseDemografia;
+  confronto: BeneficiarioFseComparison;
+}
+
+export interface BeneficiariFseError {
+  error: string;
+  errori?: string[];
+  warning?: string[];
+  bloccati?: BeneficiariFseExportIssue[];
+}
+
 export interface FseErrorResponse {
   /** Codice o messaggio stabile; include NESSUN_DATO_DA_RENDICONTARE per scope amministrativi vuoti */
   error: string;
@@ -4084,16 +4381,38 @@ export const NucleoFamiliareInputSesso = {
 } as const;
 
 export interface NucleoFamiliareInput {
-  nome?: string;
+  nome: string;
   cognome?: string;
-  dataNascita?: string;
-  sesso?: NucleoFamiliareInputSesso;
+  dataNascita: string;
+  sesso: NucleoFamiliareInputSesso;
   areaProvenienza?: string;
-  relazione?: string;
+  relazione: string;
   tagliaVestiti?: string;
   numeroScarpe?: string;
   esigenzeParticolari?: string;
   note?: string;
+}
+
+export interface NucleoFamiliareUpdate {
+  /** @nullable */
+  nome?: string | null;
+  /** @nullable */
+  cognome?: string | null;
+  /** @nullable */
+  dataNascita?: string | null;
+  sesso?: 'M' | 'F' | 'ALTRO' | null;
+  /** @nullable */
+  areaProvenienza?: string | null;
+  /** @nullable */
+  relazione?: string | null;
+  /** @nullable */
+  tagliaVestiti?: string | null;
+  /** @nullable */
+  numeroScarpe?: string | null;
+  /** @nullable */
+  esigenzeParticolari?: string | null;
+  /** @nullable */
+  note?: string | null;
 }
 
 export type InterventoVista = typeof InterventoVista[keyof typeof InterventoVista];
@@ -7040,6 +7359,36 @@ export type AgeaPayloadTooLargeResponse = AgeaErrorResponse;
  * MIME XLSX richiesto
  */
 export type AgeaUnsupportedMediaTypeResponse = AgeaErrorResponse;
+
+/**
+ * Contratto, file, data o identificativo non valido
+ */
+export type BeneficiariFseBadRequestResponse = BeneficiariFseError;
+
+/**
+ * Sessione non autenticata
+ */
+export type BeneficiariFseUnauthorizedResponse = BeneficiariFseError;
+
+/**
+ * Permesso FSE+ o scope territoriale non consentito
+ */
+export type BeneficiariFseForbiddenResponse = BeneficiariFseError;
+
+/**
+ * Beneficiario o fascicolo non trovato
+ */
+export type BeneficiariFseNotFoundResponse = BeneficiariFseError;
+
+/**
+ * Codice fascicolo già associato o conflitto di riconciliazione
+ */
+export type BeneficiariFseConflictResponse = BeneficiariFseError;
+
+/**
+ * Preflight export non superato
+ */
+export type BeneficiariFseUnprocessableResponse = BeneficiariFseError;
 
 export type FseMagazzinoIdParameter = number;
 
