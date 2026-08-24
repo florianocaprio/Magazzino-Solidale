@@ -39,7 +39,7 @@ controllo. In assenza di una specifica ufficiale verificata resta classificato
 | Movimenti esterni AGEA      | `movimenti_esterni_agea`                             | delta cumulativo per identity/content hash                            | `DATA_QUALITY_RISK`          | occurrence/multinsieme, nessun numero riga come identità             |
 | Export FSE+                 | nuove tabelle snapshot                               | formato canonico e formato osservato di controllo                     | `EXTERNAL_FORMAT_UNVERIFIED` | avvertenza esplicita, hash canonico, cutoff, copertura attiva unica  |
 | Riconciliazione             | nuove tabelle snapshot                               | confronto non mutante locale/esterno                                  | `BLOCKER`                    | matching deterministico, ambiguità manuale, nessuna rettifica stock  |
-| Report integrato            | builder reporting                                    | modello `MAGAZZINO_2_0C_V1`                                           | `ARCHITECTURAL_CONFLICT`     | un payload per UI, drill-down ed export generici                     |
+| Report integrato            | builder reporting                                    | modello `REPORTING_2_0_V1` con snapshot storici FSE/territoriali      | `ALIGNED_REPORTING_2_0`      | un payload per UI, drill-down ed export generici                     |
 | Dashboard iniziale          | dashboard e landing                                  | delega ai builder integrati                                           | `REGRESSION_RISK`            | nessun KPI duplicato con formula divergente                          |
 | Drill-down                  | reporting integrato                                  | paginato, exact values, stesso scope                                  | `PRIVACY_RISK`               | colonne operative senza PII                                          |
 | Export XLSX/PDF generico    | payload reporting                                    | riuso del modello integrato                                           | `REGRESSION_RISK`            | nessuna query contabile alternativa; sicurezza formula Excel         |
@@ -68,8 +68,11 @@ controllo. In assenza di una specifica ufficiale verificata resta classificato
 
 1. C1: modello canonico, qualità, monitoraggio ed export con snapshot.
 2. C2: riconciliazione AGEA/SIFEAD non mutante.
-3. C3: reporting `MAGAZZINO_2_0C_V1`, frontend e contratti generati.
+3. C3: reporting `REPORTING_2_0_V1`, frontend e contratti generati.
 4. Migration ledger, acceptance reale AGEA, regressione completa e smoke Docker.
+
+L’allineamento finale, le fonti, le formule e la strategia legacy sono descritti
+in [Reporting 2.0 — modello finale](./reporting-2.0-final-alignment.md).
 
 ## Correttivo 2.0C-R1
 

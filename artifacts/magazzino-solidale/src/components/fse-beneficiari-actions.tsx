@@ -132,6 +132,7 @@ export function FseBeneficiariActions({
       });
       const payload: FilePayload = {
         centroAscoltoId: Number(centroId),
+        dataRiferimento: date,
         file,
       };
       setFilePayload(payload);
@@ -271,15 +272,22 @@ export function FseBeneficiariActions({
                 (selected?.areaOperativaId ? `ID ${selected.areaOperativaId}` : "non disponibile")}
             </strong>
           </div>
-          {mode === "import" && !importResult && (
-            <Input
-              type="file"
-              accept=".xlsx"
-              aria-label="File FSE+"
-              disabled={!centroId || busy}
-              onChange={(event) => void readFile(event.target.files?.[0])}
-            />
-          )}
+            {mode === "import" && !importResult && (
+              <>
+                <Input type="date" aria-label="Data di riferimento import FSE+"
+                  value={date} disabled={busy} onChange={(event) => {
+                    setDate(event.target.value);
+                    setFilePayload(null);
+                    setPreview(null);
+                  }} />
+                <p className="text-sm text-muted-foreground">
+                  La data di riferimento determina da quando questi dati sono validi nei report storici. Verificala prima di confermare l’import.
+                </p>
+                <Input type="file" accept=".xlsx" aria-label="File FSE+"
+                  disabled={!centroId || busy}
+                  onChange={(event) => void readFile(event.target.files?.[0])} />
+              </>
+            )}
           {mode === "export" && <>
             <Input
               type="date"

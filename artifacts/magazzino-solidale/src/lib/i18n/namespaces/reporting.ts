@@ -109,7 +109,13 @@ const kpi: Record<string, Labels> = {
   giacenzaFseAsOfKgLt: ["Giacenza FSE+ as-of Kg/Lt", "Existencias FSE+ a fecha Kg/Lt", "As-of FSE+ stock Kg/Lt", "Stock FSE+ à date Kg/Lt", "FSE+-Bestand zum Stichtag Kg/Lt", "مخزون FSE+ في التاريخ كغ/لتر"],
   carichiFse: ["Carichi FSE+", "Cargas FSE+", "FSE+ loads", "Chargements FSE+", "FSE+-Zugänge", "تحميلات FSE+"],
   distribuzioniFseLorde: ["Distribuzioni FSE+ lorde", "Distribuciones FSE+ brutas", "Gross FSE+ distributions", "Distributions FSE+ brutes", "Brutto-FSE+-Ausgaben", "توزيعات FSE+ الإجمالية"],
+  distribuzioniFseLordePezzi: ["Distribuzioni FSE+ lorde — pezzi", "Distribuciones FSE+ brutas — piezas", "Gross FSE+ distributions — pieces", "Distributions FSE+ brutes — pièces", "Brutto-FSE+-Ausgaben — Stück", "توزيعات FSE+ الإجمالية — قطع"],
+  distribuzioniFseLordeKgLt: ["Distribuzioni FSE+ lorde — Kg/Lt", "Distribuciones FSE+ brutas — Kg/Lt", "Gross FSE+ distributions — Kg/Lt", "Distributions FSE+ brutes — Kg/Lt", "Brutto-FSE+-Ausgaben — Kg/Lt", "توزيعات FSE+ الإجمالية — كغ/لتر"],
   storniFse: ["Storni FSE+", "Reversiones FSE+", "FSE+ reversals", "Annulations FSE+", "FSE+-Stornierungen", "عمليات عكس FSE+"],
+  storniDistribuzioniPezzi: ["Storni distribuzioni — pezzi", "Reversiones de distribuciones — piezas", "Distribution reversals — pieces", "Annulations de distributions — pièces", "Ausgabestornierungen — Stück", "عكس التوزيعات — قطع"],
+  storniDistribuzioniKgLt: ["Storni distribuzioni — Kg/Lt", "Reversiones de distribuciones — Kg/Lt", "Distribution reversals — Kg/Lt", "Annulations de distributions — Kg/Lt", "Ausgabestornierungen — Kg/Lt", "عكس التوزيعات — كغ/لتر"],
+  distribuzioniFseNettePezzi: ["Distribuzioni FSE+ nette — pezzi", "Distribuciones FSE+ netas — piezas", "Net FSE+ distributions — pieces", "Distributions FSE+ nettes — pièces", "Netto-FSE+-Ausgaben — Stück", "توزيعات FSE+ الصافية — قطع"],
+  distribuzioniFseNetteKgLt: ["Distribuzioni FSE+ nette — Kg/Lt", "Distribuciones FSE+ netas — Kg/Lt", "Net FSE+ distributions — Kg/Lt", "Distributions FSE+ nettes — Kg/Lt", "Netto-FSE+-Ausgaben — Kg/Lt", "توزيعات FSE+ الصافية — كغ/لتر"],
   distribuzioniFseNette: ["Distribuzioni FSE+ nette", "Distribuciones FSE+ netas", "Net FSE+ distributions", "Distributions FSE+ nettes", "Netto-FSE+-Ausgaben", "توزيعات FSE+ الصافية"],
   eventiDistribuzione: ["Eventi di distribuzione", "Eventos de distribución", "Distribution events", "Événements de distribution", "Ausgabeereignisse", "أحداث التوزيع"],
   saltuari: ["Saltuari", "Ocasionales", "Occasional recipients", "Occasionnels", "Gelegentlich Unterstützte", "المستفيدون العرضيون"],
@@ -150,6 +156,7 @@ const tables: Record<string, Labels> = {
   canali: ["Canali di distribuzione", "Canales de distribución", "Distribution channels", "Canaux de distribution", "Verteilungskanäle", "قنوات التوزيع"],
   quantitaPerCanaleUnita: ["Quantità per canale e unità", "Cantidad por canal y unidad", "Quantity by channel and unit", "Quantité par canal et unité", "Menge nach Kanal und Einheit", "الكمية حسب القناة والوحدة"],
   disponibilitaSifead: ["Disponibilità dati SIFEAD", "Disponibilidad de datos SIFEAD", "SIFEAD data availability", "Disponibilité des données SIFEAD", "SIFEAD-Datenverfügbarkeit", "توفر بيانات SIFEAD"],
+  dimensioniFseBeneficiari: ["Dimensioni FSE+ dei nuclei", "Dimensiones FSE+ de los hogares", "Household FSE+ dimensions", "Dimensions FSE+ des ménages", "FSE+-Dimensionen der Haushalte", "أبعاد FSE+ للأسر"],
   "01_Prodotti_FSE": ["Prodotti FSE+", "Productos FSE+", "FSE+ products", "Produits FSE+", "FSE+-Produkte", "منتجات FSE+"],
   "02_Continuativi": ["Indigenti continuativi", "Personas continuativas", "Continuous recipients", "Bénéficiaires continus", "Kontinuierlich Unterstützte", "المستفيدون المستمرون"],
   "03_Saltuari_Mensa": ["Saltuari Mensa", "Ocasionales del comedor", "Occasional canteen recipients", "Occasionnels cantine", "Gelegentliche Kantinennutzer", "مستفيدو المطعم العرضيون"],
@@ -177,6 +184,25 @@ const quality: Record<string, Labels> = {
   provenienzaMancante: ["Provenienza mancante", "Procedencia ausente", "Missing provenance", "Provenance manquante", "Fehlende Herkunft", "المصدر مفقود"],
   unitaPesoNonNormalizzabile: ["Unità o peso non normalizzabile", "Unidad o peso no normalizable", "Unit or weight cannot be normalized", "Unité ou poids non normalisable", "Einheit oder Gewicht nicht normalisierbar", "الوحدة أو الوزن غير قابل للتوحيد"],
   dimensioniSifeadMancanti: ["Dimensioni SIFEAD non disponibili", "Dimensiones SIFEAD no disponibles", "SIFEAD dimensions unavailable", "Dimensions SIFEAD indisponibles", "SIFEAD-Dimensionen nicht verfügbar", "أبعاد SIFEAD غير متاحة"],
+  snapshotFseMancante: ["Snapshot FSE+ mancante", "Instantánea FSE+ ausente", "Missing FSE+ snapshot", "Instantané FSE+ manquant", "Fehlender FSE+-Snapshot", "لقطة FSE+ مفقودة"],
+  snapshotFseIncompleto: ["Snapshot FSE+ incompleto", "Instantánea FSE+ incompleta", "Incomplete FSE+ snapshot", "Instantané FSE+ incomplet", "Unvollständiger FSE+-Snapshot", "لقطة FSE+ غير مكتملة"],
+  snapshotFseDerivato: ["Snapshot FSE+ derivato", "Instantánea FSE+ derivada", "Derived FSE+ snapshot", "Instantané FSE+ dérivé", "Abgeleiteter FSE+-Snapshot", "لقطة FSE+ مشتقة"],
+  statisticheEventoStornoParziale: ["Statistiche evento con storno parziale", "Estadísticas de evento con reversión parcial", "Event statistics with partial reversal", "Statistiques d’événement avec annulation partielle", "Ereignisstatistik mit Teilstornierung", "إحصاءات حدث بعكس جزئي"],
+};
+
+const reporting20Columns: Record<string, Labels> = {
+  valore: ["Valore", "Valor", "Value", "Valeur", "Wert", "القيمة"],
+  nucleiCoperti: ["Nuclei coperti", "Hogares cubiertos", "Covered households", "Ménages couverts", "Abgedeckte Haushalte", "الأسر المشمولة"],
+  nucleiTotali: ["Nuclei totali", "Hogares totales", "Total households", "Total des ménages", "Haushalte gesamt", "إجمالي الأسر"],
+  nucleiSenzaDato: ["Nuclei senza dato", "Hogares sin datos", "Households without data", "Ménages sans données", "Haushalte ohne Daten", "أسر بلا بيانات"],
+  naturaContabile: ["Natura contabile", "Naturaleza contable", "Accounting nature", "Nature comptable", "Buchungsart", "الطبيعة المحاسبية"],
+  operazioneDistribuzioneId: ["ID operazione di distribuzione", "ID de operación de distribución", "Distribution operation ID", "ID opération de distribution", "ID der Ausgabeoperation", "معرّف عملية التوزيع"],
+  movimentoOriginaleId: ["ID Movimento originale", "ID de Movimiento original", "Original Movement ID", "ID Mouvement d’origine", "ID der Ursprungsbewegung", "معرّف الحركة الأصلية"],
+  qualita: ["Codici qualità", "Códigos de calidad", "Quality codes", "Codes qualité", "Qualitätscodes", "رموز الجودة"],
+  dataRiferimento: ["Data di riferimento", "Fecha de referencia", "Reference date", "Date de référence", "Referenzdatum", "التاريخ المرجعي"],
+  origineSnapshot: ["Origine snapshot", "Origen de la instantánea", "Snapshot source", "Origine de l’instantané", "Snapshot-Quelle", "مصدر اللقطة"],
+  numeroComponenti: ["Numero componenti", "Número de miembros", "Member count", "Nombre de membres", "Anzahl Mitglieder", "عدد الأفراد"],
+  quantitaNetta: ["Quantità netta", "Cantidad neta", "Net quantity", "Quantité nette", "Nettomenge", "الكمية الصافية"],
 };
 
 const columnNames: Record<string, Labels> = (
@@ -435,6 +461,10 @@ function make(index: number, core: (typeof localeCore)[keyof typeof localeCore])
       allMense: core.filters[9],
       zone: core.filters[10],
       allZones: core.filters[11],
+      lockedByRole: ["Valore assegnato dal ruolo: non può essere ampliato.", "Valor asignado por el rol: no se puede ampliar.", "Value assigned by your role and cannot be broadened.", "Valeur imposée par le rôle et non extensible.", "Durch die Rolle festgelegt; der Bereich kann nicht erweitert werden.", "قيمة محددة حسب الدور ولا يمكن توسيع نطاقها."][index],
+      noOptions: ["Nessuna opzione disponibile per i filtri e i permessi correnti.", "No hay opciones disponibles para los filtros y permisos actuales.", "No options are available for the current filters and permissions.", "Aucune option disponible pour les filtres et autorisations actuels.", "Für die aktuellen Filter und Berechtigungen sind keine Optionen verfügbar.", "لا توجد خيارات متاحة لعوامل التصفية والصلاحيات الحالية."][index],
+      optionsError: ["Impossibile caricare le opzioni. Verifica che Area e risorsa appartengano allo stesso perimetro.", "No se pueden cargar las opciones. Compruebe que el área y el recurso pertenezcan al mismo ámbito.", "Options could not be loaded. Check that the Area and resource belong to the same scope.", "Impossible de charger les options. Vérifiez que la zone et la ressource appartiennent au même périmètre.", "Optionen konnten nicht geladen werden. Prüfen Sie, ob Bereich und Ressource zum selben Umfang gehören.", "تعذر تحميل الخيارات. تحقق من أن المنطقة والمورد ضمن النطاق نفسه."][index],
+      appliedPeriod: ["Periodo applicato: {{from}} – {{to}} (Europe/Rome)", "Período aplicado: {{from}} – {{to}} (Europe/Rome)", "Applied period: {{from}} – {{to}} (Europe/Rome)", "Période appliquée : {{from}} – {{to}} (Europe/Rome)", "Angewandter Zeitraum: {{from}} – {{to}} (Europe/Rome)", "الفترة المطبقة: {{from}} – {{to}} (Europe/Rome)"][index],
     },
     unavailable: core.unavailable,
     error: core.error,
@@ -460,7 +490,7 @@ function make(index: number, core: (typeof localeCore)[keyof typeof localeCore])
     kpi: select(kpi, index),
     series: select(tables, index),
     tables: select(tables, index),
-    columns: select(columnNames, index),
+    columns: { ...select(columnNames, index), ...select(reporting20Columns, index) },
     quality: select(quality, index),
     export: select(exportLabels, index),
     status: {
@@ -478,6 +508,8 @@ function make(index: number, core: (typeof localeCore)[keyof typeof localeCore])
       previous: core.drilldown[4],
       next: core.drilldown[5],
     },
+    retry: ["Riprova", "Reintentar", "Retry", "Réessayer", "Erneut versuchen", "إعادة المحاولة"][index],
+    period: ["Periodo: {{from}} – {{to}} (Europe/Rome)", "Período: {{from}} – {{to}} (Europe/Rome)", "Period: {{from}} – {{to}} (Europe/Rome)", "Période : {{from}} – {{to}} (Europe/Rome)", "Zeitraum: {{from}} – {{to}} (Europe/Rome)", "الفترة: {{from}} – {{to}} (Europe/Rome)"][index],
   };
 }
 

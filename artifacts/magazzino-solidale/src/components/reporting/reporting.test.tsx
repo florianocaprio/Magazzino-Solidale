@@ -8,7 +8,7 @@ vi.mock("react-i18next", async (importOriginal) => ({
 
 import { ReportEmptyState } from "./report-empty-state";
 import { ReportDataQuality } from "./report-data-quality";
-import { getReportingFilterLocks } from "./report-filters";
+import { getReportingFilterLocks, reconcileReportingFilterSelection, reportingPeriodForYear } from "./report-filters";
 import { isReportingCardVisible } from "@/pages/reporting-landing";
 import { MODULO_BY_ROUTE } from "@/lib/use-moduli";
 import { NAV_ITEMS } from "@/components/layout";
@@ -25,6 +25,21 @@ describe("reportistica integrata", () => {
       centreLocked: false,
       zoneLocked: false,
     });
+  });
+
+  it("ripulisce URL obsolete e filtri figli senza rimuovere gli scope bloccati", () => {
+    const value = { da: "2026-01-01", a: "2026-08-24", areaOperativaId: 1, centroAscoltoId: 2, magazzinoId: 3, mensaId: 4, zonaUdsId: 5 };
+    expect(reconcileReportingFilterSelection(value, {
+      areeOperative: [{ id: 1 }], centres: [{ id: 2 }], warehouses: [], mense: [], zones: [],
+    }, getReportingFilterLocks({ areaOperativaId: 1, centroAscoltoId: 2, zonaUdsId: 5 }))).toEqual({ magazzinoId: null, mensaId: null });
+    expect(reconcileReportingFilterSelection(value, {
+      areeOperative: [], centres: [], warehouses: [], mense: [], zones: [],
+    }, getReportingFilterLocks(null))).toMatchObject({ areaOperativaId: null, centroAscoltoId: null, magazzinoId: null, mensaId: null, zonaUdsId: null });
+  });
+
+  it("chiude l'anno FSE corrente a oggi e un anno passato al 31 dicembre", () => {
+    expect(reportingPeriodForYear(2026, "2026-08-24")).toEqual({ da: "2026-01-01", a: "2026-08-24" });
+    expect(reportingPeriodForYear(2025, "2026-08-24")).toEqual({ da: "2025-01-01", a: "2025-12-31" });
   });
 
   it("mostra le card solo con area, modulo e permesso richiesti", () => {

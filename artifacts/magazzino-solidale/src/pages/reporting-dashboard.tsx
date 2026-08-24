@@ -27,6 +27,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { localizeReportingText } from "@/lib/reporting-text";
 import { FseOperations } from "@/components/reporting/fse-operations";
+import { Button } from "@/components/ui/button";
 
 type Section = ReportingDashboardSection;
 
@@ -51,11 +52,18 @@ function positiveId(params: URLSearchParams, key: string, fallback: number | nul
 function initialFilters(user: ReturnType<typeof useAuth>["user"]): ReportingFilterState {
   const today = todayEuropeRome();
   const params = new URLSearchParams(window.location.search);
-  const validDate = (value: string | null, fallback: string) =>
-    value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallback;
+  const validDate = (value: string | null, fallback: string) => {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return fallback;
+    const parsed = new Date(`${value}T12:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value ? value : fallback;
+  };
+  const defaultFrom = `${today.slice(0, 4)}-01-01`;
+  const requestedFrom = validDate(params.get("da"), defaultFrom);
+  const requestedTo = validDate(params.get("a"), today);
+  const [da, a] = requestedFrom <= requestedTo ? [requestedFrom, requestedTo] : [defaultFrom, today];
   return {
-    da: validDate(params.get("da"), `${today.slice(0, 4)}-01-01`),
-    a: validDate(params.get("a"), today),
+    da,
+    a,
     areaOperativaId: positiveId(params, "areaOperativaId", user?.areaOperativaId ?? null),
     centroAscoltoId: positiveId(params, "centroAscoltoId", user?.centroAscoltoId ?? null),
     magazzinoId: positiveId(params, "magazzinoId", null),
@@ -98,6 +106,7 @@ function QueryContent({
     data: ReportingDashboard | undefined;
     isLoading: boolean;
     isError: boolean;
+    refetch?: () => unknown;
   };
 }) {
   const { t } = useTranslation();
@@ -106,7 +115,10 @@ function QueryContent({
     return <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Skeleton className="h-32" /><Skeleton className="h-32" /><Skeleton className="h-32" /><Skeleton className="h-32" /></div>;
   }
   if (query.isError) {
-    return <Alert variant="destructive"><AlertDescription>{t("reporting.error")}</AlertDescription></Alert>;
+    return <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+      <span>{t("reporting.error")}</span>
+      <Button type="button" variant="outline" size="sm" onClick={() => query.refetch?.()}>{t("reporting.retry")}</Button>
+    </AlertDescription></Alert>;
   }
   const report = query.data;
   if (!report) return <ReportEmptyState />;
@@ -116,7 +128,10 @@ function QueryContent({
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">{t("reporting.generated", { value: new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short", timeZone: report.timezone }).format(new Date(report.generatedAt)) })}</p>
+        <div className="text-sm text-muted-foreground">
+          <p>{t("reporting.period", { from: report.filters.da, to: report.filters.a })}</p>
+          <p>{t("reporting.generated", { value: new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short", timeZone: report.timezone }).format(new Date(report.generatedAt)) })}</p>
+        </div>
         <ReportExportActions report={report} />
       </div>
       {report.kpi.length === 0 ? <ReportEmptyState /> : (

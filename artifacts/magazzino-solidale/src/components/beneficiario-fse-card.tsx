@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { formatDateOrDateTimeEuropeRome } from "@/lib/europe-rome";
+import { formatDateOrDateTimeEuropeRome, todayEuropeRome } from "@/lib/europe-rome";
 import { Pencil } from "lucide-react";
 
 const DEMOGRAPHY_ROWS = [
@@ -67,6 +67,7 @@ export function BeneficiarioFseCard({
     origineStranieraMinoranze: "",
     cittadiniPaesiTerzi: "",
     senzaTettoEsclusioneAbitativa: "",
+    dataRiferimento: todayEuropeRome(),
   });
 
   useEffect(() => {
@@ -76,6 +77,7 @@ export function BeneficiarioFseCard({
         origineStranieraMinoranze: "",
         cittadiniPaesiTerzi: "",
         senzaTettoEsclusioneAbitativa: "",
+        dataRiferimento: todayEuropeRome(),
       });
       return;
     }
@@ -84,6 +86,7 @@ export function BeneficiarioFseCard({
       origineStranieraMinoranze: fseCountInput(data.profilo.origineStranieraMinoranze),
       cittadiniPaesiTerzi: fseCountInput(data.profilo.cittadiniPaesiTerzi),
       senzaTettoEsclusioneAbitativa: fseCountInput(data.profilo.senzaTettoEsclusioneAbitativa),
+      dataRiferimento: data.profilo.dataRiferimento ?? todayEuropeRome(),
     });
   }, [data]);
 
@@ -105,6 +108,8 @@ export function BeneficiarioFseCard({
       origineStranieraMinoranze: nullableCount(form.origineStranieraMinoranze),
       cittadiniPaesiTerzi: nullableCount(form.cittadiniPaesiTerzi),
       senzaTettoEsclusioneAbitativa: nullableCount(form.senzaTettoEsclusioneAbitativa),
+      dataRiferimento: form.dataRiferimento,
+      versione: profile?.versione ?? 0,
     };
     try {
       await update.mutateAsync({ id: beneficiarioId, data: payload });
@@ -212,6 +217,13 @@ export function BeneficiarioFseCard({
       <DialogContent>
         <DialogHeader><DialogTitle>Modifica fascicolo FSE+</DialogTitle></DialogHeader>
         <div className="space-y-4">
+          <div><Label htmlFor="fse-reference-date">Data di riferimento</Label>
+            <Input id="fse-reference-date" type="date" value={form.dataRiferimento}
+              onChange={(event) => setForm({ ...form, dataRiferimento: event.target.value })} />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Determina la validità storica dei dati. Conferma che rappresenti la data effettiva dell’informazione.
+            </p>
+          </div>
           <div><Label htmlFor="fse-code">Codice fascicolo</Label>
             <Input id="fse-code" value={form.codiceFascicolo}
               onChange={(event) => setForm({ ...form, codiceFascicolo: event.target.value })} />

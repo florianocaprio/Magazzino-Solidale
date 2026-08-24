@@ -87,6 +87,8 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
         origineStranieraMinoranze: 1,
         cittadiniPaesiTerzi: 0,
         senzaTettoEsclusioneAbitativa: 0,
+        dataRiferimento: "2026-08-24",
+        versione: 1,
         ultimoImportAt: "2026-08-24T10:00:00.000Z",
         ultimoExportAt: null,
       },
@@ -168,6 +170,9 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     />));
     await act(async () => button("Importa FSE+")?.click());
     expect(document.body.textContent).toContain("Area Operativa: Area UI");
+    const dataRiferimento = document.querySelector<HTMLInputElement>(
+      'input[aria-label="Data di riferimento import FSE+"]',
+    )!.value;
     const input = document.querySelector<HTMLInputElement>('input[aria-label="File FSE+"]')!;
     const bytes = workbookBytes();
     const file = new File([bytes], "beneficiari-test.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -180,7 +185,7 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     });
     expect(mocks.preview).toHaveBeenCalled();
     expect(mocks.preview).toHaveBeenCalledWith({
-      data: { centroAscoltoId: 7, file },
+      data: { centroAscoltoId: 7, dataRiferimento, file },
     });
     expect(document.body.textContent).toContain("Le righe non valide saranno escluse");
     const confirm = button("Conferma importazione") as HTMLButtonElement;
@@ -188,7 +193,7 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     await act(async () => { confirm.click(); await Promise.resolve(); });
     expect(mocks.importRows).toHaveBeenCalled();
     expect(mocks.importRows).toHaveBeenCalledWith({
-      data: { centroAscoltoId: 7, file, risoluzioni: "[]" },
+      data: { centroAscoltoId: 7, dataRiferimento, file, risoluzioni: "[]" },
     });
     expect(onImported).toHaveBeenCalledOnce();
     expect(document.body.textContent).toContain("Risultato import · batch 11");
@@ -245,6 +250,8 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     expect(mocks.updateProfile).toHaveBeenCalledWith({
       id: 42,
       data: {
+        dataRiferimento: "2026-08-24",
+        versione: 1,
         origineStranieraMinoranze: null,
         cittadiniPaesiTerzi: 0,
         senzaTettoEsclusioneAbitativa: null,
@@ -274,12 +281,13 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     expect(mocks.updateProfile).toHaveBeenCalledWith({
       id: 42,
       data: {
+        dataRiferimento: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        versione: 0,
         origineStranieraMinoranze: null,
         cittadiniPaesiTerzi: null,
         senzaTettoEsclusioneAbitativa: null,
       },
     });
-    expect(JSON.stringify(mocks.updateProfile.mock.calls)).not.toContain(":0");
   });
 
   it("blocca il download al preflight e scarica l'XLSX soltanto quando esportabile", async () => {
@@ -365,6 +373,9 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       onImported={vi.fn()}
     />));
     await act(async () => button("Importa FSE+")?.click());
+    const dataRiferimento = document.querySelector<HTMLInputElement>(
+      'input[aria-label="Data di riferimento import FSE+"]',
+    )!.value;
     const input = document.querySelector<HTMLInputElement>('input[aria-label="File FSE+"]')!;
     const bytes = workbookBytes();
     const file = new File([bytes], "duplicato.xlsx");
@@ -379,6 +390,7 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     expect(mocks.importRows).toHaveBeenCalledWith({
       data: {
         centroAscoltoId: 7,
+        dataRiferimento,
         file,
         risoluzioni: JSON.stringify([{ numeroRiga: 2, azione: "crea" }]),
       },

@@ -190,7 +190,7 @@ Il modulo `REPORT` espone in `/report` la landing della reportistica integrata:
 Dashboard generale, Pacchi Alimentari, Centro di Ascolto, Emporio, Mensa, UDS,
 Magazzino/Logistica e rendicontazione trasversale FSE+. I calcoli sono eseguiti
 dal reporting service server-side; grafici, tabelle, drill-down paginato ed
-export XLSX/PDF consumano lo stesso payload `MAGAZZINO_2_0C_V1`. I KPI
+export XLSX/PDF consumano lo stesso payload `REPORTING_2_0_V1`. I KPI
 contabili espongono `exactValue` decimale per decisioni/export e una proiezione
 numerica separata per i grafici; `null` non viene trasformato in zero. Area Operativa, Centro e Zona UDS
 sono sempre riapplicati dal backend; per Mensa resta necessario anche il
