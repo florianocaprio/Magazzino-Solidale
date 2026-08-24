@@ -2,7 +2,13 @@ import { Router, type IRouter } from "express";
 import { and, eq, gt, isNull, ne } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, passwordResetTokensTable, utentiTable } from "@workspace/db";
-import { LoginUserBody, ChangePasswordBody, ForgotPasswordBody, ResetPasswordBody } from "@workspace/api-zod";
+import {
+  LoginUserBody,
+  ChangePasswordBody,
+  ForgotPasswordBody,
+  ResetPasswordBody,
+  type AuthUser,
+} from "@workspace/api-zod";
 import { loadSessionUser, requireAuth, type SessionUser } from "../middlewares/auth";
 import { isBootstrapMode } from "../lib/bootstrap";
 import { logSystemEvent, systemLogMetaFromRequest } from "../lib/systemLog";
@@ -280,7 +286,7 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
   res.json({ message: RESET_PASSWORD_SUCCESS_MESSAGE });
 });
 
-function authUserResponse(u: SessionUser) {
+function authUserResponse(u: SessionUser): AuthUser {
   return {
     id: u.id,
     username: u.username,
@@ -300,6 +306,7 @@ function authUserResponse(u: SessionUser) {
     isSuperAdmin: u.isSuperAdmin,
     isAdmin: u.isAdmin,
     aree: u.aree,
+    permessi: u.permessi,
     mustChangePassword: u.mustChangePassword,
   };
 }

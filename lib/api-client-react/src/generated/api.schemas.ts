@@ -7132,6 +7132,8 @@ export interface MensaReport {
 export interface Area {
   key: string;
   label: string;
+  /** Permessi operativi suggeriti dalla UX quando l'Area viene selezionata */
+  permessi: string[];
 }
 
 export interface Permission {

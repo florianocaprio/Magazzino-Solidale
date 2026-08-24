@@ -16709,7 +16709,12 @@ components:
           type: string
         label:
           type: string
-      required: [key, label]
+        permessi:
+          type: array
+          description: Permessi operativi suggeriti dalla UX quando l'Area viene selezionata
+          items:
+            type: string
+      required: [key, label, permessi]
 
     Permission:
       type: object
