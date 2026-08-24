@@ -35,6 +35,7 @@ import { MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/ben
 import { createBeneficiarioWithOptionalMensa } from "@/lib/beneficiario-mensa-workflow";
 import { BENEFICIARI_PAGE_SIZE, fetchBeneficiariExportRows, type BeneficiarioExportRow } from "@/lib/beneficiari-pagination";
 import { buildBeneficiarioDuplicateParams, canSearchBeneficiarioDuplicates, requireGlobalBeneficiarioArea } from "@/lib/beneficiario-create-ui";
+import { FseBeneficiariActions } from "@/components/fse-beneficiari-actions";
 
 const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.object({
   cognome: z.string().min(2),
@@ -149,6 +150,8 @@ export default function Beneficiari() {
   const canManage = hasPermission("beneficiari.manage");
   const canDeactivate = hasPermission("beneficiari.deactivate");
   const canExport = hasPermission("beneficiari.export");
+  const canImportFse = hasPermission("beneficiari.fse.import");
+  const canExportFse = hasPermission("beneficiari.fse.export");
   const beneficiarioIds = useMemo(() => (beneficiari ?? []).map((beneficiario) => beneficiario.id), [beneficiari]);
   const mensaSummaryParams = useMemo(() => beneficiarioIds.length > 0 ? { beneficiarioIds: beneficiarioIds.join(",") } : undefined, [beneficiarioIds]);
   const mensaSummary = useGetMensaAbilitazioniRiepilogoBeneficiari(mensaSummaryParams, {
@@ -376,6 +379,13 @@ export default function Beneficiari() {
           <p className="text-muted-foreground">{t("beneficiari.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
+          <FseBeneficiariActions
+            centri={centri ?? []}
+            lockedCentroId={lockedCentroId}
+            canImport={canImportFse}
+            canExport={canExportFse}
+            onImported={() => queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() })}
+          />
           {canExport && <ExportButtons<BeneficiarioExportRow>
             rows={currentExportRows}
             columns={[

@@ -65,10 +65,25 @@ import type {
   AuthorizeBeneficiariExport200,
   BeneficiariBulkInput,
   BeneficiariExportInput,
+  BeneficiariFseBadRequestResponse,
+  BeneficiariFseConflictResponse,
+  BeneficiariFseExportInput,
+  BeneficiariFseExportPreflight,
+  BeneficiariFseForbiddenResponse,
+  BeneficiariFseImportInput,
+  BeneficiariFseImportResult,
+  BeneficiariFseNotFoundResponse,
+  BeneficiariFsePreviewInput,
+  BeneficiariFsePreviewResult,
+  BeneficiariFseUnauthorizedResponse,
+  BeneficiariFseUnprocessableResponse,
   Beneficiario,
   BeneficiarioAccessoEmporioSearchResult,
   BeneficiarioDettaglio,
   BeneficiarioDirectory,
+  BeneficiarioFseDetail,
+  BeneficiarioFseProfile,
+  BeneficiarioFseUpdate,
   BeneficiarioInput,
   BeneficiarioSimile,
   BeneficiarioStatoInput,
@@ -301,6 +316,7 @@ import type {
   MovimentoSummary,
   NucleoFamiliare,
   NucleoFamiliareInput,
+  NucleoFamiliareUpdate,
   Permission,
   PoliticaCreditoSolidale,
   PoliticaCreditoSolidaleInput,
@@ -7524,6 +7540,437 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getBulkBeneficiariMutationOptions(options));
     }
 
+export const getPreviewBeneficiariFseUrl = () => {
+
+
+
+
+  return `/api/beneficiari/fse/preview`
+}
+
+/**
+ * Richiede beneficiari.fse.import. Il Centro è verificato server-side e l'Area è sempre derivata dal Centro.
+ * @summary Valida e classifica un workbook FSE+ senza scrivere dati di dominio
+ */
+export const previewBeneficiariFse = async (beneficiariFsePreviewInput: BeneficiariFsePreviewInput, options?: RequestInit): Promise<BeneficiariFsePreviewResult> => {
+
+  return customFetch<BeneficiariFsePreviewResult>(getPreviewBeneficiariFseUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      beneficiariFsePreviewInput,)
+  }
+);}
+
+
+
+
+export const getPreviewBeneficiariFseMutationOptions = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBeneficiariFse>>, TError,{data: BodyType<BeneficiariFsePreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewBeneficiariFse>>, TError,{data: BodyType<BeneficiariFsePreviewInput>}, TContext> => {
+
+const mutationKey = ['previewBeneficiariFse'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewBeneficiariFse>>, {data: BodyType<BeneficiariFsePreviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewBeneficiariFse(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewBeneficiariFseMutationResult = NonNullable<Awaited<ReturnType<typeof previewBeneficiariFse>>>
+    export type PreviewBeneficiariFseMutationBody = BodyType<BeneficiariFsePreviewInput>
+    export type PreviewBeneficiariFseMutationError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>
+
+    /**
+ * @summary Valida e classifica un workbook FSE+ senza scrivere dati di dominio
+ */
+export const usePreviewBeneficiariFse = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBeneficiariFse>>, TError,{data: BodyType<BeneficiariFsePreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewBeneficiariFse>>,
+        TError,
+        {data: BodyType<BeneficiariFsePreviewInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewBeneficiariFseMutationOptions(options));
+    }
+
+export const getImportBeneficiariFseUrl = () => {
+
+
+
+
+  return `/api/beneficiari/fse/import`
+}
+
+/**
+ * Richiede beneficiari.fse.import. Ogni fascicolo è atomico; Area e scope sono risolti server-side.
+ * @summary Conferma un import FSE+ già analizzato
+ */
+export const importBeneficiariFse = async (beneficiariFseImportInput: BeneficiariFseImportInput, options?: RequestInit): Promise<BeneficiariFseImportResult> => {
+
+  return customFetch<BeneficiariFseImportResult>(getImportBeneficiariFseUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      beneficiariFseImportInput,)
+  }
+);}
+
+
+
+
+export const getImportBeneficiariFseMutationOptions = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseImportInput>}, TContext> => {
+
+const mutationKey = ['importBeneficiariFse'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importBeneficiariFse>>, {data: BodyType<BeneficiariFseImportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importBeneficiariFse(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportBeneficiariFseMutationResult = NonNullable<Awaited<ReturnType<typeof importBeneficiariFse>>>
+    export type ImportBeneficiariFseMutationBody = BodyType<BeneficiariFseImportInput>
+    export type ImportBeneficiariFseMutationError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>
+
+    /**
+ * @summary Conferma un import FSE+ già analizzato
+ */
+export const useImportBeneficiariFse = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importBeneficiariFse>>,
+        TError,
+        {data: BodyType<BeneficiariFseImportInput>},
+        TContext
+      > => {
+      return useMutation(getImportBeneficiariFseMutationOptions(options));
+    }
+
+export const getPreflightBeneficiariFseExportUrl = () => {
+
+
+
+
+  return `/api/beneficiari/fse/export/preflight`
+}
+
+/**
+ * Richiede beneficiari.fse.export. Non esclude silenziosamente record non esportabili.
+ * @summary Verifica tutti i beneficiari candidati prima dell'export
+ */
+export const preflightBeneficiariFseExport = async (beneficiariFseExportInput: BeneficiariFseExportInput, options?: RequestInit): Promise<BeneficiariFseExportPreflight> => {
+
+  return customFetch<BeneficiariFseExportPreflight>(getPreflightBeneficiariFseExportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      beneficiariFseExportInput,)
+  }
+);}
+
+
+
+
+export const getPreflightBeneficiariFseExportMutationOptions = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightBeneficiariFseExport>>, TError,{data: BodyType<BeneficiariFseExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof preflightBeneficiariFseExport>>, TError,{data: BodyType<BeneficiariFseExportInput>}, TContext> => {
+
+const mutationKey = ['preflightBeneficiariFseExport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof preflightBeneficiariFseExport>>, {data: BodyType<BeneficiariFseExportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  preflightBeneficiariFseExport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreflightBeneficiariFseExportMutationResult = NonNullable<Awaited<ReturnType<typeof preflightBeneficiariFseExport>>>
+    export type PreflightBeneficiariFseExportMutationBody = BodyType<BeneficiariFseExportInput>
+    export type PreflightBeneficiariFseExportMutationError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>
+
+    /**
+ * @summary Verifica tutti i beneficiari candidati prima dell'export
+ */
+export const usePreflightBeneficiariFseExport = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightBeneficiariFseExport>>, TError,{data: BodyType<BeneficiariFseExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof preflightBeneficiariFseExport>>,
+        TError,
+        {data: BodyType<BeneficiariFseExportInput>},
+        TContext
+      > => {
+      return useMutation(getPreflightBeneficiariFseExportMutationOptions(options));
+    }
+
+export const getExportBeneficiariFseUrl = () => {
+
+
+
+
+  return `/api/beneficiari/fse/export`
+}
+
+/**
+ * Richiede beneficiari.fse.export. L'export è bloccato se il preflight contiene errori.
+ * @summary Genera il workbook FSE+ canonico
+ */
+export const exportBeneficiariFse = async (beneficiariFseExportInput: BeneficiariFseExportInput, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportBeneficiariFseUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      beneficiariFseExportInput,)
+  }
+);}
+
+
+
+
+export const getExportBeneficiariFseMutationOptions = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse | BeneficiariFseUnprocessableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exportBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof exportBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseExportInput>}, TContext> => {
+
+const mutationKey = ['exportBeneficiariFse'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof exportBeneficiariFse>>, {data: BodyType<BeneficiariFseExportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  exportBeneficiariFse(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExportBeneficiariFseMutationResult = NonNullable<Awaited<ReturnType<typeof exportBeneficiariFse>>>
+    export type ExportBeneficiariFseMutationBody = BodyType<BeneficiariFseExportInput>
+    export type ExportBeneficiariFseMutationError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse | BeneficiariFseUnprocessableResponse>
+
+    /**
+ * @summary Genera il workbook FSE+ canonico
+ */
+export const useExportBeneficiariFse = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse | BeneficiariFseUnprocessableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exportBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof exportBeneficiariFse>>,
+        TError,
+        {data: BodyType<BeneficiariFseExportInput>},
+        TContext
+      > => {
+      return useMutation(getExportBeneficiariFseMutationOptions(options));
+    }
+
+export const getGetBeneficiarioFseUrl = (id: number,) => {
+
+
+
+
+  return `/api/beneficiari/${id}/fse`
+}
+
+/**
+ * Richiede beneficiari.fse.view e applica scope Area, Centro e Zona UDS.
+ */
+export const getBeneficiarioFse = async (id: number, options?: RequestInit): Promise<BeneficiarioFseDetail> => {
+
+  return customFetch<BeneficiarioFseDetail>(getGetBeneficiarioFseUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBeneficiarioFseQueryKey = (id: number,) => {
+    return [
+    `/api/beneficiari/${id}/fse`
+    ] as const;
+    }
+
+
+export const getGetBeneficiarioFseQueryOptions = <TData = Awaited<ReturnType<typeof getBeneficiarioFse>>, TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse | BeneficiariFseNotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBeneficiarioFse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBeneficiarioFseQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBeneficiarioFse>>> = ({ signal }) => getBeneficiarioFse(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBeneficiarioFse>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBeneficiarioFseQueryResult = NonNullable<Awaited<ReturnType<typeof getBeneficiarioFse>>>
+export type GetBeneficiarioFseQueryError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse | BeneficiariFseNotFoundResponse>
+
+
+
+export function useGetBeneficiarioFse<TData = Awaited<ReturnType<typeof getBeneficiarioFse>>, TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse | BeneficiariFseNotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBeneficiarioFse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBeneficiarioFseQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateBeneficiarioFseUrl = (id: number,) => {
+
+
+
+
+  return `/api/beneficiari/${id}/fse`
+}
+
+/**
+ * Richiede beneficiari.fse.manage e applica scope Area, Centro e Zona UDS.
+ */
+export const updateBeneficiarioFse = async (id: number,
+    beneficiarioFseUpdate: BeneficiarioFseUpdate, options?: RequestInit): Promise<BeneficiarioFseProfile> => {
+
+  return customFetch<BeneficiarioFseProfile>(getUpdateBeneficiarioFseUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      beneficiarioFseUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateBeneficiarioFseMutationOptions = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse | BeneficiariFseNotFoundResponse | BeneficiariFseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBeneficiarioFse>>, TError,{id: number;data: BodyType<BeneficiarioFseUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBeneficiarioFse>>, TError,{id: number;data: BodyType<BeneficiarioFseUpdate>}, TContext> => {
+
+const mutationKey = ['updateBeneficiarioFse'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBeneficiarioFse>>, {id: number;data: BodyType<BeneficiarioFseUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateBeneficiarioFse(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBeneficiarioFseMutationResult = NonNullable<Awaited<ReturnType<typeof updateBeneficiarioFse>>>
+    export type UpdateBeneficiarioFseMutationBody = BodyType<BeneficiarioFseUpdate>
+    export type UpdateBeneficiarioFseMutationError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse | BeneficiariFseNotFoundResponse | BeneficiariFseConflictResponse>
+
+    export const useUpdateBeneficiarioFse = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse | BeneficiariFseNotFoundResponse | BeneficiariFseConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBeneficiarioFse>>, TError,{id: number;data: BodyType<BeneficiarioFseUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBeneficiarioFse>>,
+        TError,
+        {id: number;data: BodyType<BeneficiarioFseUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateBeneficiarioFseMutationOptions(options));
+    }
+
 export const getGetBeneficiarioUrl = (id: number,) => {
 
 
@@ -7876,6 +8323,9 @@ export const getGetNucleoFamiliareUrl = (id: number,) => {
   return `/api/beneficiari/${id}/nucleo`
 }
 
+/**
+ * Richiede beneficiari.sensitive.view e applica scope Area, Centro e Zona UDS.
+ */
 export const getNucleoFamiliare = async (id: number, options?: RequestInit): Promise<NucleoFamiliare[]> => {
 
   return customFetch<NucleoFamiliare[]>(getGetNucleoFamiliareUrl(id),
@@ -7947,6 +8397,9 @@ export const getAddNucleoFamiliareUrl = (id: number,) => {
   return `/api/beneficiari/${id}/nucleo`
 }
 
+/**
+ * Richiede beneficiari.manage e beneficiari.sensitive.view; data di nascita e sesso sono obbligatori.
+ */
 export const addNucleoFamiliare = async (id: number,
     nucleoFamiliareInput: NucleoFamiliareInput, options?: RequestInit): Promise<NucleoFamiliare> => {
 
@@ -8014,9 +8467,12 @@ export const getUpdateNucleoFamiliareUrl = (id: number,
   return `/api/beneficiari/${id}/nucleo/${membroId}`
 }
 
+/**
+ * Richiede beneficiari.manage e beneficiari.sensitive.view; verifica appartenenza e scope territoriale.
+ */
 export const updateNucleoFamiliare = async (id: number,
     membroId: number,
-    nucleoFamiliareInput: NucleoFamiliareInput, options?: RequestInit): Promise<NucleoFamiliare> => {
+    nucleoFamiliareUpdate: NucleoFamiliareUpdate, options?: RequestInit): Promise<NucleoFamiliare> => {
 
   return customFetch<NucleoFamiliare>(getUpdateNucleoFamiliareUrl(id,membroId),
   {
@@ -8024,7 +8480,7 @@ export const updateNucleoFamiliare = async (id: number,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      nucleoFamiliareInput,)
+      nucleoFamiliareUpdate,)
   }
 );}
 
@@ -8032,8 +8488,8 @@ export const updateNucleoFamiliare = async (id: number,
 
 
 export const getUpdateNucleoFamiliareMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateNucleoFamiliare>>, TError,{id: number;membroId: number;data: BodyType<NucleoFamiliareInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateNucleoFamiliare>>, TError,{id: number;membroId: number;data: BodyType<NucleoFamiliareInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateNucleoFamiliare>>, TError,{id: number;membroId: number;data: BodyType<NucleoFamiliareUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateNucleoFamiliare>>, TError,{id: number;membroId: number;data: BodyType<NucleoFamiliareUpdate>}, TContext> => {
 
 const mutationKey = ['updateNucleoFamiliare'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -8045,7 +8501,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateNucleoFamiliare>>, {id: number;membroId: number;data: BodyType<NucleoFamiliareInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateNucleoFamiliare>>, {id: number;membroId: number;data: BodyType<NucleoFamiliareUpdate>}> = (props) => {
           const {id,membroId,data} = props ?? {};
 
           return  updateNucleoFamiliare(id,membroId,data,requestOptions)
@@ -8059,15 +8515,15 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type UpdateNucleoFamiliareMutationResult = NonNullable<Awaited<ReturnType<typeof updateNucleoFamiliare>>>
-    export type UpdateNucleoFamiliareMutationBody = BodyType<NucleoFamiliareInput>
+    export type UpdateNucleoFamiliareMutationBody = BodyType<NucleoFamiliareUpdate>
     export type UpdateNucleoFamiliareMutationError = ErrorType<unknown>
 
     export const useUpdateNucleoFamiliare = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateNucleoFamiliare>>, TError,{id: number;membroId: number;data: BodyType<NucleoFamiliareInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateNucleoFamiliare>>, TError,{id: number;membroId: number;data: BodyType<NucleoFamiliareUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateNucleoFamiliare>>,
         TError,
-        {id: number;membroId: number;data: BodyType<NucleoFamiliareInput>},
+        {id: number;membroId: number;data: BodyType<NucleoFamiliareUpdate>},
         TContext
       > => {
       return useMutation(getUpdateNucleoFamiliareMutationOptions(options));

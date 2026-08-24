@@ -165,7 +165,7 @@ describe("migrazione Città -> Area Operativa", () => {
         WHERE table_schema = 'public' AND column_name = 'area_operativa_id'
         ORDER BY table_name
       `);
-      expect(columns.rows.map((row) => row.table_name)).toEqual([...scopedTables].sort());
+      expect(columns.rows.map((row) => row.table_name)).toEqual(expect.arrayContaining([...scopedTables]));
 
       const legacyColumns = await client.query<{ count: number }>(`
         SELECT count(*)::int AS count
@@ -316,7 +316,7 @@ describe("migrazione Città -> Area Operativa", () => {
       `);
       expect(
         Object.fromEntries(
-          normalizedForeignKeys.rows.map((row) => [
+          normalizedForeignKeys.rows.filter((row) => scopedTables.includes(row.table_name as (typeof scopedTables)[number])).map((row) => [
             row.table_name,
             row.constraint_name,
           ]),

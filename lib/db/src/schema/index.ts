@@ -6,6 +6,7 @@ export * from "./movimenti";
 export * from "./inventoryAccounting";
 export * from "./ageaImports";
 export * from "./fseReporting";
+export * from "./fseFascicoliSociali";
 export * from "./carichiMagazzino";
 export * from "./operazioniDistribuzioneMagazzino";
 export * from "./volontari";
