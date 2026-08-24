@@ -58,6 +58,24 @@ describe("migrazione Beneficiari 2.0 FSE+", () => {
       expect(columns.get("centro_ascolto_id")).toBe("NO");
       expect(columns.get("area_operativa_id")).toBe("NO");
 
+      const profileColumns = await client.query<{ column_name: string; is_nullable: string }>(`
+        SELECT column_name, is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'fse_fascicoli_sociali'
+          AND column_name IN (
+            'origine_straniera_minoranze',
+            'cittadini_paesi_terzi',
+            'senza_tetto_esclusione_abitativa'
+          )
+      `);
+      const nullableProfileColumns = new Map(
+        profileColumns.rows.map((row) => [row.column_name, row.is_nullable]),
+      );
+      expect(nullableProfileColumns.get("origine_straniera_minoranze")).toBe("YES");
+      expect(nullableProfileColumns.get("cittadini_paesi_terzi")).toBe("YES");
+      expect(nullableProfileColumns.get("senza_tetto_esclusione_abitativa")).toBe("YES");
+
       const constraints = await client.query<{ conname: string; contype: string; validated: boolean }>(`
         SELECT conname, contype, convalidated AS validated
         FROM pg_constraint

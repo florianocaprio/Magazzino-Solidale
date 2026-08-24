@@ -2419,13 +2419,13 @@ paths:
     post:
       operationId: previewBeneficiariFse
       tags: [beneficiari]
-      summary: Valida e classifica un workbook FSE+ senza scrivere dati di dominio
-      description: Richiede beneficiari.fse.import. Il Centro è verificato server-side e l'Area è sempre derivata dal Centro.
+      summary: Valida e classifica il workbook FSE+ reale senza scrivere dati di dominio
+      description: Richiede beneficiari.fse.import. Il server calcola SHA-256, apre il workbook e valida foglio e colonne; il Centro è verificato server-side e l'Area è sempre derivata dal Centro.
       requestBody:
         required: true
         content:
-          application/json:
-            schema: { $ref: "#/components/schemas/BeneficiariFsePreviewInput" }
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/BeneficiariFseWorkbookUpload" }
       responses:
         "200":
           description: Preview e classificazione righe
@@ -2435,18 +2435,19 @@ paths:
         "400": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
         "401": { $ref: "#/components/responses/BeneficiariFseUnauthorized" }
         "403": { $ref: "#/components/responses/BeneficiariFseForbidden" }
+        "415": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
 
   /beneficiari/fse/import:
     post:
       operationId: importBeneficiariFse
       tags: [beneficiari]
-      summary: Conferma un import FSE+ già analizzato
-      description: Richiede beneficiari.fse.import. Ogni fascicolo è atomico; Area e scope sono risolti server-side.
+      summary: Conferma un import FSE+ rivalidando il workbook reale
+      description: Richiede beneficiari.fse.import. Il server ricalcola SHA-256 e rivalida il workbook; ogni fascicolo è atomico e Area/scope sono risolti server-side.
       requestBody:
         required: true
         content:
-          application/json:
-            schema: { $ref: "#/components/schemas/BeneficiariFseImportInput" }
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/BeneficiariFseWorkbookImportUpload" }
       responses:
         "200":
           description: Esito batch
@@ -2456,6 +2457,7 @@ paths:
         "400": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
         "401": { $ref: "#/components/responses/BeneficiariFseUnauthorized" }
         "403": { $ref: "#/components/responses/BeneficiariFseForbidden" }
+        "415": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
 
   /beneficiari/fse/export/preflight:
     post:
@@ -8228,22 +8230,16 @@ components:
           "Cittadini di Paesi Terzi",
           "Senzatetto o colpiti da esclusione abitativa",
         ]
-    BeneficiariFsePreviewInput:
+    BeneficiariFseWorkbookUpload:
       type: object
       additionalProperties: false
       properties:
         centroAscoltoId: { type: integer, minimum: 1 }
-        nomeFile: { type: string, maxLength: 255 }
-        sha256File: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
-        headers:
-          type: array
-          items: { type: string }
-        righe:
-          type: array
-          minItems: 1
-          maxItems: 500
-          items: { $ref: "#/components/schemas/BeneficiariFseRowInput" }
-      required: [centroAscoltoId, headers, righe]
+        file:
+          type: string
+          format: binary
+          description: Workbook XLSX reale; non viene conservato dal server.
+      required: [centroAscoltoId, file]
     BeneficiariFseImportResolution:
       type: object
       additionalProperties: false
@@ -8252,25 +8248,19 @@ components:
         azione: { type: string, enum: [crea, collega] }
         beneficiarioId: { type: integer, minimum: 1 }
       required: [numeroRiga, azione]
-    BeneficiariFseImportInput:
+    BeneficiariFseWorkbookImportUpload:
       type: object
       additionalProperties: false
       properties:
         centroAscoltoId: { type: integer, minimum: 1 }
-        nomeFile: { type: string, maxLength: 255 }
-        sha256File: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
-        headers:
-          type: array
-          items: { type: string }
-        righe:
-          type: array
-          minItems: 1
-          maxItems: 500
-          items: { $ref: "#/components/schemas/BeneficiariFseRowInput" }
+        file:
+          type: string
+          format: binary
+          description: Lo stesso workbook XLSX reale viene rivalidato dal server.
         risoluzioni:
-          type: array
-          items: { $ref: "#/components/schemas/BeneficiariFseImportResolution" }
-      required: [centroAscoltoId, nomeFile, sha256File, headers, righe]
+          type: string
+          description: Array JSON di BeneficiariFseImportResolution.
+      required: [centroAscoltoId, file]
     BeneficiariFseDuplicateCandidate:
       type: object
       properties:
@@ -8359,9 +8349,9 @@ components:
       minProperties: 1
       properties:
         codiceFascicolo: { type: string, minLength: 1, maxLength: 255 }
-        origineStranieraMinoranze: { type: integer, minimum: 0 }
-        cittadiniPaesiTerzi: { type: integer, minimum: 0 }
-        senzaTettoEsclusioneAbitativa: { type: integer, minimum: 0 }
+        origineStranieraMinoranze: { type: [integer, "null"], minimum: 0 }
+        cittadiniPaesiTerzi: { type: [integer, "null"], minimum: 0 }
+        senzaTettoEsclusioneAbitativa: { type: [integer, "null"], minimum: 0 }
     BeneficiarioFseSnapshot:
       type: object
       properties:
@@ -8410,9 +8400,9 @@ components:
         eta1829Importata: { type: [integer, "null"] }
         eta3064Importata: { type: [integer, "null"] }
         eta65PlusImportata: { type: [integer, "null"] }
-        origineStranieraMinoranze: { type: integer }
-        cittadiniPaesiTerzi: { type: integer }
-        senzaTettoEsclusioneAbitativa: { type: integer }
+        origineStranieraMinoranze: { type: [integer, "null"] }
+        cittadiniPaesiTerzi: { type: [integer, "null"] }
+        senzaTettoEsclusioneAbitativa: { type: [integer, "null"] }
         tipologiaAttivitaImportata: { type: [string, "null"] }
         statoAttualeImportato: { type: [string, "null"] }
         ultimoImportBatchId: { type: [integer, "null"] }

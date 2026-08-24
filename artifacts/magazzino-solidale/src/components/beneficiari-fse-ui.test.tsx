@@ -124,6 +124,18 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       dettagli: [{ numeroRiga: 3, codiceFascicolo: "FSE-BAD", esito: "errore", errori: ["DATO_NON_VALIDO"] }],
     });
     mocks.updateProfile.mockResolvedValue({});
+    mocks.preflight.mockResolvedValue({
+      centroAscoltoId: 7,
+      areaOperativaId: 3,
+      dataRiferimento: "2026-08-24",
+      candidati: 1,
+      esportabili: 1,
+      bloccati: [],
+      warning: [],
+    });
+    mocks.exportRows.mockResolvedValue(new Blob(["xlsx"], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }));
   });
 
   afterEach(async () => {
@@ -167,11 +179,17 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       await Promise.resolve();
     });
     expect(mocks.preview).toHaveBeenCalled();
+    expect(mocks.preview).toHaveBeenCalledWith({
+      data: { centroAscoltoId: 7, file },
+    });
     expect(document.body.textContent).toContain("Le righe non valide saranno escluse");
     const confirm = button("Conferma importazione") as HTMLButtonElement;
     expect(confirm.disabled).toBe(false);
     await act(async () => { confirm.click(); await Promise.resolve(); });
     expect(mocks.importRows).toHaveBeenCalled();
+    expect(mocks.importRows).toHaveBeenCalledWith({
+      data: { centroAscoltoId: 7, file, risoluzioni: "[]" },
+    });
     expect(onImported).toHaveBeenCalledOnce();
     expect(document.body.textContent).toContain("Risultato import · batch 11");
   });
@@ -197,5 +215,162 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
       data: expect.objectContaining({ codiceFascicolo: "FSE-CARD-EDIT" }),
     }));
     expect(mocks.invalidateQueries).toHaveBeenCalled();
+  });
+
+  it("distingue i valori FSE non valorizzati dallo zero e salva il profilo senza codice", async () => {
+    mocks.profileData = {
+      ...(mocks.profileData ?? {}),
+      profilo: {
+        ...((mocks.profileData?.profilo as Record<string, unknown>) ?? {}),
+        codiceFascicolo: null,
+        origineStranieraMinoranze: null,
+        cittadiniPaesiTerzi: 0,
+        senzaTettoEsclusioneAbitativa: null,
+      },
+    };
+    await act(async () => root.render(<BeneficiarioFseCard beneficiarioId={42} canManage />));
+    expect(document.body.textContent).toContain("Non ancora assegnato");
+    expect(document.body.textContent).toContain("Origine/minoranze: Non valorizzato");
+    expect(document.body.textContent).toContain("Paesi terzi: 0");
+    expect(document.body.textContent).toContain("Esclusione abitativa: Non valorizzato");
+
+    await act(async () => button("Modifica")?.click());
+    const code = document.querySelector<HTMLInputElement>("#fse-code")!;
+    const unknown = document.querySelector<HTMLInputElement>("#fse-origineStranieraMinoranze")!;
+    const explicitZero = document.querySelector<HTMLInputElement>("#fse-cittadiniPaesiTerzi")!;
+    expect(code.value).toBe("");
+    expect(unknown.value).toBe("");
+    expect(explicitZero.value).toBe("0");
+    await act(async () => { button("Salva")?.click(); await Promise.resolve(); });
+    expect(mocks.updateProfile).toHaveBeenCalledWith({
+      id: 42,
+      data: {
+        origineStranieraMinoranze: null,
+        cittadiniPaesiTerzi: 0,
+        senzaTettoEsclusioneAbitativa: null,
+      },
+    });
+  });
+
+  it("blocca il download al preflight e scarica l'XLSX soltanto quando esportabile", async () => {
+    const createObjectURL = vi.fn().mockReturnValue("blob:fse-export");
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectURL });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    mocks.preflight
+      .mockResolvedValueOnce({
+        centroAscoltoId: 7,
+        areaOperativaId: 3,
+        dataRiferimento: "2026-08-24",
+        candidati: 1,
+        esportabili: 0,
+        bloccati: [{
+          beneficiarioId: 42,
+          codice: "BEN-42",
+          errori: ["CITTADINI_PAESI_TERZI_NON_VALORIZZATO"],
+          warning: [],
+        }],
+        warning: [],
+      })
+      .mockResolvedValueOnce({
+        centroAscoltoId: 7,
+        areaOperativaId: 3,
+        dataRiferimento: "2026-08-24",
+        candidati: 1,
+        esportabili: 1,
+        bloccati: [],
+        warning: [],
+      });
+
+    const onImported = vi.fn();
+    await act(async () => root.render(<FseBeneficiariActions
+      centri={[{ id: 7, nome: "Centro UI", areaOperativaId: 3, areaOperativaNome: "Area UI" }]}
+      lockedCentroId={7}
+      canImport={false}
+      canExport
+      onImported={onImported}
+    />));
+    await act(async () => button("Esporta FSE+")?.click());
+    await act(async () => { button("Esegui preflight")?.click(); await Promise.resolve(); });
+    expect(document.body.textContent).toContain("CITTADINI_PAESI_TERZI_NON_VALORIZZATO");
+    expect((button("Scarica Excel") as HTMLButtonElement).disabled).toBe(true);
+
+    await act(async () => button("Annulla")?.click());
+    await act(async () => button("Esporta FSE+")?.click());
+    await act(async () => { button("Esegui preflight")?.click(); await Promise.resolve(); });
+    expect((button("Scarica Excel") as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => { button("Scarica Excel")?.click(); await Promise.resolve(); });
+    expect(mocks.exportRows).toHaveBeenCalledWith({
+      data: expect.objectContaining({ centroAscoltoId: 7, soloAttivi: true }),
+    });
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(click).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:fse-export");
+    expect(onImported).toHaveBeenCalledOnce();
+  });
+
+  it("richiede una scelta collega o crea e mantiene bloccante il conflitto", async () => {
+    mocks.preview.mockResolvedValueOnce({
+      centroAscoltoId: 7,
+      areaOperativaId: 3,
+      areaOperativaDerivata: true,
+      warningHeader: [],
+      numeroRighe: 1,
+      conteggi: { possibile_duplicato: 1 },
+      righe: [{
+        numeroRiga: 2,
+        codiceFascicolo: "FSE-DUP",
+        classificazione: "possibile_duplicato",
+        errori: [],
+        warning: ["Possibile duplicato"],
+        duplicati: [{ id: 9, codice: "BEN-9" }],
+      }],
+    });
+    await act(async () => root.render(<FseBeneficiariActions
+      centri={[{ id: 7, nome: "Centro UI", areaOperativaId: 3, areaOperativaNome: "Area UI" }]}
+      lockedCentroId={7}
+      canImport
+      canExport={false}
+      onImported={vi.fn()}
+    />));
+    await act(async () => button("Importa FSE+")?.click());
+    const input = document.querySelector<HTMLInputElement>('input[aria-label="File FSE+"]')!;
+    const bytes = workbookBytes();
+    const file = new File([bytes], "duplicato.xlsx");
+    Object.defineProperty(file, "arrayBuffer", { value: vi.fn().mockResolvedValue(bytes) });
+    Object.defineProperty(input, "files", { configurable: true, value: [file] });
+    await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); await Promise.resolve(); await Promise.resolve(); });
+    expect((button("Conferma importazione") as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => button("Collega a BEN-9")?.click());
+    expect((button("Conferma importazione") as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => button("Crea nuovo")?.click());
+    await act(async () => { button("Conferma importazione")?.click(); await Promise.resolve(); });
+    expect(mocks.importRows).toHaveBeenCalledWith({
+      data: {
+        centroAscoltoId: 7,
+        file,
+        risoluzioni: JSON.stringify([{ numeroRiga: 2, azione: "crea" }]),
+      },
+    });
+
+    await act(async () => button("Chiudi")?.click());
+    mocks.preview.mockResolvedValueOnce({
+      centroAscoltoId: 7,
+      areaOperativaId: 3,
+      areaOperativaDerivata: true,
+      warningHeader: [],
+      numeroRighe: 1,
+      conteggi: { conflitto: 1 },
+      righe: [{ numeroRiga: 2, codiceFascicolo: "FSE-CONFLICT", classificazione: "conflitto", errori: ["Codice associato altrove"], warning: [] }],
+    });
+    await act(async () => button("Importa FSE+")?.click());
+    const conflictInput = document.querySelector<HTMLInputElement>('input[aria-label="File FSE+"]')!;
+    const conflictFile = new File([bytes], "conflitto.xlsx");
+    Object.defineProperty(conflictFile, "arrayBuffer", { value: vi.fn().mockResolvedValue(bytes) });
+    Object.defineProperty(conflictInput, "files", { configurable: true, value: [conflictFile] });
+    await act(async () => { conflictInput.dispatchEvent(new Event("change", { bubbles: true })); await Promise.resolve(); await Promise.resolve(); });
+    expect(document.body.textContent).toContain("Codice associato altrove");
+    expect((button("Conferma importazione") as HTMLButtonElement).disabled).toBe(true);
   });
 });

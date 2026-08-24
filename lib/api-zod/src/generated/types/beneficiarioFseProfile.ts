@@ -29,9 +29,12 @@ export interface BeneficiarioFseProfile {
   eta3064Importata?: number | null;
   /** @nullable */
   eta65PlusImportata?: number | null;
-  origineStranieraMinoranze: number;
-  cittadiniPaesiTerzi: number;
-  senzaTettoEsclusioneAbitativa: number;
+  /** @nullable */
+  origineStranieraMinoranze: number | null;
+  /** @nullable */
+  cittadiniPaesiTerzi: number | null;
+  /** @nullable */
+  senzaTettoEsclusioneAbitativa: number | null;
   /** @nullable */
   tipologiaAttivitaImportata?: string | null;
   /** @nullable */

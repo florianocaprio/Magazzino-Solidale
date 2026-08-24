@@ -12,10 +12,19 @@ export interface BeneficiarioFseUpdate {
      * @maxLength 255
      */
   codiceFascicolo?: string;
-  /** @minimum 0 */
-  origineStranieraMinoranze?: number;
-  /** @minimum 0 */
-  cittadiniPaesiTerzi?: number;
-  /** @minimum 0 */
-  senzaTettoEsclusioneAbitativa?: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  origineStranieraMinoranze?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  cittadiniPaesiTerzi?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  senzaTettoEsclusioneAbitativa?: number | null;
 }

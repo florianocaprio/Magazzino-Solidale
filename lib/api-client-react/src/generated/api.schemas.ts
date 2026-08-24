@@ -26,19 +26,11 @@ export interface BeneficiariFseRowInput {
   [key: string]: unknown;
  }
 
-export interface BeneficiariFsePreviewInput {
+export interface BeneficiariFseWorkbookUpload {
   /** @minimum 1 */
   centroAscoltoId: number;
-  /** @maxLength 255 */
-  nomeFile?: string;
-  /** @pattern ^[0-9a-fA-F]{64}$ */
-  sha256File?: string;
-  headers: string[];
-  /**
-     * @minItems 1
-     * @maxItems 500
-     */
-  righe: BeneficiariFseRowInput[];
+  /** Workbook XLSX reale; non viene conservato dal server. */
+  file: Blob;
 }
 
 export type BeneficiariFseImportResolutionAzione = typeof BeneficiariFseImportResolutionAzione[keyof typeof BeneficiariFseImportResolutionAzione];
@@ -57,20 +49,13 @@ export interface BeneficiariFseImportResolution {
   beneficiarioId?: number;
 }
 
-export interface BeneficiariFseImportInput {
+export interface BeneficiariFseWorkbookImportUpload {
   /** @minimum 1 */
   centroAscoltoId: number;
-  /** @maxLength 255 */
-  nomeFile: string;
-  /** @pattern ^[0-9a-fA-F]{64}$ */
-  sha256File: string;
-  headers: string[];
-  /**
-     * @minItems 1
-     * @maxItems 500
-     */
-  righe: BeneficiariFseRowInput[];
-  risoluzioni?: BeneficiariFseImportResolution[];
+  /** Lo stesso workbook XLSX reale viene rivalidato dal server. */
+  file: Blob;
+  /** Array JSON di BeneficiariFseImportResolution. */
+  risoluzioni?: string;
 }
 
 export interface BeneficiariFseDuplicateCandidate {
@@ -187,12 +172,21 @@ export interface BeneficiarioFseUpdate {
      * @maxLength 255
      */
   codiceFascicolo?: string;
-  /** @minimum 0 */
-  origineStranieraMinoranze?: number;
-  /** @minimum 0 */
-  cittadiniPaesiTerzi?: number;
-  /** @minimum 0 */
-  senzaTettoEsclusioneAbitativa?: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  origineStranieraMinoranze?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  cittadiniPaesiTerzi?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  senzaTettoEsclusioneAbitativa?: number | null;
 }
 
 export interface BeneficiarioFseSnapshot {
@@ -269,9 +263,12 @@ export interface BeneficiarioFseProfile {
   eta3064Importata?: number | null;
   /** @nullable */
   eta65PlusImportata?: number | null;
-  origineStranieraMinoranze: number;
-  cittadiniPaesiTerzi: number;
-  senzaTettoEsclusioneAbitativa: number;
+  /** @nullable */
+  origineStranieraMinoranze: number | null;
+  /** @nullable */
+  cittadiniPaesiTerzi: number | null;
+  /** @nullable */
+  senzaTettoEsclusioneAbitativa: number | null;
   /** @nullable */
   tipologiaAttivitaImportata?: string | null;
   /** @nullable */

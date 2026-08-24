@@ -5,12 +5,11 @@ import {
   useImportBeneficiariFse,
   usePreflightBeneficiariFseExport,
   usePreviewBeneficiariFse,
-  type BeneficiariFseImportInput,
   type BeneficiariFseImportResolution,
   type BeneficiariFseImportResult,
   type BeneficiariFsePreviewResult,
-  type BeneficiariFseRowInput,
   type BeneficiariFseExportPreflight,
+  type BeneficiariFseWorkbookUpload,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,10 +41,7 @@ type Centro = {
   attivo?: boolean;
 };
 
-type FilePayload = BeneficiariFseImportInput & {
-  nomeFile: string;
-  sha256File: string;
-};
+type FilePayload = BeneficiariFseWorkbookUpload & { file: File };
 
 export const FSE_BENEFICIARI_HEADERS_UI = [
   "Nome Referente fascicolo",
@@ -121,33 +117,22 @@ export function FseBeneficiariActions({
   const readFile = async (file?: File) => {
     if (!file || !centroId) return;
     try {
-      if (!/\.(xlsx|xls)$/i.test(file.name)) throw new Error("Seleziona un file .xlsx o .xls.");
+      if (!/\.xlsx$/i.test(file.name)) throw new Error("Seleziona un file .xlsx.");
       const bytes = await file.arrayBuffer();
-      const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
-        .map((value) => value.toString(16).padStart(2, "0"))
-        .join("");
       const workbook = XLSX.read(bytes, { type: "array", cellDates: false });
       if (workbook.SheetNames.length !== 1 || workbook.SheetNames[0] !== "Table1") {
         throw new Error("Il workbook deve contenere un solo foglio denominato Table1.");
       }
       const worksheet = workbook.Sheets.Table1;
       if (!worksheet) throw new Error("Workbook privo del foglio Table1.");
-      const matrix = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+      XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
         header: 1,
-        raw: true,
-        defval: null,
-      });
-      const headers = (matrix[0] ?? []).map((value) => String(value ?? ""));
-      const righe = XLSX.utils.sheet_to_json<BeneficiariFseRowInput>(worksheet, {
         raw: true,
         defval: null,
       });
       const payload: FilePayload = {
         centroAscoltoId: Number(centroId),
-        nomeFile: file.name,
-        sha256File: hash,
-        headers,
-        righe,
+        file,
       };
       setFilePayload(payload);
       setImportResult(null);
@@ -168,7 +153,10 @@ export function FseBeneficiariActions({
     if (!filePayload) return;
     try {
       const result = await importMutation.mutateAsync({
-        data: { ...filePayload, risoluzioni: Object.values(resolutions) },
+        data: {
+          ...filePayload,
+          risoluzioni: JSON.stringify(Object.values(resolutions)),
+        },
       });
       setImportResult(result);
       onImported();
@@ -286,7 +274,7 @@ export function FseBeneficiariActions({
           {mode === "import" && !importResult && (
             <Input
               type="file"
-              accept=".xlsx,.xls"
+              accept=".xlsx"
               aria-label="File FSE+"
               disabled={!centroId || busy}
               onChange={(event) => void readFile(event.target.files?.[0])}

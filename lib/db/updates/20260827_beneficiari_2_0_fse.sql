@@ -44,9 +44,9 @@ CREATE TABLE IF NOT EXISTS public.fse_fascicoli_sociali (
   eta_18_29_importata integer,
   eta_30_64_importata integer,
   eta_65_plus_importata integer,
-  origine_straniera_minoranze integer NOT NULL DEFAULT 0,
-  cittadini_paesi_terzi integer NOT NULL DEFAULT 0,
-  senza_tetto_esclusione_abitativa integer NOT NULL DEFAULT 0,
+  origine_straniera_minoranze integer,
+  cittadini_paesi_terzi integer,
+  senza_tetto_esclusione_abitativa integer,
   tipologia_attivita_importata varchar(80),
   stato_attuale_importato varchar(80),
   ultimo_import_batch_id integer REFERENCES public.fse_import_batches(id) ON DELETE SET NULL,
@@ -69,8 +69,9 @@ CREATE TABLE IF NOT EXISTS public.fse_fascicoli_sociali (
     )
   ),
   CONSTRAINT fse_fascicoli_sociali_specific_counts_check CHECK (
-    origine_straniera_minoranze >= 0 AND cittadini_paesi_terzi >= 0
-    AND senza_tetto_esclusione_abitativa >= 0
+    (origine_straniera_minoranze IS NULL OR origine_straniera_minoranze >= 0)
+    AND (cittadini_paesi_terzi IS NULL OR cittadini_paesi_terzi >= 0)
+    AND (senza_tetto_esclusione_abitativa IS NULL OR senza_tetto_esclusione_abitativa >= 0)
   )
 );
 CREATE UNIQUE INDEX IF NOT EXISTS fse_fascicoli_sociali_beneficiario_uidx ON public.fse_fascicoli_sociali (beneficiario_id);

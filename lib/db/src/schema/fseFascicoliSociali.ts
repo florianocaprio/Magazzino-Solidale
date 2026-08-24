@@ -44,9 +44,9 @@ export const fseFascicoliSocialiTable = pgTable("fse_fascicoli_sociali", {
   eta1829Importata: integer("eta_18_29_importata"),
   eta3064Importata: integer("eta_30_64_importata"),
   eta65PlusImportata: integer("eta_65_plus_importata"),
-  origineStranieraMinoranze: integer("origine_straniera_minoranze").notNull().default(0),
-  cittadiniPaesiTerzi: integer("cittadini_paesi_terzi").notNull().default(0),
-  senzaTettoEsclusioneAbitativa: integer("senza_tetto_esclusione_abitativa").notNull().default(0),
+  origineStranieraMinoranze: integer("origine_straniera_minoranze"),
+  cittadiniPaesiTerzi: integer("cittadini_paesi_terzi"),
+  senzaTettoEsclusioneAbitativa: integer("senza_tetto_esclusione_abitativa"),
   tipologiaAttivitaImportata: varchar("tipologia_attivita_importata", { length: 80 }),
   statoAttualeImportato: varchar("stato_attuale_importato", { length: 80 }),
   ultimoImportBatchId: integer("ultimo_import_batch_id").references(() => fseImportBatchesTable.id, { onDelete: "set null" }),
@@ -68,7 +68,7 @@ export const fseFascicoliSocialiTable = pgTable("fse_fascicoli_sociali", {
     and ${table.donneImportate} + ${table.uominiImportati} = ${table.numeroComponentiImportato}
     and ${table.eta017Importata} + ${table.eta1829Importata} + ${table.eta3064Importata} + ${table.eta65PlusImportata} = ${table.numeroComponentiImportato}
   )`),
-  check("fse_fascicoli_sociali_specific_counts_check", sql`${table.origineStranieraMinoranze} >= 0 and ${table.cittadiniPaesiTerzi} >= 0 and ${table.senzaTettoEsclusioneAbitativa} >= 0`),
+  check("fse_fascicoli_sociali_specific_counts_check", sql`(${table.origineStranieraMinoranze} is null or ${table.origineStranieraMinoranze} >= 0) and (${table.cittadiniPaesiTerzi} is null or ${table.cittadiniPaesiTerzi} >= 0) and (${table.senzaTettoEsclusioneAbitativa} is null or ${table.senzaTettoEsclusioneAbitativa} >= 0)`),
 ]);
 
 export type FseFascicoloSociale = typeof fseFascicoliSocialiTable.$inferSelect;

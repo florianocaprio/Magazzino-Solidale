@@ -42,6 +42,14 @@ function errorMessage(error: unknown): string {
     (error instanceof Error ? error.message : "Aggiornamento FSE+ non riuscito.");
 }
 
+function formatFseCount(value: number | null | undefined): string {
+  return value == null ? "Non valorizzato" : String(value);
+}
+
+function fseCountInput(value: number | null | undefined): string {
+  return value == null ? "" : String(value);
+}
+
 export function BeneficiarioFseCard({
   beneficiarioId,
   canManage,
@@ -65,9 +73,9 @@ export function BeneficiarioFseCard({
     if (!data?.profilo) return;
     setForm({
       codiceFascicolo: data.profilo.codiceFascicolo ?? "",
-      origineStranieraMinoranze: String(data.profilo.origineStranieraMinoranze),
-      cittadiniPaesiTerzi: String(data.profilo.cittadiniPaesiTerzi),
-      senzaTettoEsclusioneAbitativa: String(data.profilo.senzaTettoEsclusioneAbitativa),
+      origineStranieraMinoranze: fseCountInput(data.profilo.origineStranieraMinoranze),
+      cittadiniPaesiTerzi: fseCountInput(data.profilo.cittadiniPaesiTerzi),
+      senzaTettoEsclusioneAbitativa: fseCountInput(data.profilo.senzaTettoEsclusioneAbitativa),
     });
   }, [data]);
 
@@ -83,11 +91,12 @@ export function BeneficiarioFseCard({
   const profile = data.profilo;
   const detailComplete = data.demografia.dettaglioCompleto;
   const save = async () => {
+    const nullableCount = (value: string) => value.trim() === "" ? null : Number(value);
     const payload: BeneficiarioFseUpdate = {
-      codiceFascicolo: form.codiceFascicolo.trim(),
-      origineStranieraMinoranze: Number(form.origineStranieraMinoranze),
-      cittadiniPaesiTerzi: Number(form.cittadiniPaesiTerzi),
-      senzaTettoEsclusioneAbitativa: Number(form.senzaTettoEsclusioneAbitativa),
+      ...(form.codiceFascicolo.trim() ? { codiceFascicolo: form.codiceFascicolo.trim() } : {}),
+      origineStranieraMinoranze: nullableCount(form.origineStranieraMinoranze),
+      cittadiniPaesiTerzi: nullableCount(form.cittadiniPaesiTerzi),
+      senzaTettoEsclusioneAbitativa: nullableCount(form.senzaTettoEsclusioneAbitativa),
     };
     try {
       await update.mutateAsync({ id: beneficiarioId, data: payload });
@@ -148,9 +157,9 @@ export function BeneficiarioFseCard({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div>Origine/minoranze: <strong>{profile?.origineStranieraMinoranze ?? 0}</strong></div>
-          <div>Paesi terzi: <strong>{profile?.cittadiniPaesiTerzi ?? 0}</strong></div>
-          <div>Esclusione abitativa: <strong>{profile?.senzaTettoEsclusioneAbitativa ?? 0}</strong></div>
+          <div>Origine/minoranze: <strong>{formatFseCount(profile?.origineStranieraMinoranze)}</strong></div>
+          <div>Paesi terzi: <strong>{formatFseCount(profile?.cittadiniPaesiTerzi)}</strong></div>
+          <div>Esclusione abitativa: <strong>{formatFseCount(profile?.senzaTettoEsclusioneAbitativa)}</strong></div>
           <div>Disabili: <strong>{data.disabili}</strong></div>
         </div>
 
@@ -206,13 +215,14 @@ export function BeneficiarioFseCard({
           ] as const).map(([key, label]) => (
             <div key={key}><Label htmlFor={`fse-${key}`}>{label}</Label>
               <Input id={`fse-${key}`} type="number" min={0} max={data.componentiDichiarati}
+                placeholder="Non valorizzato"
                 value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} />
             </div>
           ))}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setEditing(false)}>Annulla</Button>
-          <Button onClick={() => void save()} disabled={update.isPending || !form.codiceFascicolo.trim()}>
+          <Button onClick={() => void save()} disabled={update.isPending}>
             Salva
           </Button>
         </DialogFooter>

@@ -70,13 +70,13 @@ import type {
   BeneficiariFseExportInput,
   BeneficiariFseExportPreflight,
   BeneficiariFseForbiddenResponse,
-  BeneficiariFseImportInput,
   BeneficiariFseImportResult,
   BeneficiariFseNotFoundResponse,
-  BeneficiariFsePreviewInput,
   BeneficiariFsePreviewResult,
   BeneficiariFseUnauthorizedResponse,
   BeneficiariFseUnprocessableResponse,
+  BeneficiariFseWorkbookImportUpload,
+  BeneficiariFseWorkbookUpload,
   Beneficiario,
   BeneficiarioAccessoEmporioSearchResult,
   BeneficiarioDettaglio,
@@ -7549,18 +7549,21 @@ export const getPreviewBeneficiariFseUrl = () => {
 }
 
 /**
- * Richiede beneficiari.fse.import. Il Centro è verificato server-side e l'Area è sempre derivata dal Centro.
- * @summary Valida e classifica un workbook FSE+ senza scrivere dati di dominio
+ * Richiede beneficiari.fse.import. Il server calcola SHA-256, apre il workbook e valida foglio e colonne; il Centro è verificato server-side e l'Area è sempre derivata dal Centro.
+ * @summary Valida e classifica il workbook FSE+ reale senza scrivere dati di dominio
  */
-export const previewBeneficiariFse = async (beneficiariFsePreviewInput: BeneficiariFsePreviewInput, options?: RequestInit): Promise<BeneficiariFsePreviewResult> => {
+export const previewBeneficiariFse = async (beneficiariFseWorkbookUpload: BeneficiariFseWorkbookUpload, options?: RequestInit): Promise<BeneficiariFsePreviewResult> => {
+    const formData = new FormData();
+formData.append(`centroAscoltoId`, beneficiariFseWorkbookUpload.centroAscoltoId.toString())
+formData.append(`file`, beneficiariFseWorkbookUpload.file);
 
   return customFetch<BeneficiariFsePreviewResult>(getPreviewBeneficiariFseUrl(),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      beneficiariFsePreviewInput,)
+    method: 'POST'
+    ,
+    body:
+      formData,
   }
 );}
 
@@ -7568,8 +7571,8 @@ export const previewBeneficiariFse = async (beneficiariFsePreviewInput: Benefici
 
 
 export const getPreviewBeneficiariFseMutationOptions = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBeneficiariFse>>, TError,{data: BodyType<BeneficiariFsePreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof previewBeneficiariFse>>, TError,{data: BodyType<BeneficiariFsePreviewInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseWorkbookUpload>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseWorkbookUpload>}, TContext> => {
 
 const mutationKey = ['previewBeneficiariFse'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -7581,7 +7584,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewBeneficiariFse>>, {data: BodyType<BeneficiariFsePreviewInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewBeneficiariFse>>, {data: BodyType<BeneficiariFseWorkbookUpload>}> = (props) => {
           const {data} = props ?? {};
 
           return  previewBeneficiariFse(data,requestOptions)
@@ -7595,18 +7598,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PreviewBeneficiariFseMutationResult = NonNullable<Awaited<ReturnType<typeof previewBeneficiariFse>>>
-    export type PreviewBeneficiariFseMutationBody = BodyType<BeneficiariFsePreviewInput>
+    export type PreviewBeneficiariFseMutationBody = BodyType<BeneficiariFseWorkbookUpload>
     export type PreviewBeneficiariFseMutationError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>
 
     /**
- * @summary Valida e classifica un workbook FSE+ senza scrivere dati di dominio
+ * @summary Valida e classifica il workbook FSE+ reale senza scrivere dati di dominio
  */
 export const usePreviewBeneficiariFse = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBeneficiariFse>>, TError,{data: BodyType<BeneficiariFsePreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseWorkbookUpload>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof previewBeneficiariFse>>,
         TError,
-        {data: BodyType<BeneficiariFsePreviewInput>},
+        {data: BodyType<BeneficiariFseWorkbookUpload>},
         TContext
       > => {
       return useMutation(getPreviewBeneficiariFseMutationOptions(options));
@@ -7621,18 +7624,24 @@ export const getImportBeneficiariFseUrl = () => {
 }
 
 /**
- * Richiede beneficiari.fse.import. Ogni fascicolo è atomico; Area e scope sono risolti server-side.
- * @summary Conferma un import FSE+ già analizzato
+ * Richiede beneficiari.fse.import. Il server ricalcola SHA-256 e rivalida il workbook; ogni fascicolo è atomico e Area/scope sono risolti server-side.
+ * @summary Conferma un import FSE+ rivalidando il workbook reale
  */
-export const importBeneficiariFse = async (beneficiariFseImportInput: BeneficiariFseImportInput, options?: RequestInit): Promise<BeneficiariFseImportResult> => {
+export const importBeneficiariFse = async (beneficiariFseWorkbookImportUpload: BeneficiariFseWorkbookImportUpload, options?: RequestInit): Promise<BeneficiariFseImportResult> => {
+    const formData = new FormData();
+formData.append(`centroAscoltoId`, beneficiariFseWorkbookImportUpload.centroAscoltoId.toString())
+formData.append(`file`, beneficiariFseWorkbookImportUpload.file);
+if(beneficiariFseWorkbookImportUpload.risoluzioni !== undefined) {
+ formData.append(`risoluzioni`, beneficiariFseWorkbookImportUpload.risoluzioni);
+ }
 
   return customFetch<BeneficiariFseImportResult>(getImportBeneficiariFseUrl(),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      beneficiariFseImportInput,)
+    method: 'POST'
+    ,
+    body:
+      formData,
   }
 );}
 
@@ -7640,8 +7649,8 @@ export const importBeneficiariFse = async (beneficiariFseImportInput: Beneficiar
 
 
 export const getImportBeneficiariFseMutationOptions = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof importBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseImportInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseWorkbookImportUpload>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseWorkbookImportUpload>}, TContext> => {
 
 const mutationKey = ['importBeneficiariFse'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -7653,7 +7662,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importBeneficiariFse>>, {data: BodyType<BeneficiariFseImportInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importBeneficiariFse>>, {data: BodyType<BeneficiariFseWorkbookImportUpload>}> = (props) => {
           const {data} = props ?? {};
 
           return  importBeneficiariFse(data,requestOptions)
@@ -7667,18 +7676,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ImportBeneficiariFseMutationResult = NonNullable<Awaited<ReturnType<typeof importBeneficiariFse>>>
-    export type ImportBeneficiariFseMutationBody = BodyType<BeneficiariFseImportInput>
+    export type ImportBeneficiariFseMutationBody = BodyType<BeneficiariFseWorkbookImportUpload>
     export type ImportBeneficiariFseMutationError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>
 
     /**
- * @summary Conferma un import FSE+ già analizzato
+ * @summary Conferma un import FSE+ rivalidando il workbook reale
  */
 export const useImportBeneficiariFse = <TError = ErrorType<BeneficiariFseBadRequestResponse | BeneficiariFseUnauthorizedResponse | BeneficiariFseForbiddenResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importBeneficiariFse>>, TError,{data: BodyType<BeneficiariFseWorkbookImportUpload>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof importBeneficiariFse>>,
         TError,
-        {data: BodyType<BeneficiariFseImportInput>},
+        {data: BodyType<BeneficiariFseWorkbookImportUpload>},
         TContext
       > => {
       return useMutation(getImportBeneficiariFseMutationOptions(options));

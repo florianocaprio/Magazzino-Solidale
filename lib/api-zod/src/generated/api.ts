@@ -3500,41 +3500,15 @@ export const BulkBeneficiariResponse = zod.object({
 
 
 /**
- * Richiede beneficiari.fse.import. Il Centro è verificato server-side e l'Area è sempre derivata dal Centro.
- * @summary Valida e classifica un workbook FSE+ senza scrivere dati di dominio
+ * Richiede beneficiari.fse.import. Il server calcola SHA-256, apre il workbook e valida foglio e colonne; il Centro è verificato server-side e l'Area è sempre derivata dal Centro.
+ * @summary Valida e classifica il workbook FSE+ reale senza scrivere dati di dominio
  */
-
-export const previewBeneficiariFseBodyNomeFileMax = 255;
-
-export const previewBeneficiariFseBodySha256FileRegExp = new RegExp('^[0-9a-fA-F]{64}$');
-export const previewBeneficiariFseBodyRigheMax = 500;
 
 
 
 export const PreviewBeneficiariFseBody = zod.object({
   "centroAscoltoId": zod.number().min(1),
-  "nomeFile": zod.string().max(previewBeneficiariFseBodyNomeFileMax).optional(),
-  "sha256File": zod.string().regex(previewBeneficiariFseBodySha256FileRegExp).optional(),
-  "headers": zod.array(zod.string()),
-  "righe": zod.array(zod.object({
-  "Nome Referente fascicolo": zod.string(),
-  "Cognome Referente fascicolo": zod.string(),
-  "Codice fascicolo": zod.string(),
-  "Data di presa in carico": zod.union([zod.string(),zod.number()]),
-  "Numero componenti fascicolo": zod.union([zod.string(),zod.number()]),
-  "Tipologia di Attività": zod.string(),
-  "Stato attuale": zod.string(),
-  "Donne": zod.union([zod.string(),zod.number()]),
-  "Uomini": zod.union([zod.string(),zod.number()]),
-  "Età<18": zod.union([zod.string(),zod.number()]),
-  "Età 18-29": zod.union([zod.string(),zod.number()]),
-  "Età 30-64": zod.union([zod.string(),zod.number()]),
-  "Età>=65": zod.union([zod.string(),zod.number()]),
-  "Origine straniera e minoranze": zod.union([zod.string(),zod.number()]),
-  "Disabili": zod.union([zod.string(),zod.number()]),
-  "Cittadini di Paesi Terzi": zod.union([zod.string(),zod.number()]),
-  "Senzatetto o colpiti da esclusione abitativa": zod.union([zod.string(),zod.number()])
-})).min(1).max(previewBeneficiariFseBodyRigheMax)
+  "file": zod.custom<Uint8Array>((value) => value instanceof Uint8Array).describe('Workbook XLSX reale; non viene conservato dal server.')
 })
 
 export const PreviewBeneficiariFseResponse = zod.object({
@@ -3561,49 +3535,16 @@ export const PreviewBeneficiariFseResponse = zod.object({
 
 
 /**
- * Richiede beneficiari.fse.import. Ogni fascicolo è atomico; Area e scope sono risolti server-side.
- * @summary Conferma un import FSE+ già analizzato
+ * Richiede beneficiari.fse.import. Il server ricalcola SHA-256 e rivalida il workbook; ogni fascicolo è atomico e Area/scope sono risolti server-side.
+ * @summary Conferma un import FSE+ rivalidando il workbook reale
  */
-
-export const importBeneficiariFseBodyNomeFileMax = 255;
-
-export const importBeneficiariFseBodySha256FileRegExp = new RegExp('^[0-9a-fA-F]{64}$');
-export const importBeneficiariFseBodyRigheMax = 500;
-
-export const importBeneficiariFseBodyRisoluzioniItemNumeroRigaMin = 2;
-
 
 
 
 export const ImportBeneficiariFseBody = zod.object({
   "centroAscoltoId": zod.number().min(1),
-  "nomeFile": zod.string().max(importBeneficiariFseBodyNomeFileMax),
-  "sha256File": zod.string().regex(importBeneficiariFseBodySha256FileRegExp),
-  "headers": zod.array(zod.string()),
-  "righe": zod.array(zod.object({
-  "Nome Referente fascicolo": zod.string(),
-  "Cognome Referente fascicolo": zod.string(),
-  "Codice fascicolo": zod.string(),
-  "Data di presa in carico": zod.union([zod.string(),zod.number()]),
-  "Numero componenti fascicolo": zod.union([zod.string(),zod.number()]),
-  "Tipologia di Attività": zod.string(),
-  "Stato attuale": zod.string(),
-  "Donne": zod.union([zod.string(),zod.number()]),
-  "Uomini": zod.union([zod.string(),zod.number()]),
-  "Età<18": zod.union([zod.string(),zod.number()]),
-  "Età 18-29": zod.union([zod.string(),zod.number()]),
-  "Età 30-64": zod.union([zod.string(),zod.number()]),
-  "Età>=65": zod.union([zod.string(),zod.number()]),
-  "Origine straniera e minoranze": zod.union([zod.string(),zod.number()]),
-  "Disabili": zod.union([zod.string(),zod.number()]),
-  "Cittadini di Paesi Terzi": zod.union([zod.string(),zod.number()]),
-  "Senzatetto o colpiti da esclusione abitativa": zod.union([zod.string(),zod.number()])
-})).min(1).max(importBeneficiariFseBodyRigheMax),
-  "risoluzioni": zod.array(zod.object({
-  "numeroRiga": zod.number().min(importBeneficiariFseBodyRisoluzioniItemNumeroRigaMin),
-  "azione": zod.enum(['crea', 'collega']),
-  "beneficiarioId": zod.number().min(1).optional()
-})).optional()
+  "file": zod.custom<Uint8Array>((value) => value instanceof Uint8Array).describe('Lo stesso workbook XLSX reale viene rivalidato dal server.'),
+  "risoluzioni": zod.string().optional().describe('Array JSON di BeneficiariFseImportResolution.')
 })
 
 export const ImportBeneficiariFseResponse = zod.object({
@@ -3697,9 +3638,9 @@ export const GetBeneficiarioFseResponse = zod.object({
   "eta1829Importata": zod.number().nullish(),
   "eta3064Importata": zod.number().nullish(),
   "eta65PlusImportata": zod.number().nullish(),
-  "origineStranieraMinoranze": zod.number(),
-  "cittadiniPaesiTerzi": zod.number(),
-  "senzaTettoEsclusioneAbitativa": zod.number(),
+  "origineStranieraMinoranze": zod.number().nullable(),
+  "cittadiniPaesiTerzi": zod.number().nullable(),
+  "senzaTettoEsclusioneAbitativa": zod.number().nullable(),
   "tipologiaAttivitaImportata": zod.string().nullish(),
   "statoAttualeImportato": zod.string().nullish(),
   "ultimoImportBatchId": zod.number().nullish(),
@@ -3767,9 +3708,9 @@ export const updateBeneficiarioFseBodySenzaTettoEsclusioneAbitativaMin = 0;
 
 export const UpdateBeneficiarioFseBody = zod.object({
   "codiceFascicolo": zod.string().min(1).max(updateBeneficiarioFseBodyCodiceFascicoloMax).optional(),
-  "origineStranieraMinoranze": zod.number().min(updateBeneficiarioFseBodyOrigineStranieraMinoranzeMin).optional(),
-  "cittadiniPaesiTerzi": zod.number().min(updateBeneficiarioFseBodyCittadiniPaesiTerziMin).optional(),
-  "senzaTettoEsclusioneAbitativa": zod.number().min(updateBeneficiarioFseBodySenzaTettoEsclusioneAbitativaMin).optional()
+  "origineStranieraMinoranze": zod.number().min(updateBeneficiarioFseBodyOrigineStranieraMinoranzeMin).nullish(),
+  "cittadiniPaesiTerzi": zod.number().min(updateBeneficiarioFseBodyCittadiniPaesiTerziMin).nullish(),
+  "senzaTettoEsclusioneAbitativa": zod.number().min(updateBeneficiarioFseBodySenzaTettoEsclusioneAbitativaMin).nullish()
 })
 
 export const UpdateBeneficiarioFseResponse = zod.object({
@@ -3785,9 +3726,9 @@ export const UpdateBeneficiarioFseResponse = zod.object({
   "eta1829Importata": zod.number().nullish(),
   "eta3064Importata": zod.number().nullish(),
   "eta65PlusImportata": zod.number().nullish(),
-  "origineStranieraMinoranze": zod.number(),
-  "cittadiniPaesiTerzi": zod.number(),
-  "senzaTettoEsclusioneAbitativa": zod.number(),
+  "origineStranieraMinoranze": zod.number().nullable(),
+  "cittadiniPaesiTerzi": zod.number().nullable(),
+  "senzaTettoEsclusioneAbitativa": zod.number().nullable(),
   "tipologiaAttivitaImportata": zod.string().nullish(),
   "statoAttualeImportato": zod.string().nullish(),
   "ultimoImportBatchId": zod.number().nullish(),
