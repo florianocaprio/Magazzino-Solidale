@@ -64,13 +64,21 @@ export function BeneficiarioFseCard({
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     codiceFascicolo: "",
-    origineStranieraMinoranze: "0",
-    cittadiniPaesiTerzi: "0",
-    senzaTettoEsclusioneAbitativa: "0",
+    origineStranieraMinoranze: "",
+    cittadiniPaesiTerzi: "",
+    senzaTettoEsclusioneAbitativa: "",
   });
 
   useEffect(() => {
-    if (!data?.profilo) return;
+    if (!data?.profilo) {
+      setForm({
+        codiceFascicolo: "",
+        origineStranieraMinoranze: "",
+        cittadiniPaesiTerzi: "",
+        senzaTettoEsclusioneAbitativa: "",
+      });
+      return;
+    }
     setForm({
       codiceFascicolo: data.profilo.codiceFascicolo ?? "",
       origineStranieraMinoranze: fseCountInput(data.profilo.origineStranieraMinoranze),

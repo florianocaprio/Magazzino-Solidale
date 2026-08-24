@@ -252,6 +252,36 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     });
   });
 
+  it("mantiene null i valori FSE di un beneficiario ancora privo di profilo", async () => {
+    mocks.profileData = {
+      ...(mocks.profileData ?? {}),
+      profilo: null,
+      snapshot: null,
+    };
+    await act(async () => root.render(<BeneficiarioFseCard beneficiarioId={42} canManage />));
+    expect(document.body.textContent).toContain("Non ancora assegnato");
+    expect(document.body.textContent).toContain("Origine/minoranze: Non valorizzato");
+    expect(document.body.textContent).toContain("Paesi terzi: Non valorizzato");
+    expect(document.body.textContent).toContain("Esclusione abitativa: Non valorizzato");
+
+    await act(async () => button("Modifica")?.click());
+    expect(document.querySelector<HTMLInputElement>("#fse-code")?.value).toBe("");
+    expect(document.querySelector<HTMLInputElement>("#fse-origineStranieraMinoranze")?.value).toBe("");
+    expect(document.querySelector<HTMLInputElement>("#fse-cittadiniPaesiTerzi")?.value).toBe("");
+    expect(document.querySelector<HTMLInputElement>("#fse-senzaTettoEsclusioneAbitativa")?.value).toBe("");
+
+    await act(async () => { button("Salva")?.click(); await Promise.resolve(); });
+    expect(mocks.updateProfile).toHaveBeenCalledWith({
+      id: 42,
+      data: {
+        origineStranieraMinoranze: null,
+        cittadiniPaesiTerzi: null,
+        senzaTettoEsclusioneAbitativa: null,
+      },
+    });
+    expect(JSON.stringify(mocks.updateProfile.mock.calls)).not.toContain(":0");
+  });
+
   it("blocca il download al preflight e scarica l'XLSX soltanto quando esportabile", async () => {
     const createObjectURL = vi.fn().mockReturnValue("blob:fse-export");
     const revokeObjectURL = vi.fn();
