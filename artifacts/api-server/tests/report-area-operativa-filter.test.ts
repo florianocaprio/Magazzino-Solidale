@@ -226,7 +226,7 @@ describe("Report — filtro ?areaOperativaId (admin globale)", () => {
         entitaOrigineTipo: "BOLLA",
         entitaOrigineId: bolA,
         areaOperativaIdSnapshot: areaOperativaA,
-        centroAscoltoIdSnapshot: centro,
+        centroAscoltoIdSnapshot: null,
         territorioClassificazione: "attribuito",
         creatoDa: operatoreId,
       })
@@ -273,7 +273,7 @@ describe("Report — filtro ?areaOperativaId (admin globale)", () => {
         entitaOrigineTipo: "BOLLA",
         entitaOrigineId: bolB,
         areaOperativaIdSnapshot: areaOperativaB,
-        centroAscoltoIdSnapshot: centro,
+        centroAscoltoIdSnapshot: null,
         territorioClassificazione: "attribuito",
         creatoDa: operatoreId,
       })

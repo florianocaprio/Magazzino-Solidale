@@ -21,7 +21,10 @@ import {
   markDistributionOperationReversed,
 } from "./distributionLedger";
 import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
-import { beneficiaryReportingSnapshotTx } from "./reporting/eventSnapshots";
+import {
+  beneficiaryReportingSnapshotTx,
+  isReportingSnapshotConcurrencyError,
+} from "./reporting/eventSnapshots";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 const PRENOTAZIONE_CONVERTITA = "convertita_in_scarico";
@@ -38,6 +41,12 @@ export class BollaActionError extends Error {
 }
 
 export function handleBollaActionError(err: unknown, res: Response): boolean {
+  if (isReportingSnapshotConcurrencyError(err)) {
+    res.status(409).json({
+      error: "Finalizzazione concorrente: ricarica i dati e riprova",
+    });
+    return true;
+  }
   if (err instanceof BollaActionError) {
     res.status(err.status).json({ error: err.message });
     return true;
@@ -442,15 +451,15 @@ export async function completeBollaDelivery(opts: {
 
   await db.transaction(async (tx) => {
     const current = await lockBolla(tx, opts.bollaId);
-    await requireOperationalMagazzino(tx, current.magazzinoId);
 
     if (current.stato === "consegnato") {
+      await requireOperationalMagazzino(tx, current.magazzinoId);
       if (!opts.allowAlreadyConsegnata) {
         throw new BollaActionError(400, "La bolla risulta già consegnata");
       }
       alreadyConsegnata = true;
-      await syncInterventoBollaTx(tx, opts.bollaId);
       await syncConsegnaDaBollaTx(tx, current);
+      await syncInterventoBollaTx(tx, opts.bollaId);
       return;
     }
 
@@ -461,10 +470,54 @@ export async function completeBollaDelivery(opts: {
       );
     }
 
-    const convertite = await convertiPrenotazioniAttiveInScarico(tx, current, {
-      dataMovimento,
-      operatoreId: opts.userId,
-    });
+    const reportingSnapshot = await beneficiaryReportingSnapshotTx(
+      tx,
+      current.beneficiarioId,
+    );
+    let areaOperativaIdSnapshot = current.areaOperativaIdSnapshot;
+    let centroAscoltoIdSnapshot = current.centroAscoltoIdSnapshot;
+    if (areaOperativaIdSnapshot == null && centroAscoltoIdSnapshot == null) {
+      areaOperativaIdSnapshot = reportingSnapshot.areaOperativaIdSnapshot;
+      centroAscoltoIdSnapshot = reportingSnapshot.centroAscoltoIdSnapshot;
+    } else if (
+      areaOperativaIdSnapshot != null &&
+      centroAscoltoIdSnapshot == null &&
+      reportingSnapshot.areaOperativaIdSnapshot === areaOperativaIdSnapshot
+    ) {
+      centroAscoltoIdSnapshot = reportingSnapshot.centroAscoltoIdSnapshot;
+    } else if (
+      areaOperativaIdSnapshot == null &&
+      centroAscoltoIdSnapshot != null &&
+      reportingSnapshot.centroAscoltoIdSnapshot === centroAscoltoIdSnapshot
+    ) {
+      areaOperativaIdSnapshot = reportingSnapshot.areaOperativaIdSnapshot;
+    }
+    const effectiveReportingSnapshot = {
+      areaOperativaIdSnapshot,
+      centroAscoltoIdSnapshot,
+      numeroComponentiNucleoSnapshot:
+        current.numeroComponentiNucleoSnapshot ??
+        reportingSnapshot.numeroComponentiNucleoSnapshot,
+    };
+    const [snapshotted] = await tx
+      .update(bolleTable)
+      .set(effectiveReportingSnapshot)
+      .where(eq(bolleTable.id, opts.bollaId))
+      .returning();
+    const effectiveBolla = snapshotted ?? {
+      ...current,
+      ...effectiveReportingSnapshot,
+    };
+
+    await requireOperationalMagazzino(tx, effectiveBolla.magazzinoId);
+    const convertite = await convertiPrenotazioniAttiveInScarico(
+      tx,
+      effectiveBolla,
+      {
+        dataMovimento,
+        operatoreId: opts.userId,
+      },
+    );
     if (convertite === 0) {
       const scarichiLegacy = await scarichiFisiciBolla(tx, opts.bollaId);
       if (scarichiLegacy === 0) {
@@ -475,11 +528,6 @@ export async function completeBollaDelivery(opts: {
       }
     }
 
-    const reportingSnapshot = await beneficiaryReportingSnapshotTx(
-      tx,
-      current.beneficiarioId,
-    );
-
     const [updated] = await tx
       .update(bolleTable)
       .set({
@@ -487,24 +535,20 @@ export async function completeBollaDelivery(opts: {
         confermaRicezione: opts.confermaRicezione ?? true,
         noteRicezione: opts.noteRicezione ?? null,
         operatoreId: opts.userId,
-        areaOperativaIdSnapshot:
-          current.areaOperativaIdSnapshot ??
-          reportingSnapshot.areaOperativaIdSnapshot,
-        centroAscoltoIdSnapshot:
-          current.centroAscoltoIdSnapshot ??
-          reportingSnapshot.centroAscoltoIdSnapshot,
-        numeroComponentiNucleoSnapshot:
-          current.numeroComponentiNucleoSnapshot ??
-          reportingSnapshot.numeroComponentiNucleoSnapshot,
+        ...effectiveReportingSnapshot,
       })
       .where(eq(bolleTable.id, opts.bollaId))
       .returning();
 
-    await syncInterventoBollaTx(tx, opts.bollaId);
     await syncConsegnaDaBollaTx(
       tx,
-      updated ?? { ...current, stato: "consegnato", operatoreId: opts.userId },
+      updated ?? {
+        ...effectiveBolla,
+        stato: "consegnato",
+        operatoreId: opts.userId,
+      },
     );
+    await syncInterventoBollaTx(tx, opts.bollaId);
   });
 
   return { alreadyConsegnata };

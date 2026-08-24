@@ -4,7 +4,9 @@ import express, { type Express } from "express";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  areeOperativeTable,
   beneficiariTable,
+  centriAscoltoTable,
   db,
   lottiTable,
   magazziniTable,
@@ -30,6 +32,8 @@ let magazzinoId: number;
 let prodottoId: number;
 let lottoId: number;
 let beneficiarioId: number;
+let areaOperativaId: number;
+let centroAscoltoId: number;
 let originalScarichiAttivo = true;
 const suffix = `${process.pid}${Date.now().toString(36)}`;
 
@@ -48,11 +52,24 @@ beforeAll(async () => {
       cognome: "Distribuzione",
     })
     .returning({ id: utentiTable.id });
+  [{ id: areaOperativaId }] = await db
+    .insert(areeOperativeTable)
+    .values({ nome: `Area scarico ${suffix}` })
+    .returning({ id: areeOperativeTable.id });
+  [{ id: centroAscoltoId }] = await db
+    .insert(centriAscoltoTable)
+    .values({
+      nome: `Centro scarico ${suffix}`,
+      areaOperativaId,
+    })
+    .returning({ id: centriAscoltoTable.id });
   [{ id: magazzinoId }] = await db
     .insert(magazziniTable)
     .values({
       codice: `S20A-${suffix}`.slice(0, 20),
       nome: `Magazzino ${suffix}`,
+      areaOperativaId,
+      centroAscoltoId,
     })
     .returning({ id: magazziniTable.id });
   [{ id: prodottoId }] = await db
@@ -83,6 +100,8 @@ beforeAll(async () => {
       nome: "Beneficiario",
       cognome: "Test",
       sesso: "X",
+      areaOperativaId,
+      centroAscoltoId,
     })
     .returning({ id: beneficiariTable.id });
 
@@ -129,6 +148,12 @@ afterAll(async () => {
   await db
     .delete(beneficiariTable)
     .where(eq(beneficiariTable.id, beneficiarioId));
+  await db
+    .delete(centriAscoltoTable)
+    .where(eq(centriAscoltoTable.id, centroAscoltoId));
+  await db
+    .delete(areeOperativeTable)
+    .where(eq(areeOperativeTable.id, areaOperativaId));
   await db.delete(utentiTable).where(eq(utentiTable.id, userId));
   await updateModuloAmbiente("SCARICHI", originalScarichiAttivo, null);
   await pool.end();
@@ -160,6 +185,9 @@ describe("scarico manuale beneficiario 2.0A", () => {
       dominioOrigine: "MAGAZZINO",
       entitaOrigineTipo: "scarico_manual_beneficiario",
       numeroPacchi: 1,
+      areaOperativaIdSnapshot: areaOperativaId,
+      centroAscoltoIdSnapshot: centroAscoltoId,
+      territorioClassificazione: "attribuito",
     });
 
     const movements = await db

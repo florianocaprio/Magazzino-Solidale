@@ -48,18 +48,34 @@ export async function emporioMetrics(filters: ReportFilters) {
              COUNT(DISTINCT se.beneficiario_id) AS utenti,
              COALESCE(SUM(se.totale_credito_consumati::numeric), 0) AS credito,
              COALESCE(AVG(se.totale_credito_consumati::numeric), 0) AS credito_medio,
-             COALESCE((SELECT COUNT(DISTINCT ser.prodotto_id)
-               FROM spese_emporio_righe ser
-               JOIN spese_emporio se2 ON se2.id = ser.spesa_emporio_id
-               WHERE se2.id IN (SELECT se3.id FROM spese_emporio se3 WHERE se3.stato_spesa = 'chiusa'
-                 AND se3.data_chiusura::date BETWEEN ${filters.da} AND ${filters.a}
-                 AND ${andSql(
-                   reportScope(filters, {
-                     areaOperativa: sql`se3.area_operativa_id`,
-                     centro: sql`se3.centro_ascolto_id`,
-                     magazzino: sql`se3.magazzino_emporio_id`,
-                   }),
-                 )})) , 0) AS prodotti_distinti
+             COALESCE((
+               WITH movimenti_distribuzione AS (
+                 SELECT ${effectiveBollaRigaId} AS bolla_riga_id,
+                        SUM(${fseNetDistributedQuantity(sql`mv.quantita`)}) AS quantita_totale
+                 FROM movimenti mv
+                 LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+                 WHERE ${effectiveBollaRigaId} IS NOT NULL
+                   AND ${fseDistributionNatureCondition}
+                 GROUP BY ${effectiveBollaRigaId}
+               )
+               SELECT COUNT(*) FROM (
+                 SELECT ser.prodotto_id
+                 FROM spese_emporio se3
+                 JOIN spese_emporio_righe ser ON ser.spesa_emporio_id = se3.id
+                 JOIN movimenti_distribuzione md ON md.bolla_riga_id = ser.bolla_riga_id
+                 WHERE se3.stato_spesa = 'chiusa'
+                   AND se3.data_chiusura::date BETWEEN ${filters.da} AND ${filters.a}
+                   AND ${andSql(
+                     reportScope(filters, {
+                       areaOperativa: sql`se3.area_operativa_id`,
+                       centro: sql`se3.centro_ascolto_id`,
+                       magazzino: sql`se3.magazzino_emporio_id`,
+                     }),
+                   )}
+                 GROUP BY ser.prodotto_id
+                 HAVING SUM(md.quantita_totale) <> 0
+               ) prodotti_netti
+             ), 0) AS prodotti_distinti
       FROM spese_emporio se WHERE ${speseWhere}
     `),
     rows<Record<string, unknown>>(sql`
@@ -146,9 +162,11 @@ export async function buildEmporioReport(filters: ReportFilters) {
       FROM spese_emporio se
       JOIN spese_emporio_righe ser ON ser.spesa_emporio_id = se.id
       JOIN prodotti p ON p.id = ser.prodotto_id
-      LEFT JOIN movimenti_distribuzione md ON md.bolla_riga_id = ser.bolla_riga_id
+      JOIN movimenti_distribuzione md ON md.bolla_riga_id = ser.bolla_riga_id
       WHERE ${where}
-      GROUP BY p.id, p.nome, p.unita_misura ORDER BY quantita DESC, p.nome
+      GROUP BY p.id, p.nome, p.unita_misura
+      HAVING SUM(md.quantita_totale) <> 0
+      ORDER BY quantita DESC, p.nome
     `),
     rows<Record<string, unknown>>(sql`
       SELECT COALESCE(ca.nome, 'Senza centro') AS centro,
@@ -219,7 +237,7 @@ export async function buildEmporioReport(filters: ReportFilters) {
       },
     ],
     quality: [quality("lottoMancante", number(dq.lotto_mancante), number(dq.lotto_mancante) ? "derivable" : "ok", "Senza lotto non è possibile attribuire con certezza la provenienza FSE+."), quality("centroMancante", number(dq.centro_mancante), number(dq.centro_mancante) ? "derivable" : "ok")],
-    definitions: ["Spesa Emporio = record spese_emporio nello stato chiusa.", "Prodotti distinti distribuiti = prodotti diversi presenti nelle sole spese chiuse.", "Utente servito = beneficiario distinto con almeno una spesa chiusa nel periodo.", "La provenienza FSE+ deriva dallo snapshot Fondo dei Movimenti della spesa.", "Le quantità restano separate per prodotto e unità di misura e non vengono sommate tra unità eterogenee."],
+    definitions: ["Spesa Emporio = record spese_emporio nello stato chiusa.", "Prodotti distinti distribuiti = prodotti con quantità netta diversa da zero nel ledger canonico delle spese chiuse.", "Utente servito = beneficiario distinto con almeno una spesa chiusa nel periodo.", "La provenienza FSE+ deriva dallo snapshot Fondo dei Movimenti della spesa.", "Le quantità restano separate per prodotto e unità di misura e non vengono sommate tra unità eterogenee."],
   });
 }
 

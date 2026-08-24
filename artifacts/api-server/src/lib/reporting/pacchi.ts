@@ -96,6 +96,7 @@ export async function buildPacchiReport(filters: ReportFilters) {
       LEFT JOIN consumo_lotti cl ON cl.bolla_riga_id = br.id
       WHERE ${where}
       GROUP BY p.id, p.nome, br.unita_misura
+      HAVING SUM(COALESCE(cl.quantita_totale, 0)) <> 0
       ORDER BY quantita DESC, p.nome
     `),
     rows<Record<string, unknown>>(sql`

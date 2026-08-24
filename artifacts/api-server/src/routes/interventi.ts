@@ -81,7 +81,10 @@ import {
   InventoryError,
 } from "../lib/scaricoInventory";
 import { canAccessUdsInterventoTerritory } from "../lib/udsInterventoPolicy";
-import { beneficiaryReportingSnapshotTx } from "../lib/reporting/eventSnapshots";
+import {
+  beneficiaryReportingSnapshotTx,
+  isReportingSnapshotConcurrencyError,
+} from "../lib/reporting/eventSnapshots";
 import {
   InventoryDecimal,
   InventoryDecimalError,
@@ -943,6 +946,50 @@ function assertExpectedVersion(
   return expected;
 }
 
+async function snapshotInterventoReportingContext(
+  tx: DbTransaction,
+  current: InterventoRow,
+): Promise<InterventoRow> {
+  const beneficiarySnapshot = await beneficiaryReportingSnapshotTx(
+    tx,
+    current.beneficiarioId,
+  );
+  let areaOperativaIdSnapshot = current.areaOperativaIdSnapshot;
+  let centroAscoltoIdSnapshot = current.centroAscoltoIdSnapshot;
+
+  if (areaOperativaIdSnapshot == null && centroAscoltoIdSnapshot == null) {
+    areaOperativaIdSnapshot = beneficiarySnapshot.areaOperativaIdSnapshot;
+    centroAscoltoIdSnapshot = beneficiarySnapshot.centroAscoltoIdSnapshot;
+  } else if (
+    areaOperativaIdSnapshot != null &&
+    centroAscoltoIdSnapshot == null &&
+    beneficiarySnapshot.areaOperativaIdSnapshot === areaOperativaIdSnapshot
+  ) {
+    centroAscoltoIdSnapshot = beneficiarySnapshot.centroAscoltoIdSnapshot;
+  } else if (
+    areaOperativaIdSnapshot == null &&
+    centroAscoltoIdSnapshot != null &&
+    beneficiarySnapshot.centroAscoltoIdSnapshot === centroAscoltoIdSnapshot
+  ) {
+    areaOperativaIdSnapshot = beneficiarySnapshot.areaOperativaIdSnapshot;
+  }
+
+  if (
+    areaOperativaIdSnapshot === current.areaOperativaIdSnapshot &&
+    centroAscoltoIdSnapshot === current.centroAscoltoIdSnapshot
+  ) {
+    return current;
+  }
+  const [snapshotted] = await tx
+    .update(interventiTable)
+    .set({ areaOperativaIdSnapshot, centroAscoltoIdSnapshot })
+    .where(eq(interventiTable.id, current.id))
+    .returning();
+  if (!snapshotted)
+    throw new RouteError(409, "Snapshot concorrente dell'intervento");
+  return snapshotted;
+}
+
 async function replaceOperativita(
   tx: DbTransaction,
   intervento: InterventoRow,
@@ -1065,25 +1112,14 @@ async function replaceOperativita(
       throw new RouteError(400, "Un prodotto selezionato non esiste");
     if (magazzini.length !== magazzinoIds.length)
       throw new RouteError(400, "Un magazzino selezionato non esiste");
-    const [beneficiario] = await tx
-      .select({
-        id: beneficiariTable.id,
-        areaOperativaId: beneficiariTable.areaOperativaId,
-        centroAscoltoId: beneficiariTable.centroAscoltoId,
-      })
-      .from(beneficiariTable)
-      .where(eq(beneficiariTable.id, intervento.beneficiarioId))
-      .limit(1);
-    if (!beneficiario)
-      throw new RouteError(409, "Beneficiario dell'intervento non trovato");
     for (const magazzino of magazzini) {
       if (magazzino.stato !== "attivo") {
         throw new RouteError(400, "Un magazzino selezionato non è attivo");
       }
       if (
-        beneficiario.areaOperativaId == null ||
+        intervento.areaOperativaIdSnapshot == null ||
         magazzino.areaOperativaId == null ||
-        magazzino.areaOperativaId !== beneficiario.areaOperativaId
+        magazzino.areaOperativaId !== intervento.areaOperativaIdSnapshot
       ) {
         throw new RouteError(
           400,
@@ -1092,7 +1128,7 @@ async function replaceOperativita(
       }
       if (
         magazzino.centroAscoltoId != null &&
-        magazzino.centroAscoltoId !== beneficiario.centroAscoltoId
+        magazzino.centroAscoltoId !== intervento.centroAscoltoIdSnapshot
       ) {
         throw new RouteError(
           403,
@@ -1241,7 +1277,7 @@ async function replaceOperativita(
         await creaScaricoInventariale(tx, {
           codice: `INT-${interventoId}-${now.getTime().toString(36)}-${sequence}`,
           magazzinoId,
-          centroAscoltoId: beneficiario.centroAscoltoId,
+          centroAscoltoId: intervento.centroAscoltoIdSnapshot,
           dataScarico: dataCivileEuropeRome(now),
           causale: "altro",
           causaleAltro: "Consegna Intervento Sociale",
@@ -1847,6 +1883,12 @@ function sendRouteError(
   error: unknown,
   res: { status: (status: number) => { json: (body: unknown) => void } },
 ) {
+  if (isReportingSnapshotConcurrencyError(error)) {
+    res.status(409).json({
+      error: "Finalizzazione concorrente: ricarica i dati e riprova",
+    });
+    return true;
+  }
   if (error instanceof RouteError) {
     res.status(error.status).json({ error: error.message });
     return true;
@@ -3301,7 +3343,10 @@ router.post("/interventi/:id/salva-operativita", async (req, res) => {
           "Un intervento terminale è consultabile in sola lettura",
         );
       }
-      await replaceOperativita(tx, current, body, req, now);
+      const effectiveCurrent = hasOwn(body, "materiali")
+        ? await snapshotInterventoReportingContext(tx, current)
+        : current;
+      await replaceOperativita(tx, effectiveCurrent, body, req, now);
       const updates: Partial<typeof interventiTable.$inferInsert> = {
         dataAggiornamento: now,
       };
@@ -3365,17 +3410,18 @@ router.post("/interventi/:id/concludi", async (req, res) => {
     conclusionDate =
       parseIsoTimestamp(body.dataOraConclusione, "dataOraConclusione") ??
       new Date();
-    await requireAccessibleIntervento(
+    const accessibleIntervento = await requireAccessibleIntervento(
       id,
       req,
-      "sociale",
+      null,
       "sociale.interventi.complete",
     );
     if (
       containsOperationalChanges(body) ||
       (successivoInput != null && containsOperationalChanges(successivoInput))
     ) {
-      requireSocialInterventoPermission(req, "sociale.interventi.update");
+      if (accessibleIntervento.ambito !== "uds")
+        requireSocialInterventoPermission(req, "sociale.interventi.update");
     }
     if (successivoInput) {
       requireSocialInterventoPermission(req, "sociale.interventi.create");
@@ -3435,11 +3481,11 @@ router.post("/interventi/:id/concludi", async (req, res) => {
           "Inserire almeno un risultato o un esito finale",
         );
       }
-      await replaceOperativita(tx, current, body, req, conclusionDate);
-      const reportingSnapshot = await beneficiaryReportingSnapshotTx(
+      const effectiveCurrent = await snapshotInterventoReportingContext(
         tx,
-        current.beneficiarioId,
+        current,
       );
+      await replaceOperativita(tx, effectiveCurrent, body, req, conclusionDate);
       const [concluso] = await tx
         .update(interventiTable)
         .set({
@@ -3451,12 +3497,8 @@ router.post("/interventi/:id/concludi", async (req, res) => {
             : current.note,
           dataOraConclusione: conclusionDate,
           dataAggiornamento: conclusionDate,
-          areaOperativaIdSnapshot:
-            current.areaOperativaIdSnapshot ??
-            reportingSnapshot.areaOperativaIdSnapshot,
-          centroAscoltoIdSnapshot:
-            current.centroAscoltoIdSnapshot ??
-            reportingSnapshot.centroAscoltoIdSnapshot,
+          areaOperativaIdSnapshot: effectiveCurrent.areaOperativaIdSnapshot,
+          centroAscoltoIdSnapshot: effectiveCurrent.centroAscoltoIdSnapshot,
         })
         .where(
           and(
@@ -3526,9 +3568,13 @@ router.post("/interventi/:id/concludi", async (req, res) => {
           dataTransizione: conclusionDate,
           motivo: "Creato contestualmente alla conclusione del precedente",
         });
-        await replaceOperativita(
+        const effectiveSuccessivo = await snapshotInterventoReportingContext(
           tx,
           successivo,
+        );
+        await replaceOperativita(
+          tx,
+          effectiveSuccessivo,
           {
             ...(hasOwn(successivoInput, "attivita")
               ? { attivita: successivoInput.attivita }

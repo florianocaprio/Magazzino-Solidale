@@ -13,6 +13,10 @@ const migrationUrl = new URL(
   "../../../lib/db/updates/20260829_reporting_2_0_hardening.sql",
   import.meta.url,
 );
+const residualMigrationUrl = new URL(
+  "../../../lib/db/updates/20260830_reporting_2_0_residual_workflow_hardening.sql",
+  import.meta.url,
+);
 
 afterAll(async () => {
   await pool.end();
@@ -66,9 +70,15 @@ describe("Reporting 2.0 hardening migration", () => {
 
   it("è additiva, idempotente e rende immutabili territorio e snapshot storici", async () => {
     const migrationSql = await readFile(migrationUrl, "utf8");
+    const residualMigrationSql = await readFile(residualMigrationUrl, "utf8");
     expect(migrationSql).not.toMatch(/\bDROP\s+(TABLE|COLUMN)\b/i);
     expect(migrationSql).not.toMatch(/\bDELETE\s+FROM\b/i);
     expect(migrationSql).not.toMatch(
+      /\bUPDATE\s+(public\.)?(bolle|consegne|interventi|operazioni_distribuzione_magazzino)\b/i,
+    );
+    expect(residualMigrationSql).not.toMatch(/\bDROP\s+(TABLE|COLUMN)\b/i);
+    expect(residualMigrationSql).not.toMatch(/\bDELETE\s+FROM\b/i);
+    expect(residualMigrationSql).not.toMatch(
       /\bUPDATE\s+(public\.)?(bolle|consegne|interventi|operazioni_distribuzione_magazzino)\b/i,
     );
 
@@ -76,6 +86,7 @@ describe("Reporting 2.0 hardening migration", () => {
     try {
       await client.query("BEGIN");
       await client.query(migrationSql);
+      await client.query(residualMigrationSql);
 
       const areaA = await client.query<{ id: number }>(
         "INSERT INTO aree_operative (nome) VALUES ('Reporting hardening A') RETURNING id",
@@ -105,6 +116,43 @@ describe("Reporting 2.0 hardening migration", () => {
         "INSERT INTO beneficiari (codice, nome, cognome) VALUES ('RPT-HARD', 'Test', 'Reporting') RETURNING id",
       );
       const beneficiaryId = beneficiary.rows[0].id;
+
+      await rejectsAtSavepoint(
+        client,
+        "bolla_mixed_territory",
+        `INSERT INTO bolle (
+           numero_bolla, data_bolla, beneficiario_id, magazzino_id,
+           area_operativa_id_snapshot, centro_ascolto_id_snapshot
+         ) VALUES ('RPT-HARD-MIX-B', '2026-08-24', $1, $2, $3, $4)`,
+        [beneficiaryId, warehouse.rows[0].id, areaAId, centreBId],
+      );
+      await rejectsAtSavepoint(
+        client,
+        "delivery_mixed_territory",
+        `INSERT INTO consegne (
+           codice, beneficiario_id, tipo_consegna, data_prevista, magazzino_id,
+           area_operativa_id_snapshot, centro_ascolto_id_snapshot
+         ) VALUES ('RPT-HARD-MIX-C', $1, 'in_sede', '2026-08-24', $2, $3, $4)`,
+        [beneficiaryId, warehouse.rows[0].id, areaAId, centreBId],
+      );
+      await rejectsAtSavepoint(
+        client,
+        "intervention_mixed_territory",
+        `INSERT INTO interventi (
+           beneficiario_id, tipo_intervento, ambito, stato,
+           area_operativa_id_snapshot, centro_ascolto_id_snapshot
+         ) VALUES ($1, 'reporting mixed', 'sociale', 'concluso', $2, $3)`,
+        [beneficiaryId, areaAId, centreBId],
+      );
+      await expect(
+        client.query(
+          `INSERT INTO interventi (
+             beneficiario_id, tipo_intervento, ambito, stato,
+             area_operativa_id_snapshot, centro_ascolto_id_snapshot
+           ) VALUES ($1, 'reporting area only', 'sociale', 'concluso', $2, NULL)`,
+          [beneficiaryId, areaAId],
+        ),
+      ).resolves.toMatchObject({ rowCount: 1 });
 
       const bolla = await client.query<{ id: number }>(
         `INSERT INTO bolle (numero_bolla, data_bolla, beneficiario_id, magazzino_id)
@@ -193,6 +241,39 @@ describe("Reporting 2.0 hardening migration", () => {
       ).resolves.toMatchObject({ rowCount: 1 });
       await rejectsAtSavepoint(
         client,
+        "operation_mixed_territory",
+        `INSERT INTO operazioni_distribuzione_magazzino (
+           magazzino_id, data_distribuzione, canale_operativo,
+           dominio_origine, entita_origine_tipo, entita_origine_id, creato_da,
+           territorio_classificazione, area_operativa_id_snapshot,
+           centro_ascolto_id_snapshot
+         ) VALUES ($1, '2026-08-24', 'PACCHI', 'TEST', 'RPT_HARD_MIX', 2, $2,
+           'attribuito', $3, $4)`,
+        [warehouse.rows[0].id, user.rows[0].id, areaAId, centreBId],
+      );
+      await expect(
+        client.query(
+          `UPDATE operazioni_distribuzione_magazzino
+           SET numero_pasti=12 WHERE id=$1`,
+          [operation.rows[0].id],
+        ),
+      ).resolves.toMatchObject({ rowCount: 1 });
+      await expect(
+        client.query(
+          `UPDATE operazioni_distribuzione_magazzino
+           SET numero_pasti=12 WHERE id=$1`,
+          [operation.rows[0].id],
+        ),
+      ).resolves.toMatchObject({ rowCount: 1 });
+      await rejectsAtSavepoint(
+        client,
+        "operation_statistics_rewrite",
+        `UPDATE operazioni_distribuzione_magazzino
+         SET numero_pasti=13 WHERE id=$1`,
+        [operation.rows[0].id],
+      );
+      await rejectsAtSavepoint(
+        client,
         "operation_rewrite",
         `UPDATE operazioni_distribuzione_magazzino
          SET area_operativa_id_snapshot=$1, centro_ascolto_id_snapshot=$2
@@ -257,6 +338,7 @@ describe("Reporting 2.0 hardening migration", () => {
           (SELECT count(*)::int FROM operazioni_distribuzione_magazzino) AS operazioni
       `);
       await client.query(migrationSql);
+      await client.query(residualMigrationSql);
       const afterReplay = await client.query(`
         SELECT
           (SELECT count(*)::int FROM beneficiari) AS beneficiari,

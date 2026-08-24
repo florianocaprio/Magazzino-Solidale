@@ -2724,10 +2724,6 @@ router.post(
           tipoServizio,
           operatoreId: req.user!.id,
         });
-        const [{ numeroPasti }] = await tx
-          .select({ numeroPasti: count(mensaPastiTable.id) })
-          .from(mensaPastiTable)
-          .where(eq(mensaPastiTable.giornataServizioId, giornata.id));
         const scaricoId = await creaScaricoInventariale(tx, {
           codice,
           magazzinoId: mensa.mensa.magazzinoId,
@@ -2759,7 +2755,6 @@ router.post(
                     mensa.magazzino?.centroAscoltoId ?? null,
                   territorioClassificazione: "attribuito",
                   numeroDocumento: `MENSA-${giornata.id}`,
-                  numeroPasti: Number(numeroPasti),
                 }
               : undefined,
           righe: [
@@ -2966,11 +2961,16 @@ router.post(
             giornata: mensaGiornateServizioTable,
             areaOperativaId: menseTable.areaOperativaId,
             magazzinoId: menseTable.magazzinoId,
+            centroAscoltoId: magazziniTable.centroAscoltoId,
           })
           .from(mensaGiornateServizioTable)
           .innerJoin(
             menseTable,
             eq(mensaGiornateServizioTable.mensaId, menseTable.id),
+          )
+          .innerJoin(
+            magazziniTable,
+            eq(menseTable.magazzinoId, magazziniTable.id),
           )
           .where(eq(mensaGiornateServizioTable.id, id))
           .for("update");
@@ -2982,8 +2982,7 @@ router.post(
           )
         )
           throw new MensaError(403, "Giornata non accessibile");
-        if (current.giornata.stato !== "aperta")
-          throw new MensaError(409, "La giornata è già chiusa");
+        if (current.giornata.stato !== "aperta") return current.giornata;
         const meals = await tx
           .select({
             beneficiarioId: mensaPastiTable.beneficiarioId,
@@ -3074,7 +3073,7 @@ router.post(
           entitaOrigineTipo: "mensa_giornata_servizio",
           entitaOrigineId: id,
           areaOperativaIdSnapshot: current.areaOperativaId,
-          centroAscoltoIdSnapshot: null,
+          centroAscoltoIdSnapshot: current.centroAscoltoId,
           territorioClassificazione: "attribuito",
           numeroPasti: snapshot.pasti,
           creatoDa: req.user!.id,

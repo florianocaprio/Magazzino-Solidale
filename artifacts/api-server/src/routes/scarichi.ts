@@ -44,6 +44,10 @@ import {
   InventoryDecimalError,
   positiveInventoryDecimal,
 } from "../lib/inventoryDecimal";
+import {
+  beneficiaryReportingSnapshotTx,
+  isReportingSnapshotConcurrencyError,
+} from "../lib/reporting/eventSnapshots";
 
 const router: IRouter = Router();
 
@@ -385,8 +389,6 @@ router.post(
     }
     let beneficiarioId: number | null = null;
     let canaleOperativo: CanaleOperativo | null = null;
-    let beneficiarioAreaOperativaId: number | null = null;
-    let beneficiarioCentroAscoltoId: number | null = null;
     if (body.causale === "consegna_beneficiario") {
       if (
         !Number.isSafeInteger(body.beneficiarioId) ||
@@ -428,8 +430,6 @@ router.post(
         return;
       }
       beneficiarioId = beneficiario.id;
-      beneficiarioAreaOperativaId = beneficiario.areaOperativaId;
-      beneficiarioCentroAscoltoId = beneficiario.centroAscoltoId;
       canaleOperativo = body.canaleOperativo as CanaleOperativo;
     }
 
@@ -509,6 +509,10 @@ router.post(
     try {
       newId = await withDocumentCodeRetry("SCAR", (codice) =>
         db.transaction(async (tx) => {
+          const reportingSnapshot =
+            beneficiarioId == null
+              ? null
+              : await beneficiaryReportingSnapshotTx(tx, beneficiarioId);
           await requireOperationalMagazzino(tx, body.magazzinoId);
           return creaScaricoInventariale(tx, {
             codice,
@@ -540,10 +544,12 @@ router.post(
                     dominioOrigine: "MAGAZZINO",
                     entitaOrigineTipo: "scarico_manual_beneficiario",
                     entitaOrigineId: 0,
-                    areaOperativaIdSnapshot: beneficiarioAreaOperativaId,
-                    centroAscoltoIdSnapshot: beneficiarioCentroAscoltoId,
+                    areaOperativaIdSnapshot:
+                      reportingSnapshot?.areaOperativaIdSnapshot ?? null,
+                    centroAscoltoIdSnapshot:
+                      reportingSnapshot?.centroAscoltoIdSnapshot ?? null,
                     territorioClassificazione:
-                      beneficiarioAreaOperativaId == null
+                      reportingSnapshot?.areaOperativaIdSnapshot == null
                         ? "legacy_sconosciuto"
                         : "attribuito",
                     numeroPacchi: canaleOperativo === "PACCHI" ? 1 : null,
@@ -559,6 +565,12 @@ router.post(
         }),
       );
     } catch (error) {
+      if (isReportingSnapshotConcurrencyError(error)) {
+        res.status(409).json({
+          error: "Finalizzazione concorrente: ricarica i dati e riprova",
+        });
+        return;
+      }
       if (error instanceof InventoryError) {
         res.status(409).json({ error: error.message });
         return;

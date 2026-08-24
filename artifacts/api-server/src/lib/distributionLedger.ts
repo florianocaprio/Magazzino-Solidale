@@ -73,27 +73,35 @@ export async function ensureDistributionOperation(
         "La sorgente è già collegata a una diversa operazione di distribuzione",
       );
     }
+    const requestedNumeroDocumento =
+      input.numeroDocumento !== undefined
+        ? input.numeroDocumento
+        : existing.numeroDocumento;
+    const finalizedStatistic = (
+      current: number | null,
+      requested: number | null | undefined,
+    ) => {
+      if (requested === undefined || requested === current) return current;
+      if (current == null) return requested;
+      throw new DistributionLedgerError(
+        "STATISTICA_DISTRIBUZIONE_IMMUTABILE: il valore è già finalizzato",
+      );
+    };
     const requested = {
-      numeroDocumento:
-        input.numeroDocumento !== undefined
-          ? input.numeroDocumento
-          : existing.numeroDocumento,
-      numeroPacchi:
-        input.numeroPacchi !== undefined
-          ? input.numeroPacchi
-          : existing.numeroPacchi,
-      numeroPasti:
-        input.numeroPasti !== undefined
-          ? input.numeroPasti
-          : existing.numeroPasti,
-      indigentiSaltuari:
-        input.indigentiSaltuari !== undefined
-          ? input.indigentiSaltuari
-          : existing.indigentiSaltuari,
-      indigentiContinuativi:
-        input.indigentiContinuativi !== undefined
-          ? input.indigentiContinuativi
-          : existing.indigentiContinuativi,
+      numeroDocumento: requestedNumeroDocumento,
+      numeroPacchi: finalizedStatistic(
+        existing.numeroPacchi,
+        input.numeroPacchi,
+      ),
+      numeroPasti: finalizedStatistic(existing.numeroPasti, input.numeroPasti),
+      indigentiSaltuari: finalizedStatistic(
+        existing.indigentiSaltuari,
+        input.indigentiSaltuari,
+      ),
+      indigentiContinuativi: finalizedStatistic(
+        existing.indigentiContinuativi,
+        input.indigentiContinuativi,
+      ),
     };
     const changed = Object.entries(requested).some(
       ([key, value]) => value !== existing[key as keyof typeof requested],
@@ -104,7 +112,10 @@ export async function ensureDistributionOperation(
       .from(movimentiTable)
       .where(eq(movimentiTable.operazioneDistribuzioneId, existing.id))
       .limit(1);
-    if (linkedMovement) {
+    if (
+      linkedMovement &&
+      requestedNumeroDocumento !== existing.numeroDocumento
+    ) {
       throw new DistributionLedgerError(
         "OPERAZIONE_DISTRIBUZIONE_IMMUTABILE: esistono Movimenti collegati",
       );

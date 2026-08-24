@@ -898,10 +898,10 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       ).toBe(1);
       expect(
         parcelReport.kpi.find((item) => item.key === "prodottiDistinti")?.value,
-      ).toBe(2);
+      ).toBe(1);
       expect(
         parcelReport.kpi.find((item) => item.key === "righeProdotto")?.value,
-      ).toBe(3);
+      ).toBe(2);
       expect(
         parcelReport.kpi.find((item) => item.key === "kgCalcolabili")?.value,
       ).toBe(4);
@@ -911,22 +911,14 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       const parcelProducts =
         parcelReport.tables.find((table) => table.key === "prodotti")?.rows ??
         [];
-      expect(parcelProducts).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            unitaMisura: "kg",
-            quantita: 4,
-            quantitaFse: 1,
-            quantitaNonFse: 3,
-          }),
-          expect.objectContaining({
-            unitaMisura: "pz",
-            quantita: 0,
-            quantitaFse: 0,
-            quantitaNonFse: 0,
-          }),
-        ]),
-      );
+      expect(parcelProducts).toEqual([
+        expect.objectContaining({
+          unitaMisura: "kg",
+          quantita: 4,
+          quantitaFse: 1,
+          quantitaNonFse: 3,
+        }),
+      ]);
 
       const emporioReport = await buildEmporioReport(filters);
       expect(
@@ -936,16 +928,10 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         emporioReport.kpi.find(
           (item) => item.key === "prodottiDistintiDistribuiti",
         )?.value,
-      ).toBe(1);
+      ).toBe(0);
       expect(
         emporioReport.tables.find((table) => table.key === "prodotti")?.rows,
-      ).toContainEqual(
-        expect.objectContaining({
-          quantita: 0,
-          quantitaFse: 0,
-          quantitaNonFse: 0,
-        }),
-      );
+      ).toEqual([]);
       const emporioDistinctDetails = await buildDrilldown({
         section: "emporio",
         metric: "prodottiDistintiDistribuiti",
@@ -958,10 +944,34 @@ describe("regole di conteggio Pacchi e FSE+", () => {
           (item) => item.key === "prodottiDistintiDistribuiti",
         )?.value,
       );
-      expect(emporioDistinctDetails.rows[0]).toMatchObject({
-        prodottoId: productPz.id,
-        unita: "pz",
+      expect(emporioDistinctDetails.rows).toEqual([]);
+      const emporioMovementDetails = await buildDrilldown({
+        section: "emporio",
+        metric: "prodottiDistribuiti",
+        filters,
+        page: 1,
+        pageSize: 25,
       });
+      expect(
+        emporioMovementDetails.rows.reduce(
+          (total, row) => total + Number(row.quantita),
+          0,
+        ),
+      ).toBe(0);
+      expect(
+        emporioMovementDetails.rows.map((row) => ({
+          ...row,
+          quantita: Number(row.quantita),
+        })),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ quantita: 4 }),
+          expect.objectContaining({
+            quantita: -4,
+            movimentoOriginaleId: originalEmporio.id,
+          }),
+        ]),
+      );
 
       const generalReport = await buildGeneralReport(filters);
       expect(
@@ -1080,8 +1090,57 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         page: 1,
         pageSize: 25,
       });
+      const peopleReachedDetails = await buildDrilldown({
+        section: "pacchi",
+        metric: "personeRaggiunte",
+        filters,
+        page: 1,
+        pageSize: 25,
+      });
+      const parcelFseDetails = await buildDrilldown({
+        section: "pacchi",
+        metric: "prodottiFse",
+        filters,
+        page: 1,
+        pageSize: 25,
+      });
       expect(parcelDetails.total).toBe(1);
+      expect(parcelDetails.rows[0]).toMatchObject({
+        centro: `Report centre ${suffix}`,
+        centroOrigine: "fallback_legacy",
+      });
       expect(householdDetails.total).toBe(1);
+      expect(
+        peopleReachedDetails.rows.reduce(
+          (total, row) => total + Number(row.persone),
+          0,
+        ),
+      ).toBe(
+        parcelReport.kpi.find((item) => item.key === "personeRaggiunte")?.value,
+      );
+      expect(peopleReachedDetails.rows[0]).toMatchObject({
+        origine: "fallback_anagrafica_corrente",
+        qualita: "derivato",
+      });
+      expect(
+        parcelFseDetails.rows.reduce(
+          (total, row) => total + Number(row.quantita),
+          0,
+        ),
+      ).toBe(1);
+      expect(
+        parcelFseDetails.rows.map((row) => ({
+          ...row,
+          quantita: Number(row.quantita),
+        })),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            quantita: -1,
+            movimentoOriginaleId: originalPacchi.id,
+          }),
+        ]),
+      );
       const logisticsReport = await buildLogisticaReport(filters);
       expect(
         logisticsReport.kpi.find((item) => item.key === "merceScaduta")?.value,

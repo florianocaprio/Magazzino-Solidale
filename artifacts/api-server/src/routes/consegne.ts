@@ -423,11 +423,6 @@ router.post("/consegne/:id/completa", async (req, res) => {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  if (consegna.stato === "effettuata") {
-    res.status(400).json({ error: "La consegna risulta già consegnata" });
-    return;
-  }
-
   // serve una bolla pronta (confermata) o già consegnata, dello stesso beneficiario
   const bolle = await db.select().from(bolleTable).where(eq(bolleTable.consegnaId, consegnaId));
   const bollaPronta = bolle.find(b =>

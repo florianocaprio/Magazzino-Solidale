@@ -11,6 +11,8 @@ import { udsBaseConditions, udsEventDate } from "./uds";
 import { movementConditions, transferCondition } from "./logistica";
 import { fseAuthorizedMovementCondition } from "./fsePlus";
 import {
+  effectiveBollaRigaId,
+  fseDistributionNatureCondition,
   fseCanonicalPeriodCondition,
   fseNetDistributedQuantity,
 } from "./fseCanonicalFacts";
@@ -83,20 +85,31 @@ function detailDefinition(
     }
     if (metric === "personeRaggiunte") {
       return {
-        columns: ["id", "beneficiarioCodice", "tipo"],
+        columns: [
+          "id",
+          "beneficiarioCodice",
+          "persone",
+          "origine",
+          "data",
+          "qualita",
+        ],
         query: sql`
           WITH famiglie AS (
-            SELECT DISTINCT be.id, be.codice
+            SELECT DISTINCT ON (b.beneficiario_id)
+                   be.id, be.codice,
+                   COALESCE(b.numero_componenti_nucleo_snapshot, be.num_componenti) AS persone,
+                   CASE WHEN b.numero_componenti_nucleo_snapshot IS NULL
+                     THEN 'fallback_anagrafica_corrente' ELSE 'snapshot_evento' END AS origine,
+                   b.data_bolla::text AS data,
+                   CASE WHEN b.numero_componenti_nucleo_snapshot IS NULL
+                     THEN 'derivato' ELSE 'storico' END AS qualita
             FROM bolle b JOIN beneficiari be ON be.id = b.beneficiario_id
             WHERE ${andSql(pacchiConditions(filters))}
-          ), persone AS (
-            SELECT 'b-' || f.id::text AS id, f.codice AS beneficiario_codice, 'titolare'::text AS tipo FROM famiglie f
-            UNION ALL
-            SELECT 'n-' || nf.id::text, f.codice, 'componente'::text
-            FROM famiglie f JOIN nucleo_familiare nf ON nf.beneficiario_id = f.id
+            ORDER BY b.beneficiario_id, b.data_bolla DESC, b.id DESC
           )
-          SELECT id, beneficiario_codice, tipo, COUNT(*) OVER() AS full_count
-          FROM persone ORDER BY beneficiario_codice, id ${pagination}
+          SELECT id, codice AS beneficiario_codice, persone, origine, data,
+                 qualita, COUNT(*) OVER() AS full_count
+          FROM famiglie ORDER BY codice, id ${pagination}
         `,
       };
     }
@@ -111,16 +124,24 @@ function detailDefinition(
           "lotto",
           "quantita",
           "unita",
+          "naturaContabile",
+          "movimentoOriginaleId",
         ],
         query: sql`
           SELECT mv.id, b.data_bolla::text AS data, b.numero_bolla AS documento,
                  be.codice AS beneficiario_codice, p.nome AS prodotto, l.codice_lotto AS lotto,
-                 abs(mv.quantita::numeric) AS quantita, mv.unita_misura AS unita,
+                 ${fseNetDistributedQuantity(sql`mv.quantita`)} AS quantita,
+                 mv.unita_misura AS unita, mv.natura_contabile,
+                 mv.movimento_origine_id AS movimento_originale_id,
                  COUNT(*) OVER() AS full_count
-          FROM movimenti mv JOIN lotti l ON l.id = mv.lotto_id
-          JOIN bolla_righe br ON br.id = mv.bolla_riga_id JOIN bolle b ON b.id = br.bolla_id
+          FROM movimenti mv
+          LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+          LEFT JOIN lotti l ON l.id = COALESCE(mv.lotto_id, original.lotto_id)
+          JOIN bolla_righe br ON br.id = ${effectiveBollaRigaId}
+          JOIN bolle b ON b.id = br.bolla_id
           JOIN beneficiari be ON be.id = b.beneficiario_id JOIN prodotti p ON p.id = br.prodotto_id
-          WHERE mv.tipo_movimento = 'scarico' AND mv.fondo_origine = 'FSE_PLUS'
+          WHERE mv.fondo_origine = 'FSE_PLUS'
+            AND ${fseDistributionNatureCondition}
             AND ${andSql(pacchiConditions(filters))}
           ORDER BY b.data_bolla DESC, mv.id DESC ${pagination}
         `,
@@ -133,14 +154,19 @@ function detailDefinition(
         "data",
         "beneficiarioCodice",
         "centro",
+        "centroOrigine",
         "stato",
       ],
       query: sql`
         SELECT b.id, b.numero_bolla AS codice, b.data_bolla::text AS data,
-               be.codice AS beneficiario_codice, ca.nome AS centro, b.stato,
+               be.codice AS beneficiario_codice, ca.nome AS centro,
+               CASE WHEN b.centro_ascolto_id_snapshot IS NULL
+                 THEN 'fallback_legacy' ELSE 'snapshot_evento' END AS centro_origine,
+               b.stato,
                COUNT(*) OVER() AS full_count
         FROM bolle b JOIN beneficiari be ON be.id = b.beneficiario_id
-        LEFT JOIN centri_di_ascolto ca ON ca.id = be.centro_ascolto_id
+        LEFT JOIN centri_di_ascolto ca
+          ON ca.id = COALESCE(b.centro_ascolto_id_snapshot, be.centro_ascolto_id)
         WHERE ${andSql(pacchiConditions(filters))}
         ORDER BY b.data_bolla DESC, b.id DESC ${pagination}
       `,
@@ -230,31 +256,70 @@ function detailDefinition(
         "prodotto",
         "quantita",
         "credito",
+        "fondo",
+        "naturaContabile",
+        "movimentoOriginaleId",
       ],
       query: sql`
-        SELECT ser.id, se.numero_spesa AS codice, se.data_chiusura::text AS data,
+        SELECT mv.id, se.numero_spesa AS codice, se.data_chiusura::text AS data,
                be.codice AS beneficiario_codice, ser.descrizione_prodotto AS prodotto,
-               ser.quantita::numeric AS quantita, ser.credito_totale::numeric AS credito,
+               ${fseNetDistributedQuantity(sql`mv.quantita`)} AS quantita,
+               ser.credito_totale::numeric AS credito, mv.fondo_origine AS fondo,
+               mv.natura_contabile, mv.movimento_origine_id AS movimento_originale_id,
                COUNT(*) OVER() AS full_count
-        FROM spese_emporio se JOIN beneficiari be ON be.id = se.beneficiario_id
-        JOIN spese_emporio_righe ser ON ser.spesa_emporio_id = se.id
+        FROM movimenti mv
+        LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+        JOIN spese_emporio_righe ser ON ser.bolla_riga_id = ${effectiveBollaRigaId}
+        JOIN spese_emporio se ON se.id = ser.spesa_emporio_id
+        JOIN beneficiari be ON be.id = se.beneficiario_id
         WHERE ${andSql(speseConditions(filters))}
-        ORDER BY se.data_chiusura DESC, ser.id DESC ${pagination}
+          AND ${fseDistributionNatureCondition}
+        ORDER BY se.data_chiusura DESC, mv.id DESC ${pagination}
       `,
     };
   }
   if (section === "emporio" && metric === "prodottiDistintiDistribuiti") {
     return {
-      columns: ["prodottoId", "codice", "prodotto", "unita", "righe", "spese"],
+      columns: [
+        "prodottoId",
+        "codice",
+        "prodotto",
+        "unita",
+        "righe",
+        "spese",
+        "quantita",
+        "quantitaFse",
+        "quantitaNonFse",
+      ],
       query: sql`
+        WITH movimenti_distribuzione AS (
+          SELECT ${effectiveBollaRigaId} AS bolla_riga_id,
+                 SUM(${fseNetDistributedQuantity(sql`mv.quantita`)}) AS quantita_totale,
+                 SUM(${fseNetDistributedQuantity(sql`mv.quantita`)})
+                   FILTER (WHERE mv.fondo_origine = 'FSE_PLUS') AS quantita_fse,
+                 SUM(${fseNetDistributedQuantity(sql`mv.quantita`)})
+                   FILTER (WHERE mv.fondo_origine <> 'FSE_PLUS') AS quantita_non_fse
+          FROM movimenti mv
+          LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+          WHERE ${effectiveBollaRigaId} IS NOT NULL
+            AND ${fseDistributionNatureCondition}
+          GROUP BY ${effectiveBollaRigaId}
+        )
         SELECT p.id AS prodotto_id, p.codice, p.nome AS prodotto,
-               p.unita_misura AS unita, COUNT(ser.id) AS righe,
-               COUNT(DISTINCT se.id) AS spese, COUNT(*) OVER() AS full_count
+               p.unita_misura AS unita,
+               COUNT(*) FILTER (WHERE md.quantita_totale <> 0) AS righe,
+               COUNT(DISTINCT se.id) FILTER (WHERE md.quantita_totale <> 0) AS spese,
+               SUM(md.quantita_totale) AS quantita,
+               SUM(md.quantita_fse) AS quantita_fse,
+               SUM(md.quantita_non_fse) AS quantita_non_fse,
+               COUNT(*) OVER() AS full_count
         FROM spese_emporio se
         JOIN spese_emporio_righe ser ON ser.spesa_emporio_id = se.id
         JOIN prodotti p ON p.id = ser.prodotto_id
+        JOIN movimenti_distribuzione md ON md.bolla_riga_id = ser.bolla_riga_id
         WHERE ${andSql(speseConditions(filters))}
         GROUP BY p.id, p.codice, p.nome, p.unita_misura
+        HAVING SUM(md.quantita_totale) <> 0
         ORDER BY p.nome, p.id ${pagination}
       `,
     };

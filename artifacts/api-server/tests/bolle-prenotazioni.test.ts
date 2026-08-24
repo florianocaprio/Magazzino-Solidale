@@ -20,6 +20,7 @@ import {
   consegneTable,
   interventiTable,
   interventiStoricoStatiTable,
+  operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
 import { and, asc, eq } from "drizzle-orm";
 import bolleRouter from "../src/routes/bolle";
@@ -519,6 +520,16 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
             id: operatoreId,
             centroAscoltoId: historicalCentre.id,
           }),
+        ).post(`/consegne/${delivery}/completa`).send({})
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          makeScopedApp(consegneRouter, {
+            id: operatoreId,
+            centroAscoltoId: historicalCentre.id,
+          }),
         )
           .post(`/consegne/${delivery}/completa`)
           .send({})
@@ -551,6 +562,21 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       areaOperativaIdSnapshot: historicalArea,
       centroAscoltoIdSnapshot: historicalCentre.id,
     });
+    const operations = await db.select().from(operazioniDistribuzioneMagazzinoTable).where(and(
+      eq(operazioniDistribuzioneMagazzinoTable.dominioOrigine, "BOLLA"),
+      eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, bolla),
+    ));
+    expect(operations).toHaveLength(1);
+    expect(operations[0]).toMatchObject({
+      areaOperativaIdSnapshot: historicalArea,
+      centroAscoltoIdSnapshot: historicalCentre.id,
+      territorioClassificazione: "attribuito",
+    });
+    const [syncedIntervention] = await db.select().from(interventiTable).where(eq(interventiTable.bollaId, bolla));
+    expect(syncedIntervention).toMatchObject({
+      areaOperativaIdSnapshot: historicalArea,
+      centroAscoltoIdSnapshot: historicalCentre.id,
+    });
 
     const historicalReport = await buildPacchiReport({
       da: "2026-06-01",
@@ -579,6 +605,12 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       historicalReport.kpi.find((item) => item.key === "personeRaggiunte")
         ?.value,
     ).toBe(3);
+    const currentReport = await buildPacchiReport({
+      ...historicalReport.filters,
+      areaOperativaId: currentArea,
+      centroAscoltoId: currentCentre.id,
+    });
+    expect(currentReport.kpi.find((item) => item.key === "pacchiDistribuiti")?.value).toBe(0);
   });
 
   it("blocca la consegna se il lotto prenotato non ha piu residuo sufficiente", async () => {
@@ -834,8 +866,8 @@ describe("Consegne — completa converte le prenotazioni bolla", () => {
     const completaBis = await request(consegneAppAs(centroA)).post(`/consegne/${consegnaId}/completa`).send({});
     const consegnaBis = await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({});
 
-    expect(completaBis.status).toBe(400);
-    expect(completaBis.body.error).toContain("già consegnata");
+    expect(completaBis.status).toBe(200);
+    expect(completaBis.body.stato).toBe("effettuata");
     expect(consegnaBis.status).toBe(400);
     expect(consegnaBis.body.error).toContain("già consegnata");
     expect(await lottoResidua(lottoId)).toBe(6);
