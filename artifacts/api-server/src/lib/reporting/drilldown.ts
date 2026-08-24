@@ -20,18 +20,51 @@ type DetailDefinition = { columns: string[]; query: SQL };
 
 const ALLOWED_METRICS: Record<ReportSection, Set<string>> = {
   generale: new Set(),
-  pacchi: new Set(["pacchiDistribuiti", "nucleiServiti", "personeRaggiunte", "prodottiFse"]),
-  "centro-ascolto": new Set(["personePreseInCarico", "personeServite", "interventi"]),
-  emporio: new Set(["utentiServiti", "accessi", "speseConcluse", "prodottiDistribuiti", "prodottiDistintiDistribuiti"]),
+  pacchi: new Set([
+    "pacchiDistribuiti",
+    "nucleiServiti",
+    "personeRaggiunte",
+    "prodottiFse",
+  ]),
+  "centro-ascolto": new Set([
+    "personePreseInCarico",
+    "personeServite",
+    "interventi",
+  ]),
+  emporio: new Set([
+    "utentiServiti",
+    "accessi",
+    "speseConcluse",
+    "prodottiDistribuiti",
+    "prodottiDistintiDistribuiti",
+  ]),
   mensa: new Set(["pastiErogati", "personeUniche", "accessiNegati"]),
   uds: new Set(["interventi", "personeUniche", "primiContatti"]),
-  "magazzino-logistica": new Set(["movimentiCarico", "movimentiScarico", "trasferimenti"]),
-  "fse-plus": new Set(["prodottiFse", "prodottiFseDistinti", "nucleiRaggiunti", "personeRaggiunte"]),
+  "magazzino-logistica": new Set([
+    "movimentiCarico",
+    "movimentiScarico",
+    "trasferimenti",
+  ]),
+  "fse-plus": new Set([
+    "prodottiFse",
+    "prodottiFseDistinti",
+    "nucleiRaggiunti",
+    "personeRaggiunte",
+  ]),
 };
 
-function detailDefinition(section: ReportSection, metric: string, filters: ReportFilters, limit: number, offset: number): DetailDefinition {
+function detailDefinition(
+  section: ReportSection,
+  metric: string,
+  filters: ReportFilters,
+  limit: number,
+  offset: number,
+): DetailDefinition {
   if (!ALLOWED_METRICS[section].has(metric)) {
-    throw new ReportingError(400, "Drill-down non disponibile per la metrica richiesta");
+    throw new ReportingError(
+      400,
+      "Drill-down non disponibile per la metrica richiesta",
+    );
   }
   const pagination = sql`LIMIT ${limit} OFFSET ${offset}`;
   if (section === "pacchi") {
@@ -69,7 +102,16 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
     }
     if (metric === "prodottiFse") {
       return {
-        columns: ["id", "data", "documento", "beneficiarioCodice", "prodotto", "lotto", "quantita", "unita"],
+        columns: [
+          "id",
+          "data",
+          "documento",
+          "beneficiarioCodice",
+          "prodotto",
+          "lotto",
+          "quantita",
+          "unita",
+        ],
         query: sql`
           SELECT mv.id, b.data_bolla::text AS data, b.numero_bolla AS documento,
                  be.codice AS beneficiario_codice, p.nome AS prodotto, l.codice_lotto AS lotto,
@@ -85,7 +127,14 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
       };
     }
     return {
-      columns: ["id", "codice", "data", "beneficiarioCodice", "centro", "stato"],
+      columns: [
+        "id",
+        "codice",
+        "data",
+        "beneficiarioCodice",
+        "centro",
+        "stato",
+      ],
       query: sql`
         SELECT b.id, b.numero_bolla AS codice, b.data_bolla::text AS data,
                be.codice AS beneficiario_codice, ca.nome AS centro, b.stato,
@@ -124,7 +173,14 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
       };
     }
     return {
-      columns: ["id", "beneficiarioCodice", "data", "tipo", "stato", "operatore"],
+      columns: [
+        "id",
+        "beneficiarioCodice",
+        "data",
+        "tipo",
+        "stato",
+        "operatore",
+      ],
       query: sql`
         SELECT i.id, be.codice AS beneficiario_codice, ${socialEventDate}::text AS data,
                i.tipo_intervento AS tipo, i.stato,
@@ -166,7 +222,15 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
   }
   if (section === "emporio" && metric === "prodottiDistribuiti") {
     return {
-      columns: ["id", "codice", "data", "beneficiarioCodice", "prodotto", "quantita", "credito"],
+      columns: [
+        "id",
+        "codice",
+        "data",
+        "beneficiarioCodice",
+        "prodotto",
+        "quantita",
+        "credito",
+      ],
       query: sql`
         SELECT ser.id, se.numero_spesa AS codice, se.data_chiusura::text AS data,
                be.codice AS beneficiario_codice, ser.descrizione_prodotto AS prodotto,
@@ -197,7 +261,14 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
   }
   if (section === "emporio") {
     return {
-      columns: ["id", "codice", "data", "beneficiarioCodice", "credito", "stato"],
+      columns: [
+        "id",
+        "codice",
+        "data",
+        "beneficiarioCodice",
+        "credito",
+        "stato",
+      ],
       query: sql`
         SELECT se.id, se.numero_spesa AS codice, se.data_chiusura::text AS data,
                be.codice AS beneficiario_codice,
@@ -238,7 +309,14 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
   }
   if (section === "mensa") {
     return {
-      columns: ["id", "data", "beneficiarioCodice", "mensa", "tipoServizio", "override"],
+      columns: [
+        "id",
+        "data",
+        "beneficiarioCodice",
+        "mensa",
+        "tipoServizio",
+        "override",
+      ],
       query: sql`
         SELECT mp.id, mp.data_servizio::text AS data, be.codice AS beneficiario_codice,
                m.nome AS mensa, mp.tipo_servizio, mp.override,
@@ -252,15 +330,26 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
   }
   if (section === "uds") {
     if (metric === "personeUniche" || metric === "primiContatti") {
-      const periodFilters: SQL[] = [sql`giorno BETWEEN ${filters.da} AND ${filters.a}`];
-      if (filters.areaOperativaId != null && filters.areaOperativaMode !== "all") {
-        periodFilters.push(sql`area_operativa_id_snapshot = ${filters.areaOperativaId}`);
+      const periodFilters: SQL[] = [
+        sql`giorno BETWEEN ${filters.da} AND ${filters.a}`,
+      ];
+      if (
+        filters.areaOperativaId != null &&
+        filters.areaOperativaMode !== "all"
+      ) {
+        periodFilters.push(
+          sql`area_operativa_id_snapshot = ${filters.areaOperativaId}`,
+        );
       }
       if (filters.zonaUdsId != null && filters.zonaMode === "query") {
         periodFilters.push(sql`zona_uds_id_snapshot = ${filters.zonaUdsId}`);
       }
-      if (filters.operatoreId != null) periodFilters.push(sql`operatore_id = ${filters.operatoreId}`);
-      if (filters.tipoIntervento) periodFilters.push(sql`${filters.tipoIntervento} = ANY(regexp_split_to_array(tipo_intervento, '\s*,\s*'))`);
+      if (filters.operatoreId != null)
+        periodFilters.push(sql`operatore_id = ${filters.operatoreId}`);
+      if (filters.tipoIntervento)
+        periodFilters.push(
+          sql`${filters.tipoIntervento} = ANY(regexp_split_to_array(tipo_intervento, '\s*,\s*'))`,
+        );
       if (metric === "primiContatti") periodFilters.push(sql`numero = 1`);
       return {
         columns: ["id", "beneficiarioCodice", "data", "interventi"],
@@ -283,7 +372,14 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
       };
     }
     return {
-      columns: ["id", "data", "beneficiarioCodice", "tipo", "zona", "operatore"],
+      columns: [
+        "id",
+        "data",
+        "beneficiarioCodice",
+        "tipo",
+        "zona",
+        "operatore",
+      ],
       query: sql`
         SELECT i.id, ${udsEventDate}::text AS data, be.codice AS beneficiario_codice,
                i.tipo_intervento AS tipo, z.nome AS zona,
@@ -315,7 +411,16 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
   if (section === "magazzino-logistica") {
     const type = metric === "movimentiCarico" ? "carico" : "scarico";
     return {
-      columns: ["id", "data", "tipo", "causale", "magazzino", "prodottoId", "quantita", "unita"],
+      columns: [
+        "id",
+        "data",
+        "tipo",
+        "causale",
+        "magazzino",
+        "prodottoId",
+        "quantita",
+        "unita",
+      ],
       query: sql`
         SELECT mv.id, mv.data_movimento::text AS data, mv.tipo_movimento AS tipo,
                mv.tipo_dettaglio AS causale, mg.nome AS magazzino,
@@ -440,6 +545,7 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
           JOIN magazzini mg ON mg.id = mv.magazzino_id
           WHERE ${fseCanonicalPeriodCondition(filters, warehouseScope, authorizedMovement)}
           GROUP BY p.id, p.codice, p.nome
+          HAVING SUM(${netDistributedQuantity}) <> 0
           ORDER BY p.nome, p.id ${pagination}
         `,
       };
@@ -517,6 +623,18 @@ export async function buildDrilldown(input: {
     pageSize: input.pageSize,
     total: number(result[0]?.full_count),
     columns: definition.columns,
-    rows: result.map(({ full_count: _fullCount, ...row }) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()), value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? (value ?? null) : String(value)]))),
+    rows: result.map(({ full_count: _fullCount, ...row }) =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [
+          key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
+          value == null ||
+          typeof value === "string" ||
+          typeof value === "number" ||
+          typeof value === "boolean"
+            ? (value ?? null)
+            : String(value),
+        ]),
+      ),
+    ),
   };
 }

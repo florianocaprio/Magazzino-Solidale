@@ -16,6 +16,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS fse_fascicoli_snapshot_authoritative_version_u
   ON public.fse_fascicoli_sociali_snapshot (beneficiario_id, versione_profilo)
   WHERE origine_snapshot <> 'export_fse';
 
+ALTER TABLE public.fse_fascicoli_sociali_snapshot
+  DROP CONSTRAINT IF EXISTS fse_fascicoli_snapshot_demography_check;
+ALTER TABLE public.fse_fascicoli_sociali_snapshot
+  ADD CONSTRAINT fse_fascicoli_snapshot_demography_check CHECK (
+    (numero_componenti IS NULL OR numero_componenti > 0)
+    AND (donne IS NULL OR donne >= 0)
+    AND (uomini IS NULL OR uomini >= 0)
+    AND (eta_0_17 IS NULL OR eta_0_17 >= 0)
+    AND (eta_18_29 IS NULL OR eta_18_29 >= 0)
+    AND (eta_30_64 IS NULL OR eta_30_64 >= 0)
+    AND (eta_65_plus IS NULL OR eta_65_plus >= 0)
+    AND (numero_componenti IS NULL OR donne IS NULL OR uomini IS NULL
+      OR donne + uomini = numero_componenti)
+    AND (numero_componenti IS NULL OR eta_0_17 IS NULL OR eta_18_29 IS NULL
+      OR eta_30_64 IS NULL OR eta_65_plus IS NULL
+      OR eta_0_17 + eta_18_29 + eta_30_64 + eta_65_plus = numero_componenti)
+  );
+
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'bolle_numero_componenti_nucleo_snapshot_check') THEN
     ALTER TABLE public.bolle ADD CONSTRAINT bolle_numero_componenti_nucleo_snapshot_check
@@ -65,7 +83,16 @@ BEGIN
   ELSIF TG_TABLE_NAME = 'operazioni_distribuzione_magazzino' THEN
     IF (OLD.area_operativa_id_snapshot IS NOT NULL AND NEW.area_operativa_id_snapshot IS DISTINCT FROM OLD.area_operativa_id_snapshot)
       OR (OLD.centro_ascolto_id_snapshot IS NOT NULL AND NEW.centro_ascolto_id_snapshot IS DISTINCT FROM OLD.centro_ascolto_id_snapshot)
-      OR NEW.territorio_classificazione IS DISTINCT FROM OLD.territorio_classificazione THEN
+      OR (
+        NEW.territorio_classificazione IS DISTINCT FROM OLD.territorio_classificazione
+        AND NOT (
+          OLD.territorio_classificazione = 'legacy_sconosciuto'
+          AND OLD.area_operativa_id_snapshot IS NULL
+          AND OLD.centro_ascolto_id_snapshot IS NULL
+          AND NEW.territorio_classificazione = 'attribuito'
+          AND NEW.area_operativa_id_snapshot IS NOT NULL
+        )
+      ) THEN
       RAISE EXCEPTION 'REPORTING_SNAPSHOT_IMMUTABILE: operazioni_distribuzione_magazzino' USING ERRCODE = '55000';
     END IF;
   END IF;

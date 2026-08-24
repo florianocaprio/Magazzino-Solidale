@@ -225,15 +225,18 @@ export const fseFascicoliSocialiSnapshotTable = pgTable(
     ),
     check(
       "fse_fascicoli_snapshot_demography_check",
-      sql`(
-    ${table.numeroComponenti} is null and ${table.donne} is null and ${table.uomini} is null
-    and ${table.eta017} is null and ${table.eta1829} is null and ${table.eta3064} is null and ${table.eta65Plus} is null
-  ) or (
-    ${table.numeroComponenti} > 0 and ${table.donne} >= 0 and ${table.uomini} >= 0
-    and ${table.eta017} >= 0 and ${table.eta1829} >= 0 and ${table.eta3064} >= 0 and ${table.eta65Plus} >= 0
-    and ${table.donne} + ${table.uomini} = ${table.numeroComponenti}
-    and ${table.eta017} + ${table.eta1829} + ${table.eta3064} + ${table.eta65Plus} = ${table.numeroComponenti}
-  )`,
+      sql`(${table.numeroComponenti} is null or ${table.numeroComponenti} > 0)
+        and (${table.donne} is null or ${table.donne} >= 0)
+        and (${table.uomini} is null or ${table.uomini} >= 0)
+        and (${table.eta017} is null or ${table.eta017} >= 0)
+        and (${table.eta1829} is null or ${table.eta1829} >= 0)
+        and (${table.eta3064} is null or ${table.eta3064} >= 0)
+        and (${table.eta65Plus} is null or ${table.eta65Plus} >= 0)
+        and (${table.numeroComponenti} is null or ${table.donne} is null or ${table.uomini} is null
+          or ${table.donne} + ${table.uomini} = ${table.numeroComponenti})
+        and (${table.numeroComponenti} is null or ${table.eta017} is null or ${table.eta1829} is null
+          or ${table.eta3064} is null or ${table.eta65Plus} is null
+          or ${table.eta017} + ${table.eta1829} + ${table.eta3064} + ${table.eta65Plus} = ${table.numeroComponenti})`,
     ),
   ],
 );

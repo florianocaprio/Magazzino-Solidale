@@ -59,14 +59,20 @@ dalla correzione del Fascicolo e necessaria ai workflow privacy/retention.
 
 Import, aggiornamento manuale ed export creano snapshot in transazione. La data
 di riferimento è esplicita nel frontend, inclusa in preview e audit. Gli
-aggiornamenti manuali usano optimistic locking; hash e vincolo univoco rendono
-idempotente il retry dello stesso contenuto alla stessa data. Una correzione
-crea una versione nuova.
+aggiornamenti manuali usano optimistic locking. Un advisory lock per
+Beneficiario serializza anche la prima creazione concorrente; la proiezione
+corrente viene riletta dentro la transazione prima di determinare esito e
+versione. Il vincolo univoco `(beneficiario_id, versione_profilo)` impedisce
+versioni duplicate. Hash e chiave idempotente rendono invariato il replay dello
+stesso contenuto alla stessa data, mentre una correzione crea una versione
+autorevole strettamente successiva.
 
 Il report seleziona solo snapshot non futuri. A parità di data ordina per
-versione, creazione e id. Le somme delle dimensioni sono accompagnate da nuclei
-coperti, nuclei totali e nuclei senza dato. Assenza e incompletezza non valgono
-zero.
+origine autorevole (`aggiornamento_manuale`, `import_fse`, `export_fse`), quindi
+per versione, creazione e id. Export ripetuti non superano una versione manuale
+o importata della stessa data e non producono duplicati. Le somme delle
+dimensioni sono accompagnate da nuclei coperti, nuclei totali e nuclei senza
+dato. Assenza e incompletezza non valgono zero.
 
 ## Snapshot evento e legacy
 
@@ -81,9 +87,91 @@ usano fallback compatibile e generano qualità `territorioStoricoDerivato` o
 `nucleoStoricoDerivato`. Modificare in seguito Area, Centro o nucleo del
 Beneficiario non riscrive eventi conclusi.
 
-Le FK degli snapshot territoriali usano `ON DELETE SET NULL`: l’evento resta
-consultabile e passa al percorso qualità legacy se una dimensione territoriale
-viene rimossa.
+Le FK degli snapshot territoriali usano `ON DELETE RESTRICT`: Area e Centro già
+referenziati da fatti storici non possono essere cancellati. Trigger dedicati
+consentono la prima valorizzazione server-side e impediscono riscrittura,
+azzeramento o cancellazione diretta degli snapshot consolidati. Gli schemi
+pubblici non accettano i campi server-managed.
+
+## Hardening finale RPT-R1–R10
+
+### Concorrenza import FSE (RPT-R1)
+
+L’import acquisisce un advisory lock per Beneficiario anche quando il Fascicolo
+non esiste ancora, rilegge lo stato nella transazione e assegna versioni
+monotone. Il vincolo database sulla coppia Beneficiario/versione resta l’ultima
+barriera. I test coprono prima creazione identica concorrente, due aggiornamenti
+diversi concorrenti e replay invariato.
+
+### Versionamento autorevole e precedenza snapshot (RPT-R7)
+
+La selezione as-of usa un ordinamento centrale e deterministico: data di
+riferimento, priorità della sorgente autorevole, versione, data creazione e id.
+Manuale e import prevalgono sugli snapshot tecnici di export della stessa data;
+un export ripetuto è idempotente.
+
+### Storni canonici Pacchi ed Emporio (RPT-R2)
+
+Originale e storno condividono Operazione, Bolla e Bolla Riga effettive tramite
+fallback al Movimento originale. Quantità e Fondo provengono dal ledger
+Movimenti: distribuzione lorda meno storni, senza riclassificare uno storno FSE
+come non FSE. KPI, tabelle e drill-down eliminano i gruppi a netto zero e
+mantengono separate le unità Pezzi e Kg/Lt.
+
+### Copertura parziale FSE (RPT-R4)
+
+Numero componenti, sesso ed età sono dimensioni indipendenti. Ogni aggregato
+espone valore noto, nuclei coperti, totale e mancanti; uno snapshot parziale è
+valido se i valori presenti sono non negativi e le somme vengono verificate
+solo quando la dimensione è completa. `NULL` non diventa zero.
+
+### Immutabilità snapshot evento (RPT-R3)
+
+Bolle, Consegne, Interventi e Operazioni di distribuzione congelano Area,
+Centro e, dove previsto, dimensione del nucleo. La prima valorizzazione è
+consentita; modifica, clear e SQL diretto successivi sono bloccati. Le FK
+storiche sono `RESTRICT` e la migration non effettua backfill.
+
+### Magazzini condivisi e isolamento territoriale (RPT-R5)
+
+L’Area del Magazzino non è usata come sostituto del territorio evento. In un
+Magazzino condiviso, gli aggregati, i grafici, le tabelle e i drill-down
+includono solo Operazioni con snapshot Area/Centro compatibile con il chiamante.
+Gli ID diretti restano soggetti alla stessa validazione server-side.
+
+### Eventi universali e legacy sconosciuti (RPT-R5)
+
+La classificazione esplicita distingue `attribuito`, `universale` e
+`legacy_sconosciuto`. Universali e legacy sono esclusi dai report di una singola
+Area e restano visibili solo in scope globale autorizzato. Tre indicatori
+separati segnalano territorio legacy mancante, evento universale ed evento
+escluso per assenza di attribuzione.
+
+### Adapter legacy e sunset (RPT-R6)
+
+`GET /report/fse-plus` delega allo stesso builder integrato e applica le stesse
+guard di area funzionale, modulo, permesso, sorgente e territorio senza
+dipendere dal modulo Centro Ascolto. Gli header `Deprecation`, `Link` e `Sunset`
+fissano il ritiro al 1 dicembre 2026.
+
+### Qualità Pacchi (RPT-R8)
+
+Le anomalie demografiche sono contate per nucleo/Beneficiario distinto; le
+anomalie territoriali restano invece conteggi evento. Più Bolle dello stesso
+nucleo non moltiplicano una singola mancanza anagrafica.
+
+### Filtri frontend (RPT-R9)
+
+Query string, opzioni autorizzate e scope bloccati vengono riconciliati anche
+con cache React Query già calda. Date invertite, ID negativi, figli non più
+compatibili e navigazione back/forward non producono chiamate con filtri
+obsoleti.
+
+### I18n e accessibilità (RPT-R10)
+
+Card, import/export Beneficiari FSE e strumenti Reporting usano chiavi presenti
+nelle sei lingue supportate. Label, placeholder e `aria-label` restano
+localizzati; l’arabo conserva il rendering RTL senza mostrare chiavi raw.
 
 ## RBAC, scope e privacy
 
@@ -132,10 +220,12 @@ sottoscorta legacy aggrega quantità per Prodotto/Magazzino e non conta i Lotti.
 
 ## Migration e indici
 
-La migration `20260828_reporting_2_0_final_alignment.sql` è additiva,
-idempotente e senza backfill. Aggiunge storia FSE, metadati della proiezione
-corrente, snapshot evento, FK/constraint e indici as-of/reporting. Il runner
-riconosce 26 migration e verifica checksum, ordine e replay.
+Le migration `20260828_reporting_2_0_final_alignment.sql` e
+`20260829_reporting_2_0_hardening.sql` sono additive, idempotenti e senza
+backfill. Aggiungono storia FSE, metadati della proiezione corrente, snapshot
+evento, classificazione territoriale, FK/constraint, trigger e indici
+as-of/reporting. Il runner riconosce 27 migration e verifica checksum, ordine e
+replay.
 
 ## Limiti dichiarati
 
@@ -145,6 +235,11 @@ riconosce 26 migration e verifica checksum, ordine e replay.
   ripartibili senza una nuova fonte: il report mostra un warning.
 - Un Movimento storico senza operazione, canale o Lotto resta visibile al
   responsabile Magazzino nel proprio scope e porta codici qualità.
+- Gli eventi legacy territorialmente sconosciuti non possono essere attribuiti
+  retroattivamente senza una fonte storica attendibile e restano esclusi dagli
+  scope di singola Area.
+- Un export FSE è un file di controllo: la trasmissione ufficiale a SIFEAD resta
+  manuale e fuori dal perimetro applicativo.
 
 ## Verifica
 

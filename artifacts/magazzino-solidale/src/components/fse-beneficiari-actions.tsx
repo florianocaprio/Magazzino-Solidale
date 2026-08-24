@@ -89,12 +89,20 @@ export function FseBeneficiariActions({
   const preflightMutation = usePreflightBeneficiariFseExport();
   const exportMutation = useExportBeneficiariFse();
   const [mode, setMode] = useState<"import" | "export" | null>(null);
-  const [centroId, setCentroId] = useState(lockedCentroId ? String(lockedCentroId) : "");
+  const [centroId, setCentroId] = useState(
+    lockedCentroId ? String(lockedCentroId) : "",
+  );
   const [filePayload, setFilePayload] = useState<FilePayload | null>(null);
-  const [preview, setPreview] = useState<BeneficiariFsePreviewResult | null>(null);
-  const [importResult, setImportResult] = useState<BeneficiariFseImportResult | null>(null);
-  const [exportPreflight, setExportPreflight] = useState<BeneficiariFseExportPreflight | null>(null);
-  const [resolutions, setResolutions] = useState<Record<number, BeneficiariFseImportResolution>>({});
+  const [preview, setPreview] = useState<BeneficiariFsePreviewResult | null>(
+    null,
+  );
+  const [importResult, setImportResult] =
+    useState<BeneficiariFseImportResult | null>(null);
+  const [exportPreflight, setExportPreflight] =
+    useState<BeneficiariFseExportPreflight | null>(null);
+  const [resolutions, setResolutions] = useState<
+    Record<number, BeneficiariFseImportResolution>
+  >({});
   const [date, setDate] = useState(todayEuropeRome());
   const selected = useMemo(
     () => centri.find((centro) => String(centro.id) === centroId),
@@ -119,14 +127,18 @@ export function FseBeneficiariActions({
   const readFile = async (file?: File) => {
     if (!file || !centroId) return;
     try {
-      if (!/\.xlsx$/i.test(file.name)) throw new Error("Seleziona un file .xlsx.");
+      if (!/\.xlsx$/i.test(file.name))
+        throw new Error(t("reporting.fse.selectXlsx"));
       const bytes = await file.arrayBuffer();
       const workbook = XLSX.read(bytes, { type: "array", cellDates: false });
-      if (workbook.SheetNames.length !== 1 || workbook.SheetNames[0] !== "Table1") {
-        throw new Error("Il workbook deve contenere un solo foglio denominato Table1.");
+      if (
+        workbook.SheetNames.length !== 1 ||
+        workbook.SheetNames[0] !== "Table1"
+      ) {
+        throw new Error(t("reporting.fse.workbookSingleSheet"));
       }
       const worksheet = workbook.Sheets.Table1;
-      if (!worksheet) throw new Error("Workbook privo del foglio Table1.");
+      if (!worksheet) throw new Error(t("reporting.fse.workbookMissingSheet"));
       XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
         header: 1,
         raw: true,
@@ -145,8 +157,8 @@ export function FseBeneficiariActions({
       setFilePayload(null);
       setPreview(null);
       toast({
-        title: "Import FSE+",
-        description: apiErrorMessage(error, "File non valido."),
+        title: t("reporting.fse.import"),
+        description: apiErrorMessage(error, t("reporting.fse.invalidFile")),
         variant: "destructive",
       });
     }
@@ -165,7 +177,13 @@ export function FseBeneficiariActions({
       onImported();
       toast({
         title: t("reporting.fse.importCompleted"),
-        description: `${result.creati} creati, ${result.collegati} collegati, ${result.aggiornati} aggiornati, ${result.invariati} invariati, ${result.errori} errori.`,
+        description: t("reporting.fse.importSummary", {
+          creati: result.creati,
+          collegati: result.collegati,
+          aggiornati: result.aggiornati,
+          invariati: result.invariati,
+          errori: result.errori,
+        }),
       });
     } catch (error) {
       toast({
@@ -178,13 +196,15 @@ export function FseBeneficiariActions({
 
   const preflight = async () => {
     try {
-      setExportPreflight(await preflightMutation.mutateAsync({
-        data: {
-          centroAscoltoId: Number(centroId),
-          dataRiferimento: date,
-          soloAttivi: true,
-        },
-      }));
+      setExportPreflight(
+        await preflightMutation.mutateAsync({
+          data: {
+            centroAscoltoId: Number(centroId),
+            dataRiferimento: date,
+            soloAttivi: true,
+          },
+        }),
+      );
     } catch (error) {
       toast({
         title: t("reporting.fse.export"),
@@ -220,219 +240,341 @@ export function FseBeneficiariActions({
     }
   };
 
-  const unresolvedDuplicates = preview?.righe.some(
-    (row) => row.classificazione === "possibile_duplicato" && !resolutions[row.numeroRiga],
-  ) ?? false;
+  const unresolvedDuplicates =
+    preview?.righe.some(
+      (row) =>
+        row.classificazione === "possibile_duplicato" &&
+        !resolutions[row.numeroRiga],
+    ) ?? false;
   const importBlocked = Boolean(
-    !preview ||
-    (preview.conteggi.conflitto ?? 0) > 0 ||
-    unresolvedDuplicates,
+    !preview || (preview.conteggi.conflitto ?? 0) > 0 || unresolvedDuplicates,
   );
 
-  return <>
-    {canImport && (
-      <Button variant="outline" className="gap-2" onClick={() => setMode("import")}>
-        <Upload className="h-4 w-4" />{t("reporting.fse.import")}
-      </Button>
-    )}
-    {canExport && (
-      <Button variant="outline" className="gap-2" onClick={() => setMode("export")}>
-        <FileDown className="h-4 w-4" />{t("reporting.fse.export")}
-      </Button>
-    )}
-    <Dialog open={mode !== null} onOpenChange={(open) => { if (!open) reset(); }}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{mode === "import" ? t("reporting.fse.import") : t("reporting.fse.export")}</DialogTitle>
-          <DialogDescription>
-            {t("reporting.fse.scopeDescription")}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <Select
-            value={centroId}
-            onValueChange={(value) => {
-              setCentroId(value);
-              setPreview(null);
-              setExportPreflight(null);
-              setImportResult(null);
-            }}
-            disabled={lockedCentroId != null || busy}
-          >
-            <SelectTrigger aria-label={t("reporting.fse.centre")}>
-              <SelectValue placeholder={t("reporting.fse.centre")} />
-            </SelectTrigger>
-            <SelectContent>
-              {centri.filter((centro) => centro.attivo !== false).map((centro) => (
-                <SelectItem key={centro.id} value={String(centro.id)}>{centro.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="rounded-md bg-muted p-3 text-sm" aria-label={t("reporting.fse.operationalArea")}>
-            {t("reporting.filters.areaOperativa")}: <strong>
-              {selected?.areaOperativaNome ??
-                (selected?.areaOperativaId ? `ID ${selected.areaOperativaId}` : t("reporting.fse.unavailable"))}
-            </strong>
-          </div>
+  return (
+    <>
+      {canImport && (
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => setMode("import")}
+        >
+          <Upload className="h-4 w-4" />
+          {t("reporting.fse.import")}
+        </Button>
+      )}
+      {canExport && (
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => setMode("export")}
+        >
+          <FileDown className="h-4 w-4" />
+          {t("reporting.fse.export")}
+        </Button>
+      )}
+      <Dialog
+        open={mode !== null}
+        onOpenChange={(open) => {
+          if (!open) reset();
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {mode === "import"
+                ? t("reporting.fse.import")
+                : t("reporting.fse.export")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("reporting.fse.scopeDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select
+              value={centroId}
+              onValueChange={(value) => {
+                setCentroId(value);
+                setPreview(null);
+                setExportPreflight(null);
+                setImportResult(null);
+              }}
+              disabled={lockedCentroId != null || busy}
+            >
+              <SelectTrigger aria-label={t("reporting.fse.centre")}>
+                <SelectValue placeholder={t("reporting.fse.centre")} />
+              </SelectTrigger>
+              <SelectContent>
+                {centri
+                  .filter((centro) => centro.attivo !== false)
+                  .map((centro) => (
+                    <SelectItem key={centro.id} value={String(centro.id)}>
+                      {centro.nome}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <div
+              className="rounded-md bg-muted p-3 text-sm"
+              aria-label={t("reporting.fse.operationalArea")}
+            >
+              {t("reporting.filters.areaOperativa")}:{" "}
+              <strong>
+                {selected?.areaOperativaNome ??
+                  (selected?.areaOperativaId
+                    ? `ID ${selected.areaOperativaId}`
+                    : t("reporting.fse.unavailable"))}
+              </strong>
+            </div>
             {mode === "import" && !importResult && (
               <>
-                <Input type="date" aria-label={t("reporting.fse.referenceDate")}
-                  value={date} disabled={busy} onChange={(event) => {
+                <Input
+                  type="date"
+                  aria-label={t("reporting.fse.referenceDate")}
+                  value={date}
+                  disabled={busy}
+                  onChange={(event) => {
                     setDate(event.target.value);
                     setFilePayload(null);
                     setPreview(null);
-                  }} />
+                  }}
+                />
                 <p className="text-sm text-muted-foreground">
                   {t("reporting.fse.referenceDateHistory")}
                 </p>
-                <Input type="file" accept=".xlsx" aria-label="File FSE+"
+                <Input
+                  type="file"
+                  accept=".xlsx"
+                  aria-label={t("reporting.fse.file")}
                   disabled={!centroId || busy}
-                  onChange={(event) => void readFile(event.target.files?.[0])} />
+                  onChange={(event) => void readFile(event.target.files?.[0])}
+                />
               </>
             )}
-          {mode === "export" && <>
-            <Input
-              type="date"
-              aria-label={t("reporting.fse.referenceDate")}
-              value={date}
-              onChange={(event) => {
-                setDate(event.target.value);
-                setExportPreflight(null);
-              }}
-            />
-            <Badge variant="outline">{t("reporting.fse.activeOnly")}</Badge>
-          </>}
+            {mode === "export" && (
+              <>
+                <Input
+                  type="date"
+                  aria-label={t("reporting.fse.referenceDate")}
+                  value={date}
+                  onChange={(event) => {
+                    setDate(event.target.value);
+                    setExportPreflight(null);
+                  }}
+                />
+                <Badge variant="outline">{t("reporting.fse.activeOnly")}</Badge>
+              </>
+            )}
 
-          {preview && <>
-            <div className="text-sm font-medium">{t("reporting.fse.rowsRead", { count: preview.numeroRighe })}</div>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(preview.conteggi).map(([key, value]) => (
-                <Badge
-                  key={key}
-                  variant={key === "errore" || key === "conflitto" ? "destructive" : "secondary"}
-                >
-                  {key}: {value}
-                </Badge>
-              ))}
-            </div>
-            {(preview.conteggi.errore ?? 0) > 0 && (
-              <div className="rounded border border-amber-400/60 p-2 text-sm">
-                {t("reporting.fse.partialImport")}
+            {preview && (
+              <>
+                <div className="text-sm font-medium">
+                  {t("reporting.fse.rowsRead", { count: preview.numeroRighe })}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(preview.conteggi).map(([key, value]) => (
+                    <Badge
+                      key={key}
+                      variant={
+                        key === "errore" || key === "conflitto"
+                          ? "destructive"
+                          : "secondary"
+                      }
+                    >
+                      {t(`reporting.fse.classification.${key}`, {
+                        defaultValue: key,
+                      })}
+                      : {value}
+                    </Badge>
+                  ))}
+                </div>
+                {(preview.conteggi.errore ?? 0) > 0 && (
+                  <div className="rounded border border-amber-400/60 p-2 text-sm">
+                    {t("reporting.fse.partialImport")}
+                  </div>
+                )}
+                {preview.warningHeader.map((warning) => (
+                  <div
+                    key={warning}
+                    className="rounded border border-amber-400/60 p-2 text-sm"
+                  >
+                    {warning}
+                  </div>
+                ))}
+                {preview.righe
+                  .filter(
+                    (row) =>
+                      row.errori.length ||
+                      row.warning.length ||
+                      row.classificazione === "conflitto",
+                  )
+                  .map((row) => (
+                    <div
+                      key={row.numeroRiga}
+                      className="rounded border border-destructive/40 p-2 text-sm"
+                    >
+                      {t("reporting.fse.row", { number: row.numeroRiga })} ·{" "}
+                      {row.codiceFascicolo ?? t("reporting.fse.missingCode")}:{" "}
+                      {[...row.errori, ...row.warning].join(" ") ||
+                        t("reporting.fse.territorialConflict")}
+                    </div>
+                  ))}
+                {preview.righe
+                  .filter(
+                    (row) => row.classificazione === "possibile_duplicato",
+                  )
+                  .map((row) => (
+                    <div
+                      key={row.numeroRiga}
+                      className="rounded border border-amber-400/60 p-3 text-sm"
+                    >
+                      <div className="mb-2 font-medium">
+                        {t("reporting.fse.possibleExisting", {
+                          number: row.numeroRiga,
+                        })}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {row.duplicati?.map((candidate) => (
+                          <Button
+                            key={candidate.id}
+                            type="button"
+                            size="sm"
+                            variant={
+                              resolutions[row.numeroRiga]?.beneficiarioId ===
+                              candidate.id
+                                ? "default"
+                                : "outline"
+                            }
+                            onClick={() =>
+                              setResolutions((current) => ({
+                                ...current,
+                                [row.numeroRiga]: {
+                                  numeroRiga: row.numeroRiga,
+                                  azione: "collega",
+                                  beneficiarioId: candidate.id,
+                                },
+                              }))
+                            }
+                          >
+                            {t("reporting.fse.linkTo", {
+                              code: candidate.codice,
+                            })}
+                          </Button>
+                        ))}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={
+                            resolutions[row.numeroRiga]?.azione === "crea"
+                              ? "default"
+                              : "outline"
+                          }
+                          onClick={() =>
+                            setResolutions((current) => ({
+                              ...current,
+                              [row.numeroRiga]: {
+                                numeroRiga: row.numeroRiga,
+                                azione: "crea",
+                              },
+                            }))
+                          }
+                        >
+                          {t("reporting.fse.createNew")}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+              </>
+            )}
+
+            {importResult && (
+              <div className="space-y-2 rounded border p-3 text-sm">
+                <div className="font-medium">
+                  {t("reporting.fse.importResult", {
+                    batchId: importResult.batchId,
+                  })}
+                </div>
+                <div>
+                  {t("reporting.fse.resultSummary", {
+                    creati: importResult.creati,
+                    collegati: importResult.collegati,
+                    aggiornati: importResult.aggiornati,
+                    invariati: importResult.invariati,
+                    conflitti: importResult.conflitti,
+                    errori: importResult.errori,
+                  })}
+                </div>
+                {importResult.dettagli
+                  .filter((detail) => detail.errori.length)
+                  .map((detail) => (
+                    <div key={detail.numeroRiga} className="text-destructive">
+                      {t("reporting.fse.row", { number: detail.numeroRiga })} ·{" "}
+                      {detail.codiceFascicolo ?? t("reporting.fse.missingCode")}
+                      : {detail.errori.join(", ")}
+                    </div>
+                  ))}
               </div>
             )}
-            {preview.warningHeader.map((warning) => (
-              <div key={warning} className="rounded border border-amber-400/60 p-2 text-sm">{warning}</div>
-            ))}
-            {preview.righe
-              .filter((row) => row.errori.length || row.warning.length || row.classificazione === "conflitto")
-              .map((row) => (
-                <div key={row.numeroRiga} className="rounded border border-destructive/40 p-2 text-sm">
-                  Riga {row.numeroRiga} · {row.codiceFascicolo ?? "codice assente"}:{" "}
-                  {[...row.errori, ...row.warning].join(" ") || "Conflitto territoriale"}
-                </div>
-              ))}
-            {preview.righe
-              .filter((row) => row.classificazione === "possibile_duplicato")
-              .map((row) => (
-                <div key={row.numeroRiga} className="rounded border border-amber-400/60 p-3 text-sm">
-                  <div className="mb-2 font-medium">
-                    Riga {row.numeroRiga}: possibile beneficiario esistente
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {row.duplicati?.map((candidate) => (
-                      <Button
-                        key={candidate.id}
-                        type="button"
-                        size="sm"
-                        variant={resolutions[row.numeroRiga]?.beneficiarioId === candidate.id ? "default" : "outline"}
-                        onClick={() => setResolutions((current) => ({
-                          ...current,
-                          [row.numeroRiga]: {
-                            numeroRiga: row.numeroRiga,
-                            azione: "collega",
-                            beneficiarioId: candidate.id,
-                          },
-                        }))}
-                      >
-                        Collega a {candidate.codice}
-                      </Button>
-                    ))}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={resolutions[row.numeroRiga]?.azione === "crea" ? "default" : "outline"}
-                      onClick={() => setResolutions((current) => ({
-                        ...current,
-                        [row.numeroRiga]: { numeroRiga: row.numeroRiga, azione: "crea" },
-                      }))}
-                    >
-                      Crea nuovo
-                    </Button>
-                  </div>
-                </div>
-              ))}
-          </>}
 
-          {importResult && (
-            <div className="space-y-2 rounded border p-3 text-sm">
-              <div className="font-medium">Risultato import · batch {importResult.batchId}</div>
-              <div>
-                Creati {importResult.creati} · Collegati {importResult.collegati} · Aggiornati{" "}
-                {importResult.aggiornati} · Invariati {importResult.invariati} · Conflitti{" "}
-                {importResult.conflitti} · Errori {importResult.errori}
+            {exportPreflight && (
+              <div className="space-y-2 rounded border p-3 text-sm">
+                <div>
+                  {t("reporting.fse.preflightSummary", {
+                    candidates: exportPreflight.candidati,
+                    exportable: exportPreflight.esportabili,
+                    blocked: exportPreflight.bloccati.length,
+                    warnings: exportPreflight.warning.length,
+                  })}
+                </div>
+                {exportPreflight.bloccati.map((issue) => (
+                  <div key={issue.beneficiarioId} className="text-destructive">
+                    {issue.codice}: {issue.errori?.join(", ")}
+                  </div>
+                ))}
+                {exportPreflight.warning.map((issue) => (
+                  <div key={issue.beneficiarioId} className="text-amber-700">
+                    {issue.codice}: {issue.warning?.join(", ")}
+                  </div>
+                ))}
               </div>
-              {importResult.dettagli.filter((detail) => detail.errori.length).map((detail) => (
-                <div key={detail.numeroRiga} className="text-destructive">
-                  Riga {detail.numeroRiga} · {detail.codiceFascicolo ?? "codice assente"}:{" "}
-                  {detail.errori.join(", ")}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {exportPreflight && (
-            <div className="space-y-2 rounded border p-3 text-sm">
-              <div>
-                Candidati: {exportPreflight.candidati} · Esportabili: {exportPreflight.esportabili} ·
-                Bloccati: {exportPreflight.bloccati.length} · Warning: {exportPreflight.warning.length}
-              </div>
-              {exportPreflight.bloccati.map((issue) => (
-                <div key={issue.beneficiarioId} className="text-destructive">
-                  {issue.codice}: {issue.errori?.join(", ")}
-                </div>
-              ))}
-              {exportPreflight.warning.map((issue) => (
-                <div key={issue.beneficiarioId} className="text-amber-700">
-                  {issue.codice}: {issue.warning?.join(", ")}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={reset}>
-            {importResult ? t("reporting.fse.close") : t("reporting.fse.cancel")}
-          </Button>
-          {mode === "import" && !importResult && (
-            <Button onClick={() => void confirmImport()} disabled={importBlocked || busy}>
-              {t("reporting.fse.confirmImport")}
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={reset}>
+              {importResult
+                ? t("reporting.fse.close")
+                : t("reporting.fse.cancel")}
             </Button>
-          )}
-          {mode === "export" && !exportPreflight && (
-            <Button onClick={() => void preflight()} disabled={!centroId || !date || busy}>
-              {t("reporting.fse.runPreflight")}
-            </Button>
-          )}
-          {mode === "export" && exportPreflight && (
-            <Button
-              onClick={() => void download()}
-              disabled={busy || exportPreflight.bloccati.length > 0 || exportPreflight.candidati === 0}
-            >
-              {t("reporting.fse.download")}
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  </>;
+            {mode === "import" && !importResult && (
+              <Button
+                onClick={() => void confirmImport()}
+                disabled={importBlocked || busy}
+              >
+                {t("reporting.fse.confirmImport")}
+              </Button>
+            )}
+            {mode === "export" && !exportPreflight && (
+              <Button
+                onClick={() => void preflight()}
+                disabled={!centroId || !date || busy}
+              >
+                {t("reporting.fse.runPreflight")}
+              </Button>
+            )}
+            {mode === "export" && exportPreflight && (
+              <Button
+                onClick={() => void download()}
+                disabled={
+                  busy ||
+                  exportPreflight.bloccati.length > 0 ||
+                  exportPreflight.candidati === 0
+                }
+              >
+                {t("reporting.fse.download")}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }

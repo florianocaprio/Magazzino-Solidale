@@ -450,7 +450,9 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
             (key) => (
               <Card key={key}>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">{key}</CardTitle>
+                  <CardTitle className="text-sm">
+                    {t(`fseOperations.${key}`)}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="text-2xl font-bold">
                   {preview.data ? text(preview.data, key) : "—"}
@@ -469,14 +471,14 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
               className="inline-flex items-center gap-2 text-sm text-primary underline md:col-span-3"
               href="/scarichi"
             >
-              Registra reso FSE+ verso OpC nel flusso Scarichi
+              {t("fseOperations.returnLink")}
               <ExternalLink className="h-4 w-4" />
             </a>
           )}
         </TabsContent>
         <TabsContent value="queue" className="space-y-3">
           <select
-            aria-label="Filtro stato rendicontazione"
+            aria-label={t("fseOperations.queueFilter")}
             className="h-10 rounded-md border bg-background px-3 text-sm"
             value={reportingStateFilter}
             onChange={(event) =>
@@ -485,7 +487,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
               )
             }
           >
-            <option value="">Tutti gli stati</option>
+            <option value="">{t("fseOperations.allStatuses")}</option>
             <option value="DA_RENDICONTARE">DA_RENDICONTARE</option>
             <option value="ARRETRATO_NON_RENDICONTATO">
               ARRETRATO_NON_RENDICONTATO
@@ -581,7 +583,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                     {t("fseOperations.status")}:{" "}
                     {text(selectedExport.data, "stato")}
                     {selectedExport.data.legacyReviewRequired === true
-                      ? " · legacy review required"
+                      ? ` · ${t("fseOperations.legacyReviewRequired")}`
                       : ""}
                   </p>
                   <Input
@@ -611,7 +613,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                           })
                         }
                       >
-                        Marca inserita
+                        {t("fseOperations.markEntered")}
                       </Button>
                       <Button
                         variant="destructive"
@@ -631,7 +633,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                           })
                         }
                       >
-                        Annulla export
+                        {t("fseOperations.cancelExport")}
                       </Button>
                     </div>
                   )}
@@ -759,7 +761,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                         <Input
                           type="number"
                           min={1}
-                          placeholder="Movimento locale target"
+                          placeholder={t("fseOperations.targetMovement")}
                           value={targetMovementId}
                           onChange={(event) =>
                             setTargetMovementId(event.target.value)
@@ -768,7 +770,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                         <Input
                           type="number"
                           min={1}
-                          placeholder="Riga AGEA target"
+                          placeholder={t("fseOperations.targetAgeaRow")}
                           value={targetAgeaRowId}
                           onChange={(event) =>
                             setTargetAgeaRowId(event.target.value)
@@ -838,7 +840,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                         })
                       }
                     >
-                      Ricalcola
+                      {t("fseOperations.recalculate")}
                     </Button>
                     <Button
                       variant="destructive"
@@ -862,7 +864,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                         })
                       }
                     >
-                      Annulla riconciliazione
+                      {t("fseOperations.cancelReconciliation")}
                     </Button>
                     <Button
                       variant="outline"
@@ -915,7 +917,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
         <TabsContent value="indicators" className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Rilevazione mensile FSE+</CardTitle>
+              <CardTitle>{t("fseOperations.monitoringTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <Input
@@ -935,7 +937,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
               <Input
                 type="number"
                 min={0}
-                placeholder="Totale saltuari (vuoto = non rilevato)"
+                placeholder={t("fseOperations.monitoringTotalPlaceholder")}
                 value={monitoringTotal}
                 onChange={(event) => setMonitoringTotal(event.target.value)}
               />
@@ -976,8 +978,8 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                   }}
                 >
                   {selectedMonitoring
-                    ? "Aggiorna versione"
-                    : "Crea rilevazione"}
+                    ? t("fseOperations.updateMonitoring")
+                    : t("fseOperations.createMonitoring")}
                 </Button>
               )}
             </CardContent>

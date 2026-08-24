@@ -50,9 +50,10 @@ export function fseAuthorizedMovementCondition(
         ]);
   const bollaScope = fseScope(filters);
   const bollaSource = fseBollaSourceCondition(filters);
-  const territorialScope = filters.areaOperativaId == null
-    ? sql`true`
-    : sql`EXISTS (
+  const territorialScope =
+    filters.areaOperativaId == null
+      ? sql`true`
+      : sql`EXISTS (
         SELECT 1
         FROM operazioni_distribuzione_magazzino territory_op
         WHERE territory_op.id = COALESCE(
@@ -152,6 +153,12 @@ export async function buildFsePlusReport(filters: ReportFilters) {
     filters,
     allowedCanonicalChannels,
   );
+  const allowedCanonicalChannelCondition = allowedCanonicalChannels.length
+    ? sql`COALESCE(mv.canale_operativo, original.canale_operativo) IN (${sql.join(
+        allowedCanonicalChannels.map((channel) => sql`${channel}`),
+        sql`, `,
+      )})`
+    : sql`false`;
   const signedPieces = signedMovementSql(
     sql`mv.quantita_pezzi`,
     sql`mv.natura_contabile`,
@@ -288,6 +295,13 @@ export async function buildFsePlusReport(filters: ReportFilters) {
              SUM(persone_disabilita) AS persone_disabilita,
              SUM(cittadini_paesi_terzi) AS cittadini_paesi_terzi,
              SUM(senza_tetto_esclusione_abitativa) AS esclusione_abitativa,
+             SUM(donne + uomini) FILTER (
+               WHERE donne IS NOT NULL AND uomini IS NOT NULL
+             ) AS persone_sesso_note,
+             SUM(eta_0_17 + eta_18_29 + eta_30_64 + eta_65_plus) FILTER (
+               WHERE eta_0_17 IS NOT NULL AND eta_18_29 IS NOT NULL
+                 AND eta_30_64 IS NOT NULL AND eta_65_plus IS NOT NULL
+             ) AS persone_eta_note,
              COUNT(*) FILTER (WHERE id IS NOT NULL) AS con_snapshot,
              COUNT(*) FILTER (WHERE id IS NULL) AS senza_snapshot,
              COUNT(*) FILTER (WHERE numero_componenti IS NOT NULL) AS copertura_numero_componenti,
@@ -353,6 +367,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
           )
       ), fse_events AS (
         SELECT op.id,
+          op.territorio_classificazione,
           CASE WHEN SUM(mv.signed_quantity) = 0 THEN 0 ELSE op.numero_pacchi END AS numero_pacchi,
           CASE WHEN SUM(mv.signed_quantity) = 0 THEN 0 ELSE op.numero_pasti END AS numero_pasti,
           CASE WHEN SUM(mv.signed_quantity) = 0 THEN 0 ELSE op.indigenti_saltuari END AS indigenti_saltuari,
@@ -362,7 +377,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
             AND SUM(mv.signed_quantity) <> 0 AS storno_parziale
         FROM fse_period mv JOIN operazioni_distribuzione_magazzino op
           ON op.id = mv.effective_operation_id
-        GROUP BY op.id, op.numero_pacchi, op.numero_pasti,
+        GROUP BY op.id, op.territorio_classificazione, op.numero_pacchi, op.numero_pasti,
           op.indigenti_saltuari, op.indigenti_continuativi
       )
       SELECT
@@ -402,6 +417,27 @@ export async function buildFsePlusReport(filters: ReportFilters) {
           WHERE indigenti_saltuari IS NOT NULL
              OR indigenti_continuativi IS NOT NULL) AS eventi_con_statistiche,
         (SELECT count(*) FROM fse_events WHERE storno_parziale) AS eventi_storno_parziale,
+        (SELECT count(*) FROM fse_events
+          WHERE territorio_classificazione = 'legacy_sconosciuto') AS eventi_territorio_legacy,
+        (SELECT count(*) FROM fse_events
+          WHERE territorio_classificazione = 'universale') AS eventi_universali,
+        (SELECT count(DISTINCT op_quality.id)
+          FROM movimenti mv
+          LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+          JOIN magazzini mg ON mg.id = mv.magazzino_id
+          JOIN operazioni_distribuzione_magazzino op_quality
+            ON op_quality.id = COALESCE(
+              mv.operazione_distribuzione_id,
+              original.operazione_distribuzione_id
+            )
+          WHERE ${filters.areaOperativaId == null ? sql`false` : sql`true`}
+            AND mv.fondo_origine = 'FSE_PLUS'
+            AND mv.data_movimento BETWEEN ${filters.da} AND ${filters.a}
+            AND ${warehouseScope}
+            AND ${allowedCanonicalChannelCondition}
+            AND ${fseDistributionNatureCondition}
+            AND op_quality.territorio_classificazione = 'legacy_sconosciuto'
+        ) AS eventi_esclusi_mancanza_attribuzione,
         count(*) FILTER (WHERE natura_contabile='DISTRIBUZIONE_FINALE' AND operazione_distribuzione_id IS NULL) AS bloccati,
         (SELECT count(*) FROM rilevazioni_monitoraggio_fse rm JOIN magazzini mg ON mg.id=rm.magazzino_id
           WHERE rm.data_riferimento BETWEEN ${filters.da} AND ${filters.a} AND ${warehouseScope}) AS rilevazioni_monitoraggio
@@ -860,8 +896,8 @@ export async function buildFsePlusReport(filters: ReportFilters) {
             persons.persone,
             persons.copertura_numero_componenti,
           ],
-          ["sesso", null, persons.copertura_sesso],
-          ["fasceEta", null, persons.copertura_eta],
+          ["sesso", persons.persone_sesso_note, persons.copertura_sesso],
+          ["fasceEta", persons.persone_eta_note, persons.copertura_eta],
           [
             "origineStranieraMinoranze",
             persons.origine_straniera_minoranze,
@@ -931,6 +967,24 @@ export async function buildFsePlusReport(filters: ReportFilters) {
         number(ac.eventi_storno_parziale),
         number(ac.eventi_storno_parziale) ? "derivable" : "ok",
         "Le quantità sono nette; pacchi, pasti e persone dell'evento non sono ripartibili in modo proporzionale dopo uno storno parziale.",
+      ),
+      quality(
+        "territorioEventoLegacyMancante",
+        number(ac.eventi_territorio_legacy),
+        number(ac.eventi_territorio_legacy) ? "missing" : "ok",
+        "Eventi visibili globalmente con territorio storico non attribuibile.",
+      ),
+      quality(
+        "eventoUniversale",
+        number(ac.eventi_universali),
+        number(ac.eventi_universali) ? "derivable" : "ok",
+        "Eventi esplicitamente universali, visibili soltanto senza scope territoriale.",
+      ),
+      quality(
+        "eventoEsclusoMancanzaAttribuzione",
+        number(ac.eventi_esclusi_mancanza_attribuzione),
+        number(ac.eventi_esclusi_mancanza_attribuzione) ? "missing" : "ok",
+        "Eventi esclusi dal report territoriale perché privi di attribuzione Area immutabile.",
       ),
       quality(
         "unitaPesoNonNormalizzabile",

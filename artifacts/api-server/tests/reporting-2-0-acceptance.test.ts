@@ -21,6 +21,7 @@ import {
 } from "@workspace/db";
 import { buildDrilldown } from "../src/lib/reporting/drilldown";
 import { buildFsePlusReport } from "../src/lib/reporting/fsePlus";
+import { buildPacchiReport } from "../src/lib/reporting/pacchi";
 import type { ReportFilters } from "../src/lib/reporting/types";
 import reportIntegratoRouter from "../src/routes/report-integrato";
 import { makeScopedApp } from "./scope-helpers";
@@ -42,8 +43,10 @@ const ids = {
 let areaA: number;
 let areaB: number;
 let centreA: number;
+let centreB: number;
 let warehouseA: number;
 let warehouseB: number;
+let warehouseShared: number;
 let beneficiaryA: number;
 let beneficiaryWithoutSnapshot: number;
 let productKg: number;
@@ -105,7 +108,7 @@ beforeAll(async () => {
       { nome: `Reporting Centro B ${suffix}`, areaOperativaId: areaB },
     ])
     .returning({ id: centriAscoltoTable.id });
-  centreA = centres[0].id;
+  [centreA, centreB] = centres.map((item) => item.id);
   ids.centres.push(...centres.map((item) => item.id));
 
   const warehouses = await db
@@ -123,9 +126,15 @@ beforeAll(async () => {
         areaOperativaId: areaB,
         centroAscoltoId: centres[1].id,
       },
+      {
+        codice: `R20-S-${suffix}`,
+        nome: `Reporting Magazzino condiviso ${suffix}`,
+        areaOperativaId: null,
+        centroAscoltoId: null,
+      },
     ])
     .returning({ id: magazziniTable.id });
-  [warehouseA, warehouseB] = warehouses.map((item) => item.id);
+  [warehouseA, warehouseB, warehouseShared] = warehouses.map((item) => item.id);
   ids.warehouses.push(warehouseA, warehouseB);
 
   const beneficiaries = await db
@@ -142,6 +151,7 @@ beforeAll(async () => {
         codice: `BM-${suffix}`,
         nome: `Missing-PII-${suffix}`,
         cognome: `Snapshot-PII-${suffix}`,
+        dataNascita: "1990-01-01",
         areaOperativaId: areaA,
         centroAscoltoId: centreA,
       },
@@ -196,6 +206,16 @@ beforeAll(async () => {
         fondoOrigine: "FSE_PLUS",
         fsePlus: true,
       },
+      {
+        prodottoId: productPieces,
+        codiceLotto: `R20-SHARED-${suffix}`,
+        dataCarico: "2026-01-01",
+        quantitaCaricata: "100",
+        quantitaResidua: "96",
+        magazzinoId: warehouseShared,
+        fondoOrigine: "FSE_PLUS",
+        fsePlus: true,
+      },
     ])
     .returning({ id: lottiTable.id });
   ids.lots.push(...lots.map((item) => item.id));
@@ -209,8 +229,8 @@ beforeAll(async () => {
         beneficiarioId: beneficiaryA,
         magazzinoId: warehouseA,
         stato: "consegnato",
-        areaOperativaIdSnapshot: areaA,
-        centroAscoltoIdSnapshot: centreA,
+        areaOperativaIdSnapshot: null,
+        centroAscoltoIdSnapshot: null,
         numeroComponentiNucleoSnapshot: 3,
       },
       {
@@ -219,8 +239,8 @@ beforeAll(async () => {
         beneficiarioId: beneficiaryA,
         magazzinoId: warehouseA,
         stato: "consegnato",
-        areaOperativaIdSnapshot: areaA,
-        centroAscoltoIdSnapshot: centreA,
+        areaOperativaIdSnapshot: null,
+        centroAscoltoIdSnapshot: null,
         numeroComponentiNucleoSnapshot: 3,
       },
       {
@@ -229,8 +249,8 @@ beforeAll(async () => {
         beneficiarioId: beneficiaryA,
         magazzinoId: warehouseA,
         stato: "consegnato",
-        areaOperativaIdSnapshot: areaA,
-        centroAscoltoIdSnapshot: centreA,
+        areaOperativaIdSnapshot: null,
+        centroAscoltoIdSnapshot: null,
         numeroComponentiNucleoSnapshot: 3,
       },
       {
@@ -269,6 +289,9 @@ beforeAll(async () => {
         numeroDocumento: `R20-${channel}-${suffix}`,
         numeroPacchi: parcels,
         numeroPasti: meals,
+        areaOperativaIdSnapshot: areaA,
+        centroAscoltoIdSnapshot: centreA,
+        territorioClassificazione: "attribuito",
         creatoDa: userId,
       })),
     )
@@ -424,6 +447,78 @@ beforeAll(async () => {
     .returning({ id: movimentiTable.id });
   ids.movements.push(...corrections.map((item) => item.id));
 
+  const territorialOperations = await db
+    .insert(operazioniDistribuzioneMagazzinoTable)
+    .values([
+      {
+        magazzinoId: warehouseShared,
+        dataDistribuzione: "2026-07-01",
+        canaleOperativo: "PACCHI",
+        dominioOrigine: "TEST_REPORTING_SCOPE",
+        entitaOrigineTipo: "SCOPE",
+        entitaOrigineId: 100,
+        areaOperativaIdSnapshot: areaA,
+        centroAscoltoIdSnapshot: centreA,
+        territorioClassificazione: "attribuito",
+        creatoDa: userId,
+      },
+      {
+        magazzinoId: warehouseShared,
+        dataDistribuzione: "2026-07-02",
+        canaleOperativo: "PACCHI",
+        dominioOrigine: "TEST_REPORTING_SCOPE",
+        entitaOrigineTipo: "SCOPE",
+        entitaOrigineId: 101,
+        areaOperativaIdSnapshot: areaB,
+        centroAscoltoIdSnapshot: centreB,
+        territorioClassificazione: "attribuito",
+        creatoDa: userId,
+      },
+      {
+        magazzinoId: warehouseShared,
+        dataDistribuzione: "2026-07-03",
+        canaleOperativo: "PACCHI",
+        dominioOrigine: "TEST_REPORTING_SCOPE",
+        entitaOrigineTipo: "SCOPE",
+        entitaOrigineId: 102,
+        territorioClassificazione: "legacy_sconosciuto",
+        creatoDa: userId,
+      },
+      {
+        magazzinoId: warehouseShared,
+        dataDistribuzione: "2026-07-04",
+        canaleOperativo: "PACCHI",
+        dominioOrigine: "TEST_REPORTING_SCOPE",
+        entitaOrigineTipo: "SCOPE",
+        entitaOrigineId: 103,
+        territorioClassificazione: "universale",
+        creatoDa: userId,
+      },
+    ])
+    .returning({ id: operazioniDistribuzioneMagazzinoTable.id });
+  ids.operations.push(...territorialOperations.map((item) => item.id));
+  const territorialMovements = await db
+    .insert(movimentiTable)
+    .values(
+      territorialOperations.map((operation, index) => ({
+        tipoMovimento: "scarico",
+        tipoDettaglio: "reporting_scope",
+        dataMovimento: `2026-07-0${index + 1}`,
+        magazzinoId: warehouseShared,
+        prodottoId: productPieces,
+        lottoId: lots[2].id,
+        quantita: "1",
+        quantitaPezzi: "1",
+        unitaMisura: "pz",
+        fondoOrigine: "FSE_PLUS",
+        naturaContabile: "DISTRIBUZIONE_FINALE",
+        canaleOperativo: "PACCHI",
+        operazioneDistribuzioneId: operation.id,
+      })),
+    )
+    .returning({ id: movimentiTable.id });
+  ids.movements.push(...territorialMovements.map((item) => item.id));
+
   await db.insert(fseFascicoliSocialiSnapshotTable).values([
     {
       beneficiarioId: beneficiaryA,
@@ -470,7 +565,7 @@ beforeAll(async () => {
       dataRiferimento: "2027-01-01",
       origineSnapshot: "aggiornamento_manuale",
       utenteId: userId,
-      versioneProfilo: 3,
+      versioneProfilo: 4,
       numeroComponenti: 9,
       donne: 5,
       uomini: 4,
@@ -484,6 +579,46 @@ beforeAll(async () => {
       senzaTettoEsclusioneAbitativa: 9,
       attendibilitaDato: "operatore_verificato",
       hashCanonico: hash(3),
+    },
+    {
+      beneficiarioId: beneficiaryA,
+      dataRiferimento: "2026-04-01",
+      origineSnapshot: "import_fse",
+      utenteId: userId,
+      versioneProfilo: 3,
+      numeroComponenti: 5,
+      donne: 3,
+      uomini: 2,
+      eta017: 1,
+      eta1829: 1,
+      eta3064: 3,
+      eta65Plus: 0,
+      origineStranieraMinoranze: 5,
+      personeDisabilita: 5,
+      cittadiniPaesiTerzi: 5,
+      senzaTettoEsclusioneAbitativa: 5,
+      attendibilitaDato: "fonte_fse_dichiarata",
+      hashCanonico: hash(4),
+    },
+    {
+      beneficiarioId: beneficiaryA,
+      dataRiferimento: "2026-04-01",
+      origineSnapshot: "export_fse",
+      utenteId: userId,
+      versioneProfilo: 99,
+      numeroComponenti: 99,
+      donne: 50,
+      uomini: 49,
+      eta017: 1,
+      eta1829: 1,
+      eta3064: 96,
+      eta65Plus: 1,
+      origineStranieraMinoranze: 99,
+      personeDisabilita: 99,
+      cittadiniPaesiTerzi: 99,
+      senzaTettoEsclusioneAbitativa: 99,
+      attendibilitaDato: "anagrafica_derivata",
+      hashCanonico: hash(5),
     },
   ]);
 });
@@ -606,6 +741,17 @@ describe("Reporting 2.0: accettazione FSE canonica", () => {
     expect(detail.columns).not.toContain("beneficiarioCodice");
   });
 
+  it("conta le anomalie anagrafiche per nucleo e quelle storiche per Bolla", async () => {
+    const report = await buildPacchiReport(filters());
+    expect(
+      report.quality.find((item) => item.key === "dataNascitaMancante")?.count,
+    ).toBe(1);
+    expect(
+      report.quality.find((item) => item.key === "territorioStoricoDerivato")
+        ?.count,
+    ).toBe(3);
+  });
+
   it("seleziona lo snapshot as-of più recente, esclude il futuro e conserva NULL/copertura", async () => {
     const report = await buildFsePlusReport(filters());
     expect(
@@ -636,6 +782,241 @@ describe("Reporting 2.0: accettazione FSE canonica", () => {
     const serialized = JSON.stringify(report);
     expect(serialized).not.toContain(`Nome-PII-${suffix}`);
     expect(serialized).not.toContain(`Cognome-PII-${suffix}`);
+  });
+
+  it("fa prevalere manuale su import ed export della stessa data in report e drill-down", async () => {
+    const report = await buildFsePlusReport(filters());
+    expect(
+      report.kpi.find((item) => item.key === "personeRaggiunte")?.value,
+    ).toBe(3);
+    const detail = await buildDrilldown({
+      section: "fse-plus",
+      metric: "nucleiRaggiunti",
+      filters: {
+        ...filters(),
+        callerPermissions: ["magazzino.fse.view", "beneficiari.fse.view"],
+      },
+      page: 1,
+      pageSize: 100,
+    });
+    expect(detail.rows).toContainEqual(
+      expect.objectContaining({
+        beneficiarioCodice: `BA-${suffix}`,
+        numeroComponenti: 3,
+        origineSnapshot: "aggiornamento_manuale",
+      }),
+    );
+  });
+
+  it("espone coperture indipendenti e persone note per snapshot parziali", async () => {
+    const [coverageWarehouse] = await db
+      .insert(magazziniTable)
+      .values({
+        codice: `R20-COV-${suffix}`,
+        nome: `Reporting copertura ${suffix}`,
+        areaOperativaId: areaA,
+        centroAscoltoId: centreA,
+      })
+      .returning({ id: magazziniTable.id });
+    ids.warehouses.push(coverageWarehouse.id);
+    const [coverageProduct] = await db
+      .insert(prodottiTable)
+      .values({
+        codice: `R20-COV-${suffix}`,
+        nome: `Prodotto copertura ${suffix}`,
+        tipoProdotto: "alimentare",
+        unitaMisura: "pz",
+      })
+      .returning({ id: prodottiTable.id });
+    ids.products.push(coverageProduct.id);
+    const [coverageLot] = await db
+      .insert(lottiTable)
+      .values({
+        prodottoId: coverageProduct.id,
+        codiceLotto: `R20-COV-${suffix}`,
+        dataCarico: "2026-01-01",
+        quantitaCaricata: "10",
+        quantitaResidua: "7",
+        magazzinoId: coverageWarehouse.id,
+        fondoOrigine: "FSE_PLUS",
+        fsePlus: true,
+      })
+      .returning({ id: lottiTable.id });
+    ids.lots.push(coverageLot.id);
+    const coverageBeneficiaries = await db
+      .insert(beneficiariTable)
+      .values(
+        [1, 2, 3].map((index) => ({
+          codice: `R20-COV-${index}-${suffix}`,
+          nome: `Coverage ${index}`,
+          cognome: `Reporting ${suffix}`,
+          areaOperativaId: areaA,
+          centroAscoltoId: centreA,
+        })),
+      )
+      .returning({ id: beneficiariTable.id });
+    ids.beneficiaries.push(...coverageBeneficiaries.map((item) => item.id));
+    const coverageBolle = await db
+      .insert(bolleTable)
+      .values(
+        coverageBeneficiaries.map((beneficiary, index) => ({
+          numeroBolla: `R20-COV-${index + 1}-${suffix}`,
+          dataBolla: `2026-08-0${index + 1}`,
+          beneficiarioId: beneficiary.id,
+          magazzinoId: coverageWarehouse.id,
+          stato: "consegnato",
+          areaOperativaIdSnapshot: areaA,
+          centroAscoltoIdSnapshot: centreA,
+          numeroComponentiNucleoSnapshot: index + 1,
+        })),
+      )
+      .returning({ id: bolleTable.id });
+    ids.bolle.push(...coverageBolle.map((item) => item.id));
+    const coverageOperations = await db
+      .insert(operazioniDistribuzioneMagazzinoTable)
+      .values(
+        coverageBeneficiaries.map((_, index) => ({
+          magazzinoId: coverageWarehouse.id,
+          dataDistribuzione: `2026-08-0${index + 1}`,
+          canaleOperativo: "PACCHI",
+          dominioOrigine: "TEST_REPORTING_COVERAGE",
+          entitaOrigineTipo: "COVERAGE",
+          entitaOrigineId: index + 1,
+          areaOperativaIdSnapshot: areaA,
+          centroAscoltoIdSnapshot: centreA,
+          territorioClassificazione: "attribuito",
+          creatoDa: userId,
+        })),
+      )
+      .returning({ id: operazioniDistribuzioneMagazzinoTable.id });
+    ids.operations.push(...coverageOperations.map((item) => item.id));
+    const coverageMovements = await db
+      .insert(movimentiTable)
+      .values(
+        coverageBeneficiaries.map((beneficiary, index) => ({
+          tipoMovimento: "scarico",
+          tipoDettaglio: "reporting_coverage",
+          dataMovimento: `2026-08-0${index + 1}`,
+          magazzinoId: coverageWarehouse.id,
+          prodottoId: coverageProduct.id,
+          lottoId: coverageLot.id,
+          quantita: "1",
+          quantitaPezzi: "1",
+          unitaMisura: "pz",
+          beneficiarioId: beneficiary.id,
+          bollaId: coverageBolle[index].id,
+          fondoOrigine: "FSE_PLUS",
+          naturaContabile: "DISTRIBUZIONE_FINALE",
+          canaleOperativo: "PACCHI",
+          operazioneDistribuzioneId: coverageOperations[index].id,
+        })),
+      )
+      .returning({ id: movimentiTable.id });
+    ids.movements.push(...coverageMovements.map((item) => item.id));
+    await db.insert(fseFascicoliSocialiSnapshotTable).values([
+      {
+        beneficiarioId: coverageBeneficiaries[0].id,
+        dataRiferimento: "2026-08-01",
+        origineSnapshot: "aggiornamento_manuale",
+        versioneProfilo: 1,
+        numeroComponenti: 2,
+        donne: 1,
+        uomini: 1,
+        eta017: 1,
+        eta1829: 0,
+        eta3064: 1,
+        eta65Plus: 0,
+        origineStranieraMinoranze: 1,
+        personeDisabilita: 0,
+        cittadiniPaesiTerzi: 1,
+        senzaTettoEsclusioneAbitativa: 0,
+        attendibilitaDato: "operatore_verificato",
+        hashCanonico: hash(20),
+      },
+      {
+        beneficiarioId: coverageBeneficiaries[1].id,
+        dataRiferimento: "2026-08-01",
+        origineSnapshot: "aggiornamento_manuale",
+        versioneProfilo: 1,
+        numeroComponenti: 3,
+        donne: 2,
+        uomini: null,
+        eta017: 1,
+        eta1829: 0,
+        eta3064: 2,
+        eta65Plus: 0,
+        origineStranieraMinoranze: null,
+        personeDisabilita: 1,
+        cittadiniPaesiTerzi: null,
+        senzaTettoEsclusioneAbitativa: 0,
+        attendibilitaDato: "operatore_verificato",
+        hashCanonico: hash(21),
+      },
+      {
+        beneficiarioId: coverageBeneficiaries[2].id,
+        dataRiferimento: "2026-08-01",
+        origineSnapshot: "aggiornamento_manuale",
+        versioneProfilo: 1,
+        numeroComponenti: null,
+        donne: 1,
+        uomini: 0,
+        eta017: 0,
+        eta1829: null,
+        eta3064: 1,
+        eta65Plus: 0,
+        origineStranieraMinoranze: 0,
+        personeDisabilita: null,
+        cittadiniPaesiTerzi: 0,
+        senzaTettoEsclusioneAbitativa: null,
+        attendibilitaDato: "operatore_verificato",
+        hashCanonico: hash(22),
+      },
+    ]);
+
+    const report = await buildFsePlusReport({
+      ...filters(),
+      magazzinoId: coverageWarehouse.id,
+    });
+    expect(
+      report.kpi.find((item) => item.key === "nucleiRaggiunti")?.value,
+    ).toBe(3);
+    expect(
+      report.kpi.find((item) => item.key === "personeRaggiunte"),
+    ).toMatchObject({
+      value: 5,
+      availability: "derivable",
+    });
+    const dimensions =
+      report.tables.find((table) => table.key === "dimensioniFseBeneficiari")
+        ?.rows ?? [];
+    expect(dimensions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          campo: "numeroComponenti",
+          valore: 5,
+          nucleiCoperti: 2,
+          nucleiTotali: 3,
+          nucleiSenzaDato: 1,
+          disponibilita: "PARZIALE",
+        }),
+        expect.objectContaining({
+          campo: "sesso",
+          valore: 3,
+          nucleiCoperti: 2,
+          nucleiTotali: 3,
+          nucleiSenzaDato: 1,
+          disponibilita: "PARZIALE",
+        }),
+        expect.objectContaining({
+          campo: "fasceEta",
+          valore: 5,
+          nucleiCoperti: 2,
+          nucleiTotali: 3,
+          nucleiSenzaDato: 1,
+          disponibilita: "PARZIALE",
+        }),
+      ]),
+    );
   });
 
   it("separa aggregati e dettaglio individuale e blocca ID fuori scope", async () => {
@@ -697,5 +1078,72 @@ describe("Reporting 2.0: accettazione FSE canonica", () => {
         )
       ).status,
     ).toBe(401);
+  });
+
+  it("isola gli eventi di un Magazzino condiviso per snapshot Area", async () => {
+    const scoped = (
+      areaOperativaId: number,
+      centroAscoltoId: number,
+    ): ReportFilters => ({
+      ...filters(),
+      areaOperativaId,
+      centroAscoltoId,
+      magazzinoId: warehouseShared,
+    });
+    const globalFilters: ReportFilters = {
+      ...filters(),
+      areaOperativaId: null,
+      centroAscoltoId: null,
+      magazzinoId: warehouseShared,
+      areaOperativaMode: "all",
+      centroMode: "all",
+    };
+    const [reportA, reportB, globalReport] = await Promise.all([
+      buildFsePlusReport(scoped(areaA, centreA)),
+      buildFsePlusReport(scoped(areaB, centreB)),
+      buildFsePlusReport(globalFilters),
+    ]);
+    const quantity = (report: Awaited<ReturnType<typeof buildFsePlusReport>>) =>
+      report.tables
+        .find((table) => table.key === "01_Prodotti_FSE")
+        ?.rows.reduce((sum, row) => sum + Number(row.quantitaFse), 0) ?? 0;
+    expect(quantity(reportA)).toBe(1);
+    expect(quantity(reportB)).toBe(1);
+    expect(quantity(globalReport)).toBe(4);
+    const qualityCount = (
+      report: Awaited<ReturnType<typeof buildFsePlusReport>>,
+      key: string,
+    ) => report.quality.find((item) => item.key === key)?.count;
+    expect(qualityCount(globalReport, "territorioEventoLegacyMancante")).toBe(
+      1,
+    );
+    expect(qualityCount(globalReport, "eventoUniversale")).toBe(1);
+    expect(
+      qualityCount(globalReport, "eventoEsclusoMancanzaAttribuzione"),
+    ).toBe(0);
+    expect(qualityCount(reportA, "territorioEventoLegacyMancante")).toBe(0);
+    expect(qualityCount(reportA, "eventoUniversale")).toBe(0);
+    expect(qualityCount(reportA, "eventoEsclusoMancanzaAttribuzione")).toBe(1);
+
+    const detailA = await buildDrilldown({
+      section: "fse-plus",
+      metric: "prodottiFse",
+      filters: scoped(areaA, centreA),
+      page: 1,
+      pageSize: 100,
+    });
+    const detailB = await buildDrilldown({
+      section: "fse-plus",
+      metric: "prodottiFse",
+      filters: scoped(areaB, centreB),
+      page: 1,
+      pageSize: 100,
+    });
+    expect(
+      detailA.rows.reduce((sum, row) => sum + Number(row.quantita), 0),
+    ).toBe(1);
+    expect(
+      detailB.rows.reduce((sum, row) => sum + Number(row.quantita), 0),
+    ).toBe(1);
   });
 });

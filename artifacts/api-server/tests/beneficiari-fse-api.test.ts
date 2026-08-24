@@ -45,16 +45,24 @@ const permissions = [
   "beneficiari.fse.export",
 ];
 
-function app(overrides: {
-  areaOperativaId?: number | null;
-  centroAscoltoId?: number | null;
-  zonaUdsId?: number | null;
-  permessi?: string[];
-} = {}) {
+function app(
+  overrides: {
+    areaOperativaId?: number | null;
+    centroAscoltoId?: number | null;
+    zonaUdsId?: number | null;
+    permessi?: string[];
+  } = {},
+) {
   return makeScopedApp(beneficiariFseRouter, {
     id: userId,
-    areaOperativaId: overrides.areaOperativaId === undefined ? areaA : overrides.areaOperativaId,
-    centroAscoltoId: overrides.centroAscoltoId === undefined ? null : overrides.centroAscoltoId,
+    areaOperativaId:
+      overrides.areaOperativaId === undefined
+        ? areaA
+        : overrides.areaOperativaId,
+    centroAscoltoId:
+      overrides.centroAscoltoId === undefined
+        ? null
+        : overrides.centroAscoltoId,
     zonaUdsId: overrides.zonaUdsId ?? null,
     aree: ["sociale"],
     permessi: overrides.permessi ?? permissions,
@@ -86,10 +94,16 @@ function row(code: string, overrides: Record<string, unknown> = {}) {
 
 function workbook(righe: Array<Record<string, unknown>>, sheetName = "Table1") {
   if (sheetName === "Table1") {
-    return buildFseBeneficiariWorkbook(righe as Array<Record<(typeof FSE_BENEFICIARI_HEADERS)[number], string | number | Date>>);
+    return buildFseBeneficiariWorkbook(
+      righe as Array<
+        Record<(typeof FSE_BENEFICIARI_HEADERS)[number], string | number | Date>
+      >,
+    );
   }
   const book = XLSX.utils.book_new();
-  const sheet = XLSX.utils.json_to_sheet(righe, { header: [...FSE_BENEFICIARI_HEADERS] });
+  const sheet = XLSX.utils.json_to_sheet(righe, {
+    header: [...FSE_BENEFICIARI_HEADERS],
+  });
   XLSX.utils.book_append_sheet(book, sheet, sheetName);
   return XLSX.write(book, { type: "buffer", bookType: "xlsx" }) as Buffer;
 }
@@ -286,9 +300,15 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
   });
 
   it("rifiuta lato server un workbook con foglio diverso da Table1", async () => {
-    const response = await upload(app(), "/beneficiari/fse/preview", centerA, [row("WRONG-SHEET")], {
-      buffer: workbook([row("WRONG-SHEET")], "FoglioErrato"),
-    });
+    const response = await upload(
+      app(),
+      "/beneficiari/fse/preview",
+      centerA,
+      [row("WRONG-SHEET")],
+      {
+        buffer: workbook([row("WRONG-SHEET")], "FoglioErrato"),
+      },
+    );
     expect(response.status).toBe(400);
     expect(response.body.errori.join(" ")).toContain("Table1");
   });
@@ -304,18 +324,37 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       centroAscoltoId: centerRemote,
       areaOperativaId: areaA,
     });
-    const preview = await upload(app(), "/beneficiari/fse/preview", centerA, [similarRow]);
+    const preview = await upload(app(), "/beneficiari/fse/preview", centerA, [
+      similarRow,
+    ]);
     expect(preview.status).toBe(200);
-    expect(preview.body.righe[0]).toMatchObject({ classificazione: "possibile_duplicato", duplicati: [] });
-    expect(preview.body.righe[0].warning.join(" ")).toContain("non sono esposti");
-
-    const unresolved = await upload(app(), "/beneficiari/fse/import", centerA, [similarRow]);
-    expect(unresolved.body.dettagli[0].errori).toContain("DUPLICATO_NON_RISOLTO");
-    const created = await upload(app(), "/beneficiari/fse/import", centerA, [similarRow], {
-      risoluzioni: [{ numeroRiga: 2, azione: "crea" }],
+    expect(preview.body.righe[0]).toMatchObject({
+      classificazione: "possibile_duplicato",
+      duplicati: [],
     });
+    expect(preview.body.righe[0].warning.join(" ")).toContain(
+      "non sono esposti",
+    );
+
+    const unresolved = await upload(app(), "/beneficiari/fse/import", centerA, [
+      similarRow,
+    ]);
+    expect(unresolved.body.dettagli[0].errori).toContain(
+      "DUPLICATO_NON_RISOLTO",
+    );
+    const created = await upload(
+      app(),
+      "/beneficiari/fse/import",
+      centerA,
+      [similarRow],
+      {
+        risoluzioni: [{ numeroRiga: 2, azione: "crea" }],
+      },
+    );
     expect(created.body).toMatchObject({ creati: 1, errori: 0 });
-    const audit = await db.select().from(auditConfigurazioniTable)
+    const audit = await db
+      .select()
+      .from(auditConfigurazioniTable)
       .where(eq(auditConfigurazioniTable.azione, "scelta-crea-nuovo-fse"));
     expect(audit.some((item) => item.utenteId === userId)).toBe(true);
   });
@@ -422,6 +461,109 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     ).toEqual(["2026-08-24", "2026-08-25"]);
   });
 
+  it("serializza prime importazioni e aggiornamenti concorrenti senza duplicare versioni", async () => {
+    const firstCode = `CONCURRENT-FIRST-${suffix}`;
+    const concurrentRow = (overrides: Record<string, unknown> = {}) =>
+      row(firstCode, {
+        "Nome Referente fascicolo": `Xylophora-${suffix}`,
+        "Cognome Referente fascicolo": `Quasarion-${suffix}`,
+        ...overrides,
+      });
+    const firstRows = [concurrentRow()];
+    const firstBuffer = workbook(firstRows);
+    const firstResults = await Promise.all([
+      upload(app(), "/beneficiari/fse/import", centerA, firstRows, {
+        buffer: firstBuffer,
+      }),
+      upload(app(), "/beneficiari/fse/import", centerA, firstRows, {
+        buffer: firstBuffer,
+      }),
+    ]);
+    expect(firstResults.map((result) => result.status)).toEqual([200, 200]);
+    expect(
+      firstResults.reduce(
+        (sum, result) => sum + Number(result.body.creati ?? 0),
+        0,
+      ),
+      JSON.stringify(firstResults.map((result) => result.body)),
+    ).toBe(1);
+    expect(
+      firstResults.reduce(
+        (sum, result) => sum + Number(result.body.invariati ?? 0),
+        0,
+      ),
+    ).toBe(1);
+
+    const [createdProfile] = await db
+      .select()
+      .from(fseFascicoliSocialiTable)
+      .where(
+        eq(
+          fseFascicoliSocialiTable.codiceFascicoloNormalizzato,
+          firstCode.toLowerCase(),
+        ),
+      );
+    beneficiaryIds.push(createdProfile.beneficiarioId);
+    expect(createdProfile.versione).toBe(1);
+    expect(
+      await db
+        .select()
+        .from(fseFascicoliSocialiSnapshotTable)
+        .where(
+          eq(
+            fseFascicoliSocialiSnapshotTable.beneficiarioId,
+            createdProfile.beneficiarioId,
+          ),
+        ),
+    ).toHaveLength(1);
+
+    const updates = await Promise.all([
+      upload(app(), "/beneficiari/fse/import", centerA, [
+        concurrentRow({ Disabili: 1 }),
+      ]),
+      upload(app(), "/beneficiari/fse/import", centerA, [
+        concurrentRow({ "Origine straniera e minoranze": 1 }),
+      ]),
+    ]);
+    expect(updates.map((result) => result.status)).toEqual([200, 200]);
+    expect(updates.every((result) => result.body.aggiornati === 1)).toBe(true);
+
+    const [updatedProfile] = await db
+      .select()
+      .from(fseFascicoliSocialiTable)
+      .where(eq(fseFascicoliSocialiTable.id, createdProfile.id));
+    expect(updatedProfile.versione).toBe(3);
+    const authoritativeSnapshots = await db
+      .select()
+      .from(fseFascicoliSocialiSnapshotTable)
+      .where(
+        eq(
+          fseFascicoliSocialiSnapshotTable.beneficiarioId,
+          createdProfile.beneficiarioId,
+        ),
+      );
+    expect(
+      authoritativeSnapshots
+        .map((snapshot) => snapshot.versioneProfilo)
+        .sort((left, right) => left - right),
+    ).toEqual([1, 2, 3]);
+    expect(
+      new Set(
+        authoritativeSnapshots.map((snapshot) => snapshot.versioneProfilo),
+      ).size,
+    ).toBe(3);
+
+    const replay = await upload(app(), "/beneficiari/fse/import", centerA, [
+      concurrentRow({
+        "Origine straniera e minoranze":
+          updatedProfile.origineStranieraMinoranze ?? 0,
+        Disabili: updatedProfile.personeDisabilita ?? 0,
+      }),
+    ]);
+    expect(replay.status).toBe(200);
+    expect(replay.body).toMatchObject({ invariati: 1, aggiornati: 0 });
+  });
+
   it("mantiene il partial success e aggiorna una riga già collegata", async () => {
     const partial = await upload(app(), "/beneficiari/fse/import", centerA, [
       row("PARTIAL-OK", {
@@ -435,7 +577,11 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       }),
     ]);
     expect(partial.status).toBe(200);
-    expect(partial.body).toMatchObject({ stato: "parziale", creati: 1, errori: 1 });
+    expect(partial.body).toMatchObject({
+      stato: "parziale",
+      creati: 1,
+      errori: 1,
+    });
     expect(partial.body.dettagli).toHaveLength(2);
 
     const update = await upload(app(), "/beneficiari/fse/import", centerA, [
@@ -469,25 +615,62 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       consegnaDomicilio: false,
       motivoConsegnaDomicilio: "Scelta interna autorevole",
     });
-    const arbitrary = await insertBeneficiary({ nome: "Target", cognome: "Arbitrario", centroAscoltoId: centerA });
-    const preview = await upload(app(), "/beneficiari/fse/preview", centerA, [duplicateRow]);
-    expect(preview.body.righe[0]).toMatchObject({ classificazione: "possibile_duplicato" });
-    expect(preview.body.righe[0].duplicati.map((item: { id: number }) => item.id)).toContain(target.id);
-
-    const unresolved = await upload(app(), "/beneficiari/fse/import", centerA, [duplicateRow]);
-    expect(unresolved.body).toMatchObject({ stato: "parziale", errori: 1 });
-    expect(unresolved.body.dettagli[0].errori).toContain("DUPLICATO_NON_RISOLTO");
-
-    const rejected = await upload(app(), "/beneficiari/fse/import", centerA, [duplicateRow], {
-      risoluzioni: [{ numeroRiga: 2, azione: "collega", beneficiarioId: arbitrary.id }],
+    const arbitrary = await insertBeneficiary({
+      nome: "Target",
+      cognome: "Arbitrario",
+      centroAscoltoId: centerA,
     });
+    const preview = await upload(app(), "/beneficiari/fse/preview", centerA, [
+      duplicateRow,
+    ]);
+    expect(preview.body.righe[0]).toMatchObject({
+      classificazione: "possibile_duplicato",
+    });
+    expect(
+      preview.body.righe[0].duplicati.map((item: { id: number }) => item.id),
+    ).toContain(target.id);
+
+    const unresolved = await upload(app(), "/beneficiari/fse/import", centerA, [
+      duplicateRow,
+    ]);
+    expect(unresolved.body).toMatchObject({ stato: "parziale", errori: 1 });
+    expect(unresolved.body.dettagli[0].errori).toContain(
+      "DUPLICATO_NON_RISOLTO",
+    );
+
+    const rejected = await upload(
+      app(),
+      "/beneficiari/fse/import",
+      centerA,
+      [duplicateRow],
+      {
+        risoluzioni: [
+          { numeroRiga: 2, azione: "collega", beneficiarioId: arbitrary.id },
+        ],
+      },
+    );
     expect(rejected.body.dettagli[0].errori).toContain("TARGET_NON_CANDIDATO");
 
-    const linked = await upload(app(), "/beneficiari/fse/import", centerA, [duplicateRow], {
-      risoluzioni: [{ numeroRiga: 2, azione: "collega", beneficiarioId: target.id }],
+    const linked = await upload(
+      app(),
+      "/beneficiari/fse/import",
+      centerA,
+      [duplicateRow],
+      {
+        risoluzioni: [
+          { numeroRiga: 2, azione: "collega", beneficiarioId: target.id },
+        ],
+      },
+    );
+    expect(linked.body).toMatchObject({
+      stato: "confermato",
+      collegati: 1,
+      errori: 0,
     });
-    expect(linked.body).toMatchObject({ stato: "confermato", collegati: 1, errori: 0 });
-    const [merged] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, target.id));
+    const [merged] = await db
+      .select()
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, target.id));
     expect(merged).toMatchObject({
       numComponenti: 5,
       numMinori: 1,
@@ -496,9 +679,15 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       dataPresaInCarico: "2026-08-24",
       consegnaDomicilio: false,
     });
-    const [profile] = await db.select().from(fseFascicoliSocialiTable)
+    const [profile] = await db
+      .select()
+      .from(fseFascicoliSocialiTable)
       .where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id));
-    expect(profile).toMatchObject({ numeroComponentiImportato: 5, donneImportate: 3, uominiImportati: 2 });
+    expect(profile).toMatchObject({
+      numeroComponentiImportato: 5,
+      donneImportate: 3,
+      uominiImportati: 2,
+    });
   });
 
   it("non sovrascrive i conteggi di un nucleo interno anagraficamente completo", async () => {
@@ -524,17 +713,44 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       numDisabili: 0,
     });
     await db.insert(nucleoFamiliareTable).values([
-      { beneficiarioId: target.id, nome: "Minore", cognome: "Uno", dataNascita: "2015-01-01", sesso: "F" },
-      { beneficiarioId: target.id, nome: "Minore", cognome: "Due", dataNascita: "2017-01-01", sesso: "M" },
+      {
+        beneficiarioId: target.id,
+        nome: "Minore",
+        cognome: "Uno",
+        dataNascita: "2015-01-01",
+        sesso: "F",
+      },
+      {
+        beneficiarioId: target.id,
+        nome: "Minore",
+        cognome: "Due",
+        dataNascita: "2017-01-01",
+        sesso: "M",
+      },
     ]);
 
-    const preview = await upload(app(), "/beneficiari/fse/preview", centerA, [completeRow]);
-    expect(preview.body.righe[0].duplicati.map((item: { id: number }) => item.id)).toContain(target.id);
-    const linked = await upload(app(), "/beneficiari/fse/import", centerA, [completeRow], {
-      risoluzioni: [{ numeroRiga: 2, azione: "collega", beneficiarioId: target.id }],
-    });
+    const preview = await upload(app(), "/beneficiari/fse/preview", centerA, [
+      completeRow,
+    ]);
+    expect(
+      preview.body.righe[0].duplicati.map((item: { id: number }) => item.id),
+    ).toContain(target.id);
+    const linked = await upload(
+      app(),
+      "/beneficiari/fse/import",
+      centerA,
+      [completeRow],
+      {
+        risoluzioni: [
+          { numeroRiga: 2, azione: "collega", beneficiarioId: target.id },
+        ],
+      },
+    );
     expect(linked.body).toMatchObject({ collegati: 1, errori: 0 });
-    const [preserved] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, target.id));
+    const [preserved] = await db
+      .select()
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, target.id));
     expect(preserved).toMatchObject({
       numComponenti: 3,
       numMinori: 2,
@@ -646,21 +862,46 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       senzaTettoEsclusioneAbitativa: 0,
     });
 
-    const preflight = await request(app()).post("/beneficiari/fse/export/preflight").send({
-      centroAscoltoId: centerExport,
-      areaOperativaId: areaB,
-      dataRiferimento: "2026-08-24",
+    const preflight = await request(app())
+      .post("/beneficiari/fse/export/preflight")
+      .send({
+        centroAscoltoId: centerExport,
+        areaOperativaId: areaB,
+        dataRiferimento: "2026-08-24",
+        soloAttivi: true,
+      });
+    expect(preflight.status).toBe(200);
+    expect(preflight.body).toMatchObject({
+      candidati: 1,
+      esportabili: 1,
+      areaOperativaId: areaA,
       soloAttivi: true,
     });
-    expect(preflight.status).toBe(200);
-    expect(preflight.body).toMatchObject({ candidati: 1, esportabili: 1, areaOperativaId: areaA, soloAttivi: true });
-    expect((await request(app()).post("/beneficiari/fse/export").send({ centroAscoltoId: centerExport, dataRiferimento: "2026-08-24", soloAttivi: false })).status).toBe(400);
+    expect(
+      (
+        await request(app())
+          .post("/beneficiari/fse/export")
+          .send({
+            centroAscoltoId: centerExport,
+            dataRiferimento: "2026-08-24",
+            soloAttivi: false,
+          })
+      ).status,
+    ).toBe(400);
 
-    const exported = await request(app()).post("/beneficiari/fse/export").buffer(true).parse((res, done) => {
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-      res.on("end", () => done(null, Buffer.concat(chunks)));
-    }).send({ centroAscoltoId: centerExport, dataRiferimento: "2026-08-24", soloAttivi: true });
+    const exported = await request(app())
+      .post("/beneficiari/fse/export")
+      .buffer(true)
+      .parse((res, done) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        res.on("end", () => done(null, Buffer.concat(chunks)));
+      })
+      .send({
+        centroAscoltoId: centerExport,
+        dataRiferimento: "2026-08-24",
+        soloAttivi: true,
+      });
     expect(exported.status).toBe(200);
     expect(exported.headers["content-type"]).toContain("spreadsheetml.sheet");
     const parsed = parseFseBeneficiariWorkbook(exported.body as Buffer);
@@ -687,6 +928,28 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     expect(
       exportSnapshots.some((item) => item.origineSnapshot === "export_fse"),
     ).toBe(true);
+
+    const replayedExport = await request(app())
+      .post("/beneficiari/fse/export")
+      .buffer(true)
+      .parse((res, done) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        res.on("end", () => done(null, Buffer.concat(chunks)));
+      })
+      .send({
+        centroAscoltoId: centerExport,
+        dataRiferimento: "2026-08-24",
+        soloAttivi: true,
+      });
+    expect(replayedExport.status).toBe(200);
+    const exportSnapshotsAfterReplay = await db
+      .select()
+      .from(fseFascicoliSocialiSnapshotTable)
+      .where(
+        eq(fseFascicoliSocialiSnapshotTable.beneficiarioId, exportable.id),
+      );
+    expect(exportSnapshotsAfterReplay).toHaveLength(exportSnapshots.length);
   });
 
   it("registra audit tecnici senza nomi o cognomi", async () => {

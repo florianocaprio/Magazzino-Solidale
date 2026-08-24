@@ -1,5 +1,43 @@
-import express, { type Express, type RequestHandler, type Router } from "express";
-import { db, centriAscoltoTable, magazziniTable, beneficiariTable, prodottiTable, fornitoriTable, volontariTable, mezziTable, ruoliTable, utentiTable, lottiTable, scarichiTable, scaricoRigheTable, approvvigionamentiTable, approvvigionamentoRigheTable, consegneTable, bolleTable, bollaRigheTable, prenotazioniMagazzinoTable, interventiTable, trasferimentiTable, trasferimentoRigheTable, movimentiTable, turniTable, turniConsegneTable, turniVolontariTable, areeOperativeTable, zoneUdsTable, auditConfigurazioniTable, ruoliVolontariTable, carichiMagazzinoRigheTable, carichiMagazzinoTable, operazioniDistribuzioneMagazzinoTable } from "@workspace/db";
+import express, {
+  type Express,
+  type RequestHandler,
+  type Router,
+} from "express";
+import {
+  db,
+  centriAscoltoTable,
+  magazziniTable,
+  beneficiariTable,
+  prodottiTable,
+  fornitoriTable,
+  volontariTable,
+  mezziTable,
+  ruoliTable,
+  utentiTable,
+  lottiTable,
+  scarichiTable,
+  scaricoRigheTable,
+  approvvigionamentiTable,
+  approvvigionamentoRigheTable,
+  consegneTable,
+  bolleTable,
+  bollaRigheTable,
+  prenotazioniMagazzinoTable,
+  interventiTable,
+  trasferimentiTable,
+  trasferimentoRigheTable,
+  movimentiTable,
+  turniTable,
+  turniConsegneTable,
+  turniVolontariTable,
+  areeOperativeTable,
+  zoneUdsTable,
+  auditConfigurazioniTable,
+  ruoliVolontariTable,
+  carichiMagazzinoRigheTable,
+  carichiMagazzinoTable,
+  operazioniDistribuzioneMagazzinoTable,
+} from "@workspace/db";
 import { inArray } from "drizzle-orm";
 
 /**
@@ -173,14 +211,23 @@ export function newScope(): SeedScope {
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
-export async function createCentro(scope: SeedScope, nome = `Centro ${rnd()}`): Promise<number> {
-  const [c] = await db.insert(centriAscoltoTable).values({ nome }).returning({ id: centriAscoltoTable.id });
+export async function createCentro(
+  scope: SeedScope,
+  nome = `Centro ${rnd()}`,
+): Promise<number> {
+  const [c] = await db
+    .insert(centriAscoltoTable)
+    .values({ nome })
+    .returning({ id: centriAscoltoTable.id });
   scope.centroIds.push(c.id);
   return c.id;
 }
 
 /** Like {@link createCentro} but accepts a area operativa and returns id + nome. */
-export async function createCentroRec(scope: SeedScope, opts: { areaOperativaId?: number | null; nome?: string } = {}): Promise<{ id: number; nome: string }> {
+export async function createCentroRec(
+  scope: SeedScope,
+  opts: { areaOperativaId?: number | null; nome?: string } = {},
+): Promise<{ id: number; nome: string }> {
   const nome = opts.nome ?? `Centro ${rnd()}`;
   const [c] = await db
     .insert(centriAscoltoTable)
@@ -190,7 +237,11 @@ export async function createCentroRec(scope: SeedScope, opts: { areaOperativaId?
   return { id: c.id, nome };
 }
 
-export async function createMagazzino(scope: SeedScope, centroId: number | null, opts: { areaOperativaId?: number | null } = {}): Promise<number> {
+export async function createMagazzino(
+  scope: SeedScope,
+  centroId: number | null,
+  opts: { areaOperativaId?: number | null } = {},
+): Promise<number> {
   const [m] = await db
     .insert(magazziniTable)
     .values({
@@ -205,7 +256,11 @@ export async function createMagazzino(scope: SeedScope, centroId: number | null,
 }
 
 /** Like {@link createMagazzino} but also returns the generated unique nome. */
-export async function createMagazzinoRec(scope: SeedScope, centroId: number | null, opts: { areaOperativaId?: number | null } = {}): Promise<{ id: number; nome: string }> {
+export async function createMagazzinoRec(
+  scope: SeedScope,
+  centroId: number | null,
+  opts: { areaOperativaId?: number | null } = {},
+): Promise<{ id: number; nome: string }> {
   const nome = `Mag ${rnd()}`;
   const [m] = await db
     .insert(magazziniTable)
@@ -256,9 +311,15 @@ export async function createAreaOperativa(scope: SeedScope): Promise<number> {
   return c.id;
 }
 
-export async function createZona(scope: SeedScope, areaOperativaId: number): Promise<{ id: number; nome: string }> {
+export async function createZona(
+  scope: SeedScope,
+  areaOperativaId: number,
+): Promise<{ id: number; nome: string }> {
   const nome = `Zona ${rnd()}`;
-  const [z] = await db.insert(zoneUdsTable).values({ areaOperativaId, nome }).returning({ id: zoneUdsTable.id });
+  const [z] = await db
+    .insert(zoneUdsTable)
+    .values({ areaOperativaId, nome })
+    .returning({ id: zoneUdsTable.id });
   scope.zonaIds.push(z.id);
   return { id: z.id, nome };
 }
@@ -278,7 +339,10 @@ export async function createProdotto(scope: SeedScope): Promise<number> {
   return p.id;
 }
 
-export async function createFornitore(scope: SeedScope, areaOperativaId: number | null): Promise<number> {
+export async function createFornitore(
+  scope: SeedScope,
+  areaOperativaId: number | null,
+): Promise<number> {
   const [f] = await db
     .insert(fornitoriTable)
     .values({ nome: `Fornitore ${rnd()}`, tipo: "azienda", areaOperativaId })
@@ -287,7 +351,10 @@ export async function createFornitore(scope: SeedScope, areaOperativaId: number 
   return f.id;
 }
 
-export async function createVolontario(scope: SeedScope, centroId: number | null): Promise<number> {
+export async function createVolontario(
+  scope: SeedScope,
+  centroId: number | null,
+): Promise<number> {
   const [v] = await db
     .insert(volontariTable)
     .values({
@@ -303,7 +370,10 @@ export async function createVolontario(scope: SeedScope, centroId: number | null
   return v.id;
 }
 
-export async function createRuoloVolontario(scope: SeedScope, opts: { nome?: string; attivo?: boolean } = {}): Promise<number> {
+export async function createRuoloVolontario(
+  scope: SeedScope,
+  opts: { nome?: string; attivo?: boolean } = {},
+): Promise<number> {
   const [ruolo] = await db
     .insert(ruoliVolontariTable)
     .values({
@@ -315,7 +385,10 @@ export async function createRuoloVolontario(scope: SeedScope, opts: { nome?: str
   return ruolo.id;
 }
 
-export async function createMezzo(scope: SeedScope, opts: { centroId?: number | null; volontarioId?: number | null } = {}): Promise<number> {
+export async function createMezzo(
+  scope: SeedScope,
+  opts: { centroId?: number | null; volontarioId?: number | null } = {},
+): Promise<number> {
   const [m] = await db
     .insert(mezziTable)
     .values({
@@ -332,7 +405,10 @@ export async function createMezzo(scope: SeedScope, opts: { centroId?: number | 
   return m.id;
 }
 
-export async function createRuolo(scope: SeedScope, opts: { isAdmin?: boolean } = {}): Promise<number> {
+export async function createRuolo(
+  scope: SeedScope,
+  opts: { isAdmin?: boolean } = {},
+): Promise<number> {
   const [r] = await db
     .insert(ruoliTable)
     .values({
@@ -345,7 +421,10 @@ export async function createRuolo(scope: SeedScope, opts: { isAdmin?: boolean } 
   return r.id;
 }
 
-export async function createUtente(scope: SeedScope, opts: { centroId?: number | null; ruoloId?: number | null } = {}): Promise<number> {
+export async function createUtente(
+  scope: SeedScope,
+  opts: { centroId?: number | null; ruoloId?: number | null } = {},
+): Promise<number> {
   const [u] = await db
     .insert(utentiTable)
     .values({
@@ -390,7 +469,10 @@ export async function createLotto(
   return l.id;
 }
 
-export async function insertScarico(scope: SeedScope, opts: { magazzinoId: number; centroId: number | null }): Promise<number> {
+export async function insertScarico(
+  scope: SeedScope,
+  opts: { magazzinoId: number; centroId: number | null },
+): Promise<number> {
   const [s] = await db
     .insert(scarichiTable)
     .values({
@@ -405,7 +487,10 @@ export async function insertScarico(scope: SeedScope, opts: { magazzinoId: numbe
   return s.id;
 }
 
-export async function insertApprovvigionamento(scope: SeedScope, opts: { magazzinoId: number; centroId: number | null }): Promise<number> {
+export async function insertApprovvigionamento(
+  scope: SeedScope,
+  opts: { magazzinoId: number; centroId: number | null },
+): Promise<number> {
   const [a] = await db
     .insert(approvvigionamentiTable)
     .values({
@@ -579,7 +664,10 @@ export async function insertIntervento(
   return i.id;
 }
 
-export async function insertTrasferimento(scope: SeedScope, opts: { origineId: number; destinoId: number }): Promise<number> {
+export async function insertTrasferimento(
+  scope: SeedScope,
+  opts: { origineId: number; destinoId: number },
+): Promise<number> {
   const [t] = await db
     .insert(trasferimentiTable)
     .values({
@@ -604,6 +692,8 @@ export async function insertMovimento(
     tipoMovimento?: typeof movimentiTable.$inferInsert.tipoMovimento;
     naturaContabile?: typeof movimentiTable.$inferInsert.naturaContabile;
     fondoOrigine?: typeof movimentiTable.$inferInsert.fondoOrigine;
+    operazioneDistribuzioneId?: number | null;
+    canaleOperativo?: typeof movimentiTable.$inferInsert.canaleOperativo;
   },
 ): Promise<number> {
   void scope;
@@ -621,6 +711,8 @@ export async function insertMovimento(
       unitaMisura: "kg",
       naturaContabile: opts.naturaContabile,
       fondoOrigine: opts.fondoOrigine,
+      operazioneDistribuzioneId: opts.operazioneDistribuzioneId ?? null,
+      canaleOperativo: opts.canaleOperativo,
     })
     .returning({ id: movimentiTable.id });
   return m.id;
@@ -748,38 +840,62 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(mezziTable).where(inArray(mezziTable.id, scope.mezzoIds));
   }
   if (scope.prodottoIds.length > 0) {
-    await db.delete(prodottiTable).where(inArray(prodottiTable.id, scope.prodottoIds));
+    await db
+      .delete(prodottiTable)
+      .where(inArray(prodottiTable.id, scope.prodottoIds));
   }
   if (scope.fornitoreIds.length > 0) {
-    await db.delete(fornitoriTable).where(inArray(fornitoriTable.id, scope.fornitoreIds));
+    await db
+      .delete(fornitoriTable)
+      .where(inArray(fornitoriTable.id, scope.fornitoreIds));
   }
   if (scope.volontarioIds.length > 0) {
-    await db.delete(volontariTable).where(inArray(volontariTable.id, scope.volontarioIds));
+    await db
+      .delete(volontariTable)
+      .where(inArray(volontariTable.id, scope.volontarioIds));
   }
   if (scope.ruoloVolontarioIds.length > 0) {
-    await db.delete(ruoliVolontariTable).where(inArray(ruoliVolontariTable.id, scope.ruoloVolontarioIds));
+    await db
+      .delete(ruoliVolontariTable)
+      .where(inArray(ruoliVolontariTable.id, scope.ruoloVolontarioIds));
   }
   if (scope.beneficiarioIds.length > 0) {
-    await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, scope.beneficiarioIds));
+    await db
+      .delete(beneficiariTable)
+      .where(inArray(beneficiariTable.id, scope.beneficiarioIds));
   }
   if (scope.magazzinoIds.length > 0) {
-    await db.delete(magazziniTable).where(inArray(magazziniTable.id, scope.magazzinoIds));
+    await db
+      .delete(magazziniTable)
+      .where(inArray(magazziniTable.id, scope.magazzinoIds));
   }
   if (scope.utenteIds.length > 0) {
-    await db.delete(interventiTable).where(inArray(interventiTable.operatoreId, scope.utenteIds));
-    await db.delete(auditConfigurazioniTable).where(inArray(auditConfigurazioniTable.utenteId, scope.utenteIds));
-    await db.delete(utentiTable).where(inArray(utentiTable.id, scope.utenteIds));
+    await db
+      .delete(interventiTable)
+      .where(inArray(interventiTable.operatoreId, scope.utenteIds));
+    await db
+      .delete(auditConfigurazioniTable)
+      .where(inArray(auditConfigurazioniTable.utenteId, scope.utenteIds));
+    await db
+      .delete(utentiTable)
+      .where(inArray(utentiTable.id, scope.utenteIds));
   }
   if (scope.ruoloIds.length > 0) {
     await db.delete(ruoliTable).where(inArray(ruoliTable.id, scope.ruoloIds));
   }
   if (scope.centroIds.length > 0) {
-    await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, scope.centroIds));
+    await db
+      .delete(centriAscoltoTable)
+      .where(inArray(centriAscoltoTable.id, scope.centroIds));
   }
   if (scope.zonaIds.length > 0) {
-    await db.delete(zoneUdsTable).where(inArray(zoneUdsTable.id, scope.zonaIds));
+    await db
+      .delete(zoneUdsTable)
+      .where(inArray(zoneUdsTable.id, scope.zonaIds));
   }
   if (scope.areaOperativaIds.length > 0) {
-    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, scope.areaOperativaIds));
+    await db
+      .delete(areeOperativeTable)
+      .where(inArray(areeOperativeTable.id, scope.areaOperativaIds));
   }
 }

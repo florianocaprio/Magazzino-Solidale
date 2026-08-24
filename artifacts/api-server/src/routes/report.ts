@@ -23,13 +23,36 @@ const requireAnyFseSource = requireAnyModulo([
   "MENSA",
   "UDS",
 ]);
+const requireFseSourceArea = (
+  req: Parameters<typeof requireReportOnly>[0],
+  res: Parameters<typeof requireReportOnly>[1],
+  next: Parameters<typeof requireReportOnly>[2],
+) => {
+  const sourceAreas = [
+    "sociale",
+    "emporio",
+    "mensa",
+    "uds",
+    "magazzino",
+    "logistica",
+  ];
+  if (
+    req.user?.isAdmin ||
+    sourceAreas.some((area) => req.user?.aree.includes(area))
+  ) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: "Area sorgente FSE+ richiesta" });
+};
 
 router.use("/report", (req, res, next) => {
-  const guard = req.path === "/fse-plus"
-    ? requireReportOnly
-    : isUdsReportRequest(req)
-      ? requireReportUds
-      : requireReportCentro;
+  const guard =
+    req.path === "/fse-plus"
+      ? requireReportOnly
+      : isUdsReportRequest(req)
+        ? requireReportUds
+        : requireReportCentro;
   guard(req, res, next);
 });
 router.use("/report", (req, res, next) => {
@@ -418,6 +441,7 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
 router.get(
   "/report/fse-plus",
   requirePermission("magazzino.fse.view"),
+  requireFseSourceArea,
   requireAnyFseSource,
   async (req, res) => {
     res.setHeader("Deprecation", "true");
