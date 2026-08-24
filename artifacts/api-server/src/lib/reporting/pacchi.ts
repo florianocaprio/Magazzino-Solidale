@@ -12,8 +12,8 @@ function pacchiConditions(filters: ReportFilters): SQL[] {
     )`,
     sql`b.data_bolla::date BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
-      areaOperativa: sql`be.area_operativa_id`,
-      centro: sql`be.centro_ascolto_id`,
+      areaOperativa: sql`COALESCE(b.area_operativa_id_snapshot, be.area_operativa_id)`,
+      centro: sql`COALESCE(b.centro_ascolto_id_snapshot, be.centro_ascolto_id)`,
       magazzino: sql`b.magazzino_id`,
     }),
   ];
@@ -33,15 +33,14 @@ export async function pacchiMetrics(filters: ReportFilters) {
   `);
   const [people] = await rows<Record<string, unknown>>(sql`
     WITH famiglie AS (
-      SELECT DISTINCT b.beneficiario_id
+      SELECT DISTINCT ON (b.beneficiario_id) b.beneficiario_id,
+             COALESCE(b.numero_componenti_nucleo_snapshot, be.num_componenti) AS numero_componenti
       FROM bolle b
       JOIN beneficiari be ON be.id = b.beneficiario_id
       WHERE ${where}
+      ORDER BY b.beneficiario_id, b.data_bolla DESC, b.id DESC
     )
-    SELECT COUNT(*) + COALESCE((
-      SELECT COUNT(*) FROM nucleo_familiare nf
-      JOIN famiglie f ON f.beneficiario_id = nf.beneficiario_id
-    ), 0) AS persone
+    SELECT COALESCE(SUM(numero_componenti), 0) AS persone
     FROM famiglie
   `);
   return {
@@ -69,10 +68,14 @@ export async function buildPacchiReport(filters: ReportFilters) {
     rows<Record<string, unknown>>(sql`
       WITH consumo_lotti AS (
         SELECT mv.bolla_riga_id,
-               SUM(abs(mv.quantita::numeric)) FILTER (WHERE mv.fondo_origine = 'FSE_PLUS') AS quantita_fse
+               SUM(CASE
+                 WHEN mv.natura_contabile = 'DISTRIBUZIONE_FINALE' THEN abs(mv.quantita::numeric)
+                 WHEN mv.natura_contabile = 'STORNO' AND original.natura_contabile = 'DISTRIBUZIONE_FINALE' THEN -abs(mv.quantita::numeric)
+                 WHEN mv.natura_contabile = 'LEGACY' AND mv.tipo_movimento = 'scarico' THEN abs(mv.quantita::numeric)
+                 ELSE 0 END) FILTER (WHERE mv.fondo_origine = 'FSE_PLUS') AS quantita_fse
         FROM movimenti mv
-        JOIN lotti l ON l.id = mv.lotto_id
-        WHERE mv.bolla_riga_id IS NOT NULL AND mv.tipo_movimento = 'scarico'
+        LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+        WHERE mv.bolla_riga_id IS NOT NULL
         GROUP BY mv.bolla_riga_id
       )
       SELECT p.id AS prodotto_id, p.nome AS prodotto_nome, br.unita_misura,
@@ -95,7 +98,7 @@ export async function buildPacchiReport(filters: ReportFilters) {
              COUNT(DISTINCT b.beneficiario_id) AS nuclei
       FROM bolle b
       JOIN beneficiari be ON be.id = b.beneficiario_id
-      LEFT JOIN centri_di_ascolto ca ON ca.id = be.centro_ascolto_id
+      LEFT JOIN centri_di_ascolto ca ON ca.id = COALESCE(b.centro_ascolto_id_snapshot, be.centro_ascolto_id)
       WHERE ${where}
       GROUP BY ca.id, ca.nome ORDER BY pacchi DESC, centro
     `),
@@ -109,8 +112,12 @@ export async function buildPacchiReport(filters: ReportFilters) {
              COUNT(*) FILTER (WHERE be.sesso IS NULL OR trim(be.sesso) = '') AS sesso_mancante,
              COUNT(*) FILTER (WHERE be.num_componenti > 1 AND NOT EXISTS (
                SELECT 1 FROM nucleo_familiare nf WHERE nf.beneficiario_id = be.id
-             )) AS nucleo_incompleto
+             )) AS nucleo_incompleto,
+             COUNT(*) FILTER (WHERE b.area_operativa_id_snapshot IS NULL OR b.centro_ascolto_id_snapshot IS NULL) AS territorio_legacy,
+             COUNT(*) FILTER (WHERE b.numero_componenti_nucleo_snapshot IS NULL) AS nucleo_storico_legacy
       FROM beneficiari be JOIN famiglie f ON f.id = be.id
+      JOIN bolle b ON b.beneficiario_id = be.id
+      WHERE ${where}
     `),
   ]);
 
@@ -153,8 +160,42 @@ export async function buildPacchiReport(filters: ReportFilters) {
         })),
       },
     ],
-    quality: [quality("dataNascitaMancante", number(dq.nascita_mancante), number(dq.nascita_mancante) ? "derivable" : "ok"), quality("sessoMancante", number(dq.sesso_mancante), number(dq.sesso_mancante) ? "derivable" : "ok"), quality("nucleoIncompleto", number(dq.nucleo_incompleto), number(dq.nucleo_incompleto) ? "derivable" : "ok")],
-    definitions: ["Pacco distribuito = bolla nello stato consegnato nel periodo non associata a una spesa Emporio chiusa.", "Nucleo servito = beneficiario distinto associato a una bolla consegnata.", "Persone raggiunte = titolare più membri del nucleo registrati per i nuclei serviti.", "La quantità FSE+ deriva dai Movimenti scaricati con snapshot Fondo FSE_PLUS.", "Le quantità sono mostrate per prodotto e unità; soltanto i kg vengono aggregati nel KPI dedicato."],
+    quality: [
+      quality(
+        "dataNascitaMancante",
+        number(dq.nascita_mancante),
+        number(dq.nascita_mancante) ? "derivable" : "ok",
+      ),
+      quality(
+        "sessoMancante",
+        number(dq.sesso_mancante),
+        number(dq.sesso_mancante) ? "derivable" : "ok",
+      ),
+      quality(
+        "nucleoIncompleto",
+        number(dq.nucleo_incompleto),
+        number(dq.nucleo_incompleto) ? "derivable" : "ok",
+      ),
+      quality(
+        "territorioStoricoDerivato",
+        number(dq.territorio_legacy),
+        number(dq.territorio_legacy) ? "derivable" : "ok",
+        "Territorio storico derivato dall'anagrafica corrente per Bolle legacy prive di snapshot.",
+      ),
+      quality(
+        "nucleoStoricoDerivato",
+        number(dq.nucleo_storico_legacy),
+        number(dq.nucleo_storico_legacy) ? "derivable" : "ok",
+        "Numero del nucleo derivato dall'anagrafica corrente per Bolle legacy prive di snapshot.",
+      ),
+    ],
+    definitions: [
+      "Pacco distribuito = bolla nello stato consegnato nel periodo non associata a una spesa Emporio chiusa.",
+      "Nucleo servito = beneficiario distinto associato a una bolla consegnata.",
+      "Persone raggiunte = snapshot del numero componenti del nucleo; il fallback legacy è segnalato come derivato.",
+      "La quantità FSE+ deriva esclusivamente dai Movimenti e dal loro snapshot Fondo FSE_PLUS, al netto degli storni.",
+      "Le quantità sono mostrate per prodotto e unità; soltanto i kg vengono aggregati nel KPI dedicato.",
+    ],
   });
 }
 

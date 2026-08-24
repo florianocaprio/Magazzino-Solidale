@@ -11,6 +11,7 @@ import type { BeneficiariFseImportResultStato } from './beneficiariFseImportResu
 export interface BeneficiariFseImportResult {
   batchId: number;
   stato: BeneficiariFseImportResultStato;
+  dataRiferimento: Date;
   creati: number;
   collegati: number;
   aggiornati: number;

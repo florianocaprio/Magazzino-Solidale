@@ -8,6 +8,7 @@ import type {
   ReportingDashboard,
 } from "./types";
 import { publicFilters } from "./types";
+import { REPORTING_MODEL_VERSION } from "./version";
 
 export function kpi(
   key: string,
@@ -39,7 +40,7 @@ export function dashboard(input: {
   definitions: string[];
 }): ReportingDashboard {
   return {
-    reportingModelVersion: "MAGAZZINO_2_0C_V1",
+    reportingModelVersion: REPORTING_MODEL_VERSION,
     section: input.section,
     filters: publicFilters(input.filters),
     kpi: input.kpi,

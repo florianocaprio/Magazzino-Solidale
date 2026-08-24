@@ -1,4 +1,14 @@
-export type ReportSection = "generale" | "pacchi" | "centro-ascolto" | "emporio" | "mensa" | "uds" | "magazzino-logistica" | "fse-plus";
+import type { REPORTING_MODEL_VERSION } from "./version";
+
+export type ReportSection =
+  | "generale"
+  | "pacchi"
+  | "centro-ascolto"
+  | "emporio"
+  | "mensa"
+  | "uds"
+  | "magazzino-logistica"
+  | "fse-plus";
 
 export type ReportAvailability = "ok" | "derivable" | "missing";
 
@@ -58,9 +68,17 @@ export type ReportQualityItem = {
 };
 
 export type ReportingDashboard = {
-  reportingModelVersion: "MAGAZZINO_2_0C_V1";
+  reportingModelVersion: typeof REPORTING_MODEL_VERSION;
   section: ReportSection;
-  filters: Omit<ReportFilters, "areaOperativaMode" | "centroMode" | "zonaMode" | "callerAreas" | "callerPermissions" | "callerIsAdmin">;
+  filters: Omit<
+    ReportFilters,
+    | "areaOperativaMode"
+    | "centroMode"
+    | "zonaMode"
+    | "callerAreas"
+    | "callerPermissions"
+    | "callerIsAdmin"
+  >;
   kpi: ReportKpi[];
   series: ReportSeries[];
   tables: ReportTable[];
@@ -71,7 +89,7 @@ export type ReportingDashboard = {
 };
 
 export type ReportDrilldown = {
-  reportingModelVersion: "MAGAZZINO_2_0C_V1";
+  reportingModelVersion: typeof REPORTING_MODEL_VERSION;
   section: ReportSection;
   metric: string;
   page: number;

@@ -9,6 +9,8 @@
 export interface BeneficiariFseWorkbookUpload {
   /** @minimum 1 */
   centroAscoltoId: number;
+  /** Data civile Europe/Rome da cui i dati importati sono storicamente validi. */
+  dataRiferimento: Date;
   /** Workbook XLSX reale; non viene conservato dal server. */
   file: Uint8Array;
 }

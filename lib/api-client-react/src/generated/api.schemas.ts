@@ -29,6 +29,8 @@ export interface BeneficiariFseRowInput {
 export interface BeneficiariFseWorkbookUpload {
   /** @minimum 1 */
   centroAscoltoId: number;
+  /** Data civile Europe/Rome da cui i dati importati sono storicamente validi. */
+  dataRiferimento: string;
   /** Workbook XLSX reale; non viene conservato dal server. */
   file: Blob;
 }
@@ -52,6 +54,8 @@ export interface BeneficiariFseImportResolution {
 export interface BeneficiariFseWorkbookImportUpload {
   /** @minimum 1 */
   centroAscoltoId: number;
+  /** Data confermata nella preview e rivalidata dal server. */
+  dataRiferimento: string;
   /** Lo stesso workbook XLSX reale viene rivalidato dal server. */
   file: Blob;
   /** Array JSON di BeneficiariFseImportResolution. */
@@ -99,6 +103,7 @@ export interface BeneficiariFsePreviewResult {
   righe: BeneficiariFsePreviewRow[];
   conteggi: BeneficiariFsePreviewResultConteggi;
   numeroRighe: number;
+  dataRiferimento: string;
 }
 
 export type BeneficiariFseImportDetailEsito = typeof BeneficiariFseImportDetailEsito[keyof typeof BeneficiariFseImportDetailEsito];
@@ -132,6 +137,7 @@ export const BeneficiariFseImportResultStato = {
 export interface BeneficiariFseImportResult {
   batchId: number;
   stato: BeneficiariFseImportResultStato;
+  dataRiferimento: string;
   creati: number;
   collegati: number;
   aggiornati: number;
@@ -187,6 +193,13 @@ export interface BeneficiarioFseUpdate {
      * @nullable
      */
   senzaTettoEsclusioneAbitativa?: number | null;
+  /** Data civile Europe/Rome di validità storica della correzione. */
+  dataRiferimento: string;
+  /**
+     * Versione letta dal chiamante per optimistic locking; 0 se il profilo non esiste ancora.
+     * @minimum 0
+     */
+  versione: number;
 }
 
 export interface BeneficiarioFseSnapshot {
@@ -270,9 +283,19 @@ export interface BeneficiarioFseProfile {
   /** @nullable */
   senzaTettoEsclusioneAbitativa: number | null;
   /** @nullable */
+  personeDisabilita: number | null;
+  /** @nullable */
   tipologiaAttivitaImportata?: string | null;
   /** @nullable */
   statoAttualeImportato?: string | null;
+  /** @nullable */
+  dataRiferimento: string | null;
+  /** @nullable */
+  origineDato: string | null;
+  /** @nullable */
+  attendibilitaDato: string | null;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   ultimoImportBatchId?: number | null;
   /** @nullable */
@@ -684,7 +707,7 @@ export type ReportingDashboardReportingModelVersion = typeof ReportingDashboardR
 
 
 export const ReportingDashboardReportingModelVersion = {
-  MAGAZZINO_2_0C_V1: 'MAGAZZINO_2_0C_V1',
+  REPORTING_2_0_V1: 'REPORTING_2_0_V1',
 } as const;
 
 export type ReportingDashboardSection = typeof ReportingDashboardSection[keyof typeof ReportingDashboardSection];
@@ -824,7 +847,7 @@ export type ReportDrilldownReportingModelVersion = typeof ReportDrilldownReporti
 
 
 export const ReportDrilldownReportingModelVersion = {
-  MAGAZZINO_2_0C_V1: 'MAGAZZINO_2_0C_V1',
+  REPORTING_2_0_V1: 'REPORTING_2_0_V1',
 } as const;
 
 export type ReportDrilldownRowsItem = { [key: string]: unknown };

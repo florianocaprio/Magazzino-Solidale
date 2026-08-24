@@ -17,6 +17,7 @@ import { buildFsePlusReport } from "../lib/reporting/fsePlus";
 import {
   parsePagination,
   parseReportFilters,
+  assertReportFilterScope,
   ReportingError,
 } from "../lib/reporting/filters";
 import { buildDrilldown } from "../lib/reporting/drilldown";
@@ -69,7 +70,9 @@ function reportHandler(
 ): RequestHandler {
   return async (req, res) => {
     try {
-      res.json(await builder(parseReportFilters(req)));
+      const filters = parseReportFilters(req);
+      await assertReportFilterScope(req, filters);
+      res.json(await builder(filters));
     } catch (error) {
       if (sendError(error, res)) return;
       throw error;
@@ -90,6 +93,7 @@ router.use(
     "/report/filter-options",
     "/report/drilldown",
   ],
+  requireSourceArea("analisi"),
   requireModulo("REPORT"),
 );
 
@@ -223,6 +227,17 @@ router.get("/report/drilldown", async (req, res) => {
       throw new ReportingError(403, "Permesso magazzino.fse.view richiesto");
     if (!metric || metric.length > 80)
       throw new ReportingError(400, "metric non valida");
+    if (
+      section === "fse-plus" &&
+      ["nucleiRaggiunti", "personeRaggiunte"].includes(metric) &&
+      !req.user?.isAdmin &&
+      !req.user?.permessi.includes("beneficiari.fse.view")
+    ) {
+      throw new ReportingError(
+        403,
+        "Permesso beneficiari.fse.view richiesto per il dettaglio individuale",
+      );
+    }
     const requiredModule: Partial<Record<ReportSection, string>> = {
       pacchi: "MAGAZZINO_SOLIDALE",
       "centro-ascolto": "CENTRO_ASCOLTO",
@@ -268,6 +283,7 @@ router.get("/report/drilldown", async (req, res) => {
       );
     }
     const filters = parseReportFilters(req);
+    await assertReportFilterScope(req, filters);
     const pagination = parsePagination(req);
     res.json(await buildDrilldown({ section, metric, filters, ...pagination }));
   } catch (error) {

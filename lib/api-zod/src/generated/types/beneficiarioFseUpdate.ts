@@ -27,4 +27,11 @@ export interface BeneficiarioFseUpdate {
      * @nullable
      */
   senzaTettoEsclusioneAbitativa?: number | null;
+  /** Data civile Europe/Rome di validità storica della correzione. */
+  dataRiferimento: Date;
+  /**
+     * Versione letta dal chiamante per optimistic locking; 0 se il profilo non esiste ancora.
+     * @minimum 0
+     */
+  versione: number;
 }

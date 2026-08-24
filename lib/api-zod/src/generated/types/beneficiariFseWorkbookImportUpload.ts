@@ -9,6 +9,8 @@
 export interface BeneficiariFseWorkbookImportUpload {
   /** @minimum 1 */
   centroAscoltoId: number;
+  /** Data confermata nella preview e rivalidata dal server. */
+  dataRiferimento: Date;
   /** Lo stesso workbook XLSX reale viene rivalidato dal server. */
   file: Uint8Array;
   /** Array JSON di BeneficiariFseImportResolution. */

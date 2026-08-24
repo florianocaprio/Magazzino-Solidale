@@ -21,8 +21,8 @@ function accessConditions(filters: ReportFilters): SQL[] {
     sql`c.stato_accesso_emporio = 'effettuato'`,
     sql`COALESCE(c.data_ora_effettiva_accesso::date, c.data_prevista) BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
-      areaOperativa: sql`be.area_operativa_id`,
-      centro: sql`be.centro_ascolto_id`,
+      areaOperativa: sql`COALESCE(c.area_operativa_id_snapshot, be.area_operativa_id)`,
+      centro: sql`COALESCE(c.centro_ascolto_id_snapshot, be.centro_ascolto_id)`,
       magazzino: sql`c.magazzino_emporio_id`,
     }),
   ];

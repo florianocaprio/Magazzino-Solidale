@@ -23,7 +23,11 @@ function warehouseConditions(
         : sql`md.centro_ascolto_id`;
   const id =
     alias === "mg" ? sql`mg.id` : alias === "mo" ? sql`mo.id` : sql`md.id`;
-  return reportScope(filters, { areaOperativa, centro, magazzino: id });
+  return reportScope(
+    filters,
+    { areaOperativa, centro, magazzino: id },
+    { sharedAreaOperativa: true, sharedCentro: true },
+  );
 }
 
 function movementConditions(filters: ReportFilters): SQL[] {

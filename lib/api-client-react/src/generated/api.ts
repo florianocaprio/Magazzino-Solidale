@@ -7555,6 +7555,7 @@ export const getPreviewBeneficiariFseUrl = () => {
 export const previewBeneficiariFse = async (beneficiariFseWorkbookUpload: BeneficiariFseWorkbookUpload, options?: RequestInit): Promise<BeneficiariFsePreviewResult> => {
     const formData = new FormData();
 formData.append(`centroAscoltoId`, beneficiariFseWorkbookUpload.centroAscoltoId.toString())
+formData.append(`dataRiferimento`, beneficiariFseWorkbookUpload.dataRiferimento);
 formData.append(`file`, beneficiariFseWorkbookUpload.file);
 
   return customFetch<BeneficiariFsePreviewResult>(getPreviewBeneficiariFseUrl(),
@@ -7630,6 +7631,7 @@ export const getImportBeneficiariFseUrl = () => {
 export const importBeneficiariFse = async (beneficiariFseWorkbookImportUpload: BeneficiariFseWorkbookImportUpload, options?: RequestInit): Promise<BeneficiariFseImportResult> => {
     const formData = new FormData();
 formData.append(`centroAscoltoId`, beneficiariFseWorkbookImportUpload.centroAscoltoId.toString())
+formData.append(`dataRiferimento`, beneficiariFseWorkbookImportUpload.dataRiferimento);
 formData.append(`file`, beneficiariFseWorkbookImportUpload.file);
 if(beneficiariFseWorkbookImportUpload.risoluzioni !== undefined) {
  formData.append(`risoluzioni`, beneficiariFseWorkbookImportUpload.risoluzioni);

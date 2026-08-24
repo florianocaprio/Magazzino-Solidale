@@ -1,5 +1,6 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportDrilldown, ReportFilters, ReportSection } from "./types";
+import { REPORTING_MODEL_VERSION } from "./version";
 import { ReportingError } from "./filters";
 import { andSql, number, reportScope, rows } from "./sql";
 import { pacchiConditions } from "./pacchi";
@@ -8,7 +9,11 @@ import { accessConditions, speseConditions } from "./emporio";
 import { mealConditions, mensaAccessConditions } from "./mensa";
 import { udsBaseConditions, udsEventDate } from "./uds";
 import { movementConditions, transferCondition } from "./logistica";
-import { fseBollaSourceCondition } from "./fsePlus";
+import { fseAuthorizedMovementCondition } from "./fsePlus";
+import {
+  fseCanonicalPeriodCondition,
+  fseNetDistributedQuantity,
+} from "./fseCanonicalFacts";
 
 type DetailDefinition = { columns: string[]; query: SQL };
 
@@ -322,98 +327,189 @@ function detailDefinition(section: ReportSection, metric: string, filters: Repor
     };
   }
   if (section === "fse-plus") {
+    const warehouseScope = andSql(
+      reportScope(
+        filters,
+        {
+          areaOperativa: sql`mg.area_operativa_id`,
+          centro: sql`mg.centro_ascolto_id`,
+          magazzino: sql`mg.id`,
+        },
+        { sharedAreaOperativa: true, sharedCentro: true },
+      ),
+    );
+    const authorizedMovement = fseAuthorizedMovementCondition(filters);
+    const netDistributedQuantity = fseNetDistributedQuantity(sql`mv.quantita`);
     if (metric === "nucleiRaggiunti" || metric === "personeRaggiunte") {
       const peopleCte = sql`
         WITH famiglie AS (
           SELECT DISTINCT be.id, be.codice
-          FROM movimenti mv JOIN lotti l ON l.id = mv.lotto_id
-          JOIN bolla_righe br ON br.id = mv.bolla_riga_id JOIN bolle b ON b.id = br.bolla_id
+          FROM movimenti mv
+          LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+          JOIN magazzini mg ON mg.id = mv.magazzino_id
+          LEFT JOIN bolla_righe br_famiglia ON br_famiglia.id = COALESCE(
+            mv.bolla_riga_id,
+            original.bolla_riga_id
+          )
+          JOIN bolle b ON b.id = COALESCE(
+            mv.bolla_id,
+            original.bolla_id,
+            br_famiglia.bolla_id
+          )
           JOIN beneficiari be ON be.id = b.beneficiario_id
-          WHERE mv.tipo_movimento = 'scarico' AND mv.fondo_origine = 'FSE_PLUS'
-            AND b.stato = 'consegnato'
-            AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
-            AND ${andSql(reportScope(filters, { areaOperativa: sql`be.area_operativa_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
-            AND ${fseBollaSourceCondition(filters)}
+          WHERE ${fseCanonicalPeriodCondition(filters, warehouseScope, authorizedMovement)}
+            AND ${andSql(
+              reportScope(filters, {
+                areaOperativa: sql`COALESCE(b.area_operativa_id_snapshot, be.area_operativa_id)`,
+                centro: sql`COALESCE(b.centro_ascolto_id_snapshot, be.centro_ascolto_id)`,
+              }),
+            )}
+        ), profili AS (
+          SELECT f.*, fs.numero_componenti, fs.donne, fs.uomini,
+                 fs.eta_0_17, fs.eta_18_29, fs.eta_30_64, fs.eta_65_plus,
+                 fs.data_riferimento, fs.origine_snapshot
+          FROM famiglie f
+          LEFT JOIN LATERAL (
+            SELECT s.* FROM fse_fascicoli_sociali_snapshot s
+            WHERE s.beneficiario_id = f.id AND s.data_riferimento <= ${filters.a}
+            ORDER BY s.data_riferimento DESC, s.versione_profilo DESC, s.data_creazione DESC, s.id DESC
+            LIMIT 1
+          ) fs ON true
         )`;
       if (metric === "nucleiRaggiunti") {
         return {
-          columns: ["id", "beneficiarioCodice"],
+          columns: [
+            "id",
+            "beneficiarioCodice",
+            "dataRiferimento",
+            "origineSnapshot",
+            "numeroComponenti",
+          ],
           query: sql`${peopleCte}
-            SELECT id, codice AS beneficiario_codice, COUNT(*) OVER() AS full_count
-            FROM famiglie ORDER BY codice, id ${pagination}`,
+            SELECT id, codice AS beneficiario_codice, data_riferimento,
+                   origine_snapshot, numero_componenti, COUNT(*) OVER() AS full_count
+            FROM profili ORDER BY codice, id ${pagination}`,
         };
       }
       return {
-        columns: ["id", "beneficiarioCodice", "tipo"],
-        query: sql`${peopleCte}, persone AS (
-            SELECT 'b-' || f.id::text AS id, f.codice AS beneficiario_codice, 'titolare'::text AS tipo FROM famiglie f
-            UNION ALL
-            SELECT 'n-' || nf.id::text, f.codice, 'componente'::text
-            FROM famiglie f JOIN nucleo_familiare nf ON nf.beneficiario_id = f.id
-          )
-          SELECT id, beneficiario_codice, tipo, COUNT(*) OVER() AS full_count
-          FROM persone ORDER BY beneficiario_codice, id ${pagination}`,
+        columns: [
+          "id",
+          "beneficiarioCodice",
+          "persone",
+          "donne",
+          "uomini",
+          "eta017",
+          "eta1829",
+          "eta3064",
+          "eta65Plus",
+          "dataRiferimento",
+        ],
+        query: sql`${peopleCte}
+          SELECT id, codice AS beneficiario_codice, numero_componenti AS persone,
+                 donne, uomini, eta_0_17, eta_18_29, eta_30_64, eta_65_plus,
+                 data_riferimento, COUNT(*) OVER() AS full_count
+          FROM profili ORDER BY codice, id ${pagination}`,
       };
     }
     if (metric === "prodottiFseDistinti") {
       return {
-        columns: ["prodottoId", "codice", "prodotto", "unita", "documenti", "lotti", "movimenti"],
+        columns: [
+          "prodottoId",
+          "codice",
+          "prodotto",
+          "unita",
+          "documenti",
+          "lotti",
+          "movimenti",
+          "quantitaNetta",
+        ],
         query: sql`
           SELECT p.id AS prodotto_id, p.codice, p.nome AS prodotto,
                  string_agg(DISTINCT mv.unita_misura, ', ' ORDER BY mv.unita_misura) AS unita,
-                 COUNT(DISTINCT b.id) AS documenti,
+                 COUNT(DISTINCT COALESCE(mv.documento_riferimento, op.numero_documento)) AS documenti,
                  COUNT(DISTINCT l.id) AS lotti,
                  COUNT(DISTINCT mv.id) AS movimenti,
+                 SUM(${netDistributedQuantity}) AS quantita_netta,
                  COUNT(*) OVER() AS full_count
           FROM movimenti mv
-          JOIN lotti l ON l.id = mv.lotto_id
-          JOIN bolla_righe br ON br.id = mv.bolla_riga_id
-          JOIN bolle b ON b.id = br.bolla_id
-          JOIN beneficiari be ON be.id = b.beneficiario_id
-          JOIN prodotti p ON p.id = br.prodotto_id
-          WHERE mv.tipo_movimento = 'scarico' AND mv.fondo_origine = 'FSE_PLUS'
-            AND b.stato = 'consegnato'
-            AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
-            AND ${andSql(reportScope(filters, { areaOperativa: sql`be.area_operativa_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
-            AND ${fseBollaSourceCondition(filters)}
+          LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+          LEFT JOIN lotti l ON l.id = mv.lotto_id
+          LEFT JOIN operazioni_distribuzione_magazzino op ON op.id = COALESCE(mv.operazione_distribuzione_id, original.operazione_distribuzione_id)
+          JOIN prodotti p ON p.id = mv.prodotto_id
+          JOIN magazzini mg ON mg.id = mv.magazzino_id
+          WHERE ${fseCanonicalPeriodCondition(filters, warehouseScope, authorizedMovement)}
           GROUP BY p.id, p.codice, p.nome
           ORDER BY p.nome, p.id ${pagination}
         `,
       };
     }
     return {
-      columns: ["id", "data", "documento", "beneficiarioCodice", "prodotto", "lotto", "quantita", "unita", "canale"],
+      columns: [
+        "id",
+        "data",
+        "documento",
+        "prodotto",
+        "lotto",
+        "quantita",
+        "unita",
+        "fondo",
+        "naturaContabile",
+        "canale",
+        "stato",
+        "operazioneDistribuzioneId",
+        "movimentoOriginaleId",
+        "qualita",
+      ],
       query: sql`
-        SELECT mv.id, b.data_bolla::text AS data, b.numero_bolla AS documento,
-               be.codice AS beneficiario_codice, p.nome AS prodotto,
-               l.codice_lotto AS lotto, abs(mv.quantita::numeric) AS quantita,
+        SELECT mv.id, mv.data_movimento::text AS data,
+               COALESCE(mv.documento_riferimento, op.numero_documento) AS documento,
+               p.nome AS prodotto, l.codice_lotto AS lotto,
+               ${netDistributedQuantity} AS quantita,
                mv.unita_misura AS unita,
-               CASE WHEN se.id IS NOT NULL THEN 'emporio'
-                    WHEN c.tipo_consegna = 'domicilio' THEN 'domiciliare'
-                    ELSE 'pacchi' END AS canale,
+               mv.fondo_origine AS fondo, mv.natura_contabile,
+               COALESCE(mv.canale_operativo, original.canale_operativo, 'NON_CLASSIFICATO') AS canale,
+               op.stato, op.id AS operazione_distribuzione_id,
+               mv.movimento_origine_id AS movimento_originale_id,
+               ARRAY_REMOVE(ARRAY[
+                 CASE WHEN COALESCE(mv.operazione_distribuzione_id, original.operazione_distribuzione_id) IS NULL THEN 'OPERAZIONE_MANCANTE' END,
+                 CASE WHEN COALESCE(mv.canale_operativo, original.canale_operativo) IS NULL THEN 'CANALE_NON_CLASSIFICATO' END,
+                 CASE WHEN mv.lotto_id IS NULL THEN 'LOTTO_MANCANTE' END
+               ], NULL) AS qualita,
                COUNT(*) OVER() AS full_count
-        FROM movimenti mv JOIN lotti l ON l.id = mv.lotto_id
-        JOIN bolla_righe br ON br.id = mv.bolla_riga_id JOIN bolle b ON b.id = br.bolla_id
-        JOIN beneficiari be ON be.id = b.beneficiario_id JOIN prodotti p ON p.id = br.prodotto_id
-        LEFT JOIN spese_emporio se ON se.bolla_id = b.id AND se.stato_spesa = 'chiusa'
-        LEFT JOIN consegne c ON c.id = b.consegna_id
-        WHERE mv.tipo_movimento = 'scarico' AND mv.fondo_origine = 'FSE_PLUS'
-          AND b.stato = 'consegnato'
-          AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
-          AND ${andSql(reportScope(filters, { areaOperativa: sql`be.area_operativa_id`, centro: sql`be.centro_ascolto_id`, magazzino: sql`b.magazzino_id` }))}
-          AND ${fseBollaSourceCondition(filters)}
-        ORDER BY b.data_bolla DESC, mv.id DESC ${pagination}
+        FROM movimenti mv
+        LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+        LEFT JOIN lotti l ON l.id = mv.lotto_id
+        LEFT JOIN operazioni_distribuzione_magazzino op ON op.id = COALESCE(mv.operazione_distribuzione_id, original.operazione_distribuzione_id)
+        JOIN prodotti p ON p.id = mv.prodotto_id
+        JOIN magazzini mg ON mg.id = mv.magazzino_id
+        WHERE ${fseCanonicalPeriodCondition(filters, warehouseScope, authorizedMovement)}
+        ORDER BY mv.data_movimento DESC, mv.id DESC ${pagination}
       `,
     };
   }
-  throw new ReportingError(400, "Drill-down non disponibile per la metrica richiesta");
+  throw new ReportingError(
+    400,
+    "Drill-down non disponibile per la metrica richiesta",
+  );
 }
 
-export async function buildDrilldown(input: { section: ReportSection; metric: string; filters: ReportFilters; page: number; pageSize: number }): Promise<ReportDrilldown> {
-  const definition = detailDefinition(input.section, input.metric, input.filters, input.pageSize, (input.page - 1) * input.pageSize);
+export async function buildDrilldown(input: {
+  section: ReportSection;
+  metric: string;
+  filters: ReportFilters;
+  page: number;
+  pageSize: number;
+}): Promise<ReportDrilldown> {
+  const definition = detailDefinition(
+    input.section,
+    input.metric,
+    input.filters,
+    input.pageSize,
+    (input.page - 1) * input.pageSize,
+  );
   const result = await rows<Record<string, unknown>>(definition.query);
   return {
-    reportingModelVersion: "MAGAZZINO_2_0C_V1",
+    reportingModelVersion: REPORTING_MODEL_VERSION,
     section: input.section,
     metric: input.metric,
     page: input.page,

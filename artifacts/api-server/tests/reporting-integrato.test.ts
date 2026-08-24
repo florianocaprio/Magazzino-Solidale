@@ -113,10 +113,21 @@ describe("filtri condivisi dei report", () => {
 describe("contratto reporting Magazzino 2.0C", () => {
   it("versiona ogni builder integrato e pubblica exactValue per ogni KPI", async () => {
     const filters = fullFilters();
-    const reports = await Promise.all([buildGeneralReport(filters), buildPacchiReport(filters), buildCentroAscoltoReport(filters), buildEmporioReport(filters), buildMensaReport(filters), buildUdsReport(filters), buildLogisticaReport(filters), buildFsePlusReport(filters)]);
+    const reports = await Promise.all([
+      buildGeneralReport(filters),
+      buildPacchiReport(filters),
+      buildCentroAscoltoReport(filters),
+      buildEmporioReport(filters),
+      buildMensaReport(filters),
+      buildUdsReport(filters),
+      buildLogisticaReport(filters),
+      buildFsePlusReport(filters),
+    ]);
     for (const report of reports) {
-      expect(report.reportingModelVersion).toBe("MAGAZZINO_2_0C_V1");
-      expect(report.kpi.every((item) => Object.hasOwn(item, "exactValue"))).toBe(true);
+      expect(report.reportingModelVersion).toBe("REPORTING_2_0_V1");
+      expect(
+        report.kpi.every((item) => Object.hasOwn(item, "exactValue")),
+      ).toBe(true);
     }
   });
 
@@ -689,22 +700,41 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         page: 1,
         pageSize: 25,
       });
-      expect(emporioDistinctDetails.total).toBe(emporioReport.kpi.find((item) => item.key === "prodottiDistintiDistribuiti")?.value);
+      expect(emporioDistinctDetails.total).toBe(
+        emporioReport.kpi.find(
+          (item) => item.key === "prodottiDistintiDistribuiti",
+        )?.value,
+      );
       expect(emporioDistinctDetails.rows[0]).toMatchObject({
         prodottoId: productPz.id,
         unita: "pz",
       });
 
       const generalReport = await buildGeneralReport(filters);
-      expect(generalReport.kpi.find((item) => item.key === "pacchiDistribuiti")?.value).toBe(1);
-      expect(generalReport.kpi.find((item) => item.key === "speseEmporio")?.value).toBe(1);
-      expect(generalReport.kpi.find((item) => item.key === "nucleiPacchi")?.value).toBe(1);
+      expect(
+        generalReport.kpi.find((item) => item.key === "pacchiDistribuiti")
+          ?.value,
+      ).toBe(1);
+      expect(
+        generalReport.kpi.find((item) => item.key === "speseEmporio")?.value,
+      ).toBe(1);
+      expect(
+        generalReport.kpi.find((item) => item.key === "nucleiPacchi")?.value,
+      ).toBe(1);
 
       const fseReport = await buildFsePlusReport(filters);
-      expect(fseReport.reportingModelVersion).toBe("MAGAZZINO_2_0C_V1");
-      expect(fseReport.kpi.find((item) => item.key === "prodottiFseDistinti")?.value).toBe(1);
-      expect(fseReport.kpi.find((item) => item.key === "giacenzaFseCorrenteKgLt")?.exactValue).toMatch(/^\d+(?:\.\d+)?$/);
-      expect(fseReport.tables.find((table) => table.key === "01_Prodotti_FSE")?.rows[0]).toMatchObject({
+      expect(fseReport.reportingModelVersion).toBe("REPORTING_2_0_V1");
+      expect(
+        fseReport.kpi.find((item) => item.key === "prodottiFseDistinti")?.value,
+      ).toBe(1);
+      expect(
+        fseReport.kpi.find((item) => item.key === "giacenzaFseCorrenteKgLt")
+          ?.exactValue,
+      ).toMatch(/^\d+(?:\.\d+)?$/);
+      expect(
+        fseReport.tables.find((table) => table.key === "01_Prodotti_FSE")
+          ?.rows[0],
+      ).toMatchObject({
         quantitaFse: 2,
         quantitaTotale: 5,
         percentualeFse: 40,
@@ -716,12 +746,28 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         page: 1,
         pageSize: 25,
       });
-      expect(fseDetails.columns).toEqual(["id", "data", "documento", "beneficiarioCodice", "prodotto", "lotto", "quantita", "unita", "canale"]);
+      expect(fseDetails.columns).toEqual([
+        "id",
+        "data",
+        "documento",
+        "prodotto",
+        "lotto",
+        "quantita",
+        "unita",
+        "fondo",
+        "naturaContabile",
+        "canale",
+        "stato",
+        "operazioneDistribuzioneId",
+        "movimentoOriginaleId",
+        "qualita",
+      ]);
       expect(fseDetails.rows[0]).toMatchObject({
-        beneficiarioCodice: `RB-${suffix}`,
-        canale: "pacchi",
+        canale: "NON_CLASSIFICATO",
         unita: "kg",
+        fondo: "FSE_PLUS",
       });
+      expect(fseDetails.rows[0]).not.toHaveProperty("beneficiarioCodice");
       expect(fseDetails.rows[0]).not.toHaveProperty("nome");
       expect(fseDetails.rows[0]).not.toHaveProperty("cognome");
       const fseDistinctDetails = await buildDrilldown({
@@ -740,10 +786,18 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         ...filters,
         callerIsAdmin: false,
         callerAreas: ["mensa"],
-        callerPermissions: ["mensa.reports.view"],
+        callerPermissions: ["mensa.reports.view", "magazzino.fse.view"],
       });
-      expect(mensaOnlyFseReport.kpi.find((item) => item.key === "prodottiFseDistinti")?.value).toBe(0);
-      expect(mensaOnlyFseReport.tables.find((table) => table.key === "01_Prodotti_FSE")?.rows).toHaveLength(0);
+      expect(
+        mensaOnlyFseReport.kpi.find(
+          (item) => item.key === "prodottiFseDistinti",
+        )?.value,
+      ).toBe(0);
+      expect(
+        mensaOnlyFseReport.tables.find(
+          (table) => table.key === "01_Prodotti_FSE",
+        )?.rows,
+      ).toHaveLength(0);
       await expect(
         buildDrilldown({
           section: "pacchi",

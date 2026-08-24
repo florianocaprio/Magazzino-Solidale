@@ -8235,11 +8235,15 @@ components:
       additionalProperties: false
       properties:
         centroAscoltoId: { type: integer, minimum: 1 }
+        dataRiferimento:
+          type: string
+          format: date
+          description: Data civile Europe/Rome da cui i dati importati sono storicamente validi.
         file:
           type: string
           format: binary
           description: Workbook XLSX reale; non viene conservato dal server.
-      required: [centroAscoltoId, file]
+      required: [centroAscoltoId, dataRiferimento, file]
     BeneficiariFseImportResolution:
       type: object
       additionalProperties: false
@@ -8253,6 +8257,10 @@ components:
       additionalProperties: false
       properties:
         centroAscoltoId: { type: integer, minimum: 1 }
+        dataRiferimento:
+          type: string
+          format: date
+          description: Data confermata nella preview e rivalidata dal server.
         file:
           type: string
           format: binary
@@ -8260,7 +8268,7 @@ components:
         risoluzioni:
           type: string
           description: Array JSON di BeneficiariFseImportResolution.
-      required: [centroAscoltoId, file]
+      required: [centroAscoltoId, dataRiferimento, file]
     BeneficiariFseDuplicateCandidate:
       type: object
       properties:
@@ -8290,16 +8298,35 @@ components:
         areaOperativaId: { type: integer }
         areaOperativaDerivata: { type: boolean, const: true }
         warningHeader: { type: array, items: { type: string } }
-        righe: { type: array, items: { $ref: "#/components/schemas/BeneficiariFsePreviewRow" } }
+        righe:
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/BeneficiariFsePreviewRow" },
+          }
         conteggi: { type: object, additionalProperties: { type: integer } }
         numeroRighe: { type: integer }
-      required: [centroAscoltoId, areaOperativaId, areaOperativaDerivata, warningHeader, righe, conteggi, numeroRighe]
+        dataRiferimento: { type: string, format: date }
+      required:
+        [
+          centroAscoltoId,
+          areaOperativaId,
+          areaOperativaDerivata,
+          warningHeader,
+          righe,
+          conteggi,
+          numeroRighe,
+          dataRiferimento,
+        ]
     BeneficiariFseImportDetail:
       type: object
       properties:
         numeroRiga: { type: integer }
         codiceFascicolo: { type: [string, "null"] }
-        esito: { type: string, enum: [creato, collegato, aggiornato, invariato, conflitto, errore] }
+        esito:
+          {
+            type: string,
+            enum: [creato, collegato, aggiornato, invariato, conflitto, errore],
+          }
         errori: { type: array, items: { type: string } }
       required: [numeroRiga, codiceFascicolo, esito, errori]
     BeneficiariFseImportResult:
@@ -8307,14 +8334,31 @@ components:
       properties:
         batchId: { type: integer }
         stato: { type: string, enum: [confermato, parziale] }
+        dataRiferimento: { type: string, format: date }
         creati: { type: integer }
         collegati: { type: integer }
         aggiornati: { type: integer }
         invariati: { type: integer }
         conflitti: { type: integer }
         errori: { type: integer }
-        dettagli: { type: array, items: { $ref: "#/components/schemas/BeneficiariFseImportDetail" } }
-      required: [batchId, stato, creati, collegati, aggiornati, invariati, conflitti, errori, dettagli]
+        dettagli:
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/BeneficiariFseImportDetail" },
+          }
+      required:
+        [
+          batchId,
+          stato,
+          dataRiferimento,
+          creati,
+          collegati,
+          aggiornati,
+          invariati,
+          conflitti,
+          errori,
+          dettagli,
+        ]
     BeneficiariFseExportInput:
       type: object
       additionalProperties: false
@@ -8352,6 +8396,15 @@ components:
         origineStranieraMinoranze: { type: [integer, "null"], minimum: 0 }
         cittadiniPaesiTerzi: { type: [integer, "null"], minimum: 0 }
         senzaTettoEsclusioneAbitativa: { type: [integer, "null"], minimum: 0 }
+        dataRiferimento:
+          type: string
+          format: date
+          description: Data civile Europe/Rome di validità storica della correzione.
+        versione:
+          type: integer
+          minimum: 0
+          description: Versione letta dal chiamante per optimistic locking; 0 se il profilo non esiste ancora.
+      required: [dataRiferimento, versione]
     BeneficiarioFseSnapshot:
       type: object
       properties:
@@ -8403,15 +8456,37 @@ components:
         origineStranieraMinoranze: { type: [integer, "null"] }
         cittadiniPaesiTerzi: { type: [integer, "null"] }
         senzaTettoEsclusioneAbitativa: { type: [integer, "null"] }
+        personeDisabilita: { type: [integer, "null"] }
         tipologiaAttivitaImportata: { type: [string, "null"] }
         statoAttualeImportato: { type: [string, "null"] }
+        dataRiferimento: { type: [string, "null"], format: date }
+        origineDato: { type: [string, "null"] }
+        attendibilitaDato: { type: [string, "null"] }
+        versione: { type: integer, minimum: 1 }
         ultimoImportBatchId: { type: [integer, "null"] }
         ultimoImportAt: { type: [string, "null"], format: date-time }
         ultimoExportAt: { type: [string, "null"], format: date-time }
         hashUltimaRigaImportata: { type: [string, "null"] }
         dataCreazione: { type: string, format: date-time }
         dataAggiornamento: { type: string, format: date-time }
-      required: [id, beneficiarioId, codiceFascicolo, codiceFascicoloNormalizzato, origineFascicolo, origineStranieraMinoranze, cittadiniPaesiTerzi, senzaTettoEsclusioneAbitativa, dataCreazione, dataAggiornamento]
+      required:
+        [
+          id,
+          beneficiarioId,
+          codiceFascicolo,
+          codiceFascicoloNormalizzato,
+          origineFascicolo,
+          origineStranieraMinoranze,
+          cittadiniPaesiTerzi,
+          senzaTettoEsclusioneAbitativa,
+          personeDisabilita,
+          dataRiferimento,
+          origineDato,
+          attendibilitaDato,
+          versione,
+          dataCreazione,
+          dataAggiornamento,
+        ]
     BeneficiarioFseDetail:
       type: object
       properties:
@@ -8740,7 +8815,7 @@ components:
       properties:
         reportingModelVersion:
           type: string
-          enum: [MAGAZZINO_2_0C_V1]
+          enum: [REPORTING_2_0_V1]
         section:
           type: string
           enum:
@@ -8883,7 +8958,7 @@ components:
           rows,
         ]
       properties:
-        reportingModelVersion: { type: string, enum: [MAGAZZINO_2_0C_V1] }
+        reportingModelVersion: { type: string, enum: [REPORTING_2_0_V1] }
         section: { type: string }
         metric: { type: string }
         page: { type: integer }

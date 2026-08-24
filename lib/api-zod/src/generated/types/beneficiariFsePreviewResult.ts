@@ -16,4 +16,5 @@ export interface BeneficiariFsePreviewResult {
   righe: BeneficiariFsePreviewRow[];
   conteggi: BeneficiariFsePreviewResultConteggi;
   numeroRighe: number;
+  dataRiferimento: Date;
 }
