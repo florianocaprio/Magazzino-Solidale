@@ -945,10 +945,7 @@ function AuthGate() {
     <>
       <AppRoutes />
       <AlertDialog open={sessionWarningOpen}>
-        <AlertDialogContent
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={(event) => event.stopPropagation()}
-        >
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("common.sessionExpiring")}</AlertDialogTitle>
             <AlertDialogDescription>

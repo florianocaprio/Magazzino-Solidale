@@ -140,13 +140,13 @@ export function useIdleLogout({
     continueSessionRef.current = renewSession;
 
     const handleActivity = () => {
+      // Once the warning is visible, local activity is not consent to renew the
+      // session. Only the explicit Continue action may call renewSession().
+      // Cross-tab activity remains handled separately by handleStorage().
+      if (warningVisible) return;
       const now = Date.now();
       if (now - lastHandled < 1000) return;
       lastHandled = now;
-      if (warningVisible) {
-        void renewSession();
-        return;
-      }
       recordActivity(now);
       if (
         keepAliveMs &&
