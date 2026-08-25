@@ -12,6 +12,7 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "line",
   retries: process.env.CI ? 1 : 0,
   fullyParallel: false,
+  workers: 1,
   use: {
     baseURL: `http://127.0.0.1:${webPort}`,
     trace: "retain-on-failure",
@@ -25,7 +26,7 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: `env PORT=${webPort} BASE_PATH=/ API_PROXY_TARGET=http://127.0.0.1:${apiPort} pnpm --filter @workspace/magazzino-solidale dev`,
+      command: `env E2E_MODE=true PORT=${webPort} BASE_PATH=/ API_PROXY_TARGET=http://127.0.0.1:${apiPort} pnpm --filter @workspace/magazzino-solidale dev`,
       url: `http://127.0.0.1:${webPort}/login`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
