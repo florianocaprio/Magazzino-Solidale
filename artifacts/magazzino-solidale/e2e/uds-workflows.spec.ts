@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { login, selectOption } from "./helpers";
+import { expect, test, type Page } from "@playwright/test";
+import { assertViewportSafe, login, selectOption } from "./helpers";
 
 type UdsIntervento = {
   id: number;
@@ -7,13 +7,11 @@ type UdsIntervento = {
   dataAggiornamento: string;
 };
 
-test("UDS registra incontro e bisogno, rettifica con versione e rifiuta una versione obsoleta", async ({
-  page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name !== "desktop-1440x900",
-    "Il lifecycle mutante gira una volta; il layout tablet è coperto separatamente",
-  );
+async function runUdsLifecycle(
+  page: Page,
+  listTestId: "uds-interventi-mobile" | "uds-interventi-desktop",
+  auditTablet = false,
+) {
   await login(page);
   const suffix = Date.now();
   const initialDescription = `Incontro UDS E2E ${suffix}`;
@@ -32,12 +30,22 @@ test("UDS registra incontro e bisogno, rettifica con versione e rifiuta una vers
   await page
     .getByPlaceholder("Cerca per nome o codice...", { exact: true })
     .fill("DEMO-BEN-001");
-  await page.getByRole("option", { name: /Demo 001 Beneficiario/i }).click();
+  const personOption = page.getByRole("option", {
+    name: /Demo 001 Beneficiario/i,
+  });
+  await personOption.click();
+  await expect(personOption).toBeHidden();
+  if (auditTablet) {
+    await expect(page.getByTestId("uds-interventi-mobile")).toBeVisible();
+    await expect(page.getByTestId("uds-interventi-desktop")).toBeHidden();
+    await assertViewportSafe(page);
+  }
 
   await page.getByRole("button", { name: /nuovo intervento/i }).click();
   const form = page.getByRole("dialog", {
     name: /nuovo intervento di strada/i,
   });
+  if (auditTablet) await assertViewportSafe(page);
   await form
     .getByRole("textbox", { name: /sintesi dell'incontro/i })
     .fill(initialDescription);
@@ -66,15 +74,19 @@ test("UDS registra incontro e bisogno, rettifica con versione e rifiuta una vers
   await expect(form).toBeHidden();
 
   const row = page.locator(
-    `[data-testid="uds-interventi-desktop"] [data-intervento-id="${created.id}"]`,
+    `[data-testid="${listTestId}"] [data-intervento-id="${created.id}"]`,
   );
   await expect(row).toContainText(initialDescription);
-  await expect(row).toContainText(/totali:\s*1/i);
+  await expect(row).toContainText(
+    auditTablet ? /1 cose da fare/i : /totali:\s*1/i,
+  );
+  if (auditTablet) await assertViewportSafe(page);
   await row.getByRole("button", { name: /rettifica/i }).click();
 
   const rectification = page.getByRole("dialog", {
     name: /rettifica intervento/i,
   });
+  if (auditTablet) await assertViewportSafe(page);
   await rectification
     .getByRole("textbox", { name: /sintesi dell'incontro/i })
     .fill(rectifiedDescription);
@@ -113,4 +125,24 @@ test("UDS registra incontro e bisogno, rettifica con versione e rifiuta una vers
     id: created.id,
     descrizione: rectifiedDescription,
   });
+}
+
+test("UDS registra incontro e bisogno, rettifica con versione e rifiuta una versione obsoleta", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop-1440x900",
+    "Il lifecycle mutante desktop gira una volta",
+  );
+  await runUdsLifecycle(page, "uds-interventi-desktop");
+});
+
+test("tablet 820: crea e rettifica un intervento UDS dalla card", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "tablet-820x1180",
+    "Lifecycle UDS dedicato al tablet 820",
+  );
+  await runUdsLifecycle(page, "uds-interventi-mobile", true);
 });

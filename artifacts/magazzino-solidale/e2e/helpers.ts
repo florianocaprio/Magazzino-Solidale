@@ -28,10 +28,20 @@ export async function assertViewportSafe(page: Page) {
       controls
         .filter((control) => {
           const element = control as HTMLElement;
-          return !(
+          if (
             element.hasAttribute("disabled") ||
             element.getAttribute("aria-disabled") === "true" ||
             element.closest("[inert]")
+          ) {
+            return false;
+          }
+          const rect = element.getBoundingClientRect();
+          const topmost = document.elementFromPoint(
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2,
+          );
+          return Boolean(
+            topmost && (topmost === element || element.contains(topmost)),
           );
         })
         .map((control) => {

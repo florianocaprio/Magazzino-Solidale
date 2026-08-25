@@ -1,17 +1,15 @@
-import { expect, test } from "@playwright/test";
-import { login, selectOption } from "./helpers";
+import { expect, test, type Page } from "@playwright/test";
+import { assertViewportSafe, login, selectOption } from "./helpers";
 
 type Identifiable = { id: number; nome: string };
 type Prodotto = { id: number; codice: string };
 type Giacenza = { prodottoId: number; disponibileReale: number };
 
-test("Consegna pianificata → Bolla FEFO → conferma → consegna scarica la merce una sola volta", async ({
-  page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name !== "desktop-1440x900",
-    "Il lifecycle mutante gira una volta; il layout tablet è coperto separatamente",
-  );
+async function runConsegnaLifecycle(
+  page: Page,
+  listTestId: "consegne-mobile-list" | "consegne-desktop-list",
+  auditTablet = false,
+) {
   await login(page);
 
   const [warehousesResponse, productsResponse] = await Promise.all([
@@ -38,8 +36,14 @@ test("Consegna pianificata → Bolla FEFO → conferma → consegna scarica la m
   expect(stockBefore).toBeGreaterThan(0);
 
   await page.goto("/consegne");
+  if (auditTablet) {
+    await expect(page.getByTestId("consegne-mobile-list")).toBeVisible();
+    await expect(page.getByTestId("consegne-desktop-list")).toBeHidden();
+    await assertViewportSafe(page);
+  }
   await page.getByRole("button", { name: /pianifica consegna/i }).click();
   const planning = page.getByRole("dialog", { name: /pianifica consegna/i });
+  if (auditTablet) await assertViewportSafe(page);
   await selectOption(
     page,
     planning.getByRole("combobox", { name: /area operativa/i }),
@@ -79,9 +83,10 @@ test("Consegna pianificata → Bolla FEFO → conferma → consegna scarica la m
   await expect(planning).toBeHidden();
 
   let row = page.locator(
-    `[data-testid="consegne-desktop-list"] [data-consegna-id="${delivery.id}"]`,
+    `[data-testid="${listTestId}"] [data-consegna-id="${delivery.id}"]`,
   );
   await expect(row).toContainText(delivery.codice);
+  if (auditTablet) await assertViewportSafe(page);
   await row.getByRole("button", { name: /crea bolla/i }).click();
 
   const createNote = page.getByRole("dialog", {
@@ -107,6 +112,7 @@ test("Consegna pianificata → Bolla FEFO → conferma → consegna scarica la m
     name: /bolla della consegna/i,
   });
   await expect(noteSheet).toBeVisible();
+  if (auditTablet) await assertViewportSafe(page);
   await noteSheet
     .getByRole("button", { name: /aggiungi il primo prodotto/i })
     .click();
@@ -146,10 +152,14 @@ test("Consegna pianificata → Bolla FEFO → conferma → consegna scarica la m
     .click();
 
   row = page.locator(
-    `[data-testid="consegne-desktop-list"] [data-consegna-id="${delivery.id}"]`,
+    `[data-testid="${listTestId}"] [data-consegna-id="${delivery.id}"]`,
   );
-  await expect(row).toContainText(/pronta/i);
-  await row.getByRole("button", { name: /segna come consegnata/i }).click();
+  const completeButton = row.getByRole("button", {
+    name: /segna come consegnata/i,
+  });
+  if (auditTablet) await expect(completeButton).toBeVisible();
+  else await expect(row).toContainText(/pronta/i);
+  await completeButton.click();
   const confirmation = page.getByRole("alertdialog", {
     name: /segna come consegnato/i,
   });
@@ -181,4 +191,24 @@ test("Consegna pianificata → Bolla FEFO → conferma → consegna scarica la m
     consegnaId: delivery.id,
   });
   expect(await readStock()).toBe(stockBefore - 1);
+}
+
+test("Consegna pianificata → Bolla FEFO → conferma → consegna scarica la merce una sola volta", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop-1440x900",
+    "Il lifecycle mutante desktop gira una volta",
+  );
+  await runConsegnaLifecycle(page, "consegne-desktop-list");
+});
+
+test("tablet 768: completa la Consegna dalla card fino allo scarico finale", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "tablet-portrait-768x1024",
+    "Lifecycle tablet Consegne dedicato al portrait 768",
+  );
+  await runConsegnaLifecycle(page, "consegne-mobile-list", true);
 });
