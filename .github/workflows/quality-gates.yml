@@ -112,5 +112,8 @@ jobs:
         env:
           FRESH_DB_INITIAL_PASSWORD: FreshDb-E2E-Only-2026
           FRESH_DB_FINAL_PASSWORD: FreshDb-E2E-Only-2026-Changed
+      - run: pnpm --filter @workspace/api-server environment:data seed-demo --super-admin=sadmin
+        env:
+          DEMO_USER_INITIAL_PASSWORD: Demo-E2E-Only-2026
       - run: pnpm --filter @workspace/magazzino-solidale exec playwright install --with-deps chromium
       - run: pnpm --filter @workspace/magazzino-solidale test:e2e
