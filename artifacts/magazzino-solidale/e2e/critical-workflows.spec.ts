@@ -45,10 +45,14 @@ test("dashboard e navigazione operativa rispettano il viewport", async ({ page }
 test("filtri Consegne sono utilizzabili da mobile e tablet portrait", async ({ page, viewport }) => {
   test.skip((viewport?.width ?? 0) >= 1024, "Il filtro Sheet è il flusso portrait");
   await page.goto("/consegne");
-  await page.getByRole("button", { name: /filtri e ricerca/i }).click();
-  await expect(page.getByRole("heading", { name: /filtri consegne/i })).toBeVisible();
-  await page.getByLabel(/ricerca/i).fill("inesistente-e2e");
-  await page.getByRole("button", { name: /mostra risultati/i }).click();
+  if ((viewport?.width ?? 0) < 768) {
+    await page.getByRole("button", { name: /filtri e ricerca/i }).click();
+    await expect(page.getByRole("heading", { name: /filtri consegne/i })).toBeVisible();
+    await page.getByLabel(/ricerca/i).fill("inesistente-e2e");
+    await page.getByRole("button", { name: /mostra risultati/i }).click();
+  } else {
+    await page.getByLabel(/cerca consegne/i).fill("inesistente-e2e");
+  }
   await expect(page.locator("p:visible, td:visible").filter({ hasText: /nessuna consegna/i })).toBeVisible();
   await assertViewportSafe(page);
 });
