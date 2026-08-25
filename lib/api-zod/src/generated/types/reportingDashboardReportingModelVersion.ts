@@ -10,5 +10,5 @@ export type ReportingDashboardReportingModelVersion = typeof ReportingDashboardR
 
 
 export const ReportingDashboardReportingModelVersion = {
-  MAGAZZINO_2_0C_V1: 'MAGAZZINO_2_0C_V1',
+  REPORTING_2_0_V1: 'REPORTING_2_0_V1',
 } as const;

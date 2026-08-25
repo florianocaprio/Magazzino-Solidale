@@ -36,6 +36,7 @@ import { createBeneficiarioWithOptionalMensa } from "@/lib/beneficiario-mensa-wo
 import { BENEFICIARI_PAGE_SIZE, fetchBeneficiariExportRows, type BeneficiarioExportRow } from "@/lib/beneficiari-pagination";
 import { buildBeneficiarioDuplicateParams, canSearchBeneficiarioDuplicates, requireGlobalBeneficiarioArea } from "@/lib/beneficiario-create-ui";
 import { FseBeneficiariActions } from "@/components/fse-beneficiari-actions";
+import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 
 const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.object({
   cognome: z.string().min(2),
@@ -212,6 +213,12 @@ export default function Beneficiari() {
       consegnaDomicilio: false, motivoConsegnaDomicilio: "", restrizioniAlimentari: "",
       uds: false, areaOperativaId: "", zonaUdsId: ""
     }
+  });
+  const unsavedGuard = useUnsavedChangesGuard(isFormOpen && form.formState.isDirty);
+  const closeCreateForm = () => unsavedGuard.requestClose(() => {
+    setIsFormOpen(false);
+    resetDup();
+    form.reset();
   });
   const creditoSolidaleAbilitato = form.watch("creditoSolidaleAbilitato");
   const abilitaMensa = form.watch("abilitaMensa");
@@ -638,7 +645,7 @@ export default function Beneficiari() {
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="p-0" aria-label={`${t("common.actions")} ${b.cognome} ${b.nome}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
                           <Link href={`/beneficiari/${b.id}`} className="cursor-pointer w-full flex items-center">
@@ -669,7 +676,7 @@ export default function Beneficiari() {
         </CardContent>
       </Card>
 
-      <Sheet open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { resetDup(); form.reset(); } }}>
+      <Sheet open={isFormOpen} onOpenChange={(open) => { if (open) setIsFormOpen(true); else closeCreateForm(); }}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader><SheetTitle>{t("beneficiari.newBeneficiario")}</SheetTitle></SheetHeader>
           <div className="mt-6">
@@ -909,7 +916,7 @@ export default function Beneficiari() {
                 </div>
 
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); resetDup(); form.reset(); }}>{t("common.cancel")}</Button>
+                  <Button type="button" variant="outline" onClick={closeCreateForm}>{t("common.cancel")}</Button>
                   <Button type="submit" disabled={createBeneficiario.isPending || createMensaAbilitazione.isPending}>{t("common.save")}</Button>
                 </div>
               </form>
@@ -917,6 +924,7 @@ export default function Beneficiari() {
           </div>
         </SheetContent>
       </Sheet>
+      <UnsavedChangesDialog guard={unsavedGuard} />
 
       {editingId != null && <QuickEditBeneficiario id={editingId} onClose={() => setEditingId(null)} />}
       {schedaId != null && <SchedaExportDialog id={schedaId} onClose={() => setSchedaId(null)} />}

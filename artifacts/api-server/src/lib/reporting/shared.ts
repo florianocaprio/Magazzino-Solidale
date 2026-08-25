@@ -5,9 +5,11 @@ import type {
   ReportSection,
   ReportSeries,
   ReportTable,
+  ReportText,
   ReportingDashboard,
 } from "./types";
 import { publicFilters } from "./types";
+import { REPORTING_MODEL_VERSION } from "./version";
 
 export function kpi(
   key: string,
@@ -24,9 +26,16 @@ export function quality(
   key: string,
   count: number | null,
   availability: ReportQualityItem["availability"] = "ok",
-  note: string | null = null,
+  note: ReportText | null = null,
 ): ReportQualityItem {
   return { key, count, availability, note };
+}
+
+export function text(
+  code: string,
+  params?: Record<string, string | number>,
+): ReportText {
+  return params ? { code, params } : { code };
 }
 
 export function dashboard(input: {
@@ -36,10 +45,10 @@ export function dashboard(input: {
   series?: ReportSeries[];
   tables?: ReportTable[];
   quality?: ReportQualityItem[];
-  definitions: string[];
+  definitions: ReportText[];
 }): ReportingDashboard {
   return {
-    reportingModelVersion: "MAGAZZINO_2_0C_V1",
+    reportingModelVersion: REPORTING_MODEL_VERSION,
     section: input.section,
     filters: publicFilters(input.filters),
     kpi: input.kpi,

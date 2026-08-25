@@ -29,6 +29,8 @@ export interface BeneficiariFseRowInput {
 export interface BeneficiariFseWorkbookUpload {
   /** @minimum 1 */
   centroAscoltoId: number;
+  /** Data civile Europe/Rome da cui i dati importati sono storicamente validi. */
+  dataRiferimento: string;
   /** Workbook XLSX reale; non viene conservato dal server. */
   file: Blob;
 }
@@ -52,6 +54,8 @@ export interface BeneficiariFseImportResolution {
 export interface BeneficiariFseWorkbookImportUpload {
   /** @minimum 1 */
   centroAscoltoId: number;
+  /** Data confermata nella preview e rivalidata dal server. */
+  dataRiferimento: string;
   /** Lo stesso workbook XLSX reale viene rivalidato dal server. */
   file: Blob;
   /** Array JSON di BeneficiariFseImportResolution. */
@@ -99,6 +103,7 @@ export interface BeneficiariFsePreviewResult {
   righe: BeneficiariFsePreviewRow[];
   conteggi: BeneficiariFsePreviewResultConteggi;
   numeroRighe: number;
+  dataRiferimento: string;
 }
 
 export type BeneficiariFseImportDetailEsito = typeof BeneficiariFseImportDetailEsito[keyof typeof BeneficiariFseImportDetailEsito];
@@ -132,6 +137,7 @@ export const BeneficiariFseImportResultStato = {
 export interface BeneficiariFseImportResult {
   batchId: number;
   stato: BeneficiariFseImportResultStato;
+  dataRiferimento: string;
   creati: number;
   collegati: number;
   aggiornati: number;
@@ -187,6 +193,13 @@ export interface BeneficiarioFseUpdate {
      * @nullable
      */
   senzaTettoEsclusioneAbitativa?: number | null;
+  /** Data civile Europe/Rome di validità storica della correzione. */
+  dataRiferimento: string;
+  /**
+     * Versione letta dal chiamante per optimistic locking; 0 se il profilo non esiste ancora.
+     * @minimum 0
+     */
+  versione: number;
 }
 
 export interface BeneficiarioFseSnapshot {
@@ -270,9 +283,19 @@ export interface BeneficiarioFseProfile {
   /** @nullable */
   senzaTettoEsclusioneAbitativa: number | null;
   /** @nullable */
+  personeDisabilita: number | null;
+  /** @nullable */
   tipologiaAttivitaImportata?: string | null;
   /** @nullable */
   statoAttualeImportato?: string | null;
+  /** @nullable */
+  dataRiferimento: string | null;
+  /** @nullable */
+  origineDato: string | null;
+  /** @nullable */
+  attendibilitaDato: string | null;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   ultimoImportBatchId?: number | null;
   /** @nullable */
@@ -684,7 +707,7 @@ export type ReportingDashboardReportingModelVersion = typeof ReportingDashboardR
 
 
 export const ReportingDashboardReportingModelVersion = {
-  MAGAZZINO_2_0C_V1: 'MAGAZZINO_2_0C_V1',
+  REPORTING_2_0_V1: 'REPORTING_2_0_V1',
 } as const;
 
 export type ReportingDashboardSection = typeof ReportingDashboardSection[keyof typeof ReportingDashboardSection];
@@ -798,13 +821,19 @@ export const ReportQualityItemAvailability = {
   missing: 'missing',
 } as const;
 
+export type ReportTextParams = {[key: string]: string | number};
+
+export interface ReportText {
+  code: string;
+  params?: ReportTextParams;
+}
+
 export interface ReportQualityItem {
   key: string;
   /** @nullable */
   count: number | null;
   availability: ReportQualityItemAvailability;
-  /** @nullable */
-  note: string | null;
+  note: ReportText | null;
 }
 
 export interface ReportingDashboard {
@@ -815,7 +844,7 @@ export interface ReportingDashboard {
   series: ReportSeries[];
   tables: ReportTable[];
   quality: ReportQualityItem[];
-  definitions: string[];
+  definitions: ReportText[];
   generatedAt: string;
   timezone: ReportingDashboardTimezone;
 }
@@ -824,7 +853,7 @@ export type ReportDrilldownReportingModelVersion = typeof ReportDrilldownReporti
 
 
 export const ReportDrilldownReportingModelVersion = {
-  MAGAZZINO_2_0C_V1: 'MAGAZZINO_2_0C_V1',
+  REPORTING_2_0_V1: 'REPORTING_2_0_V1',
 } as const;
 
 export type ReportDrilldownRowsItem = { [key: string]: unknown };
@@ -906,6 +935,17 @@ export interface ReportFsePlus {
 
 export interface HealthStatus {
   status: string;
+}
+
+export type ReadinessStatusChecks = {
+  database: string;
+  migrations: string;
+  pendingMigrations: number;
+};
+
+export interface ReadinessStatus {
+  status: string;
+  checks: ReadinessStatusChecks;
 }
 
 export interface DashboardStats {
@@ -5108,6 +5148,19 @@ export interface BisognoPianificatoStorico {
   valoreNuovo: BisognoPianificatoStoricoValoreNuovo;
 }
 
+export interface ConsegnePage {
+  items: Consegna[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ConsegneExport {
+  items: Consegna[];
+  total: number;
+}
+
 export type AccessoEmporioStato = typeof AccessoEmporioStato[keyof typeof AccessoEmporioStato];
 
 
@@ -5739,6 +5792,12 @@ export interface BollaRiga {
   fsePlus: boolean;
   fsePlusQuantita?: number;
   nonFsePlusQuantita?: number;
+  /** Quantità distribuita prima degli storni, dal ledger canonico */
+  quantitaLorda?: number;
+  /** Quantità complessivamente stornata */
+  quantitaStornata?: number;
+  /** Quantità distribuita netta dopo gli storni */
+  quantitaNetta?: number;
   quantita: number;
   /** @nullable */
   unitaMisura: string | null;
@@ -8083,6 +8142,29 @@ areaOperativaId?: number;
 };
 
 export type ListConsegneParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+pageSize?: number;
+/**
+ * Ricerca per codice, beneficiario o indirizzo
+ */
+q?: string;
+stato?: string;
+data?: string;
+dataInizio?: string;
+dataFine?: string;
+beneficiarioId?: number;
+centroAscoltoId?: number;
+};
+
+export type ExportConsegneParams = {
+q?: string;
 stato?: string;
 data?: string;
 dataInizio?: string;

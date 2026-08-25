@@ -1,14 +1,57 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from "vitest";
 import request from "supertest";
-import { db, pool, bolleTable, bollaRigheTable, lottiTable, movimentiTable, prenotazioniMagazzinoTable, consegneTable, interventiTable, interventiStoricoStatiTable } from "@workspace/db";
+import {
+  db,
+  pool,
+  beneficiariTable,
+  bolleTable,
+  bollaRigheTable,
+  lottiTable,
+  movimentiTable,
+  prenotazioniMagazzinoTable,
+  consegneTable,
+  interventiTable,
+  interventiStoricoStatiTable,
+  operazioniDistribuzioneMagazzinoTable,
+} from "@workspace/db";
 import { and, asc, eq } from "drizzle-orm";
 import bolleRouter from "../src/routes/bolle";
 import consegneRouter from "../src/routes/consegne";
 import preparazioneConsegneRouter from "../src/routes/preparazione-consegne";
 import reportRouter from "../src/routes/report";
-import { annullaInterventoDaBollaTx, stornoRigaTx } from "../src/lib/bollaDelivery";
+import {
+  annullaInterventoDaBollaTx,
+  stornoRigaTx,
+} from "../src/lib/bollaDelivery";
 import { dataOperativaEuropeRome } from "../src/lib/lottoPolicy";
-import { makeScopedApp, newScope, cleanup, type SeedScope, createBeneficiario, createCentro, createLotto, createMagazzino, createProdotto, createUtente, insertConsegna, insertBolla, insertBollaRiga, insertMovimento, insertPrenotazioneMagazzino } from "./scope-helpers";
+import { buildPacchiReport } from "../src/lib/reporting/pacchi";
+import {
+  makeScopedApp,
+  newScope,
+  cleanup,
+  type SeedScope,
+  createAreaOperativa,
+  createBeneficiario,
+  createCentro,
+  createCentroRec,
+  createLotto,
+  createMagazzino,
+  createProdotto,
+  createUtente,
+  insertConsegna,
+  insertBolla,
+  insertBollaRiga,
+  insertMovimento,
+  insertPrenotazioneMagazzino,
+} from "./scope-helpers";
 
 let bootScope: SeedScope;
 let scope: SeedScope;
@@ -21,26 +64,52 @@ let magA: number;
 let magB: number;
 let prod: number;
 
-const appAs = (centro: number | null) => makeScopedApp(bolleRouter, { id: operatoreId, centroAscoltoId: centro });
-const consegneAppAs = (centro: number | null) => makeScopedApp(consegneRouter, { id: operatoreId, centroAscoltoId: centro });
-const preparazioneAppAs = (centro: number | null) => makeScopedApp(preparazioneConsegneRouter, { id: operatoreId, centroAscoltoId: centro });
-const reportAppAs = (centro: number | null) => makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: centro });
+const appAs = (centro: number | null) =>
+  makeScopedApp(bolleRouter, { id: operatoreId, centroAscoltoId: centro });
+const consegneAppAs = (centro: number | null) =>
+  makeScopedApp(consegneRouter, { id: operatoreId, centroAscoltoId: centro });
+const preparazioneAppAs = (centro: number | null) =>
+  makeScopedApp(preparazioneConsegneRouter, {
+    id: operatoreId,
+    centroAscoltoId: centro,
+  });
+const reportAppAs = (centro: number | null) =>
+  makeScopedApp(reportRouter, {
+    id: operatoreId,
+    centroAscoltoId: centro,
+    aree: ["analisi", "sociale", "magazzino"],
+    permessi: ["magazzino.fse.view"],
+  });
 
 async function prenotazioniBolla(bollaId: number) {
-  return db.select().from(prenotazioniMagazzinoTable).where(eq(prenotazioniMagazzinoTable.bollaId, bollaId)).orderBy(asc(prenotazioniMagazzinoTable.id));
+  return db
+    .select()
+    .from(prenotazioniMagazzinoTable)
+    .where(eq(prenotazioniMagazzinoTable.bollaId, bollaId))
+    .orderBy(asc(prenotazioniMagazzinoTable.id));
 }
 
 async function movimentiBolla(bollaId: number) {
-  return db.select().from(movimentiTable).where(eq(movimentiTable.bollaId, bollaId)).orderBy(asc(movimentiTable.id));
+  return db
+    .select()
+    .from(movimentiTable)
+    .where(eq(movimentiTable.bollaId, bollaId))
+    .orderBy(asc(movimentiTable.id));
 }
 
 async function lottoResidua(lottoId: number): Promise<number> {
-  const [lotto] = await db.select().from(lottiTable).where(eq(lottiTable.id, lottoId));
+  const [lotto] = await db
+    .select()
+    .from(lottiTable)
+    .where(eq(lottiTable.id, lottoId));
   return Number(lotto.quantitaResidua);
 }
 
 async function bollaStato(bollaId: number): Promise<string> {
-  const [bolla] = await db.select().from(bolleTable).where(eq(bolleTable.id, bollaId));
+  const [bolla] = await db
+    .select()
+    .from(bolleTable)
+    .where(eq(bolleTable.id, bollaId));
   return bolla.stato;
 }
 
@@ -390,6 +459,160 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
     });
   });
 
+  it("congela Area, Centro e numero componenti per Bolla e Consegna concluse", async () => {
+    const historicalArea = await createAreaOperativa(scope);
+    const currentArea = await createAreaOperativa(scope);
+    const historicalCentre = await createCentroRec(scope, {
+      areaOperativaId: historicalArea,
+    });
+    const currentCentre = await createCentroRec(scope, {
+      areaOperativaId: currentArea,
+    });
+    const historicalWarehouse = await createMagazzino(
+      scope,
+      historicalCentre.id,
+      { areaOperativaId: historicalArea },
+    );
+    const beneficiary = await createBeneficiario(scope, historicalCentre.id, {
+      areaOperativaId: historicalArea,
+    });
+    await db
+      .update(beneficiariTable)
+      .set({ numComponenti: 3 })
+      .where(eq(beneficiariTable.id, beneficiary));
+    const delivery = await insertConsegna(scope, {
+      beneficiarioId: beneficiary,
+      magazzinoId: historicalWarehouse,
+    });
+    const product = await createProdotto(scope);
+    const lot = await createLotto(scope, {
+      prodottoId: product,
+      magazzinoId: historicalWarehouse,
+      quantita: 5,
+    });
+    const bolla = await insertBolla(scope, {
+      beneficiarioId: beneficiary,
+      magazzinoId: historicalWarehouse,
+      consegnaId: delivery,
+    });
+    await insertBollaRiga(scope, {
+      bollaId: bolla,
+      prodottoId: product,
+      lottoId: lot,
+      quantita: 1,
+    });
+    expect(
+      (
+        await request(
+          makeScopedApp(bolleRouter, {
+            id: operatoreId,
+            centroAscoltoId: historicalCentre.id,
+          }),
+        )
+          .post(`/bolle/${bolla}/conferma`)
+          .send({})
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          makeScopedApp(consegneRouter, {
+            id: operatoreId,
+            centroAscoltoId: historicalCentre.id,
+          }),
+        ).post(`/consegne/${delivery}/completa`).send({})
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          makeScopedApp(consegneRouter, {
+            id: operatoreId,
+            centroAscoltoId: historicalCentre.id,
+          }),
+        )
+          .post(`/consegne/${delivery}/completa`)
+          .send({})
+      ).status,
+    ).toBe(200);
+
+    await db
+      .update(beneficiariTable)
+      .set({
+        areaOperativaId: currentArea,
+        centroAscoltoId: currentCentre.id,
+        numComponenti: 4,
+      })
+      .where(eq(beneficiariTable.id, beneficiary));
+
+    const [historicalBolla] = await db
+      .select()
+      .from(bolleTable)
+      .where(eq(bolleTable.id, bolla));
+    const [historicalDelivery] = await db
+      .select()
+      .from(consegneTable)
+      .where(eq(consegneTable.id, delivery));
+    expect(historicalBolla).toMatchObject({
+      areaOperativaIdSnapshot: historicalArea,
+      centroAscoltoIdSnapshot: historicalCentre.id,
+      numeroComponentiNucleoSnapshot: 3,
+    });
+    expect(historicalDelivery).toMatchObject({
+      areaOperativaIdSnapshot: historicalArea,
+      centroAscoltoIdSnapshot: historicalCentre.id,
+    });
+    const operations = await db.select().from(operazioniDistribuzioneMagazzinoTable).where(and(
+      eq(operazioniDistribuzioneMagazzinoTable.dominioOrigine, "BOLLA"),
+      eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, bolla),
+    ));
+    expect(operations).toHaveLength(1);
+    expect(operations[0]).toMatchObject({
+      areaOperativaIdSnapshot: historicalArea,
+      centroAscoltoIdSnapshot: historicalCentre.id,
+      territorioClassificazione: "attribuito",
+    });
+    const [syncedIntervention] = await db.select().from(interventiTable).where(eq(interventiTable.bollaId, bolla));
+    expect(syncedIntervention).toMatchObject({
+      areaOperativaIdSnapshot: historicalArea,
+      centroAscoltoIdSnapshot: historicalCentre.id,
+    });
+
+    const historicalReport = await buildPacchiReport({
+      da: "2026-06-01",
+      a: "2026-06-01",
+      anno: 2026,
+      areaOperativaId: historicalArea,
+      centroAscoltoId: historicalCentre.id,
+      magazzinoId: historicalWarehouse,
+      mensaId: null,
+      zonaUdsId: null,
+      operatoreId: null,
+      tipoIntervento: null,
+      tipoServizio: null,
+      areaOperativaMode: "query",
+      centroMode: "query",
+      zonaMode: "all",
+      callerAreas: ["sociale"],
+      callerPermissions: [],
+      callerIsAdmin: false,
+    });
+    expect(
+      historicalReport.kpi.find((item) => item.key === "pacchiDistribuiti")
+        ?.value,
+    ).toBe(1);
+    expect(
+      historicalReport.kpi.find((item) => item.key === "personeRaggiunte")
+        ?.value,
+    ).toBe(3);
+    const currentReport = await buildPacchiReport({
+      ...historicalReport.filters,
+      areaOperativaId: currentArea,
+      centroAscoltoId: currentCentre.id,
+    });
+    expect(currentReport.kpi.find((item) => item.key === "pacchiDistribuiti")?.value).toBe(0);
+  });
+
   it("blocca la consegna se il lotto prenotato non ha piu residuo sufficiente", async () => {
     const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
     const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
@@ -643,8 +866,8 @@ describe("Consegne — completa converte le prenotazioni bolla", () => {
     const completaBis = await request(consegneAppAs(centroA)).post(`/consegne/${consegnaId}/completa`).send({});
     const consegnaBis = await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({});
 
-    expect(completaBis.status).toBe(400);
-    expect(completaBis.body.error).toContain("già consegnata");
+    expect(completaBis.status).toBe(200);
+    expect(completaBis.body.stato).toBe("effettuata");
     expect(consegnaBis.status).toBe(400);
     expect(consegnaBis.body.error).toContain("già consegnata");
     expect(await lottoResidua(lottoId)).toBe(6);
@@ -653,6 +876,87 @@ describe("Consegne — completa converte le prenotazioni bolla", () => {
 });
 
 describe("Report e preparazione — semantica merce impegnata/consegnata", () => {
+  it("espone provenienza e lordo/storno/netto dal ledger, non dal flag corrente del lotto", async () => {
+    const lottoId = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 10,
+      fsePlus: true,
+    });
+    const bollaId = await insertBolla(scope, {
+      beneficiarioId: benA,
+      magazzinoId: magA,
+      stato: "consegnato",
+    });
+    const rigaId = await insertBollaRiga(scope, {
+      bollaId,
+      prodottoId: prod,
+      lottoId,
+      quantita: 10,
+    });
+    const [originale] = await db.insert(movimentiTable).values({
+      tipoMovimento: "scarico",
+      tipoDettaglio: "consegna_beneficiario",
+      dataMovimento: "2026-06-01",
+      magazzinoId: magA,
+      prodottoId: prod,
+      lottoId,
+      quantita: "10.00",
+      unitaMisura: "kg",
+      beneficiarioId: benA,
+      bollaId,
+      bollaRigaId: rigaId,
+      fondoOrigine: "FSE_PLUS",
+      naturaContabile: "DISTRIBUZIONE_FINALE",
+    }).returning({ id: movimentiTable.id });
+    const [storno] = await db.insert(movimentiTable).values({
+      tipoMovimento: "storno",
+      tipoDettaglio: "storno_bolla",
+      dataMovimento: "2026-06-02",
+      magazzinoId: magA,
+      prodottoId: prod,
+      lottoId,
+      quantita: "2.00",
+      unitaMisura: "kg",
+      beneficiarioId: benA,
+      bollaId,
+      bollaRigaId: null,
+      movimentoOrigineId: originale.id,
+      fondoOrigine: "FSE_PLUS",
+      naturaContabile: "STORNO",
+    }).returning({ id: movimentiTable.id });
+
+    // Una riclassificazione successiva del lotto non deve riscrivere la
+    // provenienza storica già registrata dal movimento di distribuzione.
+    await db.update(lottiTable).set({
+      fsePlus: false,
+      fondoOrigine: "NESSUN_FONDO",
+    }).where(eq(lottiTable.id, lottoId));
+
+    const partial = await request(appAs(centroA)).get(`/bolle/${bollaId}`);
+    expect(partial.status).toBe(200);
+    expect(partial.body.righe[0]).toMatchObject({
+      fsePlus: true,
+      fsePlusQuantita: 8,
+      nonFsePlusQuantita: 0,
+      quantitaLorda: 10,
+      quantitaStornata: 2,
+      quantitaNetta: 8,
+    });
+
+    await db.update(movimentiTable).set({ quantita: "10.00" }).where(eq(movimentiTable.id, storno.id));
+    const total = await request(appAs(centroA)).get(`/bolle/${bollaId}`);
+    expect(total.status).toBe(200);
+    expect(total.body.righe[0]).toMatchObject({
+      fsePlus: false,
+      fsePlusQuantita: 0,
+      nonFsePlusQuantita: 0,
+      quantitaLorda: 10,
+      quantitaStornata: 10,
+      quantitaNetta: 0,
+    });
+  });
+
   it("il report FSE+ conta solo bolle fisicamente consegnate", async () => {
     const before = (await request(reportAppAs(null)).get("/report/fse-plus?anno=2026")).body.beneficiariTotali as number;
     const benConfermato = await createBeneficiario(scope, centroA);

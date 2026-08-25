@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useLoginUser } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 export default function Login() {
   const { t } = useTranslation();
   const { setUser } = useAuth();
+  const [, navigate] = useLocation();
   const loginMutation = useLoginUser();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -25,6 +26,7 @@ export default function Login() {
       {
         onSuccess: (user) => {
           setUser(user);
+          navigate("/", { replace: true });
         },
         onError: () => {
           setError(t("login.errorInvalid"));

@@ -991,7 +991,7 @@ export default function EmporioCassa() {
                   }}
                   disabled={!emporioAbilitato || contestoSelezioneBloccato}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-label={t("cassaEmporio.area")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1012,6 +1012,7 @@ export default function EmporioCassa() {
                 </label>
                 <Input
                   type="date"
+                  aria-label={t("cassaEmporio.dataCassa")}
                   value={cassaDate}
                   onChange={(e) => {
                     setCassaDate(e.target.value);
@@ -1032,7 +1033,7 @@ export default function EmporioCassa() {
                   }}
                   disabled={!emporioAbilitato || contestoSelezioneBloccato}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-label={t("cassaEmporio.emporio")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1070,6 +1071,7 @@ export default function EmporioCassa() {
               <div className="flex gap-2">
                 <Input
                   value={beneficiarioSearch}
+                  aria-label={t("cassaEmporio.cercaBeneficiario")}
                   onChange={(e) => setBeneficiarioSearch(e.target.value)}
                   onKeyDown={onBeneficiarioKeyDown}
                   placeholder={
@@ -1251,6 +1253,7 @@ export default function EmporioCassa() {
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                 <Input
                   value={sessioneSearch}
+                  aria-label={t("cassaEmporio.sessioniRecenti")}
                   onChange={(e) => setSessioneSearch(e.target.value)}
                   placeholder={t("cassaEmporio.cercaBeneficiarioPlaceholder")}
                 />
@@ -1564,6 +1567,8 @@ export default function EmporioCassa() {
                                 <Button
                                   variant="outline"
                                   size="icon"
+                                  className="min-h-11 min-w-11"
+                                  aria-label={`${t("cassaEmporio.quantita")} -`}
                                   onClick={() =>
                                     updateQuantity(
                                       riga.id,
@@ -1603,6 +1608,7 @@ export default function EmporioCassa() {
                                     ).step
                                   }
                                   className="h-9 w-24 text-center"
+                                  aria-label={t("cassaEmporio.quantita")}
                                   defaultValue={riga.quantita}
                                   onBlur={(e) =>
                                     updateQuantity(
@@ -1615,6 +1621,8 @@ export default function EmporioCassa() {
                                 <Button
                                   variant="outline"
                                   size="icon"
+                                  className="min-h-11 min-w-11"
+                                  aria-label={`${t("cassaEmporio.quantita")} +`}
                                   onClick={() =>
                                     updateQuantity(
                                       riga.id,
@@ -1664,6 +1672,8 @@ export default function EmporioCassa() {
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                className="min-h-11 min-w-11"
+                                aria-label={t("common.delete")}
                                 onClick={() =>
                                   deleteRiga.mutate({
                                     id: activeSessione.id,

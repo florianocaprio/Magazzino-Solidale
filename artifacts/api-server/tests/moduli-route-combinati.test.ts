@@ -15,6 +15,7 @@ import bolleRouter from "../src/routes/bolle";
 import consegneRouter from "../src/routes/consegne";
 import interventiRouter from "../src/routes/interventi";
 import reportRouter from "../src/routes/report";
+import reportIntegratoRouter from "../src/routes/report-integrato";
 import {
   listModuliFunzionali,
   updateModuloAmbiente,
@@ -92,7 +93,9 @@ describe("prerequisiti combinati sulle route reali", () => {
     const centroId = await createCentro(scope);
     const zona = await createZona(scope, areaOperativaId);
     const operatoreId = await createUtente(scope, { centroId });
-    const socialeId = await createBeneficiario(scope, centroId, { areaOperativaId });
+    const socialeId = await createBeneficiario(scope, centroId, {
+      areaOperativaId,
+    });
     const udsId = await createBeneficiario(scope, centroId, {
       areaOperativaId,
       zonaUdsId: zona.id,
@@ -139,10 +142,12 @@ describe("prerequisiti combinati sulle route reali", () => {
         })
       ).status,
     ).toBe(403);
-    expect((await request(app).get(`/interventi/${sociale.body.id}`)).status).toBe(
+    expect(
+      (await request(app).get(`/interventi/${sociale.body.id}`)).status,
+    ).toBe(403);
+    expect((await request(app).get(`/interventi/${legacyId}`)).status).toBe(
       403,
     );
-    expect((await request(app).get(`/interventi/${legacyId}`)).status).toBe(403);
     const listaUds = await request(app)
       .get("/interventi")
       .query({ ambito: "uds", includiStorici: true });
@@ -156,10 +161,12 @@ describe("prerequisiti combinati sulle route reali", () => {
 
     await setModulo("CENTRO_ASCOLTO", true);
     await setModulo("UDS", false);
-    expect((await request(app).get(`/interventi/${sociale.body.id}`)).status).toBe(
+    expect(
+      (await request(app).get(`/interventi/${sociale.body.id}`)).status,
+    ).toBe(200);
+    expect((await request(app).get(`/interventi/${legacyId}`)).status).toBe(
       200,
     );
-    expect((await request(app).get(`/interventi/${legacyId}`)).status).toBe(200);
     expect(
       (await request(app).get("/interventi").query({ ambito: "uds" })).status,
     ).toBe(403);
@@ -178,13 +185,15 @@ describe("prerequisiti combinati sulle route reali", () => {
     );
 
     await setModulo("UDS", true);
-    expect((await request(app).get(`/interventi/${sociale.body.id}`)).status).toBe(
-      200,
-    );
+    expect(
+      (await request(app).get(`/interventi/${sociale.body.id}`)).status,
+    ).toBe(200);
     expect((await request(app).get(`/interventi/${uds.body.id}`)).status).toBe(
       200,
     );
-    expect((await request(app).get(`/interventi/${legacyId}`)).status).toBe(200);
+    expect((await request(app).get(`/interventi/${legacyId}`)).status).toBe(
+      200,
+    );
   });
 
   it("separa Report Centro da Report UDS", async () => {
@@ -221,6 +230,52 @@ describe("prerequisiti combinati sulle route reali", () => {
     ).toBe(403);
     expect(
       (await request(app).get("/report/uds/interventi-per-mese")).status,
+    ).toBe(403);
+  });
+
+  it("mantiene adapter e report FSE integrato disponibili senza modulo Centro", async () => {
+    const user = {
+      id: 0,
+      centroAscoltoId: null,
+      areaOperativaId: null,
+      aree: ["analisi", "magazzino"],
+      permessi: ["magazzino.fse.view"],
+    };
+    const legacyApp = makeScopedApp(reportRouter, user);
+    const integratedApp = makeScopedApp(reportIntegratoRouter, user);
+    await setModulo("CENTRO_ASCOLTO", false);
+
+    const [legacy, integrated] = await Promise.all([
+      request(legacyApp).get("/report/fse-plus?anno=2026"),
+      request(integratedApp).get(
+        "/report/fse-plus/integrato?da=2026-01-01&a=2026-12-31",
+      ),
+    ]);
+    expect(legacy.status).toBe(200);
+    expect(integrated.status).toBe(200);
+    expect(legacy.body.reportingModelVersion).toBe(
+      integrated.body.reportingModelVersion,
+    );
+    expect(legacy.body.pesoTotaleKg).toBe(
+      integrated.body.kpi.find(
+        (item: { key: string }) => item.key === "kgCalcolabili",
+      )?.value ?? null,
+    );
+
+    const deniedPermission = makeScopedApp(reportRouter, {
+      ...user,
+      permessi: [],
+    });
+    const deniedArea = makeScopedApp(reportRouter, {
+      ...user,
+      aree: ["analisi"],
+    });
+    expect(
+      (await request(deniedPermission).get("/report/fse-plus?anno=2026"))
+        .status,
+    ).toBe(403);
+    expect(
+      (await request(deniedArea).get("/report/fse-plus?anno=2026")).status,
     ).toBe(403);
   });
 

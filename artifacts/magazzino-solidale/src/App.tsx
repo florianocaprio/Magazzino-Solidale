@@ -1,5 +1,6 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense, useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Loader2 } from "lucide-react";
@@ -17,66 +18,73 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { canAccessMapsApplication } from "@/lib/maps-access";
+import { createAppQueryClient } from "@/lib/query-client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+const IDLE_WARNING_MS = 2 * 60 * 1000;
 const IDLE_KEEPALIVE_MS = 5 * 60 * 1000;
 
-import Dashboard from "@/pages/dashboard";
-import Magazzini from "@/pages/magazzini";
-import Prodotti from "@/pages/prodotti";
-import Lotti from "@/pages/lotti";
-import Giacenze from "@/pages/giacenze";
-import PreparazioneConsegne from "@/pages/preparazione-consegne";
-import Volontari from "@/pages/volontari";
-import Mezzi from "@/pages/mezzi";
-import ApprovazioniLogistica from "@/pages/approvazioni-logistica";
-import Fornitori from "@/pages/fornitori";
-import Trasferimenti from "@/pages/trasferimenti";
-import Scarichi from "@/pages/scarichi";
-import Movimenti from "@/pages/movimenti";
-import CentriAscolto from "@/pages/centri-ascolto";
-import Beneficiari from "@/pages/beneficiari";
-import BeneficiarioDettaglio from "@/pages/beneficiario-dettaglio";
-import Interventi from "@/pages/interventi";
-import Consegne from "@/pages/consegne";
-import Bolle from "@/pages/bolle";
-import Turni from "@/pages/turni";
-import ImpostazioniStampa from "@/pages/impostazioni-stampa";
-import ImpostazioniModuli from "@/pages/impostazioni-moduli";
-import Approvvigionamenti from "@/pages/approvvigionamenti";
-import ReportingLanding from "@/pages/reporting-landing";
-import ReportingDashboardPage from "@/pages/reporting-dashboard";
-import Utenti from "@/pages/utenti";
-import Ruoli from "@/pages/ruoli";
-import AreeOperative from "@/pages/aree-operative";
-import ZoneUds from "@/pages/zone-uds";
-import RuoliVolontari from "@/pages/ruoli-volontari";
-import TipiIntervento from "@/pages/tipi-intervento";
-import TipologieFornitore from "@/pages/tipologie-fornitore";
-import PoliticheCreditoSolidale from "@/pages/politiche-credito-solidale";
-import EmporioCassa from "@/pages/emporio-cassa";
-import EmporioCreditiSaldo from "@/pages/emporio-crediti-saldo";
-import EmporioAccessi from "@/pages/emporio-accessi";
-import EmporioSpese from "@/pages/emporio-spese";
-import UdsAnagrafica from "@/pages/uds-anagrafica";
-import UdsInterventi from "@/pages/uds-interventi";
-import UdsReportGiornaliero from "@/pages/uds-report-giornaliero";
-import SuperAdminConfigurazioneAmbiente from "@/pages/super-admin-configurazione-ambiente";
-import SuperAdminModuli from "@/pages/super-admin-moduli";
-import SuperAdminAuditConfigurazioni from "@/pages/super-admin-audit-configurazioni";
-import SuperAdminLogSistema from "@/pages/super-admin-log-sistema";
-import SostieniProgetto from "@/pages/sostieni-progetto";
-import MensaPage, { type MensaView } from "@/pages/mensa";
-import MapsOperativa from "@/pages/maps";
+import type { MensaView } from "@/pages/mensa";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const Magazzini = lazy(() => import("@/pages/magazzini"));
+const Prodotti = lazy(() => import("@/pages/prodotti"));
+const Lotti = lazy(() => import("@/pages/lotti"));
+const Giacenze = lazy(() => import("@/pages/giacenze"));
+const PreparazioneConsegne = lazy(() => import("@/pages/preparazione-consegne"));
+const Volontari = lazy(() => import("@/pages/volontari"));
+const Mezzi = lazy(() => import("@/pages/mezzi"));
+const ApprovazioniLogistica = lazy(() => import("@/pages/approvazioni-logistica"));
+const Fornitori = lazy(() => import("@/pages/fornitori"));
+const Trasferimenti = lazy(() => import("@/pages/trasferimenti"));
+const Scarichi = lazy(() => import("@/pages/scarichi"));
+const Movimenti = lazy(() => import("@/pages/movimenti"));
+const CentriAscolto = lazy(() => import("@/pages/centri-ascolto"));
+const Beneficiari = lazy(() => import("@/pages/beneficiari"));
+const BeneficiarioDettaglio = lazy(() => import("@/pages/beneficiario-dettaglio"));
+const Interventi = lazy(() => import("@/pages/interventi"));
+const Consegne = lazy(() => import("@/pages/consegne"));
+const Bolle = lazy(() => import("@/pages/bolle"));
+const Turni = lazy(() => import("@/pages/turni"));
+const ImpostazioniStampa = lazy(() => import("@/pages/impostazioni-stampa"));
+const ImpostazioniModuli = lazy(() => import("@/pages/impostazioni-moduli"));
+const Approvvigionamenti = lazy(() => import("@/pages/approvvigionamenti"));
+const ReportingLanding = lazy(() => import("@/pages/reporting-landing"));
+const ReportingDashboardPage = lazy(() => import("@/pages/reporting-dashboard"));
+const Utenti = lazy(() => import("@/pages/utenti"));
+const Ruoli = lazy(() => import("@/pages/ruoli"));
+const AreeOperative = lazy(() => import("@/pages/aree-operative"));
+const ZoneUds = lazy(() => import("@/pages/zone-uds"));
+const RuoliVolontari = lazy(() => import("@/pages/ruoli-volontari"));
+const TipiIntervento = lazy(() => import("@/pages/tipi-intervento"));
+const TipologieFornitore = lazy(() => import("@/pages/tipologie-fornitore"));
+const PoliticheCreditoSolidale = lazy(() => import("@/pages/politiche-credito-solidale"));
+const EmporioCassa = lazy(() => import("@/pages/emporio-cassa"));
+const EmporioCreditiSaldo = lazy(() => import("@/pages/emporio-crediti-saldo"));
+const EmporioAccessi = lazy(() => import("@/pages/emporio-accessi"));
+const EmporioSpese = lazy(() => import("@/pages/emporio-spese"));
+const UdsAnagrafica = lazy(() => import("@/pages/uds-anagrafica"));
+const UdsInterventi = lazy(() => import("@/pages/uds-interventi"));
+const UdsReportGiornaliero = lazy(() => import("@/pages/uds-report-giornaliero"));
+const SuperAdminConfigurazioneAmbiente = lazy(() => import("@/pages/super-admin-configurazione-ambiente"));
+const SuperAdminModuli = lazy(() => import("@/pages/super-admin-moduli"));
+const SuperAdminAuditConfigurazioni = lazy(() => import("@/pages/super-admin-audit-configurazioni"));
+const SuperAdminLogSistema = lazy(() => import("@/pages/super-admin-log-sistema"));
+const SostieniProgetto = lazy(() => import("@/pages/sostieni-progetto"));
+const MensaPage = lazy(() => import("@/pages/mensa"));
+const MapsOperativa = lazy(() => import("@/pages/maps"));
+
+const queryClient = createAppQueryClient();
 
 function Guard({
   area,
@@ -240,6 +248,7 @@ function ReportingRoute({
 function AppRoutes() {
   return (
     <AppLayout>
+      <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-label="Caricamento pagina" /></div>}>
       <Switch>
         <Route path="/">
           {() => (
@@ -441,7 +450,9 @@ function AppRoutes() {
             <Guard area="sociale">
               <RequireModulo codice="CENTRO_ASCOLTO">
                 <RequireModulo codice="CONSEGNE">
-                  <Consegne />
+                  <RequirePermission permission="consegne.view">
+                    <Consegne />
+                  </RequirePermission>
                 </RequireModulo>
               </RequireModulo>
             </Guard>
@@ -843,6 +854,7 @@ function AppRoutes() {
 
         <Route component={NotFound} />
       </Switch>
+      </Suspense>
     </AppLayout>
   );
 }
@@ -873,13 +885,18 @@ function AuthGate() {
   const { toast } = useToast();
   const { t } = useTranslation();
   const [location] = useLocation();
+  const [sessionWarningOpen, setSessionWarningOpen] = useState(false);
 
-  useIdleLogout({
+  const continueSession = useIdleLogout({
     enabled: !!user,
     timeoutMs: IDLE_TIMEOUT_MS,
+    warningMs: IDLE_WARNING_MS,
     keepAliveMs: IDLE_KEEPALIVE_MS,
     onKeepAlive: refresh,
+    onWarning: () => setSessionWarningOpen(true),
+    onResume: () => setSessionWarningOpen(false),
     onIdle: () => {
+      setSessionWarningOpen(false);
       logout();
       toast({
         title: t("common.sessionExpired"),
@@ -888,6 +905,17 @@ function AuthGate() {
       });
     },
   });
+
+  const handleContinueSession = async () => {
+    try {
+      await continueSession();
+    } catch {
+      toast({
+        title: t("common.sessionRenewalFailed"),
+        variant: "destructive",
+      });
+    }
+  };
 
   if (isLoading || bootstrapLoading) {
     return (
@@ -913,7 +941,29 @@ function AuthGate() {
   }
   if (user.mustChangePassword) return <ChangePassword />;
 
-  return <AppRoutes />;
+  return (
+    <>
+      <AppRoutes />
+      <AlertDialog open={sessionWarningOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("common.sessionExpiring")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("common.sessionExpiringDesc")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={logout}>
+              {t("common.exitNow")}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleContinueSession()}>
+              {t("common.continueSession")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }
 
 function App() {

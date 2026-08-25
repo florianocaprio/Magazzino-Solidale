@@ -38,12 +38,20 @@ import {
 import { withDocumentCodeRetry } from "../lib/documentCode";
 import { isDateOnly } from "../lib/interventiWorkflow";
 import type { LottoSelectionPolicy } from "../lib/lottoPolicy";
-import { canAccessBeneficiarioRecord } from "../lib/beneficiarioPolicy";
+import {
+  beneficiarioAccessScopeFromRequest,
+  canAccessBeneficiarioRecord,
+} from "../lib/beneficiarioPolicy";
 import {
   InventoryDecimal,
   InventoryDecimalError,
   positiveInventoryDecimal,
 } from "../lib/inventoryDecimal";
+import {
+  BeneficiaryReportingScopeError,
+  isReportingSnapshotConcurrencyError,
+  lockAndAuthorizeBeneficiaryReportingContextTx,
+} from "../lib/reporting/eventSnapshots";
 
 const router: IRouter = Router();
 
@@ -337,6 +345,7 @@ router.post(
   requirePermission("magazzino.stock.issue"),
   async (req, res) => {
     const body = req.body ?? {};
+    const beneficiaryAccessScope = beneficiarioAccessScopeFromRequest(req);
 
     if (!Number.isInteger(body.magazzinoId) || body.magazzinoId <= 0) {
       res.status(400).json({ error: "Magazzino non valido" });
@@ -505,6 +514,16 @@ router.post(
     try {
       newId = await withDocumentCodeRetry("SCAR", (codice) =>
         db.transaction(async (tx) => {
+          const reportingSnapshot =
+            beneficiarioId == null
+              ? null
+              : (
+                  await lockAndAuthorizeBeneficiaryReportingContextTx(
+                    tx,
+                    beneficiarioId,
+                    beneficiaryAccessScope,
+                  )
+                ).snapshot;
           await requireOperationalMagazzino(tx, body.magazzinoId);
           return creaScaricoInventariale(tx, {
             codice,
@@ -536,6 +555,14 @@ router.post(
                     dominioOrigine: "MAGAZZINO",
                     entitaOrigineTipo: "scarico_manual_beneficiario",
                     entitaOrigineId: 0,
+                    areaOperativaIdSnapshot:
+                      reportingSnapshot?.areaOperativaIdSnapshot ?? null,
+                    centroAscoltoIdSnapshot:
+                      reportingSnapshot?.centroAscoltoIdSnapshot ?? null,
+                    territorioClassificazione:
+                      reportingSnapshot?.areaOperativaIdSnapshot == null
+                        ? "legacy_sconosciuto"
+                        : "attribuito",
                     numeroPacchi: canaleOperativo === "PACCHI" ? 1 : null,
                   }
                 : undefined,
@@ -549,6 +576,16 @@ router.post(
         }),
       );
     } catch (error) {
+      if (error instanceof BeneficiaryReportingScopeError) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+      if (isReportingSnapshotConcurrencyError(error)) {
+        res.status(409).json({
+          error: "Finalizzazione concorrente: ricarica i dati e riprova",
+        });
+        return;
+      }
       if (error instanceof InventoryError) {
         res.status(409).json({ error: error.message });
         return;

@@ -14,9 +14,16 @@ export function number(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function scopeCondition(column: SQL, value: number | null, mode: "all" | "caller" | "query"): SQL | null {
+export function scopeCondition(
+  column: SQL,
+  value: number | null,
+  mode: "all" | "caller" | "query",
+  includeShared = false,
+): SQL | null {
   if (value == null || mode === "all") return null;
-  return mode === "caller" ? sql`(${column} = ${value} OR ${column} IS NULL)` : sql`${column} = ${value}`;
+  return includeShared
+    ? sql`(${column} = ${value} OR ${column} IS NULL)`
+    : sql`${column} = ${value}`;
 }
 
 export function reportScope(
@@ -29,18 +36,36 @@ export function reportScope(
     zona?: SQL;
     operatore?: SQL;
   },
+  options: {
+    sharedAreaOperativa?: boolean;
+    sharedCentro?: boolean;
+  } = {},
 ): SQL[] {
   const conditions: SQL[] = [];
   if (columns.areaOperativa) {
-    const condition = scopeCondition(columns.areaOperativa, filters.areaOperativaId, filters.areaOperativaMode);
+    const condition = scopeCondition(
+      columns.areaOperativa,
+      filters.areaOperativaId,
+      filters.areaOperativaMode,
+      options.sharedAreaOperativa,
+    );
     if (condition) conditions.push(condition);
   }
   if (columns.centro) {
-    const condition = scopeCondition(columns.centro, filters.centroAscoltoId, filters.centroMode);
+    const condition = scopeCondition(
+      columns.centro,
+      filters.centroAscoltoId,
+      filters.centroMode,
+      options.sharedCentro,
+    );
     if (condition) conditions.push(condition);
   }
   if (columns.zona) {
-    const condition = scopeCondition(columns.zona, filters.zonaUdsId, filters.zonaMode);
+    const condition = scopeCondition(
+      columns.zona,
+      filters.zonaUdsId,
+      filters.zonaMode,
+    );
     if (condition) conditions.push(condition);
   }
   if (columns.magazzino && filters.magazzinoId != null) {

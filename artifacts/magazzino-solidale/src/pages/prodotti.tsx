@@ -36,6 +36,7 @@ import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from 
 import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus, Barcode, Upload } from "lucide-react";
 import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { useAuth } from "@/lib/auth";
+import { todayEuropeRome } from "@/lib/europe-rome";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -129,7 +130,7 @@ function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => 
     defaultValues: {
       magazzinoId: "",
       quantita: 0,
-      dataCarico: new Date().toISOString().split("T")[0],
+      dataCarico: todayEuropeRome(),
       causale: "donazione",
       provenienza: prodotto.fsePlus ? "fseplus" : "fornitore",
       fornitoreId: !prodotto.fsePlus && prodotto.fornitoreId ? String(prodotto.fornitoreId) : "",

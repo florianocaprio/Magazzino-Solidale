@@ -36,9 +36,19 @@ export interface BeneficiarioFseProfile {
   /** @nullable */
   senzaTettoEsclusioneAbitativa: number | null;
   /** @nullable */
+  personeDisabilita: number | null;
+  /** @nullable */
   tipologiaAttivitaImportata?: string | null;
   /** @nullable */
   statoAttualeImportato?: string | null;
+  /** @nullable */
+  dataRiferimento: Date | null;
+  /** @nullable */
+  origineDato: string | null;
+  /** @nullable */
+  attendibilitaDato: string | null;
+  /** @minimum 1 */
+  versione: number;
   /** @nullable */
   ultimoImportBatchId?: number | null;
   /** @nullable */

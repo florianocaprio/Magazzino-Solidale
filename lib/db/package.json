@@ -12,6 +12,7 @@
     "migrations:status": "node ./scripts/apply-updates.mjs status",
     "migrations:verify": "node ./scripts/apply-updates.mjs verify",
     "test:migrations": "node --test ./scripts/migration-runner.test.mjs",
+    "test:fresh": "node ./scripts/fresh-db-gate.mjs",
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
   },

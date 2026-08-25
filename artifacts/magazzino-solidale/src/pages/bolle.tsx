@@ -22,6 +22,7 @@ import {
   useListTrasferimenti,
   useListScarichi,
   useListConsegne,
+  useGetConsegna,
   useAssociaBolla,
   useSegnalaRitiroNonEffettuato,
   useConvertiBollaInConsegna,
@@ -30,6 +31,7 @@ import {
   getGetBollaQueryKey,
   getListGiacenzeQueryKey,
   getListConsegneQueryKey,
+  getGetConsegnaQueryKey,
   getListVolontariQueryKey,
   type ConversioneConsegnaInputFasciaOraria,
   type Trasferimento,
@@ -62,6 +64,7 @@ import { it } from "date-fns/locale";
 import { generateBollaPdf, type BollaTemplate } from "@/lib/bolla-pdf";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
 import { generateScaricoPdf, causaleLabel } from "@/lib/scarico-pdf";
+import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
@@ -154,7 +157,9 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
   const { data: magazzini } = useListMagazzini();
   const { data: volontari } = useListVolontari(volontariParams, { query: { queryKey: getListVolontariQueryKey(volontariParams), enabled: selectedBenef != null } });
   const { data: mezzi } = useListMezzi();
-  const { data: consegne } = useListConsegne();
+  const { data: consegnaSource } = useGetConsegna(consegnaId ?? 0, {
+    query: { enabled: consegnaId != null, queryKey: getGetConsegnaQueryKey(consegnaId ?? 0) },
+  });
   const createBolla = useCreateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -174,7 +179,6 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
     toast({ title: t("bolle.scanFound", { name: `${b.cognome} ${b.nome}` }) });
   };
 
-  const consegnaSource = consegne?.find((c) => c.id === consegnaId);
   useEffect(() => {
     if (!open || !consegnaSource) return;
     if (consegnaSource.volontarioId != null) {
@@ -192,6 +196,13 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
   // Mezzo e conteggio del carico vivono ora sulla pianificazione consegne, non sulla bolla.
   const requiresTrasportatore = selectedBenef?.consegnaDomicilio === true;
   const trasportatoreMissing = requiresTrasportatore && (!trasportatore || (trasportatore === "__altro__" && !trasportatoreAltro.trim()));
+  const initialCentroId = isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "all";
+  const initialTrasportatore = consegnaSource?.volontarioId != null ? String(consegnaSource.volontarioId) : consegnaSource?.volontarioAltro ? "__altro__" : "";
+  const initialTrasportatoreAltro = consegnaSource?.volontarioAltro ?? "";
+  const initialMezzo = consegnaSource?.mezzoId != null ? String(consegnaSource.mezzoId) : consegnaSource?.mezzoAltro ? "altro" : "";
+  const beneficiarioDirty = lockedBeneficiario ? !!beneficiarioId && beneficiarioId !== String(lockedBeneficiario.id) : !!beneficiarioId;
+  const unsavedGuard = useUnsavedChangesGuard(open && (beneficiarioDirty || !!magazzinoId || centroId !== initialCentroId || !!scanCode || trasportatore !== initialTrasportatore || trasportatoreAltro !== initialTrasportatoreAltro || mezzo !== initialMezzo));
+  const requestClose = () => unsavedGuard.requestClose(onClose);
 
   const onSubmit = () => {
     if (!beneficiarioId || !magazzinoId || trasportatoreMissing) return;
@@ -230,7 +241,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) requestClose(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader><DialogTitle>{t("bolle.createTitle")}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
@@ -287,7 +298,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
           <div className="space-y-2">
             <Label>{t("bolle.magazzinoUscitaLabel")}</Label>
             <Select value={magazzinoId} onValueChange={setMagazzinoId}>
-              <SelectTrigger><SelectValue placeholder={t("bolle.magazzinoPlaceholder")} /></SelectTrigger>
+              <SelectTrigger aria-label={t("bolle.magazzinoUscitaLabel")}><SelectValue placeholder={t("bolle.magazzinoPlaceholder")} /></SelectTrigger>
               <SelectContent>
                 {magazzini?.filter((m) => m.stato === "attivo").map(m => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
@@ -352,11 +363,12 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button variant="outline" onClick={requestClose}>{t("common.cancel")}</Button>
           <Button onClick={onSubmit} disabled={!beneficiarioId || !magazzinoId || trasportatoreMissing || createBolla.isPending}>
             {t("bolle.createBolla")}
           </Button>
         </DialogFooter>
+        <UnsavedChangesDialog guard={unsavedGuard} />
       </DialogContent>
     </Dialog>
   );
@@ -619,7 +631,7 @@ function AggiungiProdottoDialog({
           <div className="space-y-2">
             <Label>{t("bolle.prodottoDisponibileLabel")}</Label>
             <Select value={prodottoId} onValueChange={v => { setProdottoId(v); setLottoId(""); setQuantita(""); }}>
-              <SelectTrigger><SelectValue placeholder={t("bolle.prodottoPlaceholder")} /></SelectTrigger>
+              <SelectTrigger aria-label={t("bolle.prodottoDisponibileLabel")}><SelectValue placeholder={t("bolle.prodottoPlaceholder")} /></SelectTrigger>
               <SelectContent>
                 {giacenze && giacenze.length > 0 ? giacenze.map(g => (
                   <SelectItem key={g.prodottoId} value={String(g.prodottoId)}>
@@ -638,7 +650,7 @@ function AggiungiProdottoDialog({
             <div className="space-y-2">
               <Label>{t("bolle.lottoLabel")}</Label>
               <Select value={lottoId} onValueChange={v => { setLottoId(v); setQuantita(""); }}>
-                <SelectTrigger><SelectValue placeholder={t("bolle.lottoPlaceholder")} /></SelectTrigger>
+                <SelectTrigger aria-label={t("bolle.lottoLabel")}><SelectValue placeholder={t("bolle.lottoPlaceholder")} /></SelectTrigger>
                 <SelectContent>
                   {lottiDisponibili.map(l => (
                     <SelectItem key={l.id} value={String(l.id)}>
@@ -660,6 +672,7 @@ function AggiungiProdottoDialog({
               <Label>{t("common.quantity")}</Label>
               <Input
                 type="number"
+                aria-label={t("common.quantity")}
                 min="0.01"
                 step="0.000001"
                 max={maxDisponibile || undefined}
@@ -679,7 +692,7 @@ function AggiungiProdottoDialog({
             <div className="space-y-2">
               <Label>{t("bolle.unitaMisuraLabel")}</Label>
               <Select value={unitaMisura} onValueChange={setUnitaMisura}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t("bolle.unitaMisuraLabel")}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {["pz", "kg", "g", "lt", "ml", "conf", "scatola", "busta"].map(u => (
                     <SelectItem key={u} value={u}>{u}</SelectItem>
@@ -738,7 +751,9 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  const consegneParams = bollaCentroId != null ? { centroAscoltoId: bollaCentroId } : {};
+  const consegneParams = bollaCentroId != null
+    ? { centroAscoltoId: bollaCentroId, page: 1, pageSize: 100 }
+    : { page: 1, pageSize: 100 };
   const { data: consegnePianificabili } = useListConsegne(consegneParams, {
     query: { enabled: assegnaOpen && beneficiari != null, queryKey: getListConsegneQueryKey(consegneParams) },
   });
@@ -747,7 +762,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const centroBeneficiarioIds = new Set(
     (beneficiari ?? []).filter((b) => (b.centroAscoltoId ?? null) === bollaCentroId).map((b) => b.id)
   );
-  const pianificabili = (consegnePianificabili ?? []).filter(
+  const pianificabili = (consegnePianificabili?.items ?? []).filter(
     (c) => c.stato === "pianificata" && c.bollaId == null && centroBeneficiarioIds.has(c.beneficiarioId)
   );
 

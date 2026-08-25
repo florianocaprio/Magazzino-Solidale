@@ -10,5 +10,5 @@ export type ReportDrilldownReportingModelVersion = typeof ReportDrilldownReporti
 
 
 export const ReportDrilldownReportingModelVersion = {
-  MAGAZZINO_2_0C_V1: 'MAGAZZINO_2_0C_V1',
+  REPORTING_2_0_V1: 'REPORTING_2_0_V1',
 } as const;

@@ -18,9 +18,10 @@ import {
   scaricoRigheTable,
   tipiInterventoTable,
   utentiTable,
+  zoneUdsTable,
   operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
 
 const rnd = () => Math.random().toString(36).slice(2, 10);
@@ -34,6 +35,7 @@ const ids = {
   magazzini: [] as number[],
   lotti: [] as number[],
   tipi: [] as number[],
+  zone: [] as number[],
 };
 
 let roma: number;
@@ -48,6 +50,7 @@ let beneficiarioMilano: number;
 let prodottoId: number;
 let magazzinoId: number;
 let tipologiaId: number;
+let zonaRoma: number;
 
 function makeApp(
   options: {
@@ -85,6 +88,8 @@ function makeApp(
         "sociale.interventi.update",
         "sociale.interventi.complete",
         "sociale.interventi.cancel",
+        "uds.interventi.view",
+        "uds.interventi.update",
       ],
       isAdmin: false,
       isSuperAdmin: false,
@@ -103,6 +108,7 @@ async function createIntervento(input: {
   pianificata?: Date | null;
   avvio?: Date | null;
   risultato?: string | null;
+  zonaUdsIdSnapshot?: number | null;
 }): Promise<number> {
   const [row] = await db
     .insert(interventiTable)
@@ -113,6 +119,7 @@ async function createIntervento(input: {
       stato: input.stato,
       ambito: input.ambito ?? "sociale",
       areaOperativaIdSnapshot: input.ambito === "uds" ? roma : null,
+      zonaUdsIdSnapshot: input.zonaUdsIdSnapshot ?? null,
       priorita: "normale",
       dataOraPianificata: input.pianificata ?? null,
       dataOraAvvio: input.avvio ?? null,
@@ -140,6 +147,12 @@ beforeAll(async () => {
     .returning({ id: areeOperativeTable.id });
   [roma, milano] = areeOperative.map((row) => row.id);
   ids.areaOperativa.push(roma, milano);
+  const [zona] = await db
+    .insert(zoneUdsTable)
+    .values({ nome: `Zona UDS Roma ${rnd()}`, areaOperativaId: roma })
+    .returning({ id: zoneUdsTable.id });
+  zonaRoma = zona.id;
+  ids.zone.push(zona.id);
   const centers = await db
     .insert(centriAscoltoTable)
     .values([
@@ -304,6 +317,8 @@ afterAll(async () => {
   await db
     .delete(centriAscoltoTable)
     .where(inArray(centriAscoltoTable.id, ids.centri));
+  if (ids.zone.length > 0)
+    await db.delete(zoneUdsTable).where(inArray(zoneUdsTable.id, ids.zone));
   await db
     .delete(areeOperativeTable)
     .where(inArray(areeOperativeTable.id, ids.areaOperativa));
@@ -481,6 +496,20 @@ describe("gestione operativa degli interventi Sociali", () => {
     expect(
       response.body.documenti.map((item: { stato: string }) => item.stato),
     ).toEqual(["da_verificare", "verificato"]);
+    const [operation] = await db
+      .select()
+      .from(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        and(
+          eq(operazioniDistribuzioneMagazzinoTable.dominioOrigine, "SOCIALE"),
+          eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, id),
+        ),
+      );
+    expect(operation).toMatchObject({
+      areaOperativaIdSnapshot: roma,
+      centroAscoltoIdSnapshot: centroRoma,
+      territorioClassificazione: "attribuito",
+    });
 
     const invalid = await request(makeApp())
       .post(`/interventi/${id}/salva-operativita`)
@@ -563,6 +592,56 @@ describe("gestione operativa degli interventi Sociali", () => {
     ).toHaveLength(0);
   });
 
+  it("preserva Area e Zona storiche UDS prima della scrittura nel ledger", async () => {
+    const id = await createIntervento({
+      stato: "in_corso",
+      ambito: "uds",
+      avvio: new Date("2026-08-20T08:00:00Z"),
+      zonaUdsIdSnapshot: zonaRoma,
+    });
+    const response = await request(makeApp({ aree: ["sociale", "uds"] }))
+      .post(`/interventi/${id}/concludi`)
+      .send({
+        versione: await versioneIntervento(id),
+        conferma: true,
+        dataOraConclusione: "2026-08-20T09:00:00Z",
+        risultato: "Distribuzione UDS conclusa",
+        materiali: [
+          {
+            prodottoId,
+            quantitaPrevista: 1,
+            quantitaConsegnata: 1,
+            statoPreparazione: "consegnato",
+            magazzinoId,
+          },
+        ],
+      });
+    expect(response.status).toBe(200);
+    const [operation] = await db
+      .select()
+      .from(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        and(
+          eq(operazioniDistribuzioneMagazzinoTable.dominioOrigine, "UDS"),
+          eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, id),
+        ),
+      );
+    expect(operation).toMatchObject({
+      areaOperativaIdSnapshot: roma,
+      centroAscoltoIdSnapshot: centroRoma,
+      territorioClassificazione: "attribuito",
+    });
+    const [historical] = await db
+      .select()
+      .from(interventiTable)
+      .where(eq(interventiTable.id, id));
+    expect(historical).toMatchObject({
+      areaOperativaIdSnapshot: roma,
+      centroAscoltoIdSnapshot: centroRoma,
+      zonaUdsIdSnapshot: zonaRoma,
+    });
+  });
+
   it("conclude una sola volta e crea il successivo nella stessa transazione", async () => {
     const id = await createIntervento({
       stato: "in_corso",
@@ -628,6 +707,39 @@ describe("gestione operativa degli interventi Sociali", () => {
         versione: response.body.operativita.versione,
       });
     expect(immutable.status).toBe(409);
+    const [historical] = await db
+      .select()
+      .from(interventiTable)
+      .where(eq(interventiTable.id, id));
+    expect(historical).toMatchObject({
+      areaOperativaIdSnapshot: roma,
+      centroAscoltoIdSnapshot: centroRoma,
+    });
+    await db
+      .update(beneficiariTable)
+      .set({
+        areaOperativaId: milano,
+        centroAscoltoId: centroMilano,
+      })
+      .where(eq(beneficiariTable.id, beneficiarioRoma));
+    try {
+      const [stillHistorical] = await db
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, id));
+      expect(stillHistorical).toMatchObject({
+        areaOperativaIdSnapshot: roma,
+        centroAscoltoIdSnapshot: centroRoma,
+      });
+    } finally {
+      await db
+        .update(beneficiariTable)
+        .set({
+          areaOperativaId: roma,
+          centroAscoltoId: centroRoma,
+        })
+        .where(eq(beneficiariTable.id, beneficiarioRoma));
+    }
   });
 
   it("annulla con motivo e registra la mancata presentazione senza falso avvio", async () => {

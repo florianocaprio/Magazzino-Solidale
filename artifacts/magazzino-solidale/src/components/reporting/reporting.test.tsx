@@ -8,22 +8,133 @@ vi.mock("react-i18next", async (importOriginal) => ({
 
 import { ReportEmptyState } from "./report-empty-state";
 import { ReportDataQuality } from "./report-data-quality";
-import { getReportingFilterLocks } from "./report-filters";
+import {
+  getReportingFilterLocks,
+  reconcileReportingFilterSelection,
+  reportingPeriodForYear,
+} from "./report-filters";
 import { isReportingCardVisible } from "@/pages/reporting-landing";
 import { MODULO_BY_ROUTE } from "@/lib/use-moduli";
 import { NAV_ITEMS } from "@/components/layout";
+import { reportingFiltersFromSearch } from "@/pages/reporting-dashboard";
 
 describe("reportistica integrata", () => {
   it("blocca i filtri corrispondenti allo scope del caller", () => {
-    expect(getReportingFilterLocks({ areaOperativaId: 1, centroAscoltoId: 2, zonaUdsId: 3 })).toEqual({
+    expect(
+      getReportingFilterLocks({
+        areaOperativaId: 1,
+        centroAscoltoId: 2,
+        zonaUdsId: 3,
+      }),
+    ).toEqual({
       areaOperativaLocked: true,
       centreLocked: true,
       zoneLocked: true,
     });
-    expect(getReportingFilterLocks({ areaOperativaId: null, centroAscoltoId: null, zonaUdsId: null })).toEqual({
+    expect(
+      getReportingFilterLocks({
+        areaOperativaId: null,
+        centroAscoltoId: null,
+        zonaUdsId: null,
+      }),
+    ).toEqual({
       areaOperativaLocked: false,
       centreLocked: false,
       zoneLocked: false,
+    });
+  });
+
+  it("ripulisce URL obsolete e filtri figli senza rimuovere gli scope bloccati", () => {
+    const value = {
+      da: "2026-01-01",
+      a: "2026-08-24",
+      areaOperativaId: 1,
+      centroAscoltoId: 2,
+      magazzinoId: 3,
+      mensaId: 4,
+      zonaUdsId: 5,
+    };
+    expect(
+      reconcileReportingFilterSelection(
+        value,
+        {
+          areeOperative: [{ id: 1 }],
+          centres: [{ id: 2 }],
+          warehouses: [],
+          mense: [],
+          zones: [],
+        },
+        getReportingFilterLocks({
+          areaOperativaId: 1,
+          centroAscoltoId: 2,
+          zonaUdsId: 5,
+        }),
+      ),
+    ).toEqual({ magazzinoId: null, mensaId: null });
+    expect(
+      reconcileReportingFilterSelection(
+        value,
+        {
+          areeOperative: [],
+          centres: [],
+          warehouses: [],
+          mense: [],
+          zones: [],
+        },
+        getReportingFilterLocks(null),
+      ),
+    ).toMatchObject({
+      areaOperativaId: null,
+      centroAscoltoId: null,
+      magazzinoId: null,
+      mensaId: null,
+      zonaUdsId: null,
+    });
+  });
+
+  it("ricostruisce popstate e URL senza ID negativi né intervalli invertiti", () => {
+    const restored = reportingFiltersFromSearch(
+      "?da=2026-09-01&a=2026-08-01&areaOperativaId=1&centroAscoltoId=2&magazzinoId=-3&zonaUdsId=5",
+      { areaOperativaId: 1, centroAscoltoId: 2, zonaUdsId: 5 },
+      "2026-08-24",
+    );
+    expect(restored).toEqual({
+      da: "2026-01-01",
+      a: "2026-08-24",
+      areaOperativaId: 1,
+      centroAscoltoId: 2,
+      magazzinoId: null,
+      mensaId: null,
+      zonaUdsId: 5,
+    });
+    const cachedOptions = {
+      areeOperative: [{ id: 1 }],
+      centres: [{ id: 2 }],
+      warehouses: [{ id: 7 }],
+      mense: [],
+      zones: [{ id: 5 }],
+    };
+    expect(
+      reconcileReportingFilterSelection(
+        { ...restored, magazzinoId: 99 },
+        cachedOptions,
+        getReportingFilterLocks({
+          areaOperativaId: 1,
+          centroAscoltoId: 2,
+          zonaUdsId: 5,
+        }),
+      ),
+    ).toEqual({ magazzinoId: null });
+  });
+
+  it("chiude l'anno FSE corrente a oggi e un anno passato al 31 dicembre", () => {
+    expect(reportingPeriodForYear(2026, "2026-08-24")).toEqual({
+      da: "2026-01-01",
+      a: "2026-08-24",
+    });
+    expect(reportingPeriodForYear(2025, "2026-08-24")).toEqual({
+      da: "2025-01-01",
+      a: "2025-12-31",
     });
   });
 
@@ -31,7 +142,14 @@ describe("reportistica integrata", () => {
     const active = new Set(["MENSA"]);
     const areas = new Set(["mensa"]);
     const permissions = new Set(["mensa.reports.view"]);
-    const card = { section: "mensa", path: "/report/mensa", icon: (() => null) as never, areas: ["mensa"], modules: ["MENSA"], permission: "mensa.reports.view" };
+    const card = {
+      section: "mensa",
+      path: "/report/mensa",
+      icon: (() => null) as never,
+      areas: ["mensa"],
+      modules: ["MENSA"],
+      permission: "mensa.reports.view",
+    };
     const checks = {
       hasArea: (area: string) => areas.has(area),
       hasPermission: (permission: string) => permissions.has(permission),
@@ -43,7 +161,17 @@ describe("reportistica integrata", () => {
   });
 
   it("registra le nuove route e mantiene nascosto l'alias legacy dalla navigazione", () => {
-    const paths = ["/report", "/report/dashboard", "/report/pacchi", "/report/centro-ascolto", "/report/emporio", "/report/mensa", "/report/uds", "/report/magazzino-logistica", "/report/fse-plus"];
+    const paths = [
+      "/report",
+      "/report/dashboard",
+      "/report/pacchi",
+      "/report/centro-ascolto",
+      "/report/emporio",
+      "/report/mensa",
+      "/report/uds",
+      "/report/magazzino-logistica",
+      "/report/fse-plus",
+    ];
     for (const path of paths) {
       expect(MODULO_BY_ROUTE[path]).toBe("REPORT");
       expect(NAV_ITEMS.some((item) => item.url === path)).toBe(true);
@@ -52,12 +180,21 @@ describe("reportistica integrata", () => {
   });
 
   it("rende empty state e warning di qualità senza confondere zero e dato mancante", () => {
-    expect(renderToStaticMarkup(<ReportEmptyState />)).toContain("reporting.empty.title");
+    expect(renderToStaticMarkup(<ReportEmptyState />)).toContain(
+      "reporting.empty.title",
+    );
     const html = renderToStaticMarkup(
-      <ReportDataQuality items={[
-        { key: "sessoMancante", count: 0, availability: "ok", note: null },
-        { key: "dimensioniSifeadMancanti", count: null, availability: "missing", note: null },
-      ]} />,
+      <ReportDataQuality
+        items={[
+          { key: "sessoMancante", count: 0, availability: "ok", note: null },
+          {
+            key: "dimensioniSifeadMancanti",
+            count: null,
+            availability: "missing",
+            note: null,
+          },
+        ]}
+      />,
     );
     expect(html).toContain("reporting.quality.sessoMancante");
     expect(html).toContain("reporting.quality.dimensioniSifeadMancanti");

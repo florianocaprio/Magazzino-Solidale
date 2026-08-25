@@ -112,6 +112,14 @@ export const SOCIALE_INTERVENTI_PERMISSIONS = [
   },
 ] as const;
 
+export const CONSEGNE_PERMISSIONS = [
+  { key: "consegne.view", label: "Consegne: consultazione" },
+  { key: "consegne.manage", label: "Consegne: pianificazione e gestione" },
+  { key: "consegne.complete", label: "Consegne: completamento" },
+  { key: "consegne.cancel", label: "Consegne: annullamento pianificazione" },
+  { key: "consegne.export", label: "Consegne: esportazione" },
+] as const;
+
 export const UDS_PERMISSIONS = [
   { key: "uds.directory.view", label: "UDS: directory minimizzata" },
   { key: "uds.interventi.view", label: "UDS: consultazione interventi" },
@@ -244,6 +252,7 @@ export const ALL_PERMISSIONS = [
   ...EMPORIO_ACCESS_PERMISSIONS,
   ...EMPORIO_CASSA_SALES_PERMISSIONS,
   ...SOCIALE_INTERVENTI_PERMISSIONS,
+  ...CONSEGNE_PERMISSIONS,
   ...UDS_PERMISSIONS,
   ...MAPS_PERMISSIONS,
   ...LOGISTICA_PERMISSIONS,
@@ -286,6 +295,7 @@ export const AREA_PERMISSION_MAP = {
     "credito.adjust",
     ...permissionKeys(EMPORIO_ACCESS_PERMISSIONS),
     ...permissionKeys(SOCIALE_INTERVENTI_PERMISSIONS),
+    ...permissionKeys(CONSEGNE_PERMISSIONS),
     ...permissionKeys(BOLLE_PERMISSIONS),
     "logistica.turni.view",
     "logistica.turni.manage",

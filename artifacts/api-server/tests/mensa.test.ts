@@ -3016,7 +3016,7 @@ describe("Modulo Mensa", () => {
       { nome: "Pasta", unitaMisura: "kg", quantita: 5 },
     ];
     let firstProductId: number | null = null;
-    for (const input of inputs) {
+    for (const [index, input] of inputs.entries()) {
       const [product] = await db
         .insert(prodottiTable)
         .values({
@@ -3056,6 +3056,21 @@ describe("Modulo Mensa", () => {
       expect(response.status).toBe(201);
       ids.consumptions.push(response.body.id);
       ids.issues.push(response.body.scaricoId);
+      if (index === 0) {
+        const access = await verify(app, fixture, {
+          tipoServizio: "pranzo",
+          idempotencyKey: `multi-unit-access-${rnd()}`,
+        });
+        expect(access.status).toBe(201);
+        const meal = await request(app)
+          .post("/mensa/pasti")
+          .send({
+            accessoMensaId: access.body.id,
+            tipoServizio: "pranzo",
+            idempotencyKey: `multi-unit-meal-${rnd()}`,
+          });
+        expect(meal.status).toBe(201);
+      }
     }
 
     await db
@@ -3089,6 +3104,34 @@ describe("Modulo Mensa", () => {
       { unitaMisura: "pz", quantita: 20 },
     ]);
     expect(closed.body.snapshot).not.toHaveProperty("consumoTotale");
+    expect(closed.body.snapshot.pasti).toBe(1);
+    const [warehouse] = await db
+      .select({ centroAscoltoId: magazziniTable.centroAscoltoId })
+      .from(magazziniTable)
+      .where(eq(magazziniTable.id, fixture.warehouseIds[0]));
+    const [operation] = await db
+      .select()
+      .from(operazioniDistribuzioneMagazzinoTable)
+      .where(
+        and(
+          eq(operazioniDistribuzioneMagazzinoTable.dominioOrigine, "MENSA"),
+          eq(
+            operazioniDistribuzioneMagazzinoTable.entitaOrigineId,
+            lunchDay.id,
+          ),
+        ),
+      );
+    expect(operation).toMatchObject({
+      areaOperativaIdSnapshot: fixture.romeId,
+      centroAscoltoIdSnapshot: warehouse.centroAscoltoId,
+      territorioClassificazione: "attribuito",
+      numeroPasti: 1,
+    });
+    const retry = await request(app)
+      .post(`/mensa/giornate/${lunchDay.id}/chiudi`)
+      .send({ note: "Retry idempotente" });
+    expect(retry.status).toBe(200);
+    expect(retry.body.snapshot).toEqual(closed.body.snapshot);
   });
 
   it("registra consumo FEFO idempotente, rollback insufficiente, chiusura, riapertura e storno compensativo", async () => {
@@ -3370,7 +3413,7 @@ describe("Modulo Mensa", () => {
     expect(operationAfterB).toMatchObject({
       id: operation.id,
       stato: "parzialmente_stornata",
-      numeroPasti: 0,
+      numeroPasti: null,
       indigentiSaltuari: null,
       indigentiContinuativi: null,
     });

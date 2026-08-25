@@ -35,7 +35,7 @@ describe("Magazzino 2.0C — coerenza OpenAPI e client generato", () => {
     }
     expect(spec).toContain("FsePageSize:");
     expect(spec).toMatch(/FsePageSize:[\s\S]*?maximum: 200/);
-    expect(spec).toContain("MAGAZZINO_2_0C_V1");
+    expect(spec).toContain("REPORTING_2_0_V1");
     expect(spec).toContain("exactValue:");
   });
 

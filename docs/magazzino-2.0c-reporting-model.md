@@ -4,7 +4,7 @@
 
 Dashboard iniziale, landing `/report`, sezioni integrate, tabelle, grafici,
 drill-down, XLSX e PDF consumano i builder server-side e il payload
-`reportingModelVersion: MAGAZZINO_2_0C_V1`. Le pagine legacy delegano ai builder
+`reportingModelVersion: REPORTING_2_0_V1`. Le pagine legacy delegano ai builder
 integrati; non mantengono formule parallele.
 
 Ogni KPI espone:

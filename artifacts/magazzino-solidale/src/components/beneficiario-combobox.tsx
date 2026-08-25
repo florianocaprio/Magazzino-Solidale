@@ -31,6 +31,7 @@ export function BeneficiarioCombobox({
   value,
   onChange,
   placeholder,
+  ariaLabel,
   emptyText,
   disabled,
   selectedLabelFallback,
@@ -41,6 +42,7 @@ export function BeneficiarioCombobox({
   value: string;
   onChange: (id: string) => void;
   placeholder?: string;
+  ariaLabel?: string;
   emptyText?: string;
   disabled?: boolean;
   selectedLabelFallback?: string | null;
@@ -61,6 +63,7 @@ export function BeneficiarioCombobox({
           type="button"
           variant="outline"
           role="combobox"
+          aria-label={ariaLabel ?? placeholder ?? t("common.select")}
           aria-expanded={open}
           disabled={disabled}
           className={cn("w-full justify-between font-normal", !selected && !selectedLabelFallback && "text-muted-foreground")}

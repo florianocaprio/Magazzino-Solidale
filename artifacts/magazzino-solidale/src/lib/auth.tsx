@@ -18,7 +18,7 @@ interface AuthContextValue {
   hasArea: (area: string) => boolean;
   hasPermission: (permission: string) => boolean;
   setUser: (user: AuthUser) => void;
-  refresh: () => void;
+  refresh: () => Promise<void>;
   logout: () => void;
 }
 
@@ -82,8 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.setQueryData(CURRENT_USER_KEY, next);
   };
 
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: CURRENT_USER_KEY });
+  const refresh = async () => {
+    await queryClient.refetchQueries({
+      queryKey: CURRENT_USER_KEY,
+      type: "active",
+    });
   };
 
   const refreshBootstrap = () => {

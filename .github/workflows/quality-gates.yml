@@ -1,0 +1,119 @@
+name: Quality gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  PNPM_VERSION: 10.34.5
+
+jobs:
+  static-frontend-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @workspace/api-spec run codegen
+      - run: git diff --exit-code
+      - run: pnpm run typecheck
+      - run: pnpm --filter @workspace/magazzino-solidale test
+      - run: pnpm --filter @workspace/magazzino-solidale build
+        env:
+          PORT: 19176
+          BASE_PATH: /
+      - run: pnpm --filter @workspace/magazzino-solidale build:budget
+      - run: docker build -f Dockerfile.api -t magazzino-solidale-api:ci .
+      - run: docker build -f Dockerfile.web -t magazzino-solidale-web:ci .
+      - run: pnpm --filter @workspace/api-spec run codegen
+      - run: git diff --exit-code
+      - run: git diff --check
+
+  api-and-fresh-db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: magazzino
+          POSTGRES_PASSWORD: magazzino_test_only
+          POSTGRES_DB: magazzino_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U magazzino -d magazzino_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://magazzino:magazzino_test_only@127.0.0.1:5432/magazzino_ci
+      SESSION_SECRET: ci-test-session-secret-only
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: lax
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:fresh-db
+        env:
+          FRESH_DB_INITIAL_PASSWORD: FreshDb-CI-Only-2026
+          FRESH_DB_FINAL_PASSWORD: FreshDb-CI-Only-2026-Changed
+      - run: pnpm --filter @workspace/db run test:migrations
+      - run: pnpm --filter @workspace/api-server test
+
+  browser-critical-paths:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: magazzino
+          POSTGRES_PASSWORD: magazzino_e2e_only
+          POSTGRES_DB: magazzino_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U magazzino -d magazzino_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://magazzino:magazzino_e2e_only@127.0.0.1:5432/magazzino_e2e
+      E2E_DATABASE_URL: postgresql://magazzino:magazzino_e2e_only@127.0.0.1:5432/magazzino_e2e
+      E2E_USERNAME: sadmin
+      E2E_PASSWORD: FreshDb-E2E-Only-2026-Changed
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:fresh-db
+        env:
+          FRESH_DB_INITIAL_PASSWORD: FreshDb-E2E-Only-2026
+          FRESH_DB_FINAL_PASSWORD: FreshDb-E2E-Only-2026-Changed
+      - run: pnpm --filter @workspace/api-server environment:data seed-demo --super-admin=sadmin
+        env:
+          DEMO_USER_INITIAL_PASSWORD: Demo-E2E-Only-2026
+      - run: pnpm --filter @workspace/magazzino-solidale exec playwright install --with-deps chromium
+      - run: pnpm --filter @workspace/magazzino-solidale test:e2e

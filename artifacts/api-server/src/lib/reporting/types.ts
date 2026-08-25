@@ -1,4 +1,14 @@
-export type ReportSection = "generale" | "pacchi" | "centro-ascolto" | "emporio" | "mensa" | "uds" | "magazzino-logistica" | "fse-plus";
+import type { REPORTING_MODEL_VERSION } from "./version";
+
+export type ReportSection =
+  | "generale"
+  | "pacchi"
+  | "centro-ascolto"
+  | "emporio"
+  | "mensa"
+  | "uds"
+  | "magazzino-logistica"
+  | "fse-plus";
 
 export type ReportAvailability = "ok" | "derivable" | "missing";
 
@@ -44,6 +54,11 @@ export type ReportSeries = {
 
 export type ReportCell = string | number | boolean | null;
 
+export type ReportText = {
+  code: string;
+  params?: Record<string, string | number>;
+};
+
 export type ReportTable = {
   key: string;
   columns: string[];
@@ -54,24 +69,32 @@ export type ReportQualityItem = {
   key: string;
   count: number | null;
   availability: ReportAvailability;
-  note: string | null;
+  note: ReportText | null;
 };
 
 export type ReportingDashboard = {
-  reportingModelVersion: "MAGAZZINO_2_0C_V1";
+  reportingModelVersion: typeof REPORTING_MODEL_VERSION;
   section: ReportSection;
-  filters: Omit<ReportFilters, "areaOperativaMode" | "centroMode" | "zonaMode" | "callerAreas" | "callerPermissions" | "callerIsAdmin">;
+  filters: Omit<
+    ReportFilters,
+    | "areaOperativaMode"
+    | "centroMode"
+    | "zonaMode"
+    | "callerAreas"
+    | "callerPermissions"
+    | "callerIsAdmin"
+  >;
   kpi: ReportKpi[];
   series: ReportSeries[];
   tables: ReportTable[];
   quality: ReportQualityItem[];
-  definitions: string[];
+  definitions: ReportText[];
   generatedAt: string;
   timezone: "Europe/Rome";
 };
 
 export type ReportDrilldown = {
-  reportingModelVersion: "MAGAZZINO_2_0C_V1";
+  reportingModelVersion: typeof REPORTING_MODEL_VERSION;
   section: ReportSection;
   metric: string;
   page: number;

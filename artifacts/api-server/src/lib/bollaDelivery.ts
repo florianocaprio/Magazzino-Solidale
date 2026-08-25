@@ -21,6 +21,12 @@ import {
   markDistributionOperationReversed,
 } from "./distributionLedger";
 import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
+import {
+  BeneficiaryReportingScopeError,
+  isReportingSnapshotConcurrencyError,
+  lockAndAuthorizeBeneficiaryReportingContextTx,
+} from "./reporting/eventSnapshots";
+import type { BeneficiarioAccessScope } from "./beneficiarioPolicy";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 const PRENOTAZIONE_CONVERTITA = "convertita_in_scarico";
@@ -37,6 +43,16 @@ export class BollaActionError extends Error {
 }
 
 export function handleBollaActionError(err: unknown, res: Response): boolean {
+  if (err instanceof BeneficiaryReportingScopeError) {
+    res.status(403).json({ error: err.message });
+    return true;
+  }
+  if (isReportingSnapshotConcurrencyError(err)) {
+    res.status(409).json({
+      error: "Finalizzazione concorrente: ricarica i dati e riprova",
+    });
+    return true;
+  }
   if (err instanceof BollaActionError) {
     res.status(err.status).json({ error: err.message });
     return true;
@@ -131,6 +147,10 @@ async function syncInterventoBollaTx(tx: Tx, bollaId: number) {
         beneficiarioId: bolla.beneficiarioId,
         dataIntervento: bolla.dataBolla,
         operatoreId: bolla.operatoreId,
+        areaOperativaIdSnapshot:
+          esistente.areaOperativaIdSnapshot ?? bolla.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot:
+          esistente.centroAscoltoIdSnapshot ?? bolla.centroAscoltoIdSnapshot,
       })
       .where(eq(interventiTable.id, esistente.id));
   } else {
@@ -141,6 +161,8 @@ async function syncInterventoBollaTx(tx: Tx, bollaId: number) {
       tipoIntervento,
       descrizione,
       operatoreId: bolla.operatoreId,
+      areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+      centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
     });
   }
 }
@@ -297,6 +319,10 @@ async function convertiPrenotazioniAttiveInScarico(
     dominioOrigine: "BOLLA",
     entitaOrigineTipo: "bolla",
     entitaOrigineId: bolla.id,
+    areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+    centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
+    territorioClassificazione:
+      bolla.areaOperativaIdSnapshot == null ? "legacy_sconosciuto" : "attribuito",
     numeroDocumento: bolla.numeroBolla,
     numeroPacchi: 1,
     creatoDa: opts.operatoreId,
@@ -384,14 +410,19 @@ async function syncConsegnaDaBollaTx(
       if (consegna.stato !== "effettuata") {
         await tx
           .update(consegneTable)
-          .set({ stato: "effettuata", dataEffettuata: now })
+          .set({
+            stato: "effettuata",
+            dataEffettuata: now,
+            areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+            centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
+          })
           .where(eq(consegneTable.id, bolla.consegnaId));
       }
       return;
     }
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = dataCivileEuropeRome(now);
   const codice = `CON-${Date.now()}`;
   const [nuova] = await tx
     .insert(consegneTable)
@@ -403,6 +434,8 @@ async function syncConsegnaDaBollaTx(
       magazzinoId: bolla.magazzinoId,
       stato: "effettuata",
       dataEffettuata: now,
+      areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+      centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
       noteOperative: `Consegna diretta registrata dalla bolla ${bolla.numeroBolla}`,
     })
     .returning();
@@ -418,21 +451,28 @@ export async function completeBollaDelivery(opts: {
   noteRicezione?: string | null;
   confermaRicezione?: boolean;
   allowAlreadyConsegnata?: boolean;
+  beneficiaryAccessScope: BeneficiarioAccessScope;
 }): Promise<{ alreadyConsegnata: boolean }> {
   const dataMovimento = dataCivileEuropeRome(new Date());
   let alreadyConsegnata = false;
 
   await db.transaction(async (tx) => {
     const current = await lockBolla(tx, opts.bollaId);
-    await requireOperationalMagazzino(tx, current.magazzinoId);
+    const reportingContext =
+      await lockAndAuthorizeBeneficiaryReportingContextTx(
+        tx,
+        current.beneficiarioId,
+        opts.beneficiaryAccessScope,
+      );
 
     if (current.stato === "consegnato") {
+      await requireOperationalMagazzino(tx, current.magazzinoId);
       if (!opts.allowAlreadyConsegnata) {
         throw new BollaActionError(400, "La bolla risulta già consegnata");
       }
       alreadyConsegnata = true;
-      await syncInterventoBollaTx(tx, opts.bollaId);
       await syncConsegnaDaBollaTx(tx, current);
+      await syncInterventoBollaTx(tx, opts.bollaId);
       return;
     }
 
@@ -443,10 +483,51 @@ export async function completeBollaDelivery(opts: {
       );
     }
 
-    const convertite = await convertiPrenotazioniAttiveInScarico(tx, current, {
-      dataMovimento,
-      operatoreId: opts.userId,
-    });
+    const reportingSnapshot = reportingContext.snapshot;
+    let areaOperativaIdSnapshot = current.areaOperativaIdSnapshot;
+    let centroAscoltoIdSnapshot = current.centroAscoltoIdSnapshot;
+    if (areaOperativaIdSnapshot == null && centroAscoltoIdSnapshot == null) {
+      areaOperativaIdSnapshot = reportingSnapshot.areaOperativaIdSnapshot;
+      centroAscoltoIdSnapshot = reportingSnapshot.centroAscoltoIdSnapshot;
+    } else if (
+      areaOperativaIdSnapshot != null &&
+      centroAscoltoIdSnapshot == null &&
+      reportingSnapshot.areaOperativaIdSnapshot === areaOperativaIdSnapshot
+    ) {
+      centroAscoltoIdSnapshot = reportingSnapshot.centroAscoltoIdSnapshot;
+    } else if (
+      areaOperativaIdSnapshot == null &&
+      centroAscoltoIdSnapshot != null &&
+      reportingSnapshot.centroAscoltoIdSnapshot === centroAscoltoIdSnapshot
+    ) {
+      areaOperativaIdSnapshot = reportingSnapshot.areaOperativaIdSnapshot;
+    }
+    const effectiveReportingSnapshot = {
+      areaOperativaIdSnapshot,
+      centroAscoltoIdSnapshot,
+      numeroComponentiNucleoSnapshot:
+        current.numeroComponentiNucleoSnapshot ??
+        reportingSnapshot.numeroComponentiNucleoSnapshot,
+    };
+    const [snapshotted] = await tx
+      .update(bolleTable)
+      .set(effectiveReportingSnapshot)
+      .where(eq(bolleTable.id, opts.bollaId))
+      .returning();
+    const effectiveBolla = snapshotted ?? {
+      ...current,
+      ...effectiveReportingSnapshot,
+    };
+
+    await requireOperationalMagazzino(tx, effectiveBolla.magazzinoId);
+    const convertite = await convertiPrenotazioniAttiveInScarico(
+      tx,
+      effectiveBolla,
+      {
+        dataMovimento,
+        operatoreId: opts.userId,
+      },
+    );
     if (convertite === 0) {
       const scarichiLegacy = await scarichiFisiciBolla(tx, opts.bollaId);
       if (scarichiLegacy === 0) {
@@ -464,15 +545,20 @@ export async function completeBollaDelivery(opts: {
         confermaRicezione: opts.confermaRicezione ?? true,
         noteRicezione: opts.noteRicezione ?? null,
         operatoreId: opts.userId,
+        ...effectiveReportingSnapshot,
       })
       .where(eq(bolleTable.id, opts.bollaId))
       .returning();
 
-    await syncInterventoBollaTx(tx, opts.bollaId);
     await syncConsegnaDaBollaTx(
       tx,
-      updated ?? { ...current, stato: "consegnato", operatoreId: opts.userId },
+      updated ?? {
+        ...effectiveBolla,
+        stato: "consegnato",
+        operatoreId: opts.userId,
+      },
     );
+    await syncInterventoBollaTx(tx, opts.bollaId);
   });
 
   return { alreadyConsegnata };

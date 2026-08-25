@@ -69,7 +69,9 @@ import { format, differenceInDays } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
+import { todayEuropeRome } from "@/lib/europe-rome";
 import { AgeaImportWizard } from "@/components/agea-import-wizard";
+import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 
 type DraftRiga = {
   key: number;
@@ -134,7 +136,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
     "RACCOLTA_ALIMENTARE",
   );
   const [dataCarico, setDataCarico] = useState(
-    new Date().toISOString().slice(0, 10),
+    todayEuropeRome(),
   );
   const [numeroDocumento, setNumeroDocumento] = useState("");
   const [dataDocumento, setDataDocumento] = useState("");
@@ -146,6 +148,9 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
   const [idempotencyKey] = useState(
     () => `ui-carico-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
+  const isDirty = !!magazzinoId || origineCarico !== "RACCOLTA_ALIMENTARE" || dataCarico !== todayEuropeRome() || !!numeroDocumento || !!dataDocumento || !!fornitoreId || !!descrizione || !!note || righe.length !== 1 || righe.some((riga) => !!riga.prodottoId || !!riga.quantitaOperativa || riga.fondoOrigine !== "NESSUN_FONDO" || !!riga.codiceLotto || !!riga.dataScadenza || !!riga.quantitaPezzi || !!riga.quantitaKgLt || !!riga.fattoreKgLtPezzo);
+  const unsavedGuard = useUnsavedChangesGuard(isDirty);
+  const requestClose = () => unsavedGuard.requestClose(onClose);
 
   const aggiornaRiga = (key: number, patch: Partial<DraftRiga>) => {
     setRighe((current) =>
@@ -264,7 +269,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
     <Sheet
       open
       onOpenChange={(o) => {
-        if (!o) onClose();
+        if (!o) requestClose();
       }}
     >
       <SheetContent className="w-full sm:max-w-5xl overflow-y-auto">
@@ -288,7 +293,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
             <div className="space-y-2">
               <Label>Magazzino *</Label>
               <Select value={magazzinoId} onValueChange={setMagazzinoId}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Magazzino carico">
                   <SelectValue placeholder="Seleziona" />
                 </SelectTrigger>
                 <SelectContent>
@@ -311,7 +316,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                   if (value === "RACCOLTA_ALIMENTARE") setFornitoreId("");
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Provenienza carico">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -327,6 +332,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
               <Label>Data carico *</Label>
               <Input
                 type="date"
+                aria-label="Data carico"
                 value={dataCarico}
                 onChange={(event) => setDataCarico(event.target.value)}
               />
@@ -335,6 +341,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
               <Label>Numero documento</Label>
               <Input
                 value={numeroDocumento}
+                aria-label="Numero documento carico"
                 onChange={(event) => setNumeroDocumento(event.target.value)}
               />
             </div>
@@ -342,6 +349,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
               <Label>Data documento</Label>
               <Input
                 type="date"
+                aria-label="Data documento carico"
                 value={dataDocumento}
                 onChange={(event) => setDataDocumento(event.target.value)}
               />
@@ -357,7 +365,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                 }
                 disabled={origineCarico === "RACCOLTA_ALIMENTARE"}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Fornitore carico">
                   <SelectValue placeholder="Non applicabile" />
                 </SelectTrigger>
                 <SelectContent>
@@ -381,6 +389,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                     : undefined
                 }
                 value={descrizione}
+                aria-label="Descrizione carico"
                 onChange={(event) => setDescrizione(event.target.value)}
               />
             </div>
@@ -388,6 +397,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
               <Label>Note</Label>
               <Textarea
                 rows={1}
+                aria-label="Note carico"
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
               />
@@ -449,7 +459,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                           })
                         }
                       >
-                        <SelectTrigger>
+                        <SelectTrigger aria-label={`Prodotto riga ${index + 1}`}>
                           <SelectValue placeholder="Seleziona prodotto" />
                         </SelectTrigger>
                         <SelectContent>
@@ -467,6 +477,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                       <Label>Quantità operativa *</Label>
                       <Input
                         inputMode="decimal"
+                        aria-label={`Quantità operativa riga ${index + 1}`}
                         placeholder="0,000000"
                         value={riga.quantitaOperativa}
                         onChange={(event) =>
@@ -490,7 +501,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                           })
                         }
                       >
-                        <SelectTrigger>
+                        <SelectTrigger aria-label={`Fondo riga ${index + 1}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -507,6 +518,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                         <Label>Codice lotto *</Label>
                         <Input
                           value={riga.codiceLotto}
+                          aria-label={`Codice lotto riga ${index + 1}`}
                           onChange={(event) =>
                             aggiornaRiga(riga.key, {
                               codiceLotto: event.target.value,
@@ -520,6 +532,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                         <Label>Scadenza *</Label>
                         <Input
                           type="date"
+                          aria-label={`Scadenza riga ${index + 1}`}
                           value={riga.dataScadenza}
                           onChange={(event) =>
                             aggiornaRiga(riga.key, {
@@ -533,6 +546,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                       <Label>Pezzi</Label>
                       <Input
                         inputMode="decimal"
+                        aria-label={`Pezzi riga ${index + 1}`}
                         value={riga.quantitaPezzi}
                         onChange={(event) =>
                           aggiornaRiga(riga.key, {
@@ -545,6 +559,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                       <Label>Kg/Lt</Label>
                       <Input
                         inputMode="decimal"
+                        aria-label={`Kg/Lt riga ${index + 1}`}
                         value={riga.quantitaKgLt}
                         onChange={(event) =>
                           aggiornaRiga(riga.key, {
@@ -557,6 +572,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                       <Label>Fattore Kg/Lt per pezzo</Label>
                       <Input
                         inputMode="decimal"
+                        aria-label={`Fattore Kg/Lt riga ${index + 1}`}
                         placeholder="0,000000000"
                         value={riga.fattoreKgLtPezzo}
                         onChange={(event) =>
@@ -598,7 +614,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
             </div>
           )}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={requestClose}>
               Annulla
             </Button>
             <Button
@@ -612,6 +628,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
             </Button>
           </div>
         </div>
+        <UnsavedChangesDialog guard={unsavedGuard} />
       </SheetContent>
     </Sheet>
   );

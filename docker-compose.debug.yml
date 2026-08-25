@@ -22,7 +22,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    platform: linux/amd64
     depends_on:
       db:
         condition: service_healthy
@@ -57,9 +56,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
-      args:
-        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
-    platform: linux/amd64
+    environment:
+      GOOGLE_MAPS_BROWSER_API_KEY: ${GOOGLE_MAPS_BROWSER_API_KEY:-}
     depends_on:
       api:
         condition: service_healthy

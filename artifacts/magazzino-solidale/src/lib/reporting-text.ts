@@ -1,3 +1,5 @@
+import type { ReportText } from "@workspace/api-client-react";
+
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 const reportingTextKeys: Record<string, string> = {
@@ -68,7 +70,13 @@ const dynamicTexts: Array<{
   { pattern: /^Reference date (\d{4}-\d{2}-\d{2})$/, key: "sifeadReferenceDate" },
 ];
 
-export function localizeReportingText(t: Translate, value: string): string {
+export function localizeReportingText(t: Translate, value: string | ReportText): string {
+  if (typeof value !== "string") {
+    return t(`reporting.text.${value.code}`, {
+      ...value.params,
+      defaultValue: value.code,
+    });
+  }
   if (value === "OK") return t("reporting.status.ok");
   if (value === "DERIVABILE") return t("reporting.status.derivable");
   if (value === "MANCANTE") return t("reporting.status.missing");

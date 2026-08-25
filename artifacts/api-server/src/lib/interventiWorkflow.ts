@@ -147,3 +147,16 @@ export function isDateOnly(value: string): boolean {
     date.getUTCDate() === day
   );
 }
+
+export function addDaysToCivilDate(value: string, days: number): string {
+  if (!isDateOnly(value) || !Number.isInteger(days)) {
+    throw new Error("Data civile o numero di giorni non valido");
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  const result = new Date(Date.UTC(year, month - 1, day + days, 12));
+  return [
+    result.getUTCFullYear(),
+    String(result.getUTCMonth() + 1).padStart(2, "0"),
+    String(result.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}

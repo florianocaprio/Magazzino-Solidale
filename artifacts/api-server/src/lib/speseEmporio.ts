@@ -52,6 +52,11 @@ import {
   isLottoDistribuibile,
   lottoDistribuibileCondition,
 } from "./lottoPolicy";
+import { beneficiaryReportingSnapshotTx } from "./reporting/eventSnapshots";
+import {
+  canAccessBeneficiarioScope,
+  type BeneficiarioAccessScope,
+} from "./beneficiarioPolicy";
 import {
   InventoryDecimal,
   InventoryDecimalError,
@@ -536,6 +541,7 @@ export async function chiudiSessioneCassaEmporio(opts: {
   operatoreId: number | null;
   note?: string | null;
   ip?: string | null;
+  beneficiaryAccessScope: BeneficiarioAccessScope;
 }): Promise<{ spesaId: number }> {
   return db.transaction(async (tx) => {
     const sessione = await lockSessione(tx, opts.sessioneId);
@@ -588,6 +594,14 @@ export async function chiudiSessioneCassaEmporio(opts: {
     const beneficiario = await lockBeneficiario(tx, sessione.beneficiarioId);
     if (
       !beneficiario ||
+      !canAccessBeneficiarioScope(beneficiario, opts.beneficiaryAccessScope)
+    ) {
+      throw new SpesaEmporioError(
+        403,
+        "Risorsa non accessibile per il tuo profilo",
+      );
+    }
+    if (
       !beneficiario.attivo ||
       !beneficiario.creditoSolidaleAbilitato ||
       beneficiario.creditoSolidaleStato !== "attivo"
@@ -625,6 +639,10 @@ export async function chiudiSessioneCassaEmporio(opts: {
     const numeroSpesa = await generateNumeroSpesa(tx, dataDocumento);
     const numeroBolla = await generateNumeroBolla(tx, dataDocumento);
     const codiceScarico = generateCodiceScarico(dataDocumento);
+    const reportingSnapshot = await beneficiaryReportingSnapshotTx(
+      tx,
+      beneficiario.id,
+    );
 
     const [scarico] = await tx
       .insert(scarichiTable)
@@ -648,6 +666,10 @@ export async function chiudiSessioneCassaEmporio(opts: {
         beneficiarioId: sessione.beneficiarioId,
         consegnaId: accesso.id,
         magazzinoId: sessione.magazzinoEmporioId,
+        areaOperativaIdSnapshot: reportingSnapshot.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot: reportingSnapshot.centroAscoltoIdSnapshot,
+        numeroComponentiNucleoSnapshot:
+          reportingSnapshot.numeroComponentiNucleoSnapshot,
         operatoreId: opts.operatoreId,
         stato: "consegnato",
         noteConsegna: `Bolla Emporio da Spesa ${numeroSpesa}`,
@@ -694,6 +716,12 @@ export async function chiudiSessioneCassaEmporio(opts: {
       dominioOrigine: "EMPORIO",
       entitaOrigineTipo: "spesa_emporio",
       entitaOrigineId: spesa.id,
+      areaOperativaIdSnapshot: reportingSnapshot.areaOperativaIdSnapshot,
+      centroAscoltoIdSnapshot: reportingSnapshot.centroAscoltoIdSnapshot,
+      territorioClassificazione:
+        reportingSnapshot.areaOperativaIdSnapshot == null
+          ? "legacy_sconosciuto"
+          : "attribuito",
       numeroDocumento: numeroSpesa,
       creatoDa: operationActorId,
     });
@@ -780,6 +808,12 @@ export async function chiudiSessioneCassaEmporio(opts: {
           accesso.dataOraEffettivaAccesso ?? dataChiusura,
         operatoreAccessoEmporioId:
           accesso.operatoreAccessoEmporioId ?? opts.operatoreId,
+        areaOperativaIdSnapshot:
+          accesso.areaOperativaIdSnapshot ??
+          reportingSnapshot.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot:
+          accesso.centroAscoltoIdSnapshot ??
+          reportingSnapshot.centroAscoltoIdSnapshot,
       })
       .where(eq(consegneTable.id, accesso.id));
 

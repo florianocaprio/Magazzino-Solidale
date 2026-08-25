@@ -63,7 +63,12 @@ function consegneApp(opts: Parameters<typeof app>[0]) {
     areaOperativaId: opts.areaOperativaId ?? null,
     zonaUdsId: opts.zonaId ?? null,
     aree: opts.aree ?? ["sociale"],
-    permessi: opts.permessi ?? [],
+    permessi: opts.permessi ?? [
+      "consegne.view",
+      "consegne.manage",
+      "consegne.complete",
+      "consegne.cancel",
+    ],
     isAdmin: opts.isAdmin ?? false,
     isSuperAdmin: opts.isSuperAdmin ?? false,
   });

@@ -267,7 +267,7 @@ describe("FSE operations — interazioni R2", () => {
 
     await change(
       container.querySelector(
-        'select[aria-label="Filtro stato rendicontazione"]',
+        'select[aria-label="fseOperations.queueFilter"]',
       ) as HTMLSelectElement,
       "ARRETRATO_NON_RENDICONTATO",
     );
@@ -289,8 +289,8 @@ describe("FSE operations — interazioni R2", () => {
       'input[placeholder="fseOperations.motivation"]',
     ) as HTMLInputElement;
     await change(motivation, "SIFEAD R2");
-    await act(async () => button("Marca inserita").click());
-    await act(async () => button("Annulla export").click());
+    await act(async () => button("fseOperations.markEntered").click());
+    await act(async () => button("fseOperations.cancelExport").click());
     expect(spy("markExport")).toHaveBeenCalledWith({
       id: 201,
       data: expect.objectContaining({
@@ -308,25 +308,25 @@ describe("FSE operations — interazioni R2", () => {
     });
 
     await selectRecord(202);
-    expect(button("Marca inserita").disabled).toBe(true);
-    expect(button("Annulla export").disabled).toBe(true);
+    expect(button("fseOperations.markEntered").disabled).toBe(true);
+    expect(button("fseOperations.cancelExport").disabled).toBe(true);
   });
 
   it("distingue null/zero e invia la versione nel monitoraggio", async () => {
-    await act(async () => button("Crea rilevazione").click());
+    await act(async () => button("fseOperations.createMonitoring").click());
     expect(spy("createMonitoring")).toHaveBeenLastCalledWith({
       data: expect.objectContaining({ totaleSaltuari: null }),
     });
     const total = container.querySelector(
-      'input[placeholder="Totale saltuari (vuoto = non rilevato)"]',
+      'input[placeholder="fseOperations.monitoringTotalPlaceholder"]',
     ) as HTMLInputElement;
     await change(total, "0");
-    await act(async () => button("Crea rilevazione").click());
+    await act(async () => button("fseOperations.createMonitoring").click());
     expect(spy("createMonitoring")).toHaveBeenLastCalledWith({
       data: expect.objectContaining({ totaleSaltuari: 0 }),
     });
     await selectRecord(401);
-    await act(async () => button("Aggiorna versione").click());
+    await act(async () => button("fseOperations.updateMonitoring").click());
     expect(spy("updateMonitoring")).toHaveBeenCalledWith({
       id: 401,
       data: { versione: 2, totaleSaltuari: 0 },
@@ -359,13 +359,13 @@ describe("FSE operations — interazioni R2", () => {
       if (name === "ABBINA") {
         await change(
           container.querySelector(
-            'input[placeholder="Movimento locale target"]',
+            'input[placeholder="fseOperations.targetMovement"]',
           ) as HTMLInputElement,
           "71",
         );
         await change(
           container.querySelector(
-            'input[placeholder="Riga AGEA target"]',
+            'input[placeholder="fseOperations.targetAgeaRow"]',
           ) as HTMLInputElement,
           "81",
         );
@@ -388,7 +388,7 @@ describe("FSE operations — interazioni R2", () => {
       }),
     });
 
-    await act(async () => button("Ricalcola").click());
+    await act(async () => button("fseOperations.recalculate").click());
     await act(async () => button("fseOperations.closeExact").click());
     await change(
       container.querySelector(
@@ -397,7 +397,7 @@ describe("FSE operations — interazioni R2", () => {
       "chiusura con scostamenti",
     );
     await act(async () => button("fseOperations.closeWithDifferences").click());
-    await act(async () => button("Annulla riconciliazione").click());
+    await act(async () => button("fseOperations.cancelReconciliation").click());
     expect(spy("recalculate")).toHaveBeenCalledWith({
       id: 301,
       data: { versione: 4 },

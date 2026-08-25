@@ -2,7 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { isModuloAttivo } from "../featureFlags";
 import type { ReportFilters, ReportKpi } from "./types";
 import { andSql, number, rows } from "./sql";
-import { dashboard, kpi } from "./shared";
+import { dashboard, kpi, text } from "./shared";
 import { pacchiConditions, pacchiMetrics } from "./pacchi";
 import { socialCompletedConditions, socialMetrics, socialEventDate } from "./centroAscolto";
 import { emporioMetrics, speseConditions } from "./emporio";
@@ -49,13 +49,15 @@ function eventUnions(filters: ReportFilters, active: ActiveSources): SQL[] {
   const unions: SQL[] = [];
   if (active.pacchi) {
     unions.push(sql`SELECT b.beneficiario_id, b.data_bolla::date AS giorno, 'pacchi'::text AS area,
-      be.area_operativa_id, be.centro_ascolto_id
+      COALESCE(b.area_operativa_id_snapshot, be.area_operativa_id) AS area_operativa_id,
+      COALESCE(b.centro_ascolto_id_snapshot, be.centro_ascolto_id) AS centro_ascolto_id
       FROM bolle b JOIN beneficiari be ON be.id = b.beneficiario_id
       WHERE ${andSql(pacchiConditions(filters))}`);
   }
   if (active.sociale) {
     unions.push(sql`SELECT i.beneficiario_id, ${socialEventDate} AS giorno, 'centro-ascolto'::text AS area,
-      be.area_operativa_id, be.centro_ascolto_id
+      COALESCE(i.area_operativa_id_snapshot, be.area_operativa_id) AS area_operativa_id,
+      COALESCE(i.centro_ascolto_id_snapshot, be.centro_ascolto_id) AS centro_ascolto_id
       FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
       WHERE ${andSql(socialCompletedConditions(filters))}`);
   }
@@ -179,9 +181,9 @@ export async function buildGeneralReport(filters: ReportFilters) {
       }] : []),
     ],
     definitions: [
-      "Persona unica complessiva = beneficiario distinto sull'unione degli eventi effettivamente erogati nei moduli attivi.",
-      "I membri del nucleo non vengono espansi nel KPI generale delle persone uniche.",
-      "I KPI di aree diverse non vengono sommati tra loro perché rappresentano unità operative differenti.",
+      text("generalUniquePerson"),
+      text("generalHouseholdMembers"),
+      text("generalNoCrossAreaSum"),
     ],
   });
 }

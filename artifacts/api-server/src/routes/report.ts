@@ -2,29 +2,75 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql, type SQL } from "drizzle-orm";
 import { callerCentroId, callerAreaOperativaId } from "../lib/centroScope";
-import { requireAllModuli } from "../lib/featureFlags";
+import { requireAllModuli, requireAnyModulo } from "../lib/featureFlags";
 import { isUdsReportRequest, requirePermission } from "../middlewares/auth";
 import { effectiveMezzoCentroSql } from "../lib/logisticaPolicy";
+import { buildFsePlusReport } from "../lib/reporting/fsePlus";
+import {
+  assertReportFilterScope,
+  parseReportFilters,
+} from "../lib/reporting/filters";
 
 const router: IRouter = Router();
 
 const requireReportCentro = requireAllModuli(["CENTRO_ASCOLTO", "REPORT"]);
 const requireReportUds = requireAllModuli(["UDS", "REPORT"]);
+const requireReportOnly = requireAllModuli(["REPORT"]);
+const requireAnyFseSource = requireAnyModulo([
+  "MAGAZZINO_SOLIDALE",
+  "BOLLE",
+  "EMPORIO_SOLIDALE",
+  "MENSA",
+  "UDS",
+]);
+const requireFseSourceArea = (
+  req: Parameters<typeof requireReportOnly>[0],
+  res: Parameters<typeof requireReportOnly>[1],
+  next: Parameters<typeof requireReportOnly>[2],
+) => {
+  const sourceAreas = [
+    "sociale",
+    "emporio",
+    "mensa",
+    "uds",
+    "magazzino",
+    "logistica",
+  ];
+  if (
+    req.user?.isAdmin ||
+    sourceAreas.some((area) => req.user?.aree.includes(area))
+  ) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: "Area sorgente FSE+ richiesta" });
+};
 
 router.use("/report", (req, res, next) => {
-  const guard = isUdsReportRequest(req)
-    ? requireReportUds
-    : requireReportCentro;
+  const guard =
+    req.path === "/fse-plus"
+      ? requireReportOnly
+      : isUdsReportRequest(req)
+        ? requireReportUds
+        : requireReportCentro;
   guard(req, res, next);
+});
+router.use("/report", (req, res, next) => {
+  if (req.user?.isAdmin || req.user?.aree.includes("analisi")) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: "Area Analisi richiesta" });
 });
 router.use("/report/uds", requirePermission("uds.reports.view"));
 
-/**
- * Generic "own value OR shared/null" SQL fragment for a scoping column. Used for
- * both the centro axis and the area operativa axis (pass the relevant column + caller id).
- * Returns `undefined` for a global caller (no restriction on that axis).
- */
 function ownOrNullSql(col: SQL, caller: number | null): SQL | undefined {
+  if (caller == null) return undefined;
+  return sql`${col} = ${caller}`;
+}
+
+/** Scope esplicito per risorse documentate come condivise/universali. */
+function ownOrSharedSql(col: SQL, caller: number | null): SQL | undefined {
   if (caller == null) return undefined;
   return sql`(${col} = ${caller} OR ${col} IS NULL)`;
 }
@@ -95,16 +141,24 @@ router.get("/report/giacenze-per-magazzino", async (req, res) => {
     : sql``;
 
   const result1 = await db.execute(sql`
-    SELECT mg.nome as magazzino_nome,
-           COUNT(DISTINCT l.prodotto_id) as tot_prodotti,
-           COUNT(CASE WHEN l.quantita_residua::numeric <= p.scorta_minima::numeric THEN 1 END) as prodotti_sottoscorta,
-           COUNT(CASE WHEN l.data_scadenza <= (NOW() + INTERVAL '30 days')::date THEN 1 END) as lotti_in_scadenza
-    FROM magazzini mg
-    LEFT JOIN lotti l ON l.magazzino_id = mg.id AND l.quantita_residua::numeric > 0
-    LEFT JOIN prodotti p ON l.prodotto_id = p.id
-    ${where}
-    GROUP BY mg.id, mg.nome
-    ORDER BY mg.nome
+    WITH product_stock AS (
+      SELECT mg.id AS magazzino_id, mg.nome AS magazzino_nome,
+             l.prodotto_id, p.scorta_minima,
+             SUM(l.quantita_residua::numeric) AS quantita,
+             COUNT(*) FILTER (WHERE l.data_scadenza <= (NOW() + INTERVAL '30 days')::date) AS lotti_in_scadenza
+      FROM magazzini mg
+      LEFT JOIN lotti l ON l.magazzino_id = mg.id AND l.quantita_residua::numeric > 0
+      LEFT JOIN prodotti p ON l.prodotto_id = p.id
+      ${where}
+      GROUP BY mg.id, mg.nome, l.prodotto_id, p.scorta_minima
+    )
+    SELECT magazzino_nome,
+           COUNT(prodotto_id) AS tot_prodotti,
+           COUNT(*) FILTER (WHERE prodotto_id IS NOT NULL AND quantita <= scorta_minima::numeric) AS prodotti_sottoscorta,
+           COALESCE(SUM(lotti_in_scadenza), 0) AS lotti_in_scadenza
+    FROM product_stock
+    GROUP BY magazzino_id, magazzino_nome
+    ORDER BY magazzino_nome
   `);
   const rows = result1.rows as Array<Record<string, unknown>>;
 
@@ -133,16 +187,24 @@ router.get("/report/consegne-per-mese", async (req, res) => {
   const conds = [sql`c.data_prevista::date BETWEEN ${da} AND ${a}`];
   if (magazzinoId) conds.push(sql`c.magazzino_id = ${magazzinoId}`);
   if (centroAscoltoId)
-    conds.push(sql`be.centro_ascolto_id = ${centroAscoltoId}`);
-  const centroCond = ownOrNullSql(sql`be.centro_ascolto_id`, caller);
+    conds.push(
+      sql`COALESCE(c.centro_ascolto_id_snapshot, be.centro_ascolto_id) = ${centroAscoltoId}`,
+    );
+  const centroCond = ownOrNullSql(
+    sql`COALESCE(c.centro_ascolto_id_snapshot, be.centro_ascolto_id)`,
+    caller,
+  );
   if (centroCond) conds.push(centroCond);
   const areaOperativaCond = ownOrNullSql(
-    sql`be.area_operativa_id`,
+    sql`COALESCE(c.area_operativa_id_snapshot, be.area_operativa_id)`,
     areaOperativa,
   );
   if (areaOperativaCond) conds.push(areaOperativaCond);
   const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
-  if (qAreaOperativa) conds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
+  if (qAreaOperativa)
+    conds.push(
+      sql`COALESCE(c.area_operativa_id_snapshot, be.area_operativa_id) = ${qAreaOperativa}`,
+    );
   const where = sql.join(conds, sql` AND `);
 
   const result2 = await db.execute(sql`
@@ -178,32 +240,37 @@ router.get("/report/consegne-per-centro", async (req, res) => {
   const caller = callerCentroId(req);
   const areaOperativa = callerAreaOperativaId(req);
   const scopeConds: SQL[] = [];
-  const centroCond = ownOrNullSql(sql`be.centro_ascolto_id`, caller);
+  const centroCond = ownOrNullSql(
+    sql`COALESCE(c.centro_ascolto_id_snapshot, be.centro_ascolto_id)`,
+    caller,
+  );
   if (centroCond) scopeConds.push(centroCond);
   const areaOperativaCond = ownOrNullSql(
-    sql`be.area_operativa_id`,
+    sql`COALESCE(c.area_operativa_id_snapshot, be.area_operativa_id)`,
     areaOperativa,
   );
   if (areaOperativaCond) scopeConds.push(areaOperativaCond);
   const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
   if (qAreaOperativa)
-    scopeConds.push(sql`be.area_operativa_id = ${qAreaOperativa}`);
+    scopeConds.push(
+      sql`COALESCE(c.area_operativa_id_snapshot, be.area_operativa_id) = ${qAreaOperativa}`,
+    );
   const extraCentro = scopeConds.length
     ? sql` AND ${sql.join(scopeConds, sql` AND `)}`
     : sql``;
 
   const result = await db.execute(sql`
-    SELECT be.centro_ascolto_id as centro_id,
+    SELECT COALESCE(c.centro_ascolto_id_snapshot, be.centro_ascolto_id) as centro_id,
            COALESCE(ca.nome, 'Senza centro di ascolto') as centro_nome,
            COUNT(*) FILTER (WHERE c.volontario_id IS NULL) as dirette,
            COUNT(*) FILTER (WHERE c.volontario_id IS NOT NULL) as con_volontari,
            COUNT(*) as totale
     FROM consegne c
     JOIN beneficiari be ON be.id = c.beneficiario_id
-    LEFT JOIN centri_di_ascolto ca ON ca.id = be.centro_ascolto_id
+    LEFT JOIN centri_di_ascolto ca ON ca.id = COALESCE(c.centro_ascolto_id_snapshot, be.centro_ascolto_id)
     WHERE c.stato = 'effettuata'
       AND c.data_prevista::date BETWEEN ${da} AND ${a}${extraCentro}
-    GROUP BY be.centro_ascolto_id, ca.nome
+    GROUP BY COALESCE(c.centro_ascolto_id_snapshot, be.centro_ascolto_id), ca.nome
     ORDER BY totale DESC, centro_nome
   `);
   const rows = result.rows as Array<Record<string, unknown>>;
@@ -246,9 +313,9 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
   );
   if (centroAscoltoId)
     mezzoConds.push(sql`${effectiveMezzoCentro} = ${centroAscoltoId}`);
-  const mCentroCond = ownOrNullSql(effectiveMezzoCentro, caller);
+  const mCentroCond = ownOrSharedSql(effectiveMezzoCentro, caller);
   if (mCentroCond) mezzoConds.push(mCentroCond);
-  const mAreaOperativaCond = ownOrNullSql(
+  const mAreaOperativaCond = ownOrSharedSql(
     sql`ca.area_operativa_id`,
     areaOperativa,
   );
@@ -374,143 +441,56 @@ router.get("/report/allocazione-mezzi", async (req, res) => {
 router.get(
   "/report/fse-plus",
   requirePermission("magazzino.fse.view"),
+  requireFseSourceArea,
+  requireAnyFseSource,
   async (req, res) => {
     res.setHeader("Deprecation", "true");
     res.setHeader(
       "Link",
       '</api/report/fse-plus/integrato>; rel="successor-version"',
     );
-    const parsedAnno = req.query.anno
-      ? parseInt(req.query.anno as string, 10)
-      : new Date().getFullYear();
-    if (Number.isNaN(parsedAnno) || parsedAnno < 2000 || parsedAnno > 2100) {
-      res.status(400).json({ message: "Parametro 'anno' non valido." });
-      return;
-    }
-    const anno = parsedAnno;
-    const caller = callerCentroId(req);
-    const areaOperativa = callerAreaOperativaId(req);
-    const centroSub =
-      caller == null
-        ? sql``
-        : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE centro_ascolto_id = ${caller} OR centro_ascolto_id IS NULL)`;
-    const areaOperativaSub =
-      areaOperativa == null
-        ? sql``
-        : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${areaOperativa} OR area_operativa_id IS NULL)`;
-    const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
-    const areaOperativaQSub =
-      qAreaOperativa == null
-        ? sql``
-        : sql` AND b.beneficiario_id IN (SELECT id FROM beneficiari WHERE area_operativa_id = ${qAreaOperativa})`;
-    const centroCond = sql`${centroSub}${areaOperativaSub}${areaOperativaQSub}`;
-
-    const prodRes = await db.execute(sql`
-    SELECT p.id as prodotto_id,
-           p.nome as prodotto_nome,
-           p.unita_misura,
-           SUM(abs(mv.quantita::numeric)) as quantita_totale,
-           SUM(CASE WHEN p.unita_misura = 'kg' THEN abs(mv.quantita::numeric) ELSE 0 END) as peso_kg
-    FROM bolle b
-    JOIN bolla_righe br ON br.bolla_id = b.id
-    JOIN movimenti mv ON mv.bolla_riga_id = br.id
-    JOIN prodotti p ON br.prodotto_id = p.id
-    WHERE mv.fondo_origine = 'FSE_PLUS'
-      AND b.stato = 'consegnato'
-      AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
-    GROUP BY p.id, p.nome, p.unita_misura
-    ORDER BY p.nome
-  `);
-    const prodRows = prodRes.rows as Array<Record<string, unknown>>;
-
-    const famRes = await db.execute(sql`
-    SELECT COUNT(DISTINCT b.beneficiario_id) as tot
-    FROM bolle b
-    JOIN bolla_righe br ON br.bolla_id = b.id
-    JOIN movimenti mv ON mv.bolla_riga_id = br.id
-    WHERE mv.fondo_origine = 'FSE_PLUS'
-      AND b.stato = 'consegnato'
-      AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
-  `);
-    const beneficiariTotali = Number(
-      (famRes.rows[0] as Record<string, unknown>)?.tot ?? 0,
+    res.setHeader("Sunset", "Tue, 01 Dec 2026 00:00:00 GMT");
+    const filters = parseReportFilters(req);
+    await assertReportFilterScope(req, filters);
+    const report = await buildFsePlusReport(filters);
+    const kpi = new Map(report.kpi.map((item) => [item.key, item]));
+    const table = (key: string) =>
+      report.tables.find((item) => item.key === key)?.rows ?? [];
+    const sex = new Map(
+      table("sesso").map((row) => [String(row.sesso), row.persone]),
     );
-
-    const persRes = await db.execute(sql`
-    WITH famiglie AS (
-      SELECT DISTINCT b.beneficiario_id
-      FROM bolle b
-      JOIN bolla_righe br ON br.bolla_id = b.id
-      JOIN movimenti mv ON mv.bolla_riga_id = br.id
-      WHERE mv.fondo_origine = 'FSE_PLUS'
-        AND b.stato = 'consegnato'
-        AND EXTRACT(YEAR FROM b.data_bolla) = ${anno}${centroCond}
-    ),
-    persone AS (
-      SELECT be.sesso, be.data_nascita, be.area_provenienza
-      FROM beneficiari be
-      JOIN famiglie f ON f.beneficiario_id = be.id
-      UNION ALL
-      SELECT n.sesso, n.data_nascita, be.area_provenienza
-      FROM nucleo_familiare n
-      JOIN famiglie f ON f.beneficiario_id = n.beneficiario_id
-      JOIN beneficiari be ON be.id = n.beneficiario_id
-    ),
-    classificate AS (
-      SELECT sesso,
-             area_provenienza,
-             (data_nascita IS NOT NULL AND data_nascita <= (make_date(${anno}, 12, 31) - INTERVAL '18 years')) as adulto,
-             (data_nascita IS NOT NULL AND data_nascita > (make_date(${anno}, 12, 31) - INTERVAL '18 years')) as minore
-      FROM persone
-    )
-    SELECT
-      COUNT(*) as totale,
-      COUNT(*) FILTER (WHERE sesso = 'M') as maschi,
-      COUNT(*) FILTER (WHERE sesso = 'F') as femmine,
-      COUNT(*) FILTER (WHERE area_provenienza = 'UE') as ue,
-      COUNT(*) FILTER (WHERE area_provenienza = 'Extra-UE') as extra_ue,
-      COUNT(*) FILTER (WHERE sesso = 'M' AND adulto) as maschi_adulti,
-      COUNT(*) FILTER (WHERE sesso = 'M' AND minore) as maschi_minori,
-      COUNT(*) FILTER (WHERE sesso = 'F' AND adulto) as femmine_adulte,
-      COUNT(*) FILTER (WHERE sesso = 'F' AND minore) as femmine_minori,
-      COUNT(*) FILTER (WHERE area_provenienza = 'UE' AND sesso = 'M') as ue_maschi,
-      COUNT(*) FILTER (WHERE area_provenienza = 'UE' AND sesso = 'F') as ue_femmine,
-      COUNT(*) FILTER (WHERE area_provenienza = 'Extra-UE' AND sesso = 'M') as extra_ue_maschi,
-      COUNT(*) FILTER (WHERE area_provenienza = 'Extra-UE' AND sesso = 'F') as extra_ue_femmine
-    FROM classificate
-  `);
-    const p = (persRes.rows[0] ?? {}) as Record<string, unknown>;
-
-    const prodotti = prodRows.map((r) => ({
-      prodottoId: Number(r.prodotto_id),
-      prodottoNome: r.prodotto_nome as string,
-      unitaMisura: r.unita_misura as string,
-      quantitaTotale: parseFloat(String(r.quantita_totale ?? 0)),
-      pesoKg: parseFloat(String(r.peso_kg ?? 0)),
+    const ages = new Map(
+      table("fasceEta").map((row) => [String(row.fascia), row.persone]),
+    );
+    const products = table("01_Prodotti_FSE").map((row) => ({
+      prodottoId: row.prodottoId,
+      prodottoNome: row.prodottoNome,
+      unitaMisura: row.unitaMisura,
+      quantitaTotale: row.quantitaFse,
+      pesoKg: row.kg,
     }));
-
-    const pesoTotaleKg = prodotti.reduce((acc, x) => acc + x.pesoKg, 0);
-
     res.json({
-      anno,
-      pesoTotaleKg,
-      beneficiariTotali,
-      personeTotali: Number(p.totale ?? 0),
-      prodotti,
+      reportingModelVersion: report.reportingModelVersion,
+      anno: filters.anno,
+      pesoTotaleKg: kpi.get("kgCalcolabili")?.value ?? null,
+      beneficiariTotali: kpi.get("nucleiRaggiunti")?.value ?? null,
+      personeTotali: kpi.get("personeRaggiunte")?.value ?? null,
+      prodotti: products,
       persone: {
-        maschi: Number(p.maschi ?? 0),
-        femmine: Number(p.femmine ?? 0),
-        ue: Number(p.ue ?? 0),
-        extraUe: Number(p.extra_ue ?? 0),
-        maschiAdulti: Number(p.maschi_adulti ?? 0),
-        maschiMinori: Number(p.maschi_minori ?? 0),
-        femmineAdulte: Number(p.femmine_adulte ?? 0),
-        femmineMinori: Number(p.femmine_minori ?? 0),
-        ueMaschi: Number(p.ue_maschi ?? 0),
-        ueFemmine: Number(p.ue_femmine ?? 0),
-        extraUeMaschi: Number(p.extra_ue_maschi ?? 0),
-        extraUeFemmine: Number(p.extra_ue_femmine ?? 0),
+        maschi: sex.get("M") ?? null,
+        femmine: sex.get("F") ?? null,
+        ue: null,
+        extraUe: null,
+        maschiAdulti: null,
+        maschiMinori: null,
+        femmineAdulte: null,
+        femmineMinori: null,
+        eta017: ages.get("0_17") ?? null,
+        eta1829: ages.get("18_29") ?? null,
+        eta3064: ages.get("30_64") ?? null,
+        eta65Plus: ages.get("65_plus") ?? null,
       },
+      quality: report.quality,
     });
   },
 );

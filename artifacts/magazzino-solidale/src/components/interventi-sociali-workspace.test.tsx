@@ -175,6 +175,11 @@ describe("InterventiSocialiWorkspace", () => {
     const mobileList = document.querySelector(
       '[data-testid="interventi-mobile-list"]',
     );
+    const desktopList = document.querySelector(
+      '[data-testid="interventi-desktop-list"]',
+    );
+    expect(mobileList?.className).toContain("lg:hidden");
+    expect(desktopList?.className).toContain("lg:block");
     expect(mobileList?.textContent).toContain("BEN-10");
     expect(mobileList?.textContent).toContain("Centro Roma");
     expect(mobileList?.textContent).toContain("interventi.list.previous");

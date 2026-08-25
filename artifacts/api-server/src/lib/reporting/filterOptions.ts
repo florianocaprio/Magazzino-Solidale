@@ -71,6 +71,14 @@ export async function buildReportFilterOptions(
   const logisticsSource =
     (hasArea("magazzino") || hasArea("logistica")) &&
     (magazzino || lotti || trasferimenti);
+  const fseSource =
+    hasPermission("magazzino.fse.view") &&
+    ((hasArea("sociale") && magazzino && bolle) ||
+      (hasArea("emporio") && emporio) ||
+      (hasArea("mensa") && mensa) ||
+      (hasArea("uds") && uds) ||
+      ((hasArea("magazzino") || hasArea("logistica")) &&
+        (magazzino || lotti || trasferimenti)));
 
   const sectionSourceEnabled =
     section === "generale"
@@ -87,14 +95,15 @@ export async function buildReportFilterOptions(
                 ? udsSource
                 : section === "magazzino-logistica"
                   ? logisticsSource
-                  : pacchiSource || emporioSource || mensaSource;
+                  : fseSource;
 
   const includeWarehouses =
-    (section === "generale" && (pacchiSource || emporioSource || logisticsSource)) ||
+    (section === "generale" &&
+      (pacchiSource || emporioSource || logisticsSource)) ||
     (section === "pacchi" && pacchiSource) ||
     (section === "emporio" && emporioSource) ||
     (section === "magazzino-logistica" && logisticsSource) ||
-    (section === "fse-plus" && (pacchiSource || emporioSource));
+    (section === "fse-plus" && fseSource);
   const includeMense = section === "mensa" && mensaSource;
   const includeZones = section === "uds" && udsSource;
 

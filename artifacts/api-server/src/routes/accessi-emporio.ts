@@ -43,6 +43,11 @@ import { requirePermission } from "../middlewares/auth";
 import { auditEmporioTx } from "../lib/emporioAudit";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
+import { beneficiarioAccessScopeFromRequest } from "../lib/beneficiarioPolicy";
+import {
+  BeneficiaryReportingScopeError,
+  lockAndAuthorizeBeneficiaryReportingContextTx,
+} from "../lib/reporting/eventSnapshots";
 
 const router: IRouter = Router();
 router.use(
@@ -928,6 +933,16 @@ router.patch(
             `Transizione Accesso Emporio non consentita: ${current} → ${stato}.`,
           );
         }
+        const reportingSnapshot =
+          stato === "effettuato"
+            ? (
+                await lockAndAuthorizeBeneficiaryReportingContextTx(
+                  tx,
+                  locked.beneficiarioId,
+                  beneficiarioAccessScopeFromRequest(req),
+                )
+              ).snapshot
+            : null;
         await tx
           .update(consegneTable)
           .set({
@@ -937,6 +952,16 @@ router.patch(
               stato === "annullato"
                 ? motivoAnnullamento
                 : locked.motivoAnnullamento,
+            areaOperativaIdSnapshot:
+              reportingSnapshot == null
+                ? locked.areaOperativaIdSnapshot
+                : (locked.areaOperativaIdSnapshot ??
+                  reportingSnapshot.areaOperativaIdSnapshot),
+            centroAscoltoIdSnapshot:
+              reportingSnapshot == null
+                ? locked.centroAscoltoIdSnapshot
+                : (locked.centroAscoltoIdSnapshot ??
+                  reportingSnapshot.centroAscoltoIdSnapshot),
           })
           .where(eq(consegneTable.id, id));
         if (stato !== current) {
@@ -953,6 +978,10 @@ router.patch(
         }
       });
     } catch (error) {
+      if (error instanceof BeneficiaryReportingScopeError) {
+        res.status(403).json({ error: MSG_RISORSA_NON_ACCESSIBILE });
+        return;
+      }
       if (error instanceof SpesaAccessoError) {
         res.status(error.status).json({ error: error.message });
         return;

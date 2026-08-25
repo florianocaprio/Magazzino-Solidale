@@ -1,10 +1,35 @@
 /* @vitest-environment node */
 
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from "vitest";
 import request from "supertest";
-import { pool } from "@workspace/db";
+import { db, operazioniDistribuzioneMagazzinoTable, pool } from "@workspace/db";
 import reportRouter from "../src/routes/report";
-import { makeScopedApp, newScope, cleanup, type SeedScope, createCentro, createMagazzino, createMagazzinoRec, createProdotto, createBeneficiario, createUtente, createAreaOperativa, createLotto, insertConsegna, insertBolla, insertBollaRiga, insertMovimento } from "./scope-helpers";
+import {
+  makeScopedApp,
+  newScope,
+  cleanup,
+  type SeedScope,
+  createCentro,
+  createMagazzino,
+  createMagazzinoRec,
+  createProdotto,
+  createBeneficiario,
+  createUtente,
+  createAreaOperativa,
+  createLotto,
+  insertConsegna,
+  insertBolla,
+  insertBollaRiga,
+  insertMovimento,
+} from "./scope-helpers";
 
 /**
  * Area Operativa-level data filtering on the global reports (B5).
@@ -24,7 +49,12 @@ let areaOperativaB: number;
 let magNull: number;
 let prod: number;
 
-const appAs = (centro: number | null, areaOperativa: number | null) => makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: centro, areaOperativaId: areaOperativa });
+const appAs = (centro: number | null, areaOperativa: number | null) =>
+  makeScopedApp(reportRouter, {
+    id: operatoreId,
+    centroAscoltoId: centro,
+    areaOperativaId: areaOperativa,
+  });
 
 beforeAll(async () => {
   bootScope = newScope();
@@ -51,65 +81,156 @@ afterAll(async () => {
 
 describe("Report — filtro ?areaOperativaId (admin globale)", () => {
   it("giacenze-per-magazzino: ?areaOperativaId restringe ai magazzini della area operativa scelta", async () => {
-    const magA = await createMagazzinoRec(scope, null, { areaOperativaId: areaOperativaA });
-    const magB = await createMagazzinoRec(scope, null, { areaOperativaId: areaOperativaB });
-    await createLotto(scope, { prodottoId: prod, magazzinoId: magA.id, quantita: 10 });
-    await createLotto(scope, { prodottoId: prod, magazzinoId: magB.id, quantita: 10 });
+    const magA = await createMagazzinoRec(scope, null, {
+      areaOperativaId: areaOperativaA,
+    });
+    const magB = await createMagazzinoRec(scope, null, {
+      areaOperativaId: areaOperativaB,
+    });
+    await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA.id,
+      quantita: 10,
+    });
+    await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magB.id,
+      quantita: 10,
+    });
 
-    const res = await request(appAs(null, null)).get(`/report/giacenze-per-magazzino?areaOperativaId=${areaOperativaA}`);
+    const res = await request(appAs(null, null)).get(
+      `/report/giacenze-per-magazzino?areaOperativaId=${areaOperativaA}`,
+    );
     expect(res.status).toBe(200);
-    const names = (res.body as Array<{ magazzinoNome: string }>).map((r) => r.magazzinoNome);
+    const names = (res.body as Array<{ magazzinoNome: string }>).map(
+      (r) => r.magazzinoNome,
+    );
     expect(names).toContain(magA.nome);
     expect(names).not.toContain(magB.nome);
   });
 
   it("consegne-per-centro: ?areaOperativaId conta solo i beneficiari della area operativa scelta", async () => {
-    const benA = await createBeneficiario(scope, centro, { areaOperativaId: areaOperativaA });
-    const benB = await createBeneficiario(scope, centro, { areaOperativaId: areaOperativaB });
-    await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magNull, stato: "effettuata" });
-    await insertConsegna(scope, { beneficiarioId: benB, magazzinoId: magNull, stato: "effettuata" });
+    const benA = await createBeneficiario(scope, centro, {
+      areaOperativaId: areaOperativaA,
+    });
+    const benB = await createBeneficiario(scope, centro, {
+      areaOperativaId: areaOperativaB,
+    });
+    await insertConsegna(scope, {
+      beneficiarioId: benA,
+      magazzinoId: magNull,
+      stato: "effettuata",
+    });
+    await insertConsegna(scope, {
+      beneficiarioId: benB,
+      magazzinoId: magNull,
+      stato: "effettuata",
+    });
 
     const q = "/report/consegne-per-centro?da=2026-01-01&a=2026-12-31";
-    const totA = (await request(appAs(null, null)).get(`${q}&areaOperativaId=${areaOperativaA}`)).body as Array<{
+    const totA = (
+      await request(appAs(null, null)).get(
+        `${q}&areaOperativaId=${areaOperativaA}`,
+      )
+    ).body as Array<{
       totale: number;
     }>;
-    const totAll = (await request(appAs(null, null)).get(q)).body as Array<{ totale: number }>;
-    const sum = (rows: Array<{ totale: number }>) => rows.reduce((a, r) => a + r.totale, 0);
+    const totAll = (await request(appAs(null, null)).get(q)).body as Array<{
+      totale: number;
+    }>;
+    const sum = (rows: Array<{ totale: number }>) =>
+      rows.reduce((a, r) => a + r.totale, 0);
     // area operativa A has exactly one delivery; the unfiltered total includes B too.
     expect(sum(totA)).toBeGreaterThanOrEqual(1);
     expect(sum(totAll)).toBeGreaterThanOrEqual(sum(totA) + 1);
   });
 
   it("consegne-per-mese: ?areaOperativaId isola la consegna della area operativa scelta", async () => {
-    const monthTotal = (body: Array<{ mese: string; totConsegne: number }>, mese: string) => body.find((r) => r.mese === mese)?.totConsegne ?? 0;
+    const monthTotal = (
+      body: Array<{ mese: string; totConsegne: number }>,
+      mese: string,
+    ) => body.find((r) => r.mese === mese)?.totConsegne ?? 0;
     const q = "/report/consegne-per-mese?da=2026-01-01&a=2026-12-31";
 
-    const beforeFiltered = monthTotal((await request(appAs(null, null)).get(`${q}&areaOperativaId=${areaOperativaA}`)).body, "2026-06");
+    const beforeFiltered = monthTotal(
+      (
+        await request(appAs(null, null)).get(
+          `${q}&areaOperativaId=${areaOperativaA}`,
+        )
+      ).body,
+      "2026-06",
+    );
 
     await insertConsegna(scope, {
-      beneficiarioId: await createBeneficiario(scope, centro, { areaOperativaId: areaOperativaA }),
+      beneficiarioId: await createBeneficiario(scope, centro, {
+        areaOperativaId: areaOperativaA,
+      }),
       magazzinoId: magNull,
       stato: "effettuata",
     });
     await insertConsegna(scope, {
-      beneficiarioId: await createBeneficiario(scope, centro, { areaOperativaId: areaOperativaB }),
+      beneficiarioId: await createBeneficiario(scope, centro, {
+        areaOperativaId: areaOperativaB,
+      }),
       magazzinoId: magNull,
       stato: "effettuata",
     });
 
-    const afterFiltered = monthTotal((await request(appAs(null, null)).get(`${q}&areaOperativaId=${areaOperativaA}`)).body, "2026-06");
+    const afterFiltered = monthTotal(
+      (
+        await request(appAs(null, null)).get(
+          `${q}&areaOperativaId=${areaOperativaA}`,
+        )
+      ).body,
+      "2026-06",
+    );
     // Only the area operativa-A delivery is counted under ?areaOperativaId=A.
     expect(afterFiltered).toBe(beforeFiltered + 1);
   });
 
   it("fse-plus: ?areaOperativaId conta solo i beneficiari FSE+ della area operativa scelta", async () => {
     const q = "/report/fse-plus?anno=2026";
-    const beforeFiltered = (await request(appAs(null, null)).get(`${q}&areaOperativaId=${areaOperativaA}`)).body.beneficiariTotali as number;
+    const beforeFiltered = (
+      await request(appAs(null, null)).get(
+        `${q}&areaOperativaId=${areaOperativaA}`,
+      )
+    ).body.beneficiariTotali as number;
 
-    const benA = await createBeneficiario(scope, centro, { areaOperativaId: areaOperativaA });
-    const lotA = await createLotto(scope, { prodottoId: prod, magazzinoId: magNull, quantita: 5, fsePlus: true });
-    const bolA = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magNull, stato: "consegnato" });
-    const rowA = await insertBollaRiga(scope, { bollaId: bolA, prodottoId: prod, lottoId: lotA, quantita: 5 });
+    const benA = await createBeneficiario(scope, centro, {
+      areaOperativaId: areaOperativaA,
+    });
+    const lotA = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magNull,
+      quantita: 5,
+      fsePlus: true,
+    });
+    const bolA = await insertBolla(scope, {
+      beneficiarioId: benA,
+      magazzinoId: magNull,
+      stato: "consegnato",
+    });
+    const rowA = await insertBollaRiga(scope, {
+      bollaId: bolA,
+      prodottoId: prod,
+      lottoId: lotA,
+      quantita: 5,
+    });
+    const [operationA] = await db
+      .insert(operazioniDistribuzioneMagazzinoTable)
+      .values({
+        magazzinoId: magNull,
+        dataDistribuzione: "2026-06-01",
+        canaleOperativo: "PACCHI",
+        dominioOrigine: "TEST_REPORT_AREA_FILTER",
+        entitaOrigineTipo: "BOLLA",
+        entitaOrigineId: bolA,
+        areaOperativaIdSnapshot: areaOperativaA,
+        centroAscoltoIdSnapshot: null,
+        territorioClassificazione: "attribuito",
+        creatoDa: operatoreId,
+      })
+      .returning({ id: operazioniDistribuzioneMagazzinoTable.id });
     await insertMovimento(scope, {
       magazzinoId: magNull,
       prodottoId: prod,
@@ -118,12 +239,45 @@ describe("Report — filtro ?areaOperativaId (admin globale)", () => {
       tipoMovimento: "scarico",
       naturaContabile: "DISTRIBUZIONE_FINALE",
       fondoOrigine: "FSE_PLUS",
+      operazioneDistribuzioneId: operationA.id,
+      canaleOperativo: "PACCHI",
     });
 
-    const benB = await createBeneficiario(scope, centro, { areaOperativaId: areaOperativaB });
-    const lotB = await createLotto(scope, { prodottoId: prod, magazzinoId: magNull, quantita: 5, fsePlus: true });
-    const bolB = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magNull, stato: "consegnato" });
-    const rowB = await insertBollaRiga(scope, { bollaId: bolB, prodottoId: prod, lottoId: lotB, quantita: 5 });
+    const benB = await createBeneficiario(scope, centro, {
+      areaOperativaId: areaOperativaB,
+    });
+    const lotB = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magNull,
+      quantita: 5,
+      fsePlus: true,
+    });
+    const bolB = await insertBolla(scope, {
+      beneficiarioId: benB,
+      magazzinoId: magNull,
+      stato: "consegnato",
+    });
+    const rowB = await insertBollaRiga(scope, {
+      bollaId: bolB,
+      prodottoId: prod,
+      lottoId: lotB,
+      quantita: 5,
+    });
+    const [operationB] = await db
+      .insert(operazioniDistribuzioneMagazzinoTable)
+      .values({
+        magazzinoId: magNull,
+        dataDistribuzione: "2026-06-01",
+        canaleOperativo: "PACCHI",
+        dominioOrigine: "TEST_REPORT_AREA_FILTER",
+        entitaOrigineTipo: "BOLLA",
+        entitaOrigineId: bolB,
+        areaOperativaIdSnapshot: areaOperativaB,
+        centroAscoltoIdSnapshot: null,
+        territorioClassificazione: "attribuito",
+        creatoDa: operatoreId,
+      })
+      .returning({ id: operazioniDistribuzioneMagazzinoTable.id });
     await insertMovimento(scope, {
       magazzinoId: magNull,
       prodottoId: prod,
@@ -132,9 +286,15 @@ describe("Report — filtro ?areaOperativaId (admin globale)", () => {
       tipoMovimento: "scarico",
       naturaContabile: "DISTRIBUZIONE_FINALE",
       fondoOrigine: "FSE_PLUS",
+      operazioneDistribuzioneId: operationB.id,
+      canaleOperativo: "PACCHI",
     });
 
-    const afterFiltered = (await request(appAs(null, null)).get(`${q}&areaOperativaId=${areaOperativaA}`)).body.beneficiariTotali as number;
+    const afterFiltered = (
+      await request(appAs(null, null)).get(
+        `${q}&areaOperativaId=${areaOperativaA}`,
+      )
+    ).body.beneficiariTotali as number;
     // Only area operativa-A's FSE+ beneficiary is counted under ?areaOperativaId=A.
     expect(afterFiltered).toBe(beforeFiltered + 1);
   });
@@ -142,31 +302,60 @@ describe("Report — filtro ?areaOperativaId (admin globale)", () => {
 
 describe("Report — ?areaOperativaId NON è un leak per chiamanti scoped", () => {
   it("consegne-per-mese: uno scoped su area operativa A che chiede ?areaOperativaId=B non vede nulla di B", async () => {
-    const monthTotal = (body: Array<{ mese: string; totConsegne: number }>, mese: string) => body.find((r) => r.mese === mese)?.totConsegne ?? 0;
+    const monthTotal = (
+      body: Array<{ mese: string; totConsegne: number }>,
+      mese: string,
+    ) => body.find((r) => r.mese === mese)?.totConsegne ?? 0;
     const q = "/report/consegne-per-mese?da=2026-01-01&a=2026-12-31";
 
     // Caller is scoped to area operativa A.
-    const beforeReqB = monthTotal((await request(appAs(null, areaOperativaA)).get(`${q}&areaOperativaId=${areaOperativaB}`)).body, "2026-06");
+    const beforeReqB = monthTotal(
+      (
+        await request(appAs(null, areaOperativaA)).get(
+          `${q}&areaOperativaId=${areaOperativaB}`,
+        )
+      ).body,
+      "2026-06",
+    );
 
     // Add a delivery in area operativa B.
     await insertConsegna(scope, {
-      beneficiarioId: await createBeneficiario(scope, centro, { areaOperativaId: areaOperativaB }),
+      beneficiarioId: await createBeneficiario(scope, centro, {
+        areaOperativaId: areaOperativaB,
+      }),
       magazzinoId: magNull,
       stato: "effettuata",
     });
 
     // Scoped-A caller asking for area operativa B still sees zero of B (own-area operativa AND B = empty).
-    const afterReqB = monthTotal((await request(appAs(null, areaOperativaA)).get(`${q}&areaOperativaId=${areaOperativaB}`)).body, "2026-06");
+    const afterReqB = monthTotal(
+      (
+        await request(appAs(null, areaOperativaA)).get(
+          `${q}&areaOperativaId=${areaOperativaB}`,
+        )
+      ).body,
+      "2026-06",
+    );
     expect(afterReqB).toBe(beforeReqB);
   });
 
   it("giacenze-per-magazzino: uno scoped su area operativa A che chiede ?areaOperativaId=B non vede i magazzini di B", async () => {
-    const magB = await createMagazzinoRec(scope, null, { areaOperativaId: areaOperativaB });
-    await createLotto(scope, { prodottoId: prod, magazzinoId: magB.id, quantita: 10 });
+    const magB = await createMagazzinoRec(scope, null, {
+      areaOperativaId: areaOperativaB,
+    });
+    await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magB.id,
+      quantita: 10,
+    });
 
-    const res = await request(appAs(null, areaOperativaA)).get(`/report/giacenze-per-magazzino?areaOperativaId=${areaOperativaB}`);
+    const res = await request(appAs(null, areaOperativaA)).get(
+      `/report/giacenze-per-magazzino?areaOperativaId=${areaOperativaB}`,
+    );
     expect(res.status).toBe(200);
-    const names = (res.body as Array<{ magazzinoNome: string }>).map((r) => r.magazzinoNome);
+    const names = (res.body as Array<{ magazzinoNome: string }>).map(
+      (r) => r.magazzinoNome,
+    );
     expect(names).not.toContain(magB.nome);
   });
 });

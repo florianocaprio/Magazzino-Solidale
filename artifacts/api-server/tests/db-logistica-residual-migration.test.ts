@@ -205,10 +205,11 @@ describe("migration residui Logistica", () => {
       await replayChain(client);
       await expectCanonicalRestrict(client);
 
-      const centro = await client.query<{ id: number }>(
-        "SELECT id FROM centri_di_ascolto ORDER BY id LIMIT 1",
-      );
-      expect(centro.rows[0]).toBeDefined();
+      const centro = await client.query<{ id: number }>(`
+        INSERT INTO centri_di_ascolto (nome)
+        VALUES ('FK Restrict ' || txid_current())
+        RETURNING id
+      `);
       const volontario = await client.query<{ id: number }>(`
         INSERT INTO volontari (
           nome, cognome, matricola, ruolo, attivo, stato_approvazione

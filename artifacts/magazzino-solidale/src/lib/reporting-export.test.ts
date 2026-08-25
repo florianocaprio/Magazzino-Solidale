@@ -30,7 +30,7 @@ describe("export reportistica", () => {
     };
     const workbook = buildReportingWorkbook(
       {
-        reportingModelVersion: "MAGAZZINO_2_0C_V1",
+        reportingModelVersion: "REPORTING_2_0_V1",
         section: "fse-plus",
         filters: { da: "2026-01-01", a: "2026-12-31", anno: 2026, areaOperativaId: null, centroAscoltoId: null, magazzinoId: null, mensaId: null, zonaUdsId: null, operatoreId: null, tipoIntervento: null, tipoServizio: null },
         kpi: [], series: [], tables: [], quality: [], definitions: [],
@@ -58,7 +58,7 @@ describe("export reportistica", () => {
   it("popola il dettaglio FSE+ con dati auditabili e senza nominativi", () => {
     const workbook = buildReportingWorkbook(
       {
-        reportingModelVersion: "MAGAZZINO_2_0C_V1",
+        reportingModelVersion: "REPORTING_2_0_V1",
         section: "fse-plus",
         filters: { da: "2026-01-01", a: "2026-12-31", anno: 2026, areaOperativaId: 1, centroAscoltoId: null, magazzinoId: null, mensaId: null, zonaUdsId: null, operatoreId: null, tipoIntervento: null, tipoServizio: null },
         kpi: [], series: [], tables: [], quality: [], definitions: [],
@@ -68,20 +68,21 @@ describe("export reportistica", () => {
       { areaOperativa: "Roma" },
       {
         section: "fse-plus", metric: "prodottiFse", page: 1, pageSize: 1, total: 1,
-        columns: ["data", "documento", "beneficiarioCodice", "prodotto", "lotto", "quantita", "unita", "canale"],
-        rows: [{ data: "2026-06-01", documento: "B-1", beneficiarioCodice: "BEN-1", prodotto: "Pasta", lotto: "L-1", quantita: 2, unita: "kg", canale: "pacchi" }],
+        columns: ["data", "documento", "prodotto", "lotto", "quantita", "unita", "canale"],
+        rows: [{ data: "2026-06-01", documento: "B-1", prodotto: "Pasta", lotto: "L-1", quantita: 2, unita: "kg", canale: "PACCHI" }],
       },
     );
     const detail = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets["09_Dettaglio_Controllo"]);
     expect(detail).toHaveLength(1);
-    expect(detail[0]).toMatchObject({ documento: "B-1", beneficiarioCodice: "BEN-1", canale: "pacchi" });
+    expect(detail[0]).toMatchObject({ documento: "B-1", canale: "PACCHI" });
+    expect(detail[0]).not.toHaveProperty("beneficiarioCodice");
     expect(detail[0]).not.toHaveProperty("nome");
     expect(XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets["00_Riepilogo"], { header: 1 })).toContainEqual(["Area Operativa", "Roma"]);
   });
 
   it("usa exactValue negli export e non trasforma null in zero", () => {
     const workbook = buildReportingWorkbook({
-      reportingModelVersion: "MAGAZZINO_2_0C_V1",
+      reportingModelVersion: "REPORTING_2_0_V1",
       section: "fse-plus",
       filters: { da: "2026-01-01", a: "2026-12-31", anno: 2026, areaOperativaId: null, centroAscoltoId: null, magazzinoId: 1, mensaId: null, zonaUdsId: null, operatoreId: null, tipoIntervento: null, tipoServizio: null },
       kpi: [

@@ -1702,7 +1702,15 @@ describe("Cassa Emporio", () => {
     expect(dettaglioBollaPreservato.body.righe[0].quantita).toBe(2);
     expect(scarico.causaleAltro).toBe("Spesa Emporio");
     expect(righeScarico).toHaveLength(1);
-    expect(accesso.statoAccessoEmporio).toBe("effettuato");
+    expect(accesso).toMatchObject({
+      statoAccessoEmporio: "effettuato",
+      areaOperativaIdSnapshot: fixture.areaOperativaId,
+      centroAscoltoIdSnapshot: fixture.centroId,
+    });
+    expect(bolla).toMatchObject({
+      areaOperativaIdSnapshot: fixture.areaOperativaId,
+      centroAscoltoIdSnapshot: fixture.centroId,
+    });
   });
 
   it("genera numeri Spesa e Bolla distinti per due checkout concorrenti", async () => {

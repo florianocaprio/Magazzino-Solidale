@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 const ACTIVITY_EVENTS = [
   "mousemove",
@@ -18,8 +18,11 @@ interface UseIdleLogoutOptions {
   enabled: boolean;
   timeoutMs: number;
   onIdle: () => void;
+  warningMs?: number;
+  onWarning?: () => void;
+  onResume?: () => void;
   keepAliveMs?: number;
-  onKeepAlive?: () => void;
+  onKeepAlive?: () => void | Promise<void>;
 }
 
 /**
@@ -33,20 +36,31 @@ export function useIdleLogout({
   enabled,
   timeoutMs,
   onIdle,
+  warningMs,
+  onWarning,
+  onResume,
   keepAliveMs,
   onKeepAlive,
 }: UseIdleLogoutOptions) {
   const onIdleRef = useRef(onIdle);
+  const onWarningRef = useRef(onWarning);
+  const onResumeRef = useRef(onResume);
   const onKeepAliveRef = useRef(onKeepAlive);
+  const continueSessionRef = useRef<() => Promise<void>>(async () => {});
   onIdleRef.current = onIdle;
+  onWarningRef.current = onWarning;
+  onResumeRef.current = onResume;
   onKeepAliveRef.current = onKeepAlive;
 
   useEffect(() => {
     if (!enabled) return;
 
-    let timer: ReturnType<typeof setTimeout>;
+    let idleTimer: ReturnType<typeof setTimeout>;
+    let warningTimer: ReturnType<typeof setTimeout>;
     let lastHandled = 0;
     let lastKeepAlive = Date.now();
+    let warningVisible = false;
+    let renewalPending = false;
 
     const readSharedActivity = (): number => {
       try {
@@ -59,34 +73,81 @@ export function useIdleLogout({
     };
 
     const scheduleFrom = (fromTs: number) => {
-      clearTimeout(timer);
+      clearTimeout(idleTimer);
+      clearTimeout(warningTimer);
       const remaining = Math.max(0, timeoutMs - (Date.now() - fromTs));
-      timer = setTimeout(fire, remaining);
+      idleTimer = setTimeout(fireIdle, remaining);
+      if (warningMs && onWarningRef.current) {
+        warningTimer = setTimeout(
+          fireWarning,
+          Math.max(0, remaining - warningMs),
+        );
+      }
     };
 
-    const fire = () => {
+    const fireIdle = () => {
       // Another tab may have been active since this timer was set — re-check the
       // shared timestamp and reschedule instead of logging out an active user.
       const shared = readSharedActivity();
       const remaining = timeoutMs - (Date.now() - shared);
       if (shared && remaining > 0) {
-        clearTimeout(timer);
-        timer = setTimeout(fire, remaining);
+        scheduleFrom(shared);
         return;
       }
       onIdleRef.current();
     };
 
-    const handleActivity = () => {
-      const now = Date.now();
-      if (now - lastHandled < 1000) return;
-      lastHandled = now;
+    const fireWarning = () => {
+      const shared = readSharedActivity();
+      const remaining = timeoutMs - (Date.now() - shared);
+      if (shared && warningMs && remaining > warningMs) {
+        scheduleFrom(shared);
+        return;
+      }
+      warningVisible = true;
+      onWarningRef.current?.();
+    };
+
+    const recordActivity = (now: number) => {
       try {
         localStorage.setItem(ACTIVITY_STORAGE_KEY, String(now));
       } catch {
-        // ignore storage failures (private mode, quota) — local timer still works
+        // ignore storage failures (private mode, quota) — local timers still work
       }
       scheduleFrom(now);
+    };
+
+    const renewSession = async () => {
+      if (renewalPending) return;
+      renewalPending = true;
+      clearTimeout(idleTimer);
+      clearTimeout(warningTimer);
+      try {
+        await onKeepAliveRef.current?.();
+        const now = Date.now();
+        lastKeepAlive = now;
+        warningVisible = false;
+        recordActivity(now);
+        onResumeRef.current?.();
+      } catch (error) {
+        const shared = readSharedActivity();
+        scheduleFrom(shared || Date.now() - timeoutMs);
+        throw error;
+      } finally {
+        renewalPending = false;
+      }
+    };
+    continueSessionRef.current = renewSession;
+
+    const handleActivity = () => {
+      // Once the warning is visible, local activity is not consent to renew the
+      // session. Only the explicit Continue action may call renewSession().
+      // Cross-tab activity remains handled separately by handleStorage().
+      if (warningVisible) return;
+      const now = Date.now();
+      if (now - lastHandled < 1000) return;
+      lastHandled = now;
+      recordActivity(now);
       if (
         keepAliveMs &&
         onKeepAliveRef.current &&
@@ -102,7 +163,12 @@ export function useIdleLogout({
     const handleStorage = (e: StorageEvent) => {
       if (e.key !== ACTIVITY_STORAGE_KEY || !e.newValue) return;
       const ts = parseInt(e.newValue, 10);
-      scheduleFrom(Number.isFinite(ts) ? ts : Date.now());
+      const activityTs = Number.isFinite(ts) ? ts : Date.now();
+      if (warningVisible) {
+        warningVisible = false;
+        onResumeRef.current?.();
+      }
+      scheduleFrom(activityTs);
     };
 
     const handleVisibility = () => {
@@ -118,12 +184,16 @@ export function useIdleLogout({
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      clearTimeout(timer);
+      clearTimeout(idleTimer);
+      clearTimeout(warningTimer);
+      continueSessionRef.current = async () => {};
       for (const ev of ACTIVITY_EVENTS) {
         window.removeEventListener(ev, handleActivity);
       }
       window.removeEventListener("storage", handleStorage);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [enabled, timeoutMs, keepAliveMs]);
+  }, [enabled, timeoutMs, warningMs, keepAliveMs]);
+
+  return useCallback(() => continueSessionRef.current(), []);
 }

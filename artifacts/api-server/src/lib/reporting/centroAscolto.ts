@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
-import { dashboard, kpi, quality } from "./shared";
+import { dashboard, kpi, quality, text } from "./shared";
 import { intervalloGiornoEuropeRome } from "../interventiViste";
 
 const eventDate = sql`(
@@ -19,8 +19,8 @@ function socialConditions(filters: ReportFilters): SQL[] {
     sql`(i.ambito = 'sociale' OR i.ambito IS NULL)`,
     sql`${eventDate} BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
-      areaOperativa: sql`be.area_operativa_id`,
-      centro: sql`be.centro_ascolto_id`,
+      areaOperativa: sql`COALESCE(i.area_operativa_id_snapshot, be.area_operativa_id)`,
+      centro: sql`COALESCE(i.centro_ascolto_id_snapshot, be.centro_ascolto_id)`,
       zona: sql`be.zona_uds_id`,
       operatore: sql`i.operatore_id`,
     }),
@@ -137,14 +137,15 @@ export async function buildCentroAscoltoReport(filters: ReportFilters) {
              COUNT(DISTINCT i.beneficiario_id) AS persone
       FROM interventi i
       JOIN beneficiari be ON be.id = i.beneficiario_id
-      LEFT JOIN centri_di_ascolto ca ON ca.id = be.centro_ascolto_id
+      LEFT JOIN centri_di_ascolto ca ON ca.id = COALESCE(i.centro_ascolto_id_snapshot, be.centro_ascolto_id)
       WHERE ${completedWhere}
       GROUP BY ca.id, ca.nome ORDER BY totale DESC, centro
     `),
     rows<Record<string, unknown>>(sql`
       SELECT COUNT(*) FILTER (WHERE i.ambito IS NULL) AS ambito_legacy,
              COUNT(*) FILTER (WHERE i.operatore_id IS NULL) AS operatore_mancante,
-             COUNT(*) FILTER (WHERE trim(i.tipo_intervento) = '') AS tipo_mancante
+             COUNT(*) FILTER (WHERE trim(i.tipo_intervento) = '') AS tipo_mancante,
+             COUNT(*) FILTER (WHERE i.area_operativa_id_snapshot IS NULL OR i.centro_ascolto_id_snapshot IS NULL) AS territorio_legacy
       FROM interventi i JOIN beneficiari be ON be.id = i.beneficiario_id
       WHERE ${where}
     `),
@@ -167,23 +168,70 @@ export async function buildCentroAscoltoReport(filters: ReportFilters) {
       kpi("scaduti", metrics.scaduti),
       kpi("operatoriCoinvolti", metrics.operatori),
     ],
-    series: [{ key: "interventiPerMese", points: monthSeries(monthly, "totale", "persone") }],
+    series: [
+      {
+        key: "interventiPerMese",
+        points: monthSeries(monthly, "totale", "persone"),
+      },
+    ],
     tables: [
-      { key: "tipologie", columns: ["tipo", "totale"], rows: types.map((r) => ({ tipo: String(r.tipo), totale: number(r.totale) })) },
-      { key: "operatori", columns: ["operatore", "totale"], rows: operators.map((r) => ({ operatore: String(r.operatore), totale: number(r.totale) })) },
-      { key: "centri", columns: ["centro", "totale", "persone"], rows: centres.map((r) => ({ centro: String(r.centro), totale: number(r.totale), persone: number(r.persone) })) },
+      {
+        key: "tipologie",
+        columns: ["tipo", "totale"],
+        rows: types.map((r) => ({
+          tipo: String(r.tipo),
+          totale: number(r.totale),
+        })),
+      },
+      {
+        key: "operatori",
+        columns: ["operatore", "totale"],
+        rows: operators.map((r) => ({
+          operatore: String(r.operatore),
+          totale: number(r.totale),
+        })),
+      },
+      {
+        key: "centri",
+        columns: ["centro", "totale", "persone"],
+        rows: centres.map((r) => ({
+          centro: String(r.centro),
+          totale: number(r.totale),
+          persone: number(r.persone),
+        })),
+      },
     ],
     quality: [
-      quality("ambitoLegacy", number(dq.ambito_legacy), number(dq.ambito_legacy) ? "derivable" : "ok", "I record legacy con ambito NULL seguono la vista Sociale corrente."),
-      quality("operatoreMancante", number(dq.operatore_mancante), number(dq.operatore_mancante) ? "derivable" : "ok"),
-      quality("classificazioneAccoglienzaMancante", null, "missing", "Le tipologie sono configurabili e non possiedono una categoria semantica accoglienza/follow-up."),
+      quality(
+        "ambitoLegacy",
+        number(dq.ambito_legacy),
+        number(dq.ambito_legacy) ? "derivable" : "ok",
+        text("qualitySocialLegacy"),
+      ),
+      quality(
+        "operatoreMancante",
+        number(dq.operatore_mancante),
+        number(dq.operatore_mancante) ? "derivable" : "ok",
+      ),
+      quality(
+        "territorioStoricoDerivato",
+        number(dq.territorio_legacy),
+        number(dq.territorio_legacy) ? "derivable" : "ok",
+        text("qualitySocialLegacyTerritory"),
+      ),
+      quality(
+        "classificazioneAccoglienzaMancante",
+        null,
+        "missing",
+        text("qualitySocialClassification"),
+      ),
     ],
     definitions: [
-      "Intervento Sociale = ambito sociale oppure ambito NULL legacy, coerentemente con la vista operativa corrente.",
-      "Intervento effettuato = intervento Sociale nello stato concluso.",
-      "Persona servita = beneficiario distinto con almeno un intervento concluso nel periodo.",
-      "Scaduto = intervento ancora pianificato con data/ora precedente al minore tra fine periodo e ora corrente Europe/Rome.",
-      "Le note riservate non sono dimensioni analitiche e non vengono esportate.",
+      text("socialIntervention"),
+      text("socialCompleted"),
+      text("socialServedPerson"),
+      text("socialExpired"),
+      text("socialPrivateNotes"),
     ],
   });
 }

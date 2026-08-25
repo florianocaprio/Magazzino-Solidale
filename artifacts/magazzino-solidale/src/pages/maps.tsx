@@ -26,7 +26,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { useToast } from "@/hooks/use-toast";
 import { GoogleOperationalMap } from "@/components/maps/google-operational-map";
 import { RouteActions } from "@/components/maps/route-actions";
-import { formatDateOrDateTimeEuropeRome } from "@/lib/europe-rome";
+import { addDaysToCivilDate, formatDateOrDateTimeEuropeRome, todayEuropeRome } from "@/lib/europe-rome";
 
 const LAYER_LABELS: Record<MapsLayerCode, string> = {
   "sociale.interventi_pianificati": "maps.layerSocialInterventions",
@@ -34,16 +34,6 @@ const LAYER_LABELS: Record<MapsLayerCode, string> = {
   "pacchi.ritiri_non_effettuati": "maps.layerMissedPickups",
   "centro.punti_operativi": "maps.layerOperationalPoints",
 };
-
-function todayRome(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-}
-
-function addDays(value: string, days: number): string {
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day + days));
-  return date.toISOString().slice(0, 10);
-}
 
 function entityUrl(marker: MapsMarker): string | null {
   if (marker.entityType === "intervento") return "/interventi";
@@ -67,9 +57,9 @@ function mapsLayerError(error: unknown, fallback: string): string {
 export default function MapsOperativa() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const today = useMemo(todayRome, []);
+  const today = useMemo(todayEuropeRome, []);
   const [da, setDa] = useState(today);
-  const [a, setA] = useState(addDays(today, 7));
+  const [a, setA] = useState(addDaysToCivilDate(today, 7));
   const { data: capabilities, isLoading: loadingCapabilities } = useGetMapsCapabilities();
   const available = capabilities?.layers ?? [];
   const [disabled, setDisabled] = useState<Set<MapsLayerCode>>(new Set());
@@ -91,7 +81,7 @@ export default function MapsOperativa() {
     { code: "centro.punti_operativi" as const, query: points },
   ].filter(({ code, query }) => enabled(code) && query.isError);
   const isLoading = social.isLoading || deliveries.isLoading || missed.isLoading || points.isLoading;
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() ?? "";
+  const apiKey = window.__APP_CONFIG__?.googleMapsApiKey?.trim() ?? "";
 
   const toggle = (code: MapsLayerCode) => setDisabled((current) => {
     const next = new Set(current);

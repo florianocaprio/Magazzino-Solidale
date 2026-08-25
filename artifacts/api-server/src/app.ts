@@ -1,4 +1,5 @@
-import express, { type Express } from "express";
+import { randomUUID } from "node:crypto";
+import express, { type ErrorRequestHandler, type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import session from "express-session";
@@ -20,6 +21,15 @@ const sessionConfig = resolveSessionRuntimeConfig();
 app.use(
   pinoHttp({
     logger,
+    genReqId(req, res) {
+      const incoming = req.headers["x-correlation-id"];
+      const requested = Array.isArray(incoming) ? incoming[0] : incoming;
+      const id = requested && /^[A-Za-z0-9._-]{1,128}$/.test(requested)
+        ? requested
+        : randomUUID();
+      res.setHeader("X-Correlation-Id", id);
+      return id;
+    },
     serializers: {
       req(req) {
         return {
@@ -53,6 +63,37 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/api", (req, res, next) => {
+  const json = res.json.bind(res);
+  res.json = ((body: unknown) => {
+    if (
+      res.statusCode >= 400
+      && body != null
+      && typeof body === "object"
+      && typeof (body as { error?: unknown }).error === "string"
+    ) {
+      const current = body as Record<string, unknown> & { error: string };
+      const domain = req.path.split("/").filter(Boolean)[0]
+        ?.replace(/[^A-Za-z0-9]+/g, "_")
+        .toUpperCase() || "API";
+      const suffix = res.statusCode === 400 ? "INVALID_REQUEST"
+        : res.statusCode === 401 ? "UNAUTHENTICATED"
+        : res.statusCode === 403 ? "FORBIDDEN"
+        : res.statusCode === 404 ? "NOT_FOUND"
+        : res.statusCode === 409 ? "CONFLICT"
+        : "ERROR";
+      return json({
+        ...current,
+        code: typeof current.code === "string" ? current.code : `${domain}_${suffix}`,
+        message: typeof current.message === "string" ? current.message : current.error,
+        correlationId: String(req.id),
+        details: current.details ?? null,
+      });
+    }
+    return json(body);
+  }) as typeof res.json;
+  next();
+});
 app.use("/uploads", express.static(process.env.UPLOAD_DIR ?? "/app/uploads", {
   fallthrough: false,
   index: false,
@@ -147,5 +188,18 @@ app.use("/api", (req, res, next) => {
 });
 
 app.use("/api", router);
+
+const unhandledError: ErrorRequestHandler = (error, req, res, _next) => {
+  req.log.error({ err: error }, "Unhandled API error");
+  if (res.headersSent) return;
+  res.status(500).json({
+    error: "Errore interno del servizio",
+    code: "API_INTERNAL_ERROR",
+    message: "Errore interno del servizio",
+    correlationId: String(req.id),
+    details: null,
+  });
+};
+app.use("/api", unhandledError);
 
 export default app;

@@ -6,6 +6,7 @@ import { pool } from "@workspace/db";
 import dashboardRouter from "../src/routes/dashboard";
 import reportRouter from "../src/routes/report";
 import { makeScopedApp, newScope, cleanup, type SeedScope, createCentro, createMagazzino, createMagazzinoRec, createProdotto, createBeneficiario, createUtente, createLotto, insertConsegna, insertMovimento, insertBolla, insertBollaRiga } from "./scope-helpers";
+import { dataCivileEuropeRome } from "../src/lib/interventiWorkflow";
 
 /**
  * Centro scoping for the aggregate/read-only screens (Dashboard + Report).
@@ -81,7 +82,7 @@ describe("Dashboard — scoping via magazzini visibili", () => {
     // consegneMese counts consegne with dataPrevista >= current month start,
     // scoped via the beneficiario-centro path. Pin the fixture date to the same
     // runtime month so the delta assertion stays valid as calendar time moves.
-    const inizioMese = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
+    const inizioMese = `${dataCivileEuropeRome().slice(0, 7)}-01`;
     const consMese = (body: { consegneMese: number }) => body.consegneMese;
     const beforeA = consMese((await request(appAs(dashboardRouter, centroA)).get("/dashboard/stats")).body);
     const beforeG = consMese((await request(appAs(dashboardRouter, null)).get("/dashboard/stats")).body);

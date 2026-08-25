@@ -109,13 +109,17 @@ describe("Magazzino 2.0A-R1 — lifecycle operazione distribuzione", () => {
   it("serializza la stessa sorgente e aggiorna le statistiche autorevoli", async () => {
     const sourceId = 9_000_000 + Math.floor(Math.random() * 100_000);
     const concurrent = await Promise.all([
-      ensure(sourceId, 1),
-      ensure(sourceId, 1),
-      ensure(sourceId, 1),
+      ensure(sourceId),
+      ensure(sourceId),
+      ensure(sourceId),
     ]);
     expect(new Set(concurrent.map((row) => row.id)).size).toBe(1);
     const updated = await ensure(sourceId, 7);
     expect(updated.numeroPasti).toBe(7);
+    expect((await ensure(sourceId, 7)).id).toBe(updated.id);
+    await expect(ensure(sourceId, 8)).rejects.toThrow(
+      /STATISTICA_DISTRIBUZIONE_IMMUTABILE/,
+    );
   });
 
   it("passa da confermata a parzialmente_stornata e poi stornata", async () => {
@@ -154,7 +158,7 @@ describe("Magazzino 2.0A-R1 — lifecycle operazione distribuzione", () => {
       .returning({ id: movimentiTable.id });
     expect((await ensure(sourceId, 2)).id).toBe(operation.id);
     await expect(ensure(sourceId, 3)).rejects.toThrow(
-      /OPERAZIONE_DISTRIBUZIONE_IMMUTABILE/,
+      /STATISTICA_DISTRIBUZIONE_IMMUTABILE/,
     );
     await db.insert(movimentiTable).values({
       tipoMovimento: "storno",

@@ -11,7 +11,7 @@ import {
   serial,
   text,
   timestamp,
-  uniqueIndex,
+  unique,
   varchar,
 } from "drizzle-orm/pg-core";
 import { utentiTable } from "./auth";
@@ -160,7 +160,7 @@ export const mappatureProdottiEsterniTable = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("mappature_prodotti_esterni_fonte_descrizione_unique").on(
+    unique("mappature_prodotti_esterni_fonte_descrizione_unique").on(
       table.fonte,
       table.chiaveDescrizioneNormalizzata,
     ),
@@ -260,7 +260,7 @@ export const importazioniAgeaRigheTable = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("importazioni_agea_righe_numero_unique").on(
+    unique("importazioni_agea_righe_numero_unique").on(
       table.importazioneId,
       table.numeroRiga,
     ),
@@ -329,7 +329,7 @@ export const importazioniAgeaPartiteTable = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("importazioni_agea_partite_key_unique").on(
+    unique("importazioni_agea_partite_key_unique").on(
       table.importazioneId,
       table.partyKey,
     ),
@@ -385,7 +385,7 @@ export const movimentiEsterniAgeaTable = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("movimenti_esterni_agea_magazzino_identity_unique").on(
+    unique("movimenti_esterni_agea_magazzino_identity_unique").on(
       table.magazzinoId,
       table.identityKey,
     ),

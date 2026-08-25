@@ -81,7 +81,7 @@ function appAs(
     centroAscoltoId: null,
     areaOperativaId,
     zonaUdsId,
-    aree: ["uds"],
+    aree: ["analisi", "uds"],
     permessi: [...permessi],
   });
 }
@@ -109,7 +109,7 @@ function appAsPureUds(
     "beneficiari.manage",
     "beneficiari.view",
   ],
-  aree: string[] = ["uds"],
+  aree: string[] = ["analisi", "uds"],
 ) {
   return makeScopedApp(
     combinedRouter(),
@@ -500,7 +500,10 @@ describe("UDS hardening territoriale e storico", () => {
   });
 
   it("classifica i report UDS attraverso areaGuard reale senza ampliare gli altri report", async () => {
-    const udsReports = appWithRealAreaGuard(["uds"], ["uds.reports.view"]);
+    const udsReports = appWithRealAreaGuard(
+      ["analisi", "uds"],
+      ["uds.reports.view"],
+    );
     for (const path of [
       "/report/uds",
       "/report/uds/interventi-per-mese",
@@ -519,8 +522,18 @@ describe("UDS hardening territoriale e storico", () => {
       expect((await request(udsReports).get(path)).status, path).toBe(403);
     }
     expect(
-      (await request(appWithRealAreaGuard(["uds"], [])).get("/report/uds"))
-        .status,
+      (
+        await request(appWithRealAreaGuard(["analisi", "uds"], [])).get(
+          "/report/uds",
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(appWithRealAreaGuard(["uds"], ["uds.reports.view"])).get(
+          "/report/uds",
+        )
+      ).status,
     ).toBe(403);
     expect(
       (

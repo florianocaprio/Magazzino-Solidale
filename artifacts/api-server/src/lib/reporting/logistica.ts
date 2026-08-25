@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
-import { dashboard, kpi, quality } from "./shared";
+import { dashboard, kpi, quality, text } from "./shared";
 import { isModuloAttivo } from "../featureFlags";
 import { signedMovementSql } from "../fseAccounting";
 
@@ -23,7 +23,11 @@ function warehouseConditions(
         : sql`md.centro_ascolto_id`;
   const id =
     alias === "mg" ? sql`mg.id` : alias === "mo" ? sql`mo.id` : sql`md.id`;
-  return reportScope(filters, { areaOperativa, centro, magazzino: id });
+  return reportScope(
+    filters,
+    { areaOperativa, centro, magazzino: id },
+    { sharedAreaOperativa: true, sharedCentro: true },
+  );
 }
 
 function movementConditions(filters: ReportFilters): SQL[] {
@@ -426,10 +430,10 @@ export async function buildLogisticaReport(filters: ReportFilters) {
         ]
       : [],
     definitions: [
-      "La giacenza reale è la somma delle quantità residue dei lotti.",
-      `Scadenze e merce scaduta sono valutate sulla data civile finale ${filters.a} ricostruendo il saldo di ogni Partita dal ledger, anche se oggi il residuo è zero.`,
-      "I movimenti sono eventi di audit; non costituiscono una seconda giacenza.",
-      "Giacenze e quantità movimentate sono aggregate separatamente per unità di misura.",
+      text("logisticsStock"),
+      text("logisticsExpiryLedgerDate", { date: filters.a }),
+      text("logisticsMovements"),
+      text("logisticsUnits"),
     ],
   });
 }

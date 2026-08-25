@@ -95,4 +95,20 @@ describe("DELETE /consegne/:id", () => {
     const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
     expect(consegna).toBeDefined();
   });
+
+  it("non elimina una consegna già effettuata", async () => {
+    const centro = await createCentro(scope);
+    const mag = await createMagazzino(scope, centro);
+    const ben = await createBeneficiario(scope, centro);
+    const consegnaId = await insertConsegna(scope, {
+      beneficiarioId: ben,
+      magazzinoId: mag,
+      stato: "effettuata",
+    });
+
+    const res = await request(appGlobal()).delete(`/consegne/${consegnaId}`).send();
+    expect(res.status).toBe(409);
+    const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
+    expect(consegna).toBeDefined();
+  });
 });

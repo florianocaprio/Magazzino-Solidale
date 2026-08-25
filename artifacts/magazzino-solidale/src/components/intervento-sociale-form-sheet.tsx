@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { dateTimeEuropeRomeToIso, todayEuropeRome } from "@/lib/europe-rome";
+import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 
 export type InterventoSocialeCreateMode =
   | "da_pianificare"
@@ -160,6 +161,14 @@ export function InterventoSocialeFormSheet({
   });
   const { reset } = form;
   const wasOpen = useRef(false);
+  const unsavedGuard = useUnsavedChangesGuard(open && form.formState.isDirty);
+  const requestOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      onOpenChange(true);
+      return;
+    }
+    unsavedGuard.requestClose(() => onOpenChange(false));
+  };
 
   useEffect(() => {
     const isOpening = open && !wasOpen.current;
@@ -216,7 +225,7 @@ export function InterventoSocialeFormSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={requestOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>{t(`interventi.form.titles.${mode}`)}</SheetTitle>
@@ -237,6 +246,7 @@ export function InterventoSocialeFormSheet({
                       items={beneficiari}
                       value={field.value}
                       onChange={field.onChange}
+                      ariaLabel={t("interventi.beneficiario")}
                       searchValue={beneficiarySearch}
                       onSearchChange={onBeneficiarySearch}
                     />
@@ -438,7 +448,7 @@ export function InterventoSocialeFormSheet({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={() => requestOpenChange(false)}
               >
                 {t("common.cancel")}
               </Button>
@@ -448,6 +458,7 @@ export function InterventoSocialeFormSheet({
             </div>
           </form>
         </Form>
+        <UnsavedChangesDialog guard={unsavedGuard} />
       </SheetContent>
     </Sheet>
   );

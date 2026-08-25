@@ -17,6 +17,7 @@ import {
   trasferimentoScopeFilter,
   andScoped,
 } from "../lib/centroScope";
+import { addDaysToCivilDate, dataCivileEuropeRome } from "../lib/interventiWorkflow";
 
 const router: IRouter = Router();
 
@@ -45,11 +46,9 @@ function benScopeSql(
 }
 
 router.get("/dashboard/stats", async (req, res) => {
-  const oggi = new Date().toISOString().split("T")[0];
-  const inizioMese = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
-  const in30 = new Date();
-  in30.setDate(in30.getDate() + 30);
-  const in30str = in30.toISOString().split("T")[0];
+  const oggi = dataCivileEuropeRome();
+  const inizioMese = `${oggi.slice(0, 7)}-01`;
+  const in30str = addDaysToCivilDate(oggi, 30);
 
   const caller = callerCentroId(req);
   const areaOperativa = callerAreaOperativaId(req);
@@ -81,12 +80,9 @@ router.get("/dashboard/stats", async (req, res) => {
 });
 
 router.get("/dashboard/alerts", async (req, res) => {
-  const in7 = new Date();
-  in7.setDate(in7.getDate() + 7);
-  const in7str = in7.toISOString().split("T")[0];
-  const in30 = new Date();
-  in30.setDate(in30.getDate() + 30);
-  const in30str = in30.toISOString().split("T")[0];
+  const dataCivileOggi = dataCivileEuropeRome();
+  const in7str = addDaysToCivilDate(dataCivileOggi, 7);
+  const in30str = addDaysToCivilDate(dataCivileOggi, 30);
 
   const caller = callerCentroId(req);
   const magIds = await visibleMagazzinoIds(caller, callerAreaOperativaId(req));

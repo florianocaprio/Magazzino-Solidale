@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, rows } from "./sql";
-import { dashboard, kpi, quality } from "./shared";
+import { dashboard, kpi, quality, text } from "./shared";
 
 function udsIdentityConditions(filters: ReportFilters): SQL[] {
   const conditions: SQL[] = [sql`i.ambito = 'uds'`];
@@ -184,10 +184,10 @@ export async function buildUdsReport(filters: ReportFilters) {
       ),
     ],
     definitions: [
-      "Intervento UDS = intervento con ambito uds esplicito; i record legacy ambigui non vengono reinterpretati.",
-      "Il territorio degli interventi deriva dagli snapshot immutabili registrati sull'evento.",
-      "Primo contatto = numero cronologico 1 sull'intera storia della persona, prima di applicare il periodo.",
-      "Le note libere non vengono interpretate né incluse nelle dimensioni statistiche.",
+      text("udsInterventionStrict"),
+      text("udsSnapshotTerritory"),
+      text("udsFirstContact"),
+      text("udsFreeNotes"),
     ],
   });
 }

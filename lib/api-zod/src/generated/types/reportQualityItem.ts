@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ReportQualityItemAvailability } from './reportQualityItemAvailability';
+import type { ReportText } from './reportText';
 
 export interface ReportQualityItem {
   key: string;
   /** @nullable */
   count: number | null;
   availability: ReportQualityItemAvailability;
-  /** @nullable */
-  note: string | null;
+  note: ReportText | null;
 }

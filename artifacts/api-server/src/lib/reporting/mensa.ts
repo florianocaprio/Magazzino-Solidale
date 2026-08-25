@@ -2,7 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { reportingAgeBandSql } from "./ageBands";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
-import { dashboard, kpi, quality } from "./shared";
+import { dashboard, kpi, quality, text } from "./shared";
 
 function mealConditions(filters: ReportFilters): SQL[] {
   const conditions = [
@@ -178,14 +178,14 @@ export async function buildMensaReport(filters: ReportFilters) {
     ],
     quality: [
       quality("etaMancante", number(dq.eta_mancante), number(dq.eta_mancante) ? "missing" : "ok"),
-      quality("fasciaEtaPresuntaUsata", number(dq.fascia_presunta), number(dq.fascia_presunta) ? "derivable" : "ok", `Fascia valutata alla data finale ${filters.a}.`),
+      quality("fasciaEtaPresuntaUsata", number(dq.fascia_presunta), number(dq.fascia_presunta) ? "derivable" : "ok", text("qualityAgeDate", { date: filters.a })),
       quality("sessoMancante", number(dq.sesso_mancante), number(dq.sesso_mancante) ? "missing" : "ok"),
     ],
     definitions: [
-      "Pasto erogato = record mensa_pasti registrato nella data civile Europe/Rome.",
-      "Persona servita = beneficiario distinto dei pasti; un accesso negato non conta.",
-      `Le fasce d'età delle persone uniche sono calcolate alla data finale ${filters.a}.`,
-      "Media pasti = pasti diviso giornate con almeno un servizio, non giorni di calendario.",
+      text("mensaMeal"),
+      text("mensaServedPerson"),
+      text("mensaAgeDate", { date: filters.a }),
+      text("mensaAverage"),
     ],
   });
 }

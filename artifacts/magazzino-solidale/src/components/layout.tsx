@@ -205,6 +205,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "sociale",
     area: "sociale",
     moduloCodiciAll: ["CENTRO_ASCOLTO", "CONSEGNE"],
+    permission: "consegne.view",
   },
   {
     key: "bolle",
@@ -626,7 +627,7 @@ function LanguageSelector() {
   return (
     <Select value={i18n.language} onValueChange={(v) => i18n.changeLanguage(v)}>
       <SelectTrigger
-        className="h-9 w-full gap-2"
+        className="h-11 w-full gap-2"
         aria-label={t("common.language")}
       >
         <Languages className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -771,7 +772,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               >
                 <SidebarGroup>
                   <SidebarGroupLabel asChild>
-                    <CollapsibleTrigger className="flex w-full items-center justify-between text-xs uppercase tracking-wider text-muted-foreground font-medium px-4 py-2 hover:text-foreground transition-colors">
+                    <CollapsibleTrigger className="flex min-h-11 w-full items-center justify-between px-4 py-2 text-xs font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground">
                       {group === "mensa"
                         ? t("mensa.nav.group")
                         : t(`nav.groups.${group}`)}
@@ -829,7 +830,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex flex-1 flex-col overflow-hidden">
           <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4 md:hidden">
             <SidebarTrigger
-              className="h-9 w-9"
+              className="h-11 w-11"
               aria-label={t("common.openMenu")}
             />
             <img

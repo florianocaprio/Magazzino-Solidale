@@ -1,12 +1,13 @@
 import { createHash, randomInt } from "node:crypto";
 import express, { Router, type IRouter, type Request } from "express";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   auditConfigurazioniTable,
   beneficiariTable,
   centriAscoltoTable,
   db,
   fseFascicoliSocialiTable,
+  fseFascicoliSocialiSnapshotTable,
   fseImportBatchesTable,
   nucleoFamiliareTable,
 } from "@workspace/db";
@@ -20,7 +21,7 @@ import {
 } from "../lib/centroScope";
 import { canAccessBeneficiarioRecord } from "../lib/beneficiarioPolicy";
 import { searchBeneficiariDuplicates } from "../lib/beneficiarioDuplicates";
-import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
+import { isDateOnly } from "../lib/interventiWorkflow";
 import {
   buildFseBeneficiariWorkbook,
   calcolaDemografiaNucleo,
@@ -120,23 +121,45 @@ function parseMultipartWorkbook(req: Request):
         file = Buffer.from(data);
         nomeFile = filename.replace(/[^\p{L}\p{N}._ -]/gu, "_").slice(0, 255);
       } else {
-        if (!["centroAscoltoId", "risoluzioni"].includes(name) || name in fields) throw new Error();
+        if (
+          !["centroAscoltoId", "risoluzioni", "dataRiferimento"].includes(
+            name,
+          ) ||
+          name in fields
+        )
+          throw new Error();
         fields[name] = data.toString("utf8");
       }
       cursor = dataEnd + 2;
     }
   } catch {
-    return { ok: false, status: 400, error: "Payload multipart FSE+ non valido." };
+    return {
+      ok: false,
+      status: 400,
+      error: "Payload multipart FSE+ non valido.",
+    };
   }
   if (!file || !nomeFile.toLowerCase().endsWith(".xlsx")) {
-    return { ok: false, status: 400, error: "È richiesto un unico file .xlsx nel campo file." };
+    return {
+      ok: false,
+      status: 400,
+      error: "È richiesto un unico file .xlsx nel campo file.",
+    };
   }
   return { ok: true, upload: { file, nomeFile, fields } };
 }
 
-function authoritativeWorkbookBody(upload: MultipartWorkbook):
+function authoritativeWorkbookBody(
+  upload: MultipartWorkbook,
+):
   | { ok: true; body: RawBody }
-  | { ok: false; status: 400; error: string; errori?: string[]; warning?: string[] } {
+  | {
+      ok: false;
+      status: 400;
+      error: string;
+      errori?: string[];
+      warning?: string[];
+    } {
   let parsed: ReturnType<typeof parseFseBeneficiariWorkbook>;
   try {
     parsed = parseFseBeneficiariWorkbook(upload.file);
@@ -169,6 +192,7 @@ function authoritativeWorkbookBody(upload: MultipartWorkbook):
       headers: parsed.headers,
       righe: parsed.rawRows,
       risoluzioni,
+      dataRiferimento: upload.fields.dataRiferimento,
     },
   };
 }
@@ -215,20 +239,36 @@ function validatedHeaders(body: RawBody) {
   return validateFseHeaders(Array.isArray(body.headers) ? body.headers : []);
 }
 
-function fileMetadata(body: RawBody): { nomeFile: string; sha256File: string } | null {
+function fileMetadata(
+  body: RawBody,
+): { nomeFile: string; sha256File: string } | null {
   const nomeFile = String(body.nomeFile ?? "").trim();
-  const sha256File = String(body.sha256File ?? "").trim().toLowerCase();
-  if (!nomeFile || nomeFile.length > 255 || !/^[a-f0-9]{64}$/.test(sha256File)) return null;
+  const sha256File = String(body.sha256File ?? "")
+    .trim()
+    .toLowerCase();
+  if (!nomeFile || nomeFile.length > 255 || !/^[a-f0-9]{64}$/.test(sha256File))
+    return null;
   return { nomeFile, sha256File };
 }
 
-function normalizedRowsHash(rows: FseBeneficiariRow[]): string {
-  return createHash("sha256").update(JSON.stringify(rows.map(({ hash }) => hash))).digest("hex");
+function referenceDate(body: RawBody): string | null {
+  const value = String(body.dataRiferimento ?? "");
+  return isDateOnly(value) ? value : null;
 }
 
-function parseResolutions(value: unknown): { map: Map<number, ImportResolution>; error?: string } {
+function normalizedRowsHash(rows: FseBeneficiariRow[]): string {
+  return createHash("sha256")
+    .update(JSON.stringify(rows.map(({ hash }) => hash)))
+    .digest("hex");
+}
+
+function parseResolutions(value: unknown): {
+  map: Map<number, ImportResolution>;
+  error?: string;
+} {
   if (value == null) return { map: new Map() };
-  if (!Array.isArray(value)) return { map: new Map(), error: "Le risoluzioni import non sono valide." };
+  if (!Array.isArray(value))
+    return { map: new Map(), error: "Le risoluzioni import non sono valide." };
   const map = new Map<number, ImportResolution>();
   for (const item of value) {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
@@ -278,6 +318,7 @@ function snapshotValues(row: FseBeneficiariRow, batchId: number) {
     origineStranieraMinoranze: row.origineStranieraMinoranze,
     cittadiniPaesiTerzi: row.cittadiniPaesiTerzi,
     senzaTettoEsclusioneAbitativa: row.senzaTettoEsclusioneAbitativa,
+    personeDisabilita: row.disabili,
     tipologiaAttivitaImportata: row.tipologiaAttivita,
     statoAttualeImportato: row.statoAttuale,
     ultimoImportBatchId: batchId,
@@ -285,6 +326,101 @@ function snapshotValues(row: FseBeneficiariRow, batchId: number) {
     hashUltimaRigaImportata: row.hash,
     dataAggiornamento: new Date(),
   };
+}
+
+type SnapshotOrigin = "import_fse" | "aggiornamento_manuale" | "export_fse";
+
+function canonicalFseSnapshot(input: {
+  beneficiarioId: number;
+  dataRiferimento: string;
+  origineSnapshot: SnapshotOrigin;
+  importBatchId?: number | null;
+  utenteId?: number | null;
+  versioneProfilo: number;
+  codiceFascicolo?: string | null;
+  numeroComponenti?: number | null;
+  donne?: number | null;
+  uomini?: number | null;
+  eta017?: number | null;
+  eta1829?: number | null;
+  eta3064?: number | null;
+  eta65Plus?: number | null;
+  origineStranieraMinoranze?: number | null;
+  personeDisabilita?: number | null;
+  cittadiniPaesiTerzi?: number | null;
+  senzaTettoEsclusioneAbitativa?: number | null;
+  tipologiaAttivita?: string | null;
+  statoAttuale?: string | null;
+  attendibilitaDato?: string | null;
+  riferimentoSorgente?: string | null;
+  metadatiQualita?: Record<string, unknown>;
+}) {
+  const content = {
+    beneficiarioId: input.beneficiarioId,
+    dataRiferimento: input.dataRiferimento,
+    origineSnapshot: input.origineSnapshot,
+    codiceFascicolo: input.codiceFascicolo ?? null,
+    numeroComponenti: input.numeroComponenti ?? null,
+    donne: input.donne ?? null,
+    uomini: input.uomini ?? null,
+    eta017: input.eta017 ?? null,
+    eta1829: input.eta1829 ?? null,
+    eta3064: input.eta3064 ?? null,
+    eta65Plus: input.eta65Plus ?? null,
+    origineStranieraMinoranze: input.origineStranieraMinoranze ?? null,
+    personeDisabilita: input.personeDisabilita ?? null,
+    cittadiniPaesiTerzi: input.cittadiniPaesiTerzi ?? null,
+    senzaTettoEsclusioneAbitativa: input.senzaTettoEsclusioneAbitativa ?? null,
+    tipologiaAttivita: input.tipologiaAttivita ?? null,
+    statoAttuale: input.statoAttuale ?? null,
+    attendibilitaDato: input.attendibilitaDato ?? null,
+  };
+  return {
+    ...content,
+    origineSnapshot: input.origineSnapshot,
+    importBatchId: input.importBatchId ?? null,
+    utenteId: input.utenteId ?? null,
+    versioneProfilo: input.versioneProfilo,
+    hashCanonico: createHash("sha256")
+      .update(JSON.stringify(content))
+      .digest("hex"),
+    metadatiQualita: input.metadatiQualita ?? {},
+    riferimentoSorgente: input.riferimentoSorgente ?? null,
+  };
+}
+
+function snapshotFromImportRow(input: {
+  row: FseBeneficiariRow;
+  beneficiarioId: number;
+  dataRiferimento: string;
+  batchId: number;
+  versioneProfilo: number;
+  utenteId: number | null;
+}) {
+  return canonicalFseSnapshot({
+    beneficiarioId: input.beneficiarioId,
+    dataRiferimento: input.dataRiferimento,
+    origineSnapshot: "import_fse",
+    importBatchId: input.batchId,
+    utenteId: input.utenteId,
+    versioneProfilo: input.versioneProfilo,
+    codiceFascicolo: input.row.codiceFascicolo,
+    numeroComponenti: input.row.numeroComponenti,
+    donne: input.row.donne,
+    uomini: input.row.uomini,
+    eta017: input.row.eta017,
+    eta1829: input.row.eta1829,
+    eta3064: input.row.eta3064,
+    eta65Plus: input.row.eta65Plus,
+    origineStranieraMinoranze: input.row.origineStranieraMinoranze,
+    personeDisabilita: input.row.disabili,
+    cittadiniPaesiTerzi: input.row.cittadiniPaesiTerzi,
+    senzaTettoEsclusioneAbitativa: input.row.senzaTettoEsclusioneAbitativa,
+    tipologiaAttivita: input.row.tipologiaAttivita,
+    statoAttuale: input.row.statoAttuale,
+    attendibilitaDato: "fonte_fse_dichiarata",
+    riferimentoSorgente: `fse-import-batch:${input.batchId}`,
+  });
 }
 
 function snapshotFromProfile(
@@ -344,13 +480,28 @@ router.post(
       return;
     }
     const body = authoritative.body;
+    const dateRaw = referenceDate(body);
+    if (!dateRaw) {
+      res.status(400).json({ error: "Data di riferimento non valida." });
+      return;
+    }
     const scoped = await selectedCentro(body, req);
-    if (!scoped.ok) { res.status(scoped.status).json({ error: scoped.error }); return; }
+    if (!scoped.ok) {
+      res.status(scoped.status).json({ error: scoped.error });
+      return;
+    }
     const righe = rawRows(body);
-    if (!righe) { res.status(400).json({ error: "Il file deve contenere da 1 a 500 righe." }); return; }
+    if (!righe) {
+      res
+        .status(400)
+        .json({ error: "Il file deve contenere da 1 a 500 righe." });
+      return;
+    }
     const headerResult = validatedHeaders(body);
     if (headerResult.errori.length) {
-      res.status(400).json({ error: "Header FSE+ non valido.", ...headerResult });
+      res
+        .status(400)
+        .json({ error: "Header FSE+ non valido.", ...headerResult });
       return;
     }
     const validated = validateFseRows(righe);
@@ -361,32 +512,46 @@ router.post(
         continue;
       }
       const [fascicolo] = await db
-        .select({ profilo: fseFascicoliSocialiTable, beneficiario: beneficiariTable })
+        .select({
+          profilo: fseFascicoliSocialiTable,
+          beneficiario: beneficiariTable,
+        })
         .from(fseFascicoliSocialiTable)
-        .innerJoin(beneficiariTable, eq(beneficiariTable.id, fseFascicoliSocialiTable.beneficiarioId))
-        .where(eq(
-          fseFascicoliSocialiTable.codiceFascicoloNormalizzato,
-          normalizeFseCode(item.row.codiceFascicolo)!,
-        ));
+        .innerJoin(
+          beneficiariTable,
+          eq(beneficiariTable.id, fseFascicoliSocialiTable.beneficiarioId),
+        )
+        .where(
+          eq(
+            fseFascicoliSocialiTable.codiceFascicoloNormalizzato,
+            normalizeFseCode(item.row.codiceFascicolo)!,
+          ),
+        );
       if (fascicolo) {
         const territorial =
           fascicolo.beneficiario.centroAscoltoId === scoped.centro.id &&
-          fascicolo.beneficiario.areaOperativaId === scoped.centro.areaOperativaId;
+          fascicolo.beneficiario.areaOperativaId ===
+            scoped.centro.areaOperativaId;
         const warning = [...item.warning];
         if (!samePersonName(fascicolo.beneficiario, item.row)) {
           warning.push("Nome/cognome differiscono dall'anagrafica collegata.");
         }
         if (
           fascicolo.beneficiario.dataPresaInCarico &&
-          fascicolo.beneficiario.dataPresaInCarico !== item.row.dataPresaInCarico
+          fascicolo.beneficiario.dataPresaInCarico !==
+            item.row.dataPresaInCarico
         ) {
-          warning.push("La data di presa in carico interna è differente e non verrà sovrascritta.");
+          warning.push(
+            "La data di presa in carico interna è differente e non verrà sovrascritta.",
+          );
         }
-        const classificazione = !territorial || !samePersonName(fascicolo.beneficiario, item.row)
-          ? "conflitto"
-          : fascicolo.profilo.hashUltimaRigaImportata === item.row.hash
-            ? "invariato"
-            : "da_aggiornare";
+        const classificazione =
+          !territorial || !samePersonName(fascicolo.beneficiario, item.row)
+            ? "conflitto"
+            : fascicolo.profilo.hashUltimaRigaImportata === item.row.hash &&
+                fascicolo.profilo.dataRiferimento === dateRaw
+              ? "invariato"
+              : "da_aggiornare";
         result.push({
           ...previewItem(item),
           warning,
@@ -431,6 +596,7 @@ router.post(
           centroAscoltoId: scoped.centro.id,
           areaOperativaId: scoped.centro.areaOperativaId,
           numeroRighe: righe.length,
+          dataRiferimento: dateRaw,
           sha256File: metadata.sha256File,
           conteggi,
         },
@@ -446,6 +612,7 @@ router.post(
       righe: result,
       conteggi,
       numeroRighe: righe.length,
+      dataRiferimento: dateRaw,
     });
   },
 );
@@ -467,18 +634,33 @@ router.post(
       return;
     }
     const body = authoritative.body;
+    const dateRaw = referenceDate(body);
+    if (!dateRaw) {
+      res.status(400).json({ error: "Data di riferimento non valida." });
+      return;
+    }
     const scoped = await selectedCentro(body, req);
-    if (!scoped.ok) { res.status(scoped.status).json({ error: scoped.error }); return; }
+    if (!scoped.ok) {
+      res.status(scoped.status).json({ error: scoped.error });
+      return;
+    }
     const righe = rawRows(body);
-    if (!righe) { res.status(400).json({ error: "Righe FSE+ non valide." }); return; }
+    if (!righe) {
+      res.status(400).json({ error: "Righe FSE+ non valide." });
+      return;
+    }
     const headerResult = validatedHeaders(body);
     if (headerResult.errori.length) {
-      res.status(400).json({ error: "Header FSE+ non valido.", ...headerResult });
+      res
+        .status(400)
+        .json({ error: "Header FSE+ non valido.", ...headerResult });
       return;
     }
     const metadata = fileMetadata(body);
     if (!metadata) {
-      res.status(400).json({ error: "Nome file o SHA-256 del workbook non validi." });
+      res
+        .status(400)
+        .json({ error: "Nome file o SHA-256 del workbook non validi." });
       return;
     }
     const parsedResolutions = parseResolutions(body.risoluzioni);
@@ -488,17 +670,23 @@ router.post(
     }
 
     const validations = validateFseRows(righe);
-    const validRows = validations.flatMap((item) => item.row ? [item.row] : []);
+    const validRows = validations.flatMap((item) =>
+      item.row ? [item.row] : [],
+    );
     const contentHash = normalizedRowsHash(validRows);
-    const [batch] = await db.insert(fseImportBatchesTable).values({
-      nomeFile: metadata.nomeFile,
-      sha256File: metadata.sha256File,
-      hashContenutoNormalizzato: contentHash,
-      centroAscoltoId: scoped.centro.id,
-      areaOperativaId: scoped.centro.areaOperativaId,
-      utenteId: req.user?.id ?? null,
-      numeroRighe: righe.length,
-    }).returning();
+    const [batch] = await db
+      .insert(fseImportBatchesTable)
+      .values({
+        nomeFile: metadata.nomeFile,
+        sha256File: metadata.sha256File,
+        hashContenutoNormalizzato: contentHash,
+        centroAscoltoId: scoped.centro.id,
+        areaOperativaId: scoped.centro.areaOperativaId,
+        utenteId: req.user?.id ?? null,
+        numeroRighe: righe.length,
+        dataRiferimento: dateRaw,
+      })
+      .returning();
     await db.insert(auditConfigurazioniTable).values({
       area: "beneficiari",
       chiave: `fse-import:${batch.id}`,
@@ -510,6 +698,7 @@ router.post(
         numeroRighe: righe.length,
         sha256File: metadata.sha256File,
         hashContenutoNormalizzato: contentHash,
+        dataRiferimento: dateRaw,
       },
       utenteId: req.user?.id ?? null,
       ip: req.ip ?? req.socket.remoteAddress ?? null,
@@ -569,34 +758,87 @@ router.post(
             }
             // Il canale interno è considerato non autorevole solo per una
             // anagrafica provvisoria che non possiede una motivazione manuale.
-            if (target.statoAnagrafica === "provvisoria" && !target.motivoConsegnaDomicilio) {
-              changes.consegnaDomicilio = mapFseActivityToDelivery(row.tipologiaAttivita)!;
+            if (
+              target.statoAnagrafica === "provvisoria" &&
+              !target.motivoConsegnaDomicilio
+            ) {
+              changes.consegnaDomicilio = mapFseActivityToDelivery(
+                row.tipologiaAttivita,
+              )!;
             }
-            await tx.update(beneficiariTable).set(changes)
+            await tx
+              .update(beneficiariTable)
+              .set(changes)
               .where(eq(beneficiariTable.id, target.id));
-            return Object.keys(changes).filter((key) => key !== "dataAggiornamento");
+            return Object.keys(changes).filter(
+              (key) => key !== "dataAggiornamento",
+            );
           };
 
+          const normalizedCode = normalizeFseCode(row.codiceFascicolo)!;
+          // Serializza sia il primo inserimento sia gli aggiornamenti successivi
+          // dello stesso codice. La rilettura avviene soltanto dopo il lock.
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-profile:${normalizedCode}`}, 0))`,
+          );
           const [existing] = await tx
-            .select({ profilo: fseFascicoliSocialiTable, beneficiario: beneficiariTable })
+            .select({
+              profilo: fseFascicoliSocialiTable,
+              beneficiario: beneficiariTable,
+            })
             .from(fseFascicoliSocialiTable)
-            .innerJoin(beneficiariTable, eq(beneficiariTable.id, fseFascicoliSocialiTable.beneficiarioId))
-            .where(eq(
-              fseFascicoliSocialiTable.codiceFascicoloNormalizzato,
-              normalizeFseCode(row.codiceFascicolo)!,
-            ));
+            .innerJoin(
+              beneficiariTable,
+              eq(beneficiariTable.id, fseFascicoliSocialiTable.beneficiarioId),
+            )
+            .where(
+              eq(
+                fseFascicoliSocialiTable.codiceFascicoloNormalizzato,
+                normalizedCode,
+              ),
+            )
+            .for("update");
           if (existing) {
             if (
               existing.beneficiario.centroAscoltoId !== scoped.centro.id ||
-              existing.beneficiario.areaOperativaId !== scoped.centro.areaOperativaId ||
+              existing.beneficiario.areaOperativaId !==
+                scoped.centro.areaOperativaId ||
               !samePersonName(existing.beneficiario, row)
-            ) return "conflitto" as const;
-            if (existing.profilo.hashUltimaRigaImportata === row.hash) return "invariato" as const;
+            )
+              return "conflitto" as const;
+            if (
+              existing.profilo.hashUltimaRigaImportata === row.hash &&
+              existing.profilo.dataRiferimento === dateRaw
+            )
+              return "invariato" as const;
 
-            await tx.update(fseFascicoliSocialiTable)
-              .set(snapshotValues(row, batch.id))
+            const versioneProfilo = existing.profilo.versione + 1;
+            await tx
+              .update(fseFascicoliSocialiTable)
+              .set({
+                ...snapshotValues(row, batch.id),
+                dataRiferimento: dateRaw,
+                origineDato: "import_fse",
+                attendibilitaDato: "fonte_fse_dichiarata",
+                versione: versioneProfilo,
+              })
               .where(eq(fseFascicoliSocialiTable.id, existing.profilo.id));
-            const campiModificati = await mergeConservativo(existing.beneficiario);
+            await tx
+              .insert(fseFascicoliSocialiSnapshotTable)
+              .values(
+                snapshotFromImportRow({
+                  row,
+                  beneficiarioId: existing.beneficiario.id,
+                  dataRiferimento: dateRaw,
+                  batchId: batch.id,
+                  versioneProfilo,
+                  utenteId: req.user?.id ?? null,
+                }),
+              )
+              .onConflictDoNothing();
+            const campiModificati = await mergeConservativo(
+              existing.beneficiario,
+            );
             await tx.insert(auditConfigurazioniTable).values({
               area: "beneficiari",
               chiave: `beneficiario:${existing.beneficiario.id}:fse`,
@@ -717,7 +959,24 @@ router.post(
           await tx.insert(fseFascicoliSocialiTable).values({
             beneficiarioId,
             ...snapshotValues(row, batch.id),
+            dataRiferimento: dateRaw,
+            origineDato: "import_fse",
+            attendibilitaDato: "fonte_fse_dichiarata",
+            versione: 1,
           });
+          await tx
+            .insert(fseFascicoliSocialiSnapshotTable)
+            .values(
+              snapshotFromImportRow({
+                row,
+                beneficiarioId,
+                dataRiferimento: dateRaw,
+                batchId: batch.id,
+                versioneProfilo: 1,
+                utenteId: req.user?.id ?? null,
+              }),
+            )
+            .onConflictDoNothing();
           return outcome;
         });
 
@@ -764,12 +1023,19 @@ router.post(
         numeroRighe: righe.length,
         sha256File: metadata.sha256File,
         hashContenutoNormalizzato: contentHash,
+        dataRiferimento: dateRaw,
         ...totals,
       },
       utenteId: req.user?.id ?? null,
       ip: req.ip ?? req.socket.remoteAddress ?? null,
     });
-    res.json({ batchId: batch.id, stato, ...totals, dettagli });
+    res.json({
+      batchId: batch.id,
+      stato,
+      dataRiferimento: dateRaw,
+      ...totals,
+      dettagli,
+    });
   },
 );
 
@@ -822,52 +1088,81 @@ async function exportCandidates(body: RawBody, req: Request) {
       reference,
       snapshot,
     );
-    const errori = [...demografia.problemi.filter(
-      (problem) => !snapshot || demografia.origine === "anagrafica_calcolata" || problem.startsWith("SNAPSHOT_"),
-    )];
+    const errori = [
+      ...demografia.problemi.filter(
+        (problem) =>
+          !snapshot ||
+          demografia.origine === "anagrafica_calcolata" ||
+          problem.startsWith("SNAPSHOT_"),
+      ),
+    ];
     const warning: string[] = [];
     if (demografia.origine === "snapshot_fse") {
       warning.push("DEMOGRAFIA_DA_SNAPSHOT_FSE");
-      if (!profile?.ultimoImportAt || dataCivileEuropeRome(profile.ultimoImportAt) !== dateRaw) {
+      if (profile?.dataRiferimento !== dateRaw) {
         errori.push("SNAPSHOT_DATA_RIFERIMENTO_NON_COMPATIBILE");
       }
     }
     if (!beneficiary.nome.trim()) errori.push("NOME_MANCANTE");
     if (!beneficiary.cognome.trim()) errori.push("COGNOME_MANCANTE");
-    if (!beneficiary.dataPresaInCarico) errori.push("DATA_PRESA_IN_CARICO_MANCANTE");
-    if (!mapActiveToFseState(beneficiary.attivo)) errori.push("STATO_NON_MAPPABILE");
+    if (!beneficiary.dataPresaInCarico)
+      errori.push("DATA_PRESA_IN_CARICO_MANCANTE");
+    if (!mapActiveToFseState(beneficiary.attivo))
+      errori.push("STATO_NON_MAPPABILE");
     if (
       profile?.tipologiaAttivitaImportata &&
       mapFseActivityToDelivery(profile.tipologiaAttivitaImportata) == null
-    ) errori.push("ATTIVITA_NON_MAPPABILE");
-    if (profile?.statoAttualeImportato && profile.statoAttualeImportato !== "Attivo") {
+    )
+      errori.push("ATTIVITA_NON_MAPPABILE");
+    if (
+      profile?.statoAttualeImportato &&
+      profile.statoAttualeImportato !== "Attivo"
+    ) {
       errori.push("STATO_ESTERNO_NON_MAPPABILE");
     }
-    if (demografia.numeroComponenti <= 0) errori.push("NUMERO_COMPONENTI_NON_VALIDO");
+    if (demografia.numeroComponenti <= 0)
+      errori.push("NUMERO_COMPONENTI_NON_VALIDO");
     if (demografia.donne + demografia.uomini !== demografia.numeroComponenti) {
       errori.push("SESSO_NON_ALLINEATO");
     }
     if (
       demografia.eta017 +
-      demografia.eta1829 +
-      demografia.eta3064 +
-      demografia.eta65Plus !== demografia.numeroComponenti
-    ) errori.push("FASCE_NON_ALLINEATE");
-    if (beneficiary.numDisabili < 0 || beneficiary.numDisabili > demografia.numeroComponenti) {
+        demografia.eta1829 +
+        demografia.eta3064 +
+        demografia.eta65Plus !==
+      demografia.numeroComponenti
+    )
+      errori.push("FASCE_NON_ALLINEATE");
+    if (
+      beneficiary.numDisabili < 0 ||
+      beneficiary.numDisabili > demografia.numeroComponenti
+    ) {
       errori.push("DISABILI_NON_VALIDI");
     }
     for (const [value, missingCode] of [
-      [profile?.origineStranieraMinoranze, "ORIGINE_STRANIERA_MINORANZE_NON_VALORIZZATA"],
+      [
+        profile?.origineStranieraMinoranze,
+        "ORIGINE_STRANIERA_MINORANZE_NON_VALORIZZATA",
+      ],
       [profile?.cittadiniPaesiTerzi, "CITTADINI_PAESI_TERZI_NON_VALORIZZATO"],
-      [profile?.senzaTettoEsclusioneAbitativa, "ESCLUSIONE_ABITATIVA_NON_VALORIZZATA"],
+      [
+        profile?.senzaTettoEsclusioneAbitativa,
+        "ESCLUSIONE_ABITATIVA_NON_VALORIZZATA",
+      ],
     ] as const) {
       if (value == null) errori.push(missingCode);
-      else if (value < 0 || value > demografia.numeroComponenti) errori.push("CONTEGGIO_FSE_NON_VALIDO");
+      else if (value < 0 || value > demografia.numeroComponenti)
+        errori.push("CONTEGGIO_FSE_NON_VALIDO");
     }
     const code = profile?.codiceFascicolo ?? beneficiary.codice;
     if (!normalizeFseCode(code)) errori.push("CODICE_FASCICOLO_MANCANTE");
-    if (codeOwners.some((owner) =>
-      owner.codice === normalizeFseCode(code) && owner.beneficiarioId !== beneficiary.id)) {
+    if (
+      codeOwners.some(
+        (owner) =>
+          owner.codice === normalizeFseCode(code) &&
+          owner.beneficiarioId !== beneficiary.id,
+      )
+    ) {
       errori.push("CODICE_FASCICOLO_GIA_ASSOCIATO");
     }
     return {
@@ -959,22 +1254,63 @@ router.post(
     await db.transaction(async (tx) => {
       const exportedAt = new Date();
       for (const item of result.rows) {
-        await tx.insert(fseFascicoliSocialiTable).values({
-          beneficiarioId: item.beneficiario.id,
-          codiceFascicolo: item.code,
-          codiceFascicoloNormalizzato: normalizeFseCode(item.code),
-          origineFascicolo: item.profilo?.origineFascicolo ?? "interno",
-          ultimoExportAt: exportedAt,
-          dataAggiornamento: exportedAt,
-        }).onConflictDoUpdate({
-          target: fseFascicoliSocialiTable.beneficiarioId,
-          set: {
+        const [currentProfile] = await tx
+          .insert(fseFascicoliSocialiTable)
+          .values({
+            beneficiarioId: item.beneficiario.id,
             codiceFascicolo: item.code,
             codiceFascicoloNormalizzato: normalizeFseCode(item.code),
+            origineFascicolo: item.profilo?.origineFascicolo ?? "interno",
             ultimoExportAt: exportedAt,
             dataAggiornamento: exportedAt,
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: fseFascicoliSocialiTable.beneficiarioId,
+            set: {
+              codiceFascicolo: item.code,
+              codiceFascicoloNormalizzato: normalizeFseCode(item.code),
+              ultimoExportAt: exportedAt,
+              dataAggiornamento: exportedAt,
+            },
+          })
+          .returning();
+        const demographics = item.demografia;
+        await tx
+          .insert(fseFascicoliSocialiSnapshotTable)
+          .values(
+            canonicalFseSnapshot({
+              beneficiarioId: item.beneficiario.id,
+              dataRiferimento: result.dateRaw,
+              origineSnapshot: "export_fse",
+              utenteId: req.user?.id ?? null,
+              versioneProfilo: currentProfile.versione,
+              codiceFascicolo: item.code,
+              numeroComponenti: demographics.numeroComponenti,
+              donne: demographics.donne,
+              uomini: demographics.uomini,
+              eta017: demographics.eta017,
+              eta1829: demographics.eta1829,
+              eta3064: demographics.eta3064,
+              eta65Plus: demographics.eta65Plus,
+              origineStranieraMinoranze:
+                item.profilo?.origineStranieraMinoranze,
+              personeDisabilita: item.beneficiario.numDisabili,
+              cittadiniPaesiTerzi: item.profilo?.cittadiniPaesiTerzi,
+              senzaTettoEsclusioneAbitativa:
+                item.profilo?.senzaTettoEsclusioneAbitativa,
+              tipologiaAttivita: mapDeliveryToFseActivity(
+                item.beneficiario.consegnaDomicilio,
+              ),
+              statoAttuale: mapActiveToFseState(item.beneficiario.attivo),
+              attendibilitaDato:
+                demographics.origine === "snapshot_fse"
+                  ? "fonte_fse_dichiarata"
+                  : "anagrafica_derivata",
+              riferimentoSorgente: `fse-export:${workbookHash}`,
+              metadatiQualita: { problemi: demographics.problemi },
+            }),
+          )
+          .onConflictDoNothing();
       }
       await tx.insert(auditConfigurazioniTable).values({
         area: "beneficiari",
@@ -1057,26 +1393,62 @@ router.patch(
       "origineStranieraMinoranze",
       "cittadiniPaesiTerzi",
       "senzaTettoEsclusioneAbitativa",
+      "dataRiferimento",
+      "versione",
     ]);
     if (
       !body ||
       typeof body !== "object" ||
       Array.isArray(body) ||
-      !Object.keys(body).length ||
+      !Object.keys(body).some(
+        (key) => !["dataRiferimento", "versione"].includes(key),
+      ) ||
       Object.keys(body).some((key) => !allowed.has(key))
     ) {
-      res.status(400).json({ error: "Nessun campo FSE+ valido da aggiornare." });
+      res
+        .status(400)
+        .json({ error: "Nessun campo FSE+ valido da aggiornare." });
       return;
     }
-    const [existingProfile] = await db.select().from(fseFascicoliSocialiTable)
+    const [existingProfile] = await db
+      .select()
+      .from(fseFascicoliSocialiTable)
       .where(eq(fseFascicoliSocialiTable.beneficiarioId, id));
-    const code = body.codiceFascicolo == null ? undefined : String(body.codiceFascicolo).trim();
+    const dateRaw = String(body.dataRiferimento ?? "");
+    const expectedVersion = Number(body.versione);
+    if (!isDateOnly(dateRaw)) {
+      res.status(400).json({ error: "Data di riferimento non valida." });
+      return;
+    }
+    if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) {
+      res.status(400).json({ error: "Versione del fascicolo non valida." });
+      return;
+    }
+    if ((existingProfile?.versione ?? 0) !== expectedVersion) {
+      res
+        .status(409)
+        .json({
+          error: "Il fascicolo è stato aggiornato da un altro operatore.",
+        });
+      return;
+    }
+    const code =
+      body.codiceFascicolo == null
+        ? undefined
+        : String(body.codiceFascicolo).trim();
     const numeric = [
       "origineStranieraMinoranze",
       "cittadiniPaesiTerzi",
       "senzaTettoEsclusioneAbitativa",
     ] as const;
-    const changes: Record<string, unknown> = { dataAggiornamento: new Date() };
+    const nextVersion = expectedVersion + 1;
+    const changes: Record<string, unknown> = {
+      dataAggiornamento: new Date(),
+      dataRiferimento: dateRaw,
+      origineDato: "aggiornamento_manuale",
+      attendibilitaDato: "operatore_verificato",
+      versione: nextVersion,
+    };
     if (code !== undefined) {
       if (!code || code.length > 255) {
         res.status(400).json({ error: "Codice fascicolo non valido." });
@@ -1099,31 +1471,95 @@ router.patch(
       changes[key] = value;
     }
     try {
-      const [updated] = await db.transaction(async (tx) => {
-        const result = await tx.insert(fseFascicoliSocialiTable).values({
-          beneficiarioId: id,
-          codiceFascicolo: code ?? null,
-          codiceFascicoloNormalizzato: code ? normalizeFseCode(code) : null,
-          ...changes,
-        }).onConflictDoUpdate({
-          target: fseFascicoliSocialiTable.beneficiarioId,
-          set: changes,
-        }).returning();
+      const updated = await db.transaction(async (tx) => {
+        const [result] = existingProfile
+          ? await tx
+              .update(fseFascicoliSocialiTable)
+              .set(changes)
+              .where(
+                and(
+                  eq(fseFascicoliSocialiTable.id, existingProfile.id),
+                  eq(fseFascicoliSocialiTable.versione, expectedVersion),
+                ),
+              )
+              .returning()
+          : await tx
+              .insert(fseFascicoliSocialiTable)
+              .values({
+                beneficiarioId: id,
+                codiceFascicolo: code ?? null,
+                codiceFascicoloNormalizzato: code
+                  ? normalizeFseCode(code)
+                  : null,
+                ...changes,
+              })
+              .returning();
+        if (!result) return null;
+        await tx
+          .insert(fseFascicoliSocialiSnapshotTable)
+          .values(
+            canonicalFseSnapshot({
+              beneficiarioId: id,
+              dataRiferimento: dateRaw,
+              origineSnapshot: "aggiornamento_manuale",
+              utenteId: req.user?.id ?? null,
+              versioneProfilo: nextVersion,
+              codiceFascicolo: result.codiceFascicolo,
+              numeroComponenti: result.numeroComponentiImportato,
+              donne: result.donneImportate,
+              uomini: result.uominiImportati,
+              eta017: result.eta017Importata,
+              eta1829: result.eta1829Importata,
+              eta3064: result.eta3064Importata,
+              eta65Plus: result.eta65PlusImportata,
+              origineStranieraMinoranze: result.origineStranieraMinoranze,
+              personeDisabilita:
+                result.personeDisabilita ?? beneficiario.numDisabili,
+              cittadiniPaesiTerzi: result.cittadiniPaesiTerzi,
+              senzaTettoEsclusioneAbitativa:
+                result.senzaTettoEsclusioneAbitativa,
+              tipologiaAttivita: result.tipologiaAttivitaImportata,
+              statoAttuale: result.statoAttualeImportato,
+              attendibilitaDato: "operatore_verificato",
+              riferimentoSorgente: `beneficiario:${id}:fse`,
+            }),
+          )
+          .onConflictDoNothing();
         await tx.insert(auditConfigurazioniTable).values({
           area: "beneficiari",
           chiave: `beneficiario:${id}:fse`,
-          azione: code !== undefined && code !== existingProfile?.codiceFascicolo
-            ? "modifica-codice-fascicolo-fse"
-            : "modifica-fascicolo-fse",
+          azione:
+            code !== undefined && code !== existingProfile?.codiceFascicolo
+              ? "modifica-codice-fascicolo-fse"
+              : "modifica-fascicolo-fse",
           valoreNuovo: {
             beneficiarioId: id,
-            campiModificati: Object.keys(changes).filter((key) => key !== "dataAggiornamento"),
+            dataRiferimento: dateRaw,
+            versionePrecedente: expectedVersion,
+            versioneNuova: nextVersion,
+            campiModificati: Object.keys(changes).filter(
+              (key) => !["dataAggiornamento", "versione"].includes(key),
+            ),
           },
+          valorePrecedente: existingProfile
+            ? {
+                versione: existingProfile.versione,
+                dataRiferimento: existingProfile.dataRiferimento,
+              }
+            : null,
           utenteId: req.user?.id ?? null,
           ip: req.ip ?? req.socket.remoteAddress ?? null,
         });
         return result;
       });
+      if (!updated) {
+        res
+          .status(409)
+          .json({
+            error: "Il fascicolo è stato aggiornato da un altro operatore.",
+          });
+        return;
+      }
       res.json(updated);
     } catch (error) {
       if ((error as { code?: string }).code === "23505") {

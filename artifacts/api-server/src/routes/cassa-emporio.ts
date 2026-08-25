@@ -65,6 +65,11 @@ import {
 } from "../lib/interventiViste";
 import { auditEmporioTx } from "../lib/emporioAudit";
 import { quantitaCompatibileConUnitaMisuraEmporio } from "../lib/emporioQuantita";
+import { beneficiarioAccessScopeFromRequest } from "../lib/beneficiarioPolicy";
+import {
+  BeneficiaryReportingScopeError,
+  lockAndAuthorizeBeneficiaryReportingContextTx,
+} from "../lib/reporting/eventSnapshots";
 import {
   InventoryDecimal,
   InventoryDecimalError,
@@ -169,6 +174,10 @@ function handleCassaError(
     error instanceof SpesaEmporioError
   ) {
     res.status(error.status).json({ error: error.message });
+    return true;
+  }
+  if (error instanceof BeneficiaryReportingScopeError) {
+    res.status(403).json({ error: error.message });
     return true;
   }
   return false;
@@ -1193,6 +1202,12 @@ router.post(
         ) {
           throw new CassaEmporioError(400, MSG_ACCESSO_NON_VALIDO);
         }
+        const lockedBeneficiaryContext =
+          await lockAndAuthorizeBeneficiaryReportingContextTx(
+            tx,
+            lockedAccess.beneficiarioId,
+            beneficiarioAccessScopeFromRequest(req),
+          );
         const [lockedWarehouse] = await tx
           .select()
           .from(magazziniTable)
@@ -1201,6 +1216,15 @@ router.post(
           throw new CassaEmporioError(
             400,
             "L'Emporio selezionato non è attivo.",
+          );
+        }
+        if (
+          lockedWarehouse.areaOperativaId !==
+          lockedBeneficiaryContext.areaOperativaId
+        ) {
+          throw new CassaEmporioError(
+            400,
+            "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario.",
           );
         }
         const [duplicate] = await tx
@@ -1222,8 +1246,8 @@ router.post(
             accessoEmporioId,
             beneficiarioId: lockedAccess.beneficiarioId,
             magazzinoEmporioId: lockedAccess.magazzinoEmporioId,
-            centroAscoltoId: beneficiario!.centroAscoltoId,
-            areaOperativaId: beneficiario!.areaOperativaId,
+            centroAscoltoId: lockedBeneficiaryContext.centroAscoltoId,
+            areaOperativaId: lockedBeneficiaryContext.areaOperativaId,
             saldoCreditoIniziale: asMoney(saldoCreditoIniziale),
             totaleCreditoPrevisto: "0.00",
             creditoResiduoPrevisto: asMoney(saldoCreditoIniziale),
@@ -1358,6 +1382,21 @@ router.post(
         await tx.execute(
           sql`SELECT pg_advisory_xact_lock(hashtext('sessione-forzata-emporio'), hashtext(${`${beneficiarioId}:${magazzinoEmporioId}`}))`,
         );
+        const lockedBeneficiaryContext =
+          await lockAndAuthorizeBeneficiaryReportingContextTx(
+            tx,
+            beneficiarioId,
+            beneficiarioAccessScopeFromRequest(req),
+          );
+        if (
+          magazzino.magazzino.areaOperativaId !==
+          lockedBeneficiaryContext.areaOperativaId
+        ) {
+          throw new CassaEmporioError(
+            400,
+            "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario.",
+          );
+        }
         const [duplicateSession] = await tx
           .select()
           .from(sessioniCassaEmporioTable)
@@ -1411,8 +1450,8 @@ router.post(
             accessoEmporioId: accesso.id,
             beneficiarioId,
             magazzinoEmporioId,
-            centroAscoltoId: beneficiario!.centroAscoltoId,
-            areaOperativaId: beneficiario!.areaOperativaId,
+            centroAscoltoId: lockedBeneficiaryContext.centroAscoltoId,
+            areaOperativaId: lockedBeneficiaryContext.areaOperativaId,
             saldoCreditoIniziale: asMoney(saldoCreditoIniziale),
             totaleCreditoPrevisto: "0.00",
             creditoResiduoPrevisto: asMoney(saldoCreditoIniziale),
@@ -1946,6 +1985,7 @@ router.post(
         operatoreId: operatorId(req),
         note: asText(req.body?.note),
         ip: req.ip,
+        beneficiaryAccessScope: beneficiarioAccessScopeFromRequest(req),
       });
       const spesa = await getSpesaEmporio(spesaId);
       const updatedSessione = await loadSessione(sessione.id);
