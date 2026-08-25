@@ -69,6 +69,7 @@ import { format, differenceInDays } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
+import { todayEuropeRome } from "@/lib/europe-rome";
 import { AgeaImportWizard } from "@/components/agea-import-wizard";
 
 type DraftRiga = {
@@ -134,7 +135,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
     "RACCOLTA_ALIMENTARE",
   );
   const [dataCarico, setDataCarico] = useState(
-    new Date().toISOString().slice(0, 10),
+    todayEuropeRome(),
   );
   const [numeroDocumento, setNumeroDocumento] = useState("");
   const [dataDocumento, setDataDocumento] = useState("");

@@ -1,7 +1,8 @@
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { ReportDrilldown, ReportingDashboard } from "@workspace/api-client-react";
+import type { ReportDrilldown, ReportingDashboard, ReportText } from "@workspace/api-client-react";
+import { todayEuropeRome } from "@/lib/europe-rome";
 
 export type ExportColumn<T> = {
   header: string;
@@ -24,7 +25,7 @@ function worksheetFromRows(rows: unknown[][]): XLSX.WorkSheet {
 }
 
 function timestamp(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayEuropeRome();
 }
 
 export type PdfExportBranding = {
@@ -389,7 +390,7 @@ export type ReportingExportLabels = {
   column: (key: string) => string;
   unit: (key: string) => string;
   availability: (key: string) => string;
-  text: (value: string) => string;
+  text: (value: string | ReportText) => string;
   unavailable: string;
   locale: string;
   metadata: {

@@ -25,7 +25,7 @@ import { ReportExportActions } from "@/components/reporting/report-export-action
 import { ReportDrilldown } from "@/components/reporting/report-drilldown";
 import { ReportEmptyState } from "@/components/reporting/report-empty-state";
 import { useAuth } from "@/lib/auth";
-import { todayEuropeRome } from "@/lib/europe-rome";
+import { isCivilDate, todayEuropeRome } from "@/lib/europe-rome";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { localizeReportingText } from "@/lib/reporting-text";
@@ -67,11 +67,7 @@ export function reportingFiltersFromSearch(
   const params = new URLSearchParams(search);
   const validDate = (value: string | null, fallback: string) => {
     if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return fallback;
-    const parsed = new Date(`${value}T12:00:00Z`);
-    return !Number.isNaN(parsed.getTime()) &&
-      parsed.toISOString().slice(0, 10) === value
-      ? value
-      : fallback;
+    return isCivilDate(value) ? value : fallback;
   };
   const defaultFrom = `${today.slice(0, 4)}-01-01`;
   const requestedFrom = validDate(params.get("da"), defaultFrom);
@@ -246,7 +242,9 @@ function QueryContent({
           <h2 className="font-semibold">{t("reporting.definitions.title")}</h2>
           <ul className="mt-2 list-disc space-y-1 ps-5 text-sm text-muted-foreground">
             {report.definitions.map((definition) => (
-              <li key={definition}>{localizeReportingText(t, definition)}</li>
+              <li key={`${definition.code}:${JSON.stringify(definition.params ?? {})}`}>
+                {localizeReportingText(t, definition)}
+              </li>
             ))}
           </ul>
         </section>

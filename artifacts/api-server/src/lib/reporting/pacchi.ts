@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
-import { dashboard, kpi, quality } from "./shared";
+import { dashboard, kpi, quality, text } from "./shared";
 import {
   effectiveBollaRigaId,
   fseDistributionNatureCondition,
@@ -202,27 +202,27 @@ export async function buildPacchiReport(filters: ReportFilters) {
         "territorioStoricoDerivato",
         number(dq.territorio_legacy),
         number(dq.territorio_legacy) ? "derivable" : "ok",
-        "Territorio storico derivato dall'anagrafica corrente per Bolle legacy prive di snapshot.",
+        text("qualityParcelLegacyTerritory"),
       ),
       quality(
         "nucleoStoricoDerivato",
         number(dq.nucleo_storico_legacy),
         number(dq.nucleo_storico_legacy) ? "derivable" : "ok",
-        "Numero del nucleo derivato dall'anagrafica corrente per Bolle legacy prive di snapshot.",
+        text("qualityParcelLegacyHousehold"),
       ),
       quality(
         "eventoSenzaLineage",
         number(dq.evento_senza_lineage),
         number(dq.evento_senza_lineage) ? "missing" : "ok",
-        "Bolle distinte prive di Movimenti collegati al ledger canonico.",
+        text("qualityParcelMissingLineage"),
       ),
     ],
     definitions: [
-      "Pacco distribuito = bolla nello stato consegnato nel periodo non associata a una spesa Emporio chiusa.",
-      "Nucleo servito = beneficiario distinto associato a una bolla consegnata.",
-      "Persone raggiunte = snapshot del numero componenti del nucleo; il fallback legacy è segnalato come derivato.",
-      "La quantità FSE+ deriva esclusivamente dai Movimenti e dal loro snapshot Fondo FSE_PLUS, al netto degli storni.",
-      "Le quantità sono mostrate per prodotto e unità; soltanto i kg vengono aggregati nel KPI dedicato.",
+      text("parcelDelivered"),
+      text("parcelHousehold"),
+      text("parcelPeopleSnapshot"),
+      text("parcelFseLedger"),
+      text("parcelUnits"),
     ],
   });
 }

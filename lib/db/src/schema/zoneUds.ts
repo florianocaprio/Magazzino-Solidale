@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, serial, varchar, text, boolean, timestamp, integer, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, boolean, timestamp, integer, unique, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { areeOperativeTable } from "./areeOperative";
@@ -16,7 +16,10 @@ export const zoneUdsTable = pgTable("zone_uds", {
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
   dataAggiornamento: timestamp("data_aggiornamento").notNull().defaultNow(),
 }, (table) => [
-  uniqueIndex("zone_uds_id_area_unique").on(table.id, table.areaOperativaId),
+  // Deve essere un vincolo inline, non un indice creato dopo le tabelle: le FK
+  // composte verso (id, area_operativa_id) vengono emesse da drizzle-kit
+  // durante CREATE TABLE e PostgreSQL richiede già una chiave univoca.
+  unique("zone_uds_id_area_unique").on(table.id, table.areaOperativaId),
   uniqueIndex("zone_uds_area_nome_attiva_unique")
     .on(table.areaOperativaId, sql`lower(trim(${table.nome}))`)
     .where(sql`${table.attivo} = true`),

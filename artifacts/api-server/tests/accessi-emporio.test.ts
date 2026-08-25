@@ -749,10 +749,10 @@ describe("Accessi Emporio", () => {
 
     const list = await request(makeApp()).get("/consegne");
     expect(list.status).toBe(200);
-    expect(list.body.map((r: { id: number }) => r.id)).toContain(
+    expect(list.body.items.map((r: { id: number }) => r.id)).toContain(
       consegna.body.id,
     );
-    expect(list.body.map((r: { id: number }) => r.id)).not.toContain(
+    expect(list.body.items.map((r: { id: number }) => r.id)).not.toContain(
       accesso.body.id,
     );
   });
@@ -776,7 +776,7 @@ describe("Accessi Emporio", () => {
 
     expect(row.tipoPianificazione).toBe("consegna_pacco");
     const list = await request(makeApp()).get("/consegne");
-    expect(list.body.map((r: { id: number }) => r.id)).toContain(row.id);
+    expect(list.body.items.map((r: { id: number }) => r.id)).toContain(row.id);
   });
 
   it("modifica un Accesso Emporio pianificato", async () => {

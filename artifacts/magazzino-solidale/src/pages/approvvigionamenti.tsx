@@ -36,6 +36,7 @@ import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { fornitoriAttiviPerArea } from "@/lib/approvvigionamenti-area";
 import { loadAllPages } from "@/lib/paged-export";
+import { todayEuropeRome } from "@/lib/europe-rome";
 
 const formSchema = z.object({
   areaOperativaId: z.coerce.number().positive(),
@@ -115,7 +116,7 @@ export default function Approvvigionamenti() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      dataRichiesta: new Date().toISOString().substring(0, 10),
+      dataRichiesta: todayEuropeRome(),
       note: "",
     },
   });
@@ -158,7 +159,7 @@ export default function Approvvigionamenti() {
 
   const openCreate = () => {
     setEditingId(null);
-    form.reset({ areaOperativaId: user?.areaOperativaId ?? undefined, dataRichiesta: new Date().toISOString().substring(0, 10), note: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : undefined });
+    form.reset({ areaOperativaId: user?.areaOperativaId ?? undefined, dataRichiesta: todayEuropeRome(), note: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : undefined });
     setRigheDraft([]);
     setDraftProdottoId("");
     setDraftQuantita("1");
@@ -172,7 +173,7 @@ export default function Approvvigionamenti() {
       areaOperativaId: a.areaOperativaId ?? undefined,
       magazzinoId: a.magazzinoId ?? undefined,
       centroAscoltoId: a.centroAscoltoId ?? undefined,
-      dataRichiesta: a.dataRichiesta ? a.dataRichiesta.substring(0, 10) : new Date().toISOString().substring(0, 10),
+      dataRichiesta: a.dataRichiesta ? a.dataRichiesta.substring(0, 10) : todayEuropeRome(),
       dataPrevista: a.dataPrevista ? a.dataPrevista.substring(0, 10) : undefined,
       note: a.note ?? "",
     });

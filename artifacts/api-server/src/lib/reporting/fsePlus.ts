@@ -2,7 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { isModuloAttivo } from "../featureFlags";
 import type { ReportFilters } from "./types";
 import { andSql, number, reportScope, rows } from "./sql";
-import { dashboard, kpi, quality } from "./shared";
+import { dashboard, kpi, quality, text } from "./shared";
 import { signedMovementSql } from "../fseAccounting";
 import {
   fseCanonicalPeriodCondition,
@@ -948,67 +948,71 @@ export async function buildFsePlusReport(filters: ReportFilters) {
         "snapshotFseMancante",
         number(dq.snapshot_mancante),
         number(dq.snapshot_mancante) ? "missing" : "ok",
-        "Nuclei raggiunti senza snapshot FSE compatibile con la data finale del report.",
+        text("qualityFseSnapshotMissing"),
       ),
       quality(
         "snapshotFseIncompleto",
         number(dq.snapshot_incompleto),
         number(dq.snapshot_incompleto) ? "missing" : "ok",
-        "Snapshot compatibili ma privi di una o più dimensioni demografiche strutturate.",
+        text("qualityFseSnapshotIncomplete"),
       ),
       quality(
         "snapshotFseDerivato",
         number(dq.snapshot_derivato),
         number(dq.snapshot_derivato) ? "derivable" : "ok",
-        "Snapshot di export costruiti da anagrafica interna e marcati come derivati.",
+        text("qualityFseSnapshotDerived"),
       ),
       quality(
         "statisticheEventoStornoParziale",
         number(ac.eventi_storno_parziale),
         number(ac.eventi_storno_parziale) ? "derivable" : "ok",
-        "Le quantità sono nette; pacchi, pasti e persone dell'evento non sono ripartibili in modo proporzionale dopo uno storno parziale.",
+        text("qualityFsePartialReversal"),
       ),
       quality(
         "territorioEventoLegacyMancante",
         number(ac.eventi_territorio_legacy),
         number(ac.eventi_territorio_legacy) ? "missing" : "ok",
-        "Eventi visibili globalmente con territorio storico non attribuibile.",
+        text("qualityFseLegacyTerritory"),
       ),
       quality(
         "eventoUniversale",
         number(ac.eventi_universali),
         number(ac.eventi_universali) ? "derivable" : "ok",
-        "Eventi esplicitamente universali, visibili soltanto senza scope territoriale.",
+        text("qualityFseUniversalEvents"),
       ),
       quality(
         "eventoEsclusoMancanzaAttribuzione",
         number(ac.eventi_esclusi_mancanza_attribuzione),
         number(ac.eventi_esclusi_mancanza_attribuzione) ? "missing" : "ok",
-        "Eventi esclusi dal report territoriale perché privi di attribuzione Area immutabile.",
+        text("qualityFseExcludedTerritory"),
       ),
       quality(
         "unitaPesoNonNormalizzabile",
         unconvertible,
         unconvertible ? "missing" : "ok",
-        "Solo le quantità già espresse in kg confluiscono nei kg calcolabili.",
+        text("qualityKgOnly"),
       ),
       quality(
         "dimensioniSifeadMancanti",
         missingSifeadDimensions,
         missingSifeadDimensions ? "missing" : "ok",
-        "I campi mancanti sono esposti come non disponibili, mai come zero.",
+        text("qualityMissingFields"),
       ),
     ],
     definitions: [
-      "La provenienza FSE+ è determinata esclusivamente dallo snapshot Fondo del Movimento.",
-      "Le dimensioni Beneficiari usano lo snapshot FSE più recente con data di riferimento non successiva alla data finale del report.",
-      `Snapshot futuri rispetto a ${filters.a} sono esclusi; assenze e copertura parziale non vengono trasformate in zero.`,
+      text("fseProvenance"),
+      text("fseSnapshotAtDate"),
+      text("fseFutureSnapshotsExcluded", { date: filters.a }),
       peopleCoverage < totalFseHouseholds
-        ? `Persone note: il valore somma soltanto ${peopleCoverage} nuclei coperti su ${totalFseHouseholds}.`
-        : "Persone raggiunte: copertura completa del numero componenti per tutti i nuclei.",
-      "Le sorgenti FSE+ sono incluse solo quando modulo, area e permessi del chiamante lo consentono.",
-      "I canali comprendono Pacchi/Ritiro sede, Domiciliare, Emporio, Mensa e UDS Strada dal ledger canonico; i nuclei anonimi restano null e le quantità restano separate per unità di misura.",
-      `Ultima esportazione: ${String(administrative.ultima_esportazione ?? "mai")}; ultima importazione AGEA: ${String(administrative.ultima_importazione ?? "mai")}; ultima riconciliazione: ${String(administrative.ultima_riconciliazione ?? "mai")}.`,
+        ? text("fsePeoplePartialCoverage", { covered: peopleCoverage, total: totalFseHouseholds })
+        : text("fsePeopleFullCoverage"),
+      text("fseSources"),
+      text("fseCanonicalChannels"),
+      text("fseAdministrativeDates", {
+        exportDate: String(administrative.ultima_esportazione ?? "—"),
+        importDate: String(administrative.ultima_importazione ?? "—"),
+        reconciliationDate: String(administrative.ultima_riconciliazione ?? "—"),
+      }),
     ],
   });
 }

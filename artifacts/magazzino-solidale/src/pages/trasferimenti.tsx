@@ -35,6 +35,7 @@ import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { loadAllPages } from "@/lib/paged-export";
+import { todayEuropeRome } from "@/lib/europe-rome";
 
 interface RigaDraft {
   key: string;
@@ -227,7 +228,7 @@ function NuovoTrasferimentoForm({
         data: {
           magazzinoOrigineId: parseInt(origineId),
           magazzinoDestinoId: parseInt(destinoId),
-          dataRichiesta: new Date().toISOString().split("T")[0],
+          dataRichiesta: todayEuropeRome(),
           trasportatoreVolontarioId:
             trasportatore && trasportatore !== "altro" ? parseInt(trasportatore) : undefined,
           trasportatoreNome:

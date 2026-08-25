@@ -27,7 +27,7 @@ import {
   rettificaInventariale,
   RETTIFICA_CAUSALI,
 } from "../lib/inventoryLedger";
-import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
+import { addDaysToCivilDate, dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 
 const router: IRouter = Router();
 
@@ -81,11 +81,8 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
   );
   if (scope) conditions.push(scope);
   if (inScadenza === "true") {
-    const in30 = new Date();
-    in30.setDate(in30.getDate() + 30);
-    conditions.push(
-      lte(lottiTable.dataScadenza, in30.toISOString().split("T")[0]),
-    );
+    const in30 = addDaysToCivilDate(dataCivileEuropeRome(), 30);
+    conditions.push(lte(lottiTable.dataScadenza, in30));
   }
 
   const rows = await db

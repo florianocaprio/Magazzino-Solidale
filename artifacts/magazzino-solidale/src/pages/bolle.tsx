@@ -22,6 +22,7 @@ import {
   useListTrasferimenti,
   useListScarichi,
   useListConsegne,
+  useGetConsegna,
   useAssociaBolla,
   useSegnalaRitiroNonEffettuato,
   useConvertiBollaInConsegna,
@@ -30,6 +31,7 @@ import {
   getGetBollaQueryKey,
   getListGiacenzeQueryKey,
   getListConsegneQueryKey,
+  getGetConsegnaQueryKey,
   getListVolontariQueryKey,
   type ConversioneConsegnaInputFasciaOraria,
   type Trasferimento,
@@ -154,7 +156,9 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
   const { data: magazzini } = useListMagazzini();
   const { data: volontari } = useListVolontari(volontariParams, { query: { queryKey: getListVolontariQueryKey(volontariParams), enabled: selectedBenef != null } });
   const { data: mezzi } = useListMezzi();
-  const { data: consegne } = useListConsegne();
+  const { data: consegnaSource } = useGetConsegna(consegnaId ?? 0, {
+    query: { enabled: consegnaId != null, queryKey: getGetConsegnaQueryKey(consegnaId ?? 0) },
+  });
   const createBolla = useCreateBolla();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -174,7 +178,6 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
     toast({ title: t("bolle.scanFound", { name: `${b.cognome} ${b.nome}` }) });
   };
 
-  const consegnaSource = consegne?.find((c) => c.id === consegnaId);
   useEffect(() => {
     if (!open || !consegnaSource) return;
     if (consegnaSource.volontarioId != null) {
@@ -738,7 +741,9 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  const consegneParams = bollaCentroId != null ? { centroAscoltoId: bollaCentroId } : {};
+  const consegneParams = bollaCentroId != null
+    ? { centroAscoltoId: bollaCentroId, page: 1, pageSize: 100 }
+    : { page: 1, pageSize: 100 };
   const { data: consegnePianificabili } = useListConsegne(consegneParams, {
     query: { enabled: assegnaOpen && beneficiari != null, queryKey: getListConsegneQueryKey(consegneParams) },
   });
@@ -747,7 +752,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
   const centroBeneficiarioIds = new Set(
     (beneficiari ?? []).filter((b) => (b.centroAscoltoId ?? null) === bollaCentroId).map((b) => b.id)
   );
-  const pianificabili = (consegnePianificabili ?? []).filter(
+  const pianificabili = (consegnePianificabili?.items ?? []).filter(
     (c) => c.stato === "pianificata" && c.bollaId == null && centroBeneficiarioIds.has(c.beneficiarioId)
   );
 

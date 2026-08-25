@@ -19,6 +19,12 @@ export interface BollaRiga {
   fsePlus: boolean;
   fsePlusQuantita?: number;
   nonFsePlusQuantita?: number;
+  /** Quantità distribuita prima degli storni, dal ledger canonico */
+  quantitaLorda?: number;
+  /** Quantità complessivamente stornata */
+  quantitaStornata?: number;
+  /** Quantità distribuita netta dopo gli storni */
+  quantitaNetta?: number;
   quantita: number;
   /** @nullable */
   unitaMisura: string | null;

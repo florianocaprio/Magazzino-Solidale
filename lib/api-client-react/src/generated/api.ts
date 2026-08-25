@@ -121,7 +121,9 @@ import type {
   ConsegnaInput,
   ConsegnaRicezioneInput,
   ConsegnaUpdate,
+  ConsegneExport,
   ConsegneMeseReport,
+  ConsegnePage,
   ConsegnePerCentroReport,
   ConversioneConsegnaInput,
   ConversioneConsegnaResult,
@@ -147,6 +149,7 @@ import type {
   DeleteVolontario200,
   DownloadFseExportParams,
   EmailSendResult,
+  ExportConsegneParams,
   ForgotPasswordInput,
   Fornitore,
   FornitoreInput,
@@ -326,6 +329,7 @@ import type {
   Prodotto,
   ProdottoInput,
   ProdottoUpdate,
+  ReadinessStatus,
   ReportAllocazioneMezziParams,
   ReportConsegnePerCentroParams,
   ReportConsegnePerMeseParams,
@@ -490,6 +494,83 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReadinessCheckUrl = () => {
+
+
+
+
+  return `/api/readyz`
+}
+
+/**
+ * @summary Readiness check per database e migration ledger
+ */
+export const readinessCheck = async ( options?: RequestInit): Promise<ReadinessStatus> => {
+
+  return customFetch<ReadinessStatus>(getReadinessCheckUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getReadinessCheckQueryKey = () => {
+    return [
+    `/api/readyz`
+    ] as const;
+    }
+
+
+export const getReadinessCheckQueryOptions = <TData = Awaited<ReturnType<typeof readinessCheck>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof readinessCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getReadinessCheckQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof readinessCheck>>> = ({ signal }) => readinessCheck({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof readinessCheck>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ReadinessCheckQueryResult = NonNullable<Awaited<ReturnType<typeof readinessCheck>>>
+export type ReadinessCheckQueryError = ErrorType<void>
+
+
+/**
+ * @summary Readiness check per database e migration ledger
+ */
+
+export function useReadinessCheck<TData = Awaited<ReturnType<typeof readinessCheck>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof readinessCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getReadinessCheckQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -10839,9 +10920,9 @@ export const getListConsegneUrl = (params?: ListConsegneParams,) => {
   return stringifiedParams.length > 0 ? `/api/consegne?${stringifiedParams}` : `/api/consegne`
 }
 
-export const listConsegne = async (params?: ListConsegneParams, options?: RequestInit): Promise<Consegna[]> => {
+export const listConsegne = async (params?: ListConsegneParams, options?: RequestInit): Promise<ConsegnePage> => {
 
-  return customFetch<Consegna[]>(getListConsegneUrl(params),
+  return customFetch<ConsegnePage>(getListConsegneUrl(params),
   {
     ...options,
     method: 'GET'
@@ -10966,6 +11047,90 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCreateConsegnaMutationOptions(options));
     }
+
+export const getExportConsegneUrl = (params?: ExportConsegneParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/consegne/export?${stringifiedParams}` : `/api/consegne/export`
+}
+
+/**
+ * @summary Restituisce tutte le consegne autorizzate per i filtri richiesti
+ */
+export const exportConsegne = async (params?: ExportConsegneParams, options?: RequestInit): Promise<ConsegneExport> => {
+
+  return customFetch<ConsegneExport>(getExportConsegneUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportConsegneQueryKey = (params?: ExportConsegneParams,) => {
+    return [
+    `/api/consegne/export`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportConsegneQueryOptions = <TData = Awaited<ReturnType<typeof exportConsegne>>, TError = ErrorType<unknown>>(params?: ExportConsegneParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportConsegne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportConsegneQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportConsegne>>> = ({ signal }) => exportConsegne(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportConsegne>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportConsegneQueryResult = NonNullable<Awaited<ReturnType<typeof exportConsegne>>>
+export type ExportConsegneQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Restituisce tutte le consegne autorizzate per i filtri richiesti
+ */
+
+export function useExportConsegne<TData = Awaited<ReturnType<typeof exportConsegne>>, TError = ErrorType<unknown>>(
+ params?: ExportConsegneParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportConsegne>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportConsegneQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetConsegnaUrl = (id: number,) => {
 

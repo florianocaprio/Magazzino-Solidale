@@ -38,7 +38,12 @@ let benNull: number;
 let magNull: number;
 let magB: number;
 
-const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
+const idsOf = (body: unknown) => {
+  const rows = Array.isArray(body)
+    ? body
+    : (body as { items: Array<{ id: number }> }).items;
+  return rows.map((row: { id: number }) => row.id);
+};
 const appAs = (router: Parameters<typeof makeScopedApp>[0], centro: number | null) =>
   makeScopedApp(router, { id: operatoreId, centroAscoltoId: centro });
 

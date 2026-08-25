@@ -17,6 +17,19 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Readiness check per database e migration ledger
+ */
+export const ReadinessCheckResponse = zod.object({
+  "status": zod.string(),
+  "checks": zod.object({
+  "database": zod.string(),
+  "migrations": zod.string(),
+  "pendingMigrations": zod.number()
+})
+})
+
+
+/**
  * @summary KPI summary for dashboard
  */
 export const GetDashboardStatsResponse = zod.object({
@@ -5797,7 +5810,17 @@ export const RectifyUdsInterventoResponse = zod.object({
 })
 
 
+export const listConsegneQueryPageDefault = 1;
+
+export const listConsegneQueryPageSizeDefault = 25;
+export const listConsegneQueryPageSizeMax = 100;
+
+
+
 export const ListConsegneQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).default(listConsegneQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listConsegneQueryPageSizeMax).default(listConsegneQueryPageSizeDefault),
+  "q": zod.coerce.string().optional().describe('Ricerca per codice, beneficiario o indirizzo'),
   "stato": zod.coerce.string().optional(),
   "data": zod.coerce.string().optional(),
   "dataInizio": zod.coerce.string().optional(),
@@ -5806,7 +5829,8 @@ export const ListConsegneQueryParams = zod.object({
   "centroAscoltoId": zod.coerce.number().optional()
 })
 
-export const ListConsegneResponseItem = zod.object({
+export const ListConsegneResponse = zod.object({
+  "items": zod.array(zod.object({
   "id": zod.number(),
   "codice": zod.string(),
   "beneficiarioId": zod.number(),
@@ -5833,8 +5857,12 @@ export const ListConsegneResponseItem = zod.object({
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
+})),
+  "page": zod.number(),
+  "pageSize": zod.number(),
+  "total": zod.number(),
+  "totalPages": zod.number()
 })
-export const ListConsegneResponse = zod.array(ListConsegneResponseItem)
 
 
 export const createConsegnaBodyIndirizzoConsegnaMax = 200;
@@ -5854,6 +5882,52 @@ export const CreateConsegnaBody = zod.object({
   "mezzoId": zod.number().optional(),
   "mezzoAltro": zod.boolean().optional(),
   "noteOperative": zod.string().optional()
+})
+
+
+/**
+ * @summary Restituisce tutte le consegne autorizzate per i filtri richiesti
+ */
+export const ExportConsegneQueryParams = zod.object({
+  "q": zod.coerce.string().optional(),
+  "stato": zod.coerce.string().optional(),
+  "data": zod.coerce.string().optional(),
+  "dataInizio": zod.coerce.string().optional(),
+  "dataFine": zod.coerce.string().optional(),
+  "beneficiarioId": zod.coerce.number().optional(),
+  "centroAscoltoId": zod.coerce.number().optional()
+})
+
+export const ExportConsegneResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "tipoPianificazione": zod.enum(['consegna_pacco', 'accesso_emporio']),
+  "tipoConsegna": zod.string(),
+  "dataPrevista": zod.string(),
+  "fasciaOraria": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "zona": zod.string().nullish(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "volontarioId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
+  "volontarioAltro": zod.string().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "mezzoAltro": zod.boolean().optional(),
+  "stato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "noteOperative": zod.string().nullish(),
+  "dataEffettuata": zod.string().nullish(),
+  "dataCreazione": zod.string()
+})),
+  "total": zod.number()
 })
 
 
@@ -7658,6 +7732,9 @@ export const GetBollaResponse = zod.object({
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
@@ -7720,6 +7797,9 @@ export const UpdateBollaResponse = zod.object({
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
@@ -7744,6 +7824,9 @@ export const ListBollaRigheResponseItem = zod.object({
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
@@ -7826,6 +7909,9 @@ export const ConfermaBollaResponse = zod.object({
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
@@ -7880,6 +7966,9 @@ export const AnnullaBollaResponse = zod.object({
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
@@ -7939,6 +8028,9 @@ export const ConsegnaBollaResponse = zod.object({
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
@@ -8001,6 +8093,9 @@ export const SegnalaRitiroNonEffettuatoResponse = zod.object({
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
   "note": zod.string().nullish()
@@ -10082,9 +10177,15 @@ export const GetReportDashboardGeneraleResponse = zod.object({
   "key": zod.string(),
   "count": zod.number().nullable(),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
-  "note": zod.string().nullable()
+  "note": zod.union([zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+}),zod.null()])
 })),
-  "definitions": zod.array(zod.string()),
+  "definitions": zod.array(zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+})),
   "generatedAt": zod.coerce.date(),
   "timezone": zod.enum(['Europe/Rome'])
 })
@@ -10142,9 +10243,15 @@ export const GetReportPacchiResponse = zod.object({
   "key": zod.string(),
   "count": zod.number().nullable(),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
-  "note": zod.string().nullable()
+  "note": zod.union([zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+}),zod.null()])
 })),
-  "definitions": zod.array(zod.string()),
+  "definitions": zod.array(zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+})),
   "generatedAt": zod.coerce.date(),
   "timezone": zod.enum(['Europe/Rome'])
 })
@@ -10204,9 +10311,15 @@ export const GetReportCentroAscoltoResponse = zod.object({
   "key": zod.string(),
   "count": zod.number().nullable(),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
-  "note": zod.string().nullable()
+  "note": zod.union([zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+}),zod.null()])
 })),
-  "definitions": zod.array(zod.string()),
+  "definitions": zod.array(zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+})),
   "generatedAt": zod.coerce.date(),
   "timezone": zod.enum(['Europe/Rome'])
 })
@@ -10264,9 +10377,15 @@ export const GetReportEmporioResponse = zod.object({
   "key": zod.string(),
   "count": zod.number().nullable(),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
-  "note": zod.string().nullable()
+  "note": zod.union([zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+}),zod.null()])
 })),
-  "definitions": zod.array(zod.string()),
+  "definitions": zod.array(zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+})),
   "generatedAt": zod.coerce.date(),
   "timezone": zod.enum(['Europe/Rome'])
 })
@@ -10327,9 +10446,15 @@ export const GetReportMensaIntegratoResponse = zod.object({
   "key": zod.string(),
   "count": zod.number().nullable(),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
-  "note": zod.string().nullable()
+  "note": zod.union([zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+}),zod.null()])
 })),
-  "definitions": zod.array(zod.string()),
+  "definitions": zod.array(zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+})),
   "generatedAt": zod.coerce.date(),
   "timezone": zod.enum(['Europe/Rome'])
 })
@@ -10389,9 +10514,15 @@ export const GetReportUdsIntegratoResponse = zod.object({
   "key": zod.string(),
   "count": zod.number().nullable(),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
-  "note": zod.string().nullable()
+  "note": zod.union([zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+}),zod.null()])
 })),
-  "definitions": zod.array(zod.string()),
+  "definitions": zod.array(zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+})),
   "generatedAt": zod.coerce.date(),
   "timezone": zod.enum(['Europe/Rome'])
 })
@@ -10449,9 +10580,15 @@ export const GetReportMagazzinoLogisticaResponse = zod.object({
   "key": zod.string(),
   "count": zod.number().nullable(),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
-  "note": zod.string().nullable()
+  "note": zod.union([zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+}),zod.null()])
 })),
-  "definitions": zod.array(zod.string()),
+  "definitions": zod.array(zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+})),
   "generatedAt": zod.coerce.date(),
   "timezone": zod.enum(['Europe/Rome'])
 })
@@ -10515,9 +10652,15 @@ export const GetReportFsePlusIntegratoResponse = zod.object({
   "key": zod.string(),
   "count": zod.number().nullable(),
   "availability": zod.enum(['ok', 'derivable', 'missing']),
-  "note": zod.string().nullable()
+  "note": zod.union([zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+}),zod.null()])
 })),
-  "definitions": zod.array(zod.string()),
+  "definitions": zod.array(zod.object({
+  "code": zod.string(),
+  "params": zod.record(zod.string(), zod.union([zod.string(),zod.number()])).optional()
+})),
   "generatedAt": zod.coerce.date(),
   "timezone": zod.enum(['Europe/Rome'])
 })

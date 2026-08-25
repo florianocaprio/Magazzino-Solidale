@@ -70,6 +70,11 @@ import {
   isLottoDistribuibile,
   lottoDistribuibileCondition,
 } from "../lib/lottoPolicy";
+import {
+  effectiveBollaRigaId,
+  fseDistributionNatureCondition,
+  fseNetDistributedQuantity,
+} from "../lib/reporting/fseCanonicalFacts";
 
 const router: IRouter = Router();
 
@@ -153,22 +158,42 @@ async function buildDettaglio(id: number) {
         .leftJoin(lottiTable, eq(speseEmporioRigheTable.lottoId, lottiTable.id))
         .where(eq(speseEmporioTable.bollaId, id));
 
-  const provenanceRows = await db.select({
-    bollaRigaId: movimentiTable.bollaRigaId,
-    fsePlus: lottiTable.fsePlus,
-    quantita: sql<string>`sum(${movimentiTable.quantita})`,
-  })
-    .from(movimentiTable)
-    .innerJoin(lottiTable, eq(movimentiTable.lottoId, lottiTable.id))
-    .where(and(eq(movimentiTable.bollaId, id), eq(movimentiTable.tipoMovimento, "scarico")))
-    .groupBy(movimentiTable.bollaRigaId, lottiTable.fsePlus);
-  const provenance = new Map<number, { fse: number; nonFse: number }>();
-  for (const movement of provenanceRows) {
-    if (movement.bollaRigaId == null) continue;
-    const split = provenance.get(movement.bollaRigaId) ?? { fse: 0, nonFse: 0 };
-    if (movement.fsePlus) split.fse += Number(movement.quantita ?? 0);
-    else split.nonFse += Number(movement.quantita ?? 0);
-    provenance.set(movement.bollaRigaId, split);
+  const provenanceResult = await db.execute(sql`
+    SELECT ${effectiveBollaRigaId} AS bolla_riga_id,
+           CASE WHEN mv.natura_contabile = 'STORNO'
+             THEN COALESCE(original.fondo_origine, mv.fondo_origine, 'NESSUN_FONDO')
+             ELSE COALESCE(mv.fondo_origine, 'NESSUN_FONDO')
+           END AS fondo_origine,
+           SUM(CASE WHEN mv.natura_contabile = 'STORNO'
+             THEN 0 ELSE abs(mv.quantita::numeric) END) AS quantita_lorda,
+           SUM(CASE WHEN mv.natura_contabile = 'STORNO'
+             THEN abs(mv.quantita::numeric) ELSE 0 END) AS quantita_stornata,
+           SUM(${fseNetDistributedQuantity(sql`mv.quantita`)}) AS quantita_netta
+    FROM movimenti mv
+    LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
+    WHERE COALESCE(mv.bolla_id, original.bolla_id) = ${id}
+      AND ${effectiveBollaRigaId} IS NOT NULL
+      AND ${fseDistributionNatureCondition}
+    GROUP BY ${effectiveBollaRigaId}, 2
+  `);
+  const provenance = new Map<number, {
+    fse: number;
+    nonFse: number;
+    lorda: number;
+    stornata: number;
+    netta: number;
+  }>();
+  for (const movement of provenanceResult.rows as Array<Record<string, unknown>>) {
+    const bollaRigaId = Number(movement.bolla_riga_id);
+    if (!Number.isSafeInteger(bollaRigaId)) continue;
+    const split = provenance.get(bollaRigaId) ?? { fse: 0, nonFse: 0, lorda: 0, stornata: 0, netta: 0 };
+    const netta = Number(movement.quantita_netta ?? 0);
+    if (movement.fondo_origine === "FSE_PLUS") split.fse += netta;
+    else split.nonFse += netta;
+    split.lorda += Number(movement.quantita_lorda ?? 0);
+    split.stornata += Number(movement.quantita_stornata ?? 0);
+    split.netta += netta;
+    provenance.set(bollaRigaId, split);
   }
 
   return {
@@ -203,7 +228,8 @@ async function buildDettaglio(id: number) {
     operatoreCodice: row.operatoreMatricola ?? row.operatoreUsername ?? null,
     dataCreazione: row.b.dataCreazione.toISOString(),
     righe: righe.length > 0 ? righe.map(r => {
-      const split = provenance.get(r.r.id) ?? { fse: 0, nonFse: 0 };
+      const split = provenance.get(r.r.id) ?? { fse: 0, nonFse: 0, lorda: 0, stornata: 0, netta: 0 };
+      const hasCanonicalProvenance = split.lorda > 0 || split.stornata > 0;
       return {
       id: r.r.id,
       bollaId: r.r.bollaId,
@@ -211,16 +237,22 @@ async function buildDettaglio(id: number) {
       prodottoNome: r.prodottoNome ?? null,
       lottoId: r.r.lottoId ?? null,
       codiceLotto: r.codiceLotto ?? null,
-      fsePlus: split.fse > 0 ? split.nonFse === 0 : (r.r.lottoId ? !!r.lottoFsePlus : false),
+      fsePlus: hasCanonicalProvenance
+        ? split.fse > 0 && split.nonFse === 0
+        : (r.r.lottoId ? !!r.lottoFsePlus : false),
       fsePlusQuantita: split.fse,
       nonFsePlusQuantita: split.nonFse,
+      quantitaLorda: split.lorda,
+      quantitaStornata: split.stornata,
+      quantitaNetta: split.netta,
       quantita: parseFloat(r.r.quantita),
       unitaMisura: r.r.unitaMisura,
       note: r.r.note ?? null,
       };
     }) : righeFallbackEmporio.map(r => {
       const effectiveRigaId = r.r.bollaRigaId ?? r.r.id;
-      const split = provenance.get(effectiveRigaId) ?? { fse: 0, nonFse: 0 };
+      const split = provenance.get(effectiveRigaId) ?? { fse: 0, nonFse: 0, lorda: 0, stornata: 0, netta: 0 };
+      const hasCanonicalProvenance = split.lorda > 0 || split.stornata > 0;
       return {
       id: effectiveRigaId,
       bollaId: id,
@@ -228,9 +260,14 @@ async function buildDettaglio(id: number) {
       prodottoNome: r.prodottoNome ?? r.r.descrizioneProdotto ?? null,
       lottoId: r.r.lottoId ?? null,
       codiceLotto: r.codiceLotto ?? null,
-      fsePlus: split.fse > 0 ? split.nonFse === 0 : (r.r.lottoId ? !!r.lottoFsePlus : false),
+      fsePlus: hasCanonicalProvenance
+        ? split.fse > 0 && split.nonFse === 0
+        : (r.r.lottoId ? !!r.lottoFsePlus : false),
       fsePlusQuantita: split.fse,
       nonFsePlusQuantita: split.nonFse,
+      quantitaLorda: split.lorda,
+      quantitaStornata: split.stornata,
+      quantitaNetta: split.netta,
       quantita: parseFloat(r.r.quantita),
       unitaMisura: r.r.unitaMisura,
       note: "Riga da Spesa Emporio",

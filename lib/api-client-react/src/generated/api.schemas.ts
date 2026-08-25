@@ -821,13 +821,19 @@ export const ReportQualityItemAvailability = {
   missing: 'missing',
 } as const;
 
+export type ReportTextParams = {[key: string]: string | number};
+
+export interface ReportText {
+  code: string;
+  params?: ReportTextParams;
+}
+
 export interface ReportQualityItem {
   key: string;
   /** @nullable */
   count: number | null;
   availability: ReportQualityItemAvailability;
-  /** @nullable */
-  note: string | null;
+  note: ReportText | null;
 }
 
 export interface ReportingDashboard {
@@ -838,7 +844,7 @@ export interface ReportingDashboard {
   series: ReportSeries[];
   tables: ReportTable[];
   quality: ReportQualityItem[];
-  definitions: string[];
+  definitions: ReportText[];
   generatedAt: string;
   timezone: ReportingDashboardTimezone;
 }
@@ -929,6 +935,17 @@ export interface ReportFsePlus {
 
 export interface HealthStatus {
   status: string;
+}
+
+export type ReadinessStatusChecks = {
+  database: string;
+  migrations: string;
+  pendingMigrations: number;
+};
+
+export interface ReadinessStatus {
+  status: string;
+  checks: ReadinessStatusChecks;
 }
 
 export interface DashboardStats {
@@ -5131,6 +5148,19 @@ export interface BisognoPianificatoStorico {
   valoreNuovo: BisognoPianificatoStoricoValoreNuovo;
 }
 
+export interface ConsegnePage {
+  items: Consegna[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ConsegneExport {
+  items: Consegna[];
+  total: number;
+}
+
 export type AccessoEmporioStato = typeof AccessoEmporioStato[keyof typeof AccessoEmporioStato];
 
 
@@ -5762,6 +5792,12 @@ export interface BollaRiga {
   fsePlus: boolean;
   fsePlusQuantita?: number;
   nonFsePlusQuantita?: number;
+  /** Quantità distribuita prima degli storni, dal ledger canonico */
+  quantitaLorda?: number;
+  /** Quantità complessivamente stornata */
+  quantitaStornata?: number;
+  /** Quantità distribuita netta dopo gli storni */
+  quantitaNetta?: number;
   quantita: number;
   /** @nullable */
   unitaMisura: string | null;
@@ -8106,6 +8142,29 @@ areaOperativaId?: number;
 };
 
 export type ListConsegneParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+pageSize?: number;
+/**
+ * Ricerca per codice, beneficiario o indirizzo
+ */
+q?: string;
+stato?: string;
+data?: string;
+dataInizio?: string;
+dataFine?: string;
+beneficiarioId?: number;
+centroAscoltoId?: number;
+};
+
+export type ExportConsegneParams = {
+q?: string;
 stato?: string;
 data?: string;
 dataInizio?: string;

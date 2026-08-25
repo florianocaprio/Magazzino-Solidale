@@ -36,6 +36,7 @@ import { generateScaricoPdf } from "@/lib/scarico-pdf";
 import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
 import { useTranslation } from "react-i18next";
 import { loadAllPages } from "@/lib/paged-export";
+import { todayEuropeRome } from "@/lib/europe-rome";
 
 const CAUSALI = ["deteriorata", "rubata", "scaduta", "altro"] as const;
 
@@ -271,7 +272,7 @@ function NuovoScaricoForm({
         data: {
           magazzinoId: parseInt(magazzinoId),
           centroAscoltoId: centroAscoltoId ? parseInt(centroAscoltoId) : null,
-          dataScarico: new Date().toISOString().split("T")[0],
+          dataScarico: todayEuropeRome(),
           causale: causale as "deteriorata" | "rubata" | "scaduta" | "altro",
           causaleAltro: causale === "altro" ? causaleAltro.trim() : undefined,
           note: note || undefined,

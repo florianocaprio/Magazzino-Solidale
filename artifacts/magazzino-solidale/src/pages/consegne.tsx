@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useListConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useGetBeneficiario, getGetBeneficiarioQueryKey, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListAreeOperative, getListAreeOperativeQueryKey, getListConsegneQueryKey, useCreateTurnoVolontarioPending, useCreateTurnoMezzoPending, useListRuoliVolontari, getListVolontariQueryKey, getListMezziQueryKey, type Consegna, type Volontario, type Mezzo } from "@workspace/api-client-react";
+import { useListConsegne, exportConsegne, useCreateConsegna, useCompletaConsegna, useDeleteConsegna, useAssociaBolla, useInviaEmailConsegnaBeneficiario, useInviaEmailConsegnaVolontario, useListBolle, useListBeneficiari, useGetBeneficiario, getGetBeneficiarioQueryKey, useListMagazzini, useListVolontari, useListMezzi, useGetVolontariCarico, getGetVolontariCaricoQueryKey, useListCentriAscolto, useListAreeOperative, getListAreeOperativeQueryKey, getListConsegneQueryKey, useCreateTurnoVolontarioPending, useCreateTurnoMezzoPending, useListRuoliVolontari, getListVolontariQueryKey, getListMezziQueryKey, type Consegna, type Volontario, type Mezzo } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -30,6 +30,7 @@ import { format, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { volontarioLabel } from "@/lib/volontari-label";
+import { todayEuropeRome } from "@/lib/europe-rome";
 
 const formSchema = z.object({
   beneficiarioId: z.coerce.number().min(1),
@@ -65,9 +66,17 @@ export default function Consegne() {
   const isAreaOperativaGlobal = user?.areaOperativaId == null;
   const canCreateVolontario = hasPermission("logistica.volontari.manage");
   const canCreateMezzo = hasPermission("logistica.mezzi.manage");
-  const [areaOperativaFilter, setAreaOperativaFilter] = useState("all");
-  const [centroFilter, setCentroFilter] = useState("all");
-  const [statoFilter, setStatoFilter] = useState("all");
+  const canManage = hasPermission("consegne.manage");
+  const canComplete = hasPermission("consegne.complete");
+  const canCancel = hasPermission("consegne.cancel");
+  const canExport = hasPermission("consegne.export");
+  const initialSearch = useMemo(() => new URLSearchParams(window.location.search), []);
+  const [areaOperativaFilter, setAreaOperativaFilter] = useState(initialSearch.get("area") ?? "all");
+  const [centroFilter, setCentroFilter] = useState(initialSearch.get("centro") ?? "all");
+  const [statoFilter, setStatoFilter] = useState(initialSearch.get("stato") ?? "all");
+  const [search, setSearch] = useState(initialSearch.get("q") ?? "");
+  const [page, setPage] = useState(() => Math.max(1, Number(initialSearch.get("page")) || 1));
+  const pageSize = 25;
   const [createCentroId, setCreateCentroId] = useState("all");
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
@@ -76,22 +85,35 @@ export default function Consegne() {
     }
   }, [isCentroLocked, lockedCentroId]);
   const lastMonthRange = useMemo(() => {
-    const oggi = new Date();
+    const oggiCivile = todayEuropeRome();
+    const oggi = new Date(`${oggiCivile}T12:00:00`);
     return {
       inizio: format(subMonths(oggi, 1), "yyyy-MM-dd"),
-      fine: format(oggi, "yyyy-MM-dd"),
+      fine: oggiCivile,
     };
   }, []);
-  const [dataInizio, setDataInizio] = useState(lastMonthRange.inizio);
-  const [dataFine, setDataFine] = useState(lastMonthRange.fine);
-  const consegneParams: { centroAscoltoId?: number; stato?: string; dataInizio?: string; dataFine?: string } = {};
+  const [dataInizio, setDataInizio] = useState(initialSearch.get("dal") ?? lastMonthRange.inizio);
+  const [dataFine, setDataFine] = useState(initialSearch.get("al") ?? lastMonthRange.fine);
+  const consegneParams: { page: number; pageSize: number; q?: string; centroAscoltoId?: number; stato?: string; dataInizio?: string; dataFine?: string } = { page, pageSize };
+  if (search.trim()) consegneParams.q = search.trim();
   if (centroFilter !== "all") consegneParams.centroAscoltoId = parseInt(centroFilter);
   if (statoFilter !== "all") consegneParams.stato = statoFilter;
   if (dataInizio) consegneParams.dataInizio = dataInizio;
   if (dataFine) consegneParams.dataFine = dataFine;
-  const { data: consegne, isLoading } = useListConsegne(
-    Object.keys(consegneParams).length > 0 ? consegneParams : undefined
-  );
+  const { data: consegnePage, isLoading } = useListConsegne(consegneParams);
+  const consegne = consegnePage?.items ?? [];
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (areaOperativaFilter !== "all") params.set("area", areaOperativaFilter);
+    if (centroFilter !== "all") params.set("centro", centroFilter);
+    if (statoFilter !== "all") params.set("stato", statoFilter);
+    if (search.trim()) params.set("q", search.trim());
+    if (dataInizio) params.set("dal", dataInizio);
+    if (dataFine) params.set("al", dataFine);
+    if (page > 1) params.set("page", String(page));
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+  }, [areaOperativaFilter, centroFilter, dataFine, dataInizio, page, search, statoFilter]);
   const { data: beneficiari } = useListBeneficiari({
     attivo: true,
     ...(createCentroId !== "all" ? { centroAscoltoId: parseInt(createCentroId) } : {}),
@@ -121,6 +143,7 @@ export default function Consegne() {
     setAreaOperativaFilter(v);
     setCentroFilter("all");
     setCreateCentroId("all");
+    setPage(1);
   };
   
   const queryClient = useQueryClient();
@@ -132,6 +155,7 @@ export default function Consegne() {
     t("consegne.toastErrore");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [associatingId, setAssociatingId] = useState<number | null>(null);
   const [selectedBollaId, setSelectedBollaId] = useState<string>("");
@@ -205,7 +229,7 @@ export default function Consegne() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      beneficiarioId: 0, tipoConsegna: "in_sede", dataPrevista: new Date().toISOString().substring(0, 10),
+      beneficiarioId: 0, tipoConsegna: "in_sede", dataPrevista: todayEuropeRome(),
       fasciaOraria: "Mattina", magazzinoId: 0, noteOperative: ""
     }
   });
@@ -379,7 +403,7 @@ export default function Consegne() {
 
   const openRipianifica = (c: Consegna) => {
     setRipianificando(c);
-    setRiDate(new Date().toISOString().substring(0, 10));
+    setRiDate(todayEuropeRome());
     setRiFascia(c.fasciaOraria || "Mattina");
   };
 
@@ -444,16 +468,25 @@ export default function Consegne() {
     queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
   };
 
+  const exportParams = {
+    ...(search.trim() ? { q: search.trim() } : {}),
+    ...(centroFilter !== "all" ? { centroAscoltoId: Number(centroFilter) } : {}),
+    ...(statoFilter !== "all" ? { stato: statoFilter } : {}),
+    ...(dataInizio ? { dataInizio } : {}),
+    ...(dataFine ? { dataFine } : {}),
+  };
+
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center">
+    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t("consegne.title")}</h1>
           <p className="text-muted-foreground">{t("consegne.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <ExportButtons
-            rows={consegne ?? []}
+        <div className="flex flex-wrap items-center gap-2">
+          {canExport && <ExportButtons
+            rows={consegne}
+            loadRows={async () => (await exportConsegne(exportParams)).items}
             columns={[
               { header: t("common.code"), accessor: (c) => c.codice },
               { header: t("consegne.colDataPrevista"), accessor: (c) => c.dataPrevista ? new Date(c.dataPrevista).toLocaleDateString("it-IT") : "" },
@@ -470,13 +503,13 @@ export default function Consegne() {
             filename="consegne"
             title={t("consegne.exportTitle")}
             orientation="landscape"
-          />
-          <Button
+          />}
+          {canManage && <Button
             onClick={() => {
               form.reset({
                 beneficiarioId: 0,
                 tipoConsegna: "in_sede",
-                dataPrevista: new Date().toISOString().substring(0, 10),
+                dataPrevista: todayEuropeRome(),
                 fasciaOraria: "Mattina",
                 magazzinoId: 0,
                 noteOperative: "",
@@ -486,14 +519,29 @@ export default function Consegne() {
             className="gap-2"
           >
             <Plus className="h-4 w-4" /> {t("consegne.planDelivery")}
-          </Button>
+          </Button>}
         </div>
       </div>
 
       <Card>
         <CardHeader className="py-4 border-b">
-          <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 gap-2 md:hidden"
+            onClick={() => setFiltersOpen(true)}
+          >
+            <Filter className="h-4 w-4" /> Filtri e ricerca
+          </Button>
+          <div className="hidden flex-wrap items-center gap-2 md:flex">
             <Filter className="h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+              placeholder="Cerca codice, beneficiario o indirizzo"
+              aria-label="Cerca consegne"
+              className="w-full min-h-11 sm:w-[240px]"
+            />
             {isGlobal && isAreaOperativaGlobal && (
               <Select value={areaOperativaFilter} onValueChange={handleAreaOperativaFilterChange}>
                 <SelectTrigger className="w-[180px]">
@@ -506,7 +554,7 @@ export default function Consegne() {
               </Select>
             )}
             {isGlobal && (
-              <Select value={centroFilter} onValueChange={setCentroFilter} disabled={areaOperativaNotChosen}>
+              <Select value={centroFilter} onValueChange={(value) => { setCentroFilter(value); setPage(1); }} disabled={areaOperativaNotChosen}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder={areaOperativaNotChosen ? t("consegne.selectAreaOperativaFirst") : t("consegne.filterAllCenters")} />
                 </SelectTrigger>
@@ -516,7 +564,7 @@ export default function Consegne() {
                 </SelectContent>
               </Select>
             )}
-            <Select value={statoFilter} onValueChange={setStatoFilter}>
+            <Select value={statoFilter} onValueChange={(value) => { setStatoFilter(value); setPage(1); }}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder={t("consegne.filterAllStatuses")} />
               </SelectTrigger>
@@ -529,28 +577,114 @@ export default function Consegne() {
             <Input
               type="date"
               value={dataInizio}
-              onChange={(e) => setDataInizio(e.target.value)}
-              className="w-[160px]"
+              onChange={(e) => { setDataInizio(e.target.value); setPage(1); }}
+              className="w-[160px] min-h-11"
               aria-label={t("consegne.filterDateFrom")}
               title={t("consegne.filterDateFrom")}
             />
             <Input
               type="date"
               value={dataFine}
-              onChange={(e) => setDataFine(e.target.value)}
-              className="w-[160px]"
+              onChange={(e) => { setDataFine(e.target.value); setPage(1); }}
+              className="w-[160px] min-h-11"
               aria-label={t("consegne.filterDateTo")}
               title={t("consegne.filterDateTo")}
             />
             {(dataInizio || dataFine) && (
-              <Button variant="ghost" size="sm" onClick={() => { setDataInizio(""); setDataFine(""); }}>
+              <Button variant="ghost" size="sm" className="min-h-11" onClick={() => { setDataInizio(""); setDataFine(""); setPage(1); }}>
                 {t("consegne.clearDate")}
               </Button>
             )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
+          <div className="grid gap-3 p-3 md:hidden">
+            {isLoading ? (
+              Array.from({ length: 3 }, (_, index) => (
+                <Skeleton key={index} className="h-52 w-full rounded-lg" />
+              ))
+            ) : consegne.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                {t("consegne.emptyState")}
+              </p>
+            ) : (
+              consegne.map((c) => {
+                const bollaPronta =
+                  c.bollaStato === "confermato" || c.bollaStato === "consegnato";
+                return (
+                  <article key={c.id} className="space-y-3 rounded-lg border bg-card p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-mono text-xs text-muted-foreground">{c.codice}</p>
+                        <h2 className="font-semibold">{c.beneficiarioNome}</h2>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(`${c.dataPrevista.slice(0, 10)}T12:00:00`), "dd MMM yyyy", { locale: it })}
+                          {c.fasciaOraria ? ` · ${c.fasciaOraria}` : ""}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={c.stato === "effettuata" ? "default" : "outline"}
+                        className={c.stato === "effettuata" ? "bg-green-600" : "border-blue-200 bg-blue-50 text-blue-700"}
+                      >
+                        {c.stato === "effettuata" ? t("consegne.badgeConsegnata") : t("consegne.badgePianificata")}
+                      </Badge>
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      {isGlobal && c.centroAscoltoNome && <p>{c.centroAscoltoNome}</p>}
+                      {c.tipoConsegna === "domicilio" ? (
+                        <p className="flex items-start gap-2 text-blue-700">
+                          <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>{c.indirizzoConsegna || t("consegne.domicilioFallback")}</span>
+                        </p>
+                      ) : (
+                        <p className="flex items-center gap-2 text-purple-700">
+                          <Building2 className="h-4 w-4" /> {t("consegne.ritiroCentro")}
+                        </p>
+                      )}
+                      {c.magazzinoNome && (
+                        <p className="flex items-center gap-2 text-muted-foreground">
+                          <Package className="h-4 w-4" /> {c.magazzinoNome}
+                        </p>
+                      )}
+                    </div>
+                    <RouteActions
+                      consegnaId={c.id}
+                      available={c.stato === "pianificata" && c.tipoConsegna === "domicilio" && Boolean(c.indirizzoConsegna)}
+                      className="justify-start"
+                    />
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {c.bollaId != null && (
+                        <Button className="min-h-11 gap-2" variant="outline" onClick={() => setViewingBollaId(c.bollaId!)}>
+                          <FileText className="h-4 w-4" /> {c.stato === "effettuata" ? t("consegne.btnBolla") : t("consegne.btnCompilaBolla")}
+                        </Button>
+                      )}
+                      {c.stato === "pianificata" && c.bollaId == null && canManage && (
+                        <Button className="min-h-11 gap-2" variant="outline" onClick={() => setCreatingBollaFor(c)}>
+                          <Plus className="h-4 w-4" /> {t("consegne.btnCreaBolla")}
+                        </Button>
+                      )}
+                      {c.stato === "pianificata" && bollaPronta && canComplete && (
+                        <Button className="min-h-11 gap-2 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(c.id)}>
+                          <CheckCircle2 className="h-4 w-4" /> {t("bolle.segnaConsegnata")}
+                        </Button>
+                      )}
+                      {c.stato === "effettuata" && canManage && (
+                        <Button className="min-h-11 gap-2" variant="outline" onClick={() => openRipianifica(c)}>
+                          <CalendarClock className="h-4 w-4" /> {t("consegne.btnRipianifica")}
+                        </Button>
+                      )}
+                      {c.stato === "pianificata" && canCancel && (
+                        <Button className="min-h-11 gap-2 text-destructive hover:text-destructive" variant="ghost" onClick={() => setAnnullandoId(c.id)}>
+                          <Trash2 className="h-4 w-4" /> {t("consegne.btnAnnulla")}
+                        </Button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })
+            )}
+          </div>
+          <Table className="hidden md:table">
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.code")}</TableHead>
@@ -645,7 +779,7 @@ export default function Consegne() {
                       return (
                         <button
                           type="button"
-                          disabled={consegnata && c.bollaId == null}
+                          disabled={(consegnata && c.bollaId == null) || (!consegnata && !canManage)}
                           onClick={() => {
                             if (consegnata) {
                               if (c.bollaId != null) setViewingBollaId(c.bollaId);
@@ -682,17 +816,17 @@ export default function Consegne() {
                             <Download className="h-3.5 w-3.5" /> {t("consegne.btnBolla")}
                           </Button>
                         )}
-                        <Button size="sm" variant="outline" className="gap-1" onClick={() => openRipianifica(c)}>
+                        {canManage && <Button size="sm" variant="outline" className="gap-1 min-h-11" onClick={() => openRipianifica(c)}>
                           <CalendarClock className="h-3.5 w-3.5" /> {t("consegne.btnRipianifica")}
-                        </Button>
+                        </Button>}
                       </div>
                     ) : (
                       <div className="flex items-center justify-end gap-2">
-                        {(c.bollaStato === 'confermato' || c.bollaStato === 'consegnato') ? (
-                          <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(c.id)}>
+                        {(c.bollaStato === 'confermato' || c.bollaStato === 'consegnato') && canComplete ? (
+                          <Button size="sm" className="gap-1 min-h-11 bg-green-600 hover:bg-green-700" onClick={() => setCompletingId(c.id)}>
                             <CheckCircle2 className="h-3.5 w-3.5" /> {t("bolle.segnaConsegnata")}
                           </Button>
-                        ) : (
+                        ) : canManage ? (
                           <>
                             {c.bollaId == null ? (
                               <Button size="sm" variant="outline" className="gap-1" onClick={() => setCreatingBollaFor(c)}>
@@ -707,8 +841,8 @@ export default function Consegne() {
                               <Link2 className="h-3.5 w-3.5" /> {t("consegne.btnAssociaBolla")}
                             </Button>
                           </>
-                        )}
-                        <DropdownMenu>
+                        ) : null}
+                        {canManage && <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button size="sm" variant="ghost" className="gap-1" disabled={inviaEmailBeneficiario.isPending || inviaEmailVolontario.isPending}>
                               <Mail className="h-3.5 w-3.5" /> {t("consegne.btnReminder")} <ChevronDown className="h-3 w-3" />
@@ -722,10 +856,10 @@ export default function Consegne() {
                               <Truck className="h-3.5 w-3.5 mr-2" /> {t("consegne.reminderVolontario")}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
-                        </DropdownMenu>
-                        <Button size="sm" variant="ghost" className="gap-1 text-destructive hover:text-destructive" onClick={() => setAnnullandoId(c.id)}>
+                        </DropdownMenu>}
+                        {canCancel && <Button size="sm" variant="ghost" className="gap-1 min-h-11 text-destructive hover:text-destructive" onClick={() => setAnnullandoId(c.id)}>
                           <Trash2 className="h-3.5 w-3.5" /> {t("consegne.btnAnnulla")}
-                        </Button>
+                        </Button>}
                       </div>
                     )}
                   </TableCell>
@@ -733,8 +867,75 @@ export default function Consegne() {
               ))}
             </TableBody>
           </Table>
+          {!isLoading && consegnePage && consegnePage.totalPages > 1 && (
+            <div className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                {consegnePage.total} consegne · pagina {consegnePage.page} di {consegnePage.totalPages}
+              </p>
+              <div className="flex gap-2">
+                <Button className="min-h-11" variant="outline" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+                  Precedente
+                </Button>
+                <Button className="min-h-11" variant="outline" disabled={page >= consegnePage.totalPages} onClick={() => setPage((value) => value + 1)}>
+                  Successiva
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-sm">
+          <SheetHeader><SheetTitle>Filtri consegne</SheetTitle></SheetHeader>
+          <div className="mt-6 space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="consegne-mobile-search">Ricerca</Label>
+              <Input id="consegne-mobile-search" className="min-h-11" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Codice, beneficiario o indirizzo" />
+            </div>
+            {isGlobal && isAreaOperativaGlobal && (
+              <div className="space-y-2">
+                <Label>{t("consegne.filterAreaOperativa")}</Label>
+                <Select value={areaOperativaFilter} onValueChange={handleAreaOperativaFilterChange}>
+                  <SelectTrigger className="min-h-11"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("consegne.filterAllAreaOperativa")}</SelectItem>
+                    {areaOperativaList?.map((area) => <SelectItem key={area.id} value={String(area.id)}>{area.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isGlobal && (
+              <div className="space-y-2">
+                <Label>{t("common.centro")}</Label>
+                <Select value={centroFilter} onValueChange={(value) => { setCentroFilter(value); setPage(1); }} disabled={areaOperativaNotChosen}>
+                  <SelectTrigger className="min-h-11"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("consegne.filterAllCenters")}</SelectItem>
+                    {centriFiltrati.map((centro) => <SelectItem key={centro.id} value={String(centro.id)}>{centro.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>{t("common.status")}</Label>
+              <Select value={statoFilter} onValueChange={(value) => { setStatoFilter(value); setPage(1); }}>
+                <SelectTrigger className="min-h-11"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("consegne.filterAllStatuses")}</SelectItem>
+                  <SelectItem value="pianificata">{t("consegne.statoPianificata")}</SelectItem>
+                  <SelectItem value="effettuata">{t("consegne.statoEffettuata")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2"><Label htmlFor="consegne-mobile-from">{t("consegne.filterDateFrom")}</Label><Input id="consegne-mobile-from" type="date" className="min-h-11" value={dataInizio} onChange={(event) => { setDataInizio(event.target.value); setPage(1); }} /></div>
+              <div className="space-y-2"><Label htmlFor="consegne-mobile-to">{t("consegne.filterDateTo")}</Label><Input id="consegne-mobile-to" type="date" className="min-h-11" value={dataFine} onChange={(event) => { setDataFine(event.target.value); setPage(1); }} /></div>
+            </div>
+            <Button className="min-h-11 w-full" onClick={() => setFiltersOpen(false)}>Mostra risultati</Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <CreaiBollaDialog
         open={creatingBollaFor !== null}

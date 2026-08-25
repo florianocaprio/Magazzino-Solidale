@@ -13,6 +13,7 @@ import type { ReportKpi } from './reportKpi';
 import type { ReportQualityItem } from './reportQualityItem';
 import type { ReportSeries } from './reportSeries';
 import type { ReportTable } from './reportTable';
+import type { ReportText } from './reportText';
 
 export interface ReportingDashboard {
   reportingModelVersion: ReportingDashboardReportingModelVersion;
@@ -22,7 +23,7 @@ export interface ReportingDashboard {
   series: ReportSeries[];
   tables: ReportTable[];
   quality: ReportQualityItem[];
-  definitions: string[];
+  definitions: ReportText[];
   generatedAt: Date;
   timezone: ReportingDashboardTimezone;
 }

@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Response } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import {
   consegneTable,
@@ -8,7 +8,7 @@ import {
   bolleTable,
   centriAscoltoTable,
 } from "@workspace/db";
-import { eq, and, gte, lte, desc, inArray, type SQL } from "drizzle-orm";
+import { eq, and, or, gte, lte, desc, inArray, isNull, isNotNull, ilike, sql, type SQL } from "drizzle-orm";
 import {
   callerCentroId,
   callerAreaOperativaId,
@@ -19,9 +19,6 @@ import {
   canAccessCentro,
   canAccessAreaOperativa,
   canAccessZonaUds,
-  beneficiarioCentroId,
-  beneficiarioAreaOperativaId,
-  beneficiarioZonaUdsId,
   canUseBeneficiario,
   canAccessMagazzino,
 } from "../lib/centroScope";
@@ -45,6 +42,7 @@ import {
   beneficiarioAccessScopeFromRequest,
   isBeneficiarioActive,
 } from "../lib/beneficiarioPolicy";
+import { requirePermission } from "../middlewares/auth";
 
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
 
@@ -116,6 +114,36 @@ function assertConsegnaAddress(input: { tipoConsegna?: unknown; indirizzoConsegn
   }
 }
 
+async function canAccessConsegna(
+  req: Request,
+  consegna: typeof consegneTable.$inferSelect,
+): Promise<boolean> {
+  const [beneficiario] = await db
+    .select({
+      centroAscoltoId: beneficiariTable.centroAscoltoId,
+      areaOperativaId: beneficiariTable.areaOperativaId,
+      zonaUdsId: beneficiariTable.zonaUdsId,
+    })
+    .from(beneficiariTable)
+    .where(eq(beneficiariTable.id, consegna.beneficiarioId));
+  if (!beneficiario) return false;
+
+  // Le consegne concluse mantengono lo scope storico registrato al momento
+  // del completamento; i record legacy senza snapshot usano il fallback
+  // esplicito all'anagrafica corrente. La Zona non ha uno snapshot dedicato.
+  const terminale = consegna.stato === "effettuata";
+  const centroId = terminale
+    ? (consegna.centroAscoltoIdSnapshot ?? beneficiario.centroAscoltoId)
+    : beneficiario.centroAscoltoId;
+  const areaId = terminale
+    ? (consegna.areaOperativaIdSnapshot ?? beneficiario.areaOperativaId)
+    : beneficiario.areaOperativaId;
+
+  return canAccessCentro(centroId, callerCentroId(req))
+    && canAccessAreaOperativa(areaId, callerAreaOperativaId(req))
+    && canAccessZonaUds(beneficiario.zonaUdsId, callerZonaUdsId(req));
+}
+
 /** Ritorna, per ogni consegnaId, la bolla collegata più rilevante (non annullata). */
 async function bollePerConsegne(consegnaIds: number[]) {
   const map = new Map<number, { id: number; numeroBolla: string; stato: string }>();
@@ -134,13 +162,59 @@ async function bollePerConsegne(consegnaIds: number[]) {
   return map;
 }
 
-router.get("/consegne", async (req, res) => {
-  const { stato, data, dataInizio, dataFine, beneficiarioId, centroAscoltoId } = req.query as Record<string, string>;
+type ConsegneListOptions = { page: number; pageSize: number } | null;
+
+function historicalScopeFilter(
+  snapshotColumn: Parameters<typeof isNull>[0],
+  snapshotScope: SQL | undefined,
+  currentScope: SQL | undefined,
+): SQL | undefined {
+  if (!snapshotScope || !currentScope) return undefined;
+  return or(
+    and(
+      eq(consegneTable.stato, "effettuata"),
+      or(
+        and(isNotNull(snapshotColumn), snapshotScope),
+        and(isNull(snapshotColumn), currentScope),
+      ),
+    ),
+    and(sql`${consegneTable.stato} <> 'effettuata'`, currentScope),
+  );
+}
+
+function selectedCentroFilter(centroAscoltoId: number): SQL {
+  return or(
+    and(
+      eq(consegneTable.stato, "effettuata"),
+      or(
+        eq(consegneTable.centroAscoltoIdSnapshot, centroAscoltoId),
+        and(
+          isNull(consegneTable.centroAscoltoIdSnapshot),
+          eq(beneficiariTable.centroAscoltoId, centroAscoltoId),
+        ),
+      ),
+    ),
+    and(
+      sql`${consegneTable.stato} <> 'effettuata'`,
+      eq(beneficiariTable.centroAscoltoId, centroAscoltoId),
+    ),
+  )!;
+}
+
+function listConditions(req: Request): SQL[] | null {
+  const {
+    stato,
+    data,
+    dataInizio,
+    dataFine,
+    beneficiarioId,
+    centroAscoltoId,
+    q,
+  } = req.query as Record<string, string>;
   const dateRe = /^\d{4}-\d{2}-\d{2}$/;
   for (const [name, val] of [["data", data], ["dataInizio", dataInizio], ["dataFine", dataFine]] as const) {
     if (val && !dateRe.test(val)) {
-      res.status(400).json({ error: `Parametro '${name}' non valido (formato atteso: YYYY-MM-DD)` });
-      return;
+      return null;
     }
   }
   const conditions: SQL[] = [];
@@ -149,20 +223,57 @@ router.get("/consegne", async (req, res) => {
   if (data) conditions.push(eq(consegneTable.dataPrevista, data));
   if (dataInizio) conditions.push(gte(consegneTable.dataPrevista, dataInizio));
   if (dataFine) conditions.push(lte(consegneTable.dataPrevista, dataFine));
-  if (beneficiarioId) conditions.push(eq(consegneTable.beneficiarioId, parseInt(beneficiarioId)));
+  if (beneficiarioId) {
+    const id = Number(beneficiarioId);
+    if (!Number.isSafeInteger(id) || id < 1) return null;
+    conditions.push(eq(consegneTable.beneficiarioId, id));
+  }
   const caller = callerCentroId(req);
   if (caller != null) {
-    const f = centroScopeFilter(beneficiariTable.centroAscoltoId, caller);
+    const f = historicalScopeFilter(
+      consegneTable.centroAscoltoIdSnapshot,
+      centroScopeFilter(consegneTable.centroAscoltoIdSnapshot, caller),
+      centroScopeFilter(beneficiariTable.centroAscoltoId, caller),
+    );
     if (f) conditions.push(f);
   } else if (centroAscoltoId) {
-    conditions.push(eq(beneficiariTable.centroAscoltoId, parseInt(centroAscoltoId)));
+    const id = Number(centroAscoltoId);
+    if (!Number.isSafeInteger(id) || id < 1) return null;
+    conditions.push(selectedCentroFilter(id));
   }
-  const areaOperativaFilter = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
+  const areaOperativaFilter = historicalScopeFilter(
+    consegneTable.areaOperativaIdSnapshot,
+    areaOperativaScopeFilter(consegneTable.areaOperativaIdSnapshot, callerAreaOperativaId(req)),
+    areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req)),
+  );
   if (areaOperativaFilter) conditions.push(areaOperativaFilter);
   const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);
+  const search = q?.trim();
+  if (search) {
+    const pattern = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
+    conditions.push(or(
+      ilike(consegneTable.codice, pattern),
+      ilike(beneficiariTable.cognome, pattern),
+      ilike(beneficiariTable.nome, pattern),
+      ilike(consegneTable.indirizzoConsegna, pattern),
+    )!);
+  }
+  return conditions;
+}
 
-  const rows = await db
+async function loadConsegne(req: Request, options: ConsegneListOptions) {
+  const conditions = listConditions(req);
+  if (!conditions) return null;
+  const where = and(...conditions);
+
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(consegneTable)
+    .leftJoin(beneficiariTable, eq(consegneTable.beneficiarioId, beneficiariTable.id))
+    .where(where);
+
+  let query = db
     .select({
       c: consegneTable,
       cognome: beneficiariTable.cognome,
@@ -178,14 +289,31 @@ router.get("/consegne", async (req, res) => {
     .leftJoin(centriAscoltoTable, eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id))
     .leftJoin(magazziniTable, eq(consegneTable.magazzinoId, magazziniTable.id))
     .leftJoin(volontariTable, eq(consegneTable.volontarioId, volontariTable.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(consegneTable.dataCreazione), desc(consegneTable.id))
-    .limit(200);
+    .where(where)
+    .orderBy(desc(consegneTable.dataCreazione), desc(consegneTable.id));
+  if (options) {
+    query = query.limit(options.pageSize).offset((options.page - 1) * options.pageSize) as typeof query;
+  }
+  const rows = await query;
 
   const bolle = await bollePerConsegne(rows.map(r => r.c.id));
+  const effectiveCentroIds = [...new Set(rows.map((r) =>
+    r.c.stato === "effettuata" && r.c.centroAscoltoIdSnapshot != null
+      ? r.c.centroAscoltoIdSnapshot
+      : r.centroAscoltoId,
+  ).filter((id): id is number => id != null))];
+  const effectiveCentri = effectiveCentroIds.length === 0
+    ? []
+    : await db.select({ id: centriAscoltoTable.id, nome: centriAscoltoTable.nome })
+        .from(centriAscoltoTable)
+        .where(inArray(centriAscoltoTable.id, effectiveCentroIds));
+  const centroNames = new Map(effectiveCentri.map((centro) => [centro.id, centro.nome]));
 
-  res.json(rows.map(r => {
+  const items = rows.map(r => {
     const bolla = bolle.get(r.c.id) ?? null;
+    const effectiveCentroId = r.c.stato === "effettuata" && r.c.centroAscoltoIdSnapshot != null
+      ? r.c.centroAscoltoIdSnapshot
+      : r.centroAscoltoId;
     return {
       id: r.c.id,
       codice: r.c.codice,
@@ -199,8 +327,8 @@ router.get("/consegne", async (req, res) => {
       zona: r.c.zona ?? null,
       magazzinoId: r.c.magazzinoId,
       magazzinoNome: r.magazzinoNome ?? null,
-      centroAscoltoId: r.centroAscoltoId ?? null,
-      centroAscoltoNome: r.centroAscoltoNome ?? null,
+      centroAscoltoId: effectiveCentroId ?? null,
+      centroAscoltoNome: effectiveCentroId == null ? null : (centroNames.get(effectiveCentroId) ?? null),
       volontarioId: r.c.volontarioId ?? null,
       volontarioNome: r.volNome && r.volCognome ? `${r.volCognome} ${r.volNome}` : null,
       volontarioAltro: r.c.volontarioAltro ?? null,
@@ -214,10 +342,41 @@ router.get("/consegne", async (req, res) => {
       dataEffettuata: r.c.dataEffettuata?.toISOString() ?? null,
       dataCreazione: r.c.dataCreazione.toISOString(),
     };
-  }));
+  });
+  return { items, total: Number(total) };
+}
+
+router.get("/consegne", requirePermission("consegne.view"), async (req, res) => {
+  const page = req.query.page == null ? 1 : Number(req.query.page);
+  const pageSize = req.query.pageSize == null ? 25 : Number(req.query.pageSize);
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+    res.status(400).json({ error: "Paginazione non valida: page >= 1 e pageSize tra 1 e 100" });
+    return;
+  }
+  const result = await loadConsegne(req, { page, pageSize });
+  if (!result) {
+    res.status(400).json({ error: "Filtri Consegne non validi" });
+    return;
+  }
+  res.json({
+    items: result.items,
+    page,
+    pageSize,
+    total: result.total,
+    totalPages: Math.ceil(result.total / pageSize),
+  });
 });
 
-router.post("/consegne", async (req, res) => {
+router.get("/consegne/export", requirePermission("consegne.export"), async (req, res) => {
+  const result = await loadConsegne(req, null);
+  if (!result) {
+    res.status(400).json({ error: "Filtri Consegne non validi" });
+    return;
+  }
+  res.json({ items: result.items, total: result.total });
+});
+
+router.post("/consegne", requirePermission("consegne.manage"), async (req, res) => {
   const body = normalizeConsegnaPayload(req.body);
   const caller = callerCentroId(req);
   const cid = callerAreaOperativaId(req);
@@ -264,30 +423,26 @@ router.post("/consegne", async (req, res) => {
   }
 });
 
-router.get("/consegne/:id", async (req, res) => {
-  const [row] = await db.select().from(consegneTable).where(eq(consegneTable.id, parseInt(req.params.id)));
+router.get("/consegne/:id", requirePermission("consegne.view"), async (req, res) => {
+  const [row] = await db.select().from(consegneTable).where(eq(consegneTable.id, Number(req.params.id)));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   if (row.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCentro(await beneficiarioCentroId(row.beneficiarioId), callerCentroId(req))
-      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(row.beneficiarioId), callerAreaOperativaId(req))
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(row.beneficiarioId), callerZonaUdsId(req))) {
+  if (!(await canAccessConsegna(req, row))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
   res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
-router.patch("/consegne/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.patch("/consegne/:id", requirePermission("consegne.manage"), async (req, res) => {
+  const id = Number(req.params.id);
   const [existing] = await db.select().from(consegneTable).where(eq(consegneTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (existing.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
   const caller = callerCentroId(req);
   const cid = callerAreaOperativaId(req);
   const zid = callerZonaUdsId(req);
-  if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), caller)
-      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(existing.beneficiarioId), cid)
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(existing.beneficiarioId), zid)) {
+  if (!(await canAccessConsegna(req, existing))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -330,15 +485,17 @@ router.patch("/consegne/:id", async (req, res) => {
 // ─── ANNULLA (ELIMINA) PIANIFICAZIONE ────────────────────────────────────────
 // Annulla un'intera pianificazione di consegna: scollega le eventuali bolle
 // (il documento merce resta in archivio) ed elimina la riga consegna.
-router.delete("/consegne/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+router.delete("/consegne/:id", requirePermission("consegne.cancel"), async (req, res) => {
+  const id = Number(req.params.id);
   const [existing] = await db.select().from(consegneTable).where(eq(consegneTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (existing.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCentro(await beneficiarioCentroId(existing.beneficiarioId), callerCentroId(req))
-      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(existing.beneficiarioId), callerAreaOperativaId(req))
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(existing.beneficiarioId), callerZonaUdsId(req))) {
+  if (!(await canAccessConsegna(req, existing))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
+    return;
+  }
+  if (existing.stato !== "pianificata") {
+    res.status(409).json({ error: "Una consegna conclusa non può essere eliminata" });
     return;
   }
   try {
@@ -361,16 +518,14 @@ router.delete("/consegne/:id", async (req, res) => {
 // Collega una bolla alla consegna (o la scollega passando bollaId null).
 // La "prontezza" della consegna deriva dallo stato della bolla:
 //   bozza = in preparazione · confermato = pronta · consegnato = consegnata
-router.post("/consegne/:id/associa-bolla", async (req, res) => {
-  const consegnaId = parseInt(req.params.id);
+router.post("/consegne/:id/associa-bolla", requirePermission("consegne.manage"), async (req, res) => {
+  const consegnaId = Number(req.params.id);
   const { bollaId } = req.body ?? {};
 
   const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
   if (!consegna) { res.status(404).json({ error: "Consegna non trovata" }); return; }
   if (consegna.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Consegna non trovata" }); return; }
-  if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), callerCentroId(req))
-      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(consegna.beneficiarioId), callerAreaOperativaId(req))
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(consegna.beneficiarioId), callerZonaUdsId(req))) {
+  if (!(await canAccessConsegna(req, consegna))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -411,18 +566,15 @@ router.post("/consegne/:id/associa-bolla", async (req, res) => {
   res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
 });
 
-router.post("/consegne/:id/completa", async (req, res) => {
-  const consegnaId = parseInt(req.params.id);
+router.post("/consegne/:id/completa", requirePermission("consegne.complete"), async (req, res) => {
+  const consegnaId = Number(req.params.id);
 
   const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
   if (!consegna) { res.status(404).json({ error: "Not found" }); return; }
   if (consegna.tipoPianificazione !== TIPO_CONSEGNA_PACCO) { res.status(404).json({ error: "Not found" }); return; }
   const caller = callerCentroId(req);
   const cid = callerAreaOperativaId(req);
-  const zid = callerZonaUdsId(req);
-  if (!canAccessCentro(await beneficiarioCentroId(consegna.beneficiarioId), caller)
-      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(consegna.beneficiarioId), cid)
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(consegna.beneficiarioId), zid)) {
+  if (!(await canAccessConsegna(req, consegna))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -543,9 +695,7 @@ async function inviaReminderConsegna(req: import("express").Request, res: import
   const consegnaId = parseInt(req.params.id as string);
   const r = await caricaConsegnaPerEmail(consegnaId);
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessCentro(await beneficiarioCentroId(r.c.beneficiarioId), callerCentroId(req))
-      || !canAccessAreaOperativa(await beneficiarioAreaOperativaId(r.c.beneficiarioId), callerAreaOperativaId(req))
-      || !canAccessZonaUds(await beneficiarioZonaUdsId(r.c.beneficiarioId), callerZonaUdsId(req))) {
+  if (!(await canAccessConsegna(req, r.c))) {
     res.status(403).json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
@@ -613,7 +763,7 @@ async function inviaReminderConsegna(req: import("express").Request, res: import
   }
 }
 
-router.post("/consegne/:id/invia-email-beneficiario", (req, res) => inviaReminderConsegna(req, res, "beneficiario"));
-router.post("/consegne/:id/invia-email-volontario", (req, res) => inviaReminderConsegna(req, res, "volontario"));
+router.post("/consegne/:id/invia-email-beneficiario", requirePermission("consegne.manage"), (req, res) => inviaReminderConsegna(req, res, "beneficiario"));
+router.post("/consegne/:id/invia-email-volontario", requirePermission("consegne.manage"), (req, res) => inviaReminderConsegna(req, res, "volontario"));
 
 export default router;

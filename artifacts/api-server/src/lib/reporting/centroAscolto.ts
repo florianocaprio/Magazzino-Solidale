@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
-import { dashboard, kpi, quality } from "./shared";
+import { dashboard, kpi, quality, text } from "./shared";
 import { intervalloGiornoEuropeRome } from "../interventiViste";
 
 const eventDate = sql`(
@@ -206,7 +206,7 @@ export async function buildCentroAscoltoReport(filters: ReportFilters) {
         "ambitoLegacy",
         number(dq.ambito_legacy),
         number(dq.ambito_legacy) ? "derivable" : "ok",
-        "I record legacy con ambito NULL seguono la vista Sociale corrente.",
+        text("qualitySocialLegacy"),
       ),
       quality(
         "operatoreMancante",
@@ -217,21 +217,21 @@ export async function buildCentroAscoltoReport(filters: ReportFilters) {
         "territorioStoricoDerivato",
         number(dq.territorio_legacy),
         number(dq.territorio_legacy) ? "derivable" : "ok",
-        "Territorio derivato dall'anagrafica corrente soltanto per interventi Sociali legacy privi di snapshot.",
+        text("qualitySocialLegacyTerritory"),
       ),
       quality(
         "classificazioneAccoglienzaMancante",
         null,
         "missing",
-        "Le tipologie sono configurabili e non possiedono una categoria semantica accoglienza/follow-up.",
+        text("qualitySocialClassification"),
       ),
     ],
     definitions: [
-      "Intervento Sociale = ambito sociale oppure ambito NULL legacy, coerentemente con la vista operativa corrente.",
-      "Intervento effettuato = intervento Sociale nello stato concluso.",
-      "Persona servita = beneficiario distinto con almeno un intervento concluso nel periodo.",
-      "Scaduto = intervento ancora pianificato con data/ora precedente al minore tra fine periodo e ora corrente Europe/Rome.",
-      "Le note riservate non sono dimensioni analitiche e non vengono esportate.",
+      text("socialIntervention"),
+      text("socialCompleted"),
+      text("socialServedPerson"),
+      text("socialExpired"),
+      text("socialPrivateNotes"),
     ],
   });
 }

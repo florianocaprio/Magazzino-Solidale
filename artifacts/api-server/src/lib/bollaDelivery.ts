@@ -422,7 +422,7 @@ async function syncConsegnaDaBollaTx(
     }
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = dataCivileEuropeRome(now);
   const codice = `CON-${Date.now()}`;
   const [nuova] = await tx
     .insert(consegneTable)

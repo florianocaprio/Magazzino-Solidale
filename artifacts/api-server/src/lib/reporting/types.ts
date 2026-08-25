@@ -54,6 +54,11 @@ export type ReportSeries = {
 
 export type ReportCell = string | number | boolean | null;
 
+export type ReportText = {
+  code: string;
+  params?: Record<string, string | number>;
+};
+
 export type ReportTable = {
   key: string;
   columns: string[];
@@ -64,7 +69,7 @@ export type ReportQualityItem = {
   key: string;
   count: number | null;
   availability: ReportAvailability;
-  note: string | null;
+  note: ReportText | null;
 };
 
 export type ReportingDashboard = {
@@ -83,7 +88,7 @@ export type ReportingDashboard = {
   series: ReportSeries[];
   tables: ReportTable[];
   quality: ReportQualityItem[];
-  definitions: string[];
+  definitions: ReportText[];
   generatedAt: string;
   timezone: "Europe/Rome";
 };

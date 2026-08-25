@@ -41,7 +41,7 @@ export function ReportExportActions({ report }: { report: ReportingDashboard }) 
     column: (key: string) => t(`reporting.columns.${key}`),
     unit: (key: string) => t(`reporting.units.${key}`),
     availability: (key: string) => t(`reporting.availability.${key}`),
-    text: (value: string) => localizeReportingText(t, value),
+    text: localizeReportingText.bind(null, t),
     unavailable,
     locale: i18n.resolvedLanguage ?? i18n.language,
     metadata: {

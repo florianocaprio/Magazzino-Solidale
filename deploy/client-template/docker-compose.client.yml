@@ -21,7 +21,6 @@ services:
     build:
       context: ${SOURCE_REPO_DIR:?Definire SOURCE_REPO_DIR in .env.docker}
       dockerfile: Dockerfile.api
-    platform: linux/amd64
     container_name: magazzino-${CLIENT_SLUG}-api
     depends_on:
       db:
@@ -51,11 +50,12 @@ services:
     build:
       context: ${SOURCE_REPO_DIR:?Definire SOURCE_REPO_DIR in .env.docker}
       dockerfile: Dockerfile.web
-    platform: linux/amd64
     container_name: magazzino-${CLIENT_SLUG}-web
     depends_on:
       api:
         condition: service_healthy
+    environment:
+      GOOGLE_MAPS_BROWSER_API_KEY: ${GOOGLE_MAPS_BROWSER_API_KEY:-}
     ports:
       - "127.0.0.1:${WEB_HOST_PORT}:80"
     restart: unless-stopped

@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
-import { dashboard, kpi, quality } from "./shared";
+import { dashboard, kpi, quality, text } from "./shared";
 import {
   effectiveBollaRigaId,
   fseDistributionNatureCondition,
@@ -236,8 +236,8 @@ export async function buildEmporioReport(filters: ReportFilters) {
         })),
       },
     ],
-    quality: [quality("lottoMancante", number(dq.lotto_mancante), number(dq.lotto_mancante) ? "derivable" : "ok", "Senza lotto non è possibile attribuire con certezza la provenienza FSE+."), quality("centroMancante", number(dq.centro_mancante), number(dq.centro_mancante) ? "derivable" : "ok")],
-    definitions: ["Spesa Emporio = record spese_emporio nello stato chiusa.", "Prodotti distinti distribuiti = prodotti con quantità netta diversa da zero nel ledger canonico delle spese chiuse.", "Utente servito = beneficiario distinto con almeno una spesa chiusa nel periodo.", "La provenienza FSE+ deriva dallo snapshot Fondo dei Movimenti della spesa.", "Le quantità restano separate per prodotto e unità di misura e non vengono sommate tra unità eterogenee."],
+    quality: [quality("lottoMancante", number(dq.lotto_mancante), number(dq.lotto_mancante) ? "derivable" : "ok", text("qualityMissingLot")), quality("centroMancante", number(dq.centro_mancante), number(dq.centro_mancante) ? "derivable" : "ok")],
+    definitions: [text("emporioExpense"), text("emporioDistinctProductsLedger"), text("emporioServedUser"), text("emporioFseLot"), text("emporioUnits")],
   });
 }
 

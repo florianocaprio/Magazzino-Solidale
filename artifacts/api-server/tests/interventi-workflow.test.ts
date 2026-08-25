@@ -17,6 +17,7 @@ import {
 import { eq, inArray } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
 import {
+  addDaysToCivilDate,
   dataCivileEuropeRome,
   parseIsoTimestamp,
 } from "../src/lib/interventiWorkflow";
@@ -997,5 +998,11 @@ describe("data civile italiana", () => {
     expect(
       parseIsoTimestamp("2026-08-14T10:00:00+02:00", "data")?.toISOString(),
     ).toBe("2026-08-14T08:00:00.000Z");
+  });
+
+  it("somma giorni civili senza dipendere da UTC o dal cambio DST", () => {
+    expect(addDaysToCivilDate("2026-03-28", 2)).toBe("2026-03-30");
+    expect(addDaysToCivilDate("2026-10-24", 2)).toBe("2026-10-26");
+    expect(addDaysToCivilDate("2026-12-31", 1)).toBe("2027-01-01");
   });
 });

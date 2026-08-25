@@ -250,7 +250,7 @@ riapplicano server-side area, moduli e scope del dominio proprietario; non esist
 un archivio geografico generale interrogabile.
 
 I percorsi esterni usano Google Maps URLs e non richiedono chiavi. Per la mappa
-interattiva valorizzare `VITE_GOOGLE_MAPS_API_KEY` al momento della build web e
+interattiva valorizzare `GOOGLE_MAPS_BROWSER_API_KEY` a runtime nel container web e
 limitare la chiave in Google Cloud alle origini autorizzate e alla Maps
 JavaScript API. Senza chiave restano disponibili lista operativa e percorsi.
 La geocodifica avviene nel browser solo per i layer attivi; coordinate e

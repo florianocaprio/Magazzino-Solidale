@@ -876,6 +876,87 @@ describe("Consegne — completa converte le prenotazioni bolla", () => {
 });
 
 describe("Report e preparazione — semantica merce impegnata/consegnata", () => {
+  it("espone provenienza e lordo/storno/netto dal ledger, non dal flag corrente del lotto", async () => {
+    const lottoId = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 10,
+      fsePlus: true,
+    });
+    const bollaId = await insertBolla(scope, {
+      beneficiarioId: benA,
+      magazzinoId: magA,
+      stato: "consegnato",
+    });
+    const rigaId = await insertBollaRiga(scope, {
+      bollaId,
+      prodottoId: prod,
+      lottoId,
+      quantita: 10,
+    });
+    const [originale] = await db.insert(movimentiTable).values({
+      tipoMovimento: "scarico",
+      tipoDettaglio: "consegna_beneficiario",
+      dataMovimento: "2026-06-01",
+      magazzinoId: magA,
+      prodottoId: prod,
+      lottoId,
+      quantita: "10.00",
+      unitaMisura: "kg",
+      beneficiarioId: benA,
+      bollaId,
+      bollaRigaId: rigaId,
+      fondoOrigine: "FSE_PLUS",
+      naturaContabile: "DISTRIBUZIONE_FINALE",
+    }).returning({ id: movimentiTable.id });
+    const [storno] = await db.insert(movimentiTable).values({
+      tipoMovimento: "storno",
+      tipoDettaglio: "storno_bolla",
+      dataMovimento: "2026-06-02",
+      magazzinoId: magA,
+      prodottoId: prod,
+      lottoId,
+      quantita: "2.00",
+      unitaMisura: "kg",
+      beneficiarioId: benA,
+      bollaId,
+      bollaRigaId: null,
+      movimentoOrigineId: originale.id,
+      fondoOrigine: "FSE_PLUS",
+      naturaContabile: "STORNO",
+    }).returning({ id: movimentiTable.id });
+
+    // Una riclassificazione successiva del lotto non deve riscrivere la
+    // provenienza storica già registrata dal movimento di distribuzione.
+    await db.update(lottiTable).set({
+      fsePlus: false,
+      fondoOrigine: "NESSUN_FONDO",
+    }).where(eq(lottiTable.id, lottoId));
+
+    const partial = await request(appAs(centroA)).get(`/bolle/${bollaId}`);
+    expect(partial.status).toBe(200);
+    expect(partial.body.righe[0]).toMatchObject({
+      fsePlus: true,
+      fsePlusQuantita: 8,
+      nonFsePlusQuantita: 0,
+      quantitaLorda: 10,
+      quantitaStornata: 2,
+      quantitaNetta: 8,
+    });
+
+    await db.update(movimentiTable).set({ quantita: "10.00" }).where(eq(movimentiTable.id, storno.id));
+    const total = await request(appAs(centroA)).get(`/bolle/${bollaId}`);
+    expect(total.status).toBe(200);
+    expect(total.body.righe[0]).toMatchObject({
+      fsePlus: false,
+      fsePlusQuantita: 0,
+      nonFsePlusQuantita: 0,
+      quantitaLorda: 10,
+      quantitaStornata: 10,
+      quantitaNetta: 0,
+    });
+  });
+
   it("il report FSE+ conta solo bolle fisicamente consegnate", async () => {
     const before = (await request(reportAppAs(null)).get("/report/fse-plus?anno=2026")).body.beneficiariTotali as number;
     const benConfermato = await createBeneficiario(scope, centroA);
