@@ -36,6 +36,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { loadAllPages } from "@/lib/paged-export";
 import { todayEuropeRome } from "@/lib/europe-rome";
+import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 
 interface RigaDraft {
   key: string;
@@ -76,7 +77,7 @@ function RigheEditor({
         </p>
       )}
 
-      {righe.map((r) => {
+      {righe.map((r, index) => {
         const giac = giacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
         const max = Math.max(0, giac?.disponibileReale ?? 0);
         const qNum = parseFloat(r.quantita || "0");
@@ -93,7 +94,7 @@ function RigheEditor({
                     update(r.key, { prodottoId: v, unitaMisura: g?.unitaMisura ?? "pz", quantita: "" });
                   }}
                 >
-                  <SelectTrigger><SelectValue placeholder={t("trasferimenti.selezionaProdotto")} /></SelectTrigger>
+                  <SelectTrigger aria-label={`${t("trasferimenti.prodotto")} ${index + 1}`}><SelectValue placeholder={t("trasferimenti.selezionaProdotto")} /></SelectTrigger>
                   <SelectContent>
                     {giacenze
                       ?.filter((g) => g.prodottoId === parseInt(r.prodottoId) || !usedIds.includes(String(g.prodottoId)))
@@ -120,6 +121,7 @@ function RigheEditor({
                 <Label className="text-xs">{t("common.quantity")}</Label>
                 <Input
                   type="number"
+                  aria-label={`${t("common.quantity")} ${index + 1}`}
                   min="0.01"
                   step="0.000001"
                   max={max || undefined}
@@ -139,7 +141,7 @@ function RigheEditor({
               <div className="space-y-2">
                 <Label className="text-xs">{t("trasferimenti.unitaMisura")}</Label>
                 <Select value={r.unitaMisura} onValueChange={(v) => update(r.key, { unitaMisura: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label={`${t("trasferimenti.unitaMisura")} ${index + 1}`}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {["pz", "kg", "g", "lt", "ml", "conf", "scatola", "busta"].map((u) => (
                       <SelectItem key={u} value={u}>{u}</SelectItem>
@@ -203,6 +205,12 @@ function NuovoTrasferimentoForm({
     setNote("");
     setRighe([newRiga()]);
   };
+  const isDirty = !!origineId || !!destinoId || !!trasportatore || !!trasportatoreAltro || !!note || righe.length !== 1 || righe.some((riga) => !!riga.prodottoId || !!riga.quantita);
+  const unsavedGuard = useUnsavedChangesGuard(open && isDirty);
+  const requestClose = () => unsavedGuard.requestClose(() => {
+    reset();
+    onClose();
+  });
 
   const righeValide = righe.filter((r) => r.prodottoId && parseFloat(r.quantita || "0") > 0);
   const hasEccesso = righeValide.some((r) => {
@@ -254,7 +262,7 @@ function NuovoTrasferimentoForm({
   };
 
   return (
-    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Sheet open={open} onOpenChange={(o) => { if (!o) requestClose(); }}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{t("trasferimenti.formTitle")}</SheetTitle>
@@ -268,7 +276,7 @@ function NuovoTrasferimentoForm({
             <div className="space-y-2">
               <Label>{t("trasferimenti.magazzinoPartenza")}</Label>
               <Select value={origineId} onValueChange={(v) => { setOrigineId(v); setRighe([newRiga()]); }}>
-                <SelectTrigger><SelectValue placeholder={t("trasferimenti.selectOrigine")} /></SelectTrigger>
+                <SelectTrigger aria-label={t("trasferimenti.magazzinoPartenza")}><SelectValue placeholder={t("trasferimenti.selectOrigine")} /></SelectTrigger>
                 <SelectContent>
                   {magazzini?.filter((m) => m.stato === "attivo").map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
@@ -279,7 +287,7 @@ function NuovoTrasferimentoForm({
             <div className="space-y-2">
               <Label>{t("trasferimenti.magazzinoDestinazione")}</Label>
               <Select value={destinoId} onValueChange={setDestinoId}>
-                <SelectTrigger><SelectValue placeholder={t("trasferimenti.selectDestinazione")} /></SelectTrigger>
+                <SelectTrigger aria-label={t("trasferimenti.magazzinoDestinazione")}><SelectValue placeholder={t("trasferimenti.selectDestinazione")} /></SelectTrigger>
                 <SelectContent>
                   {magazzini?.filter((m) => m.stato === "attivo" && String(m.id) !== origineId).map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
@@ -295,7 +303,7 @@ function NuovoTrasferimentoForm({
           <div className="space-y-2">
             <Label>{t("trasferimenti.trasportatore")} <span className="text-destructive">*</span></Label>
             <Select value={trasportatore} onValueChange={(v) => { setTrasportatore(v); if (v !== "altro") setTrasportatoreAltro(""); }}>
-              <SelectTrigger><SelectValue placeholder={t("trasferimenti.selectTrasportatore")} /></SelectTrigger>
+              <SelectTrigger aria-label={t("trasferimenti.trasportatore")}><SelectValue placeholder={t("trasferimenti.selectTrasportatore")} /></SelectTrigger>
               <SelectContent>
                 {volontari?.filter((v) => v.attivo).map((v) => (
                   <SelectItem key={v.id} value={String(v.id)}>{v.nome} {v.cognome}</SelectItem>
@@ -330,11 +338,12 @@ function NuovoTrasferimentoForm({
         </div>
 
         <div className="flex justify-end gap-2 pb-4">
-          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button variant="outline" onClick={requestClose}>{t("common.cancel")}</Button>
           <Button onClick={onSubmit} disabled={!canSubmit} className="gap-2">
             <Plus className="h-4 w-4" /> {t("trasferimenti.crea")}
           </Button>
         </div>
+        <UnsavedChangesDialog guard={unsavedGuard} />
       </SheetContent>
     </Sheet>
   );
@@ -519,7 +528,7 @@ function TrasportatoreCell({ t: tras, canEdit }: { t: Trasferimento; canEdit: bo
       <button
         type="button"
         onClick={openDialog}
-        className="group flex items-center gap-1.5 text-sm hover:text-foreground text-left"
+        className="group flex min-h-11 items-center gap-1.5 text-left text-sm hover:text-foreground"
       >
         <Truck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         <span className={label ? "font-medium" : "text-muted-foreground"}>{label ?? "—"}</span>

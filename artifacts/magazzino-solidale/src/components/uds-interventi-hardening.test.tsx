@@ -415,8 +415,8 @@ describe("hardening UI Interventi UDS", () => {
     const desktop = document.querySelector(
       '[data-testid="uds-interventi-desktop"]',
     );
-    expect(mobile?.className).toContain("md:hidden");
-    expect(desktop?.className).toContain("hidden md:block");
+    expect(mobile?.className).toContain("lg:hidden");
+    expect(desktop?.className).toContain("hidden lg:block");
     expect(
       mobile?.querySelector('[data-testid="uds-intervento-mobile-card"]'),
     ).not.toBeNull();

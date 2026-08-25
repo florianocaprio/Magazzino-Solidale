@@ -116,7 +116,7 @@ function RigheEditor({
         />
       )}
 
-      {righe.map((r) => {
+      {righe.map((r, index) => {
         const giac = giacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
         const max = Math.max(0, giac?.disponibileReale ?? 0);
         const qNum = parseFloat(r.quantita || "0");
@@ -133,7 +133,7 @@ function RigheEditor({
                     update(r.key, { prodottoId: v, unitaMisura: g?.unitaMisura ?? "pz", quantita: "" });
                   }}
                 >
-                  <SelectTrigger><SelectValue placeholder={t("scarichi.selezionaProdotto")} /></SelectTrigger>
+                  <SelectTrigger aria-label={`${t("scarichi.prodotto")} ${index + 1}`}><SelectValue placeholder={t("scarichi.selezionaProdotto")} /></SelectTrigger>
                   <SelectContent>
                     {giacenze
                       ?.filter((g) => g.prodottoId === parseInt(r.prodottoId) || !usedIds.includes(String(g.prodottoId)))
@@ -160,6 +160,7 @@ function RigheEditor({
                 <Label className="text-xs">{t("common.quantity")}</Label>
                 <Input
                   type="number"
+                  aria-label={`${t("common.quantity")} ${index + 1}`}
                   min="0.01"
                   step="0.000001"
                   max={max || undefined}
@@ -179,7 +180,7 @@ function RigheEditor({
               <div className="space-y-2">
                 <Label className="text-xs">{t("scarichi.unitaMisura")}</Label>
                 <Select value={r.unitaMisura} onValueChange={(v) => update(r.key, { unitaMisura: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label={`${t("scarichi.unitaMisura")} ${index + 1}`}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {["pz", "kg", "g", "lt", "ml", "conf", "scatola", "busta"].map((u) => (
                       <SelectItem key={u} value={u}>{u}</SelectItem>
@@ -309,7 +310,7 @@ function NuovoScaricoForm({
           <div className="space-y-2">
             <Label>{t("scarichi.magazzino")}</Label>
             <Select value={magazzinoId} onValueChange={(v) => { setMagazzinoId(v); setRighe([newRiga()]); }}>
-              <SelectTrigger><SelectValue placeholder={t("scarichi.selectMagazzino")} /></SelectTrigger>
+              <SelectTrigger aria-label={t("scarichi.magazzino")}><SelectValue placeholder={t("scarichi.selectMagazzino")} /></SelectTrigger>
               <SelectContent>
                 {magazzini?.filter((m) => m.stato === "attivo").map((m) => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
@@ -321,7 +322,7 @@ function NuovoScaricoForm({
           <div className="space-y-2">
             <Label>{t("scarichi.centro")}</Label>
             <Select value={centroAscoltoId || "none"} onValueChange={(v) => setCentroAscoltoId(v === "none" ? "" : v)} disabled={isCentroLocked}>
-              <SelectTrigger><SelectValue placeholder={t("scarichi.selectCentro")} /></SelectTrigger>
+              <SelectTrigger aria-label={t("scarichi.centro")}><SelectValue placeholder={t("scarichi.selectCentro")} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">{t("scarichi.nessunCentro")}</SelectItem>
                 {centri?.map((c) => (
@@ -334,7 +335,7 @@ function NuovoScaricoForm({
           <div className="space-y-2">
             <Label>{t("scarichi.causale")}</Label>
             <Select value={causale} onValueChange={setCausale}>
-              <SelectTrigger><SelectValue placeholder={t("scarichi.selectCausale")} /></SelectTrigger>
+              <SelectTrigger aria-label={t("scarichi.causale")}><SelectValue placeholder={t("scarichi.selectCausale")} /></SelectTrigger>
               <SelectContent>
                 {CAUSALI.map((c) => (
                   <SelectItem key={c} value={c}>{t(`scarichi.causali.${c}`)}</SelectItem>
@@ -504,7 +505,7 @@ export default function Scarichi() {
                   <button
                     type="button"
                     onClick={() => setSortAsc((v) => !v)}
-                    className="inline-flex items-center gap-1 hover:text-foreground"
+                    className="inline-flex min-h-11 items-center gap-1 px-2 hover:text-foreground"
                   >
                     {t("common.date")} <ArrowUpDown className="h-3.5 w-3.5" />
                   </button>

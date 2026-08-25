@@ -60,6 +60,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
 import {
+  UnsavedChangesDialog,
+  useUnsavedChangesGuard,
+} from "@/hooks/use-unsaved-changes-guard";
+import {
   UdsPersonaSheet,
   type UdsPersonaSelection,
 } from "@/components/uds-persona-sheet";
@@ -253,6 +257,11 @@ export default function UdsInterventi() {
       bisogniPianificati: [],
     },
   });
+  const unsavedGuard = useUnsavedChangesGuard(
+    isFormOpen && form.formState.isDirty,
+  );
+  const closeInterventoForm = () =>
+    unsavedGuard.requestClose(() => setIsFormOpen(false));
 
   const selectedBenef = persone?.find((p) => p.id === personId);
   const selectedPersonData =
@@ -357,6 +366,7 @@ export default function UdsInterventi() {
           onSuccess: () => {
             invalidateList();
             toast({ title: t("udsInterventi.toastUpdated") });
+            form.reset();
             setIsFormOpen(false);
           },
           onError,
@@ -384,6 +394,7 @@ export default function UdsInterventi() {
           onSuccess: () => {
             invalidateList();
             toast({ title: t("udsInterventi.toastCreated") });
+            form.reset();
             setIsFormOpen(false);
           },
           onError,
@@ -515,7 +526,10 @@ export default function UdsInterventi() {
                   setPersonSearch("");
                 }}
               >
-                <SelectTrigger className="w-[220px]">
+                <SelectTrigger
+                  className="w-[220px]"
+                  aria-label={t("udsAnagrafica.filterAreaOperativa")}
+                >
                   <SelectValue
                     placeholder={t("udsAnagrafica.allAreaOperativa")}
                   />
@@ -546,7 +560,10 @@ export default function UdsInterventi() {
                 setPersonSearch("");
               }}
             >
-              <SelectTrigger className="w-[220px]">
+              <SelectTrigger
+                className="w-[220px]"
+                aria-label={t("udsAnagrafica.filterZona")}
+              >
                 <SelectValue placeholder={t("udsAnagrafica.allZone")} />
               </SelectTrigger>
               <SelectContent>
@@ -590,7 +607,10 @@ export default function UdsInterventi() {
                 setBisogniFilter(value)
               }
             >
-              <SelectTrigger className="w-[220px]">
+              <SelectTrigger
+                className="w-[220px]"
+                aria-label={t("udsInterventi.bisogniFilterLabel")}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -648,7 +668,7 @@ export default function UdsInterventi() {
         <>
           <div
             data-testid="uds-interventi-mobile"
-            className="space-y-3 md:hidden"
+            className="space-y-3 lg:hidden"
           >
             {isLoading ? (
               Array(3)
@@ -672,6 +692,7 @@ export default function UdsInterventi() {
                 <Card
                   key={intervento.id}
                   data-testid="uds-intervento-mobile-card"
+                  data-intervento-id={intervento.id}
                   className={
                     intervento.bisogniPianificatiScaduti > 0
                       ? "border-red-300 bg-red-50/60"
@@ -772,7 +793,7 @@ export default function UdsInterventi() {
 
           <Card
             data-testid="uds-interventi-desktop"
-            className="hidden md:block"
+            className="hidden lg:block"
           >
             <CardContent className="p-0 overflow-x-auto">
               <Table className="min-w-[1100px]">
@@ -821,6 +842,7 @@ export default function UdsInterventi() {
                     rows.map((i) => (
                       <TableRow
                         key={i.id}
+                        data-intervento-id={i.id}
                         className={
                           i.bisogniPianificatiScaduti > 0
                             ? "bg-red-50/70"
@@ -975,7 +997,13 @@ export default function UdsInterventi() {
         onChanged={invalidateList}
       />
 
-      <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Sheet
+        open={isFormOpen}
+        onOpenChange={(open) => {
+          if (open) setIsFormOpen(true);
+          else closeInterventoForm();
+        }}
+      >
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
@@ -1130,7 +1158,7 @@ export default function UdsInterventi() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setIsFormOpen(false)}
+                    onClick={closeInterventoForm}
                   >
                     {t("common.cancel")}
                   </Button>
@@ -1151,6 +1179,7 @@ export default function UdsInterventi() {
           </div>
         </SheetContent>
       </Sheet>
+      <UnsavedChangesDialog guard={unsavedGuard} />
 
       <Dialog
         open={noteEditing != null}

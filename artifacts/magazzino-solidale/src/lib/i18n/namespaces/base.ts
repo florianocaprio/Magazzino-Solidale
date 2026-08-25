@@ -55,6 +55,16 @@ export const base = {
       centroLocked: "Assegnato automaticamente al tuo centro",
       sessionExpired: "Sessione scaduta",
       sessionExpiredDesc: "Sei stato disconnesso per inattività.",
+      sessionExpiring: "La sessione sta per scadere",
+      sessionExpiringDesc:
+        "Per sicurezza verrai disconnesso tra circa 2 minuti. Vuoi continuare la sessione?",
+      continueSession: "Continua sessione",
+      exitNow: "Esci ora",
+      sessionRenewalFailed: "Impossibile rinnovare la sessione",
+      unsavedChanges: "Modifiche non salvate",
+      unsavedChangesDesc: "Se esci ora, le modifiche inserite andranno perse.",
+      stayAndEdit: "Resta e continua",
+      discardChanges: "Scarta modifiche",
     },
     nav: {
       groups: {
@@ -181,6 +191,17 @@ export const base = {
       centroLocked: "Asignado automáticamente a tu centro",
       sessionExpired: "Sesión expirada",
       sessionExpiredDesc: "Se ha cerrado la sesión por inactividad.",
+      sessionExpiring: "La sesión está a punto de expirar",
+      sessionExpiringDesc:
+        "Por seguridad, se cerrará la sesión en unos 2 minutos. ¿Quieres continuar?",
+      continueSession: "Continuar sesión",
+      exitNow: "Salir ahora",
+      sessionRenewalFailed: "No se pudo renovar la sesión",
+      unsavedChanges: "Cambios sin guardar",
+      unsavedChangesDesc:
+        "Si sales ahora, se perderán los cambios introducidos.",
+      stayAndEdit: "Quedarse y continuar",
+      discardChanges: "Descartar cambios",
     },
     nav: {
       groups: {
@@ -307,6 +328,16 @@ export const base = {
       centroLocked: "Automatically assigned to your centre",
       sessionExpired: "Session expired",
       sessionExpiredDesc: "You have been logged out due to inactivity.",
+      sessionExpiring: "Your session is about to expire",
+      sessionExpiringDesc:
+        "For security, you will be logged out in about 2 minutes. Do you want to continue?",
+      continueSession: "Continue session",
+      exitNow: "Exit now",
+      sessionRenewalFailed: "Unable to renew the session",
+      unsavedChanges: "Unsaved changes",
+      unsavedChangesDesc: "If you leave now, your changes will be lost.",
+      stayAndEdit: "Stay and continue",
+      discardChanges: "Discard changes",
     },
     nav: {
       groups: {
@@ -433,6 +464,17 @@ export const base = {
       centroLocked: "Attribué automatiquement à votre centre",
       sessionExpired: "Session expirée",
       sessionExpiredDesc: "Vous avez été déconnecté pour cause d'inactivité.",
+      sessionExpiring: "Votre session va bientôt expirer",
+      sessionExpiringDesc:
+        "Pour des raisons de sécurité, vous serez déconnecté dans environ 2 minutes. Voulez-vous continuer ?",
+      continueSession: "Continuer la session",
+      exitNow: "Quitter maintenant",
+      sessionRenewalFailed: "Impossible de renouveler la session",
+      unsavedChanges: "Modifications non enregistrées",
+      unsavedChangesDesc:
+        "Si vous quittez maintenant, vos modifications seront perdues.",
+      stayAndEdit: "Rester et continuer",
+      discardChanges: "Ignorer les modifications",
     },
     nav: {
       groups: {
@@ -559,6 +601,17 @@ export const base = {
       centroLocked: "Automatisch Ihrem Zentrum zugewiesen",
       sessionExpired: "Sitzung abgelaufen",
       sessionExpiredDesc: "Sie wurden wegen Inaktivität abgemeldet.",
+      sessionExpiring: "Ihre Sitzung läuft bald ab",
+      sessionExpiringDesc:
+        "Aus Sicherheitsgründen werden Sie in etwa 2 Minuten abgemeldet. Möchten Sie fortfahren?",
+      continueSession: "Sitzung fortsetzen",
+      exitNow: "Jetzt abmelden",
+      sessionRenewalFailed: "Sitzung konnte nicht verlängert werden",
+      unsavedChanges: "Nicht gespeicherte Änderungen",
+      unsavedChangesDesc:
+        "Wenn Sie jetzt gehen, gehen Ihre Änderungen verloren.",
+      stayAndEdit: "Bleiben und fortfahren",
+      discardChanges: "Änderungen verwerfen",
     },
     nav: {
       groups: {
@@ -685,6 +738,16 @@ export const base = {
       centroLocked: "مُعيَّن تلقائيًا لمركزك",
       sessionExpired: "انتهت الجلسة",
       sessionExpiredDesc: "تم تسجيل خروجك بسبب عدم النشاط.",
+      sessionExpiring: "جلستك على وشك الانتهاء",
+      sessionExpiringDesc:
+        "لأسباب أمنية، سيتم تسجيل خروجك خلال دقيقتين تقريبًا. هل تريد المتابعة؟",
+      continueSession: "متابعة الجلسة",
+      exitNow: "الخروج الآن",
+      sessionRenewalFailed: "تعذر تجديد الجلسة",
+      unsavedChanges: "تغييرات غير محفوظة",
+      unsavedChangesDesc: "إذا غادرت الآن، ستفقد التغييرات التي أدخلتها.",
+      stayAndEdit: "البقاء والمتابعة",
+      discardChanges: "تجاهل التغييرات",
     },
     nav: {
       groups: {

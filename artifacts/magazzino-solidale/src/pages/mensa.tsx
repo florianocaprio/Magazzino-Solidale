@@ -675,7 +675,7 @@ export function MensaPostazione() {
                     setTemporaryPerson((value) => ({ ...value, sesso }))
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Sesso">
                     <SelectValue placeholder="Seleziona" />
                   </SelectTrigger>
                   <SelectContent>
@@ -712,7 +712,7 @@ export function MensaPostazione() {
                     }))
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Fascia d'età presunta">
                     <SelectValue placeholder="In alternativa alla data" />
                   </SelectTrigger>
                   <SelectContent>

@@ -1,6 +1,6 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { lazy, Suspense } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense, useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Loader2 } from "lucide-react";
@@ -18,8 +18,20 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { canAccessMapsApplication } from "@/lib/maps-access";
+import { createAppQueryClient } from "@/lib/query-client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+const IDLE_WARNING_MS = 2 * 60 * 1000;
 const IDLE_KEEPALIVE_MS = 5 * 60 * 1000;
 
 import type { MensaView } from "@/pages/mensa";
@@ -72,14 +84,7 @@ const SostieniProgetto = lazy(() => import("@/pages/sostieni-progetto"));
 const MensaPage = lazy(() => import("@/pages/mensa"));
 const MapsOperativa = lazy(() => import("@/pages/maps"));
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+const queryClient = createAppQueryClient();
 
 function Guard({
   area,
@@ -880,13 +885,18 @@ function AuthGate() {
   const { toast } = useToast();
   const { t } = useTranslation();
   const [location] = useLocation();
+  const [sessionWarningOpen, setSessionWarningOpen] = useState(false);
 
-  useIdleLogout({
+  const continueSession = useIdleLogout({
     enabled: !!user,
     timeoutMs: IDLE_TIMEOUT_MS,
+    warningMs: IDLE_WARNING_MS,
     keepAliveMs: IDLE_KEEPALIVE_MS,
     onKeepAlive: refresh,
+    onWarning: () => setSessionWarningOpen(true),
+    onResume: () => setSessionWarningOpen(false),
     onIdle: () => {
+      setSessionWarningOpen(false);
       logout();
       toast({
         title: t("common.sessionExpired"),
@@ -895,6 +905,17 @@ function AuthGate() {
       });
     },
   });
+
+  const handleContinueSession = async () => {
+    try {
+      await continueSession();
+    } catch {
+      toast({
+        title: t("common.sessionRenewalFailed"),
+        variant: "destructive",
+      });
+    }
+  };
 
   if (isLoading || bootstrapLoading) {
     return (
@@ -920,7 +941,32 @@ function AuthGate() {
   }
   if (user.mustChangePassword) return <ChangePassword />;
 
-  return <AppRoutes />;
+  return (
+    <>
+      <AppRoutes />
+      <AlertDialog open={sessionWarningOpen}>
+        <AlertDialogContent
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("common.sessionExpiring")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("common.sessionExpiringDesc")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={logout}>
+              {t("common.exitNow")}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleContinueSession()}>
+              {t("common.continueSession")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }
 
 function App() {

@@ -31,6 +31,7 @@ import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { volontarioLabel } from "@/lib/volontari-label";
 import { todayEuropeRome } from "@/lib/europe-rome";
+import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 
 const formSchema = z.object({
   beneficiarioId: z.coerce.number().min(1),
@@ -233,6 +234,11 @@ export default function Consegne() {
       fasciaOraria: "Mattina", magazzinoId: 0, noteOperative: ""
     }
   });
+  const unsavedGuard = useUnsavedChangesGuard(isFormOpen && form.formState.isDirty);
+  const closePlanningForm = () => unsavedGuard.requestClose(() => {
+    setIsFormOpen(false);
+    form.reset();
+  });
 
   const dataPrevistaWatch = form.watch("dataPrevista");
   const fasciaOrariaWatch = form.watch("fasciaOraria");
@@ -316,6 +322,7 @@ export default function Consegne() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() });
         toast({ title: t("consegne.toastConsegnaProgrammata") });
+        form.reset();
         setIsFormOpen(false);
       },
       onError: (e: unknown) => {
@@ -528,12 +535,12 @@ export default function Consegne() {
           <Button
             type="button"
             variant="outline"
-            className="min-h-11 gap-2 md:hidden"
+            className="min-h-11 gap-2 lg:hidden"
             onClick={() => setFiltersOpen(true)}
           >
             <Filter className="h-4 w-4" /> Filtri e ricerca
           </Button>
-          <div className="hidden flex-wrap items-center gap-2 md:flex">
+          <div className="hidden flex-wrap items-center gap-2 lg:flex">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Input
               value={search}
@@ -598,7 +605,7 @@ export default function Consegne() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="grid gap-3 p-3 md:hidden">
+          <div data-testid="consegne-mobile-list" className="grid gap-3 p-3 lg:hidden">
             {isLoading ? (
               Array.from({ length: 3 }, (_, index) => (
                 <Skeleton key={index} className="h-52 w-full rounded-lg" />
@@ -612,7 +619,7 @@ export default function Consegne() {
                 const bollaPronta =
                   c.bollaStato === "confermato" || c.bollaStato === "consegnato";
                 return (
-                  <article key={c.id} className="space-y-3 rounded-lg border bg-card p-4 shadow-sm">
+                  <article key={c.id} data-consegna-id={c.id} className="space-y-3 rounded-lg border bg-card p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-mono text-xs text-muted-foreground">{c.codice}</p>
@@ -684,7 +691,7 @@ export default function Consegne() {
               })
             )}
           </div>
-          <Table className="hidden md:table">
+          <Table data-testid="consegne-desktop-list" className="hidden lg:table">
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.code")}</TableHead>
@@ -716,7 +723,7 @@ export default function Consegne() {
                   <TableCell colSpan={isGlobal ? 8 : 7} className="h-32 text-center text-muted-foreground">{t("consegne.emptyState")}</TableCell>
                 </TableRow>
               ) : consegne?.map((c) => (
-                <TableRow key={c.id}>
+                <TableRow key={c.id} data-consegna-id={c.id}>
                   <TableCell className="font-mono text-xs">{c.codice}</TableCell>
                   <TableCell>
                     <div className="font-medium">{format(new Date(c.dataPrevista), "dd MMM yyyy", { locale: it })}</div>
@@ -788,7 +795,7 @@ export default function Consegne() {
                               setSelectedBollaId(c.bollaId ? String(c.bollaId) : "");
                             }
                           }}
-                          className="text-left disabled:cursor-default disabled:opacity-100 enabled:hover:opacity-80"
+                          className="min-h-11 text-left disabled:cursor-default disabled:opacity-100 enabled:hover:opacity-80"
                           title={consegnata ? (c.bollaId != null ? t("consegne.titleViewBolla") : undefined) : t("consegne.titleManageBolla")}
                         >
                           {badge}
@@ -962,7 +969,7 @@ export default function Consegne() {
         </SheetContent>
       </Sheet>
 
-      <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Sheet open={isFormOpen} onOpenChange={(open) => { if (open) setIsFormOpen(true); else closePlanningForm(); }}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader><SheetTitle>{t("consegne.planDelivery")}</SheetTitle></SheetHeader>
           <div className="mt-6">
@@ -972,7 +979,7 @@ export default function Consegne() {
                   <div className="space-y-2">
                     <Label>{t("consegne.filterAreaOperativa")}</Label>
                     <Select value={areaOperativaFilter} onValueChange={handleAreaOperativaFilterChange}>
-                      <SelectTrigger><SelectValue placeholder={t("consegne.filterAreaOperativa")} /></SelectTrigger>
+                      <SelectTrigger aria-label={t("consegne.filterAreaOperativa")}><SelectValue placeholder={t("consegne.filterAreaOperativa")} /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">{t("consegne.filterAllAreaOperativa")}</SelectItem>
                         {areaOperativaList?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
@@ -983,7 +990,7 @@ export default function Consegne() {
                 <div className="space-y-2">
                   <Label>{t("consegne.centroFilterLabel")}</Label>
                   <Select value={createCentroId} onValueChange={(v) => { setCreateCentroId(v); form.setValue("beneficiarioId", 0); }} disabled={isCentroLocked || areaOperativaNotChosen}>
-                    <SelectTrigger><SelectValue placeholder={areaOperativaNotChosen ? t("consegne.selectAreaOperativaFirst") : undefined} /></SelectTrigger>
+                    <SelectTrigger aria-label={t("consegne.centroFilterLabel")}><SelectValue placeholder={areaOperativaNotChosen ? t("consegne.selectAreaOperativaFirst") : undefined} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t("consegne.allBeneficiari")}</SelectItem>
                       {centriFiltrati.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
@@ -1023,6 +1030,7 @@ export default function Consegne() {
                         }
                       }}
                       placeholder={t("consegne.selectPlaceholder")}
+                      ariaLabel={t("consegne.beneficiario")}
                       emptyText={t("consegne.noBeneficiarioForCentro")}
                       selectedLabelFallback={(() => {
                         const sel = allBeneficiari?.find(b => b.id === field.value);
@@ -1041,7 +1049,7 @@ export default function Consegne() {
                     <FormItem>
                       <FormLabel>{t("consegne.formFascia")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger aria-label={t("consegne.formFascia")}><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="Mattina">{t("consegne.fasciaMattina")}</SelectItem>
                           <SelectItem value="Pomeriggio">{t("consegne.fasciaPomeriggio")}</SelectItem>
@@ -1076,7 +1084,7 @@ export default function Consegne() {
                       }}
                       defaultValue={field.value}
                     >
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger aria-label={t("consegne.formModalita")}><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="in_sede">{t("consegne.modInSede")}</SelectItem>
                         <SelectItem value="domicilio">{t("consegne.modDomicilio")}</SelectItem>
@@ -1111,7 +1119,7 @@ export default function Consegne() {
                             field.onChange(Number(v));
                           }}
                         >
-                          <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger aria-label={t("consegne.formVolontario")}><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="0">{t("common.none")}</SelectItem>
                             <SelectItem value="altro">{t("consegne.volontarioAltro", { defaultValue: "Altro" })}</SelectItem>
@@ -1208,7 +1216,7 @@ export default function Consegne() {
                     <FormItem>
                       <FormLabel>{t("consegne.formMagazzino")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
-                        <FormControl><SelectTrigger><SelectValue placeholder={t("consegne.selectPlaceholder")} /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger aria-label={t("consegne.formMagazzino")}><SelectValue placeholder={t("consegne.selectPlaceholder")} /></SelectTrigger></FormControl>
                         <SelectContent>
                           {magazzini?.map(m => <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>)}
                         </SelectContent>
@@ -1218,7 +1226,7 @@ export default function Consegne() {
                 </div>
 
                 <div className="pt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
+                  <Button type="button" variant="outline" onClick={closePlanningForm}>{t("common.cancel")}</Button>
                   <Button type="submit" disabled={createConsegna.isPending}>{t("common.save")}</Button>
                 </div>
               </form>
@@ -1226,6 +1234,7 @@ export default function Consegne() {
           </div>
         </SheetContent>
       </Sheet>
+      <UnsavedChangesDialog guard={unsavedGuard} />
 
       <Dialog open={volontarioDialogOpen} onOpenChange={(open) => {
         setVolontarioDialogOpen(open);

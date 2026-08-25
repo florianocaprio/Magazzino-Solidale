@@ -190,7 +190,7 @@ export function InterventiSocialiWorkspace({
     return (
       <>
         <div
-          className="hidden overflow-x-auto md:block"
+          className="hidden overflow-x-auto lg:block"
           data-testid="interventi-desktop-list"
         >
           <Table>
@@ -211,6 +211,7 @@ export function InterventiSocialiWorkspace({
               {interventi.map((intervento) => (
                 <TableRow
                   key={intervento.id}
+                  data-intervento-id={intervento.id}
                   tabIndex={0}
                   className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   onClick={() => onOpenIntervento(intervento)}
@@ -279,12 +280,13 @@ export function InterventiSocialiWorkspace({
         </div>
 
         <div
-          className="space-y-3 p-3 md:hidden"
+          className="space-y-3 p-3 lg:hidden"
           data-testid="interventi-mobile-list"
         >
           {interventi.map((intervento) => (
             <button
               key={intervento.id}
+              data-intervento-id={intervento.id}
               type="button"
               onClick={() => onOpenIntervento(intervento)}
               className="w-full rounded-lg border bg-card p-4 text-left shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
