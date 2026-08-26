@@ -271,6 +271,23 @@ Docker `api web`. La Fase 5-5 non comprende ottimizzazione multi-tappa, tracking
 GPS, analytics/heatmap, PostGIS o un layer UDS ricavato da dati non pertinenti;
 queste estensioni restano candidate per la 5-5.2.
 
+## Licenza e contributi
+
+Magazzino Solidale è **source-available per uso non commerciale** secondo la
+[PolyForm Noncommercial License 1.0.0](LICENSE.md). È consentito studiare,
+modificare e distribuire il codice per finalità non commerciali nel rispetto
+della licenza. L'uso commerciale del software o di sue parti, anche in prodotti
+o servizi di terzi, richiede una preventiva licenza scritta di Angeli in Moto
+ODV.
+
+La limitazione commerciale rende questa licenza non conforme alla Open Source
+Definition: il progetto non va descritto come “open source” in senso OSI. Per
+proporre modifiche consulta [CONTRIBUTING.md](CONTRIBUTING.md); prima del merge è
+richiesto il [Contributor Agreement](CONTRIBUTOR_AGREEMENT.md).
+
+I componenti e le dipendenze di terzi restano soggetti alle rispettive licenze.
+Per informazioni o licenze commerciali: `angeliinmoto@pec.it`.
+
 ## Note
 
 - I segreti vanno **solo** nel file `.env`, che è escluso dal versionamento.
