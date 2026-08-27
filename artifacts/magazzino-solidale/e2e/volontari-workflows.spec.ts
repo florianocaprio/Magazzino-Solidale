@@ -28,7 +28,7 @@ test("Volontari 2.0 mantiene lista, dossier e azioni accessibili", async ({
   );
   expect(role, "seed sintetico ruolo volontario mancante").toBeDefined();
 
-  const suffix = `${testInfo.project.name.replace(/\W/g, "-")}-${Date.now()}`;
+  const suffix = `${testInfo.project.name.slice(0, 8).replace(/\W/g, "-")}-${Date.now().toString(36)}`;
   const matricola = `E2E-VOL-${suffix}`;
   const createResponse = await page.request.post("/api/volontari", {
     data: {
@@ -40,8 +40,11 @@ test("Volontari 2.0 mantiene lista, dossier e azioni accessibili", async ({
       email: `ada.${suffix}@example.test`,
     },
   });
-  expect(createResponse.status()).toBe(201);
-  const created = (await createResponse.json()) as Volunteer;
+  const createBody = (await createResponse.json()) as Volunteer & {
+    error?: string;
+  };
+  expect(createResponse.status(), JSON.stringify(createBody)).toBe(201);
+  const created = createBody;
 
   const approvalResponse = await page.request.post(
     `/api/approvazioni-logistica/volontari/${created.id}/approva`,
@@ -68,9 +71,12 @@ test("Volontari 2.0 mantiene lista, dossier e azioni accessibili", async ({
   await page
     .getByPlaceholder(/cerca nome, cognome o matricola/i)
     .fill(matricola);
-  await expect(page.getByText(matricola, { exact: true })).toBeVisible();
-
   const compact = (viewport?.width ?? 0) < 1024;
+  const visibleList = page.getByTestId(
+    compact ? "volontari-mobile-list" : "volontari-desktop-list",
+  );
+  await expect(visibleList.getByText(matricola, { exact: false })).toBeVisible();
+
   if (compact) {
     await expect(page.getByTestId("volontari-mobile-list")).toBeVisible();
     await expect(page.getByTestId("volontari-desktop-list")).toBeHidden();
@@ -80,20 +86,22 @@ test("Volontari 2.0 mantiene lista, dossier e azioni accessibili", async ({
     await expect(page.getByTestId("volontari-desktop-list")).toBeVisible();
     await page.getByRole("button", { name: /apri scheda/i }).click();
   }
-  await expect(
-    page.getByRole("heading", { name: /esempio ada/i }),
-  ).toBeVisible();
+  const dossierHeading = page.getByRole("heading", { name: /esempio ada/i });
+  await expect(dossierHeading).toBeVisible();
   await expect(page.getByRole("tab", { name: /anagrafica/i })).toBeVisible();
   await expect(page.getByRole("tab", { name: /operatività/i })).toBeVisible();
   await expect(page.getByRole("tab", { name: /assicurazione/i })).toBeVisible();
   await expect(page.getByRole("tab", { name: /formazione/i })).toBeVisible();
   await expect(page.getByRole("tab", { name: /storico/i })).toBeVisible();
   await page.getByRole("button", { name: /registra \/ rinnova/i }).click();
-  await expect(
-    page.getByRole("heading", { name: /registra \/ rinnova assicurazione/i }),
-  ).toBeVisible();
+  const insuranceHeading = page.getByRole("heading", {
+    name: /registra \/ rinnova assicurazione/i,
+  });
+  await expect(insuranceHeading).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(insuranceHeading).toBeHidden();
   await page.keyboard.press("Escape");
+  await expect(dossierHeading).toBeHidden();
 
   await expect(
     page.getByRole("heading", { name: /^volontari$/i }),

@@ -213,6 +213,9 @@ function InsuranceBadge({ volunteer }: { volunteer: Volontario }) {
   );
 }
 
+const touchCheckboxClass =
+  "relative h-11 w-11 border-0 bg-transparent shadow-none before:absolute before:h-4 before:w-4 before:rounded-sm before:border before:border-primary data-[state=checked]:bg-transparent data-[state=checked]:before:bg-primary [&_svg]:relative [&_svg]:z-10";
+
 export default function Volontari() {
   const { user, hasPermission } = useAuth();
   const lockedCenterId = user?.centroAscoltoId ?? null;
@@ -842,6 +845,7 @@ export default function Volontari() {
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
+                      className={touchCheckboxClass}
                       checked={allSelected}
                       onCheckedChange={(checked) => toggleAll(checked === true)}
                       aria-label="Seleziona tutti"
@@ -878,6 +882,7 @@ export default function Volontari() {
                     <TableRow key={volunteer.id} data-testid="volontario-row">
                       <TableCell>
                         <Checkbox
+                          className={touchCheckboxClass}
                           checked={selectedIds.has(volunteer.id)}
                           onCheckedChange={(checked) =>
                             toggleSelected(volunteer.id, checked === true)
@@ -999,7 +1004,7 @@ export default function Volontari() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
                       <Checkbox
-                        className="mt-1"
+                        className={`-mt-2 ${touchCheckboxClass}`}
                         checked={selectedIds.has(volunteer.id)}
                         onCheckedChange={(checked) =>
                           toggleSelected(volunteer.id, checked === true)

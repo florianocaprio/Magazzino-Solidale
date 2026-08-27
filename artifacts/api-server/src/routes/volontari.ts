@@ -59,6 +59,40 @@ router.use("/volontari", requireModulo("VOLONTARI"));
 const actorId = (req: Request): number | null =>
   req.user?.id && req.user.id > 0 ? req.user.id : null;
 
+const VOLONTARIO_TEXT_LIMITS = {
+  nome: 80,
+  cognome: 80,
+  matricola: 40,
+  telefono: 20,
+  telefonoSecondario: 20,
+  email: 120,
+  luogoNascita: 120,
+  indirizzoResidenza: 240,
+  codiceFiscale: 32,
+} as const;
+
+function validateVolontarioTextFields(
+  values: Record<string, unknown>,
+): string | null {
+  for (const [field, max] of Object.entries(VOLONTARIO_TEXT_LIMITS)) {
+    if (values[field] == null) continue;
+    if (typeof values[field] !== "string") return `${field} non valido`;
+    const normalized = values[field].trim();
+    values[field] = normalized || null;
+    if (normalized.length > max) {
+      return `${field} supera la lunghezza massima di ${max} caratteri`;
+    }
+  }
+  if (
+    values.dataNascita != null &&
+    (typeof values.dataNascita !== "string" ||
+      !isDateOnly(values.dataNascita))
+  ) {
+    return "dataNascita non valida";
+  }
+  return null;
+}
+
 type VolontarioRow = typeof volontariTable.$inferSelect & {
   centroAscoltoNome: string | null;
   ruoloCatalogoNome: string | null;
@@ -339,6 +373,8 @@ async function createVolontarioOne(
   for (const field of ["patente", "mezzoPersonale"] as const) {
     if (typeof body[field] === "boolean") values[field] = body[field];
   }
+  const textError = validateVolontarioTextFields(values);
+  if (textError) return { error: textError, status: 400 };
   if (typeof values.nome !== "string" || typeof values.cognome !== "string") {
     return { error: "Nome e cognome sono obbligatori", status: 400 };
   }
@@ -681,6 +717,17 @@ router.patch(
       "note",
     ] as const) {
       if (req.body?.[field] !== undefined) updates[field] = req.body[field];
+    }
+    const textError = validateVolontarioTextFields(updates);
+    if (
+      textError ||
+      ("nome" in updates && updates.nome == null) ||
+      ("cognome" in updates && updates.cognome == null)
+    ) {
+      res
+        .status(400)
+        .json({ error: textError ?? "Nome e cognome non possono essere vuoti" });
+      return;
     }
     if ("matricola" in updates) {
       const matricola = normalizeVolontarioMatricola(updates.matricola);

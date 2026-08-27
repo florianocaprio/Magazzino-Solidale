@@ -504,6 +504,15 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
   });
 
   it("rifiuta duplicati fiscali, maschera la lista e mantiene il dettaglio autorizzato", async () => {
+    const invalidLength = await request(app()).post("/volontari").send({
+      nome: "Ada",
+      cognome: "TroppoLunga",
+      matricola: "X".repeat(41),
+      ruoloVolontarioId: ruoloId,
+    });
+    expect(invalidLength.status).toBe(400);
+    expect(invalidLength.body.error).toMatch(/matricola.*40/i);
+
     const first = await createVolunteer({
       codiceFiscale: "RSS MRA 80A01 H501 U",
       telefono: "0012345",
