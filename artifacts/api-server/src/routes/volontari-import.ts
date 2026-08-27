@@ -40,6 +40,8 @@ import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
 router.use("/volontari", requireModulo("VOLONTARI"));
+const actorId = (req: Request): number | null =>
+  req.user?.id && req.user.id > 0 ? req.user.id : null;
 const xlsxBody = express.raw({
   type: [VOLONTARI_XLSX_MIME, "application/octet-stream"],
   limit: VOLONTARI_IMPORT_MAX_BYTES,
@@ -277,7 +279,7 @@ router.post(
       const [batch] = await tx.insert(importazioniVolontariTable).values({
         nomeFile: fileName, mimeType: VOLONTARI_XLSX_MIME, dimensioneBytes: req.body.length,
         sha256File, hashContenutoNormalizzato: normalizedHash, centroAscoltoId: effectiveCenter,
-        numeroRighe: normalized.length, creatoDa: req.user?.id ?? null,
+        numeroRighe: normalized.length, creatoDa: actorId(req),
       }).returning();
       const rows = await tx.insert(importazioniVolontariRigheTable).values(normalized.map((row) => ({
         importazioneId: batch.id, numeroRiga: row.numeroRiga, statoRiga: row.stato,
@@ -460,21 +462,21 @@ router.post(
             sezione: data.tipoVolontario, tipoEvento: "REGISTRAZIONE", volontarioId: volunteer.id,
             centroAscoltoId: centroId, dataEffettiva: data.dataInizioImportata ?? todayRome(),
             snapshot: { origine: "IMPORT_VOLONTARI_2_0", importazioneId: batch.id, numeroRiga: stored.numeroRiga, matricola: data.matricola },
-            utenteId: req.user?.id ?? null,
+            utenteId: actorId(req),
           });
         }
         if (data.scadenzaAssicurazione) {
           await tx.insert(copertureAssicurativeVolontariTable).values({
             volontarioId: volunteer.id, dataInizio: null, dataFine: data.scadenzaAssicurazione,
             durataMesi: null, tipoOperazione: "IMPORTAZIONE",
-            note: `Importazione ${batch.id}, riga ${stored.numeroRiga}`, creatoDa: req.user?.id ?? null,
+            note: `Importazione ${batch.id}, riga ${stored.numeroRiga}`, creatoDa: actorId(req),
           }).onConflictDoNothing();
         }
         if (data.tipoVolontario === "TEMPORANEO" && data.dataServizio) {
           await tx.insert(giornateServizioVolontariTable).values({
             volontarioId: volunteer.id, dataServizio: data.dataServizio, centroAscoltoId: centroId,
             stato: "PIANIFICATA", coperturaVerificata: Boolean(data.scadenzaAssicurazione && data.scadenzaAssicurazione >= data.dataServizio),
-            note: `Importazione ${batch.id}, riga ${stored.numeroRiga}`, creatoDa: req.user?.id ?? null,
+            note: `Importazione ${batch.id}, riga ${stored.numeroRiga}`, creatoDa: actorId(req),
           }).onConflictDoNothing();
         }
         await auditLogistica(tx, req, {
@@ -486,7 +488,7 @@ router.post(
       const stato = errori > 0 ? "PARZIALE" : "CONFERMATO";
       const [finalBatch] = await tx.update(importazioniVolontariTable).set({
         stato, creati, aggiornati, invariati, esclusi, errori,
-        confermatoDa: req.user?.id ?? null, dataConferma: new Date(),
+        confermatoDa: actorId(req), dataConferma: new Date(),
       }).where(eq(importazioniVolontariTable.id, batch.id)).returning();
       await auditLogistica(tx, req, {
         entita: "volontario", id: batch.id, azione: "import_conferma",

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   customFetch,
+  getVolontario,
   getListVolontariQueryKey,
   type Volontario,
 } from "@workspace/api-client-react";
@@ -192,6 +193,11 @@ export function VolontarioDossierSheet({
       customFetch<Dossier>(`/api/volontari/${volontario!.id}/dossier`),
     enabled: volontario != null,
   });
+  const detailQuery = useQuery({
+    queryKey: ["volontario-detail", volontario?.id],
+    queryFn: () => getVolontario(volontario!.id),
+    enabled: volontario != null,
+  });
   const coursesQuery = useQuery({
     queryKey: ["volontari-corsi-catalogo"],
     queryFn: () =>
@@ -276,6 +282,7 @@ export function VolontarioDossierSheet({
   };
 
   const dossier = dossierQuery.data;
+  const dettaglio = detailQuery.data ?? volontario;
   const state = dossier?.statoOperativo;
   return (
     <>
@@ -283,19 +290,19 @@ export function VolontarioDossierSheet({
         <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
           <SheetHeader className="pr-8">
             <SheetTitle>
-              {volontario
-                ? `${volontario.cognome} ${volontario.nome}`
+              {dettaglio
+                ? `${dettaglio.cognome} ${dettaglio.nome}`
                 : "Scheda volontario"}
             </SheetTitle>
             <SheetDescription>
-              {volontario?.matricola ?? "Senza matricola"} ·{" "}
-              {volontario?.tipoVolontario === "TEMPORANEO"
+              {dettaglio?.matricola ?? "Senza matricola"} ·{" "}
+              {dettaglio?.tipoVolontario === "TEMPORANEO"
                 ? "Temporaneo"
                 : "Permanente"}
             </SheetDescription>
           </SheetHeader>
 
-          {volontario && (
+          {dettaglio && (
             <div className="mt-5 space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
                 <div>
@@ -317,15 +324,15 @@ export function VolontarioDossierSheet({
                     <Button
                       variant="outline"
                       className="min-h-11"
-                      onClick={() => onEdit(volontario)}
+                      onClick={() => onEdit(dettaglio)}
                     >
                       <Pencil className="mr-2 h-4 w-4" /> Modifica
                     </Button>
-                    {volontario.sospesoManualmente ? (
+                    {dettaglio.sospesoManualmente ? (
                       <Button
                         variant="outline"
                         className="min-h-11"
-                        onClick={() => onOperation(volontario, "riattiva")}
+                        onClick={() => onOperation(dettaglio, "riattiva")}
                       >
                         Riattiva
                       </Button>
@@ -333,14 +340,14 @@ export function VolontarioDossierSheet({
                       <Button
                         variant="outline"
                         className="min-h-11"
-                        onClick={() => onOperation(volontario, "sospendi")}
+                        onClick={() => onOperation(dettaglio, "sospendi")}
                       >
                         Sospendi
                       </Button>
                     )}
                     <Button
                       className="min-h-11"
-                      onClick={() => onOperation(volontario, "assicurazione")}
+                      onClick={() => onOperation(dettaglio, "assicurazione")}
                     >
                       <ShieldCheck className="mr-2 h-4 w-4" /> Registra /
                       Rinnova
@@ -372,36 +379,33 @@ export function VolontarioDossierSheet({
 
                 <TabsContent value="anagrafica" className="mt-4">
                   <div className="grid gap-5 rounded-xl border p-5 sm:grid-cols-2">
-                    <Field label="Nome" value={volontario.nome} />
-                    <Field label="Cognome" value={volontario.cognome} />
-                    <Field label="Matricola" value={volontario.matricola} />
+                    <Field label="Nome" value={dettaglio.nome} />
+                    <Field label="Cognome" value={dettaglio.cognome} />
+                    <Field label="Matricola" value={dettaglio.matricola} />
                     <Field
                       label="Codice fiscale"
-                      value={volontario.codiceFiscale}
+                      value={dettaglio.codiceFiscale}
                     />
                     <Field
                       label="Data di nascita"
-                      value={volontario.dataNascita}
+                      value={dettaglio.dataNascita}
                     />
                     <Field
                       label="Luogo di nascita"
-                      value={volontario.luogoNascita}
+                      value={dettaglio.luogoNascita}
                     />
                     <Field
                       label="Indirizzo di residenza"
-                      value={volontario.indirizzoResidenza}
+                      value={dettaglio.indirizzoResidenza}
                     />
-                    <Field
-                      label="Centro"
-                      value={volontario.centroAscoltoNome}
-                    />
-                    <Field label="Cellulare" value={volontario.telefono} />
+                    <Field label="Centro" value={dettaglio.centroAscoltoNome} />
+                    <Field label="Cellulare" value={dettaglio.telefono} />
                     <Field
                       label="Telefono"
-                      value={volontario.telefonoSecondario}
+                      value={dettaglio.telefonoSecondario}
                     />
-                    <Field label="Email" value={volontario.email} />
-                    <Field label="Note" value={volontario.note} />
+                    <Field label="Email" value={dettaglio.email} />
+                    <Field label="Note" value={dettaglio.note} />
                   </div>
                 </TabsContent>
 
@@ -417,12 +421,12 @@ export function VolontarioDossierSheet({
                     />
                     <Field
                       label="Approvazione"
-                      value={volontario.statoApprovazione}
+                      value={dettaglio.statoApprovazione}
                     />
                     <Field
                       label="Abilitazione manuale"
                       value={
-                        volontario.abilitatoAmministrativamente
+                        dettaglio.abilitatoAmministrativamente
                           ? "Abilitato"
                           : "Sospeso"
                       }
@@ -430,29 +434,29 @@ export function VolontarioDossierSheet({
                     <Field
                       label="Tipo"
                       value={
-                        volontario.tipoVolontario === "TEMPORANEO"
+                        dettaglio.tipoVolontario === "TEMPORANEO"
                           ? "Temporaneo"
                           : "Permanente"
                       }
                     />
                     <Field
                       label="Ruolo"
-                      value={volontario.ruoloCatalogoNome ?? volontario.ruolo}
+                      value={dettaglio.ruoloCatalogoNome ?? dettaglio.ruolo}
                     />
                     <Field
                       label="Patente"
-                      value={volontario.patente ? "Sì" : "No"}
+                      value={dettaglio.patente ? "Sì" : "No"}
                     />
                     <Field
                       label="Mezzo personale"
-                      value={volontario.mezzoPersonale ? "Sì" : "No"}
+                      value={dettaglio.mezzoPersonale ? "Sì" : "No"}
                     />
                     <Field
                       label="Massimo consegne/turno"
-                      value={volontario.maxConsegneTurno}
+                      value={dettaglio.maxConsegneTurno}
                     />
                   </div>
-                  {volontario.tipoVolontario === "TEMPORANEO" && canManage && (
+                  {dettaglio.tipoVolontario === "TEMPORANEO" && canManage && (
                     <Button
                       variant="outline"
                       className="min-h-11"
@@ -576,7 +580,7 @@ export function VolontarioDossierSheet({
                 </TabsContent>
 
                 <TabsContent value="storico" className="mt-4 space-y-5">
-                  {volontario.tipoVolontario === "TEMPORANEO" && (
+                  {dettaglio.tipoVolontario === "TEMPORANEO" && (
                     <div>
                       <h3 className="mb-2 font-semibold">
                         Giornate temporanee

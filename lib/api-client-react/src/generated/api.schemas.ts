@@ -3009,6 +3009,10 @@ export interface Consegna {
   /** @nullable */
   volontarioNome?: string | null;
   /** @nullable */
+  volontarioOperativo?: boolean | null;
+  /** @nullable */
+  volontarioMotivoNonOperativo?: string | null;
+  /** @nullable */
   volontarioAltro?: string | null;
   /** @nullable */
   mezzoId?: number | null;
@@ -6329,7 +6333,49 @@ export const VolontariRegisterGenerateInputTipo = {
   XLSX: 'XLSX',
 } as const;
 
-export type VolontariRegisterGenerateInputFiltri = { [key: string]: unknown };
+export type VolontariRegisterGenerateInputFiltriTipo = typeof VolontariRegisterGenerateInputFiltriTipo[keyof typeof VolontariRegisterGenerateInputFiltriTipo];
+
+
+export const VolontariRegisterGenerateInputFiltriTipo = {
+  TUTTI: 'TUTTI',
+  PERMANENTE: 'PERMANENTE',
+  TEMPORANEO: 'TEMPORANEO',
+} as const;
+
+export type VolontariRegisterGenerateInputFiltriStato = typeof VolontariRegisterGenerateInputFiltriStato[keyof typeof VolontariRegisterGenerateInputFiltriStato];
+
+
+export const VolontariRegisterGenerateInputFiltriStato = {
+  tutti: 'tutti',
+  attivi: 'attivi',
+  non_attivi: 'non_attivi',
+} as const;
+
+export type VolontariRegisterGenerateInputFiltriAssicurazione = typeof VolontariRegisterGenerateInputFiltriAssicurazione[keyof typeof VolontariRegisterGenerateInputFiltriAssicurazione];
+
+
+export const VolontariRegisterGenerateInputFiltriAssicurazione = {
+  MANCANTE: 'MANCANTE',
+  VALIDA: 'VALIDA',
+  IN_SCADENZA: 'IN_SCADENZA',
+  SCADUTA: 'SCADUTA',
+  NON_ANCORA_VALIDA: 'NON_ANCORA_VALIDA',
+} as const;
+
+export type VolontariRegisterGenerateInputFiltri = {
+  tipo?: VolontariRegisterGenerateInputFiltriTipo;
+  stato?: VolontariRegisterGenerateInputFiltriStato;
+  dataRiferimento?: string;
+  /** @minimum 1 */
+  centroAscoltoId?: number;
+  /** @minimum 1 */
+  ruoloVolontarioId?: number;
+  search?: string;
+  assicurazione?: VolontariRegisterGenerateInputFiltriAssicurazione;
+  dataServizio?: string;
+  servizioDa?: string;
+  servizioA?: string;
+};
 
 export interface VolontariRegisterGenerateInput {
   tipo?: VolontariRegisterGenerateInputTipo;

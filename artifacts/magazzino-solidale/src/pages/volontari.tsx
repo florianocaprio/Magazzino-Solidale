@@ -3,6 +3,7 @@ import {
   confirmBulkVolontariInsurance,
   createVolontarioServiceDay,
   customFetch,
+  getVolontario,
   getListVolontariQueryKey,
   previewBulkVolontariInsurance,
   useCreateVolontario,
@@ -241,6 +242,8 @@ export default function Volontari() {
   );
   const [expiryFrom, setExpiryFrom] = useState("");
   const [expiryTo, setExpiryTo] = useState("");
+  const [serviceFrom, setServiceFrom] = useState("");
+  const [serviceTo, setServiceTo] = useState("");
   const [expiredMonths, setExpiredMonths] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -299,29 +302,38 @@ export default function Volontari() {
     setDraft(emptyDraft(lockedCenterId));
     setFormOpen(true);
   };
-  const openEdit = (volunteer: Volontario) => {
-    setEditing(volunteer);
-    setDraft({
-      nome: volunteer.nome,
-      cognome: volunteer.cognome,
-      matricola: volunteer.matricola ?? "",
-      tipoVolontario: volunteer.tipoVolontario,
-      centroAscoltoId: volunteer.centroAscoltoId ?? null,
-      ruoloVolontarioId: volunteer.ruoloVolontarioId ?? 0,
-      telefono: volunteer.telefono ?? "",
-      telefonoSecondario: volunteer.telefonoSecondario ?? "",
-      email: volunteer.email ?? "",
-      luogoNascita: volunteer.luogoNascita ?? "",
-      dataNascita: volunteer.dataNascita ?? "",
-      indirizzoResidenza: volunteer.indirizzoResidenza ?? "",
-      codiceFiscale: volunteer.codiceFiscale ?? "",
-      patente: volunteer.patente,
-      mezzoPersonale: volunteer.mezzoPersonale,
-      maxConsegneTurno: volunteer.maxConsegneTurno,
-      note: volunteer.note ?? "",
-      dataServizio: "",
-    });
-    setFormOpen(true);
+  const openEdit = async (volunteer: Volontario) => {
+    try {
+      const detail = await getVolontario(volunteer.id);
+      setEditing(detail);
+      setDraft({
+        nome: detail.nome,
+        cognome: detail.cognome,
+        matricola: detail.matricola ?? "",
+        tipoVolontario: detail.tipoVolontario,
+        centroAscoltoId: detail.centroAscoltoId ?? null,
+        ruoloVolontarioId: detail.ruoloVolontarioId ?? 0,
+        telefono: detail.telefono ?? "",
+        telefonoSecondario: detail.telefonoSecondario ?? "",
+        email: detail.email ?? "",
+        luogoNascita: detail.luogoNascita ?? "",
+        dataNascita: detail.dataNascita ?? "",
+        indirizzoResidenza: detail.indirizzoResidenza ?? "",
+        codiceFiscale: detail.codiceFiscale ?? "",
+        patente: detail.patente,
+        mezzoPersonale: detail.mezzoPersonale,
+        maxConsegneTurno: detail.maxConsegneTurno,
+        note: detail.note ?? "",
+        dataServizio: "",
+      });
+      setFormOpen(true);
+    } catch (error) {
+      toast({
+        title: "Impossibile caricare la scheda completa",
+        description: errorMessage(error),
+        variant: "destructive",
+      });
+    }
   };
   const setField = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
@@ -497,6 +509,8 @@ export default function Volontari() {
     query.set("dataRiferimento", referenceDate);
     if (role !== "all") query.set("ruoloVolontarioId", role);
     if (insurance !== "all") query.set("assicurazione", insurance);
+    if (serviceFrom) query.set("servizioDa", serviceFrom);
+    if (serviceTo) query.set("servizioA", serviceTo);
     return query.toString();
   };
   const exportFile = async (
@@ -526,6 +540,9 @@ export default function Volontari() {
                   ...(role !== "all"
                     ? { ruoloVolontarioId: Number(role) }
                     : {}),
+                  ...(insurance !== "all" ? { assicurazione: insurance } : {}),
+                  ...(serviceFrom ? { servizioDa: serviceFrom } : {}),
+                  ...(serviceTo ? { servizioA: serviceTo } : {}),
                 },
               }),
             });
@@ -778,6 +795,24 @@ export default function Volontari() {
                   type="date"
                   value={expiryTo}
                   onChange={(event) => setExpiryTo(event.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Servizio temporanei da</Label>
+                <Input
+                  className="min-h-11"
+                  type="date"
+                  value={serviceFrom}
+                  onChange={(event) => setServiceFrom(event.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Servizio temporanei a</Label>
+                <Input
+                  className="min-h-11"
+                  type="date"
+                  value={serviceTo}
+                  onChange={(event) => setServiceTo(event.target.value)}
                 />
               </div>
             </div>

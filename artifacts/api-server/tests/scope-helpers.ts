@@ -37,8 +37,16 @@ import {
   carichiMagazzinoRigheTable,
   carichiMagazzinoTable,
   operazioniDistribuzioneMagazzinoTable,
+  copertureAssicurativeVolontariTable,
+  corsiDeiVolontariTable,
+  emissioniRegistroVolontariTable,
+  giornateServizioVolontariTable,
+  importazioniVolontariTable,
+  qualificheDeiVolontariTable,
+  registroVolontariEventiTable,
+  statiVolontariTable,
 } from "@workspace/db";
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 
 /**
  * Shared fixtures + app builder for the per-Centro-di-Ascolto scoping tests.
@@ -371,6 +379,13 @@ export async function createVolontario(
       statoApprovazione: "approvato",
     })
     .returning({ id: volontariTable.id });
+  await db.insert(copertureAssicurativeVolontariTable).values({
+    volontarioId: v.id,
+    dataInizio: "2000-01-01",
+    dataFine: "2099-12-31",
+    tipoOperazione: "NUOVA_COPERTURA",
+    note: "Copertura fixture per test logistici",
+  });
   scope.volontarioIds.push(v.id);
   return v.id;
 }
@@ -856,6 +871,50 @@ export async function cleanup(scope: SeedScope): Promise<void> {
   }
   if (scope.volontarioIds.length > 0) {
     await db
+      .delete(qualificheDeiVolontariTable)
+      .where(
+        inArray(qualificheDeiVolontariTable.volontarioId, scope.volontarioIds),
+      );
+    await db
+      .delete(corsiDeiVolontariTable)
+      .where(inArray(corsiDeiVolontariTable.volontarioId, scope.volontarioIds));
+    await db
+      .delete(giornateServizioVolontariTable)
+      .where(
+        inArray(
+          giornateServizioVolontariTable.volontarioId,
+          scope.volontarioIds,
+        ),
+      );
+    await db
+      .delete(copertureAssicurativeVolontariTable)
+      .where(
+        inArray(
+          copertureAssicurativeVolontariTable.volontarioId,
+          scope.volontarioIds,
+        ),
+      );
+    await db
+      .delete(statiVolontariTable)
+      .where(inArray(statiVolontariTable.volontarioId, scope.volontarioIds));
+    await db.execute(
+      sql`ALTER TABLE registro_volontari_eventi DISABLE TRIGGER registro_volontari_append_only_trg`,
+    );
+    try {
+      await db
+        .delete(registroVolontariEventiTable)
+        .where(
+          inArray(
+            registroVolontariEventiTable.volontarioId,
+            scope.volontarioIds,
+          ),
+        );
+    } finally {
+      await db.execute(
+        sql`ALTER TABLE registro_volontari_eventi ENABLE TRIGGER registro_volontari_append_only_trg`,
+      );
+    }
+    await db
       .delete(volontariTable)
       .where(inArray(volontariTable.id, scope.volontarioIds));
   }
@@ -889,6 +948,19 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(ruoliTable).where(inArray(ruoliTable.id, scope.ruoloIds));
   }
   if (scope.centroIds.length > 0) {
+    await db
+      .delete(emissioniRegistroVolontariTable)
+      .where(
+        inArray(
+          emissioniRegistroVolontariTable.centroAscoltoId,
+          scope.centroIds,
+        ),
+      );
+    await db
+      .delete(importazioniVolontariTable)
+      .where(
+        inArray(importazioniVolontariTable.centroAscoltoId, scope.centroIds),
+      );
     await db
       .delete(centriAscoltoTable)
       .where(inArray(centriAscoltoTable.id, scope.centroIds));

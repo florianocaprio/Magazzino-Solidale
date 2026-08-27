@@ -14710,6 +14710,10 @@ components:
           type: ["integer", "null"]
         volontarioNome:
           type: ["string", "null"]
+        volontarioOperativo:
+          type: ["boolean", "null"]
+        volontarioMotivoNonOperativo:
+          type: ["string", "null"]
         volontarioAltro:
           type: ["string", "null"]
         mezzoId:
@@ -16363,7 +16367,18 @@ components:
           enum: [PDF, XLSX]
         filtri:
           type: object
-          additionalProperties: true
+          properties:
+            tipo: { type: string, enum: [TUTTI, PERMANENTE, TEMPORANEO] }
+            stato: { type: string, enum: [tutti, attivi, non_attivi] }
+            dataRiferimento: { type: string, format: date }
+            centroAscoltoId: { type: integer, minimum: 1 }
+            ruoloVolontarioId: { type: integer, minimum: 1 }
+            search: { type: string }
+            assicurazione: { type: string, enum: [MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA] }
+            dataServizio: { type: string, format: date }
+            servizioDa: { type: string, format: date }
+            servizioA: { type: string, format: date }
+          additionalProperties: false
 
     VolontariRegisterCorrectionInput:
       type: object

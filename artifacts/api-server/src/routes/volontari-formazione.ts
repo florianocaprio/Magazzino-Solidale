@@ -25,6 +25,8 @@ import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
 router.use("/volontari", requireModulo("VOLONTARI"));
+const actorId = (req: Request): number | null =>
+  req.user?.id && req.user.id > 0 ? req.user.id : null;
 
 function clean(value: unknown, max: number): string | null {
   const result = typeof value === "string" ? value.trim() : "";
@@ -139,7 +141,7 @@ router.post("/volontari/:id/corsi", requirePermission("logistica.volontari.manag
     esito: clean(req.body?.esito, 30) ?? "COMPLETATO", ore, dataScadenza,
     numeroAttestato: clean(req.body?.numeroAttestato, 100),
     riferimentoDocumento: clean(req.body?.riferimentoDocumento, 255),
-    note: clean(req.body?.note, 4_000), verificatoDa: req.user?.id ?? null,
+    note: clean(req.body?.note, 4_000), verificatoDa: actorId(req),
   }).returning();
   await db.transaction(async (tx) => auditLogistica(tx, req, { entita: "volontario", id: volunteer.id, azione: "corso_registrato", nuovo: { corsoVolontarioId: created.id, corsoId } }));
   res.status(201).json(created);

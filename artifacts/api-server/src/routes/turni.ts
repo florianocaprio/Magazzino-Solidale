@@ -515,7 +515,7 @@ router.post(
         volontarioId: row.id, centroAscoltoId: resolved.centroAscoltoId,
         dataEffettiva: todayRome(),
         snapshot: { origine: "turni", matricola: row.matricola, statoApprovazione: "in_attesa" },
-        utenteId: req.user?.id ?? null,
+        utenteId: req.user?.id && req.user.id > 0 ? req.user.id : null,
       });
       return row;
     });

@@ -21,7 +21,7 @@ import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
 import { RouteActions } from "@/components/maps/route-actions";
 import { BollaDettaglio, CreaiBollaDialog } from "@/pages/bolle";
-import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package, Mail, ChevronDown, Trash2 } from "lucide-react";
+import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package, Mail, ChevronDown, Trash2, AlertTriangle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -662,6 +662,12 @@ export default function Consegne() {
                           <Package className="h-4 w-4" /> {c.magazzinoNome}
                         </p>
                       )}
+                      {c.volontarioId != null && c.volontarioOperativo === false && (
+                        <p className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-destructive">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>Il volontario assegnato non è più operativo per questa data. Verifica l’assegnazione.</span>
+                        </p>
+                      )}
                     </div>
                     <RouteActions
                       consegnaId={c.id}
@@ -771,6 +777,12 @@ export default function Consegne() {
                       {(c.volontarioNome || c.volontarioAltro) && (
                         <div className="text-xs text-muted-foreground">
                           {t("consegne.volontarioPrefix", { name: c.volontarioNome ?? c.volontarioAltro })}
+                        </div>
+                      )}
+                      {c.volontarioId != null && c.volontarioOperativo === false && (
+                        <div className="flex items-start gap-1 text-xs text-destructive">
+                          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                          <span>Assegnazione da verificare: volontario non operativo per la data.</span>
                         </div>
                       )}
                     </div>

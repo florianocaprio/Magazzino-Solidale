@@ -3918,6 +3918,8 @@ export const GetBeneficiarioResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -5847,6 +5849,8 @@ export const ListConsegneResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -5916,6 +5920,8 @@ export const ExportConsegneResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -5952,6 +5958,8 @@ export const GetConsegnaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -6004,6 +6012,8 @@ export const UpdateConsegnaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -6049,6 +6059,8 @@ export const CompletaConsegnaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -6116,6 +6128,8 @@ export const AssociaBollaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -9877,9 +9891,24 @@ export const CreateVolontarioQualificationParams = zod.object({
 export const CreateVolontarioQualificationBody = zod.record(zod.string(), zod.unknown())
 
 
+
+
+
+
 export const GenerateVolontariRegisterBody = zod.object({
   "tipo": zod.enum(['PDF', 'XLSX']).optional(),
-  "filtri": zod.record(zod.string(), zod.unknown()).optional()
+  "filtri": zod.object({
+  "tipo": zod.enum(['TUTTI', 'PERMANENTE', 'TEMPORANEO']).optional(),
+  "stato": zod.enum(['tutti', 'attivi', 'non_attivi']).optional(),
+  "dataRiferimento": zod.coerce.date().optional(),
+  "centroAscoltoId": zod.number().min(1).optional(),
+  "ruoloVolontarioId": zod.number().min(1).optional(),
+  "search": zod.string().optional(),
+  "assicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']).optional(),
+  "dataServizio": zod.coerce.date().optional(),
+  "servizioDa": zod.coerce.date().optional(),
+  "servizioA": zod.coerce.date().optional()
+}).optional()
 })
 
 
