@@ -147,7 +147,7 @@ export default function Turni() {
           v.centroAscoltoId == null ||
           effectiveCentro == null ||
           v.centroAscoltoId === effectiveCentro;
-        const approved = (v.statoApprovazione ?? "approvato") === "approvato" && v.attivo;
+        const approved = (v.statoApprovazione ?? "approvato") === "approvato";
         return centroOk && approved;
       }),
     [volontari, effectiveCentro],
@@ -226,6 +226,28 @@ export default function Turni() {
       queryKey: getGetVolontariCaricoQueryKey(caricoParams),
     },
   });
+  const volontariOperativiParams = {
+    dataRiferimento: dialog?.data ?? da,
+    stato: "attivi" as const,
+  };
+  const { data: volontariOperativiDialog } = useListVolontari(
+    volontariOperativiParams,
+    {
+      query: {
+        enabled: dialog != null,
+        queryKey: getListVolontariQueryKey(volontariOperativiParams),
+      },
+    },
+  );
+  const volontariOperativiIds = useMemo(
+    () =>
+      new Set(
+        (volontariOperativiDialog ?? [])
+          .filter((volontario) => volontario.operativo)
+          .map((volontario) => volontario.id),
+      ),
+    [volontariOperativiDialog],
+  );
   const caricoMap = useMemo(
     () => new Map((caricoTurno ?? []).map((item) => [item.volontarioId, item.count])),
     [caricoTurno],
@@ -259,9 +281,9 @@ export default function Turni() {
   const volontariDisponibili = useMemo(
     () => volontariCentro.filter((v) => {
       const atLimit = v.maxConsegneTurno > 0 && (caricoMap.get(v.id) ?? 0) >= v.maxConsegneTurno;
-      return !bookedVolontari.has(v.id) && !atLimit;
+      return volontariOperativiIds.has(v.id) && !bookedVolontari.has(v.id) && !atLimit;
     }),
-    [bookedVolontari, caricoMap, volontariCentro],
+    [bookedVolontari, caricoMap, volontariCentro, volontariOperativiIds],
   );
 
   function openCell(dataISO: string, fascia: string) {
@@ -719,6 +741,11 @@ export default function Turni() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {row.volontarioId !== "" && !volontariOperativiIds.has(Number(row.volontarioId)) && (
+                    <p className="mt-1 text-xs text-destructive">
+                      Assegnazione esistente non più operativa per questa data; scegli un volontario idoneo prima di salvare.
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1">
                   <Label className="text-xs">{t("turni.ruolo")}</Label>

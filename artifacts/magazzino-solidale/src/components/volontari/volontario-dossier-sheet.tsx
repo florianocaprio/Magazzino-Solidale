@@ -1,0 +1,757 @@
+import { useEffect, useState } from "react";
+import {
+  customFetch,
+  getListVolontariQueryKey,
+  type Volontario,
+} from "@workspace/api-client-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  BookOpenCheck,
+  CalendarPlus,
+  Pencil,
+  Plus,
+  ShieldCheck,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import type { VolontarioOperation } from "./volontario-operation-dialog";
+
+type OperationalState = {
+  operativo: boolean;
+  motivoNonOperativo: string | null;
+  statoAssicurazione: string;
+  scadenzaAssicurazione: string | null;
+  sospesoManualmente: boolean;
+  giornataTemporaneaValida: boolean | null;
+};
+type StateEvent = {
+  id: number;
+  tipoEvento: string;
+  dataEffettiva: string;
+  motivo?: string | null;
+  note?: string | null;
+  dataCreazione: string;
+};
+type Coverage = {
+  id: number;
+  dataInizio?: string | null;
+  dataFine: string;
+  tipoOperazione: string;
+  riferimentoPolizza?: string | null;
+  note?: string | null;
+  annullata: boolean;
+  dataCreazione: string;
+};
+type ServiceDay = {
+  id: number;
+  dataServizio: string;
+  attivita?: string | null;
+  stato: string;
+  coperturaVerificata: boolean;
+  note?: string | null;
+  versione: number;
+};
+type CourseCatalog = {
+  id: number;
+  codice: string;
+  titolo: string;
+  ore: number;
+  validitaMesi?: number | null;
+  attivo: boolean;
+};
+type QualificationCatalog = {
+  id: number;
+  codice: string;
+  nome: string;
+  validitaMesi?: number | null;
+  attivo: boolean;
+};
+type VolunteerCourse = {
+  record: {
+    id: number;
+    dataCompletamento: string;
+    esito: string;
+    ore: number;
+    dataScadenza?: string | null;
+    numeroAttestato?: string | null;
+  };
+  catalogo: CourseCatalog;
+};
+type VolunteerQualification = {
+  record: {
+    id: number;
+    dataOttenimento: string;
+    dataScadenza?: string | null;
+    stato: string;
+  };
+  catalogo: QualificationCatalog;
+};
+type Dossier = {
+  statoOperativo: OperationalState;
+  stati: StateEvent[];
+  coperture: Coverage[];
+  giornate: ServiceDay[];
+  corsi: VolunteerCourse[];
+  qualifiche: VolunteerQualification[];
+};
+type AddKind = "giornata" | "corso" | "qualifica";
+
+function today(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Rome",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function reasonLabel(reason?: string | null): string {
+  const labels: Record<string, string> = {
+    IN_ATTESA_APPROVAZIONE: "In attesa di approvazione",
+    APPROVAZIONE_RESPINTA: "Approvazione respinta",
+    SOSPENSIONE_MANUALE: "Sospensione manuale",
+    ASSICURAZIONE_SCADUTA: "Assicurazione scaduta",
+    ASSICURAZIONE_MANCANTE: "Assicurazione mancante",
+    ASSICURAZIONE_NON_ANCORA_VALIDA: "Assicurazione non ancora valida",
+    GIORNATA_TEMPORANEA_MANCANTE: "Nessuna giornata valida per la data",
+  };
+  return reason
+    ? (labels[reason] ?? reason.replaceAll("_", " ").toLowerCase())
+    : "Nessun impedimento";
+}
+
+function Field({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | number | null;
+}) {
+  return (
+    <div>
+      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1 break-words text-sm">{value || "—"}</div>
+    </div>
+  );
+}
+
+export function VolontarioDossierSheet({
+  volontario,
+  canManage,
+  onOpenChange,
+  onEdit,
+  onOperation,
+}: {
+  volontario: Volontario | null;
+  canManage: boolean;
+  onOpenChange: (open: boolean) => void;
+  onEdit: (volontario: Volontario) => void;
+  onOperation: (volontario: Volontario, operation: VolontarioOperation) => void;
+}) {
+  const open = volontario != null;
+  const [addKind, setAddKind] = useState<AddKind | null>(null);
+  const [catalogId, setCatalogId] = useState("");
+  const [date, setDate] = useState(today());
+  const [activity, setActivity] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const dossierQuery = useQuery({
+    queryKey: ["volontario-dossier", volontario?.id],
+    queryFn: () =>
+      customFetch<Dossier>(`/api/volontari/${volontario!.id}/dossier`),
+    enabled: volontario != null,
+  });
+  const coursesQuery = useQuery({
+    queryKey: ["volontari-corsi-catalogo"],
+    queryFn: () =>
+      customFetch<CourseCatalog[]>("/api/volontari/formazione/corsi"),
+    enabled: open && canManage,
+  });
+  const qualificationsQuery = useQuery({
+    queryKey: ["volontari-qualifiche-catalogo"],
+    queryFn: () =>
+      customFetch<QualificationCatalog[]>(
+        "/api/volontari/formazione/qualifiche",
+      ),
+    enabled: open && canManage,
+  });
+
+  useEffect(() => {
+    if (!addKind) return;
+    setCatalogId("");
+    setDate(today());
+    setActivity("");
+    setNotes("");
+  }, [addKind]);
+
+  const saveAddition = async () => {
+    if (!volontario || !addKind) return;
+    setSaving(true);
+    try {
+      if (addKind === "giornata") {
+        await customFetch(`/api/volontari/${volontario.id}/giornate`, {
+          method: "POST",
+          body: JSON.stringify({
+            dataServizio: date,
+            stato: "PIANIFICATA",
+            attivita: activity || undefined,
+            note: notes || undefined,
+          }),
+        });
+      } else if (addKind === "corso") {
+        await customFetch(`/api/volontari/${volontario.id}/corsi`, {
+          method: "POST",
+          body: JSON.stringify({
+            corsoId: Number(catalogId),
+            dataCompletamento: date,
+            note: notes || undefined,
+          }),
+        });
+      } else {
+        await customFetch(`/api/volontari/${volontario.id}/qualifiche`, {
+          method: "POST",
+          body: JSON.stringify({
+            qualificaId: Number(catalogId),
+            dataOttenimento: date,
+            stato: "VALIDA",
+            note: notes || undefined,
+          }),
+        });
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["volontario-dossier", volontario.id],
+        }),
+        queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() }),
+      ]);
+      toast({
+        title:
+          addKind === "giornata"
+            ? "Giornata registrata"
+            : addKind === "corso"
+              ? "Corso registrato"
+              : "Qualifica registrata",
+      });
+      setAddKind(null);
+    } catch (error) {
+      toast({
+        title: "Salvataggio non riuscito",
+        description: error instanceof Error ? error.message : "Errore",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const dossier = dossierQuery.data;
+  const state = dossier?.statoOperativo;
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
+          <SheetHeader className="pr-8">
+            <SheetTitle>
+              {volontario
+                ? `${volontario.cognome} ${volontario.nome}`
+                : "Scheda volontario"}
+            </SheetTitle>
+            <SheetDescription>
+              {volontario?.matricola ?? "Senza matricola"} ·{" "}
+              {volontario?.tipoVolontario === "TEMPORANEO"
+                ? "Temporaneo"
+                : "Permanente"}
+            </SheetDescription>
+          </SheetHeader>
+
+          {volontario && (
+            <div className="mt-5 space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+                <div>
+                  <Badge
+                    className={
+                      state?.operativo
+                        ? "bg-emerald-600 hover:bg-emerald-600"
+                        : "bg-destructive hover:bg-destructive"
+                    }
+                  >
+                    {state?.operativo ? "Attivo" : "Non attivo"}
+                  </Badge>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    {reasonLabel(state?.motivoNonOperativo)}
+                  </div>
+                </div>
+                {canManage && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      className="min-h-11"
+                      onClick={() => onEdit(volontario)}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" /> Modifica
+                    </Button>
+                    {volontario.sospesoManualmente ? (
+                      <Button
+                        variant="outline"
+                        className="min-h-11"
+                        onClick={() => onOperation(volontario, "riattiva")}
+                      >
+                        Riattiva
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className="min-h-11"
+                        onClick={() => onOperation(volontario, "sospendi")}
+                      >
+                        Sospendi
+                      </Button>
+                    )}
+                    <Button
+                      className="min-h-11"
+                      onClick={() => onOperation(volontario, "assicurazione")}
+                    >
+                      <ShieldCheck className="mr-2 h-4 w-4" /> Registra /
+                      Rinnova
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <Tabs defaultValue="anagrafica">
+                <div className="overflow-x-auto pb-1">
+                  <TabsList className="h-11 min-w-max">
+                    <TabsTrigger className="min-h-9" value="anagrafica">
+                      Anagrafica
+                    </TabsTrigger>
+                    <TabsTrigger className="min-h-9" value="operativita">
+                      Operatività
+                    </TabsTrigger>
+                    <TabsTrigger className="min-h-9" value="assicurazione">
+                      Assicurazione
+                    </TabsTrigger>
+                    <TabsTrigger className="min-h-9" value="formazione">
+                      Formazione
+                    </TabsTrigger>
+                    <TabsTrigger className="min-h-9" value="storico">
+                      Storico
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+
+                <TabsContent value="anagrafica" className="mt-4">
+                  <div className="grid gap-5 rounded-xl border p-5 sm:grid-cols-2">
+                    <Field label="Nome" value={volontario.nome} />
+                    <Field label="Cognome" value={volontario.cognome} />
+                    <Field label="Matricola" value={volontario.matricola} />
+                    <Field
+                      label="Codice fiscale"
+                      value={volontario.codiceFiscale}
+                    />
+                    <Field
+                      label="Data di nascita"
+                      value={volontario.dataNascita}
+                    />
+                    <Field
+                      label="Luogo di nascita"
+                      value={volontario.luogoNascita}
+                    />
+                    <Field
+                      label="Indirizzo di residenza"
+                      value={volontario.indirizzoResidenza}
+                    />
+                    <Field
+                      label="Centro"
+                      value={volontario.centroAscoltoNome}
+                    />
+                    <Field label="Cellulare" value={volontario.telefono} />
+                    <Field
+                      label="Telefono"
+                      value={volontario.telefonoSecondario}
+                    />
+                    <Field label="Email" value={volontario.email} />
+                    <Field label="Note" value={volontario.note} />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="operativita" className="mt-4 space-y-4">
+                  <div className="grid gap-5 rounded-xl border p-5 sm:grid-cols-2">
+                    <Field
+                      label="Stato operativo"
+                      value={state?.operativo ? "Attivo" : "Non attivo"}
+                    />
+                    <Field
+                      label="Motivo"
+                      value={reasonLabel(state?.motivoNonOperativo)}
+                    />
+                    <Field
+                      label="Approvazione"
+                      value={volontario.statoApprovazione}
+                    />
+                    <Field
+                      label="Abilitazione manuale"
+                      value={
+                        volontario.abilitatoAmministrativamente
+                          ? "Abilitato"
+                          : "Sospeso"
+                      }
+                    />
+                    <Field
+                      label="Tipo"
+                      value={
+                        volontario.tipoVolontario === "TEMPORANEO"
+                          ? "Temporaneo"
+                          : "Permanente"
+                      }
+                    />
+                    <Field
+                      label="Ruolo"
+                      value={volontario.ruoloCatalogoNome ?? volontario.ruolo}
+                    />
+                    <Field
+                      label="Patente"
+                      value={volontario.patente ? "Sì" : "No"}
+                    />
+                    <Field
+                      label="Mezzo personale"
+                      value={volontario.mezzoPersonale ? "Sì" : "No"}
+                    />
+                    <Field
+                      label="Massimo consegne/turno"
+                      value={volontario.maxConsegneTurno}
+                    />
+                  </div>
+                  {volontario.tipoVolontario === "TEMPORANEO" && canManage && (
+                    <Button
+                      variant="outline"
+                      className="min-h-11"
+                      onClick={() => setAddKind("giornata")}
+                    >
+                      <CalendarPlus className="mr-2 h-4 w-4" /> Registra
+                      giornata di servizio
+                    </Button>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="assicurazione" className="mt-4 space-y-3">
+                  {dossierQuery.isLoading ? (
+                    <p className="text-sm text-muted-foreground">
+                      Caricamento storico…
+                    </p>
+                  ) : dossier?.coperture.length ? (
+                    dossier.coperture.map((coverage) => (
+                      <div key={coverage.id} className="rounded-xl border p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="font-medium">
+                            {coverage.dataInizio ??
+                              "Decorrenza storica non nota"}{" "}
+                            → {coverage.dataFine}
+                          </div>
+                          <Badge variant="secondary">
+                            {coverage.tipoOperazione.replaceAll("_", " ")}
+                          </Badge>
+                        </div>
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          {coverage.riferimentoPolizza ||
+                            "Nessun riferimento polizza"}
+                          {coverage.note ? ` · ${coverage.note}` : ""}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      Nessuna copertura registrata.
+                    </p>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="formazione" className="mt-4 space-y-5">
+                  {canManage && (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        className="min-h-11"
+                        onClick={() => setAddKind("corso")}
+                      >
+                        <Plus className="mr-2 h-4 w-4" /> Registra corso
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="min-h-11"
+                        onClick={() => setAddKind("qualifica")}
+                      >
+                        <BookOpenCheck className="mr-2 h-4 w-4" /> Registra
+                        qualifica
+                      </Button>
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="mb-2 font-semibold">Corsi</h3>
+                    {dossier?.corsi.length ? (
+                      dossier.corsi.map((course) => (
+                        <div
+                          key={course.record.id}
+                          className="mb-2 rounded-lg border p-3 text-sm"
+                        >
+                          <div className="font-medium">
+                            {course.catalogo.codice} · {course.catalogo.titolo}
+                          </div>
+                          <div className="mt-1 text-muted-foreground">
+                            Completato {course.record.dataCompletamento} ·{" "}
+                            {course.record.ore} ore
+                            {course.record.dataScadenza
+                              ? ` · scade ${course.record.dataScadenza}`
+                              : ""}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Nessun corso registrato.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="mb-2 font-semibold">Qualifiche</h3>
+                    {dossier?.qualifiche.length ? (
+                      dossier.qualifiche.map((qualification) => (
+                        <div
+                          key={qualification.record.id}
+                          className="mb-2 rounded-lg border p-3 text-sm"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">
+                              {qualification.catalogo.codice} ·{" "}
+                              {qualification.catalogo.nome}
+                            </span>
+                            <Badge variant="secondary">
+                              {qualification.record.stato}
+                            </Badge>
+                          </div>
+                          <div className="mt-1 text-muted-foreground">
+                            Ottenuta {qualification.record.dataOttenimento}
+                            {qualification.record.dataScadenza
+                              ? ` · scade ${qualification.record.dataScadenza}`
+                              : ""}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Nessuna qualifica registrata.
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="storico" className="mt-4 space-y-5">
+                  {volontario.tipoVolontario === "TEMPORANEO" && (
+                    <div>
+                      <h3 className="mb-2 font-semibold">
+                        Giornate temporanee
+                      </h3>
+                      {dossier?.giornate.length ? (
+                        dossier.giornate.map((day) => (
+                          <div
+                            key={day.id}
+                            className="mb-2 rounded-lg border p-3 text-sm"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">
+                                {day.dataServizio}
+                                {day.attivita ? ` · ${day.attivita}` : ""}
+                              </span>
+                              <Badge variant="secondary">{day.stato}</Badge>
+                            </div>
+                            <div className="mt-1 text-muted-foreground">
+                              Copertura{" "}
+                              {day.coperturaVerificata
+                                ? "verificata"
+                                : "da verificare"}
+                              {day.note ? ` · ${day.note}` : ""}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Nessuna giornata registrata.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="mb-2 font-semibold">Stati amministrativi</h3>
+                    {dossier?.stati.length ? (
+                      dossier.stati.map((event) => (
+                        <div
+                          key={event.id}
+                          className="mb-2 rounded-lg border p-3 text-sm"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">
+                              {event.dataEffettiva} · {event.tipoEvento}
+                            </span>
+                            <Badge variant="outline">#{event.id}</Badge>
+                          </div>
+                          <div className="mt-1 text-muted-foreground">
+                            {event.motivo ?? "Senza motivo"}
+                            {event.note ? ` · ${event.note}` : ""}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Nessun evento di stato.
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      <Dialog
+        open={addKind != null}
+        onOpenChange={(next) => {
+          if (!next) setAddKind(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {addKind === "giornata"
+                ? "Registra giornata di servizio"
+                : addKind === "corso"
+                  ? "Registra corso"
+                  : "Registra qualifica"}
+            </DialogTitle>
+            <DialogDescription>
+              I dati vengono aggiunti allo storico del volontario.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {addKind === "corso" && (
+              <div className="space-y-2">
+                <Label>Corso</Label>
+                <Select value={catalogId} onValueChange={setCatalogId}>
+                  <SelectTrigger className="min-h-11">
+                    <SelectValue placeholder="Seleziona corso" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {coursesQuery.data
+                      ?.filter((item) => item.attivo)
+                      .map((item) => (
+                        <SelectItem key={item.id} value={String(item.id)}>
+                          {item.codice} · {item.titolo}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {addKind === "qualifica" && (
+              <div className="space-y-2">
+                <Label>Qualifica</Label>
+                <Select value={catalogId} onValueChange={setCatalogId}>
+                  <SelectTrigger className="min-h-11">
+                    <SelectValue placeholder="Seleziona qualifica" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {qualificationsQuery.data
+                      ?.filter((item) => item.attivo)
+                      .map((item) => (
+                        <SelectItem key={item.id} value={String(item.id)}>
+                          {item.codice} · {item.nome}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>
+                {addKind === "giornata"
+                  ? "Data servizio"
+                  : addKind === "corso"
+                    ? "Data completamento"
+                    : "Data ottenimento"}
+              </Label>
+              <Input
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+              />
+            </div>
+            {addKind === "giornata" && (
+              <div className="space-y-2">
+                <Label>Attività</Label>
+                <Input
+                  value={activity}
+                  onChange={(event) => setActivity(event.target.value)}
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Note</Label>
+              <Textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="min-h-11"
+              onClick={() => setAddKind(null)}
+            >
+              Annulla
+            </Button>
+            <Button
+              className="min-h-11"
+              onClick={saveAddition}
+              disabled={
+                saving || !date || (addKind !== "giornata" && !catalogId)
+              }
+            >
+              {saving ? "Salvataggio…" : "Registra"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

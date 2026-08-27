@@ -121,7 +121,6 @@ export default function Consegne() {
   });
   const { data: allBeneficiari } = useListBeneficiari({ attivo: true });
   const { data: magazzini } = useListMagazzini();
-  const { data: volontari } = useListVolontari();
   const { data: mezzi } = useListMezzi();
   const { data: ruoliVolontari } = useListRuoliVolontari();
   const { data: centri } = useListCentriAscolto();
@@ -242,6 +241,16 @@ export default function Consegne() {
 
   const dataPrevistaWatch = form.watch("dataPrevista");
   const fasciaOrariaWatch = form.watch("fasciaOraria");
+  const volontariOperativiParams = {
+    dataRiferimento: dataPrevistaWatch,
+    stato: "attivi" as const,
+  };
+  const { data: volontari } = useListVolontari(volontariOperativiParams, {
+    query: {
+      queryKey: getListVolontariQueryKey(volontariOperativiParams),
+      enabled: /^\d{4}-\d{2}-\d{2}$/.test(dataPrevistaWatch ?? ""),
+    },
+  });
   const fasciaCanonica = fasciaOrariaWatch === "Mattina" ? "09-13" : fasciaOrariaWatch === "Pomeriggio" ? "14-18" : fasciaOrariaWatch === "Sera" ? "18-20" : null;
   const validData = /^\d{4}-\d{2}-\d{2}$/.test(dataPrevistaWatch ?? "");
   const caricoParams = { data: dataPrevistaWatch, fascia: (fasciaCanonica ?? "09-13") as "09-13" | "14-18" | "18-20" };
@@ -285,7 +294,7 @@ export default function Consegne() {
   const volontariConsegna = useMemo(
     () => (volontari ?? []).filter((v, idx, all) => {
       if (all.findIndex((item) => item.id === v.id) !== idx) return false;
-      if (!v.attivo || (v.statoApprovazione ?? "approvato") !== "approvato") return false;
+      if (!v.operativo) return false;
       if (v.centroAscoltoId == null) return true;
       return effectiveConsegnaCentroId != null && v.centroAscoltoId === effectiveConsegnaCentroId;
     }),

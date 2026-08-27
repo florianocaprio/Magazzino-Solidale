@@ -305,7 +305,7 @@ function NuovoTrasferimentoForm({
             <Select value={trasportatore} onValueChange={(v) => { setTrasportatore(v); if (v !== "altro") setTrasportatoreAltro(""); }}>
               <SelectTrigger aria-label={t("trasferimenti.trasportatore")}><SelectValue placeholder={t("trasferimenti.selectTrasportatore")} /></SelectTrigger>
               <SelectContent>
-                {volontari?.filter((v) => v.attivo).map((v) => (
+                {volontari?.filter((v) => v.operativo).map((v) => (
                   <SelectItem key={v.id} value={String(v.id)}>{v.nome} {v.cognome}</SelectItem>
                 ))}
                 <SelectItem value="altro">{t("trasferimenti.altro")}</SelectItem>
@@ -549,7 +549,7 @@ function TrasportatoreCell({ t: tras, canEdit }: { t: Trasferimento; canEdit: bo
               <Select value={trasportatore} onValueChange={(v) => { setTrasportatore(v); if (v !== "altro") setTrasportatoreAltro(""); }}>
                 <SelectTrigger><SelectValue placeholder={t("trasferimenti.selectTrasportatore")} /></SelectTrigger>
                 <SelectContent>
-                  {volontari?.filter((v) => v.attivo).map((v) => (
+                  {volontari?.filter((v) => v.operativo).map((v) => (
                     <SelectItem key={v.id} value={String(v.id)}>{v.nome} {v.cognome}</SelectItem>
                   ))}
                   <SelectItem value="altro">{t("trasferimenti.altro")}</SelectItem>

@@ -25,7 +25,7 @@ describe("hardening UI Logistica", () => {
       source("../pages/turni.tsx"),
     ]);
     expect(volontari).toContain("ruoloVolontarioId");
-    expect(volontari).toContain("versione: editingVersion");
+    expect(volontari).toContain("versione: editing.versione");
     expect(turni).toContain("ruoloVolontarioId");
     expect(turni).toContain("versione: existing.versione");
   });
@@ -42,6 +42,9 @@ describe("hardening UI Logistica", () => {
     expect(turni).toContain("disabled={scaduto}");
     expect(turni).toContain("pendingNotSelectable");
     expect(consegne).toContain("fasciaCanonica");
+    expect(consegne).toContain('stato: "attivi" as const');
+    expect(consegne).toContain("v.operativo");
+    expect(turni).toContain("volontariOperativiIds");
     expect(consegne).toContain("pendingNotSelectable");
   });
 
