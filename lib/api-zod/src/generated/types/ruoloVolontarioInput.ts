@@ -9,5 +9,6 @@
 export interface RuoloVolontarioInput {
   /** @minLength 1 */
   nome: string;
+  descrizione?: string;
   attivo?: boolean;
 }

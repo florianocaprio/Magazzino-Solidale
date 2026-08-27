@@ -6124,6 +6124,54 @@ paths:
           required: false
           schema:
             type: string
+        - name: stato
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [attivi, non_attivi, tutti]
+        - name: tipoVolontario
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [PERMANENTE, TEMPORANEO]
+        - name: statoAssicurazione
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
+        - name: ruoloVolontarioId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: dataRiferimento
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: scadenzaDa
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: scadenzaA
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: scadutiDaMenoDiMesi
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 120
       responses:
         "200":
           description: List of volunteers
@@ -6207,6 +6255,332 @@ paths:
                       type: integer
                   required: [volontarioId, count]
 
+  /volontari/{id}/sospendi:
+    post:
+      operationId: suspendVolontario
+      tags: [volontari]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontarioSospensioneInput" }
+      responses:
+        "200":
+          description: Sospensione registrata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioActionResult" }
+
+  /volontari/{id}/riattiva:
+    post:
+      operationId: reactivateVolontario
+      tags: [volontari]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontarioRiattivazioneInput" }
+      responses:
+        "200":
+          description: Riattivazione amministrativa registrata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioActionResult" }
+
+  /volontari/{id}/assicurazione:
+    post:
+      operationId: registerVolontarioInsurance
+      tags: [volontari]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontarioInsuranceVersionInput" }
+      responses:
+        "201":
+          description: Copertura storicizzata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioActionResult" }
+
+  /volontari/assicurazione/massivo/preview:
+    post:
+      operationId: previewBulkVolontariInsurance
+      tags: [volontari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontarioBulkInsuranceInput" }
+      responses:
+        "200":
+          description: Anteprima rinnovo massivo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/VolontarioBulkInsurancePreviewRow" }
+                required: [items]
+
+  /volontari/assicurazione/massivo/conferma:
+    post:
+      operationId: confirmBulkVolontariInsurance
+      tags: [volontari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontarioBulkInsuranceConfirmInput" }
+      responses:
+        "200": { description: Rinnovo massivo completato }
+
+  /volontari/{id}/dossier:
+    get:
+      operationId: getVolontarioDossier
+      tags: [volontari]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Storico, assicurazioni, formazione e giornate
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /volontari/{id}/giornate:
+    post:
+      operationId: createVolontarioServiceDay
+      tags: [volontari]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontarioServiceDayInput" }
+      responses:
+        "201": { description: Giornata temporanea registrata }
+
+  /volontari/{id}/giornate/{giornataId}:
+    patch:
+      operationId: updateVolontarioServiceDay
+      tags: [volontari]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: giornataId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontarioServiceDayUpdateInput" }
+      responses:
+        "200": { description: Giornata aggiornata }
+
+  /volontari/import/analizza:
+    post:
+      operationId: analyzeVolontariImport
+      tags: [volontari]
+      parameters:
+        - { name: centroAscoltoId, in: query, schema: { type: integer } }
+        - { name: x-file-name, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+            schema: { type: string, format: binary }
+      responses:
+        "201":
+          description: Anteprima import senza scritture anagrafiche
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontariImportPreview" }
+
+  /volontari/import/conferma:
+    post:
+      operationId: confirmVolontariImport
+      tags: [volontari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontariImportConfirmInput" }
+      responses:
+        "200":
+          description: Import transazionale confermato
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /volontari/formazione/corsi:
+    get:
+      operationId: listVolontariCoursesCatalog
+      tags: [volontari]
+      responses:
+        "200": { description: Catalogo corsi configurabile }
+    post:
+      operationId: createVolontariCourseCatalog
+      tags: [volontari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontariGenericWriteInput" }
+      responses:
+        "201": { description: Corso creato }
+
+  /volontari/formazione/corsi/{catalogoId}:
+    patch:
+      operationId: updateVolontariCourseCatalog
+      tags: [volontari]
+      parameters:
+        - { name: catalogoId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontariGenericWriteInput" }
+      responses:
+        "200": { description: Corso aggiornato }
+
+  /volontari/{id}/corsi:
+    post:
+      operationId: createVolontarioCourse
+      tags: [volontari]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontariGenericWriteInput" }
+      responses:
+        "201": { description: Corso del volontario registrato }
+
+  /volontari/formazione/qualifiche:
+    get:
+      operationId: listVolontariQualificationsCatalog
+      tags: [volontari]
+      responses:
+        "200": { description: Catalogo qualifiche configurabile }
+    post:
+      operationId: createVolontariQualificationCatalog
+      tags: [volontari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontariGenericWriteInput" }
+      responses:
+        "201": { description: Qualifica creata }
+
+  /volontari/formazione/qualifiche/{catalogoId}:
+    patch:
+      operationId: updateVolontariQualificationCatalog
+      tags: [volontari]
+      parameters:
+        - { name: catalogoId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontariGenericWriteInput" }
+      responses:
+        "200": { description: Qualifica aggiornata }
+
+  /volontari/{id}/qualifiche:
+    post:
+      operationId: createVolontarioQualification
+      tags: [volontari]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontariGenericWriteInput" }
+      responses:
+        "201": { description: Qualifica del volontario registrata }
+
+  /volontari/export/storico.xlsx:
+    get:
+      operationId: exportVolontariHistorical
+      tags: [volontari]
+      responses:
+        "200":
+          description: XLSX compatibile con il tracciato storico
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+
+  /volontari/export/esteso.xlsx:
+    get:
+      operationId: exportVolontariExtended
+      tags: [volontari]
+      responses:
+        "200":
+          description: XLSX operativo esteso
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+
+  /volontari/registro/genera:
+    post:
+      operationId: generateVolontariRegister
+      tags: [volontari]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontariRegisterGenerateInput" }
+      responses:
+        "200": { description: Emissione ufficiale PDF o XLSX }
+
+  /volontari/registro/emissioni:
+    get:
+      operationId: listVolontariRegisterEmissions
+      tags: [volontari]
+      responses:
+        "200": { description: Emissioni riproducibili del registro }
+
+  /volontari/registro/emissioni/{emissioneId}/file:
+    get:
+      operationId: downloadVolontariRegisterEmission
+      tags: [volontari]
+      parameters:
+        - { name: emissioneId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: File originale dell'emissione con integrità verificata }
+
+  /volontari/registro/eventi:
+    get:
+      operationId: listVolontariRegisterEvents
+      tags: [volontari]
+      responses:
+        "200": { description: Eventi append-only del registro }
+
+  /volontari/registro/eventi/{eventoId}/rettifica:
+    post:
+      operationId: correctVolontariRegisterEvent
+      tags: [volontari]
+      parameters:
+        - { name: eventoId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontariRegisterCorrectionInput" }
+      responses:
+        "201": { description: Evento di rettifica aggiunto senza alterare lo storico }
+
   /volontari/{id}:
     get:
       operationId: getVolontario
@@ -6217,6 +6591,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: dataRiferimento
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Volunteer
@@ -12415,11 +12795,17 @@ components:
           type: integer
         nome:
           type: string
+        nomeNormalizzato:
+          type: string
+        descrizione:
+          type: ["string", "null"]
         attivo:
           type: boolean
         dataCreazione:
           type: string
-      required: [id, nome, attivo, dataCreazione]
+        dataAggiornamento:
+          type: string
+      required: [id, nome, nomeNormalizzato, attivo, dataCreazione, dataAggiornamento]
 
     RuoloVolontarioInput:
       type: object
@@ -12427,6 +12813,8 @@ components:
         nome:
           type: string
           minLength: 1
+        descrizione:
+          type: string
         attivo:
           type: boolean
       required: [nome]
@@ -12437,6 +12825,8 @@ components:
         nome:
           type: string
           minLength: 1
+        descrizione:
+          type: string
         attivo:
           type: boolean
 
@@ -15551,13 +15941,34 @@ components:
           type: string
         matricola:
           type: ["string", "null"]
+        tipoVolontario:
+          type: string
+          enum: [PERMANENTE, TEMPORANEO]
         centroAscoltoId:
           type: ["integer", "null"]
         centroAscoltoNome:
           type: ["string", "null"]
         telefono:
           type: ["string", "null"]
+        telefonoSecondario:
+          type: ["string", "null"]
         email:
+          type: ["string", "null"]
+        luogoNascita:
+          type: ["string", "null"]
+        dataNascita:
+          type: ["string", "null"]
+          format: date
+        indirizzoResidenza:
+          type: ["string", "null"]
+        codiceFiscale:
+          type: ["string", "null"]
+        dataInizioImportata:
+          type: ["string", "null"]
+          format: date
+        categoriaImportataOriginale:
+          type: ["string", "null"]
+        gruppoImportatoOriginale:
           type: ["string", "null"]
         ruolo:
           type: string
@@ -15574,6 +15985,23 @@ components:
           minimum: 0
         attivo:
           type: boolean
+          description: Abilitazione amministrativa/manuale; non equivale allo stato operativo.
+        abilitatoAmministrativamente:
+          type: boolean
+        operativo:
+          type: boolean
+        motivoNonOperativo:
+          type: ["string", "null"]
+        statoAssicurazione:
+          type: string
+          enum: [MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
+        scadenzaAssicurazione:
+          type: ["string", "null"]
+          format: date
+        sospesoManualmente:
+          type: boolean
+        giornataTemporaneaValida:
+          type: ["boolean", "null"]
         statoApprovazione:
           type: string
           enum: [in_attesa, approvato, respinto]
@@ -15591,11 +16019,16 @@ components:
           id,
           nome,
           cognome,
+          tipoVolontario,
           ruolo,
           patente,
           mezzoPersonale,
           maxConsegneTurno,
           attivo,
+          abilitatoAmministrativamente,
+          operativo,
+          statoAssicurazione,
+          sospesoManualmente,
           statoApprovazione,
           versione,
           dataCreazione,
@@ -15611,11 +16044,25 @@ components:
           type: string
         matricola:
           type: string
+        tipoVolontario:
+          type: string
+          enum: [PERMANENTE, TEMPORANEO]
         centroAscoltoId:
           type: ["integer", "null"]
         telefono:
           type: string
+        telefonoSecondario:
+          type: string
         email:
+          type: string
+        luogoNascita:
+          type: string
+        dataNascita:
+          type: string
+          format: date
+        indirizzoResidenza:
+          type: string
+        codiceFiscale:
           type: string
         ruoloVolontarioId:
           type: integer
@@ -15640,11 +16087,25 @@ components:
           type: string
         matricola:
           type: string
+        tipoVolontario:
+          type: string
+          enum: [PERMANENTE, TEMPORANEO]
         centroAscoltoId:
           type: ["integer", "null"]
         telefono:
           type: string
+        telefonoSecondario:
+          type: string
         email:
+          type: string
+        luogoNascita:
+          type: string
+        dataNascita:
+          type: string
+          format: date
+        indirizzoResidenza:
+          type: string
+        codiceFiscale:
           type: string
         ruoloVolontarioId:
           type: integer
@@ -15664,6 +16125,258 @@ components:
           type: integer
           minimum: 1
       required: [versione]
+
+    VolontarioOperationalState:
+      type: object
+      properties:
+        operativo:
+          type: boolean
+        motivoNonOperativo:
+          type: ["string", "null"]
+        statoAssicurazione:
+          type: string
+          enum: [MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
+        scadenzaAssicurazione:
+          type: ["string", "null"]
+          format: date
+        sospesoManualmente:
+          type: boolean
+        giornataTemporaneaValida:
+          type: ["boolean", "null"]
+      required: [operativo, statoAssicurazione, sospesoManualmente]
+
+    VolontarioActionResult:
+      type: object
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+        stato:
+          $ref: "#/components/schemas/VolontarioOperationalState"
+        messaggio:
+          type: string
+        azioneSuggerita:
+          type: ["string", "null"]
+        copertura:
+          type: object
+          additionalProperties: true
+      required: [versione]
+
+    VolontarioSospensioneInput:
+      type: object
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+        dataEffettiva:
+          type: string
+          format: date
+        motivo:
+          type: string
+          enum: [indisponibilita_temporanea, dimissioni_cessazione, sospensione_organizzativa, altro]
+        note:
+          type: string
+      required: [versione, motivo]
+
+    VolontarioRiattivazioneInput:
+      type: object
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+        dataEffettiva:
+          type: string
+          format: date
+        note:
+          type: string
+      required: [versione]
+
+    VolontarioInsuranceInput:
+      type: object
+      properties:
+        modalita:
+          type: string
+          enum: [CONTINUA_SCADENZA, NUOVA_DA_DATA]
+        dataDecorrenza:
+          type: string
+          format: date
+        durataMesi:
+          type: integer
+          minimum: 1
+          maximum: 120
+          default: 12
+        riferimentoPolizza:
+          type: string
+        note:
+          type: string
+      required: [modalita]
+
+    VolontarioInsuranceVersionInput:
+      allOf:
+        - $ref: "#/components/schemas/VolontarioInsuranceInput"
+        - type: object
+          properties:
+            versione:
+              type: integer
+              minimum: 1
+          required: [versione]
+
+    VolontarioBulkInsuranceInput:
+      type: object
+      properties:
+        volontarioIds:
+          type: array
+          minItems: 1
+          maxItems: 2000
+          uniqueItems: true
+          items: { type: integer, minimum: 1 }
+        modalita:
+          type: string
+          enum: [CONTINUA_SCADENZA, NUOVA_DA_DATA]
+        dataDecorrenza:
+          type: string
+          format: date
+        durataMesi:
+          type: integer
+          minimum: 1
+          maximum: 120
+          default: 12
+        riferimentoPolizza:
+          type: string
+        note:
+          type: string
+      required: [volontarioIds, modalita]
+
+    VolontarioBulkInsurancePreviewRow:
+      type: object
+      properties:
+        volontarioId: { type: integer }
+        volontario: { type: string }
+        versione: { type: integer, minimum: 1 }
+        incluso: { type: boolean }
+        nuovaDecorrenza: { type: ["string", "null"], format: date }
+        nuovaScadenza: { type: ["string", "null"], format: date }
+        vecchiaScadenza: { type: ["string", "null"], format: date }
+        motivoNonOperativo: { type: ["string", "null"] }
+        esitoPrevisto: { type: string }
+        esclusioneMotivo: { type: ["string", "null"] }
+      required: [volontarioId, volontario, versione, incluso, esitoPrevisto]
+
+    VolontarioBulkInsuranceConfirmInput:
+      allOf:
+        - $ref: "#/components/schemas/VolontarioInsuranceInput"
+        - type: object
+          properties:
+            righe:
+              type: array
+              minItems: 1
+              maxItems: 2000
+              items:
+                type: object
+                properties:
+                  volontarioId: { type: integer, minimum: 1 }
+                  versione: { type: integer, minimum: 1 }
+                  incluso: { type: boolean }
+                required: [volontarioId, versione]
+          required: [righe]
+
+    VolontarioServiceDayInput:
+      type: object
+      properties:
+        dataServizio:
+          type: string
+          format: date
+        centroAscoltoId:
+          type: ["integer", "null"]
+        stato:
+          type: string
+          enum: [PIANIFICATA, PRESENTE, ASSENTE, ANNULLATA]
+        attivita:
+          type: string
+        note:
+          type: string
+      required: [dataServizio]
+
+    VolontarioServiceDayUpdateInput:
+      type: object
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+        stato:
+          type: string
+          enum: [PIANIFICATA, PRESENTE, ASSENTE, ANNULLATA]
+        attivita:
+          type: string
+        note:
+          type: string
+      required: [versione]
+
+    VolontariImportPreview:
+      type: object
+      properties:
+        importazioneId: { type: integer }
+        nomeFile: { type: string }
+        stato: { type: string }
+        hashFile: { type: string }
+        numeroRighe: { type: integer }
+        replayIdempotente: { type: boolean }
+        righe:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      required: [importazioneId, nomeFile, stato, hashFile, numeroRighe, righe]
+
+    VolontariImportConfirmInput:
+      type: object
+      properties:
+        importazioneId:
+          type: integer
+          minimum: 1
+        righe:
+          type: array
+          maxItems: 2000
+          items:
+            type: object
+            properties:
+              numeroRiga: { type: integer, minimum: 2 }
+              inclusa: { type: boolean }
+              volontarioId: { type: ["integer", "null"], minimum: 1 }
+              creaNuovo: { type: boolean }
+              ruoloVolontarioId: { type: ["integer", "null"], minimum: 1 }
+              centroAscoltoId: { type: ["integer", "null"], minimum: 1 }
+              creaRuolo: { type: boolean }
+              correzioni: { type: object, additionalProperties: true }
+            required: [numeroRiga]
+      required: [importazioneId, righe]
+
+    VolontariGenericWriteInput:
+      type: object
+      additionalProperties: true
+
+    VolontariRegisterGenerateInput:
+      type: object
+      properties:
+        tipo:
+          type: string
+          enum: [PDF, XLSX]
+        filtri:
+          type: object
+          additionalProperties: true
+
+    VolontariRegisterCorrectionInput:
+      type: object
+      properties:
+        motivo:
+          type: string
+        dataEffettiva:
+          type: string
+          format: date
+        snapshot:
+          type: object
+          additionalProperties: true
+      required: [motivo, snapshot]
 
     # ── Mezzi ─────────────────────────────────────────────────────────────
     Mezzo:

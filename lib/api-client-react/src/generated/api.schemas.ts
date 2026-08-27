@@ -1022,14 +1022,28 @@ export interface Magazzino {
   dataCreazione: string;
 }
 
+export type VolontarioInputTipoVolontario = typeof VolontarioInputTipoVolontario[keyof typeof VolontarioInputTipoVolontario];
+
+
+export const VolontarioInputTipoVolontario = {
+  PERMANENTE: 'PERMANENTE',
+  TEMPORANEO: 'TEMPORANEO',
+} as const;
+
 export interface VolontarioInput {
   nome: string;
   cognome: string;
   matricola: string;
+  tipoVolontario?: VolontarioInputTipoVolontario;
   /** @nullable */
   centroAscoltoId?: number | null;
   telefono?: string;
+  telefonoSecondario?: string;
   email?: string;
+  luogoNascita?: string;
+  dataNascita?: string;
+  indirizzoResidenza?: string;
+  codiceFiscale?: string;
   /** @minimum 1 */
   ruoloVolontarioId: number;
   patente?: boolean;
@@ -3702,19 +3716,25 @@ export interface CreditoSolidaleRicaricaMensileEsecuzione {
 export interface RuoloVolontario {
   id: number;
   nome: string;
+  nomeNormalizzato: string;
+  /** @nullable */
+  descrizione?: string | null;
   attivo: boolean;
   dataCreazione: string;
+  dataAggiornamento: string;
 }
 
 export interface RuoloVolontarioInput {
   /** @minLength 1 */
   nome: string;
+  descrizione?: string;
   attivo?: boolean;
 }
 
 export interface RuoloVolontarioUpdate {
   /** @minLength 1 */
   nome?: string;
+  descrizione?: string;
   attivo?: boolean;
 }
 
@@ -5949,6 +5969,25 @@ export interface BollaUpdate {
   noteConsegna?: string | null;
 }
 
+export type VolontarioTipoVolontario = typeof VolontarioTipoVolontario[keyof typeof VolontarioTipoVolontario];
+
+
+export const VolontarioTipoVolontario = {
+  PERMANENTE: 'PERMANENTE',
+  TEMPORANEO: 'TEMPORANEO',
+} as const;
+
+export type VolontarioStatoAssicurazione = typeof VolontarioStatoAssicurazione[keyof typeof VolontarioStatoAssicurazione];
+
+
+export const VolontarioStatoAssicurazione = {
+  MANCANTE: 'MANCANTE',
+  VALIDA: 'VALIDA',
+  IN_SCADENZA: 'IN_SCADENZA',
+  SCADUTA: 'SCADUTA',
+  NON_ANCORA_VALIDA: 'NON_ANCORA_VALIDA',
+} as const;
+
 export type VolontarioStatoApprovazione = typeof VolontarioStatoApprovazione[keyof typeof VolontarioStatoApprovazione];
 
 
@@ -5964,6 +6003,7 @@ export interface Volontario {
   cognome: string;
   /** @nullable */
   matricola?: string | null;
+  tipoVolontario: VolontarioTipoVolontario;
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
@@ -5971,7 +6011,23 @@ export interface Volontario {
   /** @nullable */
   telefono?: string | null;
   /** @nullable */
+  telefonoSecondario?: string | null;
+  /** @nullable */
   email?: string | null;
+  /** @nullable */
+  luogoNascita?: string | null;
+  /** @nullable */
+  dataNascita?: string | null;
+  /** @nullable */
+  indirizzoResidenza?: string | null;
+  /** @nullable */
+  codiceFiscale?: string | null;
+  /** @nullable */
+  dataInizioImportata?: string | null;
+  /** @nullable */
+  categoriaImportataOriginale?: string | null;
+  /** @nullable */
+  gruppoImportatoOriginale?: string | null;
   ruolo: string;
   /** @nullable */
   ruoloVolontarioId?: number | null;
@@ -5981,7 +6037,18 @@ export interface Volontario {
   mezzoPersonale: boolean;
   /** @minimum 0 */
   maxConsegneTurno: number;
+  /** Abilitazione amministrativa/manuale; non equivale allo stato operativo. */
   attivo: boolean;
+  abilitatoAmministrativamente: boolean;
+  operativo: boolean;
+  /** @nullable */
+  motivoNonOperativo?: string | null;
+  statoAssicurazione: VolontarioStatoAssicurazione;
+  /** @nullable */
+  scadenzaAssicurazione?: string | null;
+  sospesoManualmente: boolean;
+  /** @nullable */
+  giornataTemporaneaValida?: boolean | null;
   statoApprovazione: VolontarioStatoApprovazione;
   /** @nullable */
   note?: string | null;
@@ -5991,14 +6058,28 @@ export interface Volontario {
   dataAggiornamento: string;
 }
 
+export type VolontarioUpdateTipoVolontario = typeof VolontarioUpdateTipoVolontario[keyof typeof VolontarioUpdateTipoVolontario];
+
+
+export const VolontarioUpdateTipoVolontario = {
+  PERMANENTE: 'PERMANENTE',
+  TEMPORANEO: 'TEMPORANEO',
+} as const;
+
 export interface VolontarioUpdate {
   nome?: string;
   cognome?: string;
   matricola?: string;
+  tipoVolontario?: VolontarioUpdateTipoVolontario;
   /** @nullable */
   centroAscoltoId?: number | null;
   telefono?: string;
+  telefonoSecondario?: string;
   email?: string;
+  luogoNascita?: string;
+  dataNascita?: string;
+  indirizzoResidenza?: string;
+  codiceFiscale?: string;
   /** @minimum 1 */
   ruoloVolontarioId?: number;
   patente?: boolean;
@@ -6009,6 +6090,258 @@ export interface VolontarioUpdate {
   note?: string;
   /** @minimum 1 */
   versione: number;
+}
+
+export type VolontarioOperationalStateStatoAssicurazione = typeof VolontarioOperationalStateStatoAssicurazione[keyof typeof VolontarioOperationalStateStatoAssicurazione];
+
+
+export const VolontarioOperationalStateStatoAssicurazione = {
+  MANCANTE: 'MANCANTE',
+  VALIDA: 'VALIDA',
+  IN_SCADENZA: 'IN_SCADENZA',
+  SCADUTA: 'SCADUTA',
+  NON_ANCORA_VALIDA: 'NON_ANCORA_VALIDA',
+} as const;
+
+export interface VolontarioOperationalState {
+  operativo: boolean;
+  /** @nullable */
+  motivoNonOperativo?: string | null;
+  statoAssicurazione: VolontarioOperationalStateStatoAssicurazione;
+  /** @nullable */
+  scadenzaAssicurazione?: string | null;
+  sospesoManualmente: boolean;
+  /** @nullable */
+  giornataTemporaneaValida?: boolean | null;
+}
+
+export type VolontarioActionResultCopertura = { [key: string]: unknown };
+
+export interface VolontarioActionResult {
+  /** @minimum 1 */
+  versione: number;
+  stato?: VolontarioOperationalState;
+  messaggio?: string;
+  /** @nullable */
+  azioneSuggerita?: string | null;
+  copertura?: VolontarioActionResultCopertura;
+}
+
+export type VolontarioSospensioneInputMotivo = typeof VolontarioSospensioneInputMotivo[keyof typeof VolontarioSospensioneInputMotivo];
+
+
+export const VolontarioSospensioneInputMotivo = {
+  indisponibilita_temporanea: 'indisponibilita_temporanea',
+  dimissioni_cessazione: 'dimissioni_cessazione',
+  sospensione_organizzativa: 'sospensione_organizzativa',
+  altro: 'altro',
+} as const;
+
+export interface VolontarioSospensioneInput {
+  /** @minimum 1 */
+  versione: number;
+  dataEffettiva?: string;
+  motivo: VolontarioSospensioneInputMotivo;
+  note?: string;
+}
+
+export interface VolontarioRiattivazioneInput {
+  /** @minimum 1 */
+  versione: number;
+  dataEffettiva?: string;
+  note?: string;
+}
+
+export type VolontarioInsuranceInputModalita = typeof VolontarioInsuranceInputModalita[keyof typeof VolontarioInsuranceInputModalita];
+
+
+export const VolontarioInsuranceInputModalita = {
+  CONTINUA_SCADENZA: 'CONTINUA_SCADENZA',
+  NUOVA_DA_DATA: 'NUOVA_DA_DATA',
+} as const;
+
+export interface VolontarioInsuranceInput {
+  modalita: VolontarioInsuranceInputModalita;
+  dataDecorrenza?: string;
+  /**
+     * @minimum 1
+     * @maximum 120
+     */
+  durataMesi?: number;
+  riferimentoPolizza?: string;
+  note?: string;
+}
+
+export type VolontarioInsuranceVersionInput = VolontarioInsuranceInput & {
+  /** @minimum 1 */
+  versione: number;
+};
+
+export type VolontarioBulkInsuranceInputModalita = typeof VolontarioBulkInsuranceInputModalita[keyof typeof VolontarioBulkInsuranceInputModalita];
+
+
+export const VolontarioBulkInsuranceInputModalita = {
+  CONTINUA_SCADENZA: 'CONTINUA_SCADENZA',
+  NUOVA_DA_DATA: 'NUOVA_DA_DATA',
+} as const;
+
+export interface VolontarioBulkInsuranceInput {
+  /**
+     * @minItems 1
+     * @maxItems 2000
+     */
+  volontarioIds: number[];
+  modalita: VolontarioBulkInsuranceInputModalita;
+  dataDecorrenza?: string;
+  /**
+     * @minimum 1
+     * @maximum 120
+     */
+  durataMesi?: number;
+  riferimentoPolizza?: string;
+  note?: string;
+}
+
+export interface VolontarioBulkInsurancePreviewRow {
+  volontarioId: number;
+  volontario: string;
+  /** @minimum 1 */
+  versione: number;
+  incluso: boolean;
+  /** @nullable */
+  nuovaDecorrenza?: string | null;
+  /** @nullable */
+  nuovaScadenza?: string | null;
+  /** @nullable */
+  vecchiaScadenza?: string | null;
+  /** @nullable */
+  motivoNonOperativo?: string | null;
+  esitoPrevisto: string;
+  /** @nullable */
+  esclusioneMotivo?: string | null;
+}
+
+export type VolontarioBulkInsuranceConfirmInputRigheItem = {
+  /** @minimum 1 */
+  volontarioId: number;
+  /** @minimum 1 */
+  versione: number;
+  incluso?: boolean;
+};
+
+export type VolontarioBulkInsuranceConfirmInput = VolontarioInsuranceInput & {
+  /**
+     * @minItems 1
+     * @maxItems 2000
+     */
+  righe: VolontarioBulkInsuranceConfirmInputRigheItem[];
+};
+
+export type VolontarioServiceDayInputStato = typeof VolontarioServiceDayInputStato[keyof typeof VolontarioServiceDayInputStato];
+
+
+export const VolontarioServiceDayInputStato = {
+  PIANIFICATA: 'PIANIFICATA',
+  PRESENTE: 'PRESENTE',
+  ASSENTE: 'ASSENTE',
+  ANNULLATA: 'ANNULLATA',
+} as const;
+
+export interface VolontarioServiceDayInput {
+  dataServizio: string;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  stato?: VolontarioServiceDayInputStato;
+  attivita?: string;
+  note?: string;
+}
+
+export type VolontarioServiceDayUpdateInputStato = typeof VolontarioServiceDayUpdateInputStato[keyof typeof VolontarioServiceDayUpdateInputStato];
+
+
+export const VolontarioServiceDayUpdateInputStato = {
+  PIANIFICATA: 'PIANIFICATA',
+  PRESENTE: 'PRESENTE',
+  ASSENTE: 'ASSENTE',
+  ANNULLATA: 'ANNULLATA',
+} as const;
+
+export interface VolontarioServiceDayUpdateInput {
+  /** @minimum 1 */
+  versione: number;
+  stato?: VolontarioServiceDayUpdateInputStato;
+  attivita?: string;
+  note?: string;
+}
+
+export type VolontariImportPreviewRigheItem = { [key: string]: unknown };
+
+export interface VolontariImportPreview {
+  importazioneId: number;
+  nomeFile: string;
+  stato: string;
+  hashFile: string;
+  numeroRighe: number;
+  replayIdempotente?: boolean;
+  righe: VolontariImportPreviewRigheItem[];
+}
+
+export type VolontariImportConfirmInputRigheItemCorrezioni = { [key: string]: unknown };
+
+export type VolontariImportConfirmInputRigheItem = {
+  /** @minimum 2 */
+  numeroRiga: number;
+  inclusa?: boolean;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  volontarioId?: number | null;
+  creaNuovo?: boolean;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  ruoloVolontarioId?: number | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  centroAscoltoId?: number | null;
+  creaRuolo?: boolean;
+  correzioni?: VolontariImportConfirmInputRigheItemCorrezioni;
+};
+
+export interface VolontariImportConfirmInput {
+  /** @minimum 1 */
+  importazioneId: number;
+  /** @maxItems 2000 */
+  righe: VolontariImportConfirmInputRigheItem[];
+}
+
+export interface VolontariGenericWriteInput { [key: string]: unknown }
+
+export type VolontariRegisterGenerateInputTipo = typeof VolontariRegisterGenerateInputTipo[keyof typeof VolontariRegisterGenerateInputTipo];
+
+
+export const VolontariRegisterGenerateInputTipo = {
+  PDF: 'PDF',
+  XLSX: 'XLSX',
+} as const;
+
+export type VolontariRegisterGenerateInputFiltri = { [key: string]: unknown };
+
+export interface VolontariRegisterGenerateInput {
+  tipo?: VolontariRegisterGenerateInputTipo;
+  filtri?: VolontariRegisterGenerateInputFiltri;
+}
+
+export type VolontariRegisterCorrectionInputSnapshot = { [key: string]: unknown };
+
+export interface VolontariRegisterCorrectionInput {
+  motivo: string;
+  dataEffettiva?: string;
+  snapshot: VolontariRegisterCorrectionInputSnapshot;
 }
 
 export type MezzoStato = typeof MezzoStato[keyof typeof MezzoStato];
@@ -8396,7 +8729,47 @@ limit?: number;
 export type ListVolontariParams = {
 centroAscoltoId?: number;
 search?: string;
+stato?: ListVolontariStato;
+tipoVolontario?: ListVolontariTipoVolontario;
+statoAssicurazione?: ListVolontariStatoAssicurazione;
+ruoloVolontarioId?: number;
+dataRiferimento?: string;
+scadenzaDa?: string;
+scadenzaA?: string;
+/**
+ * @minimum 1
+ * @maximum 120
+ */
+scadutiDaMenoDiMesi?: number;
 };
+
+export type ListVolontariStato = typeof ListVolontariStato[keyof typeof ListVolontariStato];
+
+
+export const ListVolontariStato = {
+  attivi: 'attivi',
+  non_attivi: 'non_attivi',
+  tutti: 'tutti',
+} as const;
+
+export type ListVolontariTipoVolontario = typeof ListVolontariTipoVolontario[keyof typeof ListVolontariTipoVolontario];
+
+
+export const ListVolontariTipoVolontario = {
+  PERMANENTE: 'PERMANENTE',
+  TEMPORANEO: 'TEMPORANEO',
+} as const;
+
+export type ListVolontariStatoAssicurazione = typeof ListVolontariStatoAssicurazione[keyof typeof ListVolontariStatoAssicurazione];
+
+
+export const ListVolontariStatoAssicurazione = {
+  MANCANTE: 'MANCANTE',
+  VALIDA: 'VALIDA',
+  IN_SCADENZA: 'IN_SCADENZA',
+  SCADUTA: 'SCADUTA',
+  NON_ANCORA_VALIDA: 'NON_ANCORA_VALIDA',
+} as const;
 
 export type GetVolontariCaricoParams = {
 /**
@@ -8419,6 +8792,22 @@ export const GetVolontariCaricoFascia = {
 export type GetVolontariCarico200Item = {
   volontarioId: number;
   count: number;
+};
+
+export type PreviewBulkVolontariInsurance200 = {
+  items: VolontarioBulkInsurancePreviewRow[];
+};
+
+export type GetVolontarioDossier200 = { [key: string]: unknown };
+
+export type AnalyzeVolontariImportParams = {
+centroAscoltoId?: number;
+};
+
+export type ConfirmVolontariImport200 = { [key: string]: unknown };
+
+export type GetVolontarioParams = {
+dataRiferimento?: string;
 };
 
 export type DeleteVolontario200 = {

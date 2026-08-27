@@ -5,8 +5,23 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListVolontariStato } from './listVolontariStato';
+import type { ListVolontariStatoAssicurazione } from './listVolontariStatoAssicurazione';
+import type { ListVolontariTipoVolontario } from './listVolontariTipoVolontario';
 
 export type ListVolontariParams = {
 centroAscoltoId?: number;
 search?: string;
+stato?: ListVolontariStato;
+tipoVolontario?: ListVolontariTipoVolontario;
+statoAssicurazione?: ListVolontariStatoAssicurazione;
+ruoloVolontarioId?: number;
+dataRiferimento?: Date;
+scadenzaDa?: Date;
+scadenzaA?: Date;
+/**
+ * @minimum 1
+ * @maximum 120
+ */
+scadutiDaMenoDiMesi?: number;
 };

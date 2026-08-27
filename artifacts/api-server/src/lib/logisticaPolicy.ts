@@ -6,6 +6,7 @@ import {
   volontariTable,
 } from "@workspace/db";
 import { and, eq, inArray, ne, or, sql, type SQL } from "drizzle-orm";
+import { operationalStateForVolunteer } from "./volontariOperational";
 
 export type LogisticaTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -236,13 +237,23 @@ export async function assertVolontarioAssignableTx(
     .for("update");
   if (
     !volontario ||
-    !volontario.attivo ||
-    volontario.statoApprovazione !== "approvato" ||
     !compatibleCentro(volontario.centroAscoltoId, input.centroAscoltoId)
   ) {
     throw new LogisticaPolicyError(
       403,
-      "Volontario non attivo, non approvato o non assegnabile al centro",
+      "Volontario non trovato o non assegnabile al centro",
+    );
+  }
+  const operational = await operationalStateForVolunteer(
+    tx,
+    volontario.id,
+    input.data,
+    input.centroAscoltoId,
+  );
+  if (!operational?.operativo) {
+    throw new LogisticaPolicyError(
+      403,
+      `Volontario non operativo per la data selezionata (${operational?.motivoNonOperativo ?? "requisiti non soddisfatti"})`,
     );
   }
 

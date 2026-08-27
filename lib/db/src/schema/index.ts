@@ -10,6 +10,7 @@ export * from "./fseFascicoliSociali";
 export * from "./carichiMagazzino";
 export * from "./operazioniDistribuzioneMagazzino";
 export * from "./volontari";
+export * from "./volontari2";
 export * from "./ruoliVolontari";
 export * from "./tipiIntervento";
 export * from "./tipologieFornitore";

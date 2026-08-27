@@ -12,6 +12,9 @@ const DEFAULT_ROLES = [
   "coordinatore",
 ];
 
+const normalizeRoleName = (value: string) =>
+  value.trim().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, " ").trim().toLowerCase();
+
 /**
  * Idempotently ensures the default volunteer roles exist so the volontari form
  * has options out of the box. Admins can add/remove roles afterwards.
@@ -23,7 +26,10 @@ export async function seedRuoliVolontari(): Promise<void> {
       .from(ruoliVolontariTable)
       .where(eq(ruoliVolontariTable.nome, nome));
     if (!existing) {
-      await db.insert(ruoliVolontariTable).values({ nome });
+      await db.insert(ruoliVolontariTable).values({
+        nome,
+        nomeNormalizzato: normalizeRoleName(nome),
+      });
     }
   }
   logger.info("Seeded default volunteer roles");

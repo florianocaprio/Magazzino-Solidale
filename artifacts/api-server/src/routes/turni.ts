@@ -40,6 +40,8 @@ import {
   type PlanningSlot,
 } from "../lib/logisticaPolicy";
 import { auditLogistica } from "../lib/logisticaAudit";
+import { appendVolontarioLedgerEvent } from "../lib/volontariLedger";
+import { todayRome } from "../lib/volontariDomain";
 
 const router: IRouter = Router();
 
@@ -508,6 +510,13 @@ router.post(
         note: trimText(req.body?.note) || "Inserito da pianificazione turni",
       }).returning();
       await auditLogistica(tx, req, { entita: "volontario", id: row.id, azione: "creazione", nuovo: { origine: "turni", statoApprovazione: "in_attesa", attivo: false, versione: row.versione } });
+      await appendVolontarioLedgerEvent(tx, {
+        sezione: "PERMANENTE", tipoEvento: "REGISTRAZIONE",
+        volontarioId: row.id, centroAscoltoId: resolved.centroAscoltoId,
+        dataEffettiva: todayRome(),
+        snapshot: { origine: "turni", matricola: row.matricola, statoApprovazione: "in_attesa" },
+        utenteId: req.user?.id ?? null,
+      });
       return row;
     });
   } catch (e) {
