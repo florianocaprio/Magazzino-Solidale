@@ -197,6 +197,13 @@ describe("Volontari — API salvataggio e conversione", () => {
       codiceFiscaleNota: null,
       versione: legacy.versione + 1,
     });
+    const ledger = await db
+      .select({ tipoEvento: registroVolontariEventiTable.tipoEvento })
+      .from(registroVolontariEventiTable)
+      .where(eq(registroVolontariEventiTable.volontarioId, legacy.id));
+    expect(ledger).toContainEqual({
+      tipoEvento: "AGGIORNAMENTO_ANAGRAFICA",
+    });
   });
 
   it("valida il nextState legacy in modo atomico e preserva la riga", async () => {

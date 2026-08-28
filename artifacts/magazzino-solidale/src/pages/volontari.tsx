@@ -18,6 +18,8 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowRightLeft,
+  CalendarPlus,
   CalendarRange,
   ChevronDown,
   Download,
@@ -91,6 +93,10 @@ import {
   type VolunteerFormErrors,
   type VolunteerFormField,
 } from "@/lib/volontari-form";
+import {
+  canReactivateVolunteer,
+  canSuspendVolunteer,
+} from "@/lib/volontari-actions";
 
 const emptyDraft = (centerId: number | null): Draft => ({
   nome: "",
@@ -200,7 +206,9 @@ function InsuranceBadge({ volunteer }: { volunteer: Volontario }) {
         {insuranceLabel(volunteer.statoAssicurazione)}
       </Badge>
       <div className="text-xs text-muted-foreground">
-        {volunteer.scadenzaAssicurazione ?? "Nessuna scadenza"}
+        {volunteer.tipoVolontario === "TEMPORANEO"
+          ? "Copertura legata alle giornate registrate"
+          : (volunteer.scadenzaAssicurazione ?? "Nessuna scadenza")}
       </div>
     </div>
   );
@@ -255,6 +263,7 @@ export default function Volontari() {
   );
   const [resumeConversionAfterSave, setResumeConversionAfterSave] =
     useState(false);
+  const [autoOpenServiceDay, setAutoOpenServiceDay] = useState(false);
   const [dossierVolunteer, setDossierVolunteer] = useState<Volontario | null>(
     null,
   );
@@ -460,6 +469,14 @@ export default function Volontari() {
       volunteers.find((item) => item.id === volunteer.id) ?? volunteer,
     );
     setOperation(nextOperation);
+  };
+  const openDossierAction = (
+    volunteer: Volontario,
+    action: "conversion" | "giornata",
+  ) => {
+    setResumeConversionAfterSave(action === "conversion");
+    setAutoOpenServiceDay(action === "giornata");
+    setDossierVolunteer(volunteer);
   };
   const allSelected =
     volunteers.length > 0 &&
@@ -999,21 +1016,25 @@ export default function Volontari() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
+                                  className="min-h-11"
                                   onClick={() => openEdit(volunteer)}
                                 >
                                   <Pencil className="mr-2 h-4 w-4" /> Modifica
                                   anagrafica
                                 </DropdownMenuItem>
-                                {volunteer.sospesoManualmente ? (
+                                {canReactivateVolunteer(volunteer) && (
                                   <DropdownMenuItem
+                                    className="min-h-11"
                                     onClick={() =>
                                       openOperation(volunteer, "riattiva")
                                     }
                                   >
                                     Riattiva
                                   </DropdownMenuItem>
-                                ) : (
+                                )}
+                                {canSuspendVolunteer(volunteer) && (
                                   <DropdownMenuItem
+                                    className="min-h-11"
                                     onClick={() =>
                                       openOperation(volunteer, "sospendi")
                                     }
@@ -1021,14 +1042,41 @@ export default function Volontari() {
                                     Sospendi
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    openOperation(volunteer, "assicurazione")
-                                  }
-                                >
-                                  <ShieldCheck className="mr-2 h-4 w-4" />{" "}
-                                  Registra / Rinnova assicurazione
-                                </DropdownMenuItem>
+                                {volunteer.tipoVolontario === "TEMPORANEO" ? (
+                                  <>
+                                    <DropdownMenuItem
+                                      className="min-h-11"
+                                      onClick={() =>
+                                        openDossierAction(volunteer, "giornata")
+                                      }
+                                    >
+                                      <CalendarPlus className="mr-2 h-4 w-4" />
+                                      Registra giornata di servizio
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="min-h-11"
+                                      onClick={() =>
+                                        openDossierAction(
+                                          volunteer,
+                                          "conversion",
+                                        )
+                                      }
+                                    >
+                                      <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                      Converti in permanente
+                                    </DropdownMenuItem>
+                                  </>
+                                ) : (
+                                  <DropdownMenuItem
+                                    className="min-h-11"
+                                    onClick={() =>
+                                      openOperation(volunteer, "assicurazione")
+                                    }
+                                  >
+                                    <ShieldCheck className="mr-2 h-4 w-4" />
+                                    Registra / Rinnova assicurazione
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}
@@ -1109,33 +1157,75 @@ export default function Volontari() {
                     >
                       <Eye className="mr-2 h-4 w-4" /> Scheda
                     </Button>
-                    {canManage &&
-                      (volunteer.sospesoManualmente ? (
-                        <Button
-                          variant="outline"
-                          className="min-h-11"
-                          onClick={() => openOperation(volunteer, "riattiva")}
-                        >
-                          Riattiva
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          className="min-h-11"
-                          onClick={() => openOperation(volunteer, "sospendi")}
-                        >
-                          Sospendi
-                        </Button>
-                      ))}
                     {canManage && (
-                      <Button
-                        className="min-h-11"
-                        onClick={() =>
-                          openOperation(volunteer, "assicurazione")
-                        }
-                      >
-                        <ShieldCheck className="mr-2 h-4 w-4" /> Assicurazione
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="min-h-11 flex-1">
+                            Azioni <ChevronDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="min-h-11"
+                            onClick={() => openEdit(volunteer)}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" /> Modifica
+                            anagrafica
+                          </DropdownMenuItem>
+                          {canReactivateVolunteer(volunteer) && (
+                            <DropdownMenuItem
+                              className="min-h-11"
+                              onClick={() =>
+                                openOperation(volunteer, "riattiva")
+                              }
+                            >
+                              Riattiva
+                            </DropdownMenuItem>
+                          )}
+                          {canSuspendVolunteer(volunteer) && (
+                            <DropdownMenuItem
+                              className="min-h-11"
+                              onClick={() =>
+                                openOperation(volunteer, "sospendi")
+                              }
+                            >
+                              Sospendi
+                            </DropdownMenuItem>
+                          )}
+                          {volunteer.tipoVolontario === "TEMPORANEO" ? (
+                            <>
+                              <DropdownMenuItem
+                                className="min-h-11"
+                                onClick={() =>
+                                  openDossierAction(volunteer, "giornata")
+                                }
+                              >
+                                <CalendarPlus className="mr-2 h-4 w-4" />
+                                Registra giornata di servizio
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="min-h-11"
+                                onClick={() =>
+                                  openDossierAction(volunteer, "conversion")
+                                }
+                              >
+                                <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                Converti in permanente
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <DropdownMenuItem
+                              className="min-h-11"
+                              onClick={() =>
+                                openOperation(volunteer, "assicurazione")
+                              }
+                            >
+                              <ShieldCheck className="mr-2 h-4 w-4" />
+                              Registra / Rinnova assicurazione
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
                 </article>
@@ -1563,10 +1653,15 @@ export default function Volontari() {
         volontario={currentDossierVolunteer}
         canManage={canManage}
         onOpenChange={(open) => {
-          if (!open) setDossierVolunteer(null);
+          if (!open) {
+            setDossierVolunteer(null);
+            setAutoOpenServiceDay(false);
+          }
         }}
         autoOpenConversion={resumeConversionAfterSave}
         onAutoOpenConversionHandled={() => setResumeConversionAfterSave(false)}
+        autoOpenServiceDay={autoOpenServiceDay}
+        onAutoOpenServiceDayHandled={() => setAutoOpenServiceDay(false)}
         onEdit={(volunteer, errors = {}) => {
           setResumeConversionAfterSave(Object.keys(errors).length > 0);
           setDossierVolunteer(null);

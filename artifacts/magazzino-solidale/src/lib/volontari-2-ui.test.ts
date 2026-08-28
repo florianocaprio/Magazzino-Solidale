@@ -6,7 +6,7 @@ async function source(relativePath: string): Promise<string> {
 }
 
 describe("Volontari 2.0 — contratti UI", () => {
-  it("espone solo le tre azioni operative previste", async () => {
+  it("espone azioni operative contestuali per tipo e stato", async () => {
     const [page, operations] = await Promise.all([
       source("../pages/volontari.tsx"),
       source("../components/volontari/volontario-operation-dialog.tsx"),
@@ -14,7 +14,14 @@ describe("Volontari 2.0 — contratti UI", () => {
     expect(page).toContain('openOperation(volunteer, "sospendi")');
     expect(page).toContain('openOperation(volunteer, "riattiva")');
     expect(page).toContain('openOperation(volunteer, "assicurazione")');
+    expect(page).toContain('openDossierAction(volunteer, "giornata")');
+    expect(page).toContain('openDossierAction(volunteer, "conversion")');
+    expect(page).toContain("canSuspendVolunteer(volunteer)");
+    expect(page).toContain("canReactivateVolunteer(volunteer)");
     expect(operations).toContain("Registra / Rinnova assicurazione");
+    expect(operations).toContain(
+      'queryKey: ["volontario-detail", volontario.id]',
+    );
     expect(page).not.toContain("useDeleteVolontario");
     expect(page).not.toContain("toggleStatus");
   });
@@ -96,8 +103,36 @@ describe("Volontari 2.0 — contratti UI", () => {
       source("../components/volontari/volontario-dossier-sheet.tsx"),
     ]);
     expect(page).toContain("TEMPORANEA");
-    expect(dossier).toContain(
-      "Copertura temporanea legata alle giornate di servizio",
+    expect(dossier).toContain("Copertura legata alle giornate registrate");
+    expect(page).toContain("Copertura legata alle giornate registrate");
+  });
+
+  it("riusa il dossier per conversione e registrazione giornata", async () => {
+    const [page, dossier] = await Promise.all([
+      source("../pages/volontari.tsx"),
+      source("../components/volontari/volontario-dossier-sheet.tsx"),
+    ]);
+    expect(page).toContain("autoOpenConversion={resumeConversionAfterSave}");
+    expect(page).toContain("autoOpenServiceDay={autoOpenServiceDay}");
+    expect(dossier).toContain('setAddKind("giornata")');
+    expect(dossier).toContain("void openConversion()");
+  });
+
+  it("mostra l'errore strutturato della giornata duplicata", async () => {
+    const dossier = await source(
+      "../components/volontari/volontario-dossier-sheet.tsx",
     );
+    expect(dossier).toContain("volunteerApiErrorData(error)");
+    expect(dossier).toContain("data.message ?? data.error");
+  });
+
+  it("mantiene le azioni tablet in un menu con target da 44px", async () => {
+    const page = await source("../pages/volontari.tsx");
+    const cards = page.slice(
+      page.indexOf('data-testid="volontari-mobile-list"'),
+    );
+    expect(cards).toContain("DropdownMenuTrigger");
+    expect(cards).toContain("Azioni");
+    expect(cards).toContain("min-h-11");
   });
 });

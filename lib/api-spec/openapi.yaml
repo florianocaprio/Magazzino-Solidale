@@ -6345,6 +6345,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/VolontarioActionResult" }
+        "409":
+          description: Copertura annuale non applicabile a un volontario temporaneo o versione non aggiornata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioKnownConflictResponse" }
 
   /volontari/assicurazione/massivo/preview:
     post:
@@ -6406,6 +6411,11 @@ paths:
             schema: { $ref: "#/components/schemas/VolontarioServiceDayInput" }
       responses:
         "201": { description: Giornata temporanea registrata }
+        "409":
+          description: Giornata già registrata per volontario, data e centro
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioKnownConflictResponse" }
 
   /volontari/{id}/giornate/{giornataId}:
     patch:
@@ -16393,6 +16403,22 @@ components:
           required: [fieldErrors, missingFields]
       required: [error, code, message, fieldErrors, missingFields, correlationId, details]
 
+    VolontarioKnownConflictResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        error: { type: string }
+        code:
+          type: string
+          enum:
+            - GIORNATA_TEMPORANEA_DUPLICATA
+            - ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO
+            - STALE_VERSION
+        message: { type: string }
+        correlationId: { type: string }
+        giornataId: { type: integer, minimum: 1 }
+      required: [error]
+
     VolontarioIdentifier:
       type: object
       properties:
@@ -16577,6 +16603,7 @@ components:
         motivoNonOperativo: { type: ["string", "null"] }
         esitoPrevisto: { type: string }
         esclusioneMotivo: { type: ["string", "null"] }
+        code: { type: string }
       required: [volontarioId, volontario, versione, incluso, esitoPrevisto]
 
     VolontarioBulkInsuranceConfirmInput:

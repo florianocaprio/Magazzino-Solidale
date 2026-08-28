@@ -183,6 +183,9 @@ export function VolontarioOperationDialog({
       await queryClient.invalidateQueries({
         queryKey: ["volontario-dossier", volontario.id],
       });
+      await queryClient.invalidateQueries({
+        queryKey: ["volontario-detail", volontario.id],
+      });
       close();
     } catch (error) {
       toast({

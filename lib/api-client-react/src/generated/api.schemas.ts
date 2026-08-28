@@ -6297,6 +6297,24 @@ export interface VolontarioValidationErrorResponse {
   details: VolontarioValidationErrorResponseDetails;
 }
 
+export type VolontarioKnownConflictResponseCode = typeof VolontarioKnownConflictResponseCode[keyof typeof VolontarioKnownConflictResponseCode];
+
+
+export const VolontarioKnownConflictResponseCode = {
+  GIORNATA_TEMPORANEA_DUPLICATA: 'GIORNATA_TEMPORANEA_DUPLICATA',
+  ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO: 'ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO',
+  STALE_VERSION: 'STALE_VERSION',
+} as const;
+
+export interface VolontarioKnownConflictResponse {
+  error: string;
+  code?: VolontarioKnownConflictResponseCode;
+  message?: string;
+  correlationId?: string;
+  /** @minimum 1 */
+  giornataId?: number;
+}
+
 export type VolontarioIdentifierTipoIdentificativo = typeof VolontarioIdentifierTipoIdentificativo[keyof typeof VolontarioIdentifierTipoIdentificativo];
 
 
@@ -6494,6 +6512,7 @@ export interface VolontarioBulkInsurancePreviewRow {
   esitoPrevisto: string;
   /** @nullable */
   esclusioneMotivo?: string | null;
+  code?: string;
 }
 
 export type VolontarioBulkInsuranceConfirmInputRigheItem = {

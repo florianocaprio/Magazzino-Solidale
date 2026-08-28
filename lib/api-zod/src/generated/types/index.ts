@@ -730,6 +730,8 @@ export * from './volontarioInputTipoVolontario';
 export * from './volontarioInsuranceInput';
 export * from './volontarioInsuranceInputModalita';
 export * from './volontarioInsuranceVersionInput';
+export * from './volontarioKnownConflictResponse';
+export * from './volontarioKnownConflictResponseCode';
 export * from './volontarioOperationalState';
 export * from './volontarioOperationalStateStatoAssicurazione';
 export * from './volontarioPermanentConversionInput';

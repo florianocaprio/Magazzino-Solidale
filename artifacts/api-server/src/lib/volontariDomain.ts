@@ -173,6 +173,7 @@ export function parseFullName(value: unknown): {
 export function evaluateOperationalState(input: {
   approvazione: string;
   amministrativamenteAttivo: boolean;
+  sospesoManualmente?: boolean;
   tipoVolontario: string;
   riferimento: string;
   coperture: Array<{
@@ -207,9 +208,11 @@ export function evaluateOperationalState(input: {
 
   const base = {
     statoAssicurazione,
-    scadenzaAssicurazione:
-      current?.dataFine ?? latest?.dataFine ?? future?.dataFine ?? null,
-    sospesoManualmente: !input.amministrativamenteAttivo,
+    scadenzaAssicurazione: isTemporary
+      ? null
+      : (current?.dataFine ?? latest?.dataFine ?? future?.dataFine ?? null),
+    sospesoManualmente:
+      input.sospesoManualmente ?? !input.amministrativamenteAttivo,
     giornataTemporaneaValida: isTemporary ? input.giornataValida : null,
   };
   if (input.approvazione !== "approvato") {

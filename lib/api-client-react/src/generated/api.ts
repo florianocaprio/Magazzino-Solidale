@@ -427,6 +427,7 @@ import type {
   VolontarioIdentifier,
   VolontarioInput,
   VolontarioInsuranceVersionInput,
+  VolontarioKnownConflictResponse,
   VolontarioPermanentConversionInput,
   VolontarioPermanentConversionPreviewResponse,
   VolontarioRiattivazioneInput,
@@ -19396,7 +19397,7 @@ export const registerVolontarioInsurance = async (id: number,
 
 
 
-export const getRegisterVolontarioInsuranceMutationOptions = <TError = ErrorType<unknown>,
+export const getRegisterVolontarioInsuranceMutationOptions = <TError = ErrorType<VolontarioKnownConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerVolontarioInsurance>>, TError,{id: number;data: BodyType<VolontarioInsuranceVersionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof registerVolontarioInsurance>>, TError,{id: number;data: BodyType<VolontarioInsuranceVersionInput>}, TContext> => {
 
@@ -19425,9 +19426,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type RegisterVolontarioInsuranceMutationResult = NonNullable<Awaited<ReturnType<typeof registerVolontarioInsurance>>>
     export type RegisterVolontarioInsuranceMutationBody = BodyType<VolontarioInsuranceVersionInput>
-    export type RegisterVolontarioInsuranceMutationError = ErrorType<unknown>
+    export type RegisterVolontarioInsuranceMutationError = ErrorType<VolontarioKnownConflictResponse>
 
-    export const useRegisterVolontarioInsurance = <TError = ErrorType<unknown>,
+    export const useRegisterVolontarioInsurance = <TError = ErrorType<VolontarioKnownConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerVolontarioInsurance>>, TError,{id: number;data: BodyType<VolontarioInsuranceVersionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof registerVolontarioInsurance>>,
@@ -19663,7 +19664,7 @@ export const createVolontarioServiceDay = async (id: number,
 
 
 
-export const getCreateVolontarioServiceDayMutationOptions = <TError = ErrorType<unknown>,
+export const getCreateVolontarioServiceDayMutationOptions = <TError = ErrorType<VolontarioKnownConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontarioServiceDay>>, TError,{id: number;data: BodyType<VolontarioServiceDayInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createVolontarioServiceDay>>, TError,{id: number;data: BodyType<VolontarioServiceDayInput>}, TContext> => {
 
@@ -19692,9 +19693,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateVolontarioServiceDayMutationResult = NonNullable<Awaited<ReturnType<typeof createVolontarioServiceDay>>>
     export type CreateVolontarioServiceDayMutationBody = BodyType<VolontarioServiceDayInput>
-    export type CreateVolontarioServiceDayMutationError = ErrorType<unknown>
+    export type CreateVolontarioServiceDayMutationError = ErrorType<VolontarioKnownConflictResponse>
 
-    export const useCreateVolontarioServiceDay = <TError = ErrorType<unknown>,
+    export const useCreateVolontarioServiceDay = <TError = ErrorType<VolontarioKnownConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontarioServiceDay>>, TError,{id: number;data: BodyType<VolontarioServiceDayInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createVolontarioServiceDay>>,

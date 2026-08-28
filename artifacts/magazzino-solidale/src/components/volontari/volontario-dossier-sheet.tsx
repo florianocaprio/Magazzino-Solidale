@@ -48,6 +48,10 @@ import {
   type VolunteerFormErrors,
   type VolunteerApiErrorData,
 } from "@/lib/volontari-form";
+import {
+  canReactivateVolunteer,
+  canSuspendVolunteer,
+} from "@/lib/volontari-actions";
 import type { VolontarioOperation } from "./volontario-operation-dialog";
 
 type OperationalState = {
@@ -203,6 +207,8 @@ export function VolontarioDossierSheet({
   onOperation,
   autoOpenConversion = false,
   onAutoOpenConversionHandled,
+  autoOpenServiceDay = false,
+  onAutoOpenServiceDayHandled,
 }: {
   volontario: Volontario | null;
   canManage: boolean;
@@ -211,6 +217,8 @@ export function VolontarioDossierSheet({
   onOperation: (volontario: Volontario, operation: VolontarioOperation) => void;
   autoOpenConversion?: boolean;
   onAutoOpenConversionHandled?: () => void;
+  autoOpenServiceDay?: boolean;
+  onAutoOpenServiceDayHandled?: () => void;
 }) {
   const open = volontario != null;
   const [addKind, setAddKind] = useState<AddKind | null>(null);
@@ -318,9 +326,10 @@ export function VolontarioDossierSheet({
       });
       setAddKind(null);
     } catch (error) {
+      const data = volunteerApiErrorData(error);
       toast({
         title: "Salvataggio non riuscito",
-        description: error instanceof Error ? error.message : "Errore",
+        description: data.message ?? data.error ?? "Errore",
         variant: "destructive",
       });
     } finally {
@@ -361,6 +370,12 @@ export function VolontarioDossierSheet({
     // L'identificativo rende l'azione one-shot dopo il rientro dalla modifica.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenConversion, volontario?.id]);
+
+  useEffect(() => {
+    if (!autoOpenServiceDay || !volontario) return;
+    onAutoOpenServiceDayHandled?.();
+    setAddKind("giornata");
+  }, [autoOpenServiceDay, onAutoOpenServiceDayHandled, volontario?.id]);
 
   const confirmConversion = async () => {
     if (!volontario || !conversionPreview) return;
@@ -453,7 +468,7 @@ export function VolontarioDossierSheet({
                     >
                       <Pencil className="mr-2 h-4 w-4" /> Modifica
                     </Button>
-                    {dettaglio.sospesoManualmente ? (
+                    {canReactivateVolunteer(dettaglio) && (
                       <Button
                         variant="outline"
                         className="min-h-11"
@@ -461,7 +476,8 @@ export function VolontarioDossierSheet({
                       >
                         Riattiva
                       </Button>
-                    ) : (
+                    )}
+                    {canSuspendVolunteer(dettaglio) && (
                       <Button
                         variant="outline"
                         className="min-h-11"
@@ -470,22 +486,33 @@ export function VolontarioDossierSheet({
                         Sospendi
                       </Button>
                     )}
-                    <Button
-                      className="min-h-11"
-                      onClick={() => onOperation(dettaglio, "assicurazione")}
-                    >
-                      <ShieldCheck className="mr-2 h-4 w-4" /> Registra /
-                      Rinnova
-                    </Button>
-                    {dettaglio.tipoVolontario === "TEMPORANEO" && (
+                    {dettaglio.tipoVolontario === "TEMPORANEO" ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          className="min-h-11"
+                          onClick={() => setAddKind("giornata")}
+                        >
+                          <CalendarPlus className="mr-2 h-4 w-4" /> Registra
+                          giornata
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          className="min-h-11"
+                          onClick={openConversion}
+                          disabled={conversionPending}
+                        >
+                          <ArrowRightLeft className="mr-2 h-4 w-4" /> Converti
+                          in permanente
+                        </Button>
+                      </>
+                    ) : (
                       <Button
-                        variant="secondary"
                         className="min-h-11"
-                        onClick={openConversion}
-                        disabled={conversionPending}
+                        onClick={() => onOperation(dettaglio, "assicurazione")}
                       >
-                        <ArrowRightLeft className="mr-2 h-4 w-4" /> Converti in
-                        permanente
+                        <ShieldCheck className="mr-2 h-4 w-4" /> Registra /
+                        Rinnova
                       </Button>
                     )}
                   </div>
@@ -615,6 +642,13 @@ export function VolontarioDossierSheet({
                 </TabsContent>
 
                 <TabsContent value="assicurazione" className="mt-4 space-y-3">
+                  {dettaglio.tipoVolontario === "TEMPORANEO" && (
+                    <p className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                      Copertura legata alle giornate registrate. Le eventuali
+                      polizze annuali precedenti sono mostrate solo come
+                      storico.
+                    </p>
+                  )}
                   {dossierQuery.isLoading ? (
                     <p className="text-sm text-muted-foreground">
                       Caricamento storico…

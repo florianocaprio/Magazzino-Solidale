@@ -243,7 +243,9 @@ const fmt = (
     : "STATO_NON_CALCOLATO",
   statoAssicurazione: operational?.statoAssicurazione ?? "MANCANTE",
   scadenzaAssicurazione: operational?.scadenzaAssicurazione ?? null,
-  sospesoManualmente: operational?.sospesoManualmente ?? !r.attivo,
+  sospesoManualmente:
+    operational?.sospesoManualmente ??
+    (r.statoApprovazione === "approvato" && !r.attivo),
   giornataTemporaneaValida: operational?.giornataTemporaneaValida ?? null,
   statoApprovazione: r.statoApprovazione,
   note: includeSensitive ? (r.note ?? null) : null,

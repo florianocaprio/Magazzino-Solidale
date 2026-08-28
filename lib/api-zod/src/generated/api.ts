@@ -9929,7 +9929,8 @@ export const PreviewBulkVolontariInsuranceResponse = zod.object({
   "vecchiaScadenza": zod.coerce.date().nullish(),
   "motivoNonOperativo": zod.string().nullish(),
   "esitoPrevisto": zod.string(),
-  "esclusioneMotivo": zod.string().nullish()
+  "esclusioneMotivo": zod.string().nullish(),
+  "code": zod.string().optional()
 }))
 })
 
