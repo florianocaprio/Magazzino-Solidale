@@ -1,13 +1,7 @@
 #!/bin/sh
 set -eu
 
-maps_key="${GOOGLE_MAPS_BROWSER_API_KEY:-}"
-case "$maps_key" in
-  *[!A-Za-z0-9_-]*)
-    echo "GOOGLE_MAPS_BROWSER_API_KEY contiene caratteri non validi" >&2
-    exit 1
-    ;;
-esac
-
-printf 'window.__APP_CONFIG__ = { googleMapsApiKey: "%s" };\n' "$maps_key" \
+maps_tile_url="${MAPS_TILE_URL:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}"
+maps_tile_attribution="${MAPS_TILE_ATTRIBUTION:-© OpenStreetMap contributors}"
+printf 'window.__APP_CONFIG__ = { mapsTileUrl: "%s", mapsTileAttribution: "%s" };\n' "$maps_tile_url" "$maps_tile_attribution" \
   > /usr/share/nginx/html/config.js

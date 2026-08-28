@@ -120,7 +120,10 @@ export default function Interventi() {
   const [beneficiarySearch, setBeneficiarySearch] = useState("");
   const [selectedInterventoId, setSelectedInterventoId] = useState<
     number | null
-  >(null);
+  >(() => {
+    const value = Number(new URLSearchParams(window.location.search).get("interventoId"));
+    return Number.isInteger(value) && value > 0 ? value : null;
+  });
   const [planningPending, setPlanningPending] = useState(false);
   const [preparationMode, setPreparationMode] = useState(false);
   const [preparationPeriod, setPreparationPeriod] =
@@ -149,8 +152,11 @@ export default function Interventi() {
     : optionalId(filters.centroAscoltoId);
 
   useEffect(() => {
-    const onPopState = () =>
+    const onPopState = () => {
       setFiltersState(parseInterventiSocialiFilters(window.location.search));
+      const value = Number(new URLSearchParams(window.location.search).get("interventoId"));
+      setSelectedInterventoId(Number.isInteger(value) && value > 0 ? value : null);
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -586,7 +592,12 @@ export default function Interventi() {
         canCancel={canCancel}
         canCreate={canCreate}
         onOpenChange={(open) => {
-          if (!open) setSelectedInterventoId(null);
+          if (!open) {
+            setSelectedInterventoId(null);
+            const params = new URLSearchParams(window.location.search);
+            params.delete("interventoId");
+            window.history.pushState(null, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`);
+          }
         }}
         onPianifica={pianifica}
         onAvvia={(versione) => {

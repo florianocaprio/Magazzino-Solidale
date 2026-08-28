@@ -40,6 +40,7 @@ import {
 } from "../lib/centroScope";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import { intervalloDateEuropeRome } from "../lib/interventiViste";
+import { geocodeMapsAddress } from "../lib/maps-geocoding";
 
 const router: IRouter = Router();
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
@@ -416,13 +417,14 @@ router.get(
     const destination = consegna.indirizzoConsegna?.trim() ?? "";
     if (!origin) { res.status(422).json({ error: "Il magazzino non ha un indirizzo utilizzabile" }); return; }
     if (!destination) { res.status(422).json({ error: "La consegna non ha uno snapshot dell'indirizzo" }); return; }
-    const url = new URL("https://www.google.com/maps/dir/");
-    url.searchParams.set("api", "1");
-    url.searchParams.set("origin", origin);
-    url.searchParams.set("destination", destination);
-    url.searchParams.set("travelmode", "driving");
-    url.searchParams.set("dir_action", "navigate");
-    res.json({ origin, destination, provider: "google-maps-url", url: url.toString() });
+    const [originLocation, destinationLocation] = await Promise.all([geocodeMapsAddress(origin), geocodeMapsAddress(destination)]);
+    if (originLocation.locationStatus !== "resolved" || destinationLocation.locationStatus !== "resolved") {
+      res.status(422).json({ error: "Le coordinate del percorso non sono ancora disponibili" }); return;
+    }
+    const url = new URL("https://www.openstreetmap.org/directions");
+    url.searchParams.set("engine", "fossgis_osrm_car");
+    url.searchParams.set("route", `${originLocation.latitude},${originLocation.longitude};${destinationLocation.latitude},${destinationLocation.longitude}`);
+    res.json({ origin, destination, provider: "openstreetmap-directions", url: url.toString() });
   },
 );
 

@@ -4954,7 +4954,7 @@ paths:
     get:
       operationId: getMapsRouteConsegna
       tags: [maps]
-      summary: Costruisce un Google Maps URL per una consegna domiciliare già autorizzata
+      summary: Costruisce un URL OpenStreetMap per una consegna domiciliare già autorizzata
       parameters:
         - name: id
           in: path
@@ -9303,13 +9303,16 @@ components:
         actions:
           type: array
           items: { type: string, enum: [open, route, convert_delivery] }
+        latitude: { type: [number, "null"] }
+        longitude: { type: [number, "null"] }
+        locationStatus: { type: string, enum: [resolved, not_found, error] }
     MapsRoute:
       type: object
       required: [origin, destination, provider, url]
       properties:
         origin: { type: string }
         destination: { type: string }
-        provider: { type: string, enum: [google-maps-url] }
+        provider: { type: string, enum: [openstreetmap-directions] }
         url: { type: string, format: uri }
 
     ReportingDashboard:

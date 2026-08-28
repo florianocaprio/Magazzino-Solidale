@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
+.maps-leaflet-marker { display: grid; width: 28px; height: 28px; place-items: center; border: 2px solid white; border-radius: 9999px; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-size: 12px; font-weight: 700; box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
