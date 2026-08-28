@@ -9,6 +9,10 @@
 export interface RuoloVolontario {
   id: number;
   nome: string;
+  nomeNormalizzato: string;
+  /** @nullable */
+  descrizione?: string | null;
   attivo: boolean;
   dataCreazione: string;
+  dataAggiornamento: string;
 }

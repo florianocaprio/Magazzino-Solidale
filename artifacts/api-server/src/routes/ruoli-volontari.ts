@@ -7,6 +7,7 @@ import {
 } from "@workspace/api-zod";
 import { requireGlobalAdmin } from "../lib/adminScope";
 import { requireModulo } from "../lib/featureFlags";
+import { normalizeRoleName } from "../lib/volontariDomain";
 
 const router: IRouter = Router();
 
@@ -16,8 +17,11 @@ function fmt(r: typeof ruoliVolontariTable.$inferSelect) {
   return {
     id: r.id,
     nome: r.nome,
+    nomeNormalizzato: r.nomeNormalizzato ?? normalizeRoleName(r.nome),
+    descrizione: r.descrizione ?? null,
     attivo: r.attivo,
     dataCreazione: r.dataCreazione.toISOString(),
+    dataAggiornamento: r.dataAggiornamento.toISOString(),
   };
 }
 
@@ -43,17 +47,18 @@ router.post("/ruoli-volontari", requireGlobalAdmin, async (req, res) => {
     res.status(400).json({ error: "Nome obbligatorio" });
     return;
   }
+  const nomeNormalizzato = normalizeRoleName(nome);
   const [existing] = await db
     .select({ id: ruoliVolontariTable.id })
     .from(ruoliVolontariTable)
-    .where(eq(ruoliVolontariTable.nome, nome));
+    .where(eq(ruoliVolontariTable.nomeNormalizzato, nomeNormalizzato));
   if (existing) {
     res.status(409).json({ error: "Ruolo già esistente" });
     return;
   }
   const [row] = await db
     .insert(ruoliVolontariTable)
-    .values({ ...parsed.data, nome })
+    .values({ ...parsed.data, nome, nomeNormalizzato })
     .returning();
   res.status(201).json(fmt(row));
 });
@@ -74,15 +79,18 @@ router.patch("/ruoli-volontari/:id", requireGlobalAdmin, async (req, res) => {
       res.status(400).json({ error: "Nome obbligatorio" });
       return;
     }
+    const nomeNormalizzato = normalizeRoleName(updates.nome);
     const [clash] = await db
       .select({ id: ruoliVolontariTable.id })
       .from(ruoliVolontariTable)
-      .where(eq(ruoliVolontariTable.nome, updates.nome));
+      .where(eq(ruoliVolontariTable.nomeNormalizzato, nomeNormalizzato));
     if (clash && clash.id !== id) {
       res.status(409).json({ error: "Ruolo già esistente" });
       return;
     }
+    updates.nomeNormalizzato = nomeNormalizzato;
   }
+  updates.dataAggiornamento = new Date();
   const [row] = await db
     .update(ruoliVolontariTable)
     .set(updates)

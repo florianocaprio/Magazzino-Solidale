@@ -26,6 +26,7 @@ function makeSchema(t: (k: string) => string) {
     nome: z.string().min(1, t("common.requiredField")),
     provincia: z.string().optional(),
     sigla: z.string().max(2).optional(),
+    codiceMatricola: z.string().max(8).regex(/^[A-Za-z0-9]*$/).optional(),
     attivo: z.boolean().default(true),
     note: z.string().optional(),
   });
@@ -51,7 +52,7 @@ export default function AreeOperative() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { nome: "", provincia: "", sigla: "", attivo: true, note: "" },
+    defaultValues: { nome: "", provincia: "", sigla: "", codiceMatricola: "", attivo: true, note: "" },
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListAreeOperativeQueryKey() });
@@ -59,14 +60,14 @@ export default function AreeOperative() {
   const handleCreate = () => {
     setEditingId(null);
     setFormError(null);
-    form.reset({ nome: "", provincia: "", sigla: "", attivo: true, note: "" });
+    form.reset({ nome: "", provincia: "", sigla: "", codiceMatricola: "", attivo: true, note: "" });
     setIsFormOpen(true);
   };
 
   const handleEdit = (c: any) => {
     setEditingId(c.id);
     setFormError(null);
-    form.reset({ nome: c.nome, provincia: c.provincia || "", sigla: c.sigla || "", attivo: c.attivo, note: c.note || "" });
+    form.reset({ nome: c.nome, provincia: c.provincia || "", sigla: c.sigla || "", codiceMatricola: c.codiceMatricola || "", attivo: c.attivo, note: c.note || "" });
     setIsFormOpen(true);
   };
 
@@ -219,6 +220,9 @@ export default function AreeOperative() {
                 )} />
                 <FormField control={form.control} name="sigla" render={({ field }) => (
                   <FormItem><FormLabel>{t("areeOperative.sigla")}</FormLabel><FormControl><Input {...field} maxLength={2} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.toUpperCase())} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="codiceMatricola" render={({ field }) => (
+                  <FormItem><FormLabel>Codice matricola</FormLabel><FormControl><Input {...field} maxLength={8} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.toUpperCase())} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="note" render={({ field }) => (
                   <FormItem><FormLabel>{t("common.notes")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>

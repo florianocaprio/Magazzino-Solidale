@@ -51,6 +51,7 @@ import {
 } from "../lib/transferWorkflow";
 import { InventoryDecimal } from "../lib/inventoryDecimal";
 import { resolveInventoryQuantityDimensions } from "../lib/inventoryQuantityDimensions";
+import { operationalStateForVolunteer } from "../lib/volontariOperational";
 
 const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
@@ -740,6 +741,19 @@ router.post("/trasferimenti", async (req, res) => {
     res.status(400).json({ error: trasportatore.error });
     return;
   }
+  if (trasportatore.volontarioId != null) {
+    const state = await operationalStateForVolunteer(
+      db,
+      trasportatore.volontarioId,
+      body.dataRichiesta,
+    );
+    if (!state?.operativo) {
+      res.status(403).json({
+        error: `Il volontario selezionato non è operativo alla data richiesta (${state?.motivoNonOperativo ?? "requisiti non soddisfatti"})`,
+      });
+      return;
+    }
+  }
   let t: typeof trasferimentiTable.$inferSelect;
   try {
     t = await createTransferRequest({
@@ -903,6 +917,19 @@ router.patch("/trasferimenti/:id", async (req, res) => {
     if (!trasportatore.ok) {
       res.status(400).json({ error: trasportatore.error });
       return;
+    }
+    if (trasportatore.volontarioId != null) {
+      const state = await operationalStateForVolunteer(
+        db,
+        trasportatore.volontarioId,
+        current.dataRichiesta,
+      );
+      if (!state?.operativo) {
+        res.status(403).json({
+          error: `Il volontario selezionato non è operativo alla data richiesta (${state?.motivoNonOperativo ?? "requisiti non soddisfatti"})`,
+        });
+        return;
+      }
     }
     updates.trasportatoreVolontarioId = trasportatore.volontarioId;
     updates.trasportatoreNome = trasportatore.nome;

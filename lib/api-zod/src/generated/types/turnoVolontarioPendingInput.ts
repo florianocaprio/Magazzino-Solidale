@@ -10,7 +10,6 @@ export interface TurnoVolontarioPendingInput {
   centroAscoltoId: number;
   nome: string;
   cognome: string;
-  matricola: string;
   telefono?: string;
   email?: string;
   ruolo?: string;

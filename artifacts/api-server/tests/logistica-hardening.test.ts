@@ -35,9 +35,15 @@ import {
 
 let scope: SeedScope;
 let ruoloVolontarioId: number;
+let defaultCentroAscoltoId: number;
+let volunteerSequence = 0;
 
 beforeEach(async () => {
   scope = newScope();
+  const areaOperativaId = await createAreaOperativa(scope);
+  defaultCentroAscoltoId = (
+    await createCentroRec(scope, { areaOperativaId })
+  ).id;
   ruoloVolontarioId = await createRuoloVolontario(scope);
 });
 
@@ -54,6 +60,22 @@ const app = (
   router: Parameters<typeof makeScopedApp>[0],
   user: Parameters<typeof makeScopedApp>[1] = { id: 0, centroAscoltoId: null, areaOperativaId: null },
 ) => makeScopedApp(router, user);
+
+function volunteerInput(overrides: Record<string, unknown> = {}) {
+  volunteerSequence += 1;
+  return {
+    nome: `Volontario ${volunteerSequence}`,
+    cognome: "Logistica",
+    ruoloVolontarioId,
+    centroAscoltoId: defaultCentroAscoltoId,
+    luogoNascita: "Roma",
+    dataNascita: "1990-01-02",
+    indirizzoResidenza: `Via Logistica ${volunteerSequence}`,
+    codiceFiscaleNonDisponibile: true,
+    codiceFiscaleNota: "Non disponibile nel test automatico",
+    ...overrides,
+  };
+}
 
 describe("hardening Logistica", () => {
   it("separa permission view e manage lato server", async () => {
@@ -83,10 +105,7 @@ describe("hardening Logistica", () => {
 
   it("forza pending/inattivo e pending/non disponibile su create normali", async () => {
     const volontario = await request(app(volontariRouter)).post("/volontari").send({
-      nome: "Nuovo",
-      cognome: "Volontario",
-      matricola: `PENDING-${Date.now()}`,
-      ruoloVolontarioId,
+      ...volunteerInput({ nome: "Nuovo", cognome: "Volontario" }),
       attivo: true,
       statoApprovazione: "approvato",
     });
@@ -107,17 +126,18 @@ describe("hardening Logistica", () => {
   });
 
   it("forza il workflow pending anche su BULK e quick-create", async () => {
-    const bulkMatricola = `BLK-${Date.now()}`;
+    const bulkEmail = `bulk-${Date.now()}@example.test`;
     const bulkVolontario = await request(app(volontariRouter)).post("/volontari/bulk").send({ righe: [{
-      nome: "Bulk",
-      cognome: "Volontario",
-      matricola: bulkMatricola,
-      ruoloVolontarioId,
+      ...volunteerInput({
+        nome: "Bulk",
+        cognome: "Volontario",
+        email: bulkEmail,
+      }),
       attivo: true,
       statoApprovazione: "approvato",
     }] });
     expect(bulkVolontario.status).toBe(200);
-    const [volontario] = await db.select().from(volontariTable).where(eq(volontariTable.matricola, bulkMatricola));
+    const [volontario] = await db.select().from(volontariTable).where(eq(volontariTable.email, bulkEmail));
     expect(volontario).toMatchObject({ attivo: false, statoApprovazione: "in_attesa" });
     scope.volontarioIds.push(volontario.id);
 
@@ -134,19 +154,17 @@ describe("hardening Logistica", () => {
     expect(mezzo).toMatchObject({ stato: "non_disponibile", statoApprovazione: "in_attesa" });
     scope.mezzoIds.push(mezzo.id);
 
-    const centro = await createCentroRec(scope);
     const quickVolontario = await request(app(turniRouter)).post("/turni/volontari-pending").send({
-      centroAscoltoId: centro.id,
+      centroAscoltoId: defaultCentroAscoltoId,
       nome: "Quick",
       cognome: "Volontario",
-      matricola: `Q-${Date.now()}`,
       ruoloVolontarioId,
     });
     expect(quickVolontario.status).toBe(201);
     expect(quickVolontario.body).toMatchObject({ attivo: false, statoApprovazione: "in_attesa" });
     scope.volontarioIds.push(quickVolontario.body.id);
     const quickMezzo = await request(app(turniRouter)).post("/turni/mezzi-pending").send({
-      centroAscoltoId: centro.id,
+      centroAscoltoId: defaultCentroAscoltoId,
       codice: `QM-${Date.now()}`,
       tipo: "auto",
     });
@@ -158,23 +176,20 @@ describe("hardening Logistica", () => {
   it("accetta solo ruoli catalogati attivi e preserva la normalizzazione", async () => {
     const ruoloInattivo = await createRuoloVolontario(scope, { attivo: false });
     const rejected = await request(app(volontariRouter)).post("/volontari").send({
-      nome: "Ruolo",
-      cognome: "Inattivo",
-      matricola: `ROLE-${Date.now()}`,
-      ruoloVolontarioId: ruoloInattivo,
+      ...volunteerInput({
+        nome: "Ruolo",
+        cognome: "Inattivo",
+        ruoloVolontarioId: ruoloInattivo,
+      }),
       ruolo: "testo arbitrario",
     });
     expect(rejected.status).toBe(400);
     const created = await request(app(volontariRouter)).post("/volontari").send({
-      nome: "Ruolo",
-      cognome: "Attivo",
-      matricola: `  norm-${Date.now()}  `,
-      ruoloVolontarioId,
+      ...volunteerInput({ nome: "Ruolo", cognome: "Attivo" }),
       ruolo: "testo arbitrario",
     });
     expect(created.status).toBe(201);
-    expect(created.body.matricola).toMatch(/^norm-/);
-    expect(created.body.matricola).not.toMatch(/^\s|\s$/);
+    expect(created.body.matricola).toMatch(/^[A-Z0-9]{6}-V-\d{3}$/);
     expect(created.body.ruoloVolontarioId).toBe(ruoloVolontarioId);
     expect(created.body.ruolo).not.toBe("testo arbitrario");
     scope.volontarioIds.push(created.body.id);
@@ -184,10 +199,11 @@ describe("hardening Logistica", () => {
     const area = await createAreaOperativa(scope);
     const areaUser = { id: 0, centroAscoltoId: null, areaOperativaId: area };
     const volontario = await request(app(volontariRouter, areaUser)).post("/volontari").send({
-      nome: "Area",
-      cognome: "Senza centro",
-      matricola: `AREA-${Date.now()}`,
-      ruoloVolontarioId,
+      ...volunteerInput({
+        nome: "Area",
+        cognome: "Senza centro",
+        centroAscoltoId: null,
+      }),
     });
     expect(volontario.status).toBe(400);
     const mezzo = await request(app(mezziRouter, areaUser)).post("/mezzi").send({
@@ -200,10 +216,7 @@ describe("hardening Logistica", () => {
 
   it("approva solo da in_attesa con versione CAS", async () => {
     const created = await request(app(volontariRouter)).post("/volontari").send({
-      nome: "Da",
-      cognome: "Approvare",
-      matricola: `APP-${Date.now()}`,
-      ruoloVolontarioId,
+      ...volunteerInput({ nome: "Da", cognome: "Approvare" }),
     });
     scope.volontarioIds.push(created.body.id);
     const stale = await request(app(approvazioniRouter))
@@ -220,10 +233,7 @@ describe("hardening Logistica", () => {
     expect(repeated.status).toBe(409);
 
     const daRespingere = await request(app(volontariRouter)).post("/volontari").send({
-      nome: "Da",
-      cognome: "Respingere",
-      matricola: `REJ-${Date.now()}`,
-      ruoloVolontarioId,
+      ...volunteerInput({ nome: "Da", cognome: "Respingere" }),
     });
     scope.volontarioIds.push(daRespingere.body.id);
     const respinto = await request(app(approvazioniRouter))
@@ -240,11 +250,11 @@ describe("hardening Logistica", () => {
     const centroA = await createCentroRec(scope, { areaOperativaId: area });
     const centroB = await createCentroRec(scope, { areaOperativaId: area });
     const pending = await request(app(volontariRouter)).post("/volontari").send({
-      nome: "Pending",
-      cognome: "Turno",
-      matricola: `TURN-P-${Date.now()}`,
-      ruoloVolontarioId,
-      centroAscoltoId: centroA.id,
+      ...volunteerInput({
+        nome: "Pending",
+        cognome: "Turno",
+        centroAscoltoId: centroA.id,
+      }),
     });
     scope.volontarioIds.push(pending.body.id);
     const pendingResult = await request(app(turniRouter)).put("/turni").send({
@@ -443,7 +453,7 @@ describe("hardening Logistica", () => {
     expect((await request(app(consegneRouter, scopedA)).post("/consegne").send({ ...payload, volontarioId: volontarioB })).status).toBe(403);
     expect((await request(app(consegneRouter, scopedA)).post("/consegne").send({ ...payload, mezzoId: mezzoB })).status).toBe(403);
 
-    const pending = await request(app(volontariRouter)).post("/volontari").send({ nome: "Pending", cognome: "Consegna", matricola: `PC-${Date.now()}`, ruoloVolontarioId, centroAscoltoId: centroA.id });
+    const pending = await request(app(volontariRouter)).post("/volontari").send(volunteerInput({ nome: "Pending", cognome: "Consegna", centroAscoltoId: centroA.id }));
     scope.volontarioIds.push(pending.body.id);
     expect((await request(app(consegneRouter, scopedA)).post("/consegne").send({ ...payload, volontarioId: pending.body.id })).status).toBe(403);
     const pendingMezzo = await request(app(mezziRouter)).post("/mezzi").send({ codice: `PCM-${Date.now()}`, tipo: "auto", proprieta: "associazione", centroAscoltoId: centroA.id });

@@ -41,6 +41,7 @@ import bolleRouter from "../src/routes/bolle";
 import speseEmporioRouter from "../src/routes/spese-emporio";
 import creditoSolidaleRouter from "../src/routes/credito-solidale";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
+import { dataCivileEuropeRome } from "../src/lib/interventiWorkflow";
 import { quantitaNettaMensileProdotto } from "../src/lib/speseEmporio";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
@@ -217,8 +218,7 @@ async function createAccesso(opts: {
 }
 
 function todayInput(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return dataCivileEuropeRome();
 }
 
 async function createFixture(

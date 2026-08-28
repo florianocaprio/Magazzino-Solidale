@@ -199,6 +199,9 @@ importers:
       express-session:
         specifier: ^1.19.0
         version: 1.19.0
+      jspdf:
+        specifier: ^4.2.1
+        version: 4.2.1
       nodemailer:
         specifier: ^9.0.1
         version: 9.0.1
@@ -259,7 +262,7 @@ importers:
         version: 4.23.12
       vitest:
         specifier: ^4.1.9
-        version: 4.1.9(@types/node@25.6.2)(happy-dom@20.11.2)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)(yaml@2.8.4))
+        version: 4.1.9(@types/node@25.6.2)(happy-dom@20.11.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)(yaml@2.8.4)
 
   artifacts/magazzino-solidale:
     devDependencies:
@@ -487,7 +490,7 @@ importers:
         version: 7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)(yaml@2.8.4)
       vitest:
         specifier: ^4.1.9
-        version: 4.1.9(@types/node@25.6.2)(happy-dom@20.11.2)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)(yaml@2.8.4))
+        version: 4.1.9(@types/node@25.6.2)(happy-dom@20.11.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)(yaml@2.8.4)
       wouter:
         specifier: ^3.3.5
         version: 3.10.0(react@19.1.0)
@@ -3725,7 +3728,6 @@ packages:
       '@vitest/ui': 4.1.9
       happy-dom: '*'
       jsdom: '*'
-      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
@@ -6827,7 +6829,7 @@ snapshots:
       tsx: 4.23.12
       yaml: 2.8.4
 
-  vitest@4.1.9(@types/node@25.6.2)(happy-dom@20.11.2)(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)(yaml@2.8.4)):
+  vitest@4.1.9(@types/node@25.6.2)(happy-dom@20.11.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)(yaml@2.8.4):
     dependencies:
       '@vitest/expect': 4.1.9
       '@vitest/mocker': 4.1.9(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)(yaml@2.8.4))
@@ -6853,7 +6855,17 @@ snapshots:
       '@types/node': 25.6.2
       happy-dom: 20.11.2
     transitivePeerDependencies:
+      - jiti
+      - less
+      - lightningcss
       - msw
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - terser
+      - tsx
+      - yaml
 
   void-elements@3.1.0: {}
 

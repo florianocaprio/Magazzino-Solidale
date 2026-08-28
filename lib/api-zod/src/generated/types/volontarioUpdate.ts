@@ -9,11 +9,27 @@
 export interface VolontarioUpdate {
   nome?: string;
   cognome?: string;
-  matricola?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
   telefono?: string;
+  telefonoSecondario?: string;
   email?: string;
+  luogoNascita?: string;
+  dataNascita?: Date;
+  indirizzoResidenza?: string;
+  /**
+     * Null quando il domicilio coincide con la residenza.
+     * @nullable
+     */
+  indirizzoDomicilio?: string | null;
+  /** @nullable */
+  codiceFiscale?: string | null;
+  codiceFiscaleNonDisponibile?: boolean;
+  /**
+     * Nota facoltativa quando il codice fiscale non è disponibile.
+     * @nullable
+     */
+  codiceFiscaleNota?: string | null;
   /** @minimum 1 */
   ruoloVolontarioId?: number;
   patente?: boolean;

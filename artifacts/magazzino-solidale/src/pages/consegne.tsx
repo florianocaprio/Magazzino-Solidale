@@ -21,7 +21,7 @@ import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
 import { RouteActions } from "@/components/maps/route-actions";
 import { BollaDettaglio, CreaiBollaDialog } from "@/pages/bolle";
-import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package, Mail, ChevronDown, Trash2 } from "lucide-react";
+import { Plus, MapPin, Truck, CheckCircle2, Filter, FileText, FileClock, Link2, Download, CalendarClock, Building2, Package, Mail, ChevronDown, Trash2, AlertTriangle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -121,7 +121,6 @@ export default function Consegne() {
   });
   const { data: allBeneficiari } = useListBeneficiari({ attivo: true });
   const { data: magazzini } = useListMagazzini();
-  const { data: volontari } = useListVolontari();
   const { data: mezzi } = useListMezzi();
   const { data: ruoliVolontari } = useListRuoliVolontari();
   const { data: centri } = useListCentriAscolto();
@@ -171,7 +170,7 @@ export default function Consegne() {
   const [pendingMezzi, setPendingMezzi] = useState<Mezzo[]>([]);
   const [volontarioDialogOpen, setVolontarioDialogOpen] = useState(false);
   const [mezzoDialogOpen, setMezzoDialogOpen] = useState(false);
-  const [nuovoVolontario, setNuovoVolontario] = useState({ nome: "", cognome: "", matricola: "", ruoloVolontarioId: null as number | null, telefono: "", patente: false, note: "" });
+  const [nuovoVolontario, setNuovoVolontario] = useState({ nome: "", cognome: "", ruoloVolontarioId: null as number | null, telefono: "", patente: false, note: "" });
   const [volontarioError, setVolontarioError] = useState<string | null>(null);
   const [nuovoMezzo, setNuovoMezzo] = useState({ tipo: "", targa: "", proprieta: "associazione", descrizione: "", note: "" });
 
@@ -242,6 +241,16 @@ export default function Consegne() {
 
   const dataPrevistaWatch = form.watch("dataPrevista");
   const fasciaOrariaWatch = form.watch("fasciaOraria");
+  const volontariOperativiParams = {
+    dataRiferimento: dataPrevistaWatch,
+    stato: "attivi" as const,
+  };
+  const { data: volontari } = useListVolontari(volontariOperativiParams, {
+    query: {
+      queryKey: getListVolontariQueryKey(volontariOperativiParams),
+      enabled: /^\d{4}-\d{2}-\d{2}$/.test(dataPrevistaWatch ?? ""),
+    },
+  });
   const fasciaCanonica = fasciaOrariaWatch === "Mattina" ? "09-13" : fasciaOrariaWatch === "Pomeriggio" ? "14-18" : fasciaOrariaWatch === "Sera" ? "18-20" : null;
   const validData = /^\d{4}-\d{2}-\d{2}$/.test(dataPrevistaWatch ?? "");
   const caricoParams = { data: dataPrevistaWatch, fascia: (fasciaCanonica ?? "09-13") as "09-13" | "14-18" | "18-20" };
@@ -285,7 +294,7 @@ export default function Consegne() {
   const volontariConsegna = useMemo(
     () => (volontari ?? []).filter((v, idx, all) => {
       if (all.findIndex((item) => item.id === v.id) !== idx) return false;
-      if (!v.attivo || (v.statoApprovazione ?? "approvato") !== "approvato") return false;
+      if (!v.operativo) return false;
       if (v.centroAscoltoId == null) return true;
       return effectiveConsegnaCentroId != null && v.centroAscoltoId === effectiveConsegnaCentroId;
     }),
@@ -333,7 +342,7 @@ export default function Consegne() {
   };
 
   const creaVolontarioPending = () => {
-    if (effectiveConsegnaCentroId == null || nuovoVolontario.ruoloVolontarioId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim() || !nuovoVolontario.matricola.trim()) {
+    if (effectiveConsegnaCentroId == null || nuovoVolontario.ruoloVolontarioId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim()) {
       return;
     }
     setVolontarioError(null);
@@ -343,7 +352,6 @@ export default function Consegne() {
           centroAscoltoId: effectiveConsegnaCentroId,
           nome: nuovoVolontario.nome.trim(),
           cognome: nuovoVolontario.cognome.trim(),
-          matricola: nuovoVolontario.matricola.trim(),
           ruoloVolontarioId: nuovoVolontario.ruoloVolontarioId,
           telefono: nuovoVolontario.telefono.trim() || undefined,
           patente: nuovoVolontario.patente,
@@ -355,7 +363,7 @@ export default function Consegne() {
           setPendingVolontari((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
           toast({ description: t("turni.pendingVolCreated", { defaultValue: "Volontario inserito in attesa di approvazione" }) });
-          setNuovoVolontario({ nome: "", cognome: "", matricola: "", ruoloVolontarioId: null, telefono: "", patente: false, note: "" });
+          setNuovoVolontario({ nome: "", cognome: "", ruoloVolontarioId: null, telefono: "", patente: false, note: "" });
           setVolontarioError(null);
           setVolontarioDialogOpen(false);
         },
@@ -653,6 +661,12 @@ export default function Consegne() {
                           <Package className="h-4 w-4" /> {c.magazzinoNome}
                         </p>
                       )}
+                      {c.volontarioId != null && c.volontarioOperativo === false && (
+                        <p className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-destructive">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>Il volontario assegnato non è più operativo per questa data. Verifica l’assegnazione.</span>
+                        </p>
+                      )}
                     </div>
                     <RouteActions
                       consegnaId={c.id}
@@ -762,6 +776,12 @@ export default function Consegne() {
                       {(c.volontarioNome || c.volontarioAltro) && (
                         <div className="text-xs text-muted-foreground">
                           {t("consegne.volontarioPrefix", { name: c.volontarioNome ?? c.volontarioAltro })}
+                        </div>
+                      )}
+                      {c.volontarioId != null && c.volontarioOperativo === false && (
+                        <div className="flex items-start gap-1 text-xs text-destructive">
+                          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                          <span>Assegnazione da verificare: volontario non operativo per la data.</span>
                         </div>
                       )}
                     </div>
@@ -1260,17 +1280,6 @@ export default function Consegne() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>{t("volontari.matricola", { defaultValue: "Matricola" })}</Label>
-                <Input
-                  value={nuovoVolontario.matricola}
-                  onChange={(e) => {
-                    setVolontarioError(null);
-                    setNuovoVolontario((v) => ({ ...v, matricola: e.target.value }));
-                  }}
-                />
-                {volontarioError ? <p className="text-sm text-destructive">{volontarioError}</p> : null}
-              </div>
-              <div className="space-y-2">
                 <Label>{t("common.phone", { defaultValue: "Telefono" })}</Label>
                 <Input value={nuovoVolontario.telefono} onChange={(e) => setNuovoVolontario((v) => ({ ...v, telefono: e.target.value }))} />
               </div>
@@ -1313,7 +1322,6 @@ export default function Consegne() {
                 effectiveConsegnaCentroId == null ||
                 !nuovoVolontario.nome.trim() ||
                 !nuovoVolontario.cognome.trim() ||
-                !nuovoVolontario.matricola.trim() ||
                 nuovoVolontario.ruoloVolontarioId == null
               }
             >

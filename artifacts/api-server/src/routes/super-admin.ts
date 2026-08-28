@@ -1,5 +1,9 @@
 import { Router, type IRouter } from "express";
-import { db, systemLogsTable } from "@workspace/db";
+import {
+  configurazioniMatricoleVolontariTable,
+  db,
+  systemLogsTable,
+} from "@workspace/db";
 import { and, count, desc, eq, gte, ilike, lte, or, sql, type SQL } from "drizzle-orm";
 import { requireSuperAdmin } from "../middlewares/auth";
 import {
@@ -10,6 +14,10 @@ import {
   updateModuloAmbiente,
 } from "../lib/configurazioneAmbiente";
 import { auditMetaFromRequest, logConfigurazioneAudit } from "../lib/auditConfigurazioni";
+import {
+  formatPermanentVolunteerIdentifier,
+  validatePermanentIdentifierConfiguration,
+} from "../lib/volontariMatricola";
 
 const router: IRouter = Router();
 
@@ -294,6 +302,85 @@ router.patch("/super-admin/configurazione-ambiente", async (req, res): Promise<v
 
   res.json(after);
 });
+
+router.get("/super-admin/configurazione-matricole-volontari", async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(configurazioniMatricoleVolontariTable)
+    .orderBy(desc(configurazioniMatricoleVolontariTable.versione));
+  const active = rows.find((row) => row.attiva) ?? null;
+  res.json({
+    configurazione: active,
+    esempio: active
+      ? formatPermanentVolunteerIdentifier(active, "RM", active.numeroIniziale)
+      : null,
+    storico: rows,
+  });
+});
+
+router.put(
+  "/super-admin/configurazione-matricole-volontari",
+  async (req, res): Promise<void> => {
+    let parsed: ReturnType<typeof validatePermanentIdentifierConfiguration>;
+    try {
+      parsed = validatePermanentIdentifierConfiguration(req.body ?? {});
+    } catch (error) {
+      res.status(400).json({
+        error: error instanceof Error ? error.message : "Configurazione non valida",
+      });
+      return;
+    }
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('configurazione-matricole-volontari'))`,
+      );
+      const [before] = await tx
+        .select()
+        .from(configurazioniMatricoleVolontariTable)
+        .where(eq(configurazioniMatricoleVolontariTable.attiva, true))
+        .orderBy(desc(configurazioniMatricoleVolontariTable.versione))
+        .limit(1)
+        .for("update");
+      const [latest] = await tx
+        .select({ versione: configurazioniMatricoleVolontariTable.versione })
+        .from(configurazioniMatricoleVolontariTable)
+        .orderBy(desc(configurazioniMatricoleVolontariTable.versione))
+        .limit(1);
+      if (before)
+        await tx
+          .update(configurazioniMatricoleVolontariTable)
+          .set({ attiva: false, dataAggiornamento: new Date() })
+          .where(eq(configurazioniMatricoleVolontariTable.id, before.id));
+      const [after] = await tx
+        .insert(configurazioniMatricoleVolontariTable)
+        .values({
+          scopeTipo: "GLOBALE",
+          versione: (latest?.versione ?? 0) + 1,
+          ...parsed,
+          attiva: true,
+          aggiornataDa: req.user?.id ?? null,
+        })
+        .returning();
+      return { before: before ?? null, after };
+    });
+    await logConfigurazioneAudit({
+      area: "matricole_volontari",
+      chiave: "GLOBALE",
+      azione: "nuova_versione",
+      valorePrecedente: result.before ? { ...result.before } : null,
+      valoreNuovo: { ...result.after },
+      ...auditMetaFromRequest(req),
+    });
+    res.json({
+      configurazione: result.after,
+      esempio: formatPermanentVolunteerIdentifier(
+        result.after,
+        "RM",
+        result.after.numeroIniziale,
+      ),
+    });
+  },
+);
 
 router.get("/super-admin/moduli", async (_req, res) => {
   res.json(await listModuliFunzionali());

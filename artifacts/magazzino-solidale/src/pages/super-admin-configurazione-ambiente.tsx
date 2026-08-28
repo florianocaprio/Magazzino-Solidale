@@ -3,10 +3,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetConfigurazioneAmbientePubblicaQueryKey,
   getGetSuperAdminConfigurazioneAmbienteQueryKey,
+  getGetSuperAdminConfigurazioneMatricoleVolontariQueryKey,
   useGetSuperAdminConfigurazioneAmbiente,
+  useGetSuperAdminConfigurazioneMatricoleVolontari,
   useUpdateSuperAdminConfigurazioneAmbiente,
+  useUpdateSuperAdminConfigurazioneMatricoleVolontari,
   type ConfigurazioneAmbiente,
   type ConfigurazioneAmbienteUpdate,
+  type ConfigurazioneMatricoleVolontariInput,
 } from "@workspace/api-client-react";
 import { Loader2, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -16,6 +20,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { errorMessage } from "@/lib/api-error";
@@ -55,6 +66,15 @@ const REQUIRED_FIELDS = new Set([
 
 type TextField = (typeof TEXT_FIELDS)[number];
 type FormState = Record<TextField, string> & { attivo: boolean };
+type MatricolaForm = {
+  prefissoAssociazione: string;
+  includiCodiceArea: boolean;
+  segmentoFisso: string;
+  separatore: "" | "-" | "/";
+  cifreProgressivo: number;
+  numeroIniziale: number;
+  ambitoProgressivo: "GLOBALE" | "PER_AREA";
+};
 
 const EMPTY_FORM: FormState = {
   codiceAmbiente: "",
@@ -75,6 +95,15 @@ const EMPTY_FORM: FormState = {
   noteLegali: "",
   privacyTestoBreve: "",
   attivo: true,
+};
+const EMPTY_MATRICOLA_FORM: MatricolaForm = {
+  prefissoAssociazione: "",
+  includiCodiceArea: true,
+  segmentoFisso: "V",
+  separatore: "-",
+  cifreProgressivo: 3,
+  numeroIniziale: 1,
+  ambitoProgressivo: "PER_AREA",
 };
 
 function toForm(data: ConfigurazioneAmbiente): FormState {
@@ -137,16 +166,37 @@ export default function SuperAdminConfigurazioneAmbiente() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [matricolaForm, setMatricolaForm] = useState<MatricolaForm>(
+    EMPTY_MATRICOLA_FORM,
+  );
 
   const query = useGetSuperAdminConfigurazioneAmbiente({
     query: {
       queryKey: getGetSuperAdminConfigurazioneAmbienteQueryKey(),
     },
   });
+  const matricolaQuery = useGetSuperAdminConfigurazioneMatricoleVolontari({
+    query: {
+      queryKey: getGetSuperAdminConfigurazioneMatricoleVolontariQueryKey(),
+    },
+  });
 
   useEffect(() => {
     if (query.data) setForm(toForm(query.data));
   }, [query.data]);
+  useEffect(() => {
+    const config = matricolaQuery.data?.configurazione;
+    if (!config) return;
+    setMatricolaForm({
+      prefissoAssociazione: config.prefissoAssociazione ?? "",
+      includiCodiceArea: config.includiCodiceArea,
+      segmentoFisso: config.segmentoFisso ?? "",
+      separatore: config.separatore,
+      cifreProgressivo: config.cifreProgressivo,
+      numeroIniziale: config.numeroIniziale,
+      ambitoProgressivo: config.ambitoProgressivo,
+    });
+  }, [matricolaQuery.data]);
 
   const update = useUpdateSuperAdminConfigurazioneAmbiente({
     mutation: {
@@ -160,6 +210,26 @@ export default function SuperAdminConfigurazioneAmbiente() {
         toast({
           title: t("superAdmin.environment.error"),
           description: errorMessage(err, t("superAdmin.environment.errorDescription")),
+          variant: "destructive",
+        });
+      },
+    },
+  });
+  const updateMatricole = useUpdateSuperAdminConfigurazioneMatricoleVolontari({
+    mutation: {
+      onSuccess: (data) => {
+        queryClient.invalidateQueries({
+          queryKey: getGetSuperAdminConfigurazioneMatricoleVolontariQueryKey(),
+        });
+        toast({
+          title: "Configurazione matricole salvata",
+          description: data.esempio ? `Esempio: ${data.esempio}` : undefined,
+        });
+      },
+      onError: (err) => {
+        toast({
+          title: "Configurazione matricole non salvata",
+          description: errorMessage(err, "Controlla i valori inseriti"),
           variant: "destructive",
         });
       },
@@ -183,6 +253,20 @@ export default function SuperAdminConfigurazioneAmbiente() {
       return;
     }
     update.mutate({ data: toPayload(form) });
+  };
+
+  const saveMatricole = () => {
+    updateMatricole.mutate({
+      data: {
+        prefissoAssociazione: matricolaForm.prefissoAssociazione || null,
+        includiCodiceArea: matricolaForm.includiCodiceArea,
+        segmentoFisso: matricolaForm.segmentoFisso || null,
+        separatore: matricolaForm.separatore,
+        cifreProgressivo: matricolaForm.cifreProgressivo,
+        numeroIniziale: matricolaForm.numeroIniziale,
+        ambitoProgressivo: matricolaForm.ambitoProgressivo,
+      } satisfies ConfigurazioneMatricoleVolontariInput,
+    });
   };
 
   if (query.isLoading) {
@@ -246,6 +330,143 @@ export default function SuperAdminConfigurazioneAmbiente() {
               checked={form.attivo}
               onCheckedChange={(attivo) => setForm((current) => ({ ...current, attivo }))}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Matricole volontari permanenti</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <p className="text-sm text-muted-foreground">
+            Ogni salvataggio crea una nuova versione auditata. I progressivi già
+            assegnati e lo storico delle matricole non vengono modificati.
+          </p>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Prefisso associazione</Label>
+              <Input
+                maxLength={12}
+                value={matricolaForm.prefissoAssociazione}
+                onChange={(event) =>
+                  setMatricolaForm((current) => ({
+                    ...current,
+                    prefissoAssociazione: event.target.value.toUpperCase(),
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Segmento fisso</Label>
+              <Input
+                maxLength={8}
+                value={matricolaForm.segmentoFisso}
+                onChange={(event) =>
+                  setMatricolaForm((current) => ({
+                    ...current,
+                    segmentoFisso: event.target.value.toUpperCase(),
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Separatore</Label>
+              <Select
+                value={matricolaForm.separatore || "NESSUNO"}
+                onValueChange={(value) =>
+                  setMatricolaForm((current) => ({
+                    ...current,
+                    separatore: value === "NESSUNO" ? "" : (value as "-" | "/"),
+                  }))
+                }
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NESSUNO">Nessuno</SelectItem>
+                  <SelectItem value="-">Trattino (-)</SelectItem>
+                  <SelectItem value="/">Barra (/)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Cifre progressivo</Label>
+              <Input
+                type="number"
+                min={2}
+                max={8}
+                value={matricolaForm.cifreProgressivo}
+                onChange={(event) =>
+                  setMatricolaForm((current) => ({
+                    ...current,
+                    cifreProgressivo: Number(event.target.value),
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Numero iniziale</Label>
+              <Input
+                type="number"
+                min={1}
+                value={matricolaForm.numeroIniziale}
+                onChange={(event) =>
+                  setMatricolaForm((current) => ({
+                    ...current,
+                    numeroIniziale: Number(event.target.value),
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Ambito progressivo</Label>
+              <Select
+                value={matricolaForm.ambitoProgressivo}
+                onValueChange={(value) =>
+                  setMatricolaForm((current) => ({
+                    ...current,
+                    ambitoProgressivo: value as "GLOBALE" | "PER_AREA",
+                  }))
+                }
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PER_AREA">Separato per Area</SelectItem>
+                  <SelectItem value="GLOBALE">Globale</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <div>
+              <Label>Includi codice Area</Label>
+              <p className="text-sm text-muted-foreground">
+                Codice configurato sull’Area; in assenza viene usata la sigla.
+              </p>
+            </div>
+            <Switch
+              checked={matricolaForm.includiCodiceArea}
+              onCheckedChange={(checked) =>
+                setMatricolaForm((current) => ({
+                  ...current,
+                  includiCodiceArea: checked,
+                }))
+              }
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted p-3">
+            <div className="text-sm">
+              Esempio corrente:{" "}
+              <strong>{matricolaQuery.data?.esempio ?? "non disponibile"}</strong>
+            </div>
+            <Button onClick={saveMatricole} disabled={updateMatricole.isPending}>
+              {updateMatricole.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Salva nuova versione
+            </Button>
           </div>
         </CardContent>
       </Card>

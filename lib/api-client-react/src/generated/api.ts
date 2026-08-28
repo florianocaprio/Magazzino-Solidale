@@ -49,6 +49,7 @@ import type {
   Alert,
   AllocazioneMezziReport,
   AnalyzeAgeaImportazioneParams,
+  AnalyzeVolontariImportParams,
   AnnullaTurnoInput,
   ApprovazioniLogistica,
   Approvvigionamento,
@@ -117,6 +118,9 @@ import type {
   ConfigurazioneAmbiente,
   ConfigurazioneAmbientePubblica,
   ConfigurazioneAmbienteUpdate,
+  ConfigurazioneMatricoleVolontariInput,
+  ConfigurazioneMatricoleVolontariResponse,
+  ConfirmVolontariImport200,
   Consegna,
   ConsegnaInput,
   ConsegnaRicezioneInput,
@@ -195,6 +199,8 @@ import type {
   GetReportUdsIntegratoParams,
   GetVolontariCarico200Item,
   GetVolontariCaricoParams,
+  GetVolontarioDossier200,
+  GetVolontarioParams,
   Giacenza,
   GiacenzaMagazzinoReport,
   HealthStatus,
@@ -325,6 +331,7 @@ import type {
   PoliticaCreditoSolidaleInput,
   PoliticaCreditoSolidaleUpdate,
   PreparazioneConsegne,
+  PreviewBulkVolontariInsurance200,
   ProdottiBulkInput,
   Prodotto,
   ProdottoInput,
@@ -408,8 +415,24 @@ import type {
   UtenteUpdate,
   VersioneInput,
   VolontariBulkInput,
+  VolontariGenericWriteInput,
+  VolontariImportConfirmInput,
+  VolontariImportPreview,
+  VolontariRegisterCorrectionInput,
+  VolontariRegisterGenerateInput,
   Volontario,
+  VolontarioActionResult,
+  VolontarioBulkInsuranceConfirmInput,
+  VolontarioBulkInsuranceInput,
+  VolontarioIdentifier,
   VolontarioInput,
+  VolontarioInsuranceVersionInput,
+  VolontarioPermanentConversionInput,
+  VolontarioPermanentConversionPreviewResponse,
+  VolontarioRiattivazioneInput,
+  VolontarioServiceDayInput,
+  VolontarioServiceDayUpdateInput,
+  VolontarioSospensioneInput,
   VolontarioUpdate,
   ZonaUds,
   ZonaUdsInput,
@@ -17317,6 +17340,142 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getUpdateSuperAdminConfigurazioneAmbienteMutationOptions(options));
     }
 
+export const getGetSuperAdminConfigurazioneMatricoleVolontariUrl = () => {
+
+
+
+
+  return `/api/super-admin/configurazione-matricole-volontari`
+}
+
+export const getSuperAdminConfigurazioneMatricoleVolontari = async ( options?: RequestInit): Promise<ConfigurazioneMatricoleVolontariResponse> => {
+
+  return customFetch<ConfigurazioneMatricoleVolontariResponse>(getGetSuperAdminConfigurazioneMatricoleVolontariUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSuperAdminConfigurazioneMatricoleVolontariQueryKey = () => {
+    return [
+    `/api/super-admin/configurazione-matricole-volontari`
+    ] as const;
+    }
+
+
+export const getGetSuperAdminConfigurazioneMatricoleVolontariQueryOptions = <TData = Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSuperAdminConfigurazioneMatricoleVolontariQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>> = ({ signal }) => getSuperAdminConfigurazioneMatricoleVolontari({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSuperAdminConfigurazioneMatricoleVolontariQueryResult = NonNullable<Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>>
+export type GetSuperAdminConfigurazioneMatricoleVolontariQueryError = ErrorType<unknown>
+
+
+
+export function useGetSuperAdminConfigurazioneMatricoleVolontari<TData = Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSuperAdminConfigurazioneMatricoleVolontariQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateSuperAdminConfigurazioneMatricoleVolontariUrl = () => {
+
+
+
+
+  return `/api/super-admin/configurazione-matricole-volontari`
+}
+
+export const updateSuperAdminConfigurazioneMatricoleVolontari = async (configurazioneMatricoleVolontariInput: ConfigurazioneMatricoleVolontariInput, options?: RequestInit): Promise<ConfigurazioneMatricoleVolontariResponse> => {
+
+  return customFetch<ConfigurazioneMatricoleVolontariResponse>(getUpdateSuperAdminConfigurazioneMatricoleVolontariUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      configurazioneMatricoleVolontariInput,)
+  }
+);}
+
+
+
+
+export const getUpdateSuperAdminConfigurazioneMatricoleVolontariMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>, TError,{data: BodyType<ConfigurazioneMatricoleVolontariInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>, TError,{data: BodyType<ConfigurazioneMatricoleVolontariInput>}, TContext> => {
+
+const mutationKey = ['updateSuperAdminConfigurazioneMatricoleVolontari'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>, {data: BodyType<ConfigurazioneMatricoleVolontariInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateSuperAdminConfigurazioneMatricoleVolontari(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSuperAdminConfigurazioneMatricoleVolontariMutationResult = NonNullable<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>>
+    export type UpdateSuperAdminConfigurazioneMatricoleVolontariMutationBody = BodyType<ConfigurazioneMatricoleVolontariInput>
+    export type UpdateSuperAdminConfigurazioneMatricoleVolontariMutationError = ErrorType<unknown>
+
+    export const useUpdateSuperAdminConfigurazioneMatricoleVolontari = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>, TError,{data: BodyType<ConfigurazioneMatricoleVolontariInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>,
+        TError,
+        {data: BodyType<ConfigurazioneMatricoleVolontariInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateSuperAdminConfigurazioneMatricoleVolontariMutationOptions(options));
+    }
+
 export const getListSuperAdminModuliUrl = () => {
 
 
@@ -19080,17 +19239,345 @@ export function useGetVolontariCarico<TData = Awaited<ReturnType<typeof getVolon
 
 
 
-export const getGetVolontarioUrl = (id: number,) => {
+export const getSuspendVolontarioUrl = (id: number,) => {
 
 
 
 
-  return `/api/volontari/${id}`
+  return `/api/volontari/${id}/sospendi`
 }
 
-export const getVolontario = async (id: number, options?: RequestInit): Promise<Volontario> => {
+export const suspendVolontario = async (id: number,
+    volontarioSospensioneInput: VolontarioSospensioneInput, options?: RequestInit): Promise<VolontarioActionResult> => {
 
-  return customFetch<Volontario>(getGetVolontarioUrl(id),
+  return customFetch<VolontarioActionResult>(getSuspendVolontarioUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontarioSospensioneInput,)
+  }
+);}
+
+
+
+
+export const getSuspendVolontarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof suspendVolontario>>, TError,{id: number;data: BodyType<VolontarioSospensioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof suspendVolontario>>, TError,{id: number;data: BodyType<VolontarioSospensioneInput>}, TContext> => {
+
+const mutationKey = ['suspendVolontario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof suspendVolontario>>, {id: number;data: BodyType<VolontarioSospensioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  suspendVolontario(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SuspendVolontarioMutationResult = NonNullable<Awaited<ReturnType<typeof suspendVolontario>>>
+    export type SuspendVolontarioMutationBody = BodyType<VolontarioSospensioneInput>
+    export type SuspendVolontarioMutationError = ErrorType<unknown>
+
+    export const useSuspendVolontario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof suspendVolontario>>, TError,{id: number;data: BodyType<VolontarioSospensioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof suspendVolontario>>,
+        TError,
+        {id: number;data: BodyType<VolontarioSospensioneInput>},
+        TContext
+      > => {
+      return useMutation(getSuspendVolontarioMutationOptions(options));
+    }
+
+export const getReactivateVolontarioUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/riattiva`
+}
+
+export const reactivateVolontario = async (id: number,
+    volontarioRiattivazioneInput: VolontarioRiattivazioneInput, options?: RequestInit): Promise<VolontarioActionResult> => {
+
+  return customFetch<VolontarioActionResult>(getReactivateVolontarioUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontarioRiattivazioneInput,)
+  }
+);}
+
+
+
+
+export const getReactivateVolontarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reactivateVolontario>>, TError,{id: number;data: BodyType<VolontarioRiattivazioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reactivateVolontario>>, TError,{id: number;data: BodyType<VolontarioRiattivazioneInput>}, TContext> => {
+
+const mutationKey = ['reactivateVolontario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reactivateVolontario>>, {id: number;data: BodyType<VolontarioRiattivazioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reactivateVolontario(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReactivateVolontarioMutationResult = NonNullable<Awaited<ReturnType<typeof reactivateVolontario>>>
+    export type ReactivateVolontarioMutationBody = BodyType<VolontarioRiattivazioneInput>
+    export type ReactivateVolontarioMutationError = ErrorType<unknown>
+
+    export const useReactivateVolontario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reactivateVolontario>>, TError,{id: number;data: BodyType<VolontarioRiattivazioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reactivateVolontario>>,
+        TError,
+        {id: number;data: BodyType<VolontarioRiattivazioneInput>},
+        TContext
+      > => {
+      return useMutation(getReactivateVolontarioMutationOptions(options));
+    }
+
+export const getRegisterVolontarioInsuranceUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/assicurazione`
+}
+
+export const registerVolontarioInsurance = async (id: number,
+    volontarioInsuranceVersionInput: VolontarioInsuranceVersionInput, options?: RequestInit): Promise<VolontarioActionResult> => {
+
+  return customFetch<VolontarioActionResult>(getRegisterVolontarioInsuranceUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontarioInsuranceVersionInput,)
+  }
+);}
+
+
+
+
+export const getRegisterVolontarioInsuranceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerVolontarioInsurance>>, TError,{id: number;data: BodyType<VolontarioInsuranceVersionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerVolontarioInsurance>>, TError,{id: number;data: BodyType<VolontarioInsuranceVersionInput>}, TContext> => {
+
+const mutationKey = ['registerVolontarioInsurance'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerVolontarioInsurance>>, {id: number;data: BodyType<VolontarioInsuranceVersionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  registerVolontarioInsurance(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterVolontarioInsuranceMutationResult = NonNullable<Awaited<ReturnType<typeof registerVolontarioInsurance>>>
+    export type RegisterVolontarioInsuranceMutationBody = BodyType<VolontarioInsuranceVersionInput>
+    export type RegisterVolontarioInsuranceMutationError = ErrorType<unknown>
+
+    export const useRegisterVolontarioInsurance = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerVolontarioInsurance>>, TError,{id: number;data: BodyType<VolontarioInsuranceVersionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerVolontarioInsurance>>,
+        TError,
+        {id: number;data: BodyType<VolontarioInsuranceVersionInput>},
+        TContext
+      > => {
+      return useMutation(getRegisterVolontarioInsuranceMutationOptions(options));
+    }
+
+export const getPreviewBulkVolontariInsuranceUrl = () => {
+
+
+
+
+  return `/api/volontari/assicurazione/massivo/preview`
+}
+
+export const previewBulkVolontariInsurance = async (volontarioBulkInsuranceInput: VolontarioBulkInsuranceInput, options?: RequestInit): Promise<PreviewBulkVolontariInsurance200> => {
+
+  return customFetch<PreviewBulkVolontariInsurance200>(getPreviewBulkVolontariInsuranceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontarioBulkInsuranceInput,)
+  }
+);}
+
+
+
+
+export const getPreviewBulkVolontariInsuranceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBulkVolontariInsurance>>, TError,{data: BodyType<VolontarioBulkInsuranceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewBulkVolontariInsurance>>, TError,{data: BodyType<VolontarioBulkInsuranceInput>}, TContext> => {
+
+const mutationKey = ['previewBulkVolontariInsurance'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewBulkVolontariInsurance>>, {data: BodyType<VolontarioBulkInsuranceInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewBulkVolontariInsurance(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewBulkVolontariInsuranceMutationResult = NonNullable<Awaited<ReturnType<typeof previewBulkVolontariInsurance>>>
+    export type PreviewBulkVolontariInsuranceMutationBody = BodyType<VolontarioBulkInsuranceInput>
+    export type PreviewBulkVolontariInsuranceMutationError = ErrorType<unknown>
+
+    export const usePreviewBulkVolontariInsurance = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBulkVolontariInsurance>>, TError,{data: BodyType<VolontarioBulkInsuranceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewBulkVolontariInsurance>>,
+        TError,
+        {data: BodyType<VolontarioBulkInsuranceInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewBulkVolontariInsuranceMutationOptions(options));
+    }
+
+export const getConfirmBulkVolontariInsuranceUrl = () => {
+
+
+
+
+  return `/api/volontari/assicurazione/massivo/conferma`
+}
+
+export const confirmBulkVolontariInsurance = async (volontarioBulkInsuranceConfirmInput: VolontarioBulkInsuranceConfirmInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getConfirmBulkVolontariInsuranceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontarioBulkInsuranceConfirmInput,)
+  }
+);}
+
+
+
+
+export const getConfirmBulkVolontariInsuranceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmBulkVolontariInsurance>>, TError,{data: BodyType<VolontarioBulkInsuranceConfirmInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmBulkVolontariInsurance>>, TError,{data: BodyType<VolontarioBulkInsuranceConfirmInput>}, TContext> => {
+
+const mutationKey = ['confirmBulkVolontariInsurance'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmBulkVolontariInsurance>>, {data: BodyType<VolontarioBulkInsuranceConfirmInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  confirmBulkVolontariInsurance(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmBulkVolontariInsuranceMutationResult = NonNullable<Awaited<ReturnType<typeof confirmBulkVolontariInsurance>>>
+    export type ConfirmBulkVolontariInsuranceMutationBody = BodyType<VolontarioBulkInsuranceConfirmInput>
+    export type ConfirmBulkVolontariInsuranceMutationError = ErrorType<unknown>
+
+    export const useConfirmBulkVolontariInsurance = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmBulkVolontariInsurance>>, TError,{data: BodyType<VolontarioBulkInsuranceConfirmInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmBulkVolontariInsurance>>,
+        TError,
+        {data: BodyType<VolontarioBulkInsuranceConfirmInput>},
+        TContext
+      > => {
+      return useMutation(getConfirmBulkVolontariInsuranceMutationOptions(options));
+    }
+
+export const getGetVolontarioDossierUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/dossier`
+}
+
+export const getVolontarioDossier = async (id: number, options?: RequestInit): Promise<GetVolontarioDossier200> => {
+
+  return customFetch<GetVolontarioDossier200>(getGetVolontarioDossierUrl(id),
   {
     ...options,
     method: 'GET'
@@ -19103,23 +19590,1683 @@ export const getVolontario = async (id: number, options?: RequestInit): Promise<
 
 
 
-export const getGetVolontarioQueryKey = (id: number,) => {
+export const getGetVolontarioDossierQueryKey = (id: number,) => {
     return [
-    `/api/volontari/${id}`
+    `/api/volontari/${id}/dossier`
     ] as const;
     }
 
 
-export const getGetVolontarioQueryOptions = <TData = Awaited<ReturnType<typeof getVolontario>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVolontario>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetVolontarioDossierQueryOptions = <TData = Awaited<ReturnType<typeof getVolontarioDossier>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVolontarioDossier>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetVolontarioQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getGetVolontarioDossierQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVolontario>>> = ({ signal }) => getVolontario(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVolontarioDossier>>> = ({ signal }) => getVolontarioDossier(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVolontarioDossier>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVolontarioDossierQueryResult = NonNullable<Awaited<ReturnType<typeof getVolontarioDossier>>>
+export type GetVolontarioDossierQueryError = ErrorType<unknown>
+
+
+
+export function useGetVolontarioDossier<TData = Awaited<ReturnType<typeof getVolontarioDossier>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVolontarioDossier>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVolontarioDossierQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateVolontarioServiceDayUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/giornate`
+}
+
+export const createVolontarioServiceDay = async (id: number,
+    volontarioServiceDayInput: VolontarioServiceDayInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getCreateVolontarioServiceDayUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontarioServiceDayInput,)
+  }
+);}
+
+
+
+
+export const getCreateVolontarioServiceDayMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontarioServiceDay>>, TError,{id: number;data: BodyType<VolontarioServiceDayInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVolontarioServiceDay>>, TError,{id: number;data: BodyType<VolontarioServiceDayInput>}, TContext> => {
+
+const mutationKey = ['createVolontarioServiceDay'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVolontarioServiceDay>>, {id: number;data: BodyType<VolontarioServiceDayInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createVolontarioServiceDay(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVolontarioServiceDayMutationResult = NonNullable<Awaited<ReturnType<typeof createVolontarioServiceDay>>>
+    export type CreateVolontarioServiceDayMutationBody = BodyType<VolontarioServiceDayInput>
+    export type CreateVolontarioServiceDayMutationError = ErrorType<unknown>
+
+    export const useCreateVolontarioServiceDay = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontarioServiceDay>>, TError,{id: number;data: BodyType<VolontarioServiceDayInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVolontarioServiceDay>>,
+        TError,
+        {id: number;data: BodyType<VolontarioServiceDayInput>},
+        TContext
+      > => {
+      return useMutation(getCreateVolontarioServiceDayMutationOptions(options));
+    }
+
+export const getUpdateVolontarioServiceDayUrl = (id: number,
+    giornataId: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/giornate/${giornataId}`
+}
+
+export const updateVolontarioServiceDay = async (id: number,
+    giornataId: number,
+    volontarioServiceDayUpdateInput: VolontarioServiceDayUpdateInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getUpdateVolontarioServiceDayUrl(id,giornataId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontarioServiceDayUpdateInput,)
+  }
+);}
+
+
+
+
+export const getUpdateVolontarioServiceDayMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVolontarioServiceDay>>, TError,{id: number;giornataId: number;data: BodyType<VolontarioServiceDayUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateVolontarioServiceDay>>, TError,{id: number;giornataId: number;data: BodyType<VolontarioServiceDayUpdateInput>}, TContext> => {
+
+const mutationKey = ['updateVolontarioServiceDay'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateVolontarioServiceDay>>, {id: number;giornataId: number;data: BodyType<VolontarioServiceDayUpdateInput>}> = (props) => {
+          const {id,giornataId,data} = props ?? {};
+
+          return  updateVolontarioServiceDay(id,giornataId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateVolontarioServiceDayMutationResult = NonNullable<Awaited<ReturnType<typeof updateVolontarioServiceDay>>>
+    export type UpdateVolontarioServiceDayMutationBody = BodyType<VolontarioServiceDayUpdateInput>
+    export type UpdateVolontarioServiceDayMutationError = ErrorType<unknown>
+
+    export const useUpdateVolontarioServiceDay = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVolontarioServiceDay>>, TError,{id: number;giornataId: number;data: BodyType<VolontarioServiceDayUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateVolontarioServiceDay>>,
+        TError,
+        {id: number;giornataId: number;data: BodyType<VolontarioServiceDayUpdateInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateVolontarioServiceDayMutationOptions(options));
+    }
+
+export const getAnalyzeVolontariImportUrl = (params?: AnalyzeVolontariImportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/volontari/import/analizza?${stringifiedParams}` : `/api/volontari/import/analizza`
+}
+
+export const analyzeVolontariImport = async (analyzeVolontariImportBody: Blob,
+    params?: AnalyzeVolontariImportParams, options?: RequestInit): Promise<VolontariImportPreview> => {
+
+  return customFetch<VolontariImportPreview>(getAnalyzeVolontariImportUrl(params),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ...options?.headers },
+    body: analyzeVolontariImportBody
+  }
+);}
+
+
+
+
+export const getAnalyzeVolontariImportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeVolontariImport>>, TError,{data: BodyType<Blob>;params?: AnalyzeVolontariImportParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeVolontariImport>>, TError,{data: BodyType<Blob>;params?: AnalyzeVolontariImportParams}, TContext> => {
+
+const mutationKey = ['analyzeVolontariImport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeVolontariImport>>, {data: BodyType<Blob>;params?: AnalyzeVolontariImportParams}> = (props) => {
+          const {data,params} = props ?? {};
+
+          return  analyzeVolontariImport(data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeVolontariImportMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeVolontariImport>>>
+    export type AnalyzeVolontariImportMutationBody = BodyType<Blob>
+    export type AnalyzeVolontariImportMutationError = ErrorType<unknown>
+
+    export const useAnalyzeVolontariImport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeVolontariImport>>, TError,{data: BodyType<Blob>;params?: AnalyzeVolontariImportParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeVolontariImport>>,
+        TError,
+        {data: BodyType<Blob>;params?: AnalyzeVolontariImportParams},
+        TContext
+      > => {
+      return useMutation(getAnalyzeVolontariImportMutationOptions(options));
+    }
+
+export const getConfirmVolontariImportUrl = () => {
+
+
+
+
+  return `/api/volontari/import/conferma`
+}
+
+export const confirmVolontariImport = async (volontariImportConfirmInput: VolontariImportConfirmInput, options?: RequestInit): Promise<ConfirmVolontariImport200> => {
+
+  return customFetch<ConfirmVolontariImport200>(getConfirmVolontariImportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontariImportConfirmInput,)
+  }
+);}
+
+
+
+
+export const getConfirmVolontariImportMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmVolontariImport>>, TError,{data: BodyType<VolontariImportConfirmInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmVolontariImport>>, TError,{data: BodyType<VolontariImportConfirmInput>}, TContext> => {
+
+const mutationKey = ['confirmVolontariImport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmVolontariImport>>, {data: BodyType<VolontariImportConfirmInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  confirmVolontariImport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmVolontariImportMutationResult = NonNullable<Awaited<ReturnType<typeof confirmVolontariImport>>>
+    export type ConfirmVolontariImportMutationBody = BodyType<VolontariImportConfirmInput>
+    export type ConfirmVolontariImportMutationError = ErrorType<void>
+
+    export const useConfirmVolontariImport = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmVolontariImport>>, TError,{data: BodyType<VolontariImportConfirmInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmVolontariImport>>,
+        TError,
+        {data: BodyType<VolontariImportConfirmInput>},
+        TContext
+      > => {
+      return useMutation(getConfirmVolontariImportMutationOptions(options));
+    }
+
+export const getListVolontariCoursesCatalogUrl = () => {
+
+
+
+
+  return `/api/volontari/formazione/corsi`
+}
+
+export const listVolontariCoursesCatalog = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getListVolontariCoursesCatalogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVolontariCoursesCatalogQueryKey = () => {
+    return [
+    `/api/volontari/formazione/corsi`
+    ] as const;
+    }
+
+
+export const getListVolontariCoursesCatalogQueryOptions = <TData = Awaited<ReturnType<typeof listVolontariCoursesCatalog>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontariCoursesCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVolontariCoursesCatalogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVolontariCoursesCatalog>>> = ({ signal }) => listVolontariCoursesCatalog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVolontariCoursesCatalog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVolontariCoursesCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof listVolontariCoursesCatalog>>>
+export type ListVolontariCoursesCatalogQueryError = ErrorType<unknown>
+
+
+
+export function useListVolontariCoursesCatalog<TData = Awaited<ReturnType<typeof listVolontariCoursesCatalog>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontariCoursesCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVolontariCoursesCatalogQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateVolontariCourseCatalogUrl = () => {
+
+
+
+
+  return `/api/volontari/formazione/corsi`
+}
+
+export const createVolontariCourseCatalog = async (volontariGenericWriteInput: VolontariGenericWriteInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getCreateVolontariCourseCatalogUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontariGenericWriteInput,)
+  }
+);}
+
+
+
+
+export const getCreateVolontariCourseCatalogMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontariCourseCatalog>>, TError,{data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVolontariCourseCatalog>>, TError,{data: BodyType<VolontariGenericWriteInput>}, TContext> => {
+
+const mutationKey = ['createVolontariCourseCatalog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVolontariCourseCatalog>>, {data: BodyType<VolontariGenericWriteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createVolontariCourseCatalog(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVolontariCourseCatalogMutationResult = NonNullable<Awaited<ReturnType<typeof createVolontariCourseCatalog>>>
+    export type CreateVolontariCourseCatalogMutationBody = BodyType<VolontariGenericWriteInput>
+    export type CreateVolontariCourseCatalogMutationError = ErrorType<unknown>
+
+    export const useCreateVolontariCourseCatalog = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontariCourseCatalog>>, TError,{data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVolontariCourseCatalog>>,
+        TError,
+        {data: BodyType<VolontariGenericWriteInput>},
+        TContext
+      > => {
+      return useMutation(getCreateVolontariCourseCatalogMutationOptions(options));
+    }
+
+export const getUpdateVolontariCourseCatalogUrl = (catalogoId: number,) => {
+
+
+
+
+  return `/api/volontari/formazione/corsi/${catalogoId}`
+}
+
+export const updateVolontariCourseCatalog = async (catalogoId: number,
+    volontariGenericWriteInput: VolontariGenericWriteInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getUpdateVolontariCourseCatalogUrl(catalogoId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontariGenericWriteInput,)
+  }
+);}
+
+
+
+
+export const getUpdateVolontariCourseCatalogMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVolontariCourseCatalog>>, TError,{catalogoId: number;data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateVolontariCourseCatalog>>, TError,{catalogoId: number;data: BodyType<VolontariGenericWriteInput>}, TContext> => {
+
+const mutationKey = ['updateVolontariCourseCatalog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateVolontariCourseCatalog>>, {catalogoId: number;data: BodyType<VolontariGenericWriteInput>}> = (props) => {
+          const {catalogoId,data} = props ?? {};
+
+          return  updateVolontariCourseCatalog(catalogoId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateVolontariCourseCatalogMutationResult = NonNullable<Awaited<ReturnType<typeof updateVolontariCourseCatalog>>>
+    export type UpdateVolontariCourseCatalogMutationBody = BodyType<VolontariGenericWriteInput>
+    export type UpdateVolontariCourseCatalogMutationError = ErrorType<unknown>
+
+    export const useUpdateVolontariCourseCatalog = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVolontariCourseCatalog>>, TError,{catalogoId: number;data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateVolontariCourseCatalog>>,
+        TError,
+        {catalogoId: number;data: BodyType<VolontariGenericWriteInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateVolontariCourseCatalogMutationOptions(options));
+    }
+
+export const getCreateVolontarioCourseUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/corsi`
+}
+
+export const createVolontarioCourse = async (id: number,
+    volontariGenericWriteInput: VolontariGenericWriteInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getCreateVolontarioCourseUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontariGenericWriteInput,)
+  }
+);}
+
+
+
+
+export const getCreateVolontarioCourseMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontarioCourse>>, TError,{id: number;data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVolontarioCourse>>, TError,{id: number;data: BodyType<VolontariGenericWriteInput>}, TContext> => {
+
+const mutationKey = ['createVolontarioCourse'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVolontarioCourse>>, {id: number;data: BodyType<VolontariGenericWriteInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createVolontarioCourse(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVolontarioCourseMutationResult = NonNullable<Awaited<ReturnType<typeof createVolontarioCourse>>>
+    export type CreateVolontarioCourseMutationBody = BodyType<VolontariGenericWriteInput>
+    export type CreateVolontarioCourseMutationError = ErrorType<unknown>
+
+    export const useCreateVolontarioCourse = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontarioCourse>>, TError,{id: number;data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVolontarioCourse>>,
+        TError,
+        {id: number;data: BodyType<VolontariGenericWriteInput>},
+        TContext
+      > => {
+      return useMutation(getCreateVolontarioCourseMutationOptions(options));
+    }
+
+export const getListVolontariQualificationsCatalogUrl = () => {
+
+
+
+
+  return `/api/volontari/formazione/qualifiche`
+}
+
+export const listVolontariQualificationsCatalog = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getListVolontariQualificationsCatalogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVolontariQualificationsCatalogQueryKey = () => {
+    return [
+    `/api/volontari/formazione/qualifiche`
+    ] as const;
+    }
+
+
+export const getListVolontariQualificationsCatalogQueryOptions = <TData = Awaited<ReturnType<typeof listVolontariQualificationsCatalog>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontariQualificationsCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVolontariQualificationsCatalogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVolontariQualificationsCatalog>>> = ({ signal }) => listVolontariQualificationsCatalog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVolontariQualificationsCatalog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVolontariQualificationsCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof listVolontariQualificationsCatalog>>>
+export type ListVolontariQualificationsCatalogQueryError = ErrorType<unknown>
+
+
+
+export function useListVolontariQualificationsCatalog<TData = Awaited<ReturnType<typeof listVolontariQualificationsCatalog>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontariQualificationsCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVolontariQualificationsCatalogQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateVolontariQualificationCatalogUrl = () => {
+
+
+
+
+  return `/api/volontari/formazione/qualifiche`
+}
+
+export const createVolontariQualificationCatalog = async (volontariGenericWriteInput: VolontariGenericWriteInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getCreateVolontariQualificationCatalogUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontariGenericWriteInput,)
+  }
+);}
+
+
+
+
+export const getCreateVolontariQualificationCatalogMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontariQualificationCatalog>>, TError,{data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVolontariQualificationCatalog>>, TError,{data: BodyType<VolontariGenericWriteInput>}, TContext> => {
+
+const mutationKey = ['createVolontariQualificationCatalog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVolontariQualificationCatalog>>, {data: BodyType<VolontariGenericWriteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createVolontariQualificationCatalog(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVolontariQualificationCatalogMutationResult = NonNullable<Awaited<ReturnType<typeof createVolontariQualificationCatalog>>>
+    export type CreateVolontariQualificationCatalogMutationBody = BodyType<VolontariGenericWriteInput>
+    export type CreateVolontariQualificationCatalogMutationError = ErrorType<unknown>
+
+    export const useCreateVolontariQualificationCatalog = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontariQualificationCatalog>>, TError,{data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVolontariQualificationCatalog>>,
+        TError,
+        {data: BodyType<VolontariGenericWriteInput>},
+        TContext
+      > => {
+      return useMutation(getCreateVolontariQualificationCatalogMutationOptions(options));
+    }
+
+export const getUpdateVolontariQualificationCatalogUrl = (catalogoId: number,) => {
+
+
+
+
+  return `/api/volontari/formazione/qualifiche/${catalogoId}`
+}
+
+export const updateVolontariQualificationCatalog = async (catalogoId: number,
+    volontariGenericWriteInput: VolontariGenericWriteInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getUpdateVolontariQualificationCatalogUrl(catalogoId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontariGenericWriteInput,)
+  }
+);}
+
+
+
+
+export const getUpdateVolontariQualificationCatalogMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVolontariQualificationCatalog>>, TError,{catalogoId: number;data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateVolontariQualificationCatalog>>, TError,{catalogoId: number;data: BodyType<VolontariGenericWriteInput>}, TContext> => {
+
+const mutationKey = ['updateVolontariQualificationCatalog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateVolontariQualificationCatalog>>, {catalogoId: number;data: BodyType<VolontariGenericWriteInput>}> = (props) => {
+          const {catalogoId,data} = props ?? {};
+
+          return  updateVolontariQualificationCatalog(catalogoId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateVolontariQualificationCatalogMutationResult = NonNullable<Awaited<ReturnType<typeof updateVolontariQualificationCatalog>>>
+    export type UpdateVolontariQualificationCatalogMutationBody = BodyType<VolontariGenericWriteInput>
+    export type UpdateVolontariQualificationCatalogMutationError = ErrorType<unknown>
+
+    export const useUpdateVolontariQualificationCatalog = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVolontariQualificationCatalog>>, TError,{catalogoId: number;data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateVolontariQualificationCatalog>>,
+        TError,
+        {catalogoId: number;data: BodyType<VolontariGenericWriteInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateVolontariQualificationCatalogMutationOptions(options));
+    }
+
+export const getCreateVolontarioQualificationUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/qualifiche`
+}
+
+export const createVolontarioQualification = async (id: number,
+    volontariGenericWriteInput: VolontariGenericWriteInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getCreateVolontarioQualificationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontariGenericWriteInput,)
+  }
+);}
+
+
+
+
+export const getCreateVolontarioQualificationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontarioQualification>>, TError,{id: number;data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVolontarioQualification>>, TError,{id: number;data: BodyType<VolontariGenericWriteInput>}, TContext> => {
+
+const mutationKey = ['createVolontarioQualification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVolontarioQualification>>, {id: number;data: BodyType<VolontariGenericWriteInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createVolontarioQualification(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVolontarioQualificationMutationResult = NonNullable<Awaited<ReturnType<typeof createVolontarioQualification>>>
+    export type CreateVolontarioQualificationMutationBody = BodyType<VolontariGenericWriteInput>
+    export type CreateVolontarioQualificationMutationError = ErrorType<unknown>
+
+    export const useCreateVolontarioQualification = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolontarioQualification>>, TError,{id: number;data: BodyType<VolontariGenericWriteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVolontarioQualification>>,
+        TError,
+        {id: number;data: BodyType<VolontariGenericWriteInput>},
+        TContext
+      > => {
+      return useMutation(getCreateVolontarioQualificationMutationOptions(options));
+    }
+
+export const getExportVolontariHistoricalUrl = () => {
+
+
+
+
+  return `/api/volontari/export/storico.xlsx`
+}
+
+export const exportVolontariHistorical = async ( options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportVolontariHistoricalUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportVolontariHistoricalQueryKey = () => {
+    return [
+    `/api/volontari/export/storico.xlsx`
+    ] as const;
+    }
+
+
+export const getExportVolontariHistoricalQueryOptions = <TData = Awaited<ReturnType<typeof exportVolontariHistorical>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportVolontariHistorical>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportVolontariHistoricalQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportVolontariHistorical>>> = ({ signal }) => exportVolontariHistorical({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportVolontariHistorical>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportVolontariHistoricalQueryResult = NonNullable<Awaited<ReturnType<typeof exportVolontariHistorical>>>
+export type ExportVolontariHistoricalQueryError = ErrorType<unknown>
+
+
+
+export function useExportVolontariHistorical<TData = Awaited<ReturnType<typeof exportVolontariHistorical>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportVolontariHistorical>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportVolontariHistoricalQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportVolontariExtendedUrl = () => {
+
+
+
+
+  return `/api/volontari/export/esteso.xlsx`
+}
+
+export const exportVolontariExtended = async ( options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportVolontariExtendedUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportVolontariExtendedQueryKey = () => {
+    return [
+    `/api/volontari/export/esteso.xlsx`
+    ] as const;
+    }
+
+
+export const getExportVolontariExtendedQueryOptions = <TData = Awaited<ReturnType<typeof exportVolontariExtended>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportVolontariExtended>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportVolontariExtendedQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportVolontariExtended>>> = ({ signal }) => exportVolontariExtended({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportVolontariExtended>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportVolontariExtendedQueryResult = NonNullable<Awaited<ReturnType<typeof exportVolontariExtended>>>
+export type ExportVolontariExtendedQueryError = ErrorType<unknown>
+
+
+
+export function useExportVolontariExtended<TData = Awaited<ReturnType<typeof exportVolontariExtended>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportVolontariExtended>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportVolontariExtendedQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGenerateVolontariRegisterUrl = () => {
+
+
+
+
+  return `/api/volontari/registro/genera`
+}
+
+export const generateVolontariRegister = async (volontariRegisterGenerateInput?: VolontariRegisterGenerateInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getGenerateVolontariRegisterUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontariRegisterGenerateInput,)
+  }
+);}
+
+
+
+
+export const getGenerateVolontariRegisterMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateVolontariRegister>>, TError,{data?: BodyType<VolontariRegisterGenerateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateVolontariRegister>>, TError,{data?: BodyType<VolontariRegisterGenerateInput>}, TContext> => {
+
+const mutationKey = ['generateVolontariRegister'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateVolontariRegister>>, {data?: BodyType<VolontariRegisterGenerateInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  generateVolontariRegister(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateVolontariRegisterMutationResult = NonNullable<Awaited<ReturnType<typeof generateVolontariRegister>>>
+    export type GenerateVolontariRegisterMutationBody = BodyType<VolontariRegisterGenerateInput> | undefined
+    export type GenerateVolontariRegisterMutationError = ErrorType<unknown>
+
+    export const useGenerateVolontariRegister = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateVolontariRegister>>, TError,{data?: BodyType<VolontariRegisterGenerateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateVolontariRegister>>,
+        TError,
+        {data?: BodyType<VolontariRegisterGenerateInput>},
+        TContext
+      > => {
+      return useMutation(getGenerateVolontariRegisterMutationOptions(options));
+    }
+
+export const getListVolontariRegisterEmissionsUrl = () => {
+
+
+
+
+  return `/api/volontari/registro/emissioni`
+}
+
+export const listVolontariRegisterEmissions = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getListVolontariRegisterEmissionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVolontariRegisterEmissionsQueryKey = () => {
+    return [
+    `/api/volontari/registro/emissioni`
+    ] as const;
+    }
+
+
+export const getListVolontariRegisterEmissionsQueryOptions = <TData = Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVolontariRegisterEmissionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVolontariRegisterEmissions>>> = ({ signal }) => listVolontariRegisterEmissions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVolontariRegisterEmissionsQueryResult = NonNullable<Awaited<ReturnType<typeof listVolontariRegisterEmissions>>>
+export type ListVolontariRegisterEmissionsQueryError = ErrorType<void>
+
+
+
+export function useListVolontariRegisterEmissions<TData = Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVolontariRegisterEmissionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDownloadVolontariRegisterEmissionUrl = (emissioneId: number,) => {
+
+
+
+
+  return `/api/volontari/registro/emissioni/${emissioneId}/file`
+}
+
+export const downloadVolontariRegisterEmission = async (emissioneId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDownloadVolontariRegisterEmissionUrl(emissioneId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadVolontariRegisterEmissionQueryKey = (emissioneId: number,) => {
+    return [
+    `/api/volontari/registro/emissioni/${emissioneId}/file`
+    ] as const;
+    }
+
+
+export const getDownloadVolontariRegisterEmissionQueryOptions = <TData = Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError = ErrorType<void>>(emissioneId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadVolontariRegisterEmissionQueryKey(emissioneId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>> = ({ signal }) => downloadVolontariRegisterEmission(emissioneId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(emissioneId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadVolontariRegisterEmissionQueryResult = NonNullable<Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>>
+export type DownloadVolontariRegisterEmissionQueryError = ErrorType<void>
+
+
+
+export function useDownloadVolontariRegisterEmission<TData = Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError = ErrorType<void>>(
+ emissioneId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadVolontariRegisterEmissionQueryOptions(emissioneId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListVolontariRegisterEventsUrl = () => {
+
+
+
+
+  return `/api/volontari/registro/eventi`
+}
+
+export const listVolontariRegisterEvents = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getListVolontariRegisterEventsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVolontariRegisterEventsQueryKey = () => {
+    return [
+    `/api/volontari/registro/eventi`
+    ] as const;
+    }
+
+
+export const getListVolontariRegisterEventsQueryOptions = <TData = Awaited<ReturnType<typeof listVolontariRegisterEvents>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontariRegisterEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVolontariRegisterEventsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVolontariRegisterEvents>>> = ({ signal }) => listVolontariRegisterEvents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVolontariRegisterEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVolontariRegisterEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listVolontariRegisterEvents>>>
+export type ListVolontariRegisterEventsQueryError = ErrorType<unknown>
+
+
+
+export function useListVolontariRegisterEvents<TData = Awaited<ReturnType<typeof listVolontariRegisterEvents>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontariRegisterEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVolontariRegisterEventsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getVerifyVolontariRegisterIntegrityUrl = () => {
+
+
+
+
+  return `/api/volontari/registro/verifica-integrita`
+}
+
+/**
+ * @summary Verifica diagnostica della catena ledger riservata al Super Admin
+ */
+export const verifyVolontariRegisterIntegrity = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getVerifyVolontariRegisterIntegrityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getVerifyVolontariRegisterIntegrityQueryKey = () => {
+    return [
+    `/api/volontari/registro/verifica-integrita`
+    ] as const;
+    }
+
+
+export const getVerifyVolontariRegisterIntegrityQueryOptions = <TData = Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getVerifyVolontariRegisterIntegrityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>> = ({ signal }) => verifyVolontariRegisterIntegrity({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type VerifyVolontariRegisterIntegrityQueryResult = NonNullable<Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>>
+export type VerifyVolontariRegisterIntegrityQueryError = ErrorType<void>
+
+
+/**
+ * @summary Verifica diagnostica della catena ledger riservata al Super Admin
+ */
+
+export function useVerifyVolontariRegisterIntegrity<TData = Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getVerifyVolontariRegisterIntegrityQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCorrectVolontariRegisterEventUrl = (eventoId: number,) => {
+
+
+
+
+  return `/api/volontari/registro/eventi/${eventoId}/rettifica`
+}
+
+export const correctVolontariRegisterEvent = async (eventoId: number,
+    volontariRegisterCorrectionInput: VolontariRegisterCorrectionInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getCorrectVolontariRegisterEventUrl(eventoId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontariRegisterCorrectionInput,)
+  }
+);}
+
+
+
+
+export const getCorrectVolontariRegisterEventMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof correctVolontariRegisterEvent>>, TError,{eventoId: number;data: BodyType<VolontariRegisterCorrectionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof correctVolontariRegisterEvent>>, TError,{eventoId: number;data: BodyType<VolontariRegisterCorrectionInput>}, TContext> => {
+
+const mutationKey = ['correctVolontariRegisterEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof correctVolontariRegisterEvent>>, {eventoId: number;data: BodyType<VolontariRegisterCorrectionInput>}> = (props) => {
+          const {eventoId,data} = props ?? {};
+
+          return  correctVolontariRegisterEvent(eventoId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CorrectVolontariRegisterEventMutationResult = NonNullable<Awaited<ReturnType<typeof correctVolontariRegisterEvent>>>
+    export type CorrectVolontariRegisterEventMutationBody = BodyType<VolontariRegisterCorrectionInput>
+    export type CorrectVolontariRegisterEventMutationError = ErrorType<unknown>
+
+    export const useCorrectVolontariRegisterEvent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof correctVolontariRegisterEvent>>, TError,{eventoId: number;data: BodyType<VolontariRegisterCorrectionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof correctVolontariRegisterEvent>>,
+        TError,
+        {eventoId: number;data: BodyType<VolontariRegisterCorrectionInput>},
+        TContext
+      > => {
+      return useMutation(getCorrectVolontariRegisterEventMutationOptions(options));
+    }
+
+export const getListVolontarioIdentifiersUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/matricole`
+}
+
+export const listVolontarioIdentifiers = async (id: number, options?: RequestInit): Promise<VolontarioIdentifier[]> => {
+
+  return customFetch<VolontarioIdentifier[]>(getListVolontarioIdentifiersUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVolontarioIdentifiersQueryKey = (id: number,) => {
+    return [
+    `/api/volontari/${id}/matricole`
+    ] as const;
+    }
+
+
+export const getListVolontarioIdentifiersQueryOptions = <TData = Awaited<ReturnType<typeof listVolontarioIdentifiers>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontarioIdentifiers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVolontarioIdentifiersQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVolontarioIdentifiers>>> = ({ signal }) => listVolontarioIdentifiers(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVolontarioIdentifiers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVolontarioIdentifiersQueryResult = NonNullable<Awaited<ReturnType<typeof listVolontarioIdentifiers>>>
+export type ListVolontarioIdentifiersQueryError = ErrorType<unknown>
+
+
+
+export function useListVolontarioIdentifiers<TData = Awaited<ReturnType<typeof listVolontarioIdentifiers>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontarioIdentifiers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVolontarioIdentifiersQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPreviewVolontarioPermanentConversionUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/conversione-permanente/preview`
+}
+
+export const previewVolontarioPermanentConversion = async (id: number, options?: RequestInit): Promise<VolontarioPermanentConversionPreviewResponse> => {
+
+  return customFetch<VolontarioPermanentConversionPreviewResponse>(getPreviewVolontarioPermanentConversionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPreviewVolontarioPermanentConversionQueryKey = (id: number,) => {
+    return [
+    `/api/volontari/${id}/conversione-permanente/preview`
+    ] as const;
+    }
+
+
+export const getPreviewVolontarioPermanentConversionQueryOptions = <TData = Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPreviewVolontarioPermanentConversionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>> = ({ signal }) => previewVolontarioPermanentConversion(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type PreviewVolontarioPermanentConversionQueryResult = NonNullable<Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>>
+export type PreviewVolontarioPermanentConversionQueryError = ErrorType<unknown>
+
+
+
+export function usePreviewVolontarioPermanentConversion<TData = Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getPreviewVolontarioPermanentConversionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getConvertVolontarioToPermanentUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/conversione-permanente`
+}
+
+export const convertVolontarioToPermanent = async (id: number,
+    volontarioPermanentConversionInput: VolontarioPermanentConversionInput, options?: RequestInit): Promise<Volontario> => {
+
+  return customFetch<Volontario>(getConvertVolontarioToPermanentUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontarioPermanentConversionInput,)
+  }
+);}
+
+
+
+
+export const getConvertVolontarioToPermanentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof convertVolontarioToPermanent>>, TError,{id: number;data: BodyType<VolontarioPermanentConversionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof convertVolontarioToPermanent>>, TError,{id: number;data: BodyType<VolontarioPermanentConversionInput>}, TContext> => {
+
+const mutationKey = ['convertVolontarioToPermanent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof convertVolontarioToPermanent>>, {id: number;data: BodyType<VolontarioPermanentConversionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  convertVolontarioToPermanent(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConvertVolontarioToPermanentMutationResult = NonNullable<Awaited<ReturnType<typeof convertVolontarioToPermanent>>>
+    export type ConvertVolontarioToPermanentMutationBody = BodyType<VolontarioPermanentConversionInput>
+    export type ConvertVolontarioToPermanentMutationError = ErrorType<void>
+
+    export const useConvertVolontarioToPermanent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof convertVolontarioToPermanent>>, TError,{id: number;data: BodyType<VolontarioPermanentConversionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof convertVolontarioToPermanent>>,
+        TError,
+        {id: number;data: BodyType<VolontarioPermanentConversionInput>},
+        TContext
+      > => {
+      return useMutation(getConvertVolontarioToPermanentMutationOptions(options));
+    }
+
+export const getGetVolontarioUrl = (id: number,
+    params?: GetVolontarioParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/volontari/${id}?${stringifiedParams}` : `/api/volontari/${id}`
+}
+
+export const getVolontario = async (id: number,
+    params?: GetVolontarioParams, options?: RequestInit): Promise<Volontario> => {
+
+  return customFetch<Volontario>(getGetVolontarioUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVolontarioQueryKey = (id: number,
+    params?: GetVolontarioParams,) => {
+    return [
+    `/api/volontari/${id}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetVolontarioQueryOptions = <TData = Awaited<ReturnType<typeof getVolontario>>, TError = ErrorType<unknown>>(id: number,
+    params?: GetVolontarioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVolontario>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVolontarioQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVolontario>>> = ({ signal }) => getVolontario(id,params, { signal, ...requestOptions });
 
 
 
@@ -19134,11 +21281,12 @@ export type GetVolontarioQueryError = ErrorType<unknown>
 
 
 export function useGetVolontario<TData = Awaited<ReturnType<typeof getVolontario>>, TError = ErrorType<unknown>>(
- id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVolontario>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ id: number,
+    params?: GetVolontarioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVolontario>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetVolontarioQueryOptions(id,options)
+  const queryOptions = getGetVolontarioQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

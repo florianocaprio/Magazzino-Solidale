@@ -112,7 +112,6 @@ export default function Turni() {
   const [nuovoVolontario, setNuovoVolontario] = useState({
     nome: "",
     cognome: "",
-    matricola: "",
     ruoloVolontarioId: null as number | null,
     telefono: "",
     patente: false,
@@ -147,7 +146,7 @@ export default function Turni() {
           v.centroAscoltoId == null ||
           effectiveCentro == null ||
           v.centroAscoltoId === effectiveCentro;
-        const approved = (v.statoApprovazione ?? "approvato") === "approvato" && v.attivo;
+        const approved = (v.statoApprovazione ?? "approvato") === "approvato";
         return centroOk && approved;
       }),
     [volontari, effectiveCentro],
@@ -226,6 +225,28 @@ export default function Turni() {
       queryKey: getGetVolontariCaricoQueryKey(caricoParams),
     },
   });
+  const volontariOperativiParams = {
+    dataRiferimento: dialog?.data ?? da,
+    stato: "attivi" as const,
+  };
+  const { data: volontariOperativiDialog } = useListVolontari(
+    volontariOperativiParams,
+    {
+      query: {
+        enabled: dialog != null,
+        queryKey: getListVolontariQueryKey(volontariOperativiParams),
+      },
+    },
+  );
+  const volontariOperativiIds = useMemo(
+    () =>
+      new Set(
+        (volontariOperativiDialog ?? [])
+          .filter((volontario) => volontario.operativo)
+          .map((volontario) => volontario.id),
+      ),
+    [volontariOperativiDialog],
+  );
   const caricoMap = useMemo(
     () => new Map((caricoTurno ?? []).map((item) => [item.volontarioId, item.count])),
     [caricoTurno],
@@ -259,9 +280,9 @@ export default function Turni() {
   const volontariDisponibili = useMemo(
     () => volontariCentro.filter((v) => {
       const atLimit = v.maxConsegneTurno > 0 && (caricoMap.get(v.id) ?? 0) >= v.maxConsegneTurno;
-      return !bookedVolontari.has(v.id) && !atLimit;
+      return volontariOperativiIds.has(v.id) && !bookedVolontari.has(v.id) && !atLimit;
     }),
-    [bookedVolontari, caricoMap, volontariCentro],
+    [bookedVolontari, caricoMap, volontariCentro, volontariOperativiIds],
   );
 
   function openCell(dataISO: string, fascia: string) {
@@ -306,7 +327,7 @@ export default function Turni() {
   }
 
   function creaVolontarioPending() {
-    if (effectiveCentro == null || nuovoVolontario.ruoloVolontarioId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim() || !nuovoVolontario.matricola.trim()) {
+    if (effectiveCentro == null || nuovoVolontario.ruoloVolontarioId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim()) {
       return;
     }
     setVolontarioError(null);
@@ -316,7 +337,6 @@ export default function Turni() {
           centroAscoltoId: effectiveCentro,
           nome: nuovoVolontario.nome.trim(),
           cognome: nuovoVolontario.cognome.trim(),
-          matricola: nuovoVolontario.matricola.trim(),
           ruoloVolontarioId: nuovoVolontario.ruoloVolontarioId,
           telefono: nuovoVolontario.telefono.trim() || undefined,
           patente: nuovoVolontario.patente,
@@ -328,7 +348,7 @@ export default function Turni() {
           setPendingVolontari((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
           toast({ description: t("turni.pendingVolCreated", { defaultValue: "Volontario inserito in attesa di approvazione" }) });
-          setNuovoVolontario({ nome: "", cognome: "", matricola: "", ruoloVolontarioId: null, telefono: "", patente: false, note: "" });
+          setNuovoVolontario({ nome: "", cognome: "", ruoloVolontarioId: null, telefono: "", patente: false, note: "" });
           setVolontarioError(null);
           setVolontarioDialogOpen(false);
         },
@@ -719,6 +739,11 @@ export default function Turni() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {row.volontarioId !== "" && !volontariOperativiIds.has(Number(row.volontarioId)) && (
+                    <p className="mt-1 text-xs text-destructive">
+                      Assegnazione esistente non più operativa per questa data; scegli un volontario idoneo prima di salvare.
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1">
                   <Label className="text-xs">{t("turni.ruolo")}</Label>
@@ -840,17 +865,6 @@ export default function Turni() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>{t("volontari.matricola", { defaultValue: "Matricola" })}</Label>
-              <Input
-                value={nuovoVolontario.matricola}
-                onChange={(e) => {
-                  setVolontarioError(null);
-                  setNuovoVolontario((v) => ({ ...v, matricola: e.target.value }));
-                }}
-              />
-              {volontarioError ? <p className="text-sm text-destructive">{volontarioError}</p> : null}
-            </div>
-            <div className="space-y-1.5">
               <Label>{t("common.phone")}</Label>
               <Input
                 value={nuovoVolontario.telefono}
@@ -897,7 +911,6 @@ export default function Turni() {
                 createPendingVolontario.isPending ||
                 !nuovoVolontario.nome.trim() ||
                 !nuovoVolontario.cognome.trim() ||
-                !nuovoVolontario.matricola.trim() ||
                 nuovoVolontario.ruoloVolontarioId == null
               }
             >

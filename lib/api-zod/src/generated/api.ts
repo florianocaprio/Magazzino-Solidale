@@ -3219,7 +3219,6 @@ export const CreateTurnoVolontarioPendingBody = zod.object({
   "centroAscoltoId": zod.number(),
   "nome": zod.string(),
   "cognome": zod.string(),
-  "matricola": zod.string(),
   "telefono": zod.string().optional(),
   "email": zod.string().optional(),
   "ruolo": zod.string().optional(),
@@ -3918,6 +3917,8 @@ export const GetBeneficiarioResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -5847,6 +5848,8 @@ export const ListConsegneResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -5916,6 +5919,8 @@ export const ExportConsegneResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -5952,6 +5957,8 @@ export const GetConsegnaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -6004,6 +6011,8 @@ export const UpdateConsegnaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -6049,6 +6058,8 @@ export const CompletaConsegnaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -6116,6 +6127,8 @@ export const AssociaBollaResponse = zod.object({
   "centroAscoltoNome": zod.string().nullish(),
   "volontarioId": zod.number().nullish(),
   "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
   "volontarioAltro": zod.string().nullish(),
   "mezzoId": zod.number().nullish(),
   "mezzoAltro": zod.boolean().optional(),
@@ -8241,8 +8254,11 @@ export const GetMapsRouteConsegnaResponse = zod.object({
 export const ListRuoliVolontariResponseItem = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
+  "nomeNormalizzato": zod.string(),
+  "descrizione": zod.string().nullish(),
   "attivo": zod.boolean(),
-  "dataCreazione": zod.string()
+  "dataCreazione": zod.string(),
+  "dataAggiornamento": zod.string()
 })
 export const ListRuoliVolontariResponse = zod.array(ListRuoliVolontariResponseItem)
 
@@ -8252,6 +8268,7 @@ export const ListRuoliVolontariResponse = zod.array(ListRuoliVolontariResponseIt
 
 export const CreateRuoloVolontarioBody = zod.object({
   "nome": zod.string().min(1),
+  "descrizione": zod.string().optional(),
   "attivo": zod.boolean().optional()
 })
 
@@ -8265,14 +8282,18 @@ export const UpdateRuoloVolontarioParams = zod.object({
 
 export const UpdateRuoloVolontarioBody = zod.object({
   "nome": zod.string().min(1).optional(),
+  "descrizione": zod.string().optional(),
   "attivo": zod.boolean().optional()
 })
 
 export const UpdateRuoloVolontarioResponse = zod.object({
   "id": zod.number(),
   "nome": zod.string(),
+  "nomeNormalizzato": zod.string(),
+  "descrizione": zod.string().nullish(),
   "attivo": zod.boolean(),
-  "dataCreazione": zod.string()
+  "dataCreazione": zod.string(),
+  "dataAggiornamento": zod.string()
 })
 
 
@@ -8372,6 +8393,7 @@ export const ListAreeOperativeResponseItem = zod.object({
   "nome": zod.string(),
   "provincia": zod.string().nullish(),
   "sigla": zod.string().nullish(),
+  "codiceMatricola": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -8382,12 +8404,17 @@ export const ListAreeOperativeResponse = zod.array(ListAreeOperativeResponseItem
 
 export const createAreaOperativaBodySiglaMax = 2;
 
+export const createAreaOperativaBodyCodiceMatricolaMax = 8;
+
+
+export const createAreaOperativaBodyCodiceMatricolaRegExp = new RegExp('^[A-Za-z0-9]+$');
 
 
 export const CreateAreaOperativaBody = zod.object({
   "nome": zod.string().min(1),
   "provincia": zod.string().optional(),
   "sigla": zod.string().max(createAreaOperativaBodySiglaMax).optional(),
+  "codiceMatricola": zod.string().max(createAreaOperativaBodyCodiceMatricolaMax).regex(createAreaOperativaBodyCodiceMatricolaRegExp).optional(),
   "attivo": zod.boolean().optional(),
   "note": zod.string().optional()
 })
@@ -8402,6 +8429,7 @@ export const GetAreaOperativaResponse = zod.object({
   "nome": zod.string(),
   "provincia": zod.string().nullish(),
   "sigla": zod.string().nullish(),
+  "codiceMatricola": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -8415,12 +8443,17 @@ export const UpdateAreaOperativaParams = zod.object({
 
 export const updateAreaOperativaBodySiglaMax = 2;
 
+export const updateAreaOperativaBodyCodiceMatricolaMax = 8;
+
+
+export const updateAreaOperativaBodyCodiceMatricolaRegExp = new RegExp('^[A-Za-z0-9]+$');
 
 
 export const UpdateAreaOperativaBody = zod.object({
   "nome": zod.string().min(1).optional(),
   "provincia": zod.string().optional(),
   "sigla": zod.string().max(updateAreaOperativaBodySiglaMax).optional(),
+  "codiceMatricola": zod.string().max(updateAreaOperativaBodyCodiceMatricolaMax).regex(updateAreaOperativaBodyCodiceMatricolaRegExp).optional(),
   "attivo": zod.boolean().optional(),
   "note": zod.string().optional()
 })
@@ -8430,6 +8463,7 @@ export const UpdateAreaOperativaResponse = zod.object({
   "nome": zod.string(),
   "provincia": zod.string().nullish(),
   "sigla": zod.string().nullish(),
+  "codiceMatricola": zod.string().nullish(),
   "attivo": zod.boolean(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -8844,6 +8878,144 @@ export const UpdateSuperAdminConfigurazioneAmbienteResponse = zod.object({
   "dataCreazione": zod.coerce.date(),
   "dataAggiornamento": zod.coerce.date(),
   "aggiornatoDaId": zod.number().nullable()
+})
+
+
+
+export const getSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOnePrefissoAssociazioneMax = 12;
+
+export const getSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneSegmentoFissoMax = 8;
+
+export const getSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneCifreProgressivoMin = 2;
+export const getSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneCifreProgressivoMax = 8;
+
+
+
+export const getSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemPrefissoAssociazioneMax = 12;
+
+export const getSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemSegmentoFissoMax = 8;
+
+export const getSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemCifreProgressivoMin = 2;
+export const getSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemCifreProgressivoMax = 8;
+
+
+
+
+export const GetSuperAdminConfigurazioneMatricoleVolontariResponse = zod.object({
+  "configurazione": zod.union([zod.object({
+  "id": zod.number(),
+  "scopeTipo": zod.enum(['GLOBALE']),
+  "versione": zod.number().min(1),
+  "prefissoAssociazione": zod.string().max(getSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOnePrefissoAssociazioneMax).nullish(),
+  "includiCodiceArea": zod.boolean(),
+  "segmentoFisso": zod.string().max(getSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneSegmentoFissoMax).nullish(),
+  "separatore": zod.enum(['', '-', '/']),
+  "cifreProgressivo": zod.number().min(getSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneCifreProgressivoMin).max(getSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneCifreProgressivoMax),
+  "numeroIniziale": zod.number().min(1),
+  "ambitoProgressivo": zod.enum(['GLOBALE', 'PER_AREA']),
+  "attiva": zod.boolean(),
+  "aggiornataDa": zod.number().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+}),zod.null()]),
+  "esempio": zod.string().nullable(),
+  "storico": zod.array(zod.object({
+  "id": zod.number(),
+  "scopeTipo": zod.enum(['GLOBALE']),
+  "versione": zod.number().min(1),
+  "prefissoAssociazione": zod.string().max(getSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemPrefissoAssociazioneMax).nullish(),
+  "includiCodiceArea": zod.boolean(),
+  "segmentoFisso": zod.string().max(getSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemSegmentoFissoMax).nullish(),
+  "separatore": zod.enum(['', '-', '/']),
+  "cifreProgressivo": zod.number().min(getSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemCifreProgressivoMin).max(getSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemCifreProgressivoMax),
+  "numeroIniziale": zod.number().min(1),
+  "ambitoProgressivo": zod.enum(['GLOBALE', 'PER_AREA']),
+  "attiva": zod.boolean(),
+  "aggiornataDa": zod.number().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})).optional()
+})
+
+
+export const updateSuperAdminConfigurazioneMatricoleVolontariBodyPrefissoAssociazioneMax = 12;
+
+
+export const updateSuperAdminConfigurazioneMatricoleVolontariBodyPrefissoAssociazioneRegExp = new RegExp('^[A-Za-z0-9]\*$');
+export const updateSuperAdminConfigurazioneMatricoleVolontariBodySegmentoFissoMax = 8;
+
+
+export const updateSuperAdminConfigurazioneMatricoleVolontariBodySegmentoFissoRegExp = new RegExp('^[A-Za-z0-9]\*$');
+export const updateSuperAdminConfigurazioneMatricoleVolontariBodyCifreProgressivoMin = 2;
+export const updateSuperAdminConfigurazioneMatricoleVolontariBodyCifreProgressivoMax = 8;
+
+
+
+
+export const UpdateSuperAdminConfigurazioneMatricoleVolontariBody = zod.object({
+  "prefissoAssociazione": zod.string().max(updateSuperAdminConfigurazioneMatricoleVolontariBodyPrefissoAssociazioneMax).regex(updateSuperAdminConfigurazioneMatricoleVolontariBodyPrefissoAssociazioneRegExp).nullish(),
+  "includiCodiceArea": zod.boolean(),
+  "segmentoFisso": zod.string().max(updateSuperAdminConfigurazioneMatricoleVolontariBodySegmentoFissoMax).regex(updateSuperAdminConfigurazioneMatricoleVolontariBodySegmentoFissoRegExp).nullish(),
+  "separatore": zod.enum(['', '-', '/']),
+  "cifreProgressivo": zod.number().min(updateSuperAdminConfigurazioneMatricoleVolontariBodyCifreProgressivoMin).max(updateSuperAdminConfigurazioneMatricoleVolontariBodyCifreProgressivoMax),
+  "numeroIniziale": zod.number().min(1),
+  "ambitoProgressivo": zod.enum(['GLOBALE', 'PER_AREA'])
+})
+
+
+export const updateSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOnePrefissoAssociazioneMax = 12;
+
+export const updateSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneSegmentoFissoMax = 8;
+
+export const updateSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneCifreProgressivoMin = 2;
+export const updateSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneCifreProgressivoMax = 8;
+
+
+
+export const updateSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemPrefissoAssociazioneMax = 12;
+
+export const updateSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemSegmentoFissoMax = 8;
+
+export const updateSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemCifreProgressivoMin = 2;
+export const updateSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemCifreProgressivoMax = 8;
+
+
+
+
+export const UpdateSuperAdminConfigurazioneMatricoleVolontariResponse = zod.object({
+  "configurazione": zod.union([zod.object({
+  "id": zod.number(),
+  "scopeTipo": zod.enum(['GLOBALE']),
+  "versione": zod.number().min(1),
+  "prefissoAssociazione": zod.string().max(updateSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOnePrefissoAssociazioneMax).nullish(),
+  "includiCodiceArea": zod.boolean(),
+  "segmentoFisso": zod.string().max(updateSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneSegmentoFissoMax).nullish(),
+  "separatore": zod.enum(['', '-', '/']),
+  "cifreProgressivo": zod.number().min(updateSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneCifreProgressivoMin).max(updateSuperAdminConfigurazioneMatricoleVolontariResponseConfigurazioneOneCifreProgressivoMax),
+  "numeroIniziale": zod.number().min(1),
+  "ambitoProgressivo": zod.enum(['GLOBALE', 'PER_AREA']),
+  "attiva": zod.boolean(),
+  "aggiornataDa": zod.number().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+}),zod.null()]),
+  "esempio": zod.string().nullable(),
+  "storico": zod.array(zod.object({
+  "id": zod.number(),
+  "scopeTipo": zod.enum(['GLOBALE']),
+  "versione": zod.number().min(1),
+  "prefissoAssociazione": zod.string().max(updateSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemPrefissoAssociazioneMax).nullish(),
+  "includiCodiceArea": zod.boolean(),
+  "segmentoFisso": zod.string().max(updateSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemSegmentoFissoMax).nullish(),
+  "separatore": zod.enum(['', '-', '/']),
+  "cifreProgressivo": zod.number().min(updateSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemCifreProgressivoMin).max(updateSuperAdminConfigurazioneMatricoleVolontariResponseStoricoItemCifreProgressivoMax),
+  "numeroIniziale": zod.number().min(1),
+  "ambitoProgressivo": zod.enum(['GLOBALE', 'PER_AREA']),
+  "attiva": zod.boolean(),
+  "aggiornataDa": zod.number().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})).optional()
 })
 
 
@@ -9476,9 +9648,21 @@ export const ExecuteCreditoSolidaleRicaricaMensileResponse = zod.object({
 })
 
 
+export const listVolontariQueryScadutiDaMenoDiMesiMax = 120;
+
+
+
 export const ListVolontariQueryParams = zod.object({
   "centroAscoltoId": zod.coerce.number().optional(),
-  "search": zod.coerce.string().optional()
+  "search": zod.coerce.string().optional(),
+  "stato": zod.enum(['attivi', 'non_attivi', 'tutti']).optional(),
+  "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']).optional(),
+  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']).optional(),
+  "ruoloVolontarioId": zod.coerce.number().optional(),
+  "dataRiferimento": zod.date().optional(),
+  "scadenzaDa": zod.date().optional(),
+  "scadenzaA": zod.date().optional(),
+  "scadutiDaMenoDiMesi": zod.coerce.number().min(1).max(listVolontariQueryScadutiDaMenoDiMesiMax).optional()
 })
 
 export const listVolontariResponseMaxConsegneTurnoMin = 0;
@@ -9491,17 +9675,38 @@ export const ListVolontariResponseItem = zod.object({
   "nome": zod.string(),
   "cognome": zod.string(),
   "matricola": zod.string().nullish(),
+  "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
   "telefono": zod.string().nullish(),
+  "telefonoSecondario": zod.string().nullish(),
   "email": zod.string().nullish(),
+  "luogoNascita": zod.string().nullish(),
+  "dataNascita": zod.coerce.date().nullish(),
+  "indirizzoResidenza": zod.string().nullish(),
+  "indirizzoDomicilio": zod.string().nullish(),
+  "codiceFiscale": zod.string().nullish(),
+  "codiceFiscaleNonDisponibile": zod.boolean(),
+  "codiceFiscaleNota": zod.string().nullish(),
+  "dataIscrizione": zod.coerce.date().nullish(),
+  "progressivoRegistro": zod.number(),
+  "dataInizioImportata": zod.coerce.date().nullish(),
+  "categoriaImportataOriginale": zod.string().nullish(),
+  "gruppoImportatoOriginale": zod.string().nullish(),
   "ruolo": zod.string(),
   "ruoloVolontarioId": zod.number().nullish(),
   "ruoloCatalogoNome": zod.string().nullish(),
   "patente": zod.boolean(),
   "mezzoPersonale": zod.boolean(),
   "maxConsegneTurno": zod.number().min(listVolontariResponseMaxConsegneTurnoMin),
-  "attivo": zod.boolean(),
+  "attivo": zod.boolean().describe('Abilitazione amministrativa\/manuale; non equivale allo stato operativo.'),
+  "abilitatoAmministrativamente": zod.boolean(),
+  "operativo": zod.boolean(),
+  "motivoNonOperativo": zod.string().nullish(),
+  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "scadenzaAssicurazione": zod.coerce.date().nullish(),
+  "sospesoManualmente": zod.boolean(),
+  "giornataTemporaneaValida": zod.boolean().nullish(),
   "statoApprovazione": zod.enum(['in_attesa', 'approvato', 'respinto']),
   "note": zod.string().nullish(),
   "versione": zod.number().min(1),
@@ -9512,44 +9717,62 @@ export const ListVolontariResponse = zod.array(ListVolontariResponseItem)
 
 
 
-export const createVolontarioBodyMaxConsegneTurnoMin = 0;
+export const createVolontarioBodyTwoMaxConsegneTurnoMin = 0;
 
 
 
-export const CreateVolontarioBody = zod.object({
+export const CreateVolontarioBody = zod.unknown().and(zod.object({
   "nome": zod.string(),
   "cognome": zod.string(),
-  "matricola": zod.string(),
+  "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']).optional(),
   "centroAscoltoId": zod.number().nullish(),
   "telefono": zod.string().optional(),
+  "telefonoSecondario": zod.string().optional(),
   "email": zod.string().optional(),
+  "luogoNascita": zod.string(),
+  "dataNascita": zod.coerce.date(),
+  "indirizzoResidenza": zod.string(),
+  "indirizzoDomicilio": zod.string().nullish().describe('Null quando il domicilio coincide con la residenza.'),
+  "codiceFiscale": zod.string().nullish(),
+  "codiceFiscaleNonDisponibile": zod.boolean().optional(),
+  "codiceFiscaleNota": zod.string().nullish().describe('Nota facoltativa quando il codice fiscale non è disponibile.'),
+  "dataServizio": zod.coerce.date().optional().describe('Prima giornata, obbligatoria quando tipoVolontario è TEMPORANEO.'),
   "ruoloVolontarioId": zod.number().min(1),
   "patente": zod.boolean().optional(),
   "mezzoPersonale": zod.boolean().optional(),
-  "maxConsegneTurno": zod.number().min(createVolontarioBodyMaxConsegneTurnoMin).optional(),
+  "maxConsegneTurno": zod.number().min(createVolontarioBodyTwoMaxConsegneTurnoMin).optional(),
   "note": zod.string().optional()
-})
+}))
 
 
 
-export const bulkVolontariBodyRigheItemMaxConsegneTurnoMin = 0;
+export const bulkVolontariBodyRigheItemTwoMaxConsegneTurnoMin = 0;
 
 
 
 export const BulkVolontariBody = zod.object({
-  "righe": zod.array(zod.object({
+  "righe": zod.array(zod.unknown().and(zod.object({
   "nome": zod.string(),
   "cognome": zod.string(),
-  "matricola": zod.string(),
+  "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']).optional(),
   "centroAscoltoId": zod.number().nullish(),
   "telefono": zod.string().optional(),
+  "telefonoSecondario": zod.string().optional(),
   "email": zod.string().optional(),
+  "luogoNascita": zod.string(),
+  "dataNascita": zod.coerce.date(),
+  "indirizzoResidenza": zod.string(),
+  "indirizzoDomicilio": zod.string().nullish().describe('Null quando il domicilio coincide con la residenza.'),
+  "codiceFiscale": zod.string().nullish(),
+  "codiceFiscaleNonDisponibile": zod.boolean().optional(),
+  "codiceFiscaleNota": zod.string().nullish().describe('Nota facoltativa quando il codice fiscale non è disponibile.'),
+  "dataServizio": zod.coerce.date().optional().describe('Prima giornata, obbligatoria quando tipoVolontario è TEMPORANEO.'),
   "ruoloVolontarioId": zod.number().min(1),
   "patente": zod.boolean().optional(),
   "mezzoPersonale": zod.boolean().optional(),
-  "maxConsegneTurno": zod.number().min(bulkVolontariBodyRigheItemMaxConsegneTurnoMin).optional(),
+  "maxConsegneTurno": zod.number().min(bulkVolontariBodyRigheItemTwoMaxConsegneTurnoMin).optional(),
   "note": zod.string().optional()
-}))
+})))
 })
 
 export const BulkVolontariResponse = zod.object({
@@ -9577,8 +9800,486 @@ export const GetVolontariCaricoResponseItem = zod.object({
 export const GetVolontariCaricoResponse = zod.array(GetVolontariCaricoResponseItem)
 
 
+export const SuspendVolontarioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const SuspendVolontarioBody = zod.object({
+  "versione": zod.number().min(1),
+  "dataEffettiva": zod.coerce.date().optional(),
+  "motivo": zod.enum(['indisponibilita_temporanea', 'dimissioni_cessazione', 'sospensione_organizzativa', 'altro']),
+  "note": zod.string().optional()
+})
+
+
+
+
+export const SuspendVolontarioResponse = zod.object({
+  "versione": zod.number().min(1),
+  "stato": zod.object({
+  "operativo": zod.boolean(),
+  "motivoNonOperativo": zod.string().nullish(),
+  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "scadenzaAssicurazione": zod.coerce.date().nullish(),
+  "sospesoManualmente": zod.boolean(),
+  "giornataTemporaneaValida": zod.boolean().nullish()
+}).optional(),
+  "messaggio": zod.string().optional(),
+  "azioneSuggerita": zod.string().nullish(),
+  "copertura": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+export const ReactivateVolontarioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const ReactivateVolontarioBody = zod.object({
+  "versione": zod.number().min(1),
+  "dataEffettiva": zod.coerce.date().optional(),
+  "note": zod.string().optional()
+})
+
+
+
+
+export const ReactivateVolontarioResponse = zod.object({
+  "versione": zod.number().min(1),
+  "stato": zod.object({
+  "operativo": zod.boolean(),
+  "motivoNonOperativo": zod.string().nullish(),
+  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "scadenzaAssicurazione": zod.coerce.date().nullish(),
+  "sospesoManualmente": zod.boolean(),
+  "giornataTemporaneaValida": zod.boolean().nullish()
+}).optional(),
+  "messaggio": zod.string().optional(),
+  "azioneSuggerita": zod.string().nullish(),
+  "copertura": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+export const RegisterVolontarioInsuranceParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const registerVolontarioInsuranceBodyOneDurataMesiDefault = 12;
+export const registerVolontarioInsuranceBodyOneDurataMesiMax = 120;
+
+
+
+
+export const RegisterVolontarioInsuranceBody = zod.object({
+  "modalita": zod.enum(['CONTINUA_SCADENZA', 'NUOVA_DA_DATA']),
+  "dataDecorrenza": zod.coerce.date().optional(),
+  "durataMesi": zod.number().min(1).max(registerVolontarioInsuranceBodyOneDurataMesiMax).default(registerVolontarioInsuranceBodyOneDurataMesiDefault),
+  "riferimentoPolizza": zod.string().optional(),
+  "note": zod.string().optional()
+}).and(zod.object({
+  "versione": zod.number().min(1)
+}))
+
+
+
+export const previewBulkVolontariInsuranceBodyVolontarioIdsMax = 2000;
+
+export const previewBulkVolontariInsuranceBodyDurataMesiDefault = 12;
+export const previewBulkVolontariInsuranceBodyDurataMesiMax = 120;
+
+
+
+export const PreviewBulkVolontariInsuranceBody = zod.object({
+  "volontarioIds": zod.array(zod.number().min(1)).min(1).max(previewBulkVolontariInsuranceBodyVolontarioIdsMax),
+  "modalita": zod.enum(['CONTINUA_SCADENZA', 'NUOVA_DA_DATA']),
+  "dataDecorrenza": zod.coerce.date().optional(),
+  "durataMesi": zod.number().min(1).max(previewBulkVolontariInsuranceBodyDurataMesiMax).default(previewBulkVolontariInsuranceBodyDurataMesiDefault),
+  "riferimentoPolizza": zod.string().optional(),
+  "note": zod.string().optional()
+})
+
+
+
+
+export const PreviewBulkVolontariInsuranceResponse = zod.object({
+  "items": zod.array(zod.object({
+  "volontarioId": zod.number(),
+  "volontario": zod.string(),
+  "versione": zod.number().min(1),
+  "incluso": zod.boolean(),
+  "nuovaDecorrenza": zod.coerce.date().nullish(),
+  "nuovaScadenza": zod.coerce.date().nullish(),
+  "vecchiaScadenza": zod.coerce.date().nullish(),
+  "motivoNonOperativo": zod.string().nullish(),
+  "esitoPrevisto": zod.string(),
+  "esclusioneMotivo": zod.string().nullish()
+}))
+})
+
+
+export const confirmBulkVolontariInsuranceBodyOneDurataMesiDefault = 12;
+export const confirmBulkVolontariInsuranceBodyOneDurataMesiMax = 120;
+
+
+
+export const confirmBulkVolontariInsuranceBodyTwoRigheMax = 2000;
+
+
+
+export const ConfirmBulkVolontariInsuranceBody = zod.object({
+  "modalita": zod.enum(['CONTINUA_SCADENZA', 'NUOVA_DA_DATA']),
+  "dataDecorrenza": zod.coerce.date().optional(),
+  "durataMesi": zod.number().min(1).max(confirmBulkVolontariInsuranceBodyOneDurataMesiMax).default(confirmBulkVolontariInsuranceBodyOneDurataMesiDefault),
+  "riferimentoPolizza": zod.string().optional(),
+  "note": zod.string().optional()
+}).and(zod.object({
+  "righe": zod.array(zod.object({
+  "volontarioId": zod.number().min(1),
+  "versione": zod.number().min(1),
+  "incluso": zod.boolean().optional()
+})).min(1).max(confirmBulkVolontariInsuranceBodyTwoRigheMax)
+}))
+
+
+export const GetVolontarioDossierParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetVolontarioDossierResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const CreateVolontarioServiceDayParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateVolontarioServiceDayBody = zod.object({
+  "dataServizio": zod.coerce.date(),
+  "centroAscoltoId": zod.number().nullish(),
+  "stato": zod.enum(['PIANIFICATA', 'PRESENTE', 'ASSENTE', 'ANNULLATA']).optional(),
+  "attivita": zod.string().optional(),
+  "note": zod.string().optional()
+})
+
+
+export const UpdateVolontarioServiceDayParams = zod.object({
+  "id": zod.coerce.number(),
+  "giornataId": zod.coerce.number()
+})
+
+
+
+
+export const UpdateVolontarioServiceDayBody = zod.object({
+  "versione": zod.number().min(1),
+  "stato": zod.enum(['PIANIFICATA', 'PRESENTE', 'ASSENTE', 'ANNULLATA']).optional(),
+  "attivita": zod.string().optional(),
+  "note": zod.string().optional()
+})
+
+
+export const AnalyzeVolontariImportQueryParams = zod.object({
+  "centroAscoltoId": zod.coerce.number().optional()
+})
+
+export const AnalyzeVolontariImportHeader = zod.object({
+  "x-file-name": zod.string()
+})
+
+export const analyzeVolontariImportResponseRigheItemNumeroRigaMin = 2;
+
+
+
+export const AnalyzeVolontariImportResponse = zod.object({
+  "importazioneId": zod.number(),
+  "nomeFile": zod.string(),
+  "stato": zod.string(),
+  "hashFile": zod.string().describe('Alias retrocompatibile di sha256File.'),
+  "sha256File": zod.string().describe('SHA-256 dei byte del workbook ricevuto.'),
+  "hashContenutoNormalizzato": zod.string().describe('Hash canonico del contenuto normalizzato usato con il perimetro per l\'idempotenza semantica.'),
+  "scopeTipo": zod.enum(['CENTRO', 'AREA', 'GLOBALE']).optional(),
+  "scopeCentroId": zod.number().nullish(),
+  "scopeAreaOperativaId": zod.number().nullish(),
+  "scopeCentroIdsSnapshot": zod.array(zod.number()).optional(),
+  "scopeFingerprint": zod.string().optional(),
+  "sha256FileRichiesto": zod.string().optional().describe('SHA-256 del file appena ricevuto quando la risposta è un replay semantico.'),
+  "importazioneOriginaleSha256File": zod.string().optional().describe('SHA-256 binario dell\'importazione confermata originaria quando la risposta è un replay.'),
+  "numeroRighe": zod.number(),
+  "replayIdempotente": zod.boolean().optional(),
+  "righe": zod.array(zod.object({
+  "numeroRiga": zod.number().min(analyzeVolontariImportResponseRigheItemNumeroRigaMin),
+  "stato": zod.string(),
+  "datiOriginali": zod.record(zod.string(), zod.unknown()),
+  "datiNormalizzati": zod.record(zod.string(), zod.unknown()),
+  "matricolaProposta": zod.union([zod.object({
+  "modalita": zod.enum(['AUTOMATICA_AL_COMMIT']),
+  "tipoIdentificativo": zod.enum(['PERMANENTE', 'TEMPORANEA']),
+  "formato": zod.string(),
+  "consumaProgressivo": zod.boolean()
+}),zod.null()]),
+  "volontarioCandidatoId": zod.number().nullish(),
+  "ruoloPropostoId": zod.number().nullish(),
+  "centroPropostoId": zod.number().nullish(),
+  "errori": zod.array(zod.string()),
+  "avvisi": zod.array(zod.string())
+}))
+})
+
+
+
+export const confirmVolontariImportBodyRigheItemNumeroRigaMin = 2;
+
+
+
+
+export const confirmVolontariImportBodyRigheMax = 2000;
+
+
+
+export const ConfirmVolontariImportBody = zod.object({
+  "importazioneId": zod.number().min(1),
+  "righe": zod.array(zod.object({
+  "numeroRiga": zod.number().min(confirmVolontariImportBodyRigheItemNumeroRigaMin),
+  "inclusa": zod.boolean().optional(),
+  "volontarioId": zod.number().min(1).nullish(),
+  "creaNuovo": zod.boolean().optional(),
+  "ruoloVolontarioId": zod.number().min(1).nullish(),
+  "centroAscoltoId": zod.number().min(1).nullish(),
+  "creaRuolo": zod.boolean().optional(),
+  "correzioni": zod.object({
+  "nome": zod.string().nullish(),
+  "cognome": zod.string().nullish(),
+  "matricola": zod.string().nullish(),
+  "luogoNascita": zod.string().nullish(),
+  "dataNascita": zod.coerce.date().nullish(),
+  "indirizzoResidenza": zod.string().nullish(),
+  "codiceFiscale": zod.string().nullish(),
+  "dataInizioImportata": zod.coerce.date().nullish(),
+  "scadenzaAssicurazione": zod.coerce.date().nullish(),
+  "telefono": zod.string().nullish(),
+  "telefonoSecondario": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "gruppoOriginale": zod.string().nullish(),
+  "categoriaOriginale": zod.string().nullish(),
+  "tipoVolontario": zod.union([zod.literal('PERMANENTE'),zod.literal('TEMPORANEO'),zod.literal(null)]).nullish(),
+  "dataServizio": zod.coerce.date().nullish()
+}).optional()
+})).max(confirmVolontariImportBodyRigheMax)
+})
+
+export const ConfirmVolontariImportResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const CreateVolontariCourseCatalogBody = zod.record(zod.string(), zod.unknown())
+
+
+export const UpdateVolontariCourseCatalogParams = zod.object({
+  "catalogoId": zod.coerce.number()
+})
+
+export const UpdateVolontariCourseCatalogBody = zod.record(zod.string(), zod.unknown())
+
+
+export const CreateVolontarioCourseParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateVolontarioCourseBody = zod.record(zod.string(), zod.unknown())
+
+
+export const CreateVolontariQualificationCatalogBody = zod.record(zod.string(), zod.unknown())
+
+
+export const UpdateVolontariQualificationCatalogParams = zod.object({
+  "catalogoId": zod.coerce.number()
+})
+
+export const UpdateVolontariQualificationCatalogBody = zod.record(zod.string(), zod.unknown())
+
+
+export const CreateVolontarioQualificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateVolontarioQualificationBody = zod.record(zod.string(), zod.unknown())
+
+
+
+
+
+
+export const GenerateVolontariRegisterBody = zod.object({
+  "tipo": zod.enum(['PDF', 'XLSX']).optional(),
+  "filtri": zod.object({
+  "tipo": zod.enum(['TUTTI', 'PERMANENTE', 'TEMPORANEO']).optional(),
+  "stato": zod.enum(['tutti', 'attivi', 'non_attivi']).optional(),
+  "dataRiferimento": zod.coerce.date().optional(),
+  "centroAscoltoId": zod.number().min(1).optional(),
+  "ruoloVolontarioId": zod.number().min(1).optional(),
+  "search": zod.string().optional(),
+  "assicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']).optional(),
+  "dataServizio": zod.coerce.date().optional(),
+  "servizioDa": zod.coerce.date().optional(),
+  "servizioA": zod.coerce.date().optional()
+}).optional()
+})
+
+
+export const DownloadVolontariRegisterEmissionParams = zod.object({
+  "emissioneId": zod.coerce.number()
+})
+
+
+export const CorrectVolontariRegisterEventParams = zod.object({
+  "eventoId": zod.coerce.number()
+})
+
+export const correctVolontariRegisterEventBodyRettificheMax = 20;
+
+
+
+export const CorrectVolontariRegisterEventBody = zod.object({
+  "motivo": zod.string(),
+  "dataEffettiva": zod.coerce.date().optional(),
+  "rettifiche": zod.array(zod.object({
+  "campo": zod.enum(['matricola', 'nome', 'cognome', 'codiceFiscale', 'dataNascita', 'luogoNascita', 'indirizzoResidenza', 'indirizzoDomicilio', 'tipoVolontario', 'centroAscoltoId', 'centroAscoltoNome', 'ruoloVolontarioId', 'ruoloNome', 'dataInizio']),
+  "valorePrecedente": zod.union([zod.string(),zod.number()]).nullable(),
+  "nuovoValore": zod.union([zod.string(),zod.number()]).nullable()
+})).min(1).max(correctVolontariRegisterEventBodyRettificheMax)
+})
+
+
+export const ListVolontarioIdentifiersParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListVolontarioIdentifiersResponseItem = zod.object({
+  "id": zod.number(),
+  "matricola": zod.string(),
+  "tipoIdentificativo": zod.enum(['TEMPORANEA', 'PERMANENTE', 'LEGACY']),
+  "stato": zod.enum(['ATTIVA', 'STORICA']),
+  "origine": zod.enum(['GENERATA', 'IMPORTATA', 'CONVERSIONE', 'BACKFILL']),
+  "dataInizioValidita": zod.coerce.date(),
+  "dataFineValidita": zod.coerce.date().nullish(),
+  "dataAssegnazione": zod.coerce.date()
+})
+export const ListVolontarioIdentifiersResponse = zod.array(ListVolontarioIdentifiersResponseItem)
+
+
+export const PreviewVolontarioPermanentConversionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const previewVolontarioPermanentConversionResponsePreviewVersioneProgressivoMin = 0;
+
+
+
+
+export const PreviewVolontarioPermanentConversionResponse = zod.object({
+  "volontarioId": zod.number(),
+  "versioneVolontario": zod.number().min(1),
+  "matricolaAttuale": zod.string().nullable(),
+  "dataConversione": zod.coerce.date(),
+  "preview": zod.object({
+  "matricola": zod.string(),
+  "matricolaNormalizzata": zod.string(),
+  "configurazioneId": zod.number().min(1),
+  "configurazioneVersione": zod.number().min(1),
+  "scopeKey": zod.string(),
+  "versioneProgressivo": zod.number().min(previewVolontarioPermanentConversionResponsePreviewVersioneProgressivoMin),
+  "prossimoNumero": zod.number().min(1)
+})
+})
+
+
+export const ConvertVolontarioToPermanentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const convertVolontarioToPermanentBodyPreviewVersioneProgressivoMin = 0;
+
+
+
+
+export const ConvertVolontarioToPermanentBody = zod.object({
+  "versioneVolontario": zod.number().min(1),
+  "preview": zod.object({
+  "matricola": zod.string(),
+  "matricolaNormalizzata": zod.string(),
+  "configurazioneId": zod.number().min(1),
+  "configurazioneVersione": zod.number().min(1),
+  "scopeKey": zod.string(),
+  "versioneProgressivo": zod.number().min(convertVolontarioToPermanentBodyPreviewVersioneProgressivoMin),
+  "prossimoNumero": zod.number().min(1)
+})
+})
+
+export const convertVolontarioToPermanentResponseMaxConsegneTurnoMin = 0;
+
+
+
+
+export const ConvertVolontarioToPermanentResponse = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cognome": zod.string(),
+  "matricola": zod.string().nullish(),
+  "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "telefono": zod.string().nullish(),
+  "telefonoSecondario": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "luogoNascita": zod.string().nullish(),
+  "dataNascita": zod.coerce.date().nullish(),
+  "indirizzoResidenza": zod.string().nullish(),
+  "indirizzoDomicilio": zod.string().nullish(),
+  "codiceFiscale": zod.string().nullish(),
+  "codiceFiscaleNonDisponibile": zod.boolean(),
+  "codiceFiscaleNota": zod.string().nullish(),
+  "dataIscrizione": zod.coerce.date().nullish(),
+  "progressivoRegistro": zod.number(),
+  "dataInizioImportata": zod.coerce.date().nullish(),
+  "categoriaImportataOriginale": zod.string().nullish(),
+  "gruppoImportatoOriginale": zod.string().nullish(),
+  "ruolo": zod.string(),
+  "ruoloVolontarioId": zod.number().nullish(),
+  "ruoloCatalogoNome": zod.string().nullish(),
+  "patente": zod.boolean(),
+  "mezzoPersonale": zod.boolean(),
+  "maxConsegneTurno": zod.number().min(convertVolontarioToPermanentResponseMaxConsegneTurnoMin),
+  "attivo": zod.boolean().describe('Abilitazione amministrativa\/manuale; non equivale allo stato operativo.'),
+  "abilitatoAmministrativamente": zod.boolean(),
+  "operativo": zod.boolean(),
+  "motivoNonOperativo": zod.string().nullish(),
+  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "scadenzaAssicurazione": zod.coerce.date().nullish(),
+  "sospesoManualmente": zod.boolean(),
+  "giornataTemporaneaValida": zod.boolean().nullish(),
+  "statoApprovazione": zod.enum(['in_attesa', 'approvato', 'respinto']),
+  "note": zod.string().nullish(),
+  "versione": zod.number().min(1),
+  "dataCreazione": zod.string(),
+  "dataAggiornamento": zod.string()
+})
+
+
 export const GetVolontarioParams = zod.object({
   "id": zod.coerce.number()
+})
+
+export const GetVolontarioQueryParams = zod.object({
+  "dataRiferimento": zod.date().optional()
 })
 
 export const getVolontarioResponseMaxConsegneTurnoMin = 0;
@@ -9591,17 +10292,38 @@ export const GetVolontarioResponse = zod.object({
   "nome": zod.string(),
   "cognome": zod.string(),
   "matricola": zod.string().nullish(),
+  "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
   "telefono": zod.string().nullish(),
+  "telefonoSecondario": zod.string().nullish(),
   "email": zod.string().nullish(),
+  "luogoNascita": zod.string().nullish(),
+  "dataNascita": zod.coerce.date().nullish(),
+  "indirizzoResidenza": zod.string().nullish(),
+  "indirizzoDomicilio": zod.string().nullish(),
+  "codiceFiscale": zod.string().nullish(),
+  "codiceFiscaleNonDisponibile": zod.boolean(),
+  "codiceFiscaleNota": zod.string().nullish(),
+  "dataIscrizione": zod.coerce.date().nullish(),
+  "progressivoRegistro": zod.number(),
+  "dataInizioImportata": zod.coerce.date().nullish(),
+  "categoriaImportataOriginale": zod.string().nullish(),
+  "gruppoImportatoOriginale": zod.string().nullish(),
   "ruolo": zod.string(),
   "ruoloVolontarioId": zod.number().nullish(),
   "ruoloCatalogoNome": zod.string().nullish(),
   "patente": zod.boolean(),
   "mezzoPersonale": zod.boolean(),
   "maxConsegneTurno": zod.number().min(getVolontarioResponseMaxConsegneTurnoMin),
-  "attivo": zod.boolean(),
+  "attivo": zod.boolean().describe('Abilitazione amministrativa\/manuale; non equivale allo stato operativo.'),
+  "abilitatoAmministrativamente": zod.boolean(),
+  "operativo": zod.boolean(),
+  "motivoNonOperativo": zod.string().nullish(),
+  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "scadenzaAssicurazione": zod.coerce.date().nullish(),
+  "sospesoManualmente": zod.boolean(),
+  "giornataTemporaneaValida": zod.boolean().nullish(),
   "statoApprovazione": zod.enum(['in_attesa', 'approvato', 'respinto']),
   "note": zod.string().nullish(),
   "versione": zod.number().min(1),
@@ -9623,10 +10345,17 @@ export const updateVolontarioBodyMaxConsegneTurnoMin = 0;
 export const UpdateVolontarioBody = zod.object({
   "nome": zod.string().optional(),
   "cognome": zod.string().optional(),
-  "matricola": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
   "telefono": zod.string().optional(),
+  "telefonoSecondario": zod.string().optional(),
   "email": zod.string().optional(),
+  "luogoNascita": zod.string().optional(),
+  "dataNascita": zod.coerce.date().optional(),
+  "indirizzoResidenza": zod.string().optional(),
+  "indirizzoDomicilio": zod.string().nullish().describe('Null quando il domicilio coincide con la residenza.'),
+  "codiceFiscale": zod.string().nullish(),
+  "codiceFiscaleNonDisponibile": zod.boolean().optional(),
+  "codiceFiscaleNota": zod.string().nullish().describe('Nota facoltativa quando il codice fiscale non è disponibile.'),
   "ruoloVolontarioId": zod.number().min(1).optional(),
   "patente": zod.boolean().optional(),
   "mezzoPersonale": zod.boolean().optional(),
@@ -9646,17 +10375,38 @@ export const UpdateVolontarioResponse = zod.object({
   "nome": zod.string(),
   "cognome": zod.string(),
   "matricola": zod.string().nullish(),
+  "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
   "telefono": zod.string().nullish(),
+  "telefonoSecondario": zod.string().nullish(),
   "email": zod.string().nullish(),
+  "luogoNascita": zod.string().nullish(),
+  "dataNascita": zod.coerce.date().nullish(),
+  "indirizzoResidenza": zod.string().nullish(),
+  "indirizzoDomicilio": zod.string().nullish(),
+  "codiceFiscale": zod.string().nullish(),
+  "codiceFiscaleNonDisponibile": zod.boolean(),
+  "codiceFiscaleNota": zod.string().nullish(),
+  "dataIscrizione": zod.coerce.date().nullish(),
+  "progressivoRegistro": zod.number(),
+  "dataInizioImportata": zod.coerce.date().nullish(),
+  "categoriaImportataOriginale": zod.string().nullish(),
+  "gruppoImportatoOriginale": zod.string().nullish(),
   "ruolo": zod.string(),
   "ruoloVolontarioId": zod.number().nullish(),
   "ruoloCatalogoNome": zod.string().nullish(),
   "patente": zod.boolean(),
   "mezzoPersonale": zod.boolean(),
   "maxConsegneTurno": zod.number().min(updateVolontarioResponseMaxConsegneTurnoMin),
-  "attivo": zod.boolean(),
+  "attivo": zod.boolean().describe('Abilitazione amministrativa\/manuale; non equivale allo stato operativo.'),
+  "abilitatoAmministrativamente": zod.boolean(),
+  "operativo": zod.boolean(),
+  "motivoNonOperativo": zod.string().nullish(),
+  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "scadenzaAssicurazione": zod.coerce.date().nullish(),
+  "sospesoManualmente": zod.boolean(),
+  "giornataTemporaneaValida": zod.boolean().nullish(),
   "statoApprovazione": zod.enum(['in_attesa', 'approvato', 'respinto']),
   "note": zod.string().nullish(),
   "versione": zod.number().min(1),

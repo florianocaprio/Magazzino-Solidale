@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { VolontarioStatoApprovazione } from './volontarioStatoApprovazione';
+import type { VolontarioStatoAssicurazione } from './volontarioStatoAssicurazione';
+import type { VolontarioTipoVolontario } from './volontarioTipoVolontario';
 
 export interface Volontario {
   id: number;
@@ -13,6 +15,7 @@ export interface Volontario {
   cognome: string;
   /** @nullable */
   matricola?: string | null;
+  tipoVolontario: VolontarioTipoVolontario;
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
@@ -20,7 +23,31 @@ export interface Volontario {
   /** @nullable */
   telefono?: string | null;
   /** @nullable */
+  telefonoSecondario?: string | null;
+  /** @nullable */
   email?: string | null;
+  /** @nullable */
+  luogoNascita?: string | null;
+  /** @nullable */
+  dataNascita?: Date | null;
+  /** @nullable */
+  indirizzoResidenza?: string | null;
+  /** @nullable */
+  indirizzoDomicilio?: string | null;
+  /** @nullable */
+  codiceFiscale?: string | null;
+  codiceFiscaleNonDisponibile: boolean;
+  /** @nullable */
+  codiceFiscaleNota?: string | null;
+  /** @nullable */
+  dataIscrizione?: Date | null;
+  progressivoRegistro: number;
+  /** @nullable */
+  dataInizioImportata?: Date | null;
+  /** @nullable */
+  categoriaImportataOriginale?: string | null;
+  /** @nullable */
+  gruppoImportatoOriginale?: string | null;
   ruolo: string;
   /** @nullable */
   ruoloVolontarioId?: number | null;
@@ -30,7 +57,18 @@ export interface Volontario {
   mezzoPersonale: boolean;
   /** @minimum 0 */
   maxConsegneTurno: number;
+  /** Abilitazione amministrativa/manuale; non equivale allo stato operativo. */
   attivo: boolean;
+  abilitatoAmministrativamente: boolean;
+  operativo: boolean;
+  /** @nullable */
+  motivoNonOperativo?: string | null;
+  statoAssicurazione: VolontarioStatoAssicurazione;
+  /** @nullable */
+  scadenzaAssicurazione?: Date | null;
+  sospesoManualmente: boolean;
+  /** @nullable */
+  giornataTemporaneaValida?: boolean | null;
   statoApprovazione: VolontarioStatoApprovazione;
   /** @nullable */
   note?: string | null;

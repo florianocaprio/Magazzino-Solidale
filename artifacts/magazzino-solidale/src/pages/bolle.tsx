@@ -317,7 +317,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
               <Select value={trasportatore} onValueChange={(v) => { setTrasportatore(v); setTrasportatoreAltro(""); setMezzo(""); }}>
                 <SelectTrigger><SelectValue placeholder={t("bolle.trasportatorePlaceholder")} /></SelectTrigger>
                 <SelectContent>
-                  {volontari?.filter(v => v.attivo && (v.statoApprovazione ?? "approvato") === "approvato").map(v => (
+                  {volontari?.filter(v => v.operativo).map(v => (
                     <SelectItem key={v.id} value={String(v.id)}>
                       {volontarioLabel(v)}
                     </SelectItem>
@@ -1026,7 +1026,7 @@ export function BollaDettaglio({ bollaId, onClose, onCloseLabel, hideConsegnaAct
                 <SelectTrigger><SelectValue placeholder={t("bolle.consegnaPlaceholder")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__centro__">{t("bolle.consegnaPressoCentro")}</SelectItem>
-                  {volontari?.filter(v => v.attivo && (v.statoApprovazione ?? "approvato") === "approvato").map(v => (
+                  {volontari?.filter(v => v.operativo).map(v => (
                     <SelectItem key={v.id} value={String(v.id)}>{volontarioLabel(v)}</SelectItem>
                   ))}
                   <SelectItem value="__altro__">{t("bolle.altroRitiro")}</SelectItem>
