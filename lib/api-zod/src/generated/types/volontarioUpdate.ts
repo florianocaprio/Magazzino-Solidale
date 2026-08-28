@@ -11,9 +11,12 @@ export interface VolontarioUpdate {
   cognome?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
-  telefono?: string;
-  telefonoSecondario?: string;
-  email?: string;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  telefonoSecondario?: string | null;
+  /** @nullable */
+  email?: string | null;
   luogoNascita?: string;
   dataNascita?: Date;
   indirizzoResidenza?: string;
@@ -36,8 +39,8 @@ export interface VolontarioUpdate {
   mezzoPersonale?: boolean;
   /** @minimum 0 */
   maxConsegneTurno?: number;
-  attivo?: boolean;
-  note?: string;
+  /** @nullable */
+  note?: string | null;
   /** @minimum 1 */
   versione: number;
 }

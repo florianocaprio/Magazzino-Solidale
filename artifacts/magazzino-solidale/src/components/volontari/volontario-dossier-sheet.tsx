@@ -43,6 +43,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import {
+  volunteerApiErrorData,
+  type VolunteerFormErrors,
+  type VolunteerApiErrorData,
+} from "@/lib/volontari-form";
 import type { VolontarioOperation } from "./volontario-operation-dialog";
 
 type OperationalState = {
@@ -196,12 +201,16 @@ export function VolontarioDossierSheet({
   onOpenChange,
   onEdit,
   onOperation,
+  autoOpenConversion = false,
+  onAutoOpenConversionHandled,
 }: {
   volontario: Volontario | null;
   canManage: boolean;
   onOpenChange: (open: boolean) => void;
-  onEdit: (volontario: Volontario) => void;
+  onEdit: (volontario: Volontario, errors?: VolunteerFormErrors) => void;
   onOperation: (volontario: Volontario, operation: VolontarioOperation) => void;
+  autoOpenConversion?: boolean;
+  onAutoOpenConversionHandled?: () => void;
 }) {
   const open = volontario != null;
   const [addKind, setAddKind] = useState<AddKind | null>(null);
@@ -212,6 +221,8 @@ export function VolontarioDossierSheet({
   const [saving, setSaving] = useState(false);
   const [conversionPreview, setConversionPreview] =
     useState<ConversionPreview | null>(null);
+  const [conversionError, setConversionError] =
+    useState<VolunteerApiErrorData | null>(null);
   const [conversionPending, setConversionPending] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -320,6 +331,8 @@ export function VolontarioDossierSheet({
   const openConversion = async () => {
     if (!volontario) return;
     setConversionPending(true);
+    setConversionPreview(null);
+    setConversionError(null);
     try {
       setConversionPreview(
         await customFetch<ConversionPreview>(
@@ -327,15 +340,27 @@ export function VolontarioDossierSheet({
         ),
       );
     } catch (error) {
-      toast({
-        title: "Preview conversione non disponibile",
-        description: error instanceof Error ? error.message : "Errore",
-        variant: "destructive",
-      });
+      const data = volunteerApiErrorData(error);
+      setConversionError(data);
+      if (data.code !== "VOLONTARIO_CONVERSIONE_DATI_INCOMPLETI") {
+        toast({
+          title: "Preview conversione non disponibile",
+          description: data.message ?? data.error ?? "Errore",
+          variant: "destructive",
+        });
+      }
     } finally {
       setConversionPending(false);
     }
   };
+
+  useEffect(() => {
+    if (!autoOpenConversion || !volontario) return;
+    onAutoOpenConversionHandled?.();
+    void openConversion();
+    // L'identificativo rende l'azione one-shot dopo il rientro dalla modifica.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenConversion, volontario?.id]);
 
   const confirmConversion = async () => {
     if (!volontario || !conversionPreview) return;
@@ -369,9 +394,11 @@ export function VolontarioDossierSheet({
       });
       setConversionPreview(null);
     } catch (error) {
+      const data = volunteerApiErrorData(error);
+      setConversionError(data);
       toast({
         title: "Conversione non riuscita",
-        description: error instanceof Error ? error.message : "Errore",
+        description: data.message ?? data.error ?? "Errore",
         variant: "destructive",
       });
     } finally {
@@ -510,9 +537,11 @@ export function VolontarioDossierSheet({
                     <Field
                       label="Indirizzo di domicilio"
                       value={
-                        (dettaglio as Volontario & {
-                          indirizzoDomicilio?: string | null;
-                        }).indirizzoDomicilio
+                        (
+                          dettaglio as Volontario & {
+                            indirizzoDomicilio?: string | null;
+                          }
+                        ).indirizzoDomicilio
                       }
                     />
                     <Field label="Centro" value={dettaglio.centroAscoltoNome} />
@@ -612,7 +641,9 @@ export function VolontarioDossierSheet({
                     ))
                   ) : (
                     <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                      Nessuna copertura registrata.
+                      {dettaglio.tipoVolontario === "TEMPORANEO"
+                        ? "Copertura temporanea legata alle giornate di servizio. Nessuna polizza annuale registrata."
+                        : "Nessuna copertura registrata."}
                     </p>
                   )}
                 </TabsContent>
@@ -709,7 +740,8 @@ export function VolontarioDossierSheet({
                             {identifier.matricola}
                           </div>
                           <div className="mt-1 text-muted-foreground">
-                            {identifier.tipoIdentificativo} · {identifier.origine} · dal{" "}
+                            {identifier.tipoIdentificativo} ·{" "}
+                            {identifier.origine} · dal{" "}
                             {identifier.dataInizioValidita}
                             {identifier.dataFineValidita
                               ? ` al ${identifier.dataFineValidita}`
@@ -791,9 +823,12 @@ export function VolontarioDossierSheet({
       </Sheet>
 
       <Dialog
-        open={conversionPreview != null}
+        open={conversionPreview != null || conversionError != null}
         onOpenChange={(next) => {
-          if (!next) setConversionPreview(null);
+          if (!next) {
+            setConversionPreview(null);
+            setConversionError(null);
+          }
         }}
       >
         <DialogContent>
@@ -820,16 +855,64 @@ export function VolontarioDossierSheet({
               />
             </div>
           )}
+          {conversionError && (
+            <div
+              className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm"
+              role="alert"
+            >
+              <div className="font-medium text-destructive">
+                {conversionError.message ??
+                  conversionError.error ??
+                  "Conversione non disponibile"}
+              </div>
+              {Object.entries(conversionError.fieldErrors ?? {}).length > 0 && (
+                <ul className="list-disc space-y-1 pl-5 text-destructive">
+                  {Object.entries(conversionError.fieldErrors ?? {}).map(
+                    ([field, message]) => (
+                      <li key={field}>{message}</li>
+                    ),
+                  )}
+                </ul>
+              )}
+              {conversionError.correlationId && (
+                <div className="text-xs text-muted-foreground">
+                  ID correlazione: {conversionError.correlationId}
+                </div>
+              )}
+            </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setConversionPreview(null)}
+              className="min-h-11"
+              onClick={() => {
+                setConversionPreview(null);
+                setConversionError(null);
+              }}
             >
               Annulla
             </Button>
-            <Button onClick={confirmConversion} disabled={conversionPending}>
-              Conferma conversione
-            </Button>
+            {conversionError?.code ===
+              "VOLONTARIO_CONVERSIONE_DATI_INCOMPLETI" && volontario ? (
+              <Button
+                className="min-h-11"
+                onClick={() => {
+                  const errors = conversionError.fieldErrors ?? {};
+                  setConversionError(null);
+                  onEdit(volontario, errors);
+                }}
+              >
+                Completa anagrafica
+              </Button>
+            ) : conversionPreview ? (
+              <Button
+                className="min-h-11"
+                onClick={confirmConversion}
+                disabled={conversionPending}
+              >
+                Conferma conversione
+              </Button>
+            ) : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>

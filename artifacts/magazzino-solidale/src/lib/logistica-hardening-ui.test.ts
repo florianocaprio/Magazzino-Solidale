@@ -25,7 +25,8 @@ describe("hardening UI Logistica", () => {
       source("../pages/turni.tsx"),
     ]);
     expect(volontari).toContain("ruoloVolontarioId");
-    expect(volontari).toContain("versione: editing.versione");
+    expect(volontari).toContain("buildVolunteerUpdatePayload");
+    expect(volontari).toContain("editing.versione");
     expect(turni).toContain("ruoloVolontarioId");
     expect(turni).toContain("versione: existing.versione");
   });

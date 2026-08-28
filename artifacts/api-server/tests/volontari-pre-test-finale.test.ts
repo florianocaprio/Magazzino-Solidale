@@ -167,8 +167,8 @@ describe("Volontari 2.0 — quarto addendum pre-test finale", () => {
       indirizzoDomicilio: null,
     };
     const missingDay = await request(app()).post("/volontari").send(base);
-    expect(missingDay.status).toBe(400);
-    expect(missingDay.body.error).toMatch(/dataServizio/i);
+    expect(missingDay.status).toBe(422);
+    expect(missingDay.body.fieldErrors.dataServizio).toMatch(/giornata/i);
 
     const created = await request(app())
       .post("/volontari")
@@ -207,6 +207,7 @@ describe("Volontari 2.0 — quarto addendum pre-test finale", () => {
     expect(days[0]).toMatchObject({
       dataServizio: "2027-05-10",
       stato: "PIANIFICATA",
+      coperturaVerificata: true,
     });
     expect(identifiers).toHaveLength(1);
     expect(ledger.map((event) => event.tipoEvento)).toEqual([
@@ -223,7 +224,7 @@ describe("Volontari 2.0 — quarto addendum pre-test finale", () => {
         tipoVolontario: "PERMANENTE",
         codiceFiscaleNonDisponibile: false,
       });
-    expect(missingCf.status).toBe(400);
+    expect(missingCf.status).toBe(422);
     const inconsistentCf = await request(app())
       .post("/volontari")
       .send({
@@ -234,7 +235,7 @@ describe("Volontari 2.0 — quarto addendum pre-test finale", () => {
         codiceFiscale: "RSSMRA80A01H501U",
         codiceFiscaleNonDisponibile: true,
       });
-    expect(inconsistentCf.status).toBe(400);
+    expect(inconsistentCf.status).toBe(422);
     const permanent = await request(app())
       .post("/volontari")
       .send({

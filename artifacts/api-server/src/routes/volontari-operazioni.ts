@@ -419,7 +419,7 @@ router.post(
       const [row] = await tx.insert(giornateServizioVolontariTable).values({
         volontarioId: scoped.row.id, dataServizio, centroAscoltoId,
         attivita: text(req.body?.attivita, 200), stato,
-        coperturaVerificata: state?.statoAssicurazione === "VALIDA" || state?.statoAssicurazione === "IN_SCADENZA",
+        coperturaVerificata: state?.statoAssicurazione === "TEMPORANEA" || state?.statoAssicurazione === "VALIDA" || state?.statoAssicurazione === "IN_SCADENZA",
         note: text(req.body?.note), creatoDa: userId(req),
       }).returning();
       await appendVolontarioLedgerEvent(tx, {

@@ -6168,7 +6168,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
+            enum: [TEMPORANEA, MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
         - name: ruoloVolontarioId
           in: query
           required: false
@@ -6224,6 +6224,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Volontario"
+        "422":
+          description: Dati anagrafici non validi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
 
   /volontari/bulk:
     post:
@@ -6655,6 +6660,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/VolontarioPermanentConversionPreviewResponse" }
+        "422":
+          description: Anagrafica incompleta o configurazione matricola non valida
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
 
   /volontari/{id}/conversione-permanente:
     post:
@@ -6674,6 +6684,11 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Volontario" }
         "409": { description: Preview o versione non più attuale }
+        "422":
+          description: Anagrafica incompleta o configurazione matricola non valida
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
 
   /volontari/{id}:
     get:
@@ -6720,6 +6735,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Volontario"
+        "422":
+          description: Dati anagrafici non validi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
     delete:
       operationId: deleteVolontario
       tags: [volontari]
@@ -16161,7 +16181,7 @@ components:
           type: ["string", "null"]
         statoAssicurazione:
           type: string
-          enum: [MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
+          enum: [TEMPORANEA, MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
         scadenzaAssicurazione:
           type: ["string", "null"]
           format: date
@@ -16217,11 +16237,11 @@ components:
         centroAscoltoId:
           type: ["integer", "null"]
         telefono:
-          type: string
+          type: ["string", "null"]
         telefonoSecondario:
-          type: string
+          type: ["string", "null"]
         email:
-          type: string
+          type: ["string", "null"]
         luogoNascita:
           type: string
         dataNascita:
@@ -16254,7 +16274,7 @@ components:
           type: integer
           minimum: 0
         note:
-          type: string
+          type: ["string", "null"]
       required:
         [nome, cognome, luogoNascita, dataNascita, indirizzoResidenza, ruoloVolontarioId]
       allOf:
@@ -16275,11 +16295,11 @@ components:
         centroAscoltoId:
           type: ["integer", "null"]
         telefono:
-          type: string
+          type: ["string", "null"]
         telefonoSecondario:
-          type: string
+          type: ["string", "null"]
         email:
-          type: string
+          type: ["string", "null"]
         luogoNascita:
           type: string
         dataNascita:
@@ -16307,14 +16327,61 @@ components:
         maxConsegneTurno:
           type: integer
           minimum: 0
-        attivo:
-          type: boolean
         note:
-          type: string
+          type: ["string", "null"]
         versione:
           type: integer
           minimum: 1
       required: [versione]
+
+    VolontarioFieldErrors:
+      type: object
+      additionalProperties: false
+      properties:
+        nome: { type: string }
+        cognome: { type: string }
+        matricola: { type: string }
+        tipoVolontario: { type: string }
+        codiceFiscale: { type: string }
+        codiceFiscaleNonDisponibile: { type: string }
+        codiceFiscaleNota: { type: string }
+        dataNascita: { type: string }
+        luogoNascita: { type: string }
+        indirizzoResidenza: { type: string }
+        indirizzoDomicilio: { type: string }
+        telefono: { type: string }
+        telefonoSecondario: { type: string }
+        email: { type: string }
+        centroAscoltoId: { type: string }
+        ruoloVolontarioId: { type: string }
+        maxConsegneTurno: { type: string }
+        dataServizio: { type: string }
+        patente: { type: string }
+        mezzoPersonale: { type: string }
+        versione: { type: string }
+
+    VolontarioValidationErrorResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        error: { type: string }
+        code: { type: string }
+        message: { type: string }
+        fieldErrors: { $ref: "#/components/schemas/VolontarioFieldErrors" }
+        missingFields:
+          type: array
+          items: { type: string }
+        correlationId: { type: string }
+        details:
+          type: object
+          additionalProperties: false
+          properties:
+            fieldErrors: { $ref: "#/components/schemas/VolontarioFieldErrors" }
+            missingFields:
+              type: array
+              items: { type: string }
+          required: [fieldErrors, missingFields]
+      required: [error, code, message, fieldErrors, missingFields, correlationId, details]
 
     VolontarioIdentifier:
       type: object
@@ -16375,7 +16442,7 @@ components:
           type: ["string", "null"]
         statoAssicurazione:
           type: string
-          enum: [MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
+          enum: [TEMPORANEA, MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
         scadenzaAssicurazione:
           type: ["string", "null"]
           format: date
@@ -16676,7 +16743,7 @@ components:
             centroAscoltoId: { type: integer, minimum: 1 }
             ruoloVolontarioId: { type: integer, minimum: 1 }
             search: { type: string }
-            assicurazione: { type: string, enum: [MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA] }
+            assicurazione: { type: string, enum: [TEMPORANEA, MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA] }
             dataServizio: { type: string, format: date }
             servizioDa: { type: string, format: date }
             servizioA: { type: string, format: date }

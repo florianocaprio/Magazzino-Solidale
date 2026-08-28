@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
+import { randomUUID } from "node:crypto";
 import { db } from "@workspace/db";
 import {
   volontariTable,
@@ -54,6 +55,15 @@ import {
   normalizeCodiceFiscale,
   todayRome,
 } from "../lib/volontariDomain";
+import {
+  hasVolontarioFieldErrors,
+  mergeVolontarioNextState,
+  normalizeVolontarioPatch,
+  validateVolontarioState,
+  VOLONTARIO_EDITABLE_FIELDS,
+  type VolontarioFieldErrors,
+  type VolontarioValidationState,
+} from "../lib/volontariValidation";
 import { operationalStatesForRows } from "../lib/volontariOperational";
 import {
   appendVolontarioLedgerEvent,
@@ -67,40 +77,98 @@ router.use("/volontari", requireModulo("VOLONTARI"));
 const actorId = (req: Request): number | null =>
   req.user?.id && req.user.id > 0 ? req.user.id : null;
 
-const VOLONTARIO_TEXT_LIMITS = {
-  nome: 80,
-  cognome: 80,
-  matricola: 40,
-  telefono: 20,
-  telefonoSecondario: 20,
-  email: 120,
-  luogoNascita: 120,
-  indirizzoResidenza: 240,
-  indirizzoDomicilio: 240,
-  codiceFiscale: 32,
-  codiceFiscaleNota: 240,
-} as const;
+type VolontarioMutationError = {
+  error: string;
+  status: number;
+  code?: string;
+  message?: string;
+  fieldErrors?: VolontarioFieldErrors;
+  missingFields?: string[];
+  matricolaSuggerita?: string;
+};
 
-function validateVolontarioTextFields(
-  values: Record<string, unknown>,
-): string | null {
-  for (const [field, max] of Object.entries(VOLONTARIO_TEXT_LIMITS)) {
-    if (values[field] == null) continue;
-    if (typeof values[field] !== "string") return `${field} non valido`;
-    const normalized = values[field].trim();
-    values[field] = normalized || null;
-    if (normalized.length > max) {
-      return `${field} supera la lunghezza massima di ${max} caratteri`;
-    }
+function validationResult(
+  fieldErrors: VolontarioFieldErrors,
+  code = "VOLONTARIO_VALIDATION_ERROR",
+  message = "Correggi i campi evidenziati prima di salvare",
+): VolontarioMutationError {
+  return {
+    error: message,
+    message,
+    status: 422,
+    code,
+    fieldErrors,
+    missingFields: Object.keys(fieldErrors),
+  };
+}
+
+function validationResponse(req: Request, result: VolontarioMutationError) {
+  const correlationId = req.id == null ? randomUUID() : String(req.id);
+  return {
+    error: result.error,
+    code: result.code ?? "VOLONTARIO_VALIDATION_ERROR",
+    message: result.message ?? result.error,
+    fieldErrors: result.fieldErrors ?? {},
+    missingFields:
+      result.missingFields ?? Object.keys(result.fieldErrors ?? {}),
+    correlationId,
+    details: {
+      fieldErrors: result.fieldErrors ?? {},
+      missingFields:
+        result.missingFields ?? Object.keys(result.fieldErrors ?? {}),
+    },
+  };
+}
+
+class VolunteerConversionValidationError extends Error {
+  readonly fieldErrors: VolontarioFieldErrors;
+
+  constructor(fieldErrors: VolontarioFieldErrors) {
+    super("Completa l'anagrafica prima della conversione");
+    this.name = "VolunteerConversionValidationError";
+    this.fieldErrors = fieldErrors;
   }
-  if (
-    values.dataNascita != null &&
-    (typeof values.dataNascita !== "string" ||
-      !isDateOnly(values.dataNascita))
-  ) {
-    return "dataNascita non valida";
+}
+
+async function preflightVolunteerConversion(
+  executor: Pick<typeof db, "select">,
+  volunteer: VolontarioValidationState,
+): Promise<VolontarioFieldErrors> {
+  const fieldErrors = validateVolontarioState(volunteer, {
+    requireCenter: true,
+  });
+  const ruoloId = Number(volunteer.ruoloVolontarioId);
+  const [ruolo] = Number.isSafeInteger(ruoloId)
+    ? await executor
+        .select({ id: ruoliVolontariTable.id })
+        .from(ruoliVolontariTable)
+        .where(
+          and(
+            eq(ruoliVolontariTable.id, ruoloId),
+            eq(ruoliVolontariTable.attivo, true),
+          ),
+        )
+    : [];
+  if (!ruolo) {
+    fieldErrors.ruoloVolontarioId = "Seleziona un ruolo attivo";
   }
-  return null;
+  const centroId = Number(volunteer.centroAscoltoId);
+  const [centro] = Number.isSafeInteger(centroId)
+    ? await executor
+        .select({ id: centriAscoltoTable.id })
+        .from(centriAscoltoTable)
+        .where(
+          and(
+            eq(centriAscoltoTable.id, centroId),
+            eq(centriAscoltoTable.attivo, true),
+          ),
+        )
+    : [];
+  if (!centro) {
+    fieldErrors.centroAscoltoId =
+      "Seleziona un centro attivo e coerente con il perimetro";
+  }
+  return fieldErrors;
 }
 
 type VolontarioRow = typeof volontariTable.$inferSelect & {
@@ -156,7 +224,9 @@ const fmt = (
   attivo: r.attivo,
   abilitatoAmministrativamente: r.attivo,
   operativo: operational?.operativo ?? false,
-  motivoNonOperativo: operational?.motivoNonOperativo ?? "STATO_NON_CALCOLATO",
+  motivoNonOperativo: operational
+    ? operational.motivoNonOperativo
+    : "STATO_NON_CALCOLATO",
   statoAssicurazione: operational?.statoAssicurazione ?? "MANCANTE",
   scadenzaAssicurazione: operational?.scadenzaAssicurazione ?? null,
   sospesoManualmente: operational?.sospesoManualmente ?? !r.attivo,
@@ -299,6 +369,7 @@ router.get(
         : "";
     if (assicurazione) {
       const aliases: Record<string, string[]> = {
+        TEMPORANEA: ["TEMPORANEA"],
         VALIDA: ["VALIDA"],
         IN_SCADENZA: ["IN_SCADENZA"],
         SCADUTA: ["SCADUTA"],
@@ -360,96 +431,47 @@ router.get(
 async function createVolontarioOne(
   body: Record<string, unknown>,
   req: Request,
-): Promise<{ id: number } | (MatricolaDuplicataPayload & { status?: number })> {
+): Promise<
+  | { id: number }
+  | VolontarioMutationError
+  | (MatricolaDuplicataPayload & { status?: number })
+> {
   const caller = callerCentroId(req);
-  const values: Record<string, unknown> = {};
-  const textFields = [
-    "nome",
-    "cognome",
-    "telefono",
-    "telefonoSecondario",
-    "email",
-    "luogoNascita",
-    "dataNascita",
-    "indirizzoResidenza",
-    "indirizzoDomicilio",
-    "codiceFiscale",
-    "codiceFiscaleNota",
-    "note",
-  ] as const;
-  for (const field of textFields) {
-    if (body[field] !== undefined) {
-      values[field] =
-        typeof body[field] === "string"
-          ? body[field].trim() || null
-          : body[field];
-    }
-  }
-  for (const field of [
-    "centroAscoltoId",
-    "ruoloVolontarioId",
-    "maxConsegneTurno",
-    "tipoVolontario",
-  ] as const) {
-    if (body[field] !== undefined) values[field] = body[field];
-  }
+  const values = normalizeVolontarioPatch(body);
   for (const field of ["patente", "mezzoPersonale"] as const) {
     if (typeof body[field] === "boolean") values[field] = body[field];
   }
-  if (typeof body.codiceFiscaleNonDisponibile === "boolean")
-    values.codiceFiscaleNonDisponibile = body.codiceFiscaleNonDisponibile;
-  const textError = validateVolontarioTextFields(values);
-  if (textError) return { error: textError, status: 400 };
-  if (typeof values.nome !== "string" || typeof values.cognome !== "string") {
-    return { error: "Nome e cognome sono obbligatori", status: 400 };
-  }
   if (body.matricola != null && String(body.matricola).trim()) {
-    return {
-      error: "La matricola viene generata automaticamente dal sistema",
-      status: 400,
-    };
+    return validationResult({
+      matricola: "La matricola viene generata automaticamente dal sistema",
+    });
   }
   const tipoVolontario =
-    values.tipoVolontario == null
+    body.tipoVolontario == null
       ? "PERMANENTE"
-      : String(values.tipoVolontario).toUpperCase();
+      : String(body.tipoVolontario).toUpperCase();
   if (tipoVolontario !== "PERMANENTE" && tipoVolontario !== "TEMPORANEO") {
-    return { error: "tipoVolontario non valido", status: 400 };
+    return validationResult({ tipoVolontario: "Tipo volontario non valido" });
   }
   values.tipoVolontario = tipoVolontario;
+  values.maxConsegneTurno = body.maxConsegneTurno ?? 5;
   const dataServizio = body.dataServizio;
-  if (tipoVolontario === "TEMPORANEO" && !isDateOnly(dataServizio)) {
-    return { error: "dataServizio obbligatoria e valida per un volontario temporaneo", status: 400 };
+  if (
+    tipoVolontario === "PERMANENTE" &&
+    dataServizio != null &&
+    String(dataServizio).trim()
+  ) {
+    return validationResult({
+      dataServizio: "La giornata è prevista solo per un volontario temporaneo",
+    });
   }
-  if (tipoVolontario === "PERMANENTE" && dataServizio != null && String(dataServizio).trim()) {
-    return { error: "dataServizio è prevista solo per un volontario temporaneo", status: 400 };
-  }
+  values.dataServizio = dataServizio;
   const codiceFiscaleNormalizzato = normalizeCodiceFiscale(
     values.codiceFiscale,
   );
-  values.codiceFiscale = codiceFiscaleNormalizzato;
-  values.codiceFiscaleNormalizzato = codiceFiscaleNormalizzato;
-  const codiceFiscaleNonDisponibile = values.codiceFiscaleNonDisponibile === true;
-  if (codiceFiscaleNormalizzato && codiceFiscaleNonDisponibile) {
-    return {
-      error: "Il codice fiscale non può essere presente e segnato come non disponibile",
-      status: 400,
-    };
-  }
-  if (!codiceFiscaleNormalizzato && !codiceFiscaleNonDisponibile) {
-    return {
-      error: "Inserisci il codice fiscale oppure dichiaralo non disponibile",
-      status: 400,
-    };
-  }
-  for (const required of [
-    ["luogoNascita", "Luogo di nascita"],
-    ["dataNascita", "Data di nascita"],
-    ["indirizzoResidenza", "Indirizzo di residenza"],
-  ] as const) {
-    if (typeof values[required[0]] !== "string" || !values[required[0]])
-      return { error: `${required[1]} obbligatorio`, status: 400 };
-  }
+  const fieldErrors = validateVolontarioState(values, {
+    validateTemporaryServiceDate: true,
+  });
   if (codiceFiscaleNormalizzato) {
     const [duplicateCf] = await db
       .select({ id: volontariTable.id })
@@ -459,36 +481,29 @@ async function createVolontarioOne(
       )
       .limit(1);
     if (duplicateCf)
-      return {
-        error: "Il codice fiscale è già associato a un altro volontario",
-        status: 409,
-      };
+      fieldErrors.codiceFiscale =
+        "Il codice fiscale è già associato a un altro volontario";
   }
   const areaId = callerAreaOperativaId(req);
   const visibleIds = await visibleCentroIds(areaId);
   if (caller != null) values.centroAscoltoId = caller;
   else if (areaId != null && values.centroAscoltoId == null) {
-    return {
-      error: "Seleziona un Centro della tua Area Operativa",
-      status: 400,
-    };
+    fieldErrors.centroAscoltoId =
+      "Seleziona un Centro della tua Area Operativa";
   } else if (values.centroAscoltoId != null) {
     const centroAscoltoId = Number(values.centroAscoltoId);
     if (!Number.isSafeInteger(centroAscoltoId) || centroAscoltoId <= 0) {
-      return { error: "centroAscoltoId non valido", status: 400 };
-    }
-    if (!inVisibleCentroSet(centroAscoltoId, visibleIds)) {
-      return {
-        error: "Centro non accessibile per la tua area operativa",
-        status: 403,
-      };
-    }
-    values.centroAscoltoId = centroAscoltoId;
+      fieldErrors.centroAscoltoId = "Centro non valido";
+    } else if (!inVisibleCentroSet(centroAscoltoId, visibleIds)) {
+      const result = validationResult(
+        { centroAscoltoId: "Centro non accessibile per la tua area operativa" },
+        "CENTRO_SCOPE_FORBIDDEN",
+        "Centro non accessibile per la tua area operativa",
+      );
+      return { ...result, status: 403 };
+    } else values.centroAscoltoId = centroAscoltoId;
   }
   const ruoloVolontarioId = Number(values.ruoloVolontarioId);
-  if (!Number.isInteger(ruoloVolontarioId) || ruoloVolontarioId <= 0) {
-    return { error: "ruoloVolontarioId obbligatorio", status: 400 };
-  }
   const [ruolo] = await db
     .select({ id: ruoliVolontariTable.id, nome: ruoliVolontariTable.nome })
     .from(ruoliVolontariTable)
@@ -499,20 +514,21 @@ async function createVolontarioOne(
       ),
     );
   if (!ruolo)
-    return { error: "Ruolo volontario non attivo o non valido", status: 400 };
+    fieldErrors.ruoloVolontarioId = "Ruolo volontario non attivo o non valido";
   const maxConsegneTurno = Number(values.maxConsegneTurno ?? 5);
   if (!Number.isInteger(maxConsegneTurno) || maxConsegneTurno < 0) {
-    return {
-      error: "maxConsegneTurno deve essere maggiore o uguale a zero",
-      status: 400,
-    };
+    fieldErrors.maxConsegneTurno =
+      "Il massimo consegne deve essere maggiore o uguale a zero";
   }
-  values.ruoloVolontarioId = ruolo.id;
-  values.ruolo = ruolo.nome;
+  if (hasVolontarioFieldErrors(fieldErrors))
+    return validationResult(fieldErrors);
+  values.ruoloVolontarioId = ruolo!.id;
+  values.ruolo = ruolo!.nome;
   values.maxConsegneTurno = maxConsegneTurno;
   values.statoApprovazione = "in_attesa";
   values.attivo = false;
   values.dataIscrizione = todayRome();
+  delete values.dataServizio;
   delete values.versione;
   delete values.dataAggiornamento;
   try {
@@ -537,13 +553,20 @@ async function createVolontarioOne(
               actorId(req),
             );
       const row = { ...inserted, matricola };
-      const [giornataIniziale] = tipoVolontario === "TEMPORANEO"
-        ? await tx.insert(giornateServizioVolontariTable).values({
-            volontarioId: row.id, dataServizio: dataServizio as string,
-            centroAscoltoId: row.centroAscoltoId, stato: "PIANIFICATA",
-            coperturaVerificata: false, creatoDa: actorId(req),
-          }).returning()
-        : [];
+      const [giornataIniziale] =
+        tipoVolontario === "TEMPORANEO"
+          ? await tx
+              .insert(giornateServizioVolontariTable)
+              .values({
+                volontarioId: row.id,
+                dataServizio: dataServizio as string,
+                centroAscoltoId: row.centroAscoltoId,
+                stato: "PIANIFICATA",
+                coperturaVerificata: true,
+                creatoDa: actorId(req),
+              })
+              .returning()
+          : [];
       await appendVolontarioLedgerEvent(tx, {
         sezione: tipoVolontario,
         tipoEvento: "REGISTRAZIONE",
@@ -559,23 +582,33 @@ async function createVolontarioOne(
       });
       if (giornataIniziale) {
         await appendVolontarioLedgerEvent(tx, {
-          sezione: "TEMPORANEO", tipoEvento: "GIORNATA_TEMPORANEA",
-          volontarioId: row.id, centroAscoltoId: row.centroAscoltoId,
+          sezione: "TEMPORANEO",
+          tipoEvento: "GIORNATA_TEMPORANEA",
+          volontarioId: row.id,
+          centroAscoltoId: row.centroAscoltoId,
           dataEffettiva: giornataIniziale.dataServizio,
           snapshot: await buildVolunteerEventSnapshot(tx, row, {
-            statoPrecedente: null, nuovoStato: giornataIniziale.stato,
+            statoPrecedente: null,
+            nuovoStato: giornataIniziale.stato,
             motivo: "prima_giornata_temporanea",
             dataEffettiva: giornataIniziale.dataServizio,
             riferimentoEventoId: giornataIniziale.id,
-            datiEvento: { giornataId: giornataIniziale.id, coperturaVerificata: false },
+            datiEvento: {
+              giornataId: giornataIniziale.id,
+              coperturaVerificata: true,
+            },
           }),
           utenteId: actorId(req),
         });
       }
       await auditLogistica(tx, req, {
-        entita: "volontario", id: row.id, azione: "creazione",
+        entita: "volontario",
+        id: row.id,
+        azione: "creazione",
         nuovo: {
-          statoApprovazione: "in_attesa", attivo: false, versione: row.versione,
+          statoApprovazione: "in_attesa",
+          attivo: false,
+          versione: row.versione,
           giornataInizialeId: giornataIniziale?.id ?? null,
           dataServizio: giornataIniziale?.dataServizio ?? null,
         },
@@ -585,14 +618,28 @@ async function createVolontarioOne(
     return { id: created.id };
   } catch (e) {
     if (isVolontarioCodiceFiscaleUniqueViolation(e))
+      return validationResult(
+        {
+          codiceFiscale:
+            "Il codice fiscale è già associato a un altro volontario",
+        },
+        "CODICE_FISCALE_DUPLICATO",
+        "Il codice fiscale è già associato a un altro volontario",
+      );
+    if (isVolontarioMatricolaUniqueViolation(e))
       return {
-        error: "Il codice fiscale è già associato a un altro volontario",
+        error: "Conflitto durante la generazione della matricola",
+        message: "Conflitto durante la generazione della matricola",
+        code: "MATRICOLA_DUPLICATA",
         status: 409,
       };
-    if (isVolontarioMatricolaUniqueViolation(e))
-      return { error: "Conflitto durante la generazione della matricola", status: 409 };
     if (e instanceof VolunteerIdentifierError)
-      return { error: e.message, status: 422 };
+      return {
+        error: e.message,
+        message: e.message,
+        code: e.code,
+        status: 422,
+      };
     throw e;
   }
 }
@@ -604,7 +651,7 @@ router.post(
     const r = await createVolontarioOne(req.body, req);
     if ("error" in r) {
       res.status(r.status ?? 403).json({
-        error: r.error,
+        ...validationResponse(req, r as VolontarioMutationError),
         ...(r.matricolaSuggerita
           ? { matricolaSuggerita: r.matricolaSuggerita }
           : {}),
@@ -643,11 +690,9 @@ router.get(
       string
     >;
     if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
-      res
-        .status(400)
-        .json({
-          error: "Parametro 'data' non valido (formato atteso: YYYY-MM-DD)",
-        });
+      res.status(400).json({
+        error: "Parametro 'data' non valido (formato atteso: YYYY-MM-DD)",
+      });
       return;
     }
     if (!isFasciaTurno(fascia)) {
@@ -742,7 +787,10 @@ router.get(
       })
       .from(matricoleVolontariTable)
       .where(eq(matricoleVolontariTable.volontarioId, id))
-      .orderBy(desc(matricoleVolontariTable.dataInizioValidita), desc(matricoleVolontariTable.id));
+      .orderBy(
+        desc(matricoleVolontariTable.dataInizioValidita),
+        desc(matricoleVolontariTable.id),
+      );
     res.json(identifiers);
   },
 );
@@ -773,13 +821,25 @@ router.get(
       res.status(409).json({ error: "Il volontario è già permanente" });
       return;
     }
+    const fieldErrors = await preflightVolunteerConversion(db, volunteer);
+    if (hasVolontarioFieldErrors(fieldErrors)) {
+      const result = validationResult(
+        fieldErrors,
+        "VOLONTARIO_CONVERSIONE_DATI_INCOMPLETI",
+        "Completa l'anagrafica prima della conversione",
+      );
+      res.status(result.status).json(validationResponse(req, result));
+      return;
+    }
     try {
       res.json({
         volontarioId: volunteer.id,
         versioneVolontario: volunteer.versione,
         matricolaAttuale: volunteer.matricola,
         dataConversione: todayRome(),
-        preview: await previewPermanentVolunteerIdentifier(volunteer.centroAscoltoId),
+        preview: await previewPermanentVolunteerIdentifier(
+          volunteer.centroAscoltoId,
+        ),
       });
     } catch (error) {
       if (error instanceof VolunteerIdentifierError) {
@@ -796,7 +856,9 @@ router.post(
   requirePermission("logistica.volontari.manage"),
   async (req, res) => {
     const id = Number(req.params.id);
-    const versione = parseRequiredVersion(req.body?.versioneVolontario ?? req.body?.versione);
+    const versione = parseRequiredVersion(
+      req.body?.versioneVolontario ?? req.body?.versione,
+    );
     const preview = req.body?.preview as PermanentIdentifierPreview | undefined;
     if (!Number.isSafeInteger(id) || id <= 0 || versione == null || !preview) {
       res.status(400).json({ error: "Conferma conversione non valida" });
@@ -833,6 +895,10 @@ router.post(
         if (existing.versione !== versione) throw new Error("STALE_VERSION");
         if (existing.tipoVolontario !== "TEMPORANEO")
           throw new Error("ALREADY_PERMANENT");
+        const fieldErrors = await preflightVolunteerConversion(tx, existing);
+        if (hasVolontarioFieldErrors(fieldErrors)) {
+          throw new VolunteerConversionValidationError(fieldErrors);
+        }
         const dataConversione = todayRome();
         const nuovaMatricola = await assignPermanentVolunteerIdentifier(
           tx,
@@ -897,15 +963,32 @@ router.post(
         });
         return row;
       });
-      const [row] = await selectVolontario().where(eq(volontariTable.id, converted.id));
-      const state = (await operationalStatesForRows(db, [row], todayRome())).get(row.id);
+      const [row] = await selectVolontario().where(
+        eq(volontariTable.id, converted.id),
+      );
+      const state = (
+        await operationalStatesForRows(db, [row], todayRome())
+      ).get(row.id);
       res.json(fmt(row, state));
     } catch (error) {
+      if (error instanceof VolunteerConversionValidationError) {
+        const result = validationResult(
+          error.fieldErrors,
+          "VOLONTARIO_CONVERSIONE_DATI_INCOMPLETI",
+          error.message,
+        );
+        res.status(result.status).json(validationResponse(req, result));
+        return;
+      }
       if (error instanceof VolunteerIdentifierError) {
-        res.status(error.code === "PREVIEW_CONVERSIONE_SCADUTA" ? 409 : 422).json({
-          error: error.message,
-          code: error.code,
-        });
+        res
+          .status(error.code === "PREVIEW_CONVERSIONE_SCADUTA" ? 409 : 422)
+          .json({
+            error: error.message,
+            code: error.code,
+            message: error.message,
+            correlationId: String(req.id),
+          });
         return;
       }
       const code = error instanceof Error ? error.message : "";
@@ -924,6 +1007,11 @@ router.post(
               ? "Il volontario è già permanente"
               : "Il volontario è stato modificato: rigenera la preview",
           code,
+          message:
+            code === "ALREADY_PERMANENT"
+              ? "Il volontario è già permanente"
+              : "Ricarica i dati e rigenera la preview",
+          correlationId: String(req.id),
         });
         return;
       }
@@ -1007,64 +1095,26 @@ router.patch(
     }
     const versione = parseRequiredVersion(req.body?.versione);
     if (versione == null) {
-      res.status(400).json({ error: "versione obbligatoria e valida" });
+      const result = validationResult({
+        versione: "La versione è obbligatoria e deve essere valida",
+      });
+      res.status(result.status).json(validationResponse(req, result));
       return;
     }
-    const updates: Record<string, unknown> = {};
     if (req.body?.matricola !== undefined) {
-      res.status(400).json({
-        error: "La matricola non è modificabile manualmente",
+      const result = validationResult({
+        matricola: "La matricola non è modificabile manualmente",
       });
+      res.status(result.status).json(validationResponse(req, result));
       return;
     }
-    if (
-      req.body?.codiceFiscaleNonDisponibile !== undefined &&
-      typeof req.body.codiceFiscaleNonDisponibile !== "boolean"
-    ) {
-      res.status(400).json({
-        error: "codiceFiscaleNonDisponibile deve essere booleano",
-      });
-      return;
-    }
-    for (const field of [
-      "nome",
-      "cognome",
-      "tipoVolontario",
-      "centroAscoltoId",
-      "telefono",
-      "telefonoSecondario",
-      "email",
-      "luogoNascita",
-      "dataNascita",
-      "indirizzoResidenza",
-      "indirizzoDomicilio",
-      "codiceFiscale",
-      "codiceFiscaleNonDisponibile",
-      "codiceFiscaleNota",
-      "ruoloVolontarioId",
-      "patente",
-      "mezzoPersonale",
-      "maxConsegneTurno",
-      "attivo",
-      "note",
-    ] as const) {
-      if (req.body?.[field] !== undefined) updates[field] = req.body[field];
-    }
-    const textError = validateVolontarioTextFields(updates);
-    if (
-      textError ||
-      ("nome" in updates && updates.nome == null) ||
-      ("cognome" in updates && updates.cognome == null)
-    ) {
-      res
-        .status(400)
-        .json({ error: textError ?? "Nome e cognome non possono essere vuoti" });
-      return;
-    }
-    if ("tipoVolontario" in updates) {
-      const tipo = String(updates.tipoVolontario).toUpperCase();
+    if (req.body?.tipoVolontario !== undefined) {
+      const tipo = String(req.body.tipoVolontario).toUpperCase();
       if (tipo !== "PERMANENTE" && tipo !== "TEMPORANEO") {
-        res.status(400).json({ error: "tipoVolontario non valido" });
+        const result = validationResult({
+          tipoVolontario: "Tipo volontario non valido",
+        });
+        res.status(result.status).json(validationResponse(req, result));
         return;
       }
       if (tipo !== existing.tipoVolontario) {
@@ -1074,126 +1124,110 @@ router.patch(
               ? "Usa il workflow Converti in permanente"
               : "Il tipo volontario non è modificabile direttamente",
           code: "CONVERSIONE_RICHIESTA",
+          message: "Il tipo volontario richiede un workflow dedicato",
+          correlationId: String(req.id),
         });
         return;
       }
-      delete updates.tipoVolontario;
     }
-    if ("codiceFiscale" in updates) {
-      const normalized = normalizeCodiceFiscale(updates.codiceFiscale);
-      if (normalized) {
-        const [duplicate] = await db
-          .select({ id: volontariTable.id })
-          .from(volontariTable)
-          .where(
-            and(
-              eq(volontariTable.codiceFiscaleNormalizzato, normalized),
-              ne(volontariTable.id, existing.id),
-            ),
-          )
-          .limit(1);
-        if (duplicate) {
-          res
-            .status(409)
-            .json({
-              error: "Il codice fiscale è già associato a un altro volontario",
-            });
-          return;
-        }
-      }
-      updates.codiceFiscale = normalized;
-      updates.codiceFiscaleNormalizzato = normalized;
-    }
-    const nextCf =
-      "codiceFiscale" in updates
-        ? (updates.codiceFiscaleNormalizzato as string | null)
-        : existing.codiceFiscaleNormalizzato;
-    const nextUnavailable =
-      "codiceFiscaleNonDisponibile" in updates
-        ? updates.codiceFiscaleNonDisponibile === true
-        : existing.codiceFiscaleNonDisponibile;
-    if ((nextCf && nextUnavailable) || (!nextCf && !nextUnavailable)) {
-      res.status(400).json({
-        error: "Inserisci il codice fiscale oppure dichiaralo non disponibile",
+    if (req.body?.attivo !== undefined) {
+      res.status(409).json({
+        error: "Lo stato amministrativo si modifica dal workflow dedicato",
+        code: "STATO_VOLONTARIO_NON_MODIFICABILE",
+        message: "Usa le azioni Sospendi o Riattiva",
+        correlationId: String(req.id),
       });
       return;
     }
+    const requestedPatch = Object.fromEntries(
+      VOLONTARIO_EDITABLE_FIELDS.filter(
+        (field) => req.body?.[field] !== undefined,
+      ).map((field) => [field, req.body[field]]),
+    );
+    const updates = normalizeVolontarioPatch(requestedPatch);
     const areaId = callerAreaOperativaId(req);
     if (caller != null) delete updates.centroAscoltoId;
-    else if (updates.centroAscoltoId !== undefined) {
-      if (areaId != null && updates.centroAscoltoId == null) {
-        res
-          .status(400)
-          .json({ error: "Seleziona un Centro della tua Area Operativa" });
-        return;
-      }
+    const nextState = mergeVolontarioNextState(existing, updates);
+    const fieldErrors = validateVolontarioState(nextState);
+    if (areaId != null && nextState.centroAscoltoId == null) {
+      fieldErrors.centroAscoltoId =
+        "Seleziona un Centro della tua Area Operativa";
+    } else if (nextState.centroAscoltoId != null) {
       const centroAscoltoId =
-        updates.centroAscoltoId == null
+        nextState.centroAscoltoId == null
           ? null
-          : Number(updates.centroAscoltoId);
+          : Number(nextState.centroAscoltoId);
       if (
         centroAscoltoId != null &&
         (!Number.isSafeInteger(centroAscoltoId) || centroAscoltoId <= 0)
       ) {
-        res.status(400).json({ error: "centroAscoltoId non valido" });
-        return;
-      }
-      if (
+        fieldErrors.centroAscoltoId = "Centro non valido";
+      } else if (
         !inVisibleCentroSet(centroAscoltoId, await visibleCentroIds(areaId))
       ) {
-        res
-          .status(403)
-          .json({ error: "Centro non accessibile per la tua area operativa" });
+        const result = validationResult(
+          {
+            centroAscoltoId: "Centro non accessibile per la tua area operativa",
+          },
+          "CENTRO_SCOPE_FORBIDDEN",
+          "Centro non accessibile per la tua area operativa",
+        );
+        res.status(403).json(validationResponse(req, result));
         return;
       }
-      updates.centroAscoltoId = centroAscoltoId;
     }
-    if (updates.attivo === true && existing.statoApprovazione !== "approvato") {
-      res
-        .status(409)
-        .json({
-          error: "La risorsa deve essere approvata prima dell'attivazione",
-        });
-      return;
-    }
-    if (updates.ruoloVolontarioId !== undefined) {
-      const ruoloId = Number(updates.ruoloVolontarioId);
-      const [ruolo] = Number.isInteger(ruoloId)
-        ? await db
-            .select({
-              id: ruoliVolontariTable.id,
-              nome: ruoliVolontariTable.nome,
-            })
-            .from(ruoliVolontariTable)
-            .where(
-              and(
-                eq(ruoliVolontariTable.id, ruoloId),
-                eq(ruoliVolontariTable.attivo, true),
-              ),
-            )
-        : [];
-      if (!ruolo) {
-        res
-          .status(400)
-          .json({ error: "Ruolo volontario non attivo o non valido" });
-        return;
+    const nextCf = normalizeCodiceFiscale(nextState.codiceFiscale);
+    if (nextCf) {
+      const [duplicate] = await db
+        .select({ id: volontariTable.id })
+        .from(volontariTable)
+        .where(
+          and(
+            eq(volontariTable.codiceFiscaleNormalizzato, nextCf),
+            ne(volontariTable.id, existing.id),
+          ),
+        )
+        .limit(1);
+      if (duplicate) {
+        fieldErrors.codiceFiscale =
+          "Il codice fiscale è già associato a un altro volontario";
       }
+    }
+    const ruoloId = Number(nextState.ruoloVolontarioId);
+    const [ruolo] = Number.isSafeInteger(ruoloId)
+      ? await db
+          .select({
+            id: ruoliVolontariTable.id,
+            nome: ruoliVolontariTable.nome,
+          })
+          .from(ruoliVolontariTable)
+          .where(
+            and(
+              eq(ruoliVolontariTable.id, ruoloId),
+              eq(ruoliVolontariTable.attivo, true),
+            ),
+          )
+      : [];
+    if (!ruolo) {
+      fieldErrors.ruoloVolontarioId =
+        "Ruolo volontario non attivo o non valido";
+    } else if (updates.ruoloVolontarioId !== undefined) {
       updates.ruoloVolontarioId = ruolo.id;
       updates.ruolo = ruolo.nome;
-    } else {
-      delete updates.ruolo;
     }
     if (updates.maxConsegneTurno !== undefined) {
       const max = Number(updates.maxConsegneTurno);
       if (!Number.isInteger(max) || max < 0) {
-        res
-          .status(400)
-          .json({
-            error: "maxConsegneTurno deve essere maggiore o uguale a zero",
-          });
-        return;
+        fieldErrors.maxConsegneTurno =
+          "Il massimo consegne deve essere maggiore o uguale a zero";
+      } else {
+        updates.maxConsegneTurno = max;
       }
-      updates.maxConsegneTurno = max;
+    }
+    if (hasVolontarioFieldErrors(fieldErrors)) {
+      const result = validationResult(fieldErrors);
+      res.status(result.status).json(validationResponse(req, result));
+      return;
     }
     try {
       const [updated] = await db.transaction(async (tx) => {
@@ -1311,18 +1345,24 @@ router.patch(
       res.json(fmt(row, state));
     } catch (e) {
       if (e instanceof Error && e.message === "STALE_VERSION") {
-        res
-          .status(409)
-          .json({
-            error: "La risorsa è stata aggiornata da un altro operatore",
-          });
+        res.status(409).json({
+          error: "La risorsa è stata aggiornata da un altro operatore",
+          code: "STALE_VERSION",
+          message: "Ricarica i dati prima di riprovare",
+          correlationId: String(req.id),
+        });
         return;
       }
       if (isVolontarioCodiceFiscaleUniqueViolation(e)) {
-        res.status(409).json({
-          error: "Il codice fiscale è già associato a un altro volontario",
-          code: "CODICE_FISCALE_DUPLICATO",
-        });
+        const result = validationResult(
+          {
+            codiceFiscale:
+              "Il codice fiscale è già associato a un altro volontario",
+          },
+          "CODICE_FISCALE_DUPLICATO",
+          "Il codice fiscale è già associato a un altro volontario",
+        );
+        res.status(result.status).json(validationResponse(req, result));
         return;
       }
       throw e;
@@ -1374,16 +1414,14 @@ router.delete(
         nuovo: { versione: row.versione, attivo: false },
       });
       const date = todayRome();
-      await tx
-        .insert(statiVolontariTable)
-        .values({
-          volontarioId: id,
-          tipoEvento: "SOSPENSIONE",
-          dataEffettiva: date,
-          motivo: "sospensione organizzativa",
-          note: "Compatibilità disattivazione",
-          creatoDa: actorId(req),
-        });
+      await tx.insert(statiVolontariTable).values({
+        volontarioId: id,
+        tipoEvento: "SOSPENSIONE",
+        dataEffettiva: date,
+        motivo: "sospensione organizzativa",
+        note: "Compatibilità disattivazione",
+        creatoDa: actorId(req),
+      });
       await appendVolontarioLedgerEvent(tx, {
         sezione: existing.tipoVolontario as "PERMANENTE" | "TEMPORANEO",
         tipoEvento: "SOSPENSIONE_CESSAZIONE",

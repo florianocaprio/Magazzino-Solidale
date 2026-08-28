@@ -183,7 +183,7 @@ describe("hardening Logistica", () => {
       }),
       ruolo: "testo arbitrario",
     });
-    expect(rejected.status).toBe(400);
+    expect(rejected.status).toBe(422);
     const created = await request(app(volontariRouter)).post("/volontari").send({
       ...volunteerInput({ nome: "Ruolo", cognome: "Attivo" }),
       ruolo: "testo arbitrario",
@@ -205,7 +205,7 @@ describe("hardening Logistica", () => {
         centroAscoltoId: null,
       }),
     });
-    expect(volontario.status).toBe(400);
+    expect(volontario.status).toBe(422);
     const mezzo = await request(app(mezziRouter, areaUser)).post("/mezzi").send({
       codice: `AREA-M-${Date.now()}`,
       tipo: "auto",

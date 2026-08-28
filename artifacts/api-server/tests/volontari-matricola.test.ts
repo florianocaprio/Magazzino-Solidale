@@ -103,8 +103,10 @@ describe("Volontari — matricole automatiche e conversione", () => {
       .post("/volontari")
       .send(volunteerPayload({ matricola: "MANUALE-001" }));
 
-    expect(response.status).toBe(400);
-    expect(response.body.error).toMatch(/generata automaticamente/i);
+    expect(response.status).toBe(422);
+    expect(response.body.fieldErrors.matricola).toMatch(
+      /generata automaticamente/i,
+    );
   });
 
   it("alloca progressivi permanenti distinti anche con richieste concorrenti", async () => {
@@ -114,8 +116,11 @@ describe("Volontari — matricole automatiche e conversione", () => {
     ]);
 
     expect(responses.map((response) => response.status)).toEqual([201, 201]);
-    for (const response of responses) scope.volontarioIds.push(response.body.id);
-    const identifiers = responses.map((response) => response.body.matricola as string);
+    for (const response of responses)
+      scope.volontarioIds.push(response.body.id);
+    const identifiers = responses.map(
+      (response) => response.body.matricola as string,
+    );
     expect(new Set(identifiers).size).toBe(2);
     for (const identifier of identifiers) {
       expect(identifier).toMatch(/^[A-Z0-9]{6}-V-\d{3}$/);
@@ -161,6 +166,7 @@ describe("Volontari — matricole automatiche e conversione", () => {
     expect(converted.status, converted.text).toBe(200);
     expect(converted.body.tipoVolontario).toBe("PERMANENTE");
     expect(converted.body.matricola).not.toBe(first.matricola);
+    expect(converted.body.statoAssicurazione).toBe("MANCANTE");
 
     const stale = await request(appVolontari())
       .post(`/volontari/${second.id}/conversione-permanente`)
@@ -213,8 +219,13 @@ describe("Volontari — matricole automatiche e conversione", () => {
     });
   });
 
-  it("traduce la concorrenza sul codice fiscale in un solo 201 e un 409", async () => {
-    const codiceFiscale = `CF${process.pid}${Date.now()}${sequence}`.slice(0, 32);
+  it("traduce la concorrenza sul codice fiscale in un solo 201 e un 422", async () => {
+    const codiceFiscale =
+      `CF${process.pid}${Date.now().toString(36)}${sequence}`
+        .replace(/[^A-Z0-9]/gi, "")
+        .padEnd(16, "X")
+        .slice(0, 16)
+        .toUpperCase();
     const responses = await Promise.all([
       request(appVolontari())
         .post("/volontari")
@@ -237,7 +248,7 @@ describe("Volontari — matricole automatiche e conversione", () => {
     ]);
 
     expect(responses.map((response) => response.status).sort()).toEqual([
-      201, 409,
+      201, 422,
     ]);
     const created = responses.find((response) => response.status === 201);
     if (created) scope.volontarioIds.push(created.body.id);

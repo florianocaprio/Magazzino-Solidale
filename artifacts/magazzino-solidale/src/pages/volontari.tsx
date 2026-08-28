@@ -82,30 +82,15 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-
-type Draft = {
-  nome: string;
-  cognome: string;
-  tipoVolontario: "PERMANENTE" | "TEMPORANEO";
-  centroAscoltoId: number | null;
-  ruoloVolontarioId: number;
-  telefono: string;
-  telefonoSecondario: string;
-  email: string;
-  luogoNascita: string;
-  dataNascita: string;
-  indirizzoResidenza: string;
-  indirizzoDomicilio: string;
-  domicilioCoincideResidenza: boolean;
-  codiceFiscale: string;
-  codiceFiscaleNonDisponibile: boolean;
-  codiceFiscaleNota: string;
-  patente: boolean;
-  mezzoPersonale: boolean;
-  maxConsegneTurno: number;
-  note: string;
-  dataServizio: string;
-};
+import {
+  buildVolunteerCreatePayload,
+  buildVolunteerUpdatePayload,
+  validateVolunteerDraft,
+  volunteerApiErrorData,
+  type VolunteerDraft as Draft,
+  type VolunteerFormErrors,
+  type VolunteerFormField,
+} from "@/lib/volontari-form";
 
 const emptyDraft = (centerId: number | null): Draft => ({
   nome: "",
@@ -162,6 +147,7 @@ function insuranceLabel(value: string): string {
         SCADUTA: "Scaduta",
         MANCANTE: "Mancante",
         NON_ANCORA_VALIDA: "Non ancora valida",
+        TEMPORANEA: "Temporanea (giornata di servizio)",
       } as Record<string, string>
     )[value] ?? value
   );
@@ -201,11 +187,13 @@ function OperationalBadge({ volunteer }: { volunteer: Volontario }) {
 
 function InsuranceBadge({ volunteer }: { volunteer: Volontario }) {
   const style =
-    volunteer.statoAssicurazione === "VALIDA"
-      ? "bg-emerald-500/10 text-emerald-700"
-      : volunteer.statoAssicurazione === "IN_SCADENZA"
-        ? "bg-amber-500/10 text-amber-800"
-        : "bg-destructive/10 text-destructive";
+    volunteer.statoAssicurazione === "TEMPORANEA"
+      ? "bg-blue-500/10 text-blue-800"
+      : volunteer.statoAssicurazione === "VALIDA"
+        ? "bg-emerald-500/10 text-emerald-700"
+        : volunteer.statoAssicurazione === "IN_SCADENZA"
+          ? "bg-amber-500/10 text-amber-800"
+          : "bg-destructive/10 text-destructive";
   return (
     <div className="space-y-1">
       <Badge variant="secondary" className={style}>
@@ -238,6 +226,7 @@ export default function Volontari() {
     | "SCADUTA"
     | "MANCANTE"
     | "NON_ANCORA_VALIDA"
+    | "TEMPORANEA"
   >("all");
   const [role, setRole] = useState("all");
   const [center, setCenter] = useState(
@@ -258,6 +247,14 @@ export default function Volontari() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Volontario | null>(null);
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(lockedCenterId));
+  const [initialDraft, setInitialDraft] = useState<Draft | null>(null);
+  const [formErrors, setFormErrors] = useState<VolunteerFormErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formCorrelationId, setFormCorrelationId] = useState<string | null>(
+    null,
+  );
+  const [resumeConversionAfterSave, setResumeConversionAfterSave] =
+    useState(false);
   const [dossierVolunteer, setDossierVolunteer] = useState<Volontario | null>(
     null,
   );
@@ -305,16 +302,40 @@ export default function Volontari() {
       dossierVolunteer)
     : null;
 
+  const focusFirstError = (errors: VolunteerFormErrors) => {
+    const firstField = Object.keys(errors)[0] as VolunteerFormField | undefined;
+    if (!firstField) return;
+    window.requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>(
+        `[data-volunteer-field="${firstField}"]`,
+      );
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.focus({ preventScroll: true });
+    });
+  };
+
+  const resetFormFeedback = () => {
+    setFormErrors({});
+    setFormError(null);
+    setFormCorrelationId(null);
+  };
+
   const openCreate = () => {
     setEditing(null);
-    setDraft(emptyDraft(lockedCenterId));
+    const nextDraft = emptyDraft(lockedCenterId);
+    setDraft(nextDraft);
+    setInitialDraft(null);
+    resetFormFeedback();
     setFormOpen(true);
   };
-  const openEdit = async (volunteer: Volontario) => {
+  const openEdit = async (
+    volunteer: Volontario,
+    requestedErrors: VolunteerFormErrors = {},
+  ) => {
     try {
       const detail = await getVolontario(volunteer.id);
       setEditing(detail);
-      setDraft({
+      const loadedDraft: Draft = {
         nome: detail.nome,
         cognome: detail.cognome,
         tipoVolontario: detail.tipoVolontario,
@@ -344,8 +365,13 @@ export default function Volontari() {
         maxConsegneTurno: detail.maxConsegneTurno,
         note: detail.note ?? "",
         dataServizio: "",
-      });
+      };
+      setDraft(loadedDraft);
+      setInitialDraft(loadedDraft);
+      resetFormFeedback();
+      setFormErrors(requestedErrors);
       setFormOpen(true);
+      focusFirstError(requestedErrors);
     } catch (error) {
       toast({
         title: "Impossibile caricare la scheda completa",
@@ -354,91 +380,48 @@ export default function Volontari() {
       });
     }
   };
-  const setField = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+  const setField = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
+    setFormErrors((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key as VolunteerFormField];
+      return next;
+    });
+    setFormError(null);
+    setFormCorrelationId(null);
+  };
 
   const saveVolunteer = async () => {
-    if (
-      !draft.nome.trim() ||
-      !draft.cognome.trim() ||
-      !draft.luogoNascita.trim() ||
-      !draft.dataNascita ||
-      !draft.indirizzoResidenza.trim() ||
-      draft.ruoloVolontarioId <= 0
-    ) {
-      toast({
-        title: "Dati incompleti",
-        description:
-          "Nome, cognome, nascita, residenza e ruolo sono obbligatori.",
-        variant: "destructive",
-      });
+    const clientErrors = validateVolunteerDraft(draft, {
+      editing: editing != null,
+    });
+    if (Object.keys(clientErrors).length > 0) {
+      setFormErrors(clientErrors);
+      setFormError("Correggi tutti i campi evidenziati prima di salvare.");
+      focusFirstError(clientErrors);
       return;
     }
-    if (!draft.codiceFiscale.trim() && !draft.codiceFiscaleNonDisponibile) {
-      toast({
-        title: "Codice fiscale incompleto",
-        description:
-          "Inserisci il codice fiscale oppure indica che non è disponibile.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!draft.domicilioCoincideResidenza && !draft.indirizzoDomicilio.trim()) {
-      toast({
-        title: "Domicilio incompleto",
-        description: "Inserisci l'indirizzo di domicilio.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (
-      draft.tipoVolontario === "TEMPORANEO" &&
-      !editing &&
-      !draft.dataServizio
-    ) {
-      toast({
-        title: "Giornata obbligatoria",
-        description: "Indica la prima giornata di servizio del temporaneo.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const payload = {
-      nome: draft.nome.trim(),
-      cognome: draft.cognome.trim(),
-      ...(!editing ? { tipoVolontario: draft.tipoVolontario } : {}),
-      centroAscoltoId: lockedCenterId ?? draft.centroAscoltoId,
-      ruoloVolontarioId: draft.ruoloVolontarioId,
-      telefono: draft.telefono || undefined,
-      telefonoSecondario: draft.telefonoSecondario || undefined,
-      email: draft.email || undefined,
-      luogoNascita: draft.luogoNascita,
-      dataNascita: draft.dataNascita,
-      indirizzoResidenza: draft.indirizzoResidenza,
-      indirizzoDomicilio: draft.domicilioCoincideResidenza ? null : draft.indirizzoDomicilio.trim(),
-      codiceFiscale: draft.codiceFiscale.trim() || null,
-      codiceFiscaleNonDisponibile: draft.codiceFiscaleNonDisponibile,
-      codiceFiscaleNota: draft.codiceFiscaleNonDisponibile
-        ? draft.codiceFiscaleNota.trim() || null
-        : null,
-      patente: draft.patente,
-      mezzoPersonale: draft.mezzoPersonale,
-      maxConsegneTurno: draft.maxConsegneTurno,
-      note: draft.note || undefined,
-      ...(!editing && draft.tipoVolontario === "TEMPORANEO"
-        ? { dataServizio: draft.dataServizio }
-        : {}),
-    };
+    resetFormFeedback();
     try {
       if (editing) {
-        await updateVolunteer.mutateAsync({
+        const updated = await updateVolunteer.mutateAsync({
           id: editing.id,
-          data: { ...payload, versione: editing.versione } as VolontarioUpdate,
+          data: buildVolunteerUpdatePayload(
+            draft,
+            initialDraft ?? draft,
+            lockedCenterId,
+            editing.versione,
+          ) as unknown as VolontarioUpdate,
         });
+        if (resumeConversionAfterSave) setDossierVolunteer(updated);
         toast({ title: "Anagrafica aggiornata" });
       } else {
         await createVolunteer.mutateAsync({
-          data: payload as VolontarioInput,
+          data: buildVolunteerCreatePayload(
+            draft,
+            lockedCenterId,
+          ) as VolontarioInput,
         });
         toast({
           title: "Volontario creato",
@@ -449,10 +432,21 @@ export default function Volontari() {
         queryKey: getListVolontariQueryKey(),
       });
       setFormOpen(false);
+      if (!editing) setResumeConversionAfterSave(false);
     } catch (error) {
+      const data = volunteerApiErrorData(error);
+      const serverErrors = data.fieldErrors ?? {};
+      setFormErrors(serverErrors);
+      setFormError(
+        data.message ??
+          data.error ??
+          "Non è stato possibile salvare l'anagrafica.",
+      );
+      setFormCorrelationId(data.correlationId ?? null);
+      focusFirstError(serverErrors);
       toast({
         title: "Salvataggio non riuscito",
-        description: errorMessage(error),
+        description: data.message ?? data.error ?? errorMessage(error),
         variant: "destructive",
       });
     }
@@ -597,6 +591,31 @@ export default function Volontari() {
       setExportPending(false);
     }
   };
+
+  const fieldInputProps = (field: VolunteerFormField) => ({
+    id: `volontario-${field}`,
+    "data-volunteer-field": field,
+    "aria-invalid": formErrors[field] ? (true as const) : undefined,
+    "aria-describedby": formErrors[field]
+      ? `volontario-${field}-error`
+      : undefined,
+  });
+  const fieldError = (field: VolunteerFormField) =>
+    formErrors[field] ? (
+      <p
+        id={`volontario-${field}-error`}
+        className="text-sm text-destructive"
+        role="alert"
+      >
+        {formErrors[field]}
+      </p>
+    ) : null;
+  const invalidBorder = (field: VolunteerFormField) =>
+    `min-h-11 ${
+      formErrors[field]
+        ? "border-destructive focus-visible:ring-destructive"
+        : ""
+    }`;
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5 p-4 sm:p-6">
@@ -758,6 +777,9 @@ export default function Volontari() {
                     <SelectItem value="MANCANTE">Mancante</SelectItem>
                     <SelectItem value="NON_ANCORA_VALIDA">
                       Non ancora valida
+                    </SelectItem>
+                    <SelectItem value="TEMPORANEA">
+                      Temporanea (giornata di servizio)
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -1123,8 +1145,20 @@ export default function Volontari() {
         </CardContent>
       </Card>
 
-      <Sheet open={formOpen} onOpenChange={setFormOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+      <Sheet
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (
+            !open &&
+            !createVolunteer.isPending &&
+            !updateVolunteer.isPending
+          ) {
+            setResumeConversionAfterSave(false);
+          }
+        }}
+      >
+        <SheetContent className="flex w-full flex-col overflow-hidden sm:max-w-2xl">
           <SheetHeader>
             <SheetTitle>
               {editing ? "Modifica volontario" : "Nuovo volontario"}
@@ -1134,38 +1168,65 @@ export default function Volontari() {
               sospensione e assicurazione.
             </SheetDescription>
           </SheetHeader>
-          <div className="space-y-7 py-6">
+          {formError && (
+            <div
+              className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+              role="alert"
+            >
+              <div className="font-medium">{formError}</div>
+              {formCorrelationId && (
+                <div className="mt-1 text-xs">
+                  ID correlazione: {formCorrelationId}
+                </div>
+              )}
+            </div>
+          )}
+          <div className="min-h-0 flex-1 space-y-7 overflow-y-auto py-6 pr-1">
             <section className="space-y-4">
               <h3 className="font-semibold">1. Identità e contatti</h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <Label>Nome *</Label>
+                  <Label htmlFor="volontario-nome">Nome *</Label>
                   <Input
+                    {...fieldInputProps("nome")}
+                    className={invalidBorder("nome")}
                     value={draft.nome}
                     onChange={(event) => setField("nome", event.target.value)}
                   />
+                  {fieldError("nome")}
                 </div>
                 <div className="space-y-1">
-                  <Label>Cognome *</Label>
+                  <Label htmlFor="volontario-cognome">Cognome *</Label>
                   <Input
+                    {...fieldInputProps("cognome")}
+                    className={invalidBorder("cognome")}
                     value={draft.cognome}
                     onChange={(event) =>
                       setField("cognome", event.target.value)
                     }
                   />
+                  {fieldError("cognome")}
                 </div>
                 <div className="space-y-1">
-                  <Label>Codice fiscale *</Label>
+                  <Label htmlFor="volontario-codiceFiscale">
+                    Codice fiscale *
+                  </Label>
                   <Input
+                    {...fieldInputProps("codiceFiscale")}
+                    className={invalidBorder("codiceFiscale")}
                     disabled={draft.codiceFiscaleNonDisponibile}
                     value={draft.codiceFiscale}
                     onChange={(event) =>
                       setField("codiceFiscale", event.target.value)
                     }
                   />
+                  {fieldError("codiceFiscale")}
                 </div>
-                <label className="flex min-h-12 items-center gap-3 rounded-lg border p-3 sm:col-span-2">
+                <label
+                  className={`flex min-h-12 items-center gap-3 rounded-lg border p-3 sm:col-span-2 ${invalidBorder("codiceFiscaleNonDisponibile")}`}
+                >
                   <Checkbox
+                    {...fieldInputProps("codiceFiscaleNonDisponibile")}
                     className={touchCheckboxClass}
                     checked={draft.codiceFiscaleNonDisponibile}
                     onCheckedChange={(checked) => {
@@ -1173,46 +1234,69 @@ export default function Volontari() {
                       if (checked === true) setField("codiceFiscale", "");
                     }}
                   />
-                  Codice fiscale non disponibile
+                  <span>
+                    Codice fiscale non disponibile
+                    {fieldError("codiceFiscaleNonDisponibile")}
+                  </span>
                 </label>
                 {draft.codiceFiscaleNonDisponibile && (
                   <div className="space-y-1 sm:col-span-2">
-                    <Label>Motivo indisponibilità (facoltativo)</Label>
+                    <Label htmlFor="volontario-codiceFiscaleNota">
+                      Motivo indisponibilità (facoltativo)
+                    </Label>
                     <Input
+                      {...fieldInputProps("codiceFiscaleNota")}
+                      className={invalidBorder("codiceFiscaleNota")}
                       value={draft.codiceFiscaleNota}
                       onChange={(event) =>
                         setField("codiceFiscaleNota", event.target.value)
                       }
                     />
+                    {fieldError("codiceFiscaleNota")}
                   </div>
                 )}
                 <div className="space-y-1">
-                  <Label>Data di nascita *</Label>
+                  <Label htmlFor="volontario-dataNascita">
+                    Data di nascita *
+                  </Label>
                   <Input
+                    {...fieldInputProps("dataNascita")}
+                    className={invalidBorder("dataNascita")}
                     type="date"
                     value={draft.dataNascita}
                     onChange={(event) =>
                       setField("dataNascita", event.target.value)
                     }
                   />
+                  {fieldError("dataNascita")}
                 </div>
                 <div className="space-y-1">
-                  <Label>Luogo di nascita *</Label>
+                  <Label htmlFor="volontario-luogoNascita">
+                    Luogo di nascita *
+                  </Label>
                   <Input
+                    {...fieldInputProps("luogoNascita")}
+                    className={invalidBorder("luogoNascita")}
                     value={draft.luogoNascita}
                     onChange={(event) =>
                       setField("luogoNascita", event.target.value)
                     }
                   />
+                  {fieldError("luogoNascita")}
                 </div>
                 <div className="space-y-1 sm:col-span-2">
-                  <Label>Indirizzo di residenza *</Label>
+                  <Label htmlFor="volontario-indirizzoResidenza">
+                    Indirizzo di residenza *
+                  </Label>
                   <Input
+                    {...fieldInputProps("indirizzoResidenza")}
+                    className={invalidBorder("indirizzoResidenza")}
                     value={draft.indirizzoResidenza}
                     onChange={(event) =>
                       setField("indirizzoResidenza", event.target.value)
                     }
                   />
+                  {fieldError("indirizzoResidenza")}
                 </div>
                 <label className="flex min-h-12 items-center gap-3 rounded-lg border p-3 sm:col-span-2">
                   <Checkbox
@@ -1228,40 +1312,58 @@ export default function Volontari() {
                 </label>
                 {!draft.domicilioCoincideResidenza && (
                   <div className="space-y-1 sm:col-span-2">
-                    <Label>Indirizzo di domicilio *</Label>
+                    <Label htmlFor="volontario-indirizzoDomicilio">
+                      Indirizzo di domicilio *
+                    </Label>
                     <Input
+                      {...fieldInputProps("indirizzoDomicilio")}
+                      className={invalidBorder("indirizzoDomicilio")}
                       value={draft.indirizzoDomicilio}
-                      onChange={(event) => setField("indirizzoDomicilio", event.target.value)}
+                      onChange={(event) =>
+                        setField("indirizzoDomicilio", event.target.value)
+                      }
                     />
+                    {fieldError("indirizzoDomicilio")}
                   </div>
                 )}
                 <div className="space-y-1">
-                  <Label>Cellulare</Label>
+                  <Label htmlFor="volontario-telefono">Cellulare</Label>
                   <Input
+                    {...fieldInputProps("telefono")}
+                    className={invalidBorder("telefono")}
                     inputMode="tel"
                     value={draft.telefono}
                     onChange={(event) =>
                       setField("telefono", event.target.value)
                     }
                   />
+                  {fieldError("telefono")}
                 </div>
                 <div className="space-y-1">
-                  <Label>Telefono</Label>
+                  <Label htmlFor="volontario-telefonoSecondario">
+                    Telefono
+                  </Label>
                   <Input
+                    {...fieldInputProps("telefonoSecondario")}
+                    className={invalidBorder("telefonoSecondario")}
                     inputMode="tel"
                     value={draft.telefonoSecondario}
                     onChange={(event) =>
                       setField("telefonoSecondario", event.target.value)
                     }
                   />
+                  {fieldError("telefonoSecondario")}
                 </div>
                 <div className="space-y-1 sm:col-span-2">
-                  <Label>Email</Label>
+                  <Label htmlFor="volontario-email">Email</Label>
                   <Input
+                    {...fieldInputProps("email")}
+                    className={invalidBorder("email")}
                     type="email"
                     value={draft.email}
                     onChange={(event) => setField("email", event.target.value)}
                   />
+                  {fieldError("email")}
                 </div>
               </div>
             </section>
@@ -1269,7 +1371,9 @@ export default function Volontari() {
               <h3 className="font-semibold">2. Tipo, ruolo e perimetro</h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <Label>Tipo volontario *</Label>
+                  <Label htmlFor="volontario-tipoVolontario">
+                    Tipo volontario *
+                  </Label>
                   <Select
                     disabled={editing != null}
                     value={draft.tipoVolontario}
@@ -1280,7 +1384,10 @@ export default function Volontari() {
                       )
                     }
                   >
-                    <SelectTrigger className="min-h-11">
+                    <SelectTrigger
+                      {...fieldInputProps("tipoVolontario")}
+                      className={`min-h-11 ${invalidBorder("tipoVolontario")}`}
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1288,14 +1395,16 @@ export default function Volontari() {
                       <SelectItem value="TEMPORANEO">Temporaneo</SelectItem>
                     </SelectContent>
                   </Select>
+                  {fieldError("tipoVolontario")}
                   {!editing && (
                     <p className="text-xs text-muted-foreground">
-                      La matricola verrà generata automaticamente al salvataggio.
+                      La matricola verrà generata automaticamente al
+                      salvataggio.
                     </p>
                   )}
                 </div>
                 <div className="space-y-1">
-                  <Label>Ruolo *</Label>
+                  <Label htmlFor="volontario-ruoloVolontarioId">Ruolo *</Label>
                   <Select
                     value={
                       draft.ruoloVolontarioId
@@ -1306,7 +1415,10 @@ export default function Volontari() {
                       setField("ruoloVolontarioId", Number(value))
                     }
                   >
-                    <SelectTrigger className="min-h-11">
+                    <SelectTrigger
+                      {...fieldInputProps("ruoloVolontarioId")}
+                      className={`min-h-11 ${invalidBorder("ruoloVolontarioId")}`}
+                    >
                       <SelectValue placeholder="Seleziona ruolo" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1319,9 +1431,10 @@ export default function Volontari() {
                         ))}
                     </SelectContent>
                   </Select>
+                  {fieldError("ruoloVolontarioId")}
                 </div>
                 <div className="space-y-1">
-                  <Label>Centro</Label>
+                  <Label htmlFor="volontario-centroAscoltoId">Centro</Label>
                   <Select
                     disabled={lockedCenterId != null}
                     value={
@@ -1336,7 +1449,10 @@ export default function Volontari() {
                       )
                     }
                   >
-                    <SelectTrigger className="min-h-11">
+                    <SelectTrigger
+                      {...fieldInputProps("centroAscoltoId")}
+                      className={`min-h-11 ${invalidBorder("centroAscoltoId")}`}
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1350,17 +1466,23 @@ export default function Volontari() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {fieldError("centroAscoltoId")}
                 </div>
                 {draft.tipoVolontario === "TEMPORANEO" && !editing && (
                   <div className="space-y-1">
-                    <Label>Prima giornata di servizio *</Label>
+                    <Label htmlFor="volontario-dataServizio">
+                      Prima giornata di servizio *
+                    </Label>
                     <Input
+                      {...fieldInputProps("dataServizio")}
+                      className={invalidBorder("dataServizio")}
                       type="date"
                       value={draft.dataServizio}
                       onChange={(event) =>
                         setField("dataServizio", event.target.value)
                       }
                     />
+                    {fieldError("dataServizio")}
                   </div>
                 )}
               </div>
@@ -1370,6 +1492,7 @@ export default function Volontari() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="flex min-h-12 items-center gap-3 rounded-lg border p-3">
                   <Checkbox
+                    className={touchCheckboxClass}
                     checked={draft.patente}
                     onCheckedChange={(checked) =>
                       setField("patente", checked === true)
@@ -1379,6 +1502,7 @@ export default function Volontari() {
                 </label>
                 <label className="flex min-h-12 items-center gap-3 rounded-lg border p-3">
                   <Checkbox
+                    className={touchCheckboxClass}
                     checked={draft.mezzoPersonale}
                     onCheckedChange={(checked) =>
                       setField("mezzoPersonale", checked === true)
@@ -1387,8 +1511,12 @@ export default function Volontari() {
                   Mezzo personale
                 </label>
                 <div className="space-y-1">
-                  <Label>Massimo consegne per turno</Label>
+                  <Label htmlFor="volontario-maxConsegneTurno">
+                    Massimo consegne per turno
+                  </Label>
                   <Input
+                    {...fieldInputProps("maxConsegneTurno")}
+                    className={invalidBorder("maxConsegneTurno")}
                     type="number"
                     min="0"
                     value={draft.maxConsegneTurno}
@@ -1396,6 +1524,7 @@ export default function Volontari() {
                       setField("maxConsegneTurno", Number(event.target.value))
                     }
                   />
+                  {fieldError("maxConsegneTurno")}
                 </div>
               </div>
             </section>
@@ -1407,24 +1536,25 @@ export default function Volontari() {
                 rows={4}
               />
             </section>
-            <div className="flex justify-end gap-2 border-t pt-5">
-              <Button
-                variant="outline"
-                className="min-h-11"
-                onClick={() => setFormOpen(false)}
-              >
-                Annulla
-              </Button>
-              <Button
-                className="min-h-11"
-                onClick={saveVolunteer}
-                disabled={
-                  createVolunteer.isPending || updateVolunteer.isPending
-                }
-              >
-                {editing ? "Salva modifiche" : "Crea volontario"}
-              </Button>
-            </div>
+          </div>
+          <div className="z-10 flex shrink-0 flex-wrap justify-end gap-2 border-t bg-background/95 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+            <Button
+              variant="outline"
+              className="min-h-11"
+              onClick={() => {
+                setFormOpen(false);
+                setResumeConversionAfterSave(false);
+              }}
+            >
+              Annulla
+            </Button>
+            <Button
+              className="min-h-11"
+              onClick={saveVolunteer}
+              disabled={createVolunteer.isPending || updateVolunteer.isPending}
+            >
+              {editing ? "Salva modifiche" : "Crea volontario"}
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
@@ -1435,9 +1565,12 @@ export default function Volontari() {
         onOpenChange={(open) => {
           if (!open) setDossierVolunteer(null);
         }}
-        onEdit={(volunteer) => {
+        autoOpenConversion={resumeConversionAfterSave}
+        onAutoOpenConversionHandled={() => setResumeConversionAfterSave(false)}
+        onEdit={(volunteer, errors = {}) => {
+          setResumeConversionAfterSave(Object.keys(errors).length > 0);
           setDossierVolunteer(null);
-          openEdit(volunteer);
+          openEdit(volunteer, errors);
         }}
         onOperation={openOperation}
       />

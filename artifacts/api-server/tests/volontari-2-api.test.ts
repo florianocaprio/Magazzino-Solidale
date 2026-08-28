@@ -814,7 +814,10 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
       "",
     ];
     const first = await analyze(workbook([rowA, rowB], "ordine-a-b"), centroId);
-    const second = await analyze(workbook([rowB, rowA], "ordine-b-a"), centroId);
+    const second = await analyze(
+      workbook([rowB, rowA], "ordine-b-a"),
+      centroId,
+    );
     expect(first.status, first.text).toBe(201);
     expect(second.status, second.text).toBe(201);
     expect(first.body.righe, JSON.stringify(first.body.righe)).toEqual(
@@ -853,7 +856,10 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
   });
 
   it("blocca la conferma se il candidato cambia dopo la preview", async () => {
-    const centroId = await createCentro(scope, unique("Centro Concorrenza Import"));
+    const centroId = await createCentro(
+      scope,
+      unique("Centro Concorrenza Import"),
+    );
     const existing = await createVolunteer({
       centroAscoltoId: centroId,
       email: "prima@example.test",
@@ -884,7 +890,10 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     ]);
     const preview = await analyze(file, centroId);
     expect(preview.status, preview.text).toBe(201);
-    expect(preview.body.righe[0], JSON.stringify(preview.body.righe[0])).toMatchObject({
+    expect(
+      preview.body.righe[0],
+      JSON.stringify(preview.body.righe[0]),
+    ).toMatchObject({
       stato: "AGGIORNAMENTO_CERTO",
       errori: [],
     });
@@ -1087,8 +1096,10 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
         matricola: "X".repeat(41),
         ruoloVolontarioId: ruoloId,
       });
-    expect(invalidLength.status).toBe(400);
-    expect(invalidLength.body.error).toMatch(/generata automaticamente/i);
+    expect(invalidLength.status).toBe(422);
+    expect(invalidLength.body.fieldErrors.matricola).toMatch(
+      /generata automaticamente/i,
+    );
 
     const first = await createVolunteer({
       codiceFiscale: "RSS MRA 80A01 H501 U",
@@ -1100,19 +1111,18 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
       dataNascita: "1980-01-01",
       indirizzoResidenza: "Via dell'Unità 3",
     });
-    const duplicate = await request(app())
-      .post("/volontari")
-      .send({
-        nome: "Altro",
-        cognome: "Sintetico",
-        ruoloVolontarioId: ruoloId,
-        centroAscoltoId: defaultCenterId,
-        codiceFiscale: "RSSMRA80A01H501U",
-        luogoNascita: "Roma",
-        dataNascita: "1982-02-02",
-        indirizzoResidenza: "Via Duplicato 2",
-      });
-    expect(duplicate.status).toBe(409);
+    const duplicate = await request(app()).post("/volontari").send({
+      nome: "Altro",
+      cognome: "Sintetico",
+      ruoloVolontarioId: ruoloId,
+      centroAscoltoId: defaultCenterId,
+      codiceFiscale: "RSSMRA80A01H501U",
+      luogoNascita: "Roma",
+      dataNascita: "1982-02-02",
+      indirizzoResidenza: "Via Duplicato 2",
+    });
+    expect(duplicate.status).toBe(422);
+    expect(duplicate.body.fieldErrors.codiceFiscale).toMatch(/già associato/i);
 
     const list = await request(app()).get(
       `/volontari?search=${first.matricola}`,
@@ -1586,10 +1596,12 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
         "",
         "",
         "",
-        (await db
-          .select({ nome: centriAscoltoTable.nome })
-          .from(centriAscoltoTable)
-          .where(eq(centriAscoltoTable.id, centerA)))[0].nome,
+        (
+          await db
+            .select({ nome: centriAscoltoTable.nome })
+            .from(centriAscoltoTable)
+            .where(eq(centriAscoltoTable.id, centerA))
+        )[0].nome,
         role.nome,
         "Permanente",
         "",
@@ -1627,9 +1639,7 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     scope.importazioneVolontariIds.push(globalBatch.body.importazioneId);
     expect(
       (
-        await request(
-          app({ centroAscoltoId: centerA, areaOperativaId: areaA }),
-        )
+        await request(app({ centroAscoltoId: centerA, areaOperativaId: areaA }))
           .post("/volontari/import/conferma")
           .send({ importazioneId: globalBatch.body.importazioneId, righe: [] })
       ).status,
@@ -1820,10 +1830,9 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     );
     const futureBook = XLSX.read(futureResponse.body, { type: "buffer" });
     expect(
-      XLSX.utils.sheet_to_json(
-        futureBook.Sheets[futureBook.SheetNames[0]],
-        { raw: true },
-      ),
+      XLSX.utils.sheet_to_json(futureBook.Sheets[futureBook.SheetNames[0]], {
+        raw: true,
+      }),
     ).toHaveLength(0);
 
     const pdf = await request(app())
@@ -1868,12 +1877,10 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
   it("limita le giornate temporanee per intervallo e Centro", async () => {
     const areaA = await createAreaOperativa(scope);
     const areaB = await createAreaOperativa(scope);
-    const centerA = (
-      await createCentroRec(scope, { areaOperativaId: areaA })
-    ).id;
-    const centerB = (
-      await createCentroRec(scope, { areaOperativaId: areaB })
-    ).id;
+    const centerA = (await createCentroRec(scope, { areaOperativaId: areaA }))
+      .id;
+    const centerB = (await createCentroRec(scope, { areaOperativaId: areaB }))
+      .id;
     const volunteer = await createVolunteer({
       tipo: "TEMPORANEO",
       centroAscoltoId: centerA,

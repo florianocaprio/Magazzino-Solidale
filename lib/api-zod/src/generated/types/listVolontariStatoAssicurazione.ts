@@ -10,6 +10,7 @@ export type ListVolontariStatoAssicurazione = typeof ListVolontariStatoAssicuraz
 
 
 export const ListVolontariStatoAssicurazione = {
+  TEMPORANEA: 'TEMPORANEA',
   MANCANTE: 'MANCANTE',
   VALIDA: 'VALIDA',
   IN_SCADENZA: 'IN_SCADENZA',
