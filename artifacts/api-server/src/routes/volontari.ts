@@ -10,6 +10,7 @@ import {
   mezziTable,
   matricoleVolontariTable,
   statiVolontariTable,
+  giornateServizioVolontariTable,
 } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
 import {
@@ -416,6 +417,13 @@ async function createVolontarioOne(
     return { error: "tipoVolontario non valido", status: 400 };
   }
   values.tipoVolontario = tipoVolontario;
+  const dataServizio = body.dataServizio;
+  if (tipoVolontario === "TEMPORANEO" && !isDateOnly(dataServizio)) {
+    return { error: "dataServizio obbligatoria e valida per un volontario temporaneo", status: 400 };
+  }
+  if (tipoVolontario === "PERMANENTE" && dataServizio != null && String(dataServizio).trim()) {
+    return { error: "dataServizio è prevista solo per un volontario temporaneo", status: 400 };
+  }
   const codiceFiscaleNormalizzato = normalizeCodiceFiscale(
     values.codiceFiscale,
   );
@@ -431,15 +439,6 @@ async function createVolontarioOne(
   if (!codiceFiscaleNormalizzato && !codiceFiscaleNonDisponibile) {
     return {
       error: "Inserisci il codice fiscale oppure dichiaralo non disponibile",
-      status: 400,
-    };
-  }
-  if (
-    codiceFiscaleNonDisponibile &&
-    (typeof values.codiceFiscaleNota !== "string" || !values.codiceFiscaleNota)
-  ) {
-    return {
-      error: "Indica il motivo per cui il codice fiscale non è disponibile",
       status: 400,
     };
   }
@@ -538,16 +537,13 @@ async function createVolontarioOne(
               actorId(req),
             );
       const row = { ...inserted, matricola };
-      await auditLogistica(tx, req, {
-        entita: "volontario",
-        id: row.id,
-        azione: "creazione",
-        nuovo: {
-          statoApprovazione: "in_attesa",
-          attivo: false,
-          versione: row.versione,
-        },
-      });
+      const [giornataIniziale] = tipoVolontario === "TEMPORANEO"
+        ? await tx.insert(giornateServizioVolontariTable).values({
+            volontarioId: row.id, dataServizio: dataServizio as string,
+            centroAscoltoId: row.centroAscoltoId, stato: "PIANIFICATA",
+            coperturaVerificata: false, creatoDa: actorId(req),
+          }).returning()
+        : [];
       await appendVolontarioLedgerEvent(tx, {
         sezione: tipoVolontario,
         tipoEvento: "REGISTRAZIONE",
@@ -560,6 +556,29 @@ async function createVolontarioOne(
           dataInizio: todayRome(),
         }),
         utenteId: actorId(req),
+      });
+      if (giornataIniziale) {
+        await appendVolontarioLedgerEvent(tx, {
+          sezione: "TEMPORANEO", tipoEvento: "GIORNATA_TEMPORANEA",
+          volontarioId: row.id, centroAscoltoId: row.centroAscoltoId,
+          dataEffettiva: giornataIniziale.dataServizio,
+          snapshot: await buildVolunteerEventSnapshot(tx, row, {
+            statoPrecedente: null, nuovoStato: giornataIniziale.stato,
+            motivo: "prima_giornata_temporanea",
+            dataEffettiva: giornataIniziale.dataServizio,
+            riferimentoEventoId: giornataIniziale.id,
+            datiEvento: { giornataId: giornataIniziale.id, coperturaVerificata: false },
+          }),
+          utenteId: actorId(req),
+        });
+      }
+      await auditLogistica(tx, req, {
+        entita: "volontario", id: row.id, azione: "creazione",
+        nuovo: {
+          statoApprovazione: "in_attesa", attivo: false, versione: row.versione,
+          giornataInizialeId: giornataIniziale?.id ?? null,
+          dataServizio: giornataIniziale?.dataServizio ?? null,
+        },
       });
       return [row];
     });
@@ -1093,19 +1112,9 @@ router.patch(
       "codiceFiscaleNonDisponibile" in updates
         ? updates.codiceFiscaleNonDisponibile === true
         : existing.codiceFiscaleNonDisponibile;
-    const nextCfNote =
-      "codiceFiscaleNota" in updates
-        ? updates.codiceFiscaleNota
-        : existing.codiceFiscaleNota;
     if ((nextCf && nextUnavailable) || (!nextCf && !nextUnavailable)) {
       res.status(400).json({
         error: "Inserisci il codice fiscale oppure dichiaralo non disponibile",
-      });
-      return;
-    }
-    if (nextUnavailable && (typeof nextCfNote !== "string" || !nextCfNote.trim())) {
-      res.status(400).json({
-        error: "Indica il motivo per cui il codice fiscale non è disponibile",
       });
       return;
     }

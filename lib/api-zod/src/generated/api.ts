@@ -9717,11 +9717,11 @@ export const ListVolontariResponse = zod.array(ListVolontariResponseItem)
 
 
 
-export const createVolontarioBodyMaxConsegneTurnoMin = 0;
+export const createVolontarioBodyTwoMaxConsegneTurnoMin = 0;
 
 
 
-export const CreateVolontarioBody = zod.object({
+export const CreateVolontarioBody = zod.unknown().and(zod.object({
   "nome": zod.string(),
   "cognome": zod.string(),
   "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']).optional(),
@@ -9732,25 +9732,26 @@ export const CreateVolontarioBody = zod.object({
   "luogoNascita": zod.string(),
   "dataNascita": zod.coerce.date(),
   "indirizzoResidenza": zod.string(),
-  "indirizzoDomicilio": zod.string().optional(),
-  "codiceFiscale": zod.string().optional(),
+  "indirizzoDomicilio": zod.string().nullish().describe('Null quando il domicilio coincide con la residenza.'),
+  "codiceFiscale": zod.string().nullish(),
   "codiceFiscaleNonDisponibile": zod.boolean().optional(),
-  "codiceFiscaleNota": zod.string().optional(),
+  "codiceFiscaleNota": zod.string().nullish().describe('Nota facoltativa quando il codice fiscale non è disponibile.'),
+  "dataServizio": zod.coerce.date().optional().describe('Prima giornata, obbligatoria quando tipoVolontario è TEMPORANEO.'),
   "ruoloVolontarioId": zod.number().min(1),
   "patente": zod.boolean().optional(),
   "mezzoPersonale": zod.boolean().optional(),
-  "maxConsegneTurno": zod.number().min(createVolontarioBodyMaxConsegneTurnoMin).optional(),
+  "maxConsegneTurno": zod.number().min(createVolontarioBodyTwoMaxConsegneTurnoMin).optional(),
   "note": zod.string().optional()
-})
+}))
 
 
 
-export const bulkVolontariBodyRigheItemMaxConsegneTurnoMin = 0;
+export const bulkVolontariBodyRigheItemTwoMaxConsegneTurnoMin = 0;
 
 
 
 export const BulkVolontariBody = zod.object({
-  "righe": zod.array(zod.object({
+  "righe": zod.array(zod.unknown().and(zod.object({
   "nome": zod.string(),
   "cognome": zod.string(),
   "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']).optional(),
@@ -9761,16 +9762,17 @@ export const BulkVolontariBody = zod.object({
   "luogoNascita": zod.string(),
   "dataNascita": zod.coerce.date(),
   "indirizzoResidenza": zod.string(),
-  "indirizzoDomicilio": zod.string().optional(),
-  "codiceFiscale": zod.string().optional(),
+  "indirizzoDomicilio": zod.string().nullish().describe('Null quando il domicilio coincide con la residenza.'),
+  "codiceFiscale": zod.string().nullish(),
   "codiceFiscaleNonDisponibile": zod.boolean().optional(),
-  "codiceFiscaleNota": zod.string().optional(),
+  "codiceFiscaleNota": zod.string().nullish().describe('Nota facoltativa quando il codice fiscale non è disponibile.'),
+  "dataServizio": zod.coerce.date().optional().describe('Prima giornata, obbligatoria quando tipoVolontario è TEMPORANEO.'),
   "ruoloVolontarioId": zod.number().min(1),
   "patente": zod.boolean().optional(),
   "mezzoPersonale": zod.boolean().optional(),
-  "maxConsegneTurno": zod.number().min(bulkVolontariBodyRigheItemMaxConsegneTurnoMin).optional(),
+  "maxConsegneTurno": zod.number().min(bulkVolontariBodyRigheItemTwoMaxConsegneTurnoMin).optional(),
   "note": zod.string().optional()
-}))
+})))
 })
 
 export const BulkVolontariResponse = zod.object({
@@ -9988,6 +9990,10 @@ export const AnalyzeVolontariImportHeader = zod.object({
   "x-file-name": zod.string()
 })
 
+export const analyzeVolontariImportResponseRigheItemNumeroRigaMin = 2;
+
+
+
 export const AnalyzeVolontariImportResponse = zod.object({
   "importazioneId": zod.number(),
   "nomeFile": zod.string(),
@@ -10004,7 +10010,23 @@ export const AnalyzeVolontariImportResponse = zod.object({
   "importazioneOriginaleSha256File": zod.string().optional().describe('SHA-256 binario dell\'importazione confermata originaria quando la risposta è un replay.'),
   "numeroRighe": zod.number(),
   "replayIdempotente": zod.boolean().optional(),
-  "righe": zod.array(zod.record(zod.string(), zod.unknown()))
+  "righe": zod.array(zod.object({
+  "numeroRiga": zod.number().min(analyzeVolontariImportResponseRigheItemNumeroRigaMin),
+  "stato": zod.string(),
+  "datiOriginali": zod.record(zod.string(), zod.unknown()),
+  "datiNormalizzati": zod.record(zod.string(), zod.unknown()),
+  "matricolaProposta": zod.union([zod.object({
+  "modalita": zod.enum(['AUTOMATICA_AL_COMMIT']),
+  "tipoIdentificativo": zod.enum(['PERMANENTE', 'TEMPORANEA']),
+  "formato": zod.string(),
+  "consumaProgressivo": zod.boolean()
+}),zod.null()]),
+  "volontarioCandidatoId": zod.number().nullish(),
+  "ruoloPropostoId": zod.number().nullish(),
+  "centroPropostoId": zod.number().nullish(),
+  "errori": zod.array(zod.string()),
+  "avvisi": zod.array(zod.string())
+}))
 })
 
 
@@ -10330,10 +10352,10 @@ export const UpdateVolontarioBody = zod.object({
   "luogoNascita": zod.string().optional(),
   "dataNascita": zod.coerce.date().optional(),
   "indirizzoResidenza": zod.string().optional(),
-  "indirizzoDomicilio": zod.string().optional(),
-  "codiceFiscale": zod.string().optional(),
+  "indirizzoDomicilio": zod.string().nullish().describe('Null quando il domicilio coincide con la residenza.'),
+  "codiceFiscale": zod.string().nullish(),
   "codiceFiscaleNonDisponibile": zod.boolean().optional(),
-  "codiceFiscaleNota": zod.string().optional(),
+  "codiceFiscaleNota": zod.string().nullish().describe('Nota facoltativa quando il codice fiscale non è disponibile.'),
   "ruoloVolontarioId": zod.number().min(1).optional(),
   "patente": zod.boolean().optional(),
   "mezzoPersonale": zod.boolean().optional(),

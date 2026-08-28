@@ -92,6 +92,7 @@ async function createVolunteer(input: {
   luogoNascita?: string;
   dataNascita?: string;
   indirizzoResidenza?: string;
+  dataServizio?: string;
 }) {
   const centroAscoltoId = input.centroAscoltoId ?? defaultCenterId;
   const [center] = await db
@@ -122,6 +123,9 @@ async function createVolunteer(input: {
       luogoNascita: input.luogoNascita ?? "Roma",
       dataNascita: input.dataNascita ?? "1990-01-02",
       indirizzoResidenza: input.indirizzoResidenza ?? "Via Sintetica 1",
+      ...(input.tipo === "TEMPORANEO"
+        ? { dataServizio: input.dataServizio ?? "2026-01-01" }
+        : {}),
     });
   expect(response.status, response.text).toBe(201);
   scope.volontarioIds.push(response.body.id);
@@ -755,6 +759,7 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     );
     expect(officialRow).toMatchObject({
       Matricola: code,
+      Domicilio: "Via dell'Unità 7",
       "Data inizio attività/iscrizione": "2021-04-01",
       "Da Data importata": "2021-04-01",
       "Scadenza assicurazione": "2028-12-31",

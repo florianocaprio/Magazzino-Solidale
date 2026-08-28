@@ -51,8 +51,19 @@ describe("Volontari 2.0 — contratti UI", () => {
     expect(importDialog).toContain("confirmVolontariImport");
     expect(importDialog).toContain("POSSIBILE_DUPLICATO");
     expect(importDialog).toContain("creaNuovo");
+    expect(importDialog).toContain("dataInizioImportata");
+    expect(importDialog).toContain("matricolaProposta");
     expect(page).toContain("previewBulkVolontariInsurance");
     expect(page).toContain("confirmBulkVolontariInsurance");
     expect(page).toContain("row.incluso");
+  });
+
+  it("mantiene atomica la prima giornata e applica le semplificazioni anagrafiche", async () => {
+    const page = await source("../pages/volontari.tsx");
+    expect(page).not.toContain("createVolontarioServiceDay");
+    expect(page).toContain("dataServizio: draft.dataServizio");
+    expect(page).toContain("Il domicilio coincide con la residenza");
+    expect(page).toContain("Motivo indisponibilità (facoltativo)");
+    expect(page).toContain("domicilioCoincideResidenza");
   });
 });

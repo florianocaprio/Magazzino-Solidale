@@ -1030,7 +1030,7 @@ export const VolontarioInputTipoVolontario = {
   TEMPORANEO: 'TEMPORANEO',
 } as const;
 
-export interface VolontarioInput {
+export type VolontarioInput = unknown & ({
   nome: string;
   cognome: string;
   tipoVolontario?: VolontarioInputTipoVolontario;
@@ -1042,10 +1042,21 @@ export interface VolontarioInput {
   luogoNascita: string;
   dataNascita: string;
   indirizzoResidenza: string;
-  indirizzoDomicilio?: string;
-  codiceFiscale?: string;
+  /**
+     * Null quando il domicilio coincide con la residenza.
+     * @nullable
+     */
+  indirizzoDomicilio?: string | null;
+  /** @nullable */
+  codiceFiscale?: string | null;
   codiceFiscaleNonDisponibile?: boolean;
-  codiceFiscaleNota?: string;
+  /**
+     * Nota facoltativa quando il codice fiscale non è disponibile.
+     * @nullable
+     */
+  codiceFiscaleNota?: string | null;
+  /** Prima giornata, obbligatoria quando tipoVolontario è TEMPORANEO. */
+  dataServizio?: string;
   /** @minimum 1 */
   ruoloVolontarioId: number;
   patente?: boolean;
@@ -1053,7 +1064,7 @@ export interface VolontarioInput {
   /** @minimum 0 */
   maxConsegneTurno?: number;
   note?: string;
-}
+});
 
 export interface VolontariBulkInput {
   righe: VolontarioInput[];
@@ -6199,10 +6210,19 @@ export interface VolontarioUpdate {
   luogoNascita?: string;
   dataNascita?: string;
   indirizzoResidenza?: string;
-  indirizzoDomicilio?: string;
-  codiceFiscale?: string;
+  /**
+     * Null quando il domicilio coincide con la residenza.
+     * @nullable
+     */
+  indirizzoDomicilio?: string | null;
+  /** @nullable */
+  codiceFiscale?: string | null;
   codiceFiscaleNonDisponibile?: boolean;
-  codiceFiscaleNota?: string;
+  /**
+     * Nota facoltativa quando il codice fiscale non è disponibile.
+     * @nullable
+     */
+  codiceFiscaleNota?: string | null;
   /** @minimum 1 */
   ruoloVolontarioId?: number;
   patente?: boolean;
@@ -6466,6 +6486,50 @@ export interface VolontarioServiceDayUpdateInput {
   note?: string;
 }
 
+export type VolontariImportMatricolaProposalModalita = typeof VolontariImportMatricolaProposalModalita[keyof typeof VolontariImportMatricolaProposalModalita];
+
+
+export const VolontariImportMatricolaProposalModalita = {
+  AUTOMATICA_AL_COMMIT: 'AUTOMATICA_AL_COMMIT',
+} as const;
+
+export type VolontariImportMatricolaProposalTipoIdentificativo = typeof VolontariImportMatricolaProposalTipoIdentificativo[keyof typeof VolontariImportMatricolaProposalTipoIdentificativo];
+
+
+export const VolontariImportMatricolaProposalTipoIdentificativo = {
+  PERMANENTE: 'PERMANENTE',
+  TEMPORANEA: 'TEMPORANEA',
+} as const;
+
+export interface VolontariImportMatricolaProposal {
+  modalita: VolontariImportMatricolaProposalModalita;
+  tipoIdentificativo: VolontariImportMatricolaProposalTipoIdentificativo;
+  formato: string;
+  consumaProgressivo: false;
+}
+
+export type VolontariImportPreviewRowDatiOriginali = { [key: string]: unknown };
+
+export type VolontariImportPreviewRowDatiNormalizzati = { [key: string]: unknown };
+
+export interface VolontariImportPreviewRow {
+  /** @minimum 2 */
+  numeroRiga: number;
+  stato: string;
+  datiOriginali: VolontariImportPreviewRowDatiOriginali;
+  datiNormalizzati: VolontariImportPreviewRowDatiNormalizzati;
+  matricolaProposta: VolontariImportMatricolaProposal | null;
+  /** @nullable */
+  volontarioCandidatoId?: number | null;
+  /** @nullable */
+  ruoloPropostoId?: number | null;
+  /** @nullable */
+  centroPropostoId?: number | null;
+  errori: string[];
+  avvisi: string[];
+  [key: string]: unknown;
+ }
+
 export type VolontariImportPreviewScopeTipo = typeof VolontariImportPreviewScopeTipo[keyof typeof VolontariImportPreviewScopeTipo];
 
 
@@ -6474,8 +6538,6 @@ export const VolontariImportPreviewScopeTipo = {
   AREA: 'AREA',
   GLOBALE: 'GLOBALE',
 } as const;
-
-export type VolontariImportPreviewRigheItem = { [key: string]: unknown };
 
 export interface VolontariImportPreview {
   importazioneId: number;
@@ -6500,7 +6562,7 @@ export interface VolontariImportPreview {
   importazioneOriginaleSha256File?: string;
   numeroRighe: number;
   replayIdempotente?: boolean;
-  righe: VolontariImportPreviewRigheItem[];
+  righe: VolontariImportPreviewRow[];
 }
 
 /**

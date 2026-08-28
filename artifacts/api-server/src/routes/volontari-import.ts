@@ -26,6 +26,7 @@ import {
   normalizePhone,
   normalizeRoleName,
   parseFullName,
+  isDateOnly,
   todayRome,
 } from "../lib/volontariDomain";
 import {
@@ -39,7 +40,10 @@ import {
   isVolontarioMatricolaUniqueViolation,
   MATRICOLA_DUPLICATA_MSG,
   normalizeVolunteerIdentifier,
+  assignPermanentVolunteerIdentifier,
+  assignTemporaryVolunteerIdentifier,
   registerImportedVolunteerIdentifier,
+  VolunteerIdentifierError,
 } from "../lib/volontariMatricola";
 import {
   canAccessVolunteerOwnerScope,
@@ -114,7 +118,8 @@ function normalizeRow(row: ReturnType<typeof parseVolontariWorkbook>["rows"][num
   const tipoVolontario = parsedType(row.tipoVolontario);
   const errors = [...row.errori];
   const warnings: string[] = [];
-  if (!row.codice) errors.push("Codice/matricola obbligatorio");
+  if (!row.codice) warnings.push("Matricola assente: sarà generata automaticamente al commit");
+  if (!row.dataInizioImportata) warnings.push("Data di iscrizione/inizio attività mancante");
   if (!parsedName.nome || !parsedName.cognome) errors.push("Cognome e Nome non separabili");
   else if (parsedName.warning) warnings.push(parsedName.warning);
   if (!row.categoria) errors.push("Categoria/ruolo obbligatoria");
@@ -148,7 +153,7 @@ function normalizeRow(row: ReturnType<typeof parseVolontariWorkbook>["rows"][num
 function sameImportedFields(existing: typeof volontariTable.$inferSelect, row: NormalizedImport, ruoloId: number | null, centroId: number | null): boolean {
   return existing.nome === row.nome
     && existing.cognome === row.cognome
-    && normalizeVolunteerIdentifier(existing.matricola) === normalizeVolunteerIdentifier(row.matricola)
+    && (!row.matricola || normalizeVolunteerIdentifier(existing.matricola) === normalizeVolunteerIdentifier(row.matricola))
     && (existing.luogoNascita ?? null) === row.luogoNascita
     && (existing.dataNascita ?? null) === row.dataNascita
     && (existing.indirizzoResidenza ?? null) === row.indirizzoResidenza
@@ -221,6 +226,16 @@ function previewBatch(batch: typeof importazioniVolontariTable.$inferSelect, row
       hashRiga: row.hashRiga,
       datiOriginali: row.datiOriginali,
       datiNormalizzati: row.datiNormalizzati,
+      matricolaProposta: (() => {
+        const data = row.datiNormalizzati as NormalizedImport;
+        if (data.matricola) return null;
+        return {
+          modalita: "AUTOMATICA_AL_COMMIT",
+          tipoIdentificativo: data.tipoVolontario === "TEMPORANEO" ? "TEMPORANEA" : "PERMANENTE",
+          formato: data.tipoVolontario === "TEMPORANEO" ? "XXX-XXX" : "Configurazione matricole vigente",
+          consumaProgressivo: false,
+        };
+      })(),
       volontarioCandidatoId: row.volontarioCandidatoId,
       versioneCandidato: row.versioneCandidato,
       fingerprintCandidato: row.fingerprintCandidato,
@@ -544,11 +559,15 @@ router.post(
           continue;
         }
         const data = { ...(stored.datiNormalizzati as NormalizedImport), ...corrections } as NormalizedImport;
+        data.matricola = typeof data.matricola === "string" ? data.matricola.trim() || null : null;
         data.codiceFiscaleNormalizzato = normalizeCodiceFiscale(
           data.codiceFiscale,
         );
         data.codiceFiscale = data.codiceFiscaleNormalizzato;
-        if (!data.matricola || !data.nome || !data.cognome || !data.tipoVolontario || !["PERMANENTE", "TEMPORANEO"].includes(data.tipoVolontario)) {
+        if (!data.dataInizioImportata || !isDateOnly(data.dataInizioImportata)) {
+          throw new Error(`IMPORT_DATA_INIZIO_MANCANTE:${stored.numeroRiga}`);
+        }
+        if (!data.nome || !data.cognome || !data.tipoVolontario || !["PERMANENTE", "TEMPORANEO"].includes(data.tipoVolontario)) {
           errori += 1;
           await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_CORREZIONE" }).where(eq(importazioniVolontariRigheTable.id, stored.id));
           continue;
@@ -571,11 +590,13 @@ router.post(
           await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_MAPPING" }).where(eq(importazioniVolontariRigheTable.id, stored.id));
           continue;
         }
-        const normalizedIdentifier = normalizeVolunteerIdentifier(data.matricola)!;
-        const identifierRows = await tx
-          .select({ volontarioId: matricoleVolontariTable.volontarioId })
-          .from(matricoleVolontariTable)
-          .where(eq(matricoleVolontariTable.matricolaNormalizzata, normalizedIdentifier));
+        const normalizedIdentifier = normalizeVolunteerIdentifier(data.matricola);
+        const identifierRows = normalizedIdentifier
+          ? await tx
+              .select({ volontarioId: matricoleVolontariTable.volontarioId })
+              .from(matricoleVolontariTable)
+              .where(eq(matricoleVolontariTable.matricolaNormalizzata, normalizedIdentifier))
+          : [];
         const identifierIds = identifierRows.map((item) => item.volontarioId);
         const exactCondition = data.codiceFiscaleNormalizzato
           ? or(
@@ -733,7 +754,7 @@ router.post(
             volunteer = target; esito = "INVARIATO"; invariati += 1;
           } else {
             [volunteer] = await tx.update(volontariTable).set({
-              nome: data.nome, cognome: data.cognome, matricola: data.matricola,
+              nome: data.nome, cognome: data.cognome, matricola: data.matricola ?? target.matricola,
               tipoVolontario: data.tipoVolontario, centroAscoltoId: centroId,
               telefono: data.telefono, telefonoSecondario: data.telefonoSecondario,
               email: data.email, luogoNascita: data.luogoNascita, dataNascita: data.dataNascita,
@@ -747,16 +768,18 @@ router.post(
                   ? "Codice fiscale assente nel file importato"
                   : null,
               dataInizioImportata: data.dataInizioImportata,
-              dataIscrizione: data.dataInizioImportata ?? target.dataIscrizione,
+              dataIscrizione: data.dataInizioImportata,
               categoriaImportataOriginale: data.categoriaOriginale,
               gruppoImportatoOriginale: data.gruppoOriginale,
               ruoloVolontarioId: role.id, ruolo: role.nome,
               versione: sql`${volontariTable.versione} + 1`, dataAggiornamento: new Date(),
             }).where(eq(volontariTable.id, target.id)).returning();
-            await registerImportedVolunteerIdentifier(
-              tx, volunteer.id, data.matricola, data.tipoVolontario,
-              todayRome(), actorId(req),
-            );
+            if (data.matricola) {
+              await registerImportedVolunteerIdentifier(
+                tx, volunteer.id, data.matricola, data.tipoVolontario,
+                data.dataInizioImportata, actorId(req),
+              );
+            }
             await appendVolontarioLedgerEvent(tx, {
               sezione: volunteer.tipoVolontario as
                 | "PERMANENTE"
@@ -796,23 +819,36 @@ router.post(
                 ? "Codice fiscale assente nel file importato"
                 : null,
             dataInizioImportata: data.dataInizioImportata,
-            dataIscrizione: data.dataInizioImportata ?? todayRome(),
+            dataIscrizione: data.dataInizioImportata,
             categoriaImportataOriginale: data.categoriaOriginale,
             gruppoImportatoOriginale: data.gruppoOriginale,
             ruoloVolontarioId: role.id, ruolo: role.nome,
             attivo: false, statoApprovazione: "in_attesa",
           }).returning();
-          await registerImportedVolunteerIdentifier(
-            tx, volunteer.id, data.matricola, data.tipoVolontario,
-            data.dataInizioImportata ?? todayRome(), actorId(req),
-          );
+          let matricola: string;
+          if (data.matricola) {
+            await registerImportedVolunteerIdentifier(
+              tx, volunteer.id, data.matricola, data.tipoVolontario,
+              data.dataInizioImportata, actorId(req),
+            );
+            matricola = data.matricola;
+          } else if (data.tipoVolontario === "TEMPORANEO") {
+            matricola = await assignTemporaryVolunteerIdentifier(
+              tx, volunteer.id, data.dataInizioImportata, actorId(req),
+            );
+          } else {
+            matricola = await assignPermanentVolunteerIdentifier(
+              tx, volunteer.id, centroId, data.dataInizioImportata, actorId(req),
+            );
+          }
+          volunteer = { ...volunteer, matricola };
           esito = "CREATO"; creati += 1;
           await appendVolontarioLedgerEvent(tx, {
             sezione: data.tipoVolontario, tipoEvento: "REGISTRAZIONE", volontarioId: volunteer.id,
-            centroAscoltoId: centroId, dataEffettiva: data.dataInizioImportata ?? todayRome(),
+            centroAscoltoId: centroId, dataEffettiva: data.dataInizioImportata,
             snapshot: await buildVolunteerRegistrationSnapshot(tx, volunteer, {
               origine: "IMPORT_VOLONTARI_2_0",
-              dataInizio: data.dataInizioImportata ?? todayRome(),
+              dataInizio: data.dataInizioImportata,
               importazioneId: batch.id,
               numeroRiga: stored.numeroRiga,
             }),
@@ -882,6 +918,19 @@ router.post(
       }
       if (isVolontarioMatricolaUniqueViolation(error) || (error as Error)?.message === "MATRICOLA_DUPLICATA") {
         res.status(409).json({ error: MATRICOLA_DUPLICATA_MSG, code: "MATRICOLA_DUPLICATA" });
+        return;
+      }
+      if ((error as Error)?.message.startsWith("IMPORT_DATA_INIZIO_MANCANTE:")) {
+        const numeroRiga = Number((error as Error).message.split(":")[1]);
+        res.status(422).json({
+          error: "Data di iscrizione/inizio attività mancante",
+          code: "DATA_INIZIO_IMPORTATA_OBBLIGATORIA",
+          numeroRiga,
+        });
+        return;
+      }
+      if (error instanceof VolunteerIdentifierError) {
+        res.status(422).json({ error: error.message, code: error.code });
         return;
       }
       if ((error as Error)?.message === "IMPORT_GIA_CONFERMATO_CON_DECISIONI_DIVERSE") {

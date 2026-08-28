@@ -7,7 +7,7 @@
  */
 import type { VolontarioInputTipoVolontario } from './volontarioInputTipoVolontario';
 
-export interface VolontarioInput {
+export type VolontarioInput = unknown & ({
   nome: string;
   cognome: string;
   tipoVolontario?: VolontarioInputTipoVolontario;
@@ -19,10 +19,21 @@ export interface VolontarioInput {
   luogoNascita: string;
   dataNascita: Date;
   indirizzoResidenza: string;
-  indirizzoDomicilio?: string;
-  codiceFiscale?: string;
+  /**
+     * Null quando il domicilio coincide con la residenza.
+     * @nullable
+     */
+  indirizzoDomicilio?: string | null;
+  /** @nullable */
+  codiceFiscale?: string | null;
   codiceFiscaleNonDisponibile?: boolean;
-  codiceFiscaleNota?: string;
+  /**
+     * Nota facoltativa quando il codice fiscale non è disponibile.
+     * @nullable
+     */
+  codiceFiscaleNota?: string | null;
+  /** Prima giornata, obbligatoria quando tipoVolontario è TEMPORANEO. */
+  dataServizio?: Date;
   /** @minimum 1 */
   ruoloVolontarioId: number;
   patente?: boolean;
@@ -30,4 +41,4 @@ export interface VolontarioInput {
   /** @minimum 0 */
   maxConsegneTurno?: number;
   note?: string;
-}
+});

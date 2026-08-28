@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   confirmBulkVolontariInsurance,
-  createVolontarioServiceDay,
   customFetch,
   getVolontario,
   getListVolontariQueryKey,
@@ -97,6 +96,7 @@ type Draft = {
   dataNascita: string;
   indirizzoResidenza: string;
   indirizzoDomicilio: string;
+  domicilioCoincideResidenza: boolean;
   codiceFiscale: string;
   codiceFiscaleNonDisponibile: boolean;
   codiceFiscaleNota: string;
@@ -120,6 +120,7 @@ const emptyDraft = (centerId: number | null): Draft => ({
   dataNascita: "",
   indirizzoResidenza: "",
   indirizzoDomicilio: "",
+  domicilioCoincideResidenza: true,
   codiceFiscale: "",
   codiceFiscaleNonDisponibile: false,
   codiceFiscaleNota: "",
@@ -328,6 +329,9 @@ export default function Volontari() {
         indirizzoDomicilio:
           (detail as Volontario & { indirizzoDomicilio?: string | null })
             .indirizzoDomicilio ?? "",
+        domicilioCoincideResidenza:
+          (detail as Volontario & { indirizzoDomicilio?: string | null })
+            .indirizzoDomicilio == null,
         codiceFiscale: detail.codiceFiscale ?? "",
         codiceFiscaleNonDisponibile:
           (detail as Volontario & { codiceFiscaleNonDisponibile?: boolean })
@@ -370,14 +374,19 @@ export default function Volontari() {
       });
       return;
     }
-    if (
-      (!draft.codiceFiscale.trim() && !draft.codiceFiscaleNonDisponibile) ||
-      (draft.codiceFiscaleNonDisponibile && !draft.codiceFiscaleNota.trim())
-    ) {
+    if (!draft.codiceFiscale.trim() && !draft.codiceFiscaleNonDisponibile) {
       toast({
         title: "Codice fiscale incompleto",
         description:
-          "Inserisci il codice fiscale oppure indica che non è disponibile e specifica il motivo.",
+          "Inserisci il codice fiscale oppure indica che non è disponibile.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!draft.domicilioCoincideResidenza && !draft.indirizzoDomicilio.trim()) {
+      toast({
+        title: "Domicilio incompleto",
+        description: "Inserisci l'indirizzo di domicilio.",
         variant: "destructive",
       });
       return;
@@ -406,16 +415,19 @@ export default function Volontari() {
       luogoNascita: draft.luogoNascita,
       dataNascita: draft.dataNascita,
       indirizzoResidenza: draft.indirizzoResidenza,
-      indirizzoDomicilio: draft.indirizzoDomicilio || undefined,
-      codiceFiscale: draft.codiceFiscale || undefined,
+      indirizzoDomicilio: draft.domicilioCoincideResidenza ? null : draft.indirizzoDomicilio.trim(),
+      codiceFiscale: draft.codiceFiscale.trim() || null,
       codiceFiscaleNonDisponibile: draft.codiceFiscaleNonDisponibile,
       codiceFiscaleNota: draft.codiceFiscaleNonDisponibile
-        ? draft.codiceFiscaleNota
-        : undefined,
+        ? draft.codiceFiscaleNota.trim() || null
+        : null,
       patente: draft.patente,
       mezzoPersonale: draft.mezzoPersonale,
       maxConsegneTurno: draft.maxConsegneTurno,
       note: draft.note || undefined,
+      ...(!editing && draft.tipoVolontario === "TEMPORANEO"
+        ? { dataServizio: draft.dataServizio }
+        : {}),
     };
     try {
       if (editing) {
@@ -425,16 +437,9 @@ export default function Volontari() {
         });
         toast({ title: "Anagrafica aggiornata" });
       } else {
-        const created = await createVolunteer.mutateAsync({
+        await createVolunteer.mutateAsync({
           data: payload as VolontarioInput,
         });
-        if (draft.tipoVolontario === "TEMPORANEO" && draft.dataServizio) {
-          await createVolontarioServiceDay(created.id, {
-            dataServizio: draft.dataServizio,
-            centroAscoltoId: created.centroAscoltoId,
-            stato: "PIANIFICATA",
-          });
-        }
         toast({
           title: "Volontario creato",
           description: "L'anagrafica è in attesa di approvazione.",
@@ -1161,6 +1166,7 @@ export default function Volontari() {
                 </div>
                 <label className="flex min-h-12 items-center gap-3 rounded-lg border p-3 sm:col-span-2">
                   <Checkbox
+                    className={touchCheckboxClass}
                     checked={draft.codiceFiscaleNonDisponibile}
                     onCheckedChange={(checked) => {
                       setField("codiceFiscaleNonDisponibile", checked === true);
@@ -1171,7 +1177,7 @@ export default function Volontari() {
                 </label>
                 {draft.codiceFiscaleNonDisponibile && (
                   <div className="space-y-1 sm:col-span-2">
-                    <Label>Motivo indisponibilità *</Label>
+                    <Label>Motivo indisponibilità (facoltativo)</Label>
                     <Input
                       value={draft.codiceFiscaleNota}
                       onChange={(event) =>
@@ -1208,15 +1214,27 @@ export default function Volontari() {
                     }
                   />
                 </div>
-                <div className="space-y-1 sm:col-span-2">
-                  <Label>Indirizzo di domicilio</Label>
-                  <Input
-                    value={draft.indirizzoDomicilio}
-                    onChange={(event) =>
-                      setField("indirizzoDomicilio", event.target.value)
-                    }
+                <label className="flex min-h-12 items-center gap-3 rounded-lg border p-3 sm:col-span-2">
+                  <Checkbox
+                    className={touchCheckboxClass}
+                    checked={draft.domicilioCoincideResidenza}
+                    onCheckedChange={(checked) => {
+                      const coincide = checked === true;
+                      setField("domicilioCoincideResidenza", coincide);
+                      if (coincide) setField("indirizzoDomicilio", "");
+                    }}
                   />
-                </div>
+                  Il domicilio coincide con la residenza
+                </label>
+                {!draft.domicilioCoincideResidenza && (
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Indirizzo di domicilio *</Label>
+                    <Input
+                      value={draft.indirizzoDomicilio}
+                      onChange={(event) => setField("indirizzoDomicilio", event.target.value)}
+                    />
+                  </div>
+                )}
                 <div className="space-y-1">
                   <Label>Cellulare</Label>
                   <Input

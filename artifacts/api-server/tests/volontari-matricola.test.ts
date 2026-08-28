@@ -43,7 +43,7 @@ function volunteerPayload(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   sequence += 1;
-  return {
+  const payload: Record<string, unknown> = {
     nome: `Nome ${sequence}`,
     cognome: `Cognome ${sequence}`,
     tipoVolontario: "PERMANENTE",
@@ -56,6 +56,9 @@ function volunteerPayload(
     codiceFiscaleNota: "Non disponibile nel test automatico",
     ...overrides,
   };
+  if (payload.tipoVolontario === "TEMPORANEO" && payload.dataServizio == null)
+    payload.dataServizio = "2026-01-01";
+  return payload;
 }
 
 async function createVolunteer(overrides: Record<string, unknown> = {}) {

@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontariImportPreviewRigheItem } from './volontariImportPreviewRigheItem';
+import type { VolontariImportPreviewRow } from './volontariImportPreviewRow';
 import type { VolontariImportPreviewScopeTipo } from './volontariImportPreviewScopeTipo';
 
 export interface VolontariImportPreview {
@@ -31,5 +31,5 @@ export interface VolontariImportPreview {
   importazioneOriginaleSha256File?: string;
   numeroRighe: number;
   replayIdempotente?: boolean;
-  righe: VolontariImportPreviewRigheItem[];
+  righe: VolontariImportPreviewRow[];
 }

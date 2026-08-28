@@ -16227,13 +16227,19 @@ components:
         indirizzoResidenza:
           type: string
         indirizzoDomicilio:
-          type: string
+          type: ["string", "null"]
+          description: Null quando il domicilio coincide con la residenza.
         codiceFiscale:
-          type: string
+          type: ["string", "null"]
         codiceFiscaleNonDisponibile:
           type: boolean
         codiceFiscaleNota:
+          type: ["string", "null"]
+          description: Nota facoltativa quando il codice fiscale non è disponibile.
+        dataServizio:
           type: string
+          format: date
+          description: Prima giornata, obbligatoria quando tipoVolontario è TEMPORANEO.
         ruoloVolontarioId:
           type: integer
           minimum: 1
@@ -16248,6 +16254,13 @@ components:
           type: string
       required:
         [nome, cognome, luogoNascita, dataNascita, indirizzoResidenza, ruoloVolontarioId]
+      allOf:
+        - if:
+            properties:
+              tipoVolontario: { const: TEMPORANEO }
+            required: [tipoVolontario]
+          then:
+            required: [dataServizio]
 
     VolontarioUpdate:
       type: object
@@ -16272,13 +16285,15 @@ components:
         indirizzoResidenza:
           type: string
         indirizzoDomicilio:
-          type: string
+          type: ["string", "null"]
+          description: Null quando il domicilio coincide con la residenza.
         codiceFiscale:
-          type: string
+          type: ["string", "null"]
         codiceFiscaleNonDisponibile:
           type: boolean
         codiceFiscaleNota:
-          type: string
+          type: ["string", "null"]
+          description: Nota facoltativa quando il codice fiscale non è disponibile.
         ruoloVolontarioId:
           type: integer
           minimum: 1
@@ -16534,6 +16549,34 @@ components:
           type: string
       required: [versione]
 
+    VolontariImportMatricolaProposal:
+      type: object
+      properties:
+        modalita: { type: string, enum: [AUTOMATICA_AL_COMMIT] }
+        tipoIdentificativo: { type: string, enum: [PERMANENTE, TEMPORANEA] }
+        formato: { type: string }
+        consumaProgressivo: { type: boolean, const: false }
+      required: [modalita, tipoIdentificativo, formato, consumaProgressivo]
+
+    VolontariImportPreviewRow:
+      type: object
+      properties:
+        numeroRiga: { type: integer, minimum: 2 }
+        stato: { type: string }
+        datiOriginali: { type: object, additionalProperties: true }
+        datiNormalizzati: { type: object, additionalProperties: true }
+        matricolaProposta:
+          oneOf:
+            - $ref: "#/components/schemas/VolontariImportMatricolaProposal"
+            - type: "null"
+        volontarioCandidatoId: { type: ["integer", "null"] }
+        ruoloPropostoId: { type: ["integer", "null"] }
+        centroPropostoId: { type: ["integer", "null"] }
+        errori: { type: array, items: { type: string } }
+        avvisi: { type: array, items: { type: string } }
+      required: [numeroRiga, stato, datiOriginali, datiNormalizzati, matricolaProposta, errori, avvisi]
+      additionalProperties: true
+
     VolontariImportPreview:
       type: object
       properties:
@@ -16566,9 +16609,7 @@ components:
         replayIdempotente: { type: boolean }
         righe:
           type: array
-          items:
-            type: object
-            additionalProperties: true
+          items: { $ref: "#/components/schemas/VolontariImportPreviewRow" }
       required: [importazioneId, nomeFile, stato, hashFile, sha256File, hashContenutoNormalizzato, numeroRighe, righe]
 
     VolontariImportConfirmInput:

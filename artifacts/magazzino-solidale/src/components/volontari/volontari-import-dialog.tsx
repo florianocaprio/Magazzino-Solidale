@@ -44,6 +44,7 @@ type ImportData = {
   matricola?: string | null;
   codiceFiscale?: string | null;
   tipoVolontario?: "PERMANENTE" | "TEMPORANEO" | null;
+  dataInizioImportata?: string | null;
   dataServizio?: string | null;
   categoriaOriginale?: string | null;
   gruppoOriginale?: string | null;
@@ -52,6 +53,12 @@ type ImportRow = {
   numeroRiga: number;
   stato: string;
   datiNormalizzati?: ImportData;
+  matricolaProposta?: {
+    modalita: "AUTOMATICA_AL_COMMIT";
+    tipoIdentificativo: "PERMANENTE" | "TEMPORANEA";
+    formato: string;
+    consumaProgressivo: false;
+  } | null;
   volontarioCandidatoId?: number | null;
   ruoloPropostoId?: number | null;
   centroPropostoId?: number | null;
@@ -180,6 +187,7 @@ export function VolontariImportDialog({
           draft.decisioneDuplicato === "unresolved"
         )
           return true;
+        if (!draft.data.dataInizioImportata) return true;
         return draft.ruolo === "unresolved" || draft.centro === "unresolved";
       }).length,
     [drafts, rows],
@@ -345,7 +353,7 @@ export function VolontariImportDialog({
                             {draft.data.nome}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            Matricola {draft.data.matricola ?? "mancante"}
+                            Matricola {draft.data.matricola ?? row.matricolaProposta?.formato ?? "automatica al commit"}
                           </div>
                         </div>
                       </div>
@@ -387,9 +395,10 @@ export function VolontariImportDialog({
                     {draft.inclusa && (
                       <div className="mt-4 grid gap-3 border-t pt-4 md:grid-cols-2 xl:grid-cols-4">
                         <div className="space-y-1">
-                          <Label>Matricola</Label>
+                          <Label>Matricola (facoltativa)</Label>
                           <Input
                             value={draft.data.matricola ?? ""}
+                            placeholder={row.matricolaProposta?.formato ?? "Generata automaticamente"}
                             onChange={(event) =>
                               updateData(
                                 row.numeroRiga,
@@ -397,6 +406,14 @@ export function VolontariImportDialog({
                                 event.target.value,
                               )
                             }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Data iscrizione / inizio attività *</Label>
+                          <Input
+                            type="date"
+                            value={draft.data.dataInizioImportata ?? ""}
+                            onChange={(event) => updateData(row.numeroRiga, "dataInizioImportata", event.target.value)}
                           />
                         </div>
                         <div className="space-y-1">

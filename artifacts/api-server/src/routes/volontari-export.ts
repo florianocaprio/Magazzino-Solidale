@@ -455,7 +455,7 @@ async function officialRegisterRows(
         "Data di nascita": String(identity.dataNascita ?? ""),
         "Luogo di nascita": String(identity.luogoNascita ?? ""),
         Residenza: String(identity.indirizzoResidenza ?? ""),
-        Domicilio: String(identity.indirizzoDomicilio ?? ""),
+        Domicilio: String(identity.indirizzoDomicilio ?? identity.indirizzoResidenza ?? ""),
         "Tipo volontario": String(identity.tipoVolontario ?? ""),
         "Data inizio attività/iscrizione": item.registrationDate ?? "",
         "Origine iscrizione": item.origin,
