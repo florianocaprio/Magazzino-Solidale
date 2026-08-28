@@ -102,6 +102,20 @@ function validationResult(
   };
 }
 
+function duplicateCodiceFiscaleResult(
+  fieldErrors: VolontarioFieldErrors = {},
+): VolontarioMutationError {
+  const message = "Il codice fiscale è già associato a un altro volontario";
+  return {
+    ...validationResult(
+      { ...fieldErrors, codiceFiscale: message },
+      "CODICE_FISCALE_DUPLICATO",
+      message,
+    ),
+    status: 409,
+  };
+}
+
 function validationResponse(req: Request, result: VolontarioMutationError) {
   const correlationId = req.id == null ? randomUUID() : String(req.id);
   return {
@@ -472,6 +486,7 @@ async function createVolontarioOne(
   const fieldErrors = validateVolontarioState(values, {
     validateTemporaryServiceDate: true,
   });
+  let codiceFiscaleDuplicato = false;
   if (codiceFiscaleNormalizzato) {
     const [duplicateCf] = await db
       .select({ id: volontariTable.id })
@@ -480,9 +495,11 @@ async function createVolontarioOne(
         eq(volontariTable.codiceFiscaleNormalizzato, codiceFiscaleNormalizzato),
       )
       .limit(1);
-    if (duplicateCf)
+    if (duplicateCf) {
+      codiceFiscaleDuplicato = true;
       fieldErrors.codiceFiscale =
         "Il codice fiscale è già associato a un altro volontario";
+    }
   }
   const areaId = callerAreaOperativaId(req);
   const visibleIds = await visibleCentroIds(areaId);
@@ -520,8 +537,11 @@ async function createVolontarioOne(
     fieldErrors.maxConsegneTurno =
       "Il massimo consegne deve essere maggiore o uguale a zero";
   }
-  if (hasVolontarioFieldErrors(fieldErrors))
-    return validationResult(fieldErrors);
+  if (hasVolontarioFieldErrors(fieldErrors)) {
+    return codiceFiscaleDuplicato
+      ? duplicateCodiceFiscaleResult(fieldErrors)
+      : validationResult(fieldErrors);
+  }
   values.ruoloVolontarioId = ruolo!.id;
   values.ruolo = ruolo!.nome;
   values.maxConsegneTurno = maxConsegneTurno;
@@ -618,14 +638,7 @@ async function createVolontarioOne(
     return { id: created.id };
   } catch (e) {
     if (isVolontarioCodiceFiscaleUniqueViolation(e))
-      return validationResult(
-        {
-          codiceFiscale:
-            "Il codice fiscale è già associato a un altro volontario",
-        },
-        "CODICE_FISCALE_DUPLICATO",
-        "Il codice fiscale è già associato a un altro volontario",
-      );
+      return duplicateCodiceFiscaleResult();
     if (isVolontarioMatricolaUniqueViolation(e))
       return {
         error: "Conflitto durante la generazione della matricola",
@@ -1177,6 +1190,7 @@ router.patch(
       }
     }
     const nextCf = normalizeCodiceFiscale(nextState.codiceFiscale);
+    let codiceFiscaleDuplicato = false;
     if (nextCf) {
       const [duplicate] = await db
         .select({ id: volontariTable.id })
@@ -1189,6 +1203,7 @@ router.patch(
         )
         .limit(1);
       if (duplicate) {
+        codiceFiscaleDuplicato = true;
         fieldErrors.codiceFiscale =
           "Il codice fiscale è già associato a un altro volontario";
       }
@@ -1225,7 +1240,9 @@ router.patch(
       }
     }
     if (hasVolontarioFieldErrors(fieldErrors)) {
-      const result = validationResult(fieldErrors);
+      const result = codiceFiscaleDuplicato
+        ? duplicateCodiceFiscaleResult(fieldErrors)
+        : validationResult(fieldErrors);
       res.status(result.status).json(validationResponse(req, result));
       return;
     }
@@ -1354,14 +1371,7 @@ router.patch(
         return;
       }
       if (isVolontarioCodiceFiscaleUniqueViolation(e)) {
-        const result = validationResult(
-          {
-            codiceFiscale:
-              "Il codice fiscale è già associato a un altro volontario",
-          },
-          "CODICE_FISCALE_DUPLICATO",
-          "Il codice fiscale è già associato a un altro volontario",
-        );
+        const result = duplicateCodiceFiscaleResult();
         res.status(result.status).json(validationResponse(req, result));
         return;
       }

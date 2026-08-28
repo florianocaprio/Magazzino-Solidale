@@ -219,7 +219,7 @@ describe("Volontari — matricole automatiche e conversione", () => {
     });
   });
 
-  it("traduce la concorrenza sul codice fiscale in un solo 201 e un 422", async () => {
+  it("traduce la concorrenza sul codice fiscale in un solo 201 e un 409", async () => {
     const codiceFiscale =
       `CF${process.pid}${Date.now().toString(36)}${sequence}`
         .replace(/[^A-Z0-9]/gi, "")
@@ -248,7 +248,7 @@ describe("Volontari — matricole automatiche e conversione", () => {
     ]);
 
     expect(responses.map((response) => response.status).sort()).toEqual([
-      201, 422,
+      201, 409,
     ]);
     const created = responses.find((response) => response.status === 201);
     if (created) scope.volontarioIds.push(created.body.id);

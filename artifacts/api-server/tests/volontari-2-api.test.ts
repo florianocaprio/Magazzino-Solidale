@@ -1121,7 +1121,7 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
       dataNascita: "1982-02-02",
       indirizzoResidenza: "Via Duplicato 2",
     });
-    expect(duplicate.status).toBe(422);
+    expect(duplicate.status).toBe(409);
     expect(duplicate.body.fieldErrors.codiceFiscale).toMatch(/già associato/i);
 
     const list = await request(app()).get(

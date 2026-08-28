@@ -6229,6 +6229,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
+        "409":
+          description: Codice fiscale duplicato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
 
   /volontari/bulk:
     post:
@@ -6737,6 +6742,11 @@ paths:
                 $ref: "#/components/schemas/Volontario"
         "422":
           description: Dati anagrafici non validi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
+        "409":
+          description: Codice fiscale duplicato, versione obsoleta o modifica riservata a un workflow dedicato
           content:
             application/json:
               schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }

@@ -132,6 +132,53 @@ describe("Volontari — API salvataggio e conversione", () => {
     expect(after).toHaveLength(before.length);
   });
 
+  it("mappa il codice fiscale duplicato a 409 strutturato su create e PATCH", async () => {
+    const codiceFiscale = "RSSMRA80A01H501U";
+    const first = await request(app())
+      .post("/volontari")
+      .send(
+        completePayload({
+          codiceFiscale,
+          codiceFiscaleNonDisponibile: false,
+        }),
+      );
+    expect(first.status, first.text).toBe(201);
+    scope.volontarioIds.push(first.body.id);
+
+    const duplicateCreate = await request(app())
+      .post("/volontari")
+      .send(
+        completePayload({
+          codiceFiscale,
+          codiceFiscaleNonDisponibile: false,
+        }),
+      );
+    expect(duplicateCreate.status).toBe(409);
+    expect(duplicateCreate.body).toMatchObject({
+      code: "CODICE_FISCALE_DUPLICATO",
+      correlationId: expect.any(String),
+      fieldErrors: { codiceFiscale: expect.any(String) },
+    });
+
+    const second = await request(app())
+      .post("/volontari")
+      .send(completePayload());
+    expect(second.status, second.text).toBe(201);
+    scope.volontarioIds.push(second.body.id);
+    const duplicateUpdate = await request(app())
+      .patch(`/volontari/${second.body.id}`)
+      .send({
+        versione: second.body.versione,
+        codiceFiscale,
+        codiceFiscaleNonDisponibile: false,
+      });
+    expect(duplicateUpdate.status).toBe(409);
+    expect(duplicateUpdate.body).toMatchObject({
+      code: "CODICE_FISCALE_DUPLICATO",
+      fieldErrors: { codiceFiscale: expect.any(String) },
+    });
+  });
+
   it("completa un legacy senza CF con indisponibilità esplicita e nota nulla", async () => {
     const legacy = await insertLegacy();
     const response = await request(app())
