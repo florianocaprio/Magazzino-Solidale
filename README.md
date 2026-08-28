@@ -249,13 +249,13 @@ capability né marker. Le letture sono mantenute in endpoint distinti e
 riapplicano server-side area, moduli e scope del dominio proprietario; non esiste
 un archivio geografico generale interrogabile.
 
-I percorsi esterni usano Google Maps URLs e non richiedono chiavi. Per la mappa
-interattiva valorizzare `GOOGLE_MAPS_BROWSER_API_KEY` a runtime nel container web e
-limitare la chiave in Google Cloud alle origini autorizzate e alla Maps
-JavaScript API. Senza chiave restano disponibili lista operativa e percorsi.
-La geocodifica avviene nel browser solo per i layer attivi; coordinate e
-risultati Google non vengono persistiti né messi in cache dal server.
-Gli indirizzi sono dati personali: vengono trasmessi a Google soltanto quelli
+I percorsi esterni usano OpenStreetMap directions. La mappa integrata usa Leaflet
+con tile OpenStreetMap, configurabili tramite `MAPS_TILE_URL` e
+`MAPS_TILE_ATTRIBUTION`, senza chiavi browser. Il geocoding è cache-first lato
+server; il servizio pubblico Nominatim richiede `MAPS_PUBLIC_GEOCODING_ALLOWED=true`
+e resta limitato a una richiesta ogni 1,1 secondi. Per dati sensibili usare una
+istanza Nominatim self-hosted o un provider approvato.
+Gli indirizzi sono dati personali: vengono trasmessi al provider soltanto quelli
 strettamente necessari al geocoding o alla navigazione. I DTO MAPS sono
 minimizzati e non includono nomi, telefoni, codici beneficiario, note o contenuti
 sociali; questi dati non fanno parte neppure degli URL. Un errore Google degrada

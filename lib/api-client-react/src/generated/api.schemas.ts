@@ -671,6 +671,16 @@ export const MapsMarkerActionsItem = {
   convert_delivery: 'convert_delivery',
 } as const;
 
+export type MapsMarkerLocationStatus = typeof MapsMarkerLocationStatus[keyof typeof MapsMarkerLocationStatus];
+
+
+export const MapsMarkerLocationStatus = {
+  resolved: 'resolved',
+  pending: 'pending',
+  not_found: 'not_found',
+  error: 'error',
+} as const;
+
 /**
  * DTO geografico minimizzato; non contiene dati sociali o anagrafici
  */
@@ -687,13 +697,18 @@ export interface MapsMarker {
   /** @nullable */
   date: string | null;
   actions: MapsMarkerActionsItem[];
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  locationStatus?: MapsMarkerLocationStatus;
 }
 
 export type MapsRouteProvider = typeof MapsRouteProvider[keyof typeof MapsRouteProvider];
 
 
 export const MapsRouteProvider = {
-  'google-maps-url': 'google-maps-url',
+  'openstreetmap-directions': 'openstreetmap-directions',
 } as const;
 
 export interface MapsRoute {

@@ -45,7 +45,7 @@ describe("azioni condivise percorso", () => {
     auth.allowed = true;
     auth.isAdmin = false;
     auth.isSuperAdmin = false;
-    api.getRoute.mockReset().mockResolvedValue({ url: "https://www.google.com/maps/dir/?api=1" });
+    api.getRoute.mockReset().mockResolvedValue({ url: "https://www.openstreetmap.org/directions?engine=fossgis_osrm_car" });
     notifications.toast.mockReset();
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -74,20 +74,20 @@ describe("azioni condivise percorso", () => {
 
     await act(async () => button("maps.openRoute").click());
     expect(window.open).toHaveBeenCalledWith(
-      "https://www.google.com/maps/dir/?api=1",
+      "https://www.openstreetmap.org/directions?engine=fossgis_osrm_car",
       "_blank",
       "noopener,noreferrer",
     );
 
     await act(async () => button("maps.copyRoute").click());
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://www.google.com/maps/dir/?api=1");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://www.openstreetmap.org/directions?engine=fossgis_osrm_car");
     expect(notifications.toast).toHaveBeenCalledWith({ title: "maps.routeCopied" });
 
     await act(async () => button("maps.shareRoute").click());
     expect(navigator.share).toHaveBeenCalledWith({
       title: "maps.shareTitle",
       text: "maps.shareText",
-      url: "https://www.google.com/maps/dir/?api=1",
+      url: "https://www.openstreetmap.org/directions?engine=fossgis_osrm_car",
     });
   });
 
@@ -95,7 +95,7 @@ describe("azioni condivise percorso", () => {
     Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
     await act(async () => root.render(<RouteActions consegnaId={8} available />));
     await act(async () => button("maps.shareRoute").click());
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://www.google.com/maps/dir/?api=1");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://www.openstreetmap.org/directions?engine=fossgis_osrm_car");
   });
 
   it("mostra un link selezionabile quando Clipboard API non è disponibile", async () => {
@@ -103,7 +103,7 @@ describe("azioni condivise percorso", () => {
     await act(async () => root.render(<RouteActions consegnaId={9} available />));
     await act(async () => button("maps.copyRoute").click());
     const input = document.querySelector<HTMLInputElement>('[aria-label="maps.manualRouteUrl"]');
-    expect(input?.value).toBe("https://www.google.com/maps/dir/?api=1");
+    expect(input?.value).toBe("https://www.openstreetmap.org/directions?engine=fossgis_osrm_car");
     expect(notifications.toast).toHaveBeenCalledWith({
       title: "maps.manualCopyTitle",
       description: "maps.manualCopyDescription",

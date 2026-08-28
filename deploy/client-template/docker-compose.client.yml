@@ -55,7 +55,8 @@ services:
       api:
         condition: service_healthy
     environment:
-      GOOGLE_MAPS_BROWSER_API_KEY: ${GOOGLE_MAPS_BROWSER_API_KEY:-}
+      MAPS_TILE_URL: ${MAPS_TILE_URL:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}
+      MAPS_TILE_ATTRIBUTION: ${MAPS_TILE_ATTRIBUTION:-© OpenStreetMap contributors}
     ports:
       - "127.0.0.1:${WEB_HOST_PORT}:80"
     restart: unless-stopped

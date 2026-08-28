@@ -437,6 +437,7 @@ export * from './mapsLayerCode';
 export * from './mapsMarker';
 export * from './mapsMarkerActionsItem';
 export * from './mapsMarkerEntityType';
+export * from './mapsMarkerLocationStatus';
 export * from './mapsRoute';
 export * from './mapsRouteProvider';
 export * from './materialeDaPreparare';

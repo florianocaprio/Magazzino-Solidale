@@ -14773,7 +14773,7 @@ export const getGetMapsRouteConsegnaUrl = (id: number,) => {
 }
 
 /**
- * @summary Costruisce un Google Maps URL per una consegna domiciliare già autorizzata
+ * @summary Costruisce un URL OpenStreetMap per una consegna domiciliare già autorizzata
  */
 export const getMapsRouteConsegna = async (id: number, options?: RequestInit): Promise<MapsRoute> => {
 
@@ -14820,7 +14820,7 @@ export type GetMapsRouteConsegnaQueryError = ErrorType<void>
 
 
 /**
- * @summary Costruisce un Google Maps URL per una consegna domiciliare già autorizzata
+ * @summary Costruisce un URL OpenStreetMap per una consegna domiciliare già autorizzata
  */
 
 export function useGetMapsRouteConsegna<TData = Awaited<ReturnType<typeof getMapsRouteConsegna>>, TError = ErrorType<void>>(

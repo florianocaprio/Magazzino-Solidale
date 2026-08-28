@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getGetMapsConsegneQueryKey,
   getGetMapsInterventiSocialiQueryKey,
@@ -14,7 +14,7 @@ import {
 } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
-import { Map, MapPin, CalendarDays } from "lucide-react";
+import { Map, MapPin, CalendarDays, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
-import { GoogleOperationalMap } from "@/components/maps/google-operational-map";
+import { LeafletOperationalMap } from "@/components/maps/leaflet-operational-map";
 import { RouteActions } from "@/components/maps/route-actions";
 import { addDaysToCivilDate, formatDateOrDateTimeEuropeRome, todayEuropeRome } from "@/lib/europe-rome";
 
@@ -35,12 +35,12 @@ const LAYER_LABELS: Record<MapsLayerCode, string> = {
   "centro.punti_operativi": "maps.layerOperationalPoints",
 };
 
-function entityUrl(marker: MapsMarker): string | null {
-  if (marker.entityType === "intervento") return "/interventi";
-  if (marker.entityType === "consegna") return "/consegne";
-  if (marker.entityType === "bolla") return "/bolle";
-  if (marker.entityType === "magazzino") return "/magazzini";
-  if (marker.entityType === "centro_ascolto") return "/centri-ascolto";
+export function mapsEntityDeepLink(marker: MapsMarker): string | null {
+  if (marker.entityType === "intervento") return `/interventi?interventoId=${marker.entityId}`;
+  if (marker.entityType === "consegna") return `/consegne?consegnaId=${marker.entityId}`;
+  if (marker.entityType === "bolla") return `/bolle?bollaId=${marker.entityId}`;
+  if (marker.entityType === "magazzino") return `/magazzini?magazzinoId=${marker.entityId}`;
+  if (marker.entityType === "centro_ascolto") return `/centri-ascolto?centroId=${marker.entityId}`;
   return null;
 }
 
@@ -65,14 +65,15 @@ export default function MapsOperativa() {
   const [disabled, setDisabled] = useState<Set<MapsLayerCode>>(new Set());
   const [selectedMarker, setSelectedMarker] = useState<MapsMarker | null>(null);
   const enabled = (code: MapsLayerCode) => available.some((layer) => layer.code === code) && !disabled.has(code);
+  const validRange = da <= a;
   const range = { da, a };
-  const social = useGetMapsInterventiSociali(range, { query: { queryKey: getGetMapsInterventiSocialiQueryKey(range), enabled: enabled("sociale.interventi_pianificati") } });
-  const deliveries = useGetMapsConsegne(range, { query: { queryKey: getGetMapsConsegneQueryKey(range), enabled: enabled("pacchi.consegne") } });
-  const missed = useGetMapsRitiriNonEffettuati(range, { query: { queryKey: getGetMapsRitiriNonEffettuatiQueryKey(range), enabled: enabled("pacchi.ritiri_non_effettuati") } });
+  const social = useGetMapsInterventiSociali(range, { query: { queryKey: getGetMapsInterventiSocialiQueryKey(range), enabled: validRange && enabled("sociale.interventi_pianificati") } });
+  const deliveries = useGetMapsConsegne(range, { query: { queryKey: getGetMapsConsegneQueryKey(range), enabled: validRange && enabled("pacchi.consegne") } });
+  const missed = useGetMapsRitiriNonEffettuati(range, { query: { queryKey: getGetMapsRitiriNonEffettuatiQueryKey(range), enabled: validRange && enabled("pacchi.ritiri_non_effettuati") } });
   const points = useGetMapsPuntiOperativi({ query: { queryKey: getGetMapsPuntiOperativiQueryKey(), enabled: enabled("centro.punti_operativi") } });
   const markers = useMemo(
-    () => [social.data, deliveries.data, missed.data, points.data].flatMap((rows) => rows ?? []),
-    [social.data, deliveries.data, missed.data, points.data],
+    () => [enabled("sociale.interventi_pianificati") && validRange ? social.data : [], enabled("pacchi.consegne") && validRange ? deliveries.data : [], enabled("pacchi.ritiri_non_effettuati") && validRange ? missed.data : [], enabled("centro.punti_operativi") ? points.data : []].flatMap((rows) => rows ?? []),
+    [social.data, deliveries.data, missed.data, points.data, disabled, available, validRange],
   );
   const layerErrors = [
     { code: "sociale.interventi_pianificati" as const, query: social },
@@ -81,7 +82,7 @@ export default function MapsOperativa() {
     { code: "centro.punti_operativi" as const, query: points },
   ].filter(({ code, query }) => enabled(code) && query.isError);
   const isLoading = social.isLoading || deliveries.isLoading || missed.isLoading || points.isLoading;
-  const apiKey = window.__APP_CONFIG__?.googleMapsApiKey?.trim() ?? "";
+  const isRefreshing = social.isRefetching || deliveries.isRefetching || missed.isRefetching || points.isRefetching;
 
   const toggle = (code: MapsLayerCode) => setDisabled((current) => {
     const next = new Set(current);
@@ -90,9 +91,16 @@ export default function MapsOperativa() {
   });
 
   const onMapUnavailable = useCallback(
-    () => toast({ title: t("maps.googleUnavailable"), description: t("maps.listFallback") }),
+    () => toast({ title: t("maps.mapUnavailable"), description: t("maps.listFallback") }),
     [t, toast],
   );
+  const refresh = () => Promise.all([enabled("sociale.interventi_pianificati") && validRange ? social.refetch() : undefined, enabled("pacchi.consegne") && validRange ? deliveries.refetch() : undefined, enabled("pacchi.ritiri_non_effettuati") && validRange ? missed.refetch() : undefined, enabled("centro.punti_operativi") ? points.refetch() : undefined].filter(Boolean));
+  const hasPendingLocations = markers.some((marker) => marker.locationStatus === "pending");
+  useEffect(() => {
+    if (!hasPendingLocations) return;
+    const timer = window.setTimeout(() => { void refresh(); }, 2_500);
+    return () => window.clearTimeout(timer);
+  }, [hasPendingLocations, da, a, disabled, available]);
 
   if (loadingCapabilities) return <div className="p-6 space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96 w-full" /></div>;
   if (!capabilities?.operational || available.length === 0) {
@@ -100,39 +108,37 @@ export default function MapsOperativa() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
       <div>
         <h1 className="flex items-center gap-2 text-3xl font-bold"><Map className="h-7 w-7" /> {t("maps.title")}</h1>
         <p className="text-muted-foreground">{t("maps.subtitle")}</p>
       </div>
       <Card>
         <CardHeader><CardTitle className="text-base">{t("maps.filters")}</CardTitle></CardHeader>
-        <CardContent className="flex flex-wrap gap-4">
-          <div className="space-y-1"><Label htmlFor="maps-da">{t("maps.from")}</Label><Input id="maps-da" type="date" value={da} onChange={(event) => setDa(event.target.value)} /></div>
-          <div className="space-y-1"><Label htmlFor="maps-a">{t("maps.to")}</Label><Input id="maps-a" type="date" value={a} onChange={(event) => setA(event.target.value)} /></div>
-          <div className="flex flex-1 flex-wrap items-end gap-4">
-            {available.map((layer) => <Label key={layer.code} className="flex items-center gap-2 rounded-md border px-3 py-2"><Switch checked={enabled(layer.code)} onCheckedChange={() => toggle(layer.code)} />{t(LAYER_LABELS[layer.code])}</Label>)}
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(9rem,1fr)_minmax(9rem,1fr)_auto]">
+          <div className="space-y-1"><Label htmlFor="maps-da">{t("maps.from")}</Label><Input className="min-h-11" id="maps-da" type="date" value={da} onChange={(event) => setDa(event.target.value)} /></div>
+          <div className="space-y-1"><Label htmlFor="maps-a">{t("maps.to")}</Label><Input className="min-h-11" id="maps-a" type="date" value={a} onChange={(event) => setA(event.target.value)} /></div>
+          <Button type="button" variant="outline" className="min-h-11 sm:self-end" onClick={() => void refresh()} disabled={isRefreshing || !validRange}><RefreshCw className={isRefreshing ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />{t(isRefreshing ? "maps.refreshing" : "maps.refresh")}</Button>
+          <div className="col-span-full grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {available.map((layer) => <Label key={layer.code} className="flex min-h-11 items-center gap-2 rounded-md border px-3 py-2"><Switch checked={enabled(layer.code)} onCheckedChange={() => toggle(layer.code)} />{t(LAYER_LABELS[layer.code])}</Label>)}
           </div>
         </CardContent>
       </Card>
+      {!validRange && <p className="text-sm text-destructive" role="alert">{t("maps.invalidPeriod")}</p>}
       {layerErrors.map(({ code, query }) => (
         <div key={code} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
           <span className="font-medium">{t(LAYER_LABELS[code])}: </span>
           {mapsLayerError(query.error, t("maps.layerLoadError"))}
         </div>
       ))}
-      {apiKey ? (
-        <GoogleOperationalMap markers={markers} apiKey={apiKey} onMarkerSelect={setSelectedMarker} onUnavailable={onMapUnavailable} />
-      ) : (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{t("maps.noApiKey")}</div>
-      )}
+      <LeafletOperationalMap markers={markers} selectedMarkerId={selectedMarker?.id} onMarkerSelect={setSelectedMarker} onUnavailable={onMapUnavailable} tileUrl={window.__APP_CONFIG__?.mapsTileUrl} tileAttribution={window.__APP_CONFIG__?.mapsTileAttribution} />
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><MapPin className="h-4 w-4" />{t("maps.operationalList")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {isLoading ? <Skeleton className="h-24 w-full" /> : markers.length === 0 ? <p className="py-8 text-center text-muted-foreground">{t("maps.empty")}</p> : markers.map((marker) => (
             <div key={marker.id} className="flex flex-col justify-between gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{marker.title}</p><Badge variant="outline">{marker.status}</Badge></div><p className="truncate text-sm text-muted-foreground">{marker.address}</p>{marker.date && <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3 w-3" />{formatDateOrDateTimeEuropeRome(marker.date)}</p>}</div>
-              <div className="flex shrink-0 flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setSelectedMarker(marker)}>{t("maps.markerDetails")}</Button><RouteActions consegnaId={marker.entityId} available={marker.entityType === "consegna" && marker.actions.includes("route")} compact /></div>
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{marker.title}</p><Badge variant="outline">{marker.status}</Badge></div><p className="truncate text-sm text-muted-foreground">{marker.address}</p>{marker.locationStatus !== "resolved" && <p className="text-xs text-muted-foreground">{t("maps.locationUnavailable")}</p>}{marker.date && <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3 w-3" />{formatDateOrDateTimeEuropeRome(marker.date)}</p>}</div>
+              <div className="flex shrink-0 flex-wrap gap-2"><Button className="min-h-11" size="sm" variant="outline" onClick={() => setSelectedMarker(marker)}>{t("maps.markerDetails")}</Button><RouteActions consegnaId={marker.entityId} available={marker.entityType === "consegna" && marker.actions.includes("route")} compact /></div>
             </div>
           ))}
         </CardContent>
@@ -149,7 +155,7 @@ export default function MapsOperativa() {
               {selectedMarker.date && <div><p className="text-xs uppercase text-muted-foreground">{t("maps.date")}</p><p className="text-sm">{formatDateOrDateTimeEuropeRome(selectedMarker.date)}</p></div>}
               <div><p className="text-xs uppercase text-muted-foreground">{t("maps.address")}</p><p className="text-sm">{selectedMarker.address}</p></div>
               <div className="flex flex-col gap-2 pt-2">
-                {selectedMarker.actions.includes("open") && entityUrl(selectedMarker) && <Button asChild variant="outline"><Link href={selectedMarker.entityType === "bolla" ? `/bolle?bollaId=${selectedMarker.entityId}` : entityUrl(selectedMarker)!}>{t("maps.openOwner")}</Link></Button>}
+                {selectedMarker.actions.includes("open") && mapsEntityDeepLink(selectedMarker) && <Button asChild variant="outline"><Link href={mapsEntityDeepLink(selectedMarker)!}>{t("maps.openOwner")}</Link></Button>}
                 <RouteActions consegnaId={selectedMarker.entityId} available={selectedMarker.entityType === "consegna" && selectedMarker.actions.includes("route")} />
                 {selectedMarker.actions.includes("convert_delivery") && <Button asChild><Link href={`/bolle?bollaId=${selectedMarker.entityId}`}>{t("maps.convertDelivery")}</Link></Button>}
               </div>

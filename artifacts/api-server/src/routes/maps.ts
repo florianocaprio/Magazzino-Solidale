@@ -40,6 +40,7 @@ import {
 } from "../lib/centroScope";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import { intervalloDateEuropeRome } from "../lib/interventiViste";
+import { enrichMapsMarkersFromCache, getCachedMapsLocations } from "../lib/maps-geocoding";
 
 const router: IRouter = Router();
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
@@ -267,7 +268,7 @@ router.get(
       date: row.data?.toISOString() ?? null,
       actions: ["open"],
     }] : []);
-    res.json(markers);
+    res.json(await enrichMapsMarkersFromCache(markers));
   },
 );
 
@@ -310,7 +311,7 @@ router.get(
       date: row.data,
       actions: routeAllowed ? ["open", "route"] : ["open"],
     }] : []);
-    res.json(markers);
+    res.json(await enrichMapsMarkersFromCache(markers));
   },
 );
 
@@ -355,7 +356,7 @@ router.get(
       date: row.at?.toISOString() ?? null,
       actions: canConvert ? ["open", "convert_delivery"] : ["open"],
     }] : []);
-    res.json(markers);
+    res.json(await enrichMapsMarkersFromCache(markers));
   },
 );
 
@@ -386,7 +387,7 @@ router.get(
       ...warehouses.flatMap((row) => row.indirizzo?.trim() ? [{ id: `centro.magazzino:${row.id}`, layer: "centro.punti_operativi" as const, entityType: "magazzino" as const, entityId: row.id, title: row.nome, subtitle: "Magazzino", status: row.stato, address: [row.indirizzo.trim(), row.comune].filter(Boolean).join(", "), date: null, actions: canOpenAdministrativeTarget ? ["open" as const] : [] }] : []),
       ...centres.flatMap((row) => row.indirizzo?.trim() ? [{ id: `centro.ascolto:${row.id}`, layer: "centro.punti_operativi" as const, entityType: "centro_ascolto" as const, entityId: row.id, title: row.nome, subtitle: "Centro di ascolto", status: "attivo", address: [row.indirizzo.trim(), row.comune].filter(Boolean).join(", "), date: null, actions: canOpenAdministrativeTarget ? ["open" as const] : [] }] : []),
     ];
-    res.json(markers);
+    res.json(await enrichMapsMarkersFromCache(markers));
   },
 );
 
@@ -416,13 +417,14 @@ router.get(
     const destination = consegna.indirizzoConsegna?.trim() ?? "";
     if (!origin) { res.status(422).json({ error: "Il magazzino non ha un indirizzo utilizzabile" }); return; }
     if (!destination) { res.status(422).json({ error: "La consegna non ha uno snapshot dell'indirizzo" }); return; }
-    const url = new URL("https://www.google.com/maps/dir/");
-    url.searchParams.set("api", "1");
-    url.searchParams.set("origin", origin);
-    url.searchParams.set("destination", destination);
-    url.searchParams.set("travelmode", "driving");
-    url.searchParams.set("dir_action", "navigate");
-    res.json({ origin, destination, provider: "google-maps-url", url: url.toString() });
+    const [originLocation, destinationLocation] = await getCachedMapsLocations([origin, destination]);
+    if (originLocation.locationStatus !== "resolved" || destinationLocation.locationStatus !== "resolved") {
+      res.status(422).json({ error: "Le coordinate del percorso non sono ancora disponibili" }); return;
+    }
+    const url = new URL("https://www.openstreetmap.org/directions");
+    url.searchParams.set("engine", "fossgis_osrm_car");
+    url.searchParams.set("route", `${originLocation.latitude},${originLocation.longitude};${destinationLocation.latitude},${destinationLocation.longitude}`);
+    res.json({ origin, destination, provider: "openstreetmap-directions", url: url.toString() });
   },
 );
 

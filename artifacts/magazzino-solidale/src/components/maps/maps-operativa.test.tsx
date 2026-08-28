@@ -48,15 +48,14 @@ describe("MAPS operativa", () => {
     document.body.innerHTML = "";
   });
 
-  it("genera i toggle dalle capabilities e degrada alla lista senza chiave Google", async () => {
+  it("genera i toggle dalle capabilities e mostra la mappa OpenStreetMap senza chiavi", async () => {
     await act(async () => root.render(<MapsOperativa />));
-    expect(document.body.textContent).toContain("maps.noApiKey");
     expect(document.body.textContent).toContain("Consegna CON-1");
     expect(document.body.textContent).toContain("22/08/2026");
     expect(document.body.textContent).not.toContain("22/08/2026 00:00");
     expect(document.querySelector('[aria-label="maps.openRoute"]')).toBeTruthy();
     expect(document.querySelectorAll('[role="switch"]')).toHaveLength(1);
-    expect(document.querySelector('[aria-label="Mappa operativa Google Maps"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Mappa operativa OpenStreetMap"]')).toBeTruthy();
 
     const details = Array.from(document.querySelectorAll("button")).find((button) => button.textContent === "maps.markerDetails");
     expect(details).toBeTruthy();
@@ -69,6 +68,14 @@ describe("MAPS operativa", () => {
     apiState.markerActions = ["open"];
     await act(async () => root.render(<MapsOperativa />));
     expect(document.querySelector('[aria-label="maps.openRoute"]')).toBeNull();
+  });
+
+  it("mantiene filtri e azioni touch-friendly nel layout tablet", async () => {
+    await act(async () => root.render(<MapsOperativa />));
+    expect(document.querySelector(".sm\\:grid-cols-2")).toBeTruthy();
+    expect(document.querySelector("#maps-da")?.className).toContain("min-h-11");
+    expect(document.querySelector("#maps-a")?.className).toContain("min-h-11");
+    expect(Array.from(document.querySelectorAll("button")).some((button) => button.className.includes("min-h-11"))).toBe(true);
   });
 
   it("mostra data e ora Europe/Rome per i marker timestamp", async () => {

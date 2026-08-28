@@ -1,1 +1,1 @@
-window.__APP_CONFIG__ = { googleMapsApiKey: "" };
+window.__APP_CONFIG__ = {};
