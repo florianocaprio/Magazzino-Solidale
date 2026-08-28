@@ -70,6 +70,14 @@ describe("MAPS operativa", () => {
     expect(document.querySelector('[aria-label="maps.openRoute"]')).toBeNull();
   });
 
+  it("mantiene filtri e azioni touch-friendly nel layout tablet", async () => {
+    await act(async () => root.render(<MapsOperativa />));
+    expect(document.querySelector(".sm\\:grid-cols-2")).toBeTruthy();
+    expect(document.querySelector("#maps-da")?.className).toContain("min-h-11");
+    expect(document.querySelector("#maps-a")?.className).toContain("min-h-11");
+    expect(Array.from(document.querySelectorAll("button")).some((button) => button.className.includes("min-h-11"))).toBe(true);
+  });
+
   it("mostra data e ora Europe/Rome per i marker timestamp", async () => {
     apiState.socialDate = "2026-08-22T22:30:00Z";
     await act(async () => root.render(<MapsOperativa />));

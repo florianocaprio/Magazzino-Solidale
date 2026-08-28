@@ -108,19 +108,19 @@ export default function MapsOperativa() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
       <div>
         <h1 className="flex items-center gap-2 text-3xl font-bold"><Map className="h-7 w-7" /> {t("maps.title")}</h1>
         <p className="text-muted-foreground">{t("maps.subtitle")}</p>
       </div>
       <Card>
         <CardHeader><CardTitle className="text-base">{t("maps.filters")}</CardTitle></CardHeader>
-        <CardContent className="flex flex-wrap gap-4">
-          <div className="space-y-1"><Label htmlFor="maps-da">{t("maps.from")}</Label><Input id="maps-da" type="date" value={da} onChange={(event) => setDa(event.target.value)} /></div>
-          <div className="space-y-1"><Label htmlFor="maps-a">{t("maps.to")}</Label><Input id="maps-a" type="date" value={a} onChange={(event) => setA(event.target.value)} /></div>
-          <Button type="button" variant="outline" className="self-end" onClick={() => void refresh()} disabled={isRefreshing || !validRange}><RefreshCw className={isRefreshing ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />{t(isRefreshing ? "maps.refreshing" : "maps.refresh")}</Button>
-          <div className="flex flex-1 flex-wrap items-end gap-4">
-            {available.map((layer) => <Label key={layer.code} className="flex items-center gap-2 rounded-md border px-3 py-2"><Switch checked={enabled(layer.code)} onCheckedChange={() => toggle(layer.code)} />{t(LAYER_LABELS[layer.code])}</Label>)}
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(9rem,1fr)_minmax(9rem,1fr)_auto]">
+          <div className="space-y-1"><Label htmlFor="maps-da">{t("maps.from")}</Label><Input className="min-h-11" id="maps-da" type="date" value={da} onChange={(event) => setDa(event.target.value)} /></div>
+          <div className="space-y-1"><Label htmlFor="maps-a">{t("maps.to")}</Label><Input className="min-h-11" id="maps-a" type="date" value={a} onChange={(event) => setA(event.target.value)} /></div>
+          <Button type="button" variant="outline" className="min-h-11 sm:self-end" onClick={() => void refresh()} disabled={isRefreshing || !validRange}><RefreshCw className={isRefreshing ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />{t(isRefreshing ? "maps.refreshing" : "maps.refresh")}</Button>
+          <div className="col-span-full grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {available.map((layer) => <Label key={layer.code} className="flex min-h-11 items-center gap-2 rounded-md border px-3 py-2"><Switch checked={enabled(layer.code)} onCheckedChange={() => toggle(layer.code)} />{t(LAYER_LABELS[layer.code])}</Label>)}
           </div>
         </CardContent>
       </Card>
@@ -138,7 +138,7 @@ export default function MapsOperativa() {
           {isLoading ? <Skeleton className="h-24 w-full" /> : markers.length === 0 ? <p className="py-8 text-center text-muted-foreground">{t("maps.empty")}</p> : markers.map((marker) => (
             <div key={marker.id} className="flex flex-col justify-between gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
               <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{marker.title}</p><Badge variant="outline">{marker.status}</Badge></div><p className="truncate text-sm text-muted-foreground">{marker.address}</p>{marker.locationStatus !== "resolved" && <p className="text-xs text-muted-foreground">{t("maps.locationUnavailable")}</p>}{marker.date && <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3 w-3" />{formatDateOrDateTimeEuropeRome(marker.date)}</p>}</div>
-              <div className="flex shrink-0 flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setSelectedMarker(marker)}>{t("maps.markerDetails")}</Button><RouteActions consegnaId={marker.entityId} available={marker.entityType === "consegna" && marker.actions.includes("route")} compact /></div>
+              <div className="flex shrink-0 flex-wrap gap-2"><Button className="min-h-11" size="sm" variant="outline" onClick={() => setSelectedMarker(marker)}>{t("maps.markerDetails")}</Button><RouteActions consegnaId={marker.entityId} available={marker.entityType === "consegna" && marker.actions.includes("route")} compact /></div>
             </div>
           ))}
         </CardContent>

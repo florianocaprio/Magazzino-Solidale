@@ -24,7 +24,7 @@ export function LeafletOperationalMap({ markers, selectedMarkerId, onMarkerSelec
     if (!containerRef.current) return;
     try {
       mapRef.current?.remove();
-      const map = L.map(containerRef.current, { scrollWheelZoom: false }).setView(DEFAULT_CENTER, 6); mapRef.current = map;
+      const map = L.map(containerRef.current, { scrollWheelZoom: false, touchZoom: true, dragging: true }).setView(DEFAULT_CENTER, 6); mapRef.current = map;
       L.tileLayer(tileUrl, { attribution: tileAttribution, maxZoom: 19 }).addTo(map);
       const bounds: L.LatLngTuple[] = [];
       for (const marker of localized) {
@@ -38,5 +38,5 @@ export function LeafletOperationalMap({ markers, selectedMarkerId, onMarkerSelec
     return () => { mapRef.current?.remove(); mapRef.current = null; };
   }, [localized, onMarkerSelect, onUnavailable, selectedMarkerId, tileAttribution, tileUrl]);
   if (error) return <div className="rounded-md border p-4 text-sm"><p>{t("maps.listFallback")}</p><Button className="mt-3" type="button" variant="outline" onClick={() => setError(false)}>{t("maps.retryMap")}</Button></div>;
-  return <div className="space-y-2"><div ref={containerRef} className="h-[420px] w-full rounded-lg border" aria-label="Mappa operativa OpenStreetMap" /><p className="text-xs text-muted-foreground" role="status">{t("maps.geocodingStats", { total: markers.length, attempted: selected.length, localized: localized.length, failed: selected.length - localized.length, notAttempted: markers.length - selected.length })}</p></div>;
+  return <div className="min-w-0 space-y-2"><div ref={containerRef} className="h-[380px] w-full touch-pan-x touch-pan-y rounded-lg border sm:h-[420px]" aria-label="Mappa operativa OpenStreetMap" /><p className="text-xs text-muted-foreground" role="status">{t("maps.geocodingStats", { total: markers.length, attempted: selected.length, localized: localized.length, failed: selected.length - localized.length, notAttempted: markers.length - selected.length })}</p></div>;
 }
