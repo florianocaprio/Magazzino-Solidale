@@ -40,7 +40,7 @@ import {
 } from "../lib/centroScope";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import { intervalloDateEuropeRome } from "../lib/interventiViste";
-import { enrichMapsMarkersFromCache, geocodeMapsAddress } from "../lib/maps-geocoding";
+import { enrichMapsMarkersFromCache, getCachedMapsLocations } from "../lib/maps-geocoding";
 
 const router: IRouter = Router();
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
@@ -417,7 +417,7 @@ router.get(
     const destination = consegna.indirizzoConsegna?.trim() ?? "";
     if (!origin) { res.status(422).json({ error: "Il magazzino non ha un indirizzo utilizzabile" }); return; }
     if (!destination) { res.status(422).json({ error: "La consegna non ha uno snapshot dell'indirizzo" }); return; }
-    const [originLocation, destinationLocation] = await Promise.all([geocodeMapsAddress(origin), geocodeMapsAddress(destination)]);
+    const [originLocation, destinationLocation] = await getCachedMapsLocations([origin, destination]);
     if (originLocation.locationStatus !== "resolved" || destinationLocation.locationStatus !== "resolved") {
       res.status(422).json({ error: "Le coordinate del percorso non sono ancora disponibili" }); return;
     }
