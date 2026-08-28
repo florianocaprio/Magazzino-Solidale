@@ -22,7 +22,7 @@ export async function assertViewportSafe(page: Page) {
 
   const undersizedControls = await page
     .locator(
-      'button:visible, [role="button"]:visible, [role="switch"]:visible, [role="menuitem"]:visible, [role="option"]:visible, a[data-operational-action]:visible',
+      'button:visible, [role="button"]:visible, [role="tab"]:visible, [role="switch"]:visible, [role="menuitem"]:visible, [role="option"]:visible, a[data-operational-action]:visible',
     )
     .evaluateAll((controls) =>
       controls

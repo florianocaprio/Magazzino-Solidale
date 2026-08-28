@@ -6284,7 +6284,16 @@ export interface VolontariImportPreview {
   importazioneId: number;
   nomeFile: string;
   stato: string;
+  /** Alias retrocompatibile di sha256File. */
   hashFile: string;
+  /** SHA-256 dei byte del workbook ricevuto. */
+  sha256File: string;
+  /** Hash canonico del contenuto normalizzato usato con il perimetro per l'idempotenza semantica. */
+  hashContenutoNormalizzato: string;
+  /** SHA-256 del file appena ricevuto quando la risposta è un replay semantico. */
+  sha256FileRichiesto?: string;
+  /** SHA-256 binario dell'importazione confermata originaria quando la risposta è un replay. */
+  importazioneOriginaleSha256File?: string;
   numeroRighe: number;
   replayIdempotente?: boolean;
   righe: VolontariImportPreviewRigheItem[];

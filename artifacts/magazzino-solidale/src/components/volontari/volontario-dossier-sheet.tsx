@@ -359,19 +359,19 @@ export function VolontarioDossierSheet({
               <Tabs defaultValue="anagrafica">
                 <div className="overflow-x-auto pb-1">
                   <TabsList className="h-11 min-w-max">
-                    <TabsTrigger className="min-h-9" value="anagrafica">
+                    <TabsTrigger className="min-h-11" value="anagrafica">
                       Anagrafica
                     </TabsTrigger>
-                    <TabsTrigger className="min-h-9" value="operativita">
+                    <TabsTrigger className="min-h-11" value="operativita">
                       Operatività
                     </TabsTrigger>
-                    <TabsTrigger className="min-h-9" value="assicurazione">
+                    <TabsTrigger className="min-h-11" value="assicurazione">
                       Assicurazione
                     </TabsTrigger>
-                    <TabsTrigger className="min-h-9" value="formazione">
+                    <TabsTrigger className="min-h-11" value="formazione">
                       Formazione
                     </TabsTrigger>
-                    <TabsTrigger className="min-h-9" value="storico">
+                    <TabsTrigger className="min-h-11" value="storico">
                       Storico
                     </TabsTrigger>
                   </TabsList>
@@ -684,6 +684,12 @@ export function VolontarioDossierSheet({
                       ))}
                   </SelectContent>
                 </Select>
+                {coursesQuery.data &&
+                  coursesQuery.data.every((item) => !item.attivo) && (
+                    <p className="text-sm text-muted-foreground">
+                      Nessun corso configurato
+                    </p>
+                  )}
               </div>
             )}
             {addKind === "qualifica" && (
@@ -703,6 +709,12 @@ export function VolontarioDossierSheet({
                       ))}
                   </SelectContent>
                 </Select>
+                {qualificationsQuery.data &&
+                  qualificationsQuery.data.every((item) => !item.attivo) && (
+                    <p className="text-sm text-muted-foreground">
+                      Nessuna qualifica configurata
+                    </p>
+                  )}
               </div>
             )}
             <div className="space-y-2">

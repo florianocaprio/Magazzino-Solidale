@@ -9829,6 +9829,20 @@ export const AnalyzeVolontariImportHeader = zod.object({
   "x-file-name": zod.string()
 })
 
+export const AnalyzeVolontariImportResponse = zod.object({
+  "importazioneId": zod.number(),
+  "nomeFile": zod.string(),
+  "stato": zod.string(),
+  "hashFile": zod.string().describe('Alias retrocompatibile di sha256File.'),
+  "sha256File": zod.string().describe('SHA-256 dei byte del workbook ricevuto.'),
+  "hashContenutoNormalizzato": zod.string().describe('Hash canonico del contenuto normalizzato usato con il perimetro per l\'idempotenza semantica.'),
+  "sha256FileRichiesto": zod.string().optional().describe('SHA-256 del file appena ricevuto quando la risposta è un replay semantico.'),
+  "importazioneOriginaleSha256File": zod.string().optional().describe('SHA-256 binario dell\'importazione confermata originaria quando la risposta è un replay.'),
+  "numeroRighe": zod.number(),
+  "replayIdempotente": zod.boolean().optional(),
+  "righe": zod.array(zod.record(zod.string(), zod.unknown()))
+})
+
 
 
 export const confirmVolontariImportBodyRigheItemNumeroRigaMin = 2;

@@ -8,6 +8,10 @@ const migrationUrl = new URL(
   "../../../lib/db/updates/20260831_volontari_2_0.sql",
   import.meta.url,
 );
+const hardeningMigrationUrl = new URL(
+  "../../../lib/db/updates/20260901_volontari_2_0_review_hardening.sql",
+  import.meta.url,
+);
 
 afterAll(async () => {
   await pool.end();
@@ -16,9 +20,13 @@ afterAll(async () => {
 describe("migrazione Volontari 2.0", () => {
   it("è additiva, idempotente e aggiorna senza perdere il volontario legacy", async () => {
     const migrationSql = await readFile(migrationUrl, "utf8");
+    const hardeningMigrationSql = await readFile(hardeningMigrationUrl, "utf8");
     expect(migrationSql).not.toMatch(/\bDELETE\s+FROM\b/i);
     expect(migrationSql).not.toMatch(/\bTRUNCATE\b/i);
     expect(migrationSql).not.toMatch(/\bDROP\s+(TABLE|COLUMN)\b/i);
+    expect(hardeningMigrationSql).not.toMatch(/\bDELETE\s+FROM\b/i);
+    expect(hardeningMigrationSql).not.toMatch(/\bTRUNCATE\b/i);
+    expect(hardeningMigrationSql).not.toMatch(/\bDROP\s+(TABLE|COLUMN)\b/i);
 
     const client = await pool.connect();
     try {
@@ -76,6 +84,8 @@ describe("migrazione Volontari 2.0", () => {
 
       await client.query(migrationSql);
       await client.query(migrationSql);
+      await client.query(hardeningMigrationSql);
+      await client.query(hardeningMigrationSql);
 
       const preserved = await client.query(
         `
@@ -106,6 +116,18 @@ describe("migrazione Volontari 2.0", () => {
         ]) AS name
       `);
       expect(structures.rows.every((row) => row.name != null)).toBe(true);
+      const hardeningColumns = await client.query<{ count: string }>(`
+        SELECT count(*)::text AS count
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND column_name = 'chiave_idempotenza'
+          AND table_name IN (
+            'importazioni_volontari',
+            'coperture_assicurative_volontari',
+            'giornate_servizio_volontari'
+          )
+      `);
+      expect(hardeningColumns.rows[0].count).toBe("3");
 
       const inserted = await client.query<{ id: number }>(
         `

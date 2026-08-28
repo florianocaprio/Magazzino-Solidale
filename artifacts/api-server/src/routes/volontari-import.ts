@@ -29,7 +29,11 @@ import {
   parseFullName,
   todayRome,
 } from "../lib/volontariDomain";
-import { appendVolontarioLedgerEvent, canonicalSnapshotHash } from "../lib/volontariLedger";
+import {
+  appendVolontarioLedgerEvent,
+  buildVolunteerRegistrationSnapshot,
+  canonicalSnapshotHash,
+} from "../lib/volontariLedger";
 import {
   parseVolontariWorkbook,
   VOLONTARI_IMPORT_MAX_BYTES,
@@ -151,6 +155,8 @@ function previewBatch(batch: typeof importazioniVolontariTable.$inferSelect, row
     nomeFile: batch.nomeFile,
     stato: batch.stato,
     hashFile: batch.sha256File,
+    sha256File: batch.sha256File,
+    hashContenutoNormalizzato: batch.hashContenutoNormalizzato,
     numeroRighe: batch.numeroRighe,
     righe: rows.map((row) => ({
       numeroRiga: row.numeroRiga,
@@ -267,18 +273,32 @@ router.post(
     });
     const sha256File = createHash("sha256").update(req.body).digest("hex");
     const normalizedHash = canonicalSnapshotHash(normalized.map((row) => ({ numeroRiga: row.numeroRiga, data: row.data })));
+    const idempotencyKey = canonicalSnapshotHash({
+      hashContenutoNormalizzato: normalizedHash,
+      centroAscoltoId: effectiveCenter,
+    });
     const replay = await db.select().from(importazioniVolontariTable)
-      .where(and(eq(importazioniVolontariTable.sha256File, sha256File), eq(importazioniVolontariTable.stato, "CONFERMATO")))
+      .where(and(
+        eq(importazioniVolontariTable.hashContenutoNormalizzato, normalizedHash),
+        eq(importazioniVolontariTable.stato, "CONFERMATO"),
+        sql`${importazioniVolontariTable.centroAscoltoId} IS NOT DISTINCT FROM ${effectiveCenter}`,
+      ))
       .orderBy(asc(importazioniVolontariTable.id)).limit(1);
     if (replay[0]) {
       const rows = await db.select().from(importazioniVolontariRigheTable).where(eq(importazioniVolontariRigheTable.importazioneId, replay[0].id)).orderBy(asc(importazioniVolontariRigheTable.numeroRiga));
-      res.json({ ...previewBatch(replay[0], rows), replayIdempotente: true });
+      res.json({
+        ...previewBatch(replay[0], rows),
+        replayIdempotente: true,
+        sha256FileRichiesto: sha256File,
+        importazioneOriginaleSha256File: replay[0].sha256File,
+      });
       return;
     }
     const result = await db.transaction(async (tx) => {
       const [batch] = await tx.insert(importazioniVolontariTable).values({
         nomeFile: fileName, mimeType: VOLONTARI_XLSX_MIME, dimensioneBytes: req.body.length,
-        sha256File, hashContenutoNormalizzato: normalizedHash, centroAscoltoId: effectiveCenter,
+        sha256File, hashContenutoNormalizzato: normalizedHash,
+        chiaveIdempotenza: idempotencyKey, centroAscoltoId: effectiveCenter,
         numeroRighe: normalized.length, creatoDa: actorId(req),
       }).returning();
       const rows = await tx.insert(importazioniVolontariRigheTable).values(normalized.map((row) => ({
@@ -290,7 +310,12 @@ router.post(
       }))).returning();
       await auditLogistica(tx, req, {
         entita: "volontario", id: batch.id, azione: "import_analisi",
-        nuovo: { importazioneId: batch.id, sha256File, numeroRighe: rows.length },
+        nuovo: {
+          importazioneId: batch.id,
+          sha256File,
+          hashContenutoNormalizzato: normalizedHash,
+          numeroRighe: rows.length,
+        },
       });
       return { batch, rows };
     });
@@ -334,9 +359,15 @@ router.post(
     if (batch.stato === "CONFERMATO") { res.json({ ...resultSummary(batch), replayIdempotente: true }); return; }
     const resolutionByRow = new Map(resolutions.map((item) => [Number(item.numeroRiga), item]));
     const outcome = await db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('volontari-import'), hashtext(${batch.sha256File}))`);
+      const idempotencyKey =
+        batch.chiaveIdempotenza ??
+        canonicalSnapshotHash({
+          hashContenutoNormalizzato: batch.hashContenutoNormalizzato,
+          centroAscoltoId: batch.centroAscoltoId,
+        });
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('volontari-import'), hashtext(${idempotencyKey}))`);
       const [alreadyConfirmed] = await tx.select().from(importazioniVolontariTable).where(and(
-        eq(importazioniVolontariTable.sha256File, batch.sha256File),
+        eq(importazioniVolontariTable.hashContenutoNormalizzato, batch.hashContenutoNormalizzato),
         eq(importazioniVolontariTable.stato, "CONFERMATO"),
         ne(importazioniVolontariTable.id, batch.id),
         sql`${importazioniVolontariTable.centroAscoltoId} IS NOT DISTINCT FROM ${batch.centroAscoltoId}`,
@@ -461,21 +492,40 @@ router.post(
           await appendVolontarioLedgerEvent(tx, {
             sezione: data.tipoVolontario, tipoEvento: "REGISTRAZIONE", volontarioId: volunteer.id,
             centroAscoltoId: centroId, dataEffettiva: data.dataInizioImportata ?? todayRome(),
-            snapshot: { origine: "IMPORT_VOLONTARI_2_0", importazioneId: batch.id, numeroRiga: stored.numeroRiga, matricola: data.matricola },
+            snapshot: await buildVolunteerRegistrationSnapshot(tx, volunteer, {
+              origine: "IMPORT_VOLONTARI_2_0",
+              dataInizio: data.dataInizioImportata ?? todayRome(),
+              importazioneId: batch.id,
+              numeroRiga: stored.numeroRiga,
+            }),
             utenteId: actorId(req),
           });
         }
         if (data.scadenzaAssicurazione) {
+          const coverageKey = canonicalSnapshotHash({
+            volontarioId: volunteer.id,
+            dataInizio: null,
+            dataFine: data.scadenzaAssicurazione,
+            origine: "IMPORT_VOLONTARI_2_0",
+          });
           await tx.insert(copertureAssicurativeVolontariTable).values({
             volontarioId: volunteer.id, dataInizio: null, dataFine: data.scadenzaAssicurazione,
             durataMesi: null, tipoOperazione: "IMPORTAZIONE",
+            chiaveIdempotenza: coverageKey,
             note: `Importazione ${batch.id}, riga ${stored.numeroRiga}`, creatoDa: actorId(req),
           }).onConflictDoNothing();
         }
         if (data.tipoVolontario === "TEMPORANEO" && data.dataServizio) {
+          const serviceKey = canonicalSnapshotHash({
+            volontarioId: volunteer.id,
+            dataServizio: data.dataServizio,
+            centroAscoltoId: centroId,
+            origine: "IMPORT_VOLONTARI_2_0",
+          });
           await tx.insert(giornateServizioVolontariTable).values({
             volontarioId: volunteer.id, dataServizio: data.dataServizio, centroAscoltoId: centroId,
             stato: "PIANIFICATA", coperturaVerificata: Boolean(data.scadenzaAssicurazione && data.scadenzaAssicurazione >= data.dataServizio),
+            chiaveIdempotenza: serviceKey,
             note: `Importazione ${batch.id}, riga ${stored.numeroRiga}`, creatoDa: actorId(req),
           }).onConflictDoNothing();
         }
@@ -488,6 +538,7 @@ router.post(
       const stato = errori > 0 ? "PARZIALE" : "CONFERMATO";
       const [finalBatch] = await tx.update(importazioniVolontariTable).set({
         stato, creati, aggiornati, invariati, esclusi, errori,
+        ...(stato === "CONFERMATO" ? { chiaveIdempotenza: idempotencyKey } : {}),
         confermatoDa: actorId(req), dataConferma: new Date(),
       }).where(eq(importazioniVolontariTable.id, batch.id)).returning();
       await auditLogistica(tx, req, {

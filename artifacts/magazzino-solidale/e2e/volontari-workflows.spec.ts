@@ -75,7 +75,9 @@ test("Volontari 2.0 mantiene lista, dossier e azioni accessibili", async ({
   const visibleList = page.getByTestId(
     compact ? "volontari-mobile-list" : "volontari-desktop-list",
   );
-  await expect(visibleList.getByText(matricola, { exact: false })).toBeVisible();
+  await expect(
+    visibleList.getByText(matricola, { exact: false }),
+  ).toBeVisible();
 
   if (compact) {
     await expect(page.getByTestId("volontari-mobile-list")).toBeVisible();
@@ -93,6 +95,7 @@ test("Volontari 2.0 mantiene lista, dossier e azioni accessibili", async ({
   await expect(page.getByRole("tab", { name: /assicurazione/i })).toBeVisible();
   await expect(page.getByRole("tab", { name: /formazione/i })).toBeVisible();
   await expect(page.getByRole("tab", { name: /storico/i })).toBeVisible();
+  await assertViewportSafe(page);
   await page.getByRole("button", { name: /registra \/ rinnova/i }).click();
   const insuranceHeading = page.getByRole("heading", {
     name: /registra \/ rinnova assicurazione/i,

@@ -51,7 +51,11 @@ import {
   todayRome,
 } from "../lib/volontariDomain";
 import { operationalStatesForRows } from "../lib/volontariOperational";
-import { appendVolontarioLedgerEvent } from "../lib/volontariLedger";
+import {
+  appendVolontarioLedgerEvent,
+  buildVolunteerEventSnapshot,
+  buildVolunteerRegistrationSnapshot,
+} from "../lib/volontariLedger";
 
 const router: IRouter = Router();
 router.use("/volontari", requireModulo("VOLONTARI"));
@@ -469,10 +473,7 @@ async function createVolontarioOne(
       const [row] = await tx
         .insert(volontariTable)
         .values(values as typeof volontariTable.$inferInsert)
-        .returning({
-          id: volontariTable.id,
-          versione: volontariTable.versione,
-        });
+        .returning();
       await auditLogistica(tx, req, {
         entita: "volontario",
         id: row.id,
@@ -490,7 +491,10 @@ async function createVolontarioOne(
         centroAscoltoId:
           (values.centroAscoltoId as number | null | undefined) ?? null,
         dataEffettiva: todayRome(),
-        snapshot: { matricola, tipoVolontario, statoApprovazione: "in_attesa" },
+        snapshot: await buildVolunteerRegistrationSnapshot(tx, row, {
+          origine: "MANUALE",
+          dataInizio: todayRome(),
+        }),
         utenteId: actorId(req),
       });
       return [row];
@@ -870,10 +874,7 @@ router.patch(
               eq(volontariTable.versione, versione),
             ),
           )
-          .returning({
-            id: volontariTable.id,
-            versione: volontariTable.versione,
-          });
+          .returning();
         if (!row) throw new Error("STALE_VERSION");
         await auditLogistica(tx, req, {
           entita: "volontario",
@@ -915,10 +916,14 @@ router.patch(
             volontarioId: existing.id,
             centroAscoltoId: existing.centroAscoltoId,
             dataEffettiva: date,
-            snapshot: {
+            snapshot: await buildVolunteerEventSnapshot(tx, row, {
+              statoPrecedente: existing.attivo ? "ATTIVO" : "NON_ATTIVO",
+              nuovoStato: updates.attivo ? "ATTIVO" : "SOSPESO",
               motivo: "compatibilita_modifica",
+              dataEffettiva: date,
               versione: row.versione,
-            },
+              datiEvento: { origine: "modifica_anagrafica" },
+            }),
             utenteId: actorId(req),
           });
         }
@@ -1017,10 +1022,14 @@ router.delete(
         volontarioId: id,
         centroAscoltoId: existing.centroAscoltoId,
         dataEffettiva: date,
-        snapshot: {
+        snapshot: await buildVolunteerEventSnapshot(tx, existing, {
+          statoPrecedente: existing.attivo ? "ATTIVO" : "NON_ATTIVO",
+          nuovoStato: "SOSPESO",
           motivo: "sospensione_organizzativa",
+          dataEffettiva: date,
           versione: row.versione,
-        },
+          datiEvento: { origine: "disattivazione_compatibilita" },
+        }),
         utenteId: actorId(req),
       });
       return { status: 200 as const, versione: row.versione };

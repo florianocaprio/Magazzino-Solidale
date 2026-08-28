@@ -30,7 +30,10 @@ import {
   isDateOnly,
   todayRome,
 } from "../lib/volontariDomain";
-import { appendVolontarioLedgerEvent } from "../lib/volontariLedger";
+import {
+  appendVolontarioLedgerEvent,
+  buildVolunteerEventSnapshot,
+} from "../lib/volontariLedger";
 import { operationalStateForVolunteer, operationalStatesForRows } from "../lib/volontariOperational";
 
 const router: IRouter = Router();
@@ -116,7 +119,16 @@ router.post(
         volontarioId: locked.id,
         centroAscoltoId: locked.centroAscoltoId,
         dataEffettiva,
-        snapshot: { motivo, note: text(req.body?.note), statoEventoId: event.id, versione: updated.versione },
+        snapshot: await buildVolunteerEventSnapshot(tx, updated, {
+          statoPrecedente: locked.attivo ? "ATTIVO" : "NON_ATTIVO",
+          nuovoStato:
+            motivo === "dimissioni_cessazione" ? "CESSATO" : "SOSPESO",
+          motivo,
+          dataEffettiva,
+          riferimentoEventoId: event.id,
+          versione: updated.versione,
+          datiEvento: { note: text(req.body?.note) },
+        }),
         utenteId: userId(req),
       });
       await auditLogistica(tx, req, {
@@ -165,7 +177,15 @@ router.post(
         sezione: locked.tipoVolontario as "PERMANENTE" | "TEMPORANEO",
         tipoEvento: "RIATTIVAZIONE", volontarioId: locked.id,
         centroAscoltoId: locked.centroAscoltoId, dataEffettiva,
-        snapshot: { statoEventoId: event.id, note: text(req.body?.note), versione: row.versione },
+        snapshot: await buildVolunteerEventSnapshot(tx, row, {
+          statoPrecedente: locked.attivo ? "ATTIVO" : "SOSPESO",
+          nuovoStato: "ATTIVO",
+          motivo: "riattivazione",
+          dataEffettiva,
+          riferimentoEventoId: event.id,
+          versione: row.versione,
+          datiEvento: { note: text(req.body?.note) },
+        }),
         utenteId: userId(req),
       });
       await auditLogistica(tx, req, {
@@ -405,7 +425,18 @@ router.post(
       await appendVolontarioLedgerEvent(tx, {
         sezione: "TEMPORANEO", tipoEvento: "GIORNATA_TEMPORANEA",
         volontarioId: scoped.row.id, centroAscoltoId, dataEffettiva: dataServizio,
-        snapshot: { giornataId: row.id, stato, attivita: row.attivita, coperturaVerificata: row.coperturaVerificata },
+        snapshot: await buildVolunteerEventSnapshot(tx, scoped.row, {
+          statoPrecedente: null,
+          nuovoStato: stato,
+          motivo: "giornata_temporanea",
+          dataEffettiva: dataServizio,
+          riferimentoEventoId: row.id,
+          datiEvento: {
+            giornataId: row.id,
+            attivita: row.attivita,
+            coperturaVerificata: row.coperturaVerificata,
+          },
+        }),
         utenteId: userId(req),
       });
       await auditLogistica(tx, req, { entita: "volontario", id: scoped.row.id, azione: "giornata_temporanea", nuovo: { giornataId: row.id, dataServizio, stato } });
@@ -427,12 +458,76 @@ router.patch(
     if (!Number.isSafeInteger(giornataId) || giornataId <= 0 || versione == null || (stato && !["PIANIFICATA", "PRESENTE", "ASSENTE", "ANNULLATA"].includes(stato))) {
       res.status(400).json({ error: "Modifica giornata non valida" }); return;
     }
-    const [updated] = await db.update(giornateServizioVolontariTable).set({
-      ...(stato ? { stato } : {}),
-      ...(req.body?.attivita !== undefined ? { attivita: text(req.body.attivita, 200) } : {}),
-      ...(req.body?.note !== undefined ? { note: text(req.body.note) } : {}),
-      versione: sql`${giornateServizioVolontariTable.versione} + 1`, dataAggiornamento: new Date(),
-    }).where(and(eq(giornateServizioVolontariTable.id, giornataId), eq(giornateServizioVolontariTable.volontarioId, scoped.row.id), eq(giornateServizioVolontariTable.versione, versione))).returning();
+    const updated = await db.transaction(async (tx) => {
+      const [previous] = await tx
+        .select()
+        .from(giornateServizioVolontariTable)
+        .where(
+          and(
+            eq(giornateServizioVolontariTable.id, giornataId),
+            eq(giornateServizioVolontariTable.volontarioId, scoped.row.id),
+          ),
+        )
+        .for("update");
+      if (!previous || previous.versione !== versione) return null;
+      const [row] = await tx
+        .update(giornateServizioVolontariTable)
+        .set({
+          ...(stato ? { stato } : {}),
+          ...(req.body?.attivita !== undefined
+            ? { attivita: text(req.body.attivita, 200) }
+            : {}),
+          ...(req.body?.note !== undefined
+            ? { note: text(req.body.note) }
+            : {}),
+          versione: sql`${giornateServizioVolontariTable.versione} + 1`,
+          dataAggiornamento: new Date(),
+        })
+        .where(
+          and(
+            eq(giornateServizioVolontariTable.id, giornataId),
+            eq(giornateServizioVolontariTable.versione, versione),
+          ),
+        )
+        .returning();
+      if (!row) return null;
+      await appendVolontarioLedgerEvent(tx, {
+        sezione: "TEMPORANEO",
+        tipoEvento: "GIORNATA_TEMPORANEA",
+        volontarioId: scoped.row.id,
+        centroAscoltoId: row.centroAscoltoId,
+        dataEffettiva: row.dataServizio,
+        snapshot: await buildVolunteerEventSnapshot(tx, scoped.row, {
+          statoPrecedente: previous.stato,
+          nuovoStato: row.stato,
+          motivo: "modifica_giornata_temporanea",
+          dataEffettiva: row.dataServizio,
+          riferimentoEventoId: row.id,
+          versione: row.versione,
+          datiEvento: {
+            attivitaPrecedente: previous.attivita,
+            attivita: row.attivita,
+          },
+        }),
+        utenteId: userId(req),
+      });
+      await auditLogistica(tx, req, {
+        entita: "volontario",
+        id: scoped.row.id,
+        azione: "modifica_giornata_temporanea",
+        precedente: {
+          giornataId: previous.id,
+          stato: previous.stato,
+          versione: previous.versione,
+        },
+        nuovo: {
+          giornataId: row.id,
+          stato: row.stato,
+          versione: row.versione,
+        },
+      });
+      return row;
+    });
     if (!updated) { res.status(409).json({ error: "Giornata non trovata o aggiornata da un altro operatore" }); return; }
     res.json(updated);
   },

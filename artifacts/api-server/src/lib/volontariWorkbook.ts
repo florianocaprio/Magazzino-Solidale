@@ -24,6 +24,31 @@ export const VOLONTARI_EXTENDED_OPTIONAL_HEADERS = [
   "Tipo volontario",
   "Data servizio",
 ] as const;
+export const VOLONTARI_OFFICIAL_HEADERS = [
+  "Progressivo",
+  "Matricola",
+  "Cognome",
+  "Nome",
+  "Codice fiscale",
+  "Data di nascita",
+  "Luogo di nascita",
+  "Residenza",
+  "Domicilio",
+  "Tipo volontario",
+  "Data inizio attività/iscrizione",
+  "Origine iscrizione",
+  "Da Data importata",
+  "Data cessazione",
+  "Stato alla data di riferimento",
+  "Motivo stato",
+  "Centro/Gruppo",
+  "Ruolo/Categoria",
+  "Scadenza assicurazione",
+  "Date servizio temporaneo",
+  "Intervallo servizio temporaneo",
+  "Data di riferimento",
+  "Riferimento iscrizione",
+] as const;
 
 export class VolontariWorkbookError extends Error {
   constructor(readonly code: string, message: string) {
@@ -189,4 +214,14 @@ export function buildExtendedVolunteerWorkbook(rows: Array<Record<string, unknow
     "Qualifiche in scadenza",
   ];
   return workbookFromRows(headers, rows, "Elenco operativo");
+}
+
+export function buildOfficialVolunteerWorkbook(
+  rows: Array<Record<string, unknown>>,
+): Buffer {
+  return workbookFromRows(
+    [...VOLONTARI_OFFICIAL_HEADERS],
+    rows,
+    "Registro ufficiale",
+  );
 }

@@ -6398,6 +6398,11 @@ paths:
           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
             schema: { type: string, format: binary }
       responses:
+        "200":
+          description: Replay semantico di un import già confermato nello stesso perimetro
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontariImportPreview" }
         "201":
           description: Anteprima import senza scritture anagrafiche
           content:
@@ -6415,7 +6420,7 @@ paths:
             schema: { $ref: "#/components/schemas/VolontariImportConfirmInput" }
       responses:
         "200":
-          description: Import transazionale confermato
+          description: Import transazionale confermato o replay semantico idempotente
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
@@ -6542,7 +6547,7 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/VolontariRegisterGenerateInput" }
       responses:
-        "200": { description: Emissione ufficiale PDF o XLSX }
+        "200": { description: "Registro ufficiale separato dagli export storico e operativo, emesso in PDF Unicode o XLSX con snapshot e hash persistiti" }
 
   /volontari/registro/emissioni:
     get:
@@ -6558,14 +6563,14 @@ paths:
       parameters:
         - { name: emissioneId, in: path, required: true, schema: { type: integer } }
       responses:
-        "200": { description: File originale dell'emissione con integrità verificata }
+        "200": { description: File originale byte-per-byte dell'emissione con integrità verificata e download sottoposto ad audit }
 
   /volontari/registro/eventi:
     get:
       operationId: listVolontariRegisterEvents
       tags: [volontari]
       responses:
-        "200": { description: Eventi append-only del registro }
+        "200": { description: "Eventi append-only del registro; lo snapshot PII completo è restituito solo con permesso export/manage o privilegi amministrativi, altrimenti è sanificato" }
 
   /volontari/registro/eventi/{eventoId}/rettifica:
     post:
@@ -16322,7 +16327,21 @@ components:
         importazioneId: { type: integer }
         nomeFile: { type: string }
         stato: { type: string }
-        hashFile: { type: string }
+        hashFile:
+          type: string
+          description: Alias retrocompatibile di sha256File.
+        sha256File:
+          type: string
+          description: SHA-256 dei byte del workbook ricevuto.
+        hashContenutoNormalizzato:
+          type: string
+          description: Hash canonico del contenuto normalizzato usato con il perimetro per l'idempotenza semantica.
+        sha256FileRichiesto:
+          type: string
+          description: SHA-256 del file appena ricevuto quando la risposta è un replay semantico.
+        importazioneOriginaleSha256File:
+          type: string
+          description: SHA-256 binario dell'importazione confermata originaria quando la risposta è un replay.
         numeroRighe: { type: integer }
         replayIdempotente: { type: boolean }
         righe:
@@ -16330,7 +16349,7 @@ components:
           items:
             type: object
             additionalProperties: true
-      required: [importazioneId, nomeFile, stato, hashFile, numeroRighe, righe]
+      required: [importazioneId, nomeFile, stato, hashFile, sha256File, hashContenutoNormalizzato, numeroRighe, righe]
 
     VolontariImportConfirmInput:
       type: object

@@ -64,6 +64,7 @@ export const copertureAssicurativeVolontariTable = pgTable(
     riferimentoPolizza: varchar("riferimento_polizza", { length: 120 }),
     note: text("note"),
     gruppoOperazioneId: varchar("gruppo_operazione_id", { length: 64 }),
+    chiaveIdempotenza: varchar("chiave_idempotenza", { length: 64 }),
     rettificaDiId: integer("rettifica_di_id"),
     annullata: boolean("annullata").notNull().default(false),
     annullataDa: integer("annullata_da").references(() => utentiTable.id, {
@@ -82,6 +83,11 @@ export const copertureAssicurativeVolontariTable = pgTable(
       table.dataInizio,
     ),
     index("coperture_gruppo_operazione_idx").on(table.gruppoOperazioneId),
+    uniqueIndex("coperture_import_idempotenza_unique")
+      .on(table.chiaveIdempotenza)
+      .where(
+        sql`${table.chiaveIdempotenza} is not null and ${table.tipoOperazione} = 'IMPORTAZIONE' and ${table.annullata} = false`,
+      ),
     check(
       "coperture_tipo_operazione_check",
       sql`${table.tipoOperazione} in ('IMPORTAZIONE','NUOVA_COPERTURA','RINNOVO','RETTIFICA')`,
@@ -113,6 +119,7 @@ export const giornateServizioVolontariTable = pgTable(
     stato: varchar("stato", { length: 20 }).notNull().default("PIANIFICATA"),
     coperturaVerificata: boolean("copertura_verificata").notNull().default(false),
     note: text("note"),
+    chiaveIdempotenza: varchar("chiave_idempotenza", { length: 64 }),
     versione: integer("versione").notNull().default(1),
     creatoDa: integer("creato_da").references(() => utentiTable.id, {
       onDelete: "set null",
@@ -126,6 +133,9 @@ export const giornateServizioVolontariTable = pgTable(
       table.dataServizio,
       table.centroAscoltoId,
     ),
+    uniqueIndex("giornate_servizio_import_idempotenza_unique")
+      .on(table.chiaveIdempotenza)
+      .where(sql`${table.chiaveIdempotenza} is not null`),
     index("giornate_servizio_data_idx").on(table.dataServizio, table.stato),
     check(
       "giornate_servizio_stato_check",
@@ -305,6 +315,7 @@ export const importazioniVolontariTable = pgTable(
     hashContenutoNormalizzato: varchar("hash_contenuto_normalizzato", {
       length: 64,
     }).notNull(),
+    chiaveIdempotenza: varchar("chiave_idempotenza", { length: 64 }),
     centroAscoltoId: integer("centro_ascolto_id").references(
       () => centriAscoltoTable.id,
       { onDelete: "restrict" },
@@ -328,6 +339,11 @@ export const importazioniVolontariTable = pgTable(
   (table) => [
     index("importazioni_volontari_hash_idx").on(table.sha256File),
     index("importazioni_volontari_scope_idx").on(table.centroAscoltoId),
+    uniqueIndex("importazioni_volontari_confermate_idempotenza_unique")
+      .on(table.chiaveIdempotenza)
+      .where(
+        sql`${table.chiaveIdempotenza} is not null and ${table.stato} = 'CONFERMATO'`,
+      ),
     check(
       "importazioni_volontari_stato_check",
       sql`${table.stato} in ('ANALIZZATO','CONFERMATO','PARZIALE','FALLITO')`,
