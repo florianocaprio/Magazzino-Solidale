@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getGetMapsConsegneQueryKey,
   getGetMapsInterventiSocialiQueryKey,
@@ -95,6 +95,12 @@ export default function MapsOperativa() {
     [t, toast],
   );
   const refresh = () => Promise.all([enabled("sociale.interventi_pianificati") && validRange ? social.refetch() : undefined, enabled("pacchi.consegne") && validRange ? deliveries.refetch() : undefined, enabled("pacchi.ritiri_non_effettuati") && validRange ? missed.refetch() : undefined, enabled("centro.punti_operativi") ? points.refetch() : undefined].filter(Boolean));
+  const hasPendingLocations = markers.some((marker) => marker.locationStatus === "pending");
+  useEffect(() => {
+    if (!hasPendingLocations) return;
+    const timer = window.setTimeout(() => { void refresh(); }, 2_500);
+    return () => window.clearTimeout(timer);
+  }, [hasPendingLocations, da, a, disabled, available]);
 
   if (loadingCapabilities) return <div className="p-6 space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96 w-full" /></div>;
   if (!capabilities?.operational || available.length === 0) {
@@ -125,13 +131,13 @@ export default function MapsOperativa() {
           {mapsLayerError(query.error, t("maps.layerLoadError"))}
         </div>
       ))}
-      <LeafletOperationalMap markers={markers} onMarkerSelect={setSelectedMarker} onUnavailable={onMapUnavailable} tileUrl={window.__APP_CONFIG__?.mapsTileUrl} tileAttribution={window.__APP_CONFIG__?.mapsTileAttribution} />
+      <LeafletOperationalMap markers={markers} selectedMarkerId={selectedMarker?.id} onMarkerSelect={setSelectedMarker} onUnavailable={onMapUnavailable} tileUrl={window.__APP_CONFIG__?.mapsTileUrl} tileAttribution={window.__APP_CONFIG__?.mapsTileAttribution} />
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><MapPin className="h-4 w-4" />{t("maps.operationalList")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {isLoading ? <Skeleton className="h-24 w-full" /> : markers.length === 0 ? <p className="py-8 text-center text-muted-foreground">{t("maps.empty")}</p> : markers.map((marker) => (
             <div key={marker.id} className="flex flex-col justify-between gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{marker.title}</p><Badge variant="outline">{marker.status}</Badge></div><p className="truncate text-sm text-muted-foreground">{marker.address}</p>{marker.date && <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3 w-3" />{formatDateOrDateTimeEuropeRome(marker.date)}</p>}</div>
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{marker.title}</p><Badge variant="outline">{marker.status}</Badge></div><p className="truncate text-sm text-muted-foreground">{marker.address}</p>{marker.locationStatus !== "resolved" && <p className="text-xs text-muted-foreground">{t("maps.locationUnavailable")}</p>}{marker.date && <p className="flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3 w-3" />{formatDateOrDateTimeEuropeRome(marker.date)}</p>}</div>
               <div className="flex shrink-0 flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setSelectedMarker(marker)}>{t("maps.markerDetails")}</Button><RouteActions consegnaId={marker.entityId} available={marker.entityType === "consegna" && marker.actions.includes("route")} compact /></div>
             </div>
           ))}

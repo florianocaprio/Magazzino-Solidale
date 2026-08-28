@@ -9305,7 +9305,7 @@ components:
           items: { type: string, enum: [open, route, convert_delivery] }
         latitude: { type: [number, "null"] }
         longitude: { type: [number, "null"] }
-        locationStatus: { type: string, enum: [resolved, not_found, error] }
+        locationStatus: { type: string, enum: [resolved, pending, not_found, error] }
     MapsRoute:
       type: object
       required: [origin, destination, provider, url]

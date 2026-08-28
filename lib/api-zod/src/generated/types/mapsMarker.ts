@@ -8,6 +8,7 @@
 import type { MapsLayerCode } from './mapsLayerCode';
 import type { MapsMarkerActionsItem } from './mapsMarkerActionsItem';
 import type { MapsMarkerEntityType } from './mapsMarkerEntityType';
+import type { MapsMarkerLocationStatus } from './mapsMarkerLocationStatus';
 
 /**
  * DTO geografico minimizzato; non contiene dati sociali o anagrafici
@@ -25,4 +26,9 @@ export interface MapsMarker {
   /** @nullable */
   date: string | null;
   actions: MapsMarkerActionsItem[];
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  locationStatus?: MapsMarkerLocationStatus;
 }

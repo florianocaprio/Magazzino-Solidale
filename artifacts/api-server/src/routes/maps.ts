@@ -40,7 +40,7 @@ import {
 } from "../lib/centroScope";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import { intervalloDateEuropeRome } from "../lib/interventiViste";
-import { geocodeMapsAddress } from "../lib/maps-geocoding";
+import { enrichMapsMarkersFromCache, geocodeMapsAddress } from "../lib/maps-geocoding";
 
 const router: IRouter = Router();
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
@@ -268,7 +268,7 @@ router.get(
       date: row.data?.toISOString() ?? null,
       actions: ["open"],
     }] : []);
-    res.json(markers);
+    res.json(await enrichMapsMarkersFromCache(markers));
   },
 );
 
@@ -311,7 +311,7 @@ router.get(
       date: row.data,
       actions: routeAllowed ? ["open", "route"] : ["open"],
     }] : []);
-    res.json(markers);
+    res.json(await enrichMapsMarkersFromCache(markers));
   },
 );
 
@@ -356,7 +356,7 @@ router.get(
       date: row.at?.toISOString() ?? null,
       actions: canConvert ? ["open", "convert_delivery"] : ["open"],
     }] : []);
-    res.json(markers);
+    res.json(await enrichMapsMarkersFromCache(markers));
   },
 );
 
@@ -387,7 +387,7 @@ router.get(
       ...warehouses.flatMap((row) => row.indirizzo?.trim() ? [{ id: `centro.magazzino:${row.id}`, layer: "centro.punti_operativi" as const, entityType: "magazzino" as const, entityId: row.id, title: row.nome, subtitle: "Magazzino", status: row.stato, address: [row.indirizzo.trim(), row.comune].filter(Boolean).join(", "), date: null, actions: canOpenAdministrativeTarget ? ["open" as const] : [] }] : []),
       ...centres.flatMap((row) => row.indirizzo?.trim() ? [{ id: `centro.ascolto:${row.id}`, layer: "centro.punti_operativi" as const, entityType: "centro_ascolto" as const, entityId: row.id, title: row.nome, subtitle: "Centro di ascolto", status: "attivo", address: [row.indirizzo.trim(), row.comune].filter(Boolean).join(", "), date: null, actions: canOpenAdministrativeTarget ? ["open" as const] : [] }] : []),
     ];
-    res.json(markers);
+    res.json(await enrichMapsMarkersFromCache(markers));
   },
 );
 

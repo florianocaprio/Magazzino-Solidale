@@ -57,7 +57,8 @@ services:
       context: .
       dockerfile: Dockerfile.web
     environment:
-      GOOGLE_MAPS_BROWSER_API_KEY: ${GOOGLE_MAPS_BROWSER_API_KEY:-}
+      MAPS_TILE_URL: ${MAPS_TILE_URL:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}
+      MAPS_TILE_ATTRIBUTION: ${MAPS_TILE_ATTRIBUTION:-© OpenStreetMap contributors}
     depends_on:
       api:
         condition: service_healthy

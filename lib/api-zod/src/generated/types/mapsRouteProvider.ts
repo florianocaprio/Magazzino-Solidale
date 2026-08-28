@@ -10,5 +10,5 @@ export type MapsRouteProvider = typeof MapsRouteProvider[keyof typeof MapsRouteP
 
 
 export const MapsRouteProvider = {
-  'google-maps-url': 'google-maps-url',
+  'openstreetmap-directions': 'openstreetmap-directions',
 } as const;

@@ -1,59 +1,21 @@
-import { eq } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { db, mapsGeocodeCacheTable } from "@workspace/db";
 
-export type MapsLocation = { latitude: number | null; longitude: number | null; locationStatus: "resolved" | "not_found" | "error" };
+export type MapsLocationStatus = "resolved" | "pending" | "not_found" | "error";
+export type MapsLocation = { latitude: number | null; longitude: number | null; locationStatus: MapsLocationStatus };
+type Address = { normalizedAddress: string; originalAddress: string };
 const NEGATIVE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-let nextPublicRequestAt = 0;
-const pending = new Map<string, Promise<MapsLocation>>();
-
-export function normalizeMapsAddress(address: string): string {
-  return address.trim().replace(/\s+/g, " ").toLocaleLowerCase("it-IT");
+const queue = new Map<string, Address>(); let workerRunning = false; let nextPublicRequestAt = 0;
+export function normalizeMapsAddress(address: string): string { return address.trim().replace(/\s+/g, " ").toLocaleLowerCase("it-IT"); }
+function isPublicProvider() { return !(process.env.NOMINATIM_BASE_URL && !process.env.NOMINATIM_BASE_URL.includes("nominatim.openstreetmap.org")); }
+function providerAllowed() { return !isPublicProvider() || process.env.MAPS_PUBLIC_GEOCODING_ALLOWED === "true"; }
+async function lookup(address: string): Promise<MapsLocation> {
+  if (!providerAllowed()) return { latitude: null, longitude: null, locationStatus: "error" };
+  if (isPublicProvider()) { const wait = Math.max(0, nextPublicRequestAt - Date.now()); if (wait) await new Promise((r) => setTimeout(r, wait)); nextPublicRequestAt = Date.now() + 1_100; }
+  const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 8_000);
+  try { const base = (process.env.NOMINATIM_BASE_URL || "https://nominatim.openstreetmap.org").replace(/\/$/, ""); const response = await fetch(`${base}/search?${new URLSearchParams({ q: address, format: "jsonv2", limit: "1" })}`, { headers: { "User-Agent": process.env.NOMINATIM_USER_AGENT || "MagazzinoSolidale/1.0 (+https://magazzino.angeliinmoto.it)", Accept: "application/json" }, signal: controller.signal }); if (!response.ok) return { latitude: null, longitude: null, locationStatus: "error" }; const row = (await response.json() as Array<{ lat?: string; lon?: string }>)[0]; const latitude = Number(row?.lat); const longitude = Number(row?.lon); return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude, locationStatus: "resolved" } : { latitude: null, longitude: null, locationStatus: "not_found" }; } catch { return { latitude: null, longitude: null, locationStatus: "error" }; } finally { clearTimeout(timeout); }
 }
-
-function publicGeocodingAllowed(): boolean {
-  return process.env.MAPS_PUBLIC_GEOCODING_ALLOWED === "true";
-}
-
-async function providerLookup(address: string): Promise<MapsLocation> {
-  if (!publicGeocodingAllowed()) return { latitude: null, longitude: null, locationStatus: "error" };
-  const wait = Math.max(0, nextPublicRequestAt - Date.now());
-  if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
-  nextPublicRequestAt = Date.now() + 1_100;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
-  try {
-    const base = (process.env.NOMINATIM_BASE_URL || "https://nominatim.openstreetmap.org").replace(/\/$/, "");
-    const response = await fetch(`${base}/search?${new URLSearchParams({ q: address, format: "jsonv2", limit: "1" })}`, {
-      headers: { "User-Agent": process.env.NOMINATIM_USER_AGENT || "MagazzinoSolidale/1.0 (+https://magazzino.angeliinmoto.it)", Accept: "application/json" },
-      signal: controller.signal,
-    });
-    if (!response.ok) return { latitude: null, longitude: null, locationStatus: "error" };
-    const row = (await response.json() as Array<{ lat?: string; lon?: string }>)[0];
-    const latitude = Number(row?.lat); const longitude = Number(row?.lon);
-    return Number.isFinite(latitude) && Number.isFinite(longitude)
-      ? { latitude, longitude, locationStatus: "resolved" }
-      : { latitude: null, longitude: null, locationStatus: "not_found" };
-  } catch {
-    return { latitude: null, longitude: null, locationStatus: "error" };
-  } finally { clearTimeout(timeout); }
-}
-
-export async function geocodeMapsAddress(address: string): Promise<MapsLocation> {
-  const normalizedAddress = normalizeMapsAddress(address);
-  if (!normalizedAddress) return { latitude: null, longitude: null, locationStatus: "not_found" };
-  const current = pending.get(normalizedAddress); if (current) return current;
-  const task = (async () => {
-    const [cached] = await db.select().from(mapsGeocodeCacheTable).where(eq(mapsGeocodeCacheTable.normalizedAddress, normalizedAddress)).limit(1);
-    if (cached?.status === "resolved" && cached.latitude != null && cached.longitude != null) {
-      return { latitude: Number(cached.latitude), longitude: Number(cached.longitude), locationStatus: "resolved" as const };
-    }
-    if (cached && cached.lastAttemptAt.getTime() > Date.now() - NEGATIVE_CACHE_TTL_MS) return { latitude: null, longitude: null, locationStatus: cached.status === "not_found" ? "not_found" as const : "error" as const };
-    const location = await providerLookup(address);
-    const values = { normalizedAddress, originalAddress: address.trim(), latitude: location.latitude?.toString() ?? null, longitude: location.longitude?.toString() ?? null, provider: "nominatim", status: location.locationStatus, lastAttemptAt: new Date(), updatedAt: new Date() };
-    if (cached) await db.update(mapsGeocodeCacheTable).set(values).where(eq(mapsGeocodeCacheTable.id, cached.id));
-    else await db.insert(mapsGeocodeCacheTable).values(values);
-    return location;
-  })();
-  pending.set(normalizedAddress, task);
-  try { return await task; } finally { pending.delete(normalizedAddress); }
-}
+async function processQueue() { if (workerRunning) return; workerRunning = true; try { while (queue.size) { const [key, address] = queue.entries().next().value as [string, Address]; queue.delete(key); const result = await lookup(address.originalAddress); const values = { ...address, latitude: result.latitude?.toString() ?? null, longitude: result.longitude?.toString() ?? null, provider: "nominatim", status: result.locationStatus, lastAttemptAt: new Date(), updatedAt: new Date() }; await db.insert(mapsGeocodeCacheTable).values(values).onConflictDoUpdate({ target: mapsGeocodeCacheTable.normalizedAddress, set: values }); } } finally { workerRunning = false; } }
+export function queueMapsGeocoding(addresses: string[]) { for (const originalAddress of addresses) { const normalizedAddress = normalizeMapsAddress(originalAddress); if (normalizedAddress) queue.set(normalizedAddress, { normalizedAddress, originalAddress: originalAddress.trim() }); } void processQueue(); }
+export async function enrichMapsMarkersFromCache<T extends { address: string }>(markers: T[]): Promise<Array<T & MapsLocation>> { const unique = [...new Set(markers.map((marker) => normalizeMapsAddress(marker.address)).filter(Boolean))]; if (!unique.length) return markers.map((marker) => ({ ...marker, latitude: null, longitude: null, locationStatus: "not_found" as const })); const cached = await db.select().from(mapsGeocodeCacheTable).where(inArray(mapsGeocodeCacheTable.normalizedAddress, unique)); const byAddress = new Map(cached.map((row) => [row.normalizedAddress, row])); const misses: string[] = []; const result = markers.map((marker) => { const row = byAddress.get(normalizeMapsAddress(marker.address)); if (row?.status === "resolved" && row.latitude != null && row.longitude != null) return { ...marker, latitude: Number(row.latitude), longitude: Number(row.longitude), locationStatus: "resolved" as const }; if (row && row.lastAttemptAt.getTime() > Date.now() - NEGATIVE_CACHE_TTL_MS) return { ...marker, latitude: null, longitude: null, locationStatus: row.status === "not_found" ? "not_found" as const : "error" as const }; misses.push(marker.address); return { ...marker, latitude: null, longitude: null, locationStatus: "pending" as const }; }); queueMapsGeocoding(misses); return result; }
+export async function geocodeMapsAddress(address: string): Promise<MapsLocation> { queueMapsGeocoding([address]); return { latitude: null, longitude: null, locationStatus: "pending" }; }

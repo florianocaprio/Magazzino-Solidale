@@ -8176,7 +8176,10 @@ export const GetMapsInterventiSocialiResponseItem = zod.object({
   "status": zod.string(),
   "address": zod.string(),
   "date": zod.string().nullable(),
-  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery']))
+  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery'])),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "locationStatus": zod.enum(['resolved', 'pending', 'not_found', 'error']).optional()
 }).describe('DTO geografico minimizzato; non contiene dati sociali o anagrafici')
 export const GetMapsInterventiSocialiResponse = zod.array(GetMapsInterventiSocialiResponseItem)
 
@@ -8196,7 +8199,10 @@ export const GetMapsConsegneResponseItem = zod.object({
   "status": zod.string(),
   "address": zod.string(),
   "date": zod.string().nullable(),
-  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery']))
+  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery'])),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "locationStatus": zod.enum(['resolved', 'pending', 'not_found', 'error']).optional()
 }).describe('DTO geografico minimizzato; non contiene dati sociali o anagrafici')
 export const GetMapsConsegneResponse = zod.array(GetMapsConsegneResponseItem)
 
@@ -8216,7 +8222,10 @@ export const GetMapsRitiriNonEffettuatiResponseItem = zod.object({
   "status": zod.string(),
   "address": zod.string(),
   "date": zod.string().nullable(),
-  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery']))
+  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery'])),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "locationStatus": zod.enum(['resolved', 'pending', 'not_found', 'error']).optional()
 }).describe('DTO geografico minimizzato; non contiene dati sociali o anagrafici')
 export const GetMapsRitiriNonEffettuatiResponse = zod.array(GetMapsRitiriNonEffettuatiResponseItem)
 
@@ -8231,13 +8240,16 @@ export const GetMapsPuntiOperativiResponseItem = zod.object({
   "status": zod.string(),
   "address": zod.string(),
   "date": zod.string().nullable(),
-  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery']))
+  "actions": zod.array(zod.enum(['open', 'route', 'convert_delivery'])),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "locationStatus": zod.enum(['resolved', 'pending', 'not_found', 'error']).optional()
 }).describe('DTO geografico minimizzato; non contiene dati sociali o anagrafici')
 export const GetMapsPuntiOperativiResponse = zod.array(GetMapsPuntiOperativiResponseItem)
 
 
 /**
- * @summary Costruisce un Google Maps URL per una consegna domiciliare già autorizzata
+ * @summary Costruisce un URL OpenStreetMap per una consegna domiciliare già autorizzata
  */
 export const GetMapsRouteConsegnaParams = zod.object({
   "id": zod.coerce.number()
@@ -8246,7 +8258,7 @@ export const GetMapsRouteConsegnaParams = zod.object({
 export const GetMapsRouteConsegnaResponse = zod.object({
   "origin": zod.string(),
   "destination": zod.string(),
-  "provider": zod.enum(['google-maps-url']),
+  "provider": zod.enum(['openstreetmap-directions']),
   "url": zod.string().url()
 })
 
