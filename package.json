@@ -10,6 +10,13 @@
     "test:fresh-db": "pnpm --filter @workspace/db run test:fresh"
   },
   "private": true,
+  "pnpm": {
+    "supportedArchitectures": {
+      "os": ["current", "linux"],
+      "cpu": ["current", "x64", "arm64"],
+      "libc": ["current", "glibc", "musl"]
+    }
+  },
   "devDependencies": {
     "@rollup/rollup-darwin-arm64": "4.60.3",
     "prettier": "^3.8.3",
