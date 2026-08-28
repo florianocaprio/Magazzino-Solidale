@@ -6,11 +6,13 @@ import * as XLSX from "xlsx";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   copertureAssicurativeVolontariTable,
+  centriAscoltoTable,
   corsiVolontariCatalogoTable,
   db,
   emissioniRegistroVolontariTable,
   giornateServizioVolontariTable,
   importazioniVolontariTable,
+  importazioniVolontariRigheTable,
   pool,
   qualificheVolontariCatalogoTable,
   registroVolontariEventiTable,
@@ -30,11 +32,17 @@ import {
   subtractCalendarMonths,
   todayRome,
 } from "../src/lib/volontariDomain";
-import { canonicalLedgerEventHash } from "../src/lib/volontariLedger";
+import {
+  appendVolontarioLedgerEvent,
+  buildVolunteerEventSnapshot,
+  canonicalLedgerEventHash,
+} from "../src/lib/volontariLedger";
 import {
   cleanup,
+  createAreaOperativa,
   createBeneficiario,
   createCentro,
+  createCentroRec,
   createMagazzino,
   createRuoloVolontario,
   makeScopedApp,
@@ -63,6 +71,7 @@ const app = (overrides: Partial<UserOptions> = {}) =>
 
 let scope: SeedScope;
 let ruoloId: number;
+let defaultCenterId: number;
 let sequence = 0;
 const courseCatalogIds: number[] = [];
 const qualificationCatalogIds: number[] = [];
@@ -75,7 +84,6 @@ function unique(prefix: string): string {
 async function createVolunteer(input: {
   tipo?: "PERMANENTE" | "TEMPORANEO";
   centroAscoltoId?: number | null;
-  matricola?: string;
   email?: string;
   telefono?: string;
   codiceFiscale?: string;
@@ -85,21 +93,35 @@ async function createVolunteer(input: {
   dataNascita?: string;
   indirizzoResidenza?: string;
 }) {
+  const centroAscoltoId = input.centroAscoltoId ?? defaultCenterId;
+  const [center] = await db
+    .select({ areaOperativaId: centriAscoltoTable.areaOperativaId })
+    .from(centriAscoltoTable)
+    .where(eq(centriAscoltoTable.id, centroAscoltoId));
+  if (center && center.areaOperativaId == null) {
+    const areaOperativaId = await createAreaOperativa(scope);
+    await db
+      .update(centriAscoltoTable)
+      .set({ areaOperativaId })
+      .where(eq(centriAscoltoTable.id, centroAscoltoId));
+  }
   const response = await request(app())
     .post("/volontari")
     .send({
       nome: input.nome ?? "Ada",
       cognome: input.cognome ?? "Sintetica",
-      matricola: input.matricola ?? unique("VOL2"),
       tipoVolontario: input.tipo ?? "PERMANENTE",
       ruoloVolontarioId: ruoloId,
-      centroAscoltoId: input.centroAscoltoId ?? null,
+      centroAscoltoId,
       email: input.email,
       telefono: input.telefono,
       codiceFiscale: input.codiceFiscale,
-      luogoNascita: input.luogoNascita,
-      dataNascita: input.dataNascita,
-      indirizzoResidenza: input.indirizzoResidenza,
+      codiceFiscaleNonDisponibile: input.codiceFiscale == null,
+      codiceFiscaleNota:
+        input.codiceFiscale == null ? "Non disponibile nel test" : undefined,
+      luogoNascita: input.luogoNascita ?? "Roma",
+      dataNascita: input.dataNascita ?? "1990-01-02",
+      indirizzoResidenza: input.indirizzoResidenza ?? "Via Sintetica 1",
     });
   expect(response.status, response.text).toBe(201);
   scope.volontarioIds.push(response.body.id);
@@ -172,9 +194,14 @@ function workbook(
   return Buffer.from(XLSX.write(book, { type: "buffer", bookType: "xlsx" }));
 }
 
-async function analyze(buffer: Buffer, centroId: number) {
-  return request(app())
-    .post(`/volontari/import/analizza?centroAscoltoId=${centroId}`)
+async function analyze(
+  buffer: Buffer,
+  centroId: number | null,
+  user: Partial<UserOptions> = {},
+) {
+  const query = centroId == null ? "" : `?centroAscoltoId=${centroId}`;
+  return request(app(user))
+    .post(`/volontari/import/analizza${query}`)
     .set(
       "content-type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -185,6 +212,13 @@ async function analyze(buffer: Buffer, centroId: number) {
 
 beforeEach(async () => {
   scope = newScope();
+  const areaOperativaId = await createAreaOperativa(scope);
+  defaultCenterId = (
+    await createCentroRec(scope, {
+      areaOperativaId,
+      nome: unique("Centro Volontari 2"),
+    })
+  ).id;
   ruoloId = await createRuoloVolontario(scope, {
     nome: unique("Ruolo Volontari 2"),
   });
@@ -464,8 +498,22 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     expect(historicalRow["A Data"]).toBe("2028-01-31");
 
     const replay = await analyze(file, centroId);
-    expect(replay.status).toBe(200);
-    expect(replay.body.replayIdempotente).toBe(true);
+    expect(replay.status).toBe(201);
+    expect(replay.body.importazioneId).not.toBe(preview.body.importazioneId);
+    const replayConfirmation = await request(app())
+      .post("/volontari/import/conferma")
+      .send({
+        importazioneId: replay.body.importazioneId,
+        righe: [
+          {
+            numeroRiga: 2,
+            ruoloVolontarioId: ruoloId,
+            centroAscoltoId: centroId,
+          },
+        ],
+      });
+    expect(replayConfirmation.status, replayConfirmation.text).toBe(200);
+    expect(replayConfirmation.body.replayIdempotente).toBe(true);
     expect(
       await db
         .select()
@@ -491,6 +539,25 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
         ],
       });
     expect(update.body.aggiornati).toBe(1);
+
+    const dateOnlyRow = [...row];
+    dateOnlyRow[7] = "2021-02-03";
+    dateOnlyRow[11] = "ada.changed@example.test";
+    const dateOnlyPreview = await analyze(workbook([dateOnlyRow]), centroId);
+    expect(dateOnlyPreview.body.righe[0].stato).toBe("AGGIORNAMENTO_CERTO");
+    const dateOnlyUpdate = await request(app())
+      .post("/volontari/import/conferma")
+      .send({
+        importazioneId: dateOnlyPreview.body.importazioneId,
+        righe: [
+          {
+            numeroRiga: 2,
+            ruoloVolontarioId: ruoloId,
+            centroAscoltoId: centroId,
+          },
+        ],
+      });
+    expect(dateOnlyUpdate.body.aggiornati).toBe(1);
   });
 
   it("tratta come replay due XLSX binariamente diversi ma semanticamente identici e regge conferme concorrenti", async () => {
@@ -553,6 +620,16 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     expect(
       confirmations.some((response) => response.body.replayIdempotente),
     ).toBe(true);
+    const divergent = await request(app())
+      .post("/volontari/import/conferma")
+      .send({
+        importazioneId: preview.body.importazioneId,
+        righe: [{ numeroRiga: 2, inclusa: false }],
+      });
+    expect(divergent.status).toBe(409);
+    expect(divergent.body.code).toBe(
+      "IMPORT_GIA_CONFERMATO_CON_DECISIONI_DIVERSE",
+    );
 
     const [created] = await db
       .select()
@@ -600,20 +677,23 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     });
 
     const replay = await analyze(secondFile, centroId);
-    expect(replay.status, replay.text).toBe(200);
+    expect(replay.status, replay.text).toBe(201);
     expect(replay.body).toMatchObject({
-      replayIdempotente: true,
-      importazioneId: preview.body.importazioneId,
       hashContenutoNormalizzato: preview.body.hashContenutoNormalizzato,
-      importazioneOriginaleSha256File: preview.body.sha256File,
     });
-    expect(replay.body.sha256FileRichiesto).not.toBe(
-      replay.body.importazioneOriginaleSha256File,
-    );
+    expect(replay.body.importazioneId).not.toBe(preview.body.importazioneId);
+    expect(replay.body.sha256File).not.toBe(preview.body.sha256File);
     const replayConfirmation = await request(app())
       .post("/volontari/import/conferma")
-      .send({ importazioneId: replay.body.importazioneId, righe: [] });
+      .send({
+        importazioneId: replay.body.importazioneId,
+        righe: confirmationPayload.righe,
+      });
+    expect(replayConfirmation.status, replayConfirmation.text).toBe(200);
     expect(replayConfirmation.body.replayIdempotente).toBe(true);
+    expect(replayConfirmation.body.importazioneId).toBe(
+      preview.body.importazioneId,
+    );
 
     expect(
       await db
@@ -683,6 +763,272 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     });
   });
 
+  it("considera equivalenti file con righe riordinate solo a parità di mapping finale", async () => {
+    const centerName = unique("Centro Righe Riordinate");
+    const centroId = await createCentro(scope, centerName);
+    const [role] = await db
+      .select()
+      .from(ruoliVolontariTable)
+      .where(eq(ruoliVolontariTable.id, ruoloId));
+    const codeA = unique("ORDER-A");
+    const codeB = unique("ORDER-B");
+    const rowA = [
+      1,
+      codeA,
+      "Alfa Ada",
+      "Roma",
+      "1990-01-02",
+      "Via Alfa 1",
+      "",
+      "2020-01-01",
+      "",
+      "",
+      "",
+      "",
+      centerName,
+      role.nome,
+      "Permanente",
+      "",
+    ];
+    const rowB = [
+      2,
+      codeB,
+      "Beta Bea",
+      "Milano",
+      "1991-02-03",
+      "Via Beta 2",
+      "",
+      "2020-02-01",
+      "",
+      "",
+      "",
+      "",
+      centerName,
+      role.nome,
+      "Permanente",
+      "",
+    ];
+    const first = await analyze(workbook([rowA, rowB], "ordine-a-b"), centroId);
+    const second = await analyze(workbook([rowB, rowA], "ordine-b-a"), centroId);
+    expect(first.status, first.text).toBe(201);
+    expect(second.status, second.text).toBe(201);
+    expect(first.body.righe, JSON.stringify(first.body.righe)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stato: "NUOVO", errori: [] }),
+        expect.objectContaining({ stato: "NUOVO", errori: [] }),
+      ]),
+    );
+    expect(first.body.hashContenutoNormalizzato).toBe(
+      second.body.hashContenutoNormalizzato,
+    );
+    scope.importazioneVolontariIds.push(
+      first.body.importazioneId,
+      second.body.importazioneId,
+    );
+    const decisions = [2, 3].map((numeroRiga) => ({
+      numeroRiga,
+      ruoloVolontarioId: ruoloId,
+      centroAscoltoId: centroId,
+    }));
+    const confirmed = await request(app())
+      .post("/volontari/import/conferma")
+      .send({ importazioneId: first.body.importazioneId, righe: decisions });
+    expect(confirmed.status, confirmed.text).toBe(200);
+    expect(confirmed.body.creati).toBe(2);
+    const replay = await request(app())
+      .post("/volontari/import/conferma")
+      .send({ importazioneId: second.body.importazioneId, righe: decisions });
+    expect(replay.status, replay.text).toBe(200);
+    expect(replay.body.replayIdempotente).toBe(true);
+    const created = await db
+      .select({ id: volontariTable.id })
+      .from(volontariTable)
+      .where(inArray(volontariTable.matricola, [codeA, codeB]));
+    scope.volontarioIds.push(...created.map((item) => item.id));
+  });
+
+  it("blocca la conferma se il candidato cambia dopo la preview", async () => {
+    const centroId = await createCentro(scope, unique("Centro Concorrenza Import"));
+    const existing = await createVolunteer({
+      centroAscoltoId: centroId,
+      email: "prima@example.test",
+    });
+    const [role] = await db
+      .select()
+      .from(ruoliVolontariTable)
+      .where(eq(ruoliVolontariTable.id, ruoloId));
+    const file = workbook([
+      [
+        1,
+        existing.matricola,
+        "Sintetica Ada",
+        "Roma",
+        "1990-01-02",
+        "Via Sintetica 1",
+        "",
+        todayRome(),
+        "",
+        "",
+        "",
+        "prima@example.test",
+        "",
+        role.nome,
+        "Permanente",
+        "",
+      ],
+    ]);
+    const preview = await analyze(file, centroId);
+    expect(preview.status, preview.text).toBe(201);
+    expect(preview.body.righe[0], JSON.stringify(preview.body.righe[0])).toMatchObject({
+      stato: "AGGIORNAMENTO_CERTO",
+      errori: [],
+    });
+    scope.importazioneVolontariIds.push(preview.body.importazioneId);
+    expect(preview.body.righe[0].volontarioCandidatoId).toBe(existing.id);
+
+    const manualUpdate = await request(app())
+      .patch(`/volontari/${existing.id}`)
+      .send({ versione: existing.versione, email: "modificata@example.test" });
+    expect(manualUpdate.status, manualUpdate.text).toBe(200);
+    const confirmation = await request(app())
+      .post("/volontari/import/conferma")
+      .send({
+        importazioneId: preview.body.importazioneId,
+        righe: [
+          {
+            numeroRiga: 2,
+            ruoloVolontarioId: ruoloId,
+            centroAscoltoId: centroId,
+          },
+        ],
+      });
+    expect(confirmation.status, confirmation.text).toBe(200);
+    expect(confirmation.body).toMatchObject({ stato: "PARZIALE", errori: 1 });
+    const [storedRow] = await db
+      .select()
+      .from(importazioniVolontariRigheTable)
+      .where(
+        eq(
+          importazioniVolontariRigheTable.importazioneId,
+          preview.body.importazioneId,
+        ),
+      );
+    expect(storedRow.esitoCommit).toBe("CONFLITTO_DATI_MODIFICATI");
+    const unchanged = await request(app()).get(`/volontari/${existing.id}`);
+    expect(unchanged.body.email).toBe("modificata@example.test");
+  });
+
+  it("espone conflitti semantici per coperture e giornate manuali preesistenti", async () => {
+    const centerName = unique("Centro Conflitti Import");
+    const centroId = await createCentro(scope, centerName);
+    const existing = await createVolunteer({
+      tipo: "TEMPORANEO",
+      centroAscoltoId: centroId,
+    });
+    const [role] = await db
+      .select()
+      .from(ruoliVolontariTable)
+      .where(eq(ruoliVolontariTable.id, ruoloId));
+    await db.insert(copertureAssicurativeVolontariTable).values({
+      volontarioId: existing.id,
+      dataInizio: "2027-01-01",
+      dataFine: "2028-01-31",
+      tipoOperazione: "NUOVA_COPERTURA",
+    });
+    await db.insert(giornateServizioVolontariTable).values({
+      volontarioId: existing.id,
+      dataServizio: "2027-06-15",
+      centroAscoltoId: centroId,
+      stato: "PRESENTE",
+      note: "Giornata inserita manualmente",
+    });
+    const row = (coverageEnd: string) => [
+      1,
+      existing.matricola,
+      "Sintetica Ada",
+      "Roma",
+      "1990-01-02",
+      "Via Sintetica 1",
+      "",
+      todayRome(),
+      coverageEnd,
+      "",
+      "",
+      "",
+      centerName,
+      role.nome,
+      "Temporaneo",
+      "2027-06-15",
+    ];
+    const coveragePreview = await analyze(
+      workbook([row("2028-01-31")], "conflitto-copertura"),
+      centroId,
+    );
+    expect(coveragePreview.status, coveragePreview.text).toBe(201);
+    expect(
+      coveragePreview.body.righe[0],
+      JSON.stringify(coveragePreview.body.righe[0]),
+    ).toMatchObject({ stato: "AGGIORNAMENTO_CERTO", errori: [] });
+    scope.importazioneVolontariIds.push(coveragePreview.body.importazioneId);
+    const coverageResult = await request(app())
+      .post("/volontari/import/conferma")
+      .send({
+        importazioneId: coveragePreview.body.importazioneId,
+        righe: [
+          {
+            numeroRiga: 2,
+            ruoloVolontarioId: ruoloId,
+            centroAscoltoId: centroId,
+          },
+        ],
+      });
+    expect(coverageResult.body).toMatchObject({ stato: "PARZIALE", errori: 1 });
+    const [coverageRow] = await db
+      .select()
+      .from(importazioniVolontariRigheTable)
+      .where(
+        eq(
+          importazioniVolontariRigheTable.importazioneId,
+          coveragePreview.body.importazioneId,
+        ),
+      );
+    expect(coverageRow.esitoCommit).toBe("CONFLITTO_COPERTURA_ESISTENTE");
+
+    const servicePreview = await analyze(
+      workbook([row("")], "conflitto-giornata"),
+      centroId,
+    );
+    expect(servicePreview.status, servicePreview.text).toBe(201);
+    expect(
+      servicePreview.body.righe[0],
+      JSON.stringify(servicePreview.body.righe[0]),
+    ).toMatchObject({ stato: "AGGIORNAMENTO_CERTO", errori: [] });
+    scope.importazioneVolontariIds.push(servicePreview.body.importazioneId);
+    const serviceResult = await request(app())
+      .post("/volontari/import/conferma")
+      .send({
+        importazioneId: servicePreview.body.importazioneId,
+        righe: [
+          {
+            numeroRiga: 2,
+            ruoloVolontarioId: ruoloId,
+            centroAscoltoId: centroId,
+          },
+        ],
+      });
+    expect(serviceResult.body).toMatchObject({ stato: "PARZIALE", errori: 1 });
+    const [serviceRow] = await db
+      .select()
+      .from(importazioniVolontariRigheTable)
+      .where(
+        eq(
+          importazioniVolontariRigheTable.importazioneId,
+          servicePreview.body.importazioneId,
+        ),
+      );
+    expect(serviceRow.esitoCommit).toBe("CONFLITTO_GIORNATA_ESISTENTE");
+  });
+
   it("classifica email/telefono come possibile duplicato e non effettua merge automatici", async () => {
     const centroId = await createCentro(scope, unique("Centro Duplicati"));
     const existing = await createVolunteer({
@@ -737,7 +1083,7 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
         ruoloVolontarioId: ruoloId,
       });
     expect(invalidLength.status).toBe(400);
-    expect(invalidLength.body.error).toMatch(/matricola.*40/i);
+    expect(invalidLength.body.error).toMatch(/generata automaticamente/i);
 
     const first = await createVolunteer({
       codiceFiscale: "RSS MRA 80A01 H501 U",
@@ -754,9 +1100,12 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
       .send({
         nome: "Altro",
         cognome: "Sintetico",
-        matricola: unique("CF"),
         ruoloVolontarioId: ruoloId,
+        centroAscoltoId: defaultCenterId,
         codiceFiscale: "RSSMRA80A01H501U",
+        luogoNascita: "Roma",
+        dataNascita: "1982-02-02",
+        indirizzoResidenza: "Via Duplicato 2",
       });
     expect(duplicate.status).toBe(409);
 
@@ -978,17 +1327,53 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     const original = events.body.find(
       (item: { volontarioId: number }) => item.volontarioId === volunteer.id,
     );
+    const arbitraryCorrection = await request(app())
+      .post(`/volontari/registro/eventi/${original.id}/rettifica`)
+      .send({
+        motivo: "Payload arbitrario non ammesso",
+        snapshot: { indirizzoResidenza: "Valore non validato" },
+      });
+    expect(arbitraryCorrection.status).toBe(400);
+    const stalePreviousValue = await request(app())
+      .post(`/volontari/registro/eventi/${original.id}/rettifica`)
+      .send({
+        motivo: "Valore precedente errato",
+        rettifiche: [
+          {
+            campo: "indirizzoResidenza",
+            valorePrecedente: "Valore diverso",
+            nuovoValore: "Via domicilio rettificata 9",
+          },
+        ],
+      });
+    expect(stalePreviousValue.status).toBe(409);
     const correction = await request(app())
       .post(`/volontari/registro/eventi/${original.id}/rettifica`)
       .send({
         motivo: "Rettifica sintetica",
-        snapshot: { campo: "valore corretto" },
+        dataEffettiva: todayRome(),
+        rettifiche: [
+          {
+            campo: "indirizzoDomicilio",
+            valorePrecedente: null,
+            nuovoValore: "Via domicilio rettificata 9",
+          },
+        ],
       });
     expect(correction.status, correction.text).toBe(201);
     expect(correction.body).toMatchObject({
       tipoEvento: "RETTIFICA",
       eventoRettificatoId: original.id,
     });
+    expect(
+      (await request(app()).get("/volontari/registro/verifica-integrita"))
+        .status,
+    ).toBe(403);
+    const integrity = await request(app({ isSuperAdmin: true })).get(
+      "/volontari/registro/verifica-integrita",
+    );
+    expect(integrity.status, integrity.text).toBe(200);
+    expect(integrity.body.valid).toBe(true);
     const ledger = await db
       .select()
       .from(registroVolontariEventiTable)
@@ -1057,6 +1442,492 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
       });
     expect(delivery.status).toBe(403);
     expect(delivery.body.error).toMatch(/non operativo/i);
+  });
+
+  it("isola emissioni, ledger e batch import tra Centro, Area e scope globale", async () => {
+    const areaA = await createAreaOperativa(scope);
+    const areaB = await createAreaOperativa(scope);
+    const centerA = (
+      await createCentroRec(scope, {
+        areaOperativaId: areaA,
+        nome: unique("Centro Scope A"),
+      })
+    ).id;
+    const centerB = (
+      await createCentroRec(scope, {
+        areaOperativaId: areaB,
+        nome: unique("Centro Scope B"),
+      })
+    ).id;
+    const volunteerA = await createVolunteer({ centroAscoltoId: centerA });
+    const volunteerB = await createVolunteer({ centroAscoltoId: centerB });
+
+    const areaEmission = await request(app({ areaOperativaId: areaA }))
+      .post("/volontari/registro/genera")
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        response.on("end", () => callback(null, Buffer.concat(chunks)));
+      })
+      .send({
+        tipo: "XLSX",
+        filtri: { dataRiferimento: todayRome(), stato: "tutti", tipo: "TUTTI" },
+      });
+    expect(areaEmission.status, areaEmission.text).toBe(200);
+    const areaEmissionId = Number(
+      areaEmission.headers["x-registro-emissione-id"],
+    );
+    scope.emissioneRegistroIds.push(areaEmissionId);
+
+    const areaAList = await request(app({ areaOperativaId: areaA })).get(
+      "/volontari/registro/emissioni",
+    );
+    const areaBList = await request(app({ areaOperativaId: areaB })).get(
+      "/volontari/registro/emissioni",
+    );
+    expect(areaAList.body.map((item: { id: number }) => item.id)).toContain(
+      areaEmissionId,
+    );
+    expect(areaBList.body.map((item: { id: number }) => item.id)).not.toContain(
+      areaEmissionId,
+    );
+    expect(
+      (
+        await request(
+          app({ centroAscoltoId: centerA, areaOperativaId: areaA }),
+        ).get(`/volontari/registro/emissioni/${areaEmissionId}/file`)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app({ areaOperativaId: areaB })).get(
+          `/volontari/registro/emissioni/${areaEmissionId}/file`,
+        )
+      ).status,
+    ).toBe(403);
+
+    const globalEmission = await request(app({ isSuperAdmin: true }))
+      .post("/volontari/registro/genera")
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        response.on("end", () => callback(null, Buffer.concat(chunks)));
+      })
+      .send({
+        tipo: "XLSX",
+        filtri: { dataRiferimento: todayRome(), stato: "tutti", tipo: "TUTTI" },
+      });
+    expect(globalEmission.status, globalEmission.text).toBe(200);
+    const globalEmissionId = Number(
+      globalEmission.headers["x-registro-emissione-id"],
+    );
+    scope.emissioneRegistroIds.push(globalEmissionId);
+    expect(
+      (
+        await request(app({ areaOperativaId: areaA })).get(
+          `/volontari/registro/emissioni/${globalEmissionId}/file`,
+        )
+      ).status,
+    ).toBe(403);
+
+    const centerAEventsBefore = await request(
+      app({ centroAscoltoId: centerA, areaOperativaId: areaA }),
+    ).get("/volontari/registro/eventi");
+    const registrationA = centerAEventsBefore.body.find(
+      (item: { volontarioId: number; tipoEvento: string }) =>
+        item.volontarioId === volunteerA.id &&
+        item.tipoEvento === "REGISTRAZIONE",
+    );
+    expect(registrationA).toBeTruthy();
+    await db.transaction(async (tx) => {
+      for (let index = 0; index < 505; index += 1) {
+        await appendVolontarioLedgerEvent(tx, {
+          sezione: "PERMANENTE",
+          tipoEvento: "AGGIORNAMENTO_ANAGRAFICA",
+          volontarioId: volunteerB.id,
+          centroAscoltoId: centerB,
+          dataEffettiva: todayRome(),
+          snapshot: {
+            volontarioId: volunteerB.id,
+            sequenzaTestScope: index,
+          },
+          utenteId: null,
+        });
+      }
+    });
+    const centerAEventsAfter = await request(
+      app({ centroAscoltoId: centerA, areaOperativaId: areaA }),
+    ).get("/volontari/registro/eventi");
+    expect(centerAEventsAfter.body).toHaveLength(1);
+    expect(centerAEventsAfter.body[0].id).toBe(registrationA.id);
+
+    const [role] = await db
+      .select()
+      .from(ruoliVolontariTable)
+      .where(eq(ruoliVolontariTable.id, ruoloId));
+    const importFile = workbook([
+      [
+        1,
+        unique("SCOPE-IMP"),
+        "Scope Ada",
+        "Roma",
+        "1990-01-02",
+        "Via Scope 1",
+        "",
+        "2020-01-01",
+        "2028-01-31",
+        "",
+        "",
+        "",
+        (await db
+          .select({ nome: centriAscoltoTable.nome })
+          .from(centriAscoltoTable)
+          .where(eq(centriAscoltoTable.id, centerA)))[0].nome,
+        role.nome,
+        "Permanente",
+        "",
+      ],
+    ]);
+    const areaBatchA = await analyze(importFile, null, {
+      areaOperativaId: areaA,
+    });
+    expect(areaBatchA.status, areaBatchA.text).toBe(201);
+    expect(areaBatchA.body.scopeTipo).toBe("AREA");
+    scope.importazioneVolontariIds.push(areaBatchA.body.importazioneId);
+    expect(
+      (
+        await request(app({ areaOperativaId: areaB }))
+          .post("/volontari/import/conferma")
+          .send({ importazioneId: areaBatchA.body.importazioneId, righe: [] })
+      ).status,
+    ).toBe(403);
+
+    const areaBatchB = await analyze(importFile, null, {
+      areaOperativaId: areaB,
+    });
+    expect(areaBatchB.status, areaBatchB.text).toBe(201);
+    scope.importazioneVolontariIds.push(areaBatchB.body.importazioneId);
+    expect(areaBatchB.body.hashContenutoNormalizzato).toBe(
+      areaBatchA.body.hashContenutoNormalizzato,
+    );
+    expect(areaBatchB.body.scopeFingerprint).not.toBe(
+      areaBatchA.body.scopeFingerprint,
+    );
+
+    const globalBatch = await analyze(importFile, null, { isSuperAdmin: true });
+    expect(globalBatch.status, globalBatch.text).toBe(201);
+    expect(globalBatch.body.scopeTipo).toBe("GLOBALE");
+    scope.importazioneVolontariIds.push(globalBatch.body.importazioneId);
+    expect(
+      (
+        await request(
+          app({ centroAscoltoId: centerA, areaOperativaId: areaA }),
+        )
+          .post("/volontari/import/conferma")
+          .send({ importazioneId: globalBatch.body.importazioneId, righe: [] })
+      ).status,
+    ).toBe(403);
+  });
+
+  it("ricostruisce anagrafica, rettifiche e intervalli alla data senza rinumerare", async () => {
+    const centerId = defaultCenterId;
+    const volunteer = await createVolunteer({
+      centroAscoltoId: centerId,
+      indirizzoResidenza: "Via Storica A 1",
+    });
+    const [registration] = await db
+      .select()
+      .from(registroVolontariEventiTable)
+      .where(
+        and(
+          eq(registroVolontariEventiTable.volontarioId, volunteer.id),
+          eq(registroVolontariEventiTable.tipoEvento, "REGISTRAZIONE"),
+        ),
+      );
+    await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(volontariTable)
+        .set({
+          indirizzoResidenza: "Via Storica B 2",
+          versione: 2,
+          dataAggiornamento: new Date(),
+        })
+        .where(eq(volontariTable.id, volunteer.id))
+        .returning();
+      await appendVolontarioLedgerEvent(tx, {
+        sezione: "PERMANENTE",
+        tipoEvento: "AGGIORNAMENTO_ANAGRAFICA",
+        volontarioId: volunteer.id,
+        centroAscoltoId: centerId,
+        dataEffettiva: "2027-01-10",
+        snapshot: await buildVolunteerEventSnapshot(tx, updated, {
+          statoPrecedente: "PERMANENTE",
+          nuovoStato: "PERMANENTE",
+          motivo: "aggiornamento_anagrafica_test",
+          dataEffettiva: "2027-01-10",
+          datiEvento: { campiModificati: ["indirizzoResidenza"] },
+        }),
+      });
+      await appendVolontarioLedgerEvent(tx, {
+        sezione: "PERMANENTE",
+        tipoEvento: "RETTIFICA",
+        volontarioId: volunteer.id,
+        centroAscoltoId: centerId,
+        dataEffettiva: "2027-06-10",
+        snapshot: await buildVolunteerEventSnapshot(tx, updated, {
+          statoPrecedente: "PERMANENTE",
+          nuovoStato: "RETTIFICATO",
+          motivo: "rettifica_test",
+          dataEffettiva: "2027-06-10",
+          riferimentoEventoId: registration.id,
+          datiEvento: {
+            rettifiche: [
+              {
+                campo: "indirizzoResidenza",
+                valorePrecedente: "Via Storica B 2",
+                nuovoValore: "Via Storica C 3",
+              },
+            ],
+          },
+        }),
+        eventoRettificatoId: registration.id,
+      });
+      await appendVolontarioLedgerEvent(tx, {
+        sezione: "PERMANENTE",
+        tipoEvento: "SOSPENSIONE_CESSAZIONE",
+        volontarioId: volunteer.id,
+        centroAscoltoId: centerId,
+        dataEffettiva: "2027-08-01",
+        snapshot: await buildVolunteerEventSnapshot(tx, updated, {
+          statoPrecedente: "ATTIVO",
+          nuovoStato: "CESSATO",
+          motivo: "dimissioni_cessazione",
+          dataEffettiva: "2027-08-01",
+        }),
+      });
+      await appendVolontarioLedgerEvent(tx, {
+        sezione: "PERMANENTE",
+        tipoEvento: "RIATTIVAZIONE",
+        volontarioId: volunteer.id,
+        centroAscoltoId: centerId,
+        dataEffettiva: "2027-09-01",
+        snapshot: await buildVolunteerEventSnapshot(tx, updated, {
+          statoPrecedente: "CESSATO",
+          nuovoStato: "ATTIVO",
+          motivo: "riattivazione_test",
+          dataEffettiva: "2027-09-01",
+        }),
+      });
+    });
+
+    const officialAt = async (reference: string) => {
+      const response = await request(app())
+        .post("/volontari/registro/genera")
+        .buffer(true)
+        .parse((raw, callback) => {
+          const chunks: Buffer[] = [];
+          raw.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+          raw.on("end", () => callback(null, Buffer.concat(chunks)));
+        })
+        .send({
+          tipo: "XLSX",
+          filtri: {
+            dataRiferimento: reference,
+            stato: "tutti",
+            tipo: "TUTTI",
+            search: volunteer.matricola,
+            centroAscoltoId: centerId,
+          },
+        });
+      expect(response.status, response.text).toBe(200);
+      scope.emissioneRegistroIds.push(
+        Number(response.headers["x-registro-emissione-id"]),
+      );
+      const book = XLSX.read(response.body, { type: "buffer" });
+      return XLSX.utils.sheet_to_json<Record<string, unknown>>(
+        book.Sheets[book.SheetNames[0]],
+        { raw: true },
+      )[0];
+    };
+
+    const beforeUpdate = await officialAt("2026-12-31");
+    const afterUpdate = await officialAt("2027-03-01");
+    const afterCorrection = await officialAt("2027-07-01");
+    const ceased = await officialAt("2027-08-15");
+    const reactivated = await officialAt("2027-10-01");
+    expect(beforeUpdate.Residenza).toBe("Via Storica A 1");
+    expect(afterUpdate.Residenza).toBe("Via Storica B 2");
+    expect(afterCorrection.Residenza).toBe("Via Storica C 3");
+    expect(ceased).toMatchObject({
+      "Stato alla data di riferimento": "CESSATO",
+      "Data cessazione": "2027-08-01",
+    });
+    expect(reactivated["Stato alla data di riferimento"]).toBe("ATTIVO");
+    expect(reactivated["Data cessazione"] ?? "").toBe("");
+    expect(beforeUpdate.Progressivo).toBe(afterCorrection.Progressivo);
+
+    const [current] = await db
+      .select()
+      .from(volontariTable)
+      .where(eq(volontariTable.id, volunteer.id));
+    const [future] = await db
+      .insert(volontariTable)
+      .values({
+        nome: "Iscrizione",
+        cognome: "Futura",
+        matricola: unique("FUTURE"),
+        tipoVolontario: "PERMANENTE",
+        ruoloVolontarioId: ruoloId,
+        ruolo: current.ruolo,
+        centroAscoltoId: centerId,
+        luogoNascita: "Roma",
+        dataNascita: "1992-02-02",
+        indirizzoResidenza: "Via Futura 1",
+        codiceFiscaleNonDisponibile: true,
+        codiceFiscaleNota: "Non disponibile nel test",
+        dataIscrizione: "2027-12-31",
+      })
+      .returning();
+    scope.volontarioIds.push(future.id);
+    const futureResponse = await request(app())
+      .post("/volontari/registro/genera")
+      .buffer(true)
+      .parse((raw, callback) => {
+        const chunks: Buffer[] = [];
+        raw.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        raw.on("end", () => callback(null, Buffer.concat(chunks)));
+      })
+      .send({
+        tipo: "XLSX",
+        filtri: {
+          dataRiferimento: "2027-01-01",
+          stato: "tutti",
+          tipo: "TUTTI",
+          search: future.matricola,
+          centroAscoltoId: centerId,
+        },
+      });
+    expect(futureResponse.status, futureResponse.text).toBe(200);
+    scope.emissioneRegistroIds.push(
+      Number(futureResponse.headers["x-registro-emissione-id"]),
+    );
+    const futureBook = XLSX.read(futureResponse.body, { type: "buffer" });
+    expect(
+      XLSX.utils.sheet_to_json(
+        futureBook.Sheets[futureBook.SheetNames[0]],
+        { raw: true },
+      ),
+    ).toHaveLength(0);
+
+    const pdf = await request(app())
+      .post("/volontari/registro/genera")
+      .buffer(true)
+      .parse((raw, callback) => {
+        const chunks: Buffer[] = [];
+        raw.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        raw.on("end", () => callback(null, Buffer.concat(chunks)));
+      })
+      .send({
+        tipo: "PDF",
+        filtri: {
+          dataRiferimento: "2027-10-01",
+          stato: "tutti",
+          tipo: "TUTTI",
+          search: volunteer.matricola,
+          centroAscoltoId: centerId,
+        },
+      });
+    expect(pdf.status, pdf.text).toBe(200);
+    const pdfEmissionId = Number(pdf.headers["x-registro-emissione-id"]);
+    scope.emissioneRegistroIds.push(pdfEmissionId);
+    const [xlsxEmission, pdfEmission] = await Promise.all([
+      db
+        .select()
+        .from(emissioniRegistroVolontariTable)
+        .where(
+          eq(
+            emissioniRegistroVolontariTable.id,
+            scope.emissioneRegistroIds.at(-3)!,
+          ),
+        ),
+      db
+        .select()
+        .from(emissioniRegistroVolontariTable)
+        .where(eq(emissioniRegistroVolontariTable.id, pdfEmissionId)),
+    ]);
+    expect(pdfEmission[0].snapshot).toEqual(xlsxEmission[0].snapshot);
+  });
+
+  it("limita le giornate temporanee per intervallo e Centro", async () => {
+    const areaA = await createAreaOperativa(scope);
+    const areaB = await createAreaOperativa(scope);
+    const centerA = (
+      await createCentroRec(scope, { areaOperativaId: areaA })
+    ).id;
+    const centerB = (
+      await createCentroRec(scope, { areaOperativaId: areaB })
+    ).id;
+    const volunteer = await createVolunteer({
+      tipo: "TEMPORANEO",
+      centroAscoltoId: centerA,
+    });
+    await db.insert(giornateServizioVolontariTable).values([
+      {
+        volontarioId: volunteer.id,
+        dataServizio: "2027-04-01",
+        centroAscoltoId: centerA,
+        stato: "PRESENTE",
+      },
+      {
+        volontarioId: volunteer.id,
+        dataServizio: "2027-05-01",
+        centroAscoltoId: centerA,
+        stato: "PRESENTE",
+      },
+      {
+        volontarioId: volunteer.id,
+        dataServizio: "2027-04-02",
+        centroAscoltoId: centerB,
+        stato: "PRESENTE",
+      },
+    ]);
+    const response = await request(
+      app({ centroAscoltoId: centerA, areaOperativaId: areaA }),
+    )
+      .post("/volontari/registro/genera")
+      .buffer(true)
+      .parse((raw, callback) => {
+        const chunks: Buffer[] = [];
+        raw.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        raw.on("end", () => callback(null, Buffer.concat(chunks)));
+      })
+      .send({
+        tipo: "XLSX",
+        filtri: {
+          dataRiferimento: "2027-12-31",
+          stato: "tutti",
+          tipo: "TEMPORANEO",
+          search: volunteer.matricola,
+          centroAscoltoId: centerA,
+          servizioDa: "2027-04-01",
+          servizioA: "2027-04-30",
+        },
+      });
+    expect(response.status, response.text).toBe(200);
+    scope.emissioneRegistroIds.push(
+      Number(response.headers["x-registro-emissione-id"]),
+    );
+    const book = XLSX.read(response.body, { type: "buffer" });
+    const [row] = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      book.Sheets[book.SheetNames[0]],
+      { raw: true },
+    );
+    expect(row["Date servizio temporaneo"]).toBe("2027-04-01");
+    expect(row["Intervallo servizio temporaneo"]).toBe(
+      "2027-04-01 – 2027-04-01",
+    );
   });
 
   it("gestisce separatamente cataloghi, corsi e qualifiche del volontario", async () => {

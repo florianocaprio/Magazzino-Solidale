@@ -33,7 +33,15 @@ export interface Volontario {
   /** @nullable */
   indirizzoResidenza?: string | null;
   /** @nullable */
+  indirizzoDomicilio?: string | null;
+  /** @nullable */
   codiceFiscale?: string | null;
+  codiceFiscaleNonDisponibile: boolean;
+  /** @nullable */
+  codiceFiscaleNota?: string | null;
+  /** @nullable */
+  dataIscrizione?: Date | null;
+  progressivoRegistro: number;
   /** @nullable */
   dataInizioImportata?: Date | null;
   /** @nullable */

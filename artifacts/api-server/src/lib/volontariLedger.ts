@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import {
   centriAscoltoTable,
+  db,
   registroVolontariEventiTable,
   ruoliVolontariTable,
   volontariTable,
 } from "@workspace/db";
-import { desc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import type { VolontariTx } from "./volontariOperational";
 
 function stable(value: unknown): string {
@@ -27,6 +28,11 @@ type VolunteerSnapshotSource = Pick<
   | "dataNascita"
   | "luogoNascita"
   | "indirizzoResidenza"
+  | "indirizzoDomicilio"
+  | "codiceFiscaleNonDisponibile"
+  | "codiceFiscaleNota"
+  | "dataIscrizione"
+  | "progressivoRegistro"
   | "tipoVolontario"
   | "centroAscoltoId"
   | "ruoloVolontarioId"
@@ -67,6 +73,11 @@ async function volunteerIdentitySnapshot(
     dataNascita: volunteer.dataNascita ?? null,
     luogoNascita: volunteer.luogoNascita ?? null,
     indirizzoResidenza: volunteer.indirizzoResidenza ?? null,
+    indirizzoDomicilio: volunteer.indirizzoDomicilio ?? null,
+    codiceFiscaleNonDisponibile: volunteer.codiceFiscaleNonDisponibile,
+    codiceFiscaleNota: volunteer.codiceFiscaleNota ?? null,
+    dataIscrizione: volunteer.dataIscrizione ?? null,
+    progressivoRegistro: volunteer.progressivoRegistro,
     tipoVolontario: volunteer.tipoVolontario,
     centroAscoltoId: volunteer.centroAscoltoId ?? null,
     centroAscoltoNome: center?.nome ?? null,
@@ -131,6 +142,8 @@ type LedgerEventHashInput = {
     | "SOSPENSIONE_CESSAZIONE"
     | "RIATTIVAZIONE"
     | "GIORNATA_TEMPORANEA"
+    | "CONVERSIONE_PERMANENTE"
+    | "AGGIORNAMENTO_ANAGRAFICA"
     | "RETTIFICA";
   volontarioId: number;
   centroAscoltoId?: number | null;
@@ -142,8 +155,12 @@ type LedgerEventHashInput = {
 
 function normalizedLedgerInput(input: LedgerEventHashInput) {
   return {
-    ...input,
+    sezione: input.sezione,
+    tipoEvento: input.tipoEvento,
+    volontarioId: input.volontarioId,
     centroAscoltoId: input.centroAscoltoId ?? null,
+    dataEffettiva: input.dataEffettiva,
+    snapshot: input.snapshot,
     utenteId: input.utenteId ?? null,
     eventoRettificatoId: input.eventoRettificatoId ?? null,
   };
@@ -197,4 +214,74 @@ export async function appendVolontarioLedgerEvent(
 
 export function canonicalSnapshotHash(value: unknown): string {
   return createHash("sha256").update(stable(value)).digest("hex");
+}
+
+export async function verifyVolontarioLedgerChain(
+  executor: typeof db | VolontariTx = db,
+) {
+  const rows = await executor
+    .select()
+    .from(registroVolontariEventiTable)
+    .orderBy(asc(registroVolontariEventiTable.progressivo));
+  const eventById = new Map(rows.map((row) => [row.id, row]));
+  let previousHash: string | null = null;
+  let expectedProgressive = 1;
+  for (const row of rows) {
+    const referencedEvent =
+      row.eventoRettificatoId == null
+        ? null
+        : eventById.get(row.eventoRettificatoId);
+    if (
+      (row.tipoEvento === "RETTIFICA" && row.eventoRettificatoId == null) ||
+      (row.eventoRettificatoId != null &&
+        (!referencedEvent || referencedEvent.progressivo >= row.progressivo))
+    ) {
+      return {
+        valid: false,
+        eventoId: row.id,
+        progressivo: row.progressivo,
+        reason: "RIFERIMENTO_RETTIFICA_NON_VALIDO",
+      };
+    }
+    const calculated = canonicalLedgerEventHash({
+      sezione: row.sezione as LedgerEventHashInput["sezione"],
+      tipoEvento: row.tipoEvento as LedgerEventHashInput["tipoEvento"],
+      volontarioId: row.volontarioId,
+      centroAscoltoId: row.centroAscoltoId,
+      dataEffettiva: row.dataEffettiva,
+      snapshot: row.snapshot,
+      utenteId: row.utenteId,
+      eventoRettificatoId: row.eventoRettificatoId,
+      progressivo: row.progressivo,
+      hashPrecedente: row.hashPrecedente,
+    });
+    if (
+      row.progressivo !== expectedProgressive ||
+      row.hashPrecedente !== previousHash ||
+      row.hashEvento !== calculated
+    ) {
+      return {
+        valid: false,
+        eventoId: row.id,
+        progressivo: row.progressivo,
+        reason:
+          row.progressivo !== expectedProgressive
+            ? "PROGRESSIVO_NON_CONSECUTIVO"
+            : row.hashPrecedente !== previousHash
+              ? "HASH_PRECEDENTE_NON_VALIDO"
+              : "HASH_EVENTO_NON_VALIDO",
+        expectedProgressive,
+        expectedPreviousHash: previousHash,
+        calculatedHash: calculated,
+      };
+    }
+    previousHash = row.hashEvento;
+    expectedProgressive += 1;
+  }
+  return {
+    valid: true,
+    eventi: rows.length,
+    ultimoProgressivo: rows.at(-1)?.progressivo ?? 0,
+    ultimoHash: previousHash,
+  };
 }

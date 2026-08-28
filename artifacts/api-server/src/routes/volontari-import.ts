@@ -7,16 +7,15 @@ import {
   giornateServizioVolontariTable,
   importazioniVolontariRigheTable,
   importazioniVolontariTable,
+  matricoleVolontariTable,
   ruoliVolontariTable,
   volontariTable,
 } from "@workspace/db";
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import {
   callerAreaOperativaId,
   callerCentroId,
   canAccessCentro,
-  inVisibleCentroSet,
-  visibleCentroIds,
 } from "../lib/centroScope";
 import { requireModulo } from "../lib/featureFlags";
 import { auditLogistica } from "../lib/logisticaAudit";
@@ -31,9 +30,22 @@ import {
 } from "../lib/volontariDomain";
 import {
   appendVolontarioLedgerEvent,
+  buildVolunteerEventSnapshot,
   buildVolunteerRegistrationSnapshot,
   canonicalSnapshotHash,
 } from "../lib/volontariLedger";
+import {
+  isVolontarioCodiceFiscaleUniqueViolation,
+  isVolontarioMatricolaUniqueViolation,
+  MATRICOLA_DUPLICATA_MSG,
+  normalizeVolunteerIdentifier,
+  registerImportedVolunteerIdentifier,
+} from "../lib/volontariMatricola";
+import {
+  canAccessVolunteerOwnerScope,
+  resolveVolunteerOwnerScope,
+  scopeContainsCenter,
+} from "../lib/volontariScope";
 import {
   parseVolontariWorkbook,
   VOLONTARI_IMPORT_MAX_BYTES,
@@ -136,7 +148,7 @@ function normalizeRow(row: ReturnType<typeof parseVolontariWorkbook>["rows"][num
 function sameImportedFields(existing: typeof volontariTable.$inferSelect, row: NormalizedImport, ruoloId: number | null, centroId: number | null): boolean {
   return existing.nome === row.nome
     && existing.cognome === row.cognome
-    && existing.matricola === row.matricola
+    && normalizeVolunteerIdentifier(existing.matricola) === normalizeVolunteerIdentifier(row.matricola)
     && (existing.luogoNascita ?? null) === row.luogoNascita
     && (existing.dataNascita ?? null) === row.dataNascita
     && (existing.indirizzoResidenza ?? null) === row.indirizzoResidenza
@@ -145,8 +157,48 @@ function sameImportedFields(existing: typeof volontariTable.$inferSelect, row: N
     && (existing.telefonoSecondario ?? null) === row.telefonoSecondario
     && (existing.email?.toLowerCase() ?? null) === row.email
     && existing.tipoVolontario === row.tipoVolontario
+    && (existing.dataInizioImportata ?? existing.dataIscrizione ?? null) === row.dataInizioImportata
+    && (existing.categoriaImportataOriginale ?? null) === row.categoriaOriginale
+    && (existing.gruppoImportatoOriginale ?? null) === row.gruppoOriginale
     && existing.ruoloVolontarioId === ruoloId
     && existing.centroAscoltoId === centroId;
+}
+
+function volunteerCandidateFingerprint(row: typeof volontariTable.$inferSelect): string {
+  return canonicalSnapshotHash({
+    versione: row.versione,
+    nome: row.nome,
+    cognome: row.cognome,
+    matricolaNormalizzata: normalizeVolunteerIdentifier(row.matricola),
+    codiceFiscaleNormalizzato: row.codiceFiscaleNormalizzato,
+    tipoVolontario: row.tipoVolontario,
+    centroAscoltoId: row.centroAscoltoId,
+    ruoloVolontarioId: row.ruoloVolontarioId,
+    dataInizioImportata: row.dataInizioImportata,
+    dataIscrizione: row.dataIscrizione,
+    categoriaImportataOriginale: row.categoriaImportataOriginale,
+    gruppoImportatoOriginale: row.gruppoImportatoOriginale,
+    telefono: row.telefono,
+    email: row.email?.trim().toLowerCase() ?? null,
+  });
+}
+
+const IMPORT_CORRECTION_FIELDS = new Set<keyof NormalizedImport>([
+  "nome", "cognome", "matricola", "luogoNascita", "dataNascita",
+  "indirizzoResidenza", "codiceFiscale",
+  "dataInizioImportata", "scadenzaAssicurazione", "telefono",
+  "telefonoSecondario", "email", "gruppoOriginale", "categoriaOriginale",
+  "tipoVolontario", "dataServizio",
+]);
+
+function validatedCorrections(value: unknown): Partial<NormalizedImport> | null {
+  if (value == null) return {};
+  if (typeof value !== "object" || Array.isArray(value)) return null;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.some(([key]) => !IMPORT_CORRECTION_FIELDS.has(key as keyof NormalizedImport)))
+    return null;
+  if (entries.some(([, item]) => item !== null && typeof item !== "string")) return null;
+  return Object.fromEntries(entries) as Partial<NormalizedImport>;
 }
 
 function previewBatch(batch: typeof importazioniVolontariTable.$inferSelect, rows: Array<typeof importazioniVolontariRigheTable.$inferSelect>) {
@@ -157,6 +209,11 @@ function previewBatch(batch: typeof importazioniVolontariTable.$inferSelect, row
     hashFile: batch.sha256File,
     sha256File: batch.sha256File,
     hashContenutoNormalizzato: batch.hashContenutoNormalizzato,
+    scopeTipo: batch.scopeTipo,
+    scopeCentroId: batch.scopeCentroId,
+    scopeAreaOperativaId: batch.scopeAreaOperativaId,
+    scopeCentroIdsSnapshot: batch.scopeCentroIdsSnapshot,
+    scopeFingerprint: batch.scopeFingerprint,
     numeroRighe: batch.numeroRighe,
     righe: rows.map((row) => ({
       numeroRiga: row.numeroRiga,
@@ -165,6 +222,10 @@ function previewBatch(batch: typeof importazioniVolontariTable.$inferSelect, row
       datiOriginali: row.datiOriginali,
       datiNormalizzati: row.datiNormalizzati,
       volontarioCandidatoId: row.volontarioCandidatoId,
+      versioneCandidato: row.versioneCandidato,
+      fingerprintCandidato: row.fingerprintCandidato,
+      fingerprintMappingPreview: row.fingerprintMappingPreview,
+      dataAnalisi: row.dataAnalisi,
       ruoloPropostoId: row.ruoloPropostoId,
       centroPropostoId: row.centroPropostoId,
       errori: row.errori,
@@ -194,22 +255,46 @@ router.post(
       throw error;
     }
     const caller = callerCentroId(req);
-    const visibleIds = await visibleCentroIds(callerAreaOperativaId(req));
+    const callerAreaId = callerAreaOperativaId(req);
     const requestedCenter = req.query.centroAscoltoId == null ? null : Number(req.query.centroAscoltoId);
-    if (requestedCenter != null && (!Number.isSafeInteger(requestedCenter) || !canAccessCentro(requestedCenter, caller) || !inVisibleCentroSet(requestedCenter, visibleIds))) {
+    const [requestedCenterRow] = requestedCenter == null
+      ? []
+      : await db
+          .select({ areaOperativaId: centriAscoltoTable.areaOperativaId })
+          .from(centriAscoltoTable)
+          .where(eq(centriAscoltoTable.id, requestedCenter));
+    if (
+      requestedCenter != null &&
+      (!Number.isSafeInteger(requestedCenter) ||
+        !canAccessCentro(requestedCenter, caller) ||
+        !requestedCenterRow ||
+        (callerAreaId != null &&
+          requestedCenterRow.areaOperativaId !== callerAreaId))
+    ) {
       res.status(403).json({ error: "Centro import non accessibile" }); return;
     }
     const effectiveCenter = caller ?? requestedCenter;
-    if (callerAreaOperativaId(req) != null && effectiveCenter == null) {
-      res.status(400).json({ error: "Seleziona il Centro a cui attribuire le righe senza gruppo riconosciuto" }); return;
-    }
-    const [roles, centers, volunteers] = await Promise.all([
+    const ownerScope = await resolveVolunteerOwnerScope(req, effectiveCenter);
+    const [roles, centers, volunteers, identifiers] = await Promise.all([
       db.select().from(ruoliVolontariTable),
       db.select().from(centriAscoltoTable),
       db.select().from(volontariTable),
+      db.select().from(matricoleVolontariTable),
     ]);
-    const allowedCenters = centers.filter((center) => canAccessCentro(center.id, caller) && inVisibleCentroSet(center.id, visibleIds));
-    const visibleVolunteers = volunteers.filter((volunteer) => canAccessCentro(volunteer.centroAscoltoId, caller) && inVisibleCentroSet(volunteer.centroAscoltoId, visibleIds));
+    const allowedCenters = centers.filter((center) =>
+      caller != null
+        ? center.id === caller
+        : callerAreaId != null
+          ? center.areaOperativaId === callerAreaId
+          : true,
+    );
+    const allowedCenterSet = new Set(allowedCenters.map((center) => center.id));
+    const visibleVolunteers = volunteers.filter((volunteer) =>
+      caller == null && callerAreaId == null
+        ? true
+        : volunteer.centroAscoltoId != null &&
+          allowedCenterSet.has(volunteer.centroAscoltoId),
+    );
     const normalized = parsed.rows.map((source) => {
       const row = normalizeRow(source);
       const roleKey = normalizeRoleName(row.data.categoriaOriginale);
@@ -233,9 +318,22 @@ router.post(
       if (groupKey && groupMatches.length === 0) row.warnings.push(`Gruppo “${row.data.gruppoOriginale}” non riconosciuto: confermare il Centro proposto`);
       if (!center && callerAreaOperativaId(req) != null) row.errors.push("Centro/Gruppo non risolto");
 
-      const byCode = row.data.matricola ? volunteers.filter((item) => item.matricola === row.data.matricola) : [];
+      const normalizedIdentifier = normalizeVolunteerIdentifier(row.data.matricola);
+      const identifierVolunteerIds = new Set(
+        normalizedIdentifier
+          ? identifiers
+              .filter((item) => item.matricolaNormalizzata === normalizedIdentifier)
+              .map((item) => item.volontarioId)
+          : [],
+      );
+      const byCode = volunteers.filter((item) => identifierVolunteerIds.has(item.id));
       const byTax = row.data.codiceFiscaleNormalizzato ? volunteers.filter((item) => item.codiceFiscaleNormalizzato === row.data.codiceFiscaleNormalizzato) : [];
-      const exact = byCode.length === 1 ? byCode[0] : byTax.length === 1 ? byTax[0] : null;
+      const exactCandidates = [
+        ...new Map([...byCode, ...byTax].map((item) => [item.id, item])).values(),
+      ];
+      if (exactCandidates.length > 1)
+        row.errors.push("Matricola e codice fiscale identificano volontari differenti");
+      const exact = exactCandidates.length === 1 ? exactCandidates[0] : null;
       const exactVisible = exact && visibleVolunteers.some((item) => item.id === exact.id) ? exact : null;
       if (exact && !exactVisible) row.errors.push("La matricola o il codice fiscale appartengono a un volontario fuori perimetro");
       const byContact = visibleVolunteers.filter((item) =>
@@ -267,38 +365,26 @@ router.post(
         avvisi: row.warnings,
         stato: status,
         candidateId: candidate?.id ?? null,
+        candidateVersion: candidate?.versione ?? null,
+        candidateFingerprint: candidate ? volunteerCandidateFingerprint(candidate) : null,
         roleId: role?.id ?? null,
         centerId: center?.id ?? null,
+        mappingFingerprint: canonicalSnapshotHash({
+          ruoloVolontarioId: role?.id ?? null,
+          centroAscoltoId: center?.id ?? null,
+        }),
       };
     });
     const sha256File = createHash("sha256").update(req.body).digest("hex");
-    const normalizedHash = canonicalSnapshotHash(normalized.map((row) => ({ numeroRiga: row.numeroRiga, data: row.data })));
-    const idempotencyKey = canonicalSnapshotHash({
-      hashContenutoNormalizzato: normalizedHash,
-      centroAscoltoId: effectiveCenter,
-    });
-    const replay = await db.select().from(importazioniVolontariTable)
-      .where(and(
-        eq(importazioniVolontariTable.hashContenutoNormalizzato, normalizedHash),
-        eq(importazioniVolontariTable.stato, "CONFERMATO"),
-        sql`${importazioniVolontariTable.centroAscoltoId} IS NOT DISTINCT FROM ${effectiveCenter}`,
-      ))
-      .orderBy(asc(importazioniVolontariTable.id)).limit(1);
-    if (replay[0]) {
-      const rows = await db.select().from(importazioniVolontariRigheTable).where(eq(importazioniVolontariRigheTable.importazioneId, replay[0].id)).orderBy(asc(importazioniVolontariRigheTable.numeroRiga));
-      res.json({
-        ...previewBatch(replay[0], rows),
-        replayIdempotente: true,
-        sha256FileRichiesto: sha256File,
-        importazioneOriginaleSha256File: replay[0].sha256File,
-      });
-      return;
-    }
+    const normalizedHash = canonicalSnapshotHash(
+      normalized.map((row) => canonicalSnapshotHash(row.data)).sort(),
+    );
     const result = await db.transaction(async (tx) => {
       const [batch] = await tx.insert(importazioniVolontariTable).values({
         nomeFile: fileName, mimeType: VOLONTARI_XLSX_MIME, dimensioneBytes: req.body.length,
         sha256File, hashContenutoNormalizzato: normalizedHash,
-        chiaveIdempotenza: idempotencyKey, centroAscoltoId: effectiveCenter,
+        chiaveIdempotenza: null, centroAscoltoId: effectiveCenter,
+        ...ownerScope,
         numeroRighe: normalized.length, creatoDa: actorId(req),
       }).returning();
       const rows = await tx.insert(importazioniVolontariRigheTable).values(normalized.map((row) => ({
@@ -307,6 +393,9 @@ router.post(
         datiNormalizzati: row.data as unknown as Record<string, unknown>,
         volontarioCandidatoId: row.candidateId, ruoloPropostoId: row.roleId,
         centroPropostoId: row.centerId, errori: row.errori, avvisi: row.avvisi,
+        versioneCandidato: row.candidateVersion,
+        fingerprintCandidato: row.candidateFingerprint,
+        fingerprintMappingPreview: row.mappingFingerprint,
       }))).returning();
       await auditLogistica(tx, req, {
         entita: "volontario", id: batch.id, azione: "import_analisi",
@@ -315,6 +404,7 @@ router.post(
           sha256File,
           hashContenutoNormalizzato: normalizedHash,
           numeroRighe: rows.length,
+          scope: ownerScope,
         },
       });
       return { batch, rows };
@@ -353,31 +443,51 @@ router.post(
     }
     const [batch] = await db.select().from(importazioniVolontariTable).where(eq(importazioniVolontariTable.id, importazioneId));
     if (!batch) { res.status(404).json({ error: "Importazione non trovata" }); return; }
-    if (!canAccessCentro(batch.centroAscoltoId, callerCentroId(req)) || !inVisibleCentroSet(batch.centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req)))) {
+    if (!canAccessVolunteerOwnerScope(req, batch)) {
       res.status(403).json({ error: "Importazione non accessibile" }); return;
     }
-    if (batch.stato === "CONFERMATO") { res.json({ ...resultSummary(batch), replayIdempotente: true }); return; }
     const resolutionByRow = new Map(resolutions.map((item) => [Number(item.numeroRiga), item]));
-    const outcome = await db.transaction(async (tx) => {
-      const idempotencyKey =
-        batch.chiaveIdempotenza ??
-        canonicalSnapshotHash({
-          hashContenutoNormalizzato: batch.hashContenutoNormalizzato,
-          centroAscoltoId: batch.centroAscoltoId,
+    let outcome: { batch: typeof importazioniVolontariTable.$inferSelect; replay: boolean };
+    try {
+      outcome = await db.transaction(async (tx) => {
+      const previewRows = await tx.select().from(importazioniVolontariRigheTable)
+        .where(eq(importazioniVolontariRigheTable.importazioneId, batch.id))
+        .orderBy(asc(importazioniVolontariRigheTable.numeroRiga));
+      const decisionEntries = previewRows.map((stored) => {
+        const resolution = resolutionByRow.get(stored.numeroRiga);
+        const corrections = validatedCorrections(resolution?.correzioni);
+        return canonicalSnapshotHash({
+          hashRiga: stored.hashRiga,
+          inclusa: resolution?.inclusa !== false,
+          volontarioId: resolution?.volontarioId ?? null,
+          creaNuovo: resolution?.creaNuovo === true,
+          ruoloVolontarioId: resolution?.ruoloVolontarioId ?? stored.ruoloPropostoId,
+          centroAscoltoId: resolution?.centroAscoltoId ?? stored.centroPropostoId,
+          creaRuolo: resolution?.creaRuolo === true,
+          correzioni: corrections,
         });
+      }).sort();
+      const finalDecisionsHash = canonicalSnapshotHash(decisionEntries);
+      const idempotencyKey = canonicalSnapshotHash({
+        hashContenutoNormalizzato: batch.hashContenutoNormalizzato,
+        scopeFingerprint: batch.scopeFingerprint,
+        hashDecisioniFinali: finalDecisionsHash,
+      });
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('volontari-import'), hashtext(${idempotencyKey}))`);
       const [alreadyConfirmed] = await tx.select().from(importazioniVolontariTable).where(and(
-        eq(importazioniVolontariTable.hashContenutoNormalizzato, batch.hashContenutoNormalizzato),
+        eq(importazioniVolontariTable.chiaveIdempotenza, idempotencyKey),
         eq(importazioniVolontariTable.stato, "CONFERMATO"),
         ne(importazioniVolontariTable.id, batch.id),
-        sql`${importazioniVolontariTable.centroAscoltoId} IS NOT DISTINCT FROM ${batch.centroAscoltoId}`,
       )).orderBy(asc(importazioniVolontariTable.id)).limit(1);
       if (alreadyConfirmed) return { batch: alreadyConfirmed, replay: true };
       const [lockedBatch] = await tx.select().from(importazioniVolontariTable).where(eq(importazioniVolontariTable.id, batch.id)).for("update");
       if (!lockedBatch) throw new Error("IMPORT_NOT_FOUND");
-      if (lockedBatch.stato === "CONFERMATO") return { batch: lockedBatch, replay: true };
-      const rows = await tx.select().from(importazioniVolontariRigheTable)
-        .where(eq(importazioniVolontariRigheTable.importazioneId, batch.id)).orderBy(asc(importazioniVolontariRigheTable.numeroRiga));
+      if (lockedBatch.stato === "CONFERMATO") {
+        if (lockedBatch.hashDecisioniFinali === finalDecisionsHash)
+          return { batch: lockedBatch, replay: true };
+        throw new Error("IMPORT_GIA_CONFERMATO_CON_DECISIONI_DIVERSE");
+      }
+      const rows = previewRows;
       let creati = 0; let aggiornati = 0; let invariati = 0; let esclusi = 0; let errori = 0;
       for (const stored of rows) {
         const resolution = resolutionByRow.get(stored.numeroRiga);
@@ -400,7 +510,44 @@ router.post(
           await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_DECISIONE_DUPLICATO" }).where(eq(importazioniVolontariRigheTable.id, stored.id));
           continue;
         }
-        const data = { ...(stored.datiNormalizzati as NormalizedImport), ...(resolution?.correzioni ?? {}) } as NormalizedImport;
+        let previewCandidate: typeof volontariTable.$inferSelect | null = null;
+        if (stored.volontarioCandidatoId != null) {
+          const [candidate] = await tx
+            .select()
+            .from(volontariTable)
+            .where(eq(volontariTable.id, stored.volontarioCandidatoId))
+            .for("update");
+          if (!candidate || !scopeContainsCenter(batch, candidate.centroAscoltoId)) {
+            errori += 1;
+            await tx.update(importazioniVolontariRigheTable).set({
+              esitoCommit: "ERRORE_SCOPE_CANDIDATO",
+            }).where(eq(importazioniVolontariRigheTable.id, stored.id));
+            continue;
+          }
+          if (
+            stored.versioneCandidato !== candidate.versione ||
+            stored.fingerprintCandidato !== volunteerCandidateFingerprint(candidate)
+          ) {
+            errori += 1;
+            await tx.update(importazioniVolontariRigheTable).set({
+              esitoCommit: "CONFLITTO_DATI_MODIFICATI",
+              avvisi: [...stored.avvisi, "Il volontario è cambiato dopo la preview: ripetere l’analisi"],
+            }).where(eq(importazioniVolontariRigheTable.id, stored.id));
+            continue;
+          }
+          previewCandidate = candidate;
+        }
+        const corrections = validatedCorrections(resolution?.correzioni);
+        if (!corrections) {
+          errori += 1;
+          await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_CORREZIONE" }).where(eq(importazioniVolontariRigheTable.id, stored.id));
+          continue;
+        }
+        const data = { ...(stored.datiNormalizzati as NormalizedImport), ...corrections } as NormalizedImport;
+        data.codiceFiscaleNormalizzato = normalizeCodiceFiscale(
+          data.codiceFiscale,
+        );
+        data.codiceFiscale = data.codiceFiscaleNormalizzato;
         if (!data.matricola || !data.nome || !data.cognome || !data.tipoVolontario || !["PERMANENTE", "TEMPORANEO"].includes(data.tipoVolontario)) {
           errori += 1;
           await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_CORREZIONE" }).where(eq(importazioniVolontariRigheTable.id, stored.id));
@@ -419,21 +566,39 @@ router.post(
         }
         const [role] = ruoloId ? await tx.select().from(ruoliVolontariTable).where(eq(ruoliVolontariTable.id, ruoloId)).limit(1) : [];
         const centroId = callerCentroId(req) ?? resolution?.centroAscoltoId ?? stored.centroPropostoId ?? batch.centroAscoltoId;
-        if (!role || !role.attivo || (centroId != null && (!canAccessCentro(centroId, callerCentroId(req)) || !inVisibleCentroSet(centroId, await visibleCentroIds(callerAreaOperativaId(req)))))) {
+        if (!role || !role.attivo || !scopeContainsCenter(batch, centroId)) {
           errori += 1;
           await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_MAPPING" }).where(eq(importazioniVolontariRigheTable.id, stored.id));
           continue;
         }
-        const exactRows = await tx.select().from(volontariTable).where(
-          data.codiceFiscaleNormalizzato
-            ? sql`${volontariTable.matricola} = ${data.matricola} OR ${volontariTable.codiceFiscaleNormalizzato} = ${data.codiceFiscaleNormalizzato}`
-            : eq(volontariTable.matricola, data.matricola),
-        ).orderBy(asc(volontariTable.id)).for("update");
-        const explicitId = resolution?.volontarioId ?? null;
-        let target = explicitId ? exactRows.find((item) => item.id === explicitId) : null;
+        const normalizedIdentifier = normalizeVolunteerIdentifier(data.matricola)!;
+        const identifierRows = await tx
+          .select({ volontarioId: matricoleVolontariTable.volontarioId })
+          .from(matricoleVolontariTable)
+          .where(eq(matricoleVolontariTable.matricolaNormalizzata, normalizedIdentifier));
+        const identifierIds = identifierRows.map((item) => item.volontarioId);
+        const exactCondition = data.codiceFiscaleNormalizzato
+          ? or(
+              identifierIds.length ? inArray(volontariTable.id, identifierIds) : sql`false`,
+              eq(volontariTable.codiceFiscaleNormalizzato, data.codiceFiscaleNormalizzato),
+            )
+          : identifierIds.length
+            ? inArray(volontariTable.id, identifierIds)
+            : sql`false`;
+        const exactRows = await tx.select().from(volontariTable).where(exactCondition)
+          .orderBy(asc(volontariTable.id)).for("update");
+        const explicitId =
+          resolution?.volontarioId ??
+          (["AGGIORNAMENTO_CERTO", "INVARIATO"].includes(stored.statoRiga)
+            ? stored.volontarioCandidatoId
+            : null);
+        let target = explicitId
+          ? exactRows.find((item) => item.id === explicitId) ??
+            (previewCandidate?.id === explicitId ? previewCandidate : null)
+          : null;
         if (!target && explicitId) {
           const [explicit] = await tx.select().from(volontariTable).where(eq(volontariTable.id, explicitId)).for("update");
-          if (explicit && canAccessCentro(explicit.centroAscoltoId, callerCentroId(req)) && inVisibleCentroSet(explicit.centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req)))) target = explicit;
+          if (explicit && scopeContainsCenter(batch, explicit.centroAscoltoId)) target = explicit;
         }
         if (!target && ["AGGIORNAMENTO_CERTO", "INVARIATO"].includes(stored.statoRiga) && exactRows.length === 1) target = exactRows[0];
         if (target && exactRows.some((item) => item.id !== target!.id)) {
@@ -446,12 +611,122 @@ router.post(
           await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_DUPLICATO" }).where(eq(importazioniVolontariRigheTable.id, stored.id));
           continue;
         }
+        if (target && data.scadenzaAssicurazione) {
+          const coverageKey = canonicalSnapshotHash({
+            volontarioId: target.id,
+            dataInizio: null,
+            dataFine: data.scadenzaAssicurazione,
+            origine: "IMPORT_VOLONTARI_2_0",
+          });
+          const existingCoverages = await tx
+            .select({
+              chiaveIdempotenza:
+                copertureAssicurativeVolontariTable.chiaveIdempotenza,
+            })
+            .from(copertureAssicurativeVolontariTable)
+            .where(
+              and(
+                eq(
+                  copertureAssicurativeVolontariTable.volontarioId,
+                  target.id,
+                ),
+                eq(
+                  copertureAssicurativeVolontariTable.dataFine,
+                  data.scadenzaAssicurazione,
+                ),
+                eq(copertureAssicurativeVolontariTable.annullata, false),
+              ),
+            );
+          if (
+            existingCoverages.some(
+              (coverage) => coverage.chiaveIdempotenza !== coverageKey,
+            )
+          ) {
+            errori += 1;
+            await tx
+              .update(importazioniVolontariRigheTable)
+              .set({
+                esitoCommit: "CONFLITTO_COPERTURA_ESISTENTE",
+                avvisi: [
+                  ...stored.avvisi,
+                  "Esiste una copertura non originata da questo replay: verificare manualmente",
+                ],
+              })
+              .where(eq(importazioniVolontariRigheTable.id, stored.id));
+            continue;
+          }
+        }
+        if (target && data.tipoVolontario === "TEMPORANEO" && data.dataServizio) {
+          const serviceKey = canonicalSnapshotHash({
+            volontarioId: target.id,
+            dataServizio: data.dataServizio,
+            centroAscoltoId: centroId,
+            origine: "IMPORT_VOLONTARI_2_0",
+          });
+          const [existingService] = await tx
+            .select({
+              chiaveIdempotenza:
+                giornateServizioVolontariTable.chiaveIdempotenza,
+            })
+            .from(giornateServizioVolontariTable)
+            .where(
+              and(
+                eq(giornateServizioVolontariTable.volontarioId, target.id),
+                eq(
+                  giornateServizioVolontariTable.dataServizio,
+                  data.dataServizio,
+                ),
+                centroId == null
+                  ? isNull(giornateServizioVolontariTable.centroAscoltoId)
+                  : eq(
+                      giornateServizioVolontariTable.centroAscoltoId,
+                      centroId,
+                    ),
+              ),
+            )
+            .limit(1);
+          if (
+            existingService &&
+            existingService.chiaveIdempotenza !== serviceKey
+          ) {
+            errori += 1;
+            await tx
+              .update(importazioniVolontariRigheTable)
+              .set({
+                esitoCommit: "CONFLITTO_GIORNATA_ESISTENTE",
+                avvisi: [
+                  ...stored.avvisi,
+                  "Esiste una giornata non originata da questo replay: verificare manualmente",
+                ],
+              })
+              .where(eq(importazioniVolontariRigheTable.id, stored.id));
+            continue;
+          }
+        }
         let volunteer: typeof volontariTable.$inferSelect;
         let esito: "CREATO" | "AGGIORNATO" | "INVARIATO";
         if (target) {
-          if (!canAccessCentro(target.centroAscoltoId, callerCentroId(req)) || !inVisibleCentroSet(target.centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req)))) {
+          if (!scopeContainsCenter(batch, target.centroAscoltoId)) {
             errori += 1;
             await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_SCOPE" }).where(eq(importazioniVolontariRigheTable.id, stored.id));
+            continue;
+          }
+          if (target.tipoVolontario !== data.tipoVolontario) {
+            errori += 1;
+            await tx.update(importazioniVolontariRigheTable).set({
+              esitoCommit:
+                target.tipoVolontario === "TEMPORANEO" &&
+                data.tipoVolontario === "PERMANENTE"
+                  ? "CONVERSIONE_RICHIESTA"
+                  : "CONFLITTO_TIPO_VOLONTARIO",
+              avvisi: [
+                ...stored.avvisi,
+                target.tipoVolontario === "TEMPORANEO" &&
+                data.tipoVolontario === "PERMANENTE"
+                  ? "Usare il workflow Converti in permanente"
+                  : "Il tipo volontario non può essere modificato dall'import",
+              ],
+            }).where(eq(importazioniVolontariRigheTable.id, stored.id));
             continue;
           }
           if (sameImportedFields(target, data, role.id, centroId)) {
@@ -465,12 +740,44 @@ router.post(
               indirizzoResidenza: data.indirizzoResidenza,
               codiceFiscale: data.codiceFiscaleNormalizzato,
               codiceFiscaleNormalizzato: data.codiceFiscaleNormalizzato,
+              codiceFiscaleNonDisponibile:
+                data.codiceFiscaleNormalizzato == null,
+              codiceFiscaleNota:
+                data.codiceFiscaleNormalizzato == null
+                  ? "Codice fiscale assente nel file importato"
+                  : null,
               dataInizioImportata: data.dataInizioImportata,
+              dataIscrizione: data.dataInizioImportata ?? target.dataIscrizione,
               categoriaImportataOriginale: data.categoriaOriginale,
               gruppoImportatoOriginale: data.gruppoOriginale,
               ruoloVolontarioId: role.id, ruolo: role.nome,
               versione: sql`${volontariTable.versione} + 1`, dataAggiornamento: new Date(),
             }).where(eq(volontariTable.id, target.id)).returning();
+            await registerImportedVolunteerIdentifier(
+              tx, volunteer.id, data.matricola, data.tipoVolontario,
+              todayRome(), actorId(req),
+            );
+            await appendVolontarioLedgerEvent(tx, {
+              sezione: volunteer.tipoVolontario as
+                | "PERMANENTE"
+                | "TEMPORANEO",
+              tipoEvento: "AGGIORNAMENTO_ANAGRAFICA",
+              volontarioId: volunteer.id,
+              centroAscoltoId: volunteer.centroAscoltoId,
+              dataEffettiva: todayRome(),
+              snapshot: await buildVolunteerEventSnapshot(tx, volunteer, {
+                statoPrecedente: target.tipoVolontario,
+                nuovoStato: volunteer.tipoVolontario,
+                motivo: "aggiornamento_da_import",
+                dataEffettiva: todayRome(),
+                versione: volunteer.versione,
+                datiEvento: {
+                  importazioneId: batch.id,
+                  numeroRiga: stored.numeroRiga,
+                },
+              }),
+              utenteId: actorId(req),
+            });
             esito = "AGGIORNATO"; aggiornati += 1;
           }
         } else {
@@ -482,12 +789,23 @@ router.post(
             indirizzoResidenza: data.indirizzoResidenza,
             codiceFiscale: data.codiceFiscaleNormalizzato,
             codiceFiscaleNormalizzato: data.codiceFiscaleNormalizzato,
+            codiceFiscaleNonDisponibile:
+              data.codiceFiscaleNormalizzato == null,
+            codiceFiscaleNota:
+              data.codiceFiscaleNormalizzato == null
+                ? "Codice fiscale assente nel file importato"
+                : null,
             dataInizioImportata: data.dataInizioImportata,
+            dataIscrizione: data.dataInizioImportata ?? todayRome(),
             categoriaImportataOriginale: data.categoriaOriginale,
             gruppoImportatoOriginale: data.gruppoOriginale,
             ruoloVolontarioId: role.id, ruolo: role.nome,
             attivo: false, statoApprovazione: "in_attesa",
           }).returning();
+          await registerImportedVolunteerIdentifier(
+            tx, volunteer.id, data.matricola, data.tipoVolontario,
+            data.dataInizioImportata ?? todayRome(), actorId(req),
+          );
           esito = "CREATO"; creati += 1;
           await appendVolontarioLedgerEvent(tx, {
             sezione: data.tipoVolontario, tipoEvento: "REGISTRAZIONE", volontarioId: volunteer.id,
@@ -513,7 +831,10 @@ router.post(
             durataMesi: null, tipoOperazione: "IMPORTAZIONE",
             chiaveIdempotenza: coverageKey,
             note: `Importazione ${batch.id}, riga ${stored.numeroRiga}`, creatoDa: actorId(req),
-          }).onConflictDoNothing();
+          }).onConflictDoNothing({
+            target: copertureAssicurativeVolontariTable.chiaveIdempotenza,
+            where: sql`${copertureAssicurativeVolontariTable.chiaveIdempotenza} is not null and ${copertureAssicurativeVolontariTable.tipoOperazione} = 'IMPORTAZIONE' and ${copertureAssicurativeVolontariTable.annullata} = false`,
+          });
         }
         if (data.tipoVolontario === "TEMPORANEO" && data.dataServizio) {
           const serviceKey = canonicalSnapshotHash({
@@ -527,7 +848,10 @@ router.post(
             stato: "PIANIFICATA", coperturaVerificata: Boolean(data.scadenzaAssicurazione && data.scadenzaAssicurazione >= data.dataServizio),
             chiaveIdempotenza: serviceKey,
             note: `Importazione ${batch.id}, riga ${stored.numeroRiga}`, creatoDa: actorId(req),
-          }).onConflictDoNothing();
+          }).onConflictDoNothing({
+            target: giornateServizioVolontariTable.chiaveIdempotenza,
+            where: sql`${giornateServizioVolontariTable.chiaveIdempotenza} is not null`,
+          });
         }
         await auditLogistica(tx, req, {
           entita: "volontario", id: volunteer.id, azione: `import_${esito.toLowerCase()}`,
@@ -539,6 +863,7 @@ router.post(
       const [finalBatch] = await tx.update(importazioniVolontariTable).set({
         stato, creati, aggiornati, invariati, esclusi, errori,
         ...(stato === "CONFERMATO" ? { chiaveIdempotenza: idempotencyKey } : {}),
+        hashDecisioniFinali: finalDecisionsHash,
         confermatoDa: actorId(req), dataConferma: new Date(),
       }).where(eq(importazioniVolontariTable.id, batch.id)).returning();
       await auditLogistica(tx, req, {
@@ -546,7 +871,28 @@ router.post(
         nuovo: { importazioneId: batch.id, stato, creati, aggiornati, invariati, esclusi, errori },
       });
       return { batch: finalBatch, replay: false };
-    });
+      });
+    } catch (error) {
+      if (isVolontarioCodiceFiscaleUniqueViolation(error)) {
+        res.status(409).json({
+          error: "Codice fiscale già associato a un altro volontario",
+          code: "CODICE_FISCALE_DUPLICATO",
+        });
+        return;
+      }
+      if (isVolontarioMatricolaUniqueViolation(error) || (error as Error)?.message === "MATRICOLA_DUPLICATA") {
+        res.status(409).json({ error: MATRICOLA_DUPLICATA_MSG, code: "MATRICOLA_DUPLICATA" });
+        return;
+      }
+      if ((error as Error)?.message === "IMPORT_GIA_CONFERMATO_CON_DECISIONI_DIVERSE") {
+        res.status(409).json({
+          error: "Il batch è già stato confermato con decisioni differenti",
+          code: "IMPORT_GIA_CONFERMATO_CON_DECISIONI_DIVERSE",
+        });
+        return;
+      }
+      throw error;
+    }
     res.json({ ...resultSummary(outcome.batch), replayIdempotente: outcome.replay });
   },
 );

@@ -8,6 +8,7 @@ import {
   ruoliVolontariTable,
   turniVolontariTable,
   mezziTable,
+  matricoleVolontariTable,
   statiVolontariTable,
 } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
@@ -33,11 +34,13 @@ import {
   andScoped,
 } from "../lib/centroScope";
 import {
+  assignPermanentVolunteerIdentifier,
+  assignTemporaryVolunteerIdentifier,
+  isVolontarioCodiceFiscaleUniqueViolation,
   isVolontarioMatricolaUniqueViolation,
-  MATRICOLA_OBBLIGATORIA_MSG,
-  matricolaVolontarioDuplicataPayload,
-  matricolaVolontarioGiaUsata,
-  normalizeVolontarioMatricola,
+  previewPermanentVolunteerIdentifier,
+  VolunteerIdentifierError,
+  type PermanentIdentifierPreview,
   type MatricolaDuplicataPayload,
 } from "../lib/volontariMatricola";
 import { requireModulo } from "../lib/featureFlags";
@@ -72,7 +75,9 @@ const VOLONTARIO_TEXT_LIMITS = {
   email: 120,
   luogoNascita: 120,
   indirizzoResidenza: 240,
+  indirizzoDomicilio: 240,
   codiceFiscale: 32,
+  codiceFiscaleNota: 240,
 } as const;
 
 function validateVolontarioTextFields(
@@ -124,7 +129,14 @@ const fmt = (
   luogoNascita: includeSensitive ? (r.luogoNascita ?? null) : null,
   dataNascita: includeSensitive ? (r.dataNascita ?? null) : null,
   indirizzoResidenza: includeSensitive ? (r.indirizzoResidenza ?? null) : null,
+  indirizzoDomicilio: includeSensitive ? (r.indirizzoDomicilio ?? null) : null,
   codiceFiscale: includeSensitive ? (r.codiceFiscale ?? null) : null,
+  codiceFiscaleNonDisponibile: includeSensitive
+    ? r.codiceFiscaleNonDisponibile
+    : false,
+  codiceFiscaleNota: includeSensitive ? (r.codiceFiscaleNota ?? null) : null,
+  dataIscrizione: r.dataIscrizione ?? null,
+  progressivoRegistro: r.progressivoRegistro,
   dataInizioImportata: includeSensitive
     ? (r.dataInizioImportata ?? null)
     : null,
@@ -210,6 +222,11 @@ router.get(
         ilike(volontariTable.nome, pattern),
         ilike(volontariTable.cognome, pattern),
         ilike(volontariTable.matricola, pattern),
+        sql`exists (
+          select 1 from matricole_volontari mv
+          where mv.volontario_id = ${volontariTable.id}
+            and mv.matricola ilike ${pattern}
+        )`,
       );
     }
     const tipoQuery = req.query.tipoVolontario ?? req.query.tipo;
@@ -348,14 +365,15 @@ async function createVolontarioOne(
   const textFields = [
     "nome",
     "cognome",
-    "matricola",
     "telefono",
     "telefonoSecondario",
     "email",
     "luogoNascita",
     "dataNascita",
     "indirizzoResidenza",
+    "indirizzoDomicilio",
     "codiceFiscale",
+    "codiceFiscaleNota",
     "note",
   ] as const;
   for (const field of textFields) {
@@ -377,14 +395,19 @@ async function createVolontarioOne(
   for (const field of ["patente", "mezzoPersonale"] as const) {
     if (typeof body[field] === "boolean") values[field] = body[field];
   }
+  if (typeof body.codiceFiscaleNonDisponibile === "boolean")
+    values.codiceFiscaleNonDisponibile = body.codiceFiscaleNonDisponibile;
   const textError = validateVolontarioTextFields(values);
   if (textError) return { error: textError, status: 400 };
   if (typeof values.nome !== "string" || typeof values.cognome !== "string") {
     return { error: "Nome e cognome sono obbligatori", status: 400 };
   }
-  const matricola = normalizeVolontarioMatricola(values.matricola);
-  if (!matricola) return { error: MATRICOLA_OBBLIGATORIA_MSG, status: 400 };
-  values.matricola = matricola;
+  if (body.matricola != null && String(body.matricola).trim()) {
+    return {
+      error: "La matricola viene generata automaticamente dal sistema",
+      status: 400,
+    };
+  }
   const tipoVolontario =
     values.tipoVolontario == null
       ? "PERMANENTE"
@@ -398,6 +421,36 @@ async function createVolontarioOne(
   );
   values.codiceFiscale = codiceFiscaleNormalizzato;
   values.codiceFiscaleNormalizzato = codiceFiscaleNormalizzato;
+  const codiceFiscaleNonDisponibile = values.codiceFiscaleNonDisponibile === true;
+  if (codiceFiscaleNormalizzato && codiceFiscaleNonDisponibile) {
+    return {
+      error: "Il codice fiscale non può essere presente e segnato come non disponibile",
+      status: 400,
+    };
+  }
+  if (!codiceFiscaleNormalizzato && !codiceFiscaleNonDisponibile) {
+    return {
+      error: "Inserisci il codice fiscale oppure dichiaralo non disponibile",
+      status: 400,
+    };
+  }
+  if (
+    codiceFiscaleNonDisponibile &&
+    (typeof values.codiceFiscaleNota !== "string" || !values.codiceFiscaleNota)
+  ) {
+    return {
+      error: "Indica il motivo per cui il codice fiscale non è disponibile",
+      status: 400,
+    };
+  }
+  for (const required of [
+    ["luogoNascita", "Luogo di nascita"],
+    ["dataNascita", "Data di nascita"],
+    ["indirizzoResidenza", "Indirizzo di residenza"],
+  ] as const) {
+    if (typeof values[required[0]] !== "string" || !values[required[0]])
+      return { error: `${required[1]} obbligatorio`, status: 400 };
+  }
   if (codiceFiscaleNormalizzato) {
     const [duplicateCf] = await db
       .select({ id: volontariTable.id })
@@ -460,20 +513,31 @@ async function createVolontarioOne(
   values.maxConsegneTurno = maxConsegneTurno;
   values.statoApprovazione = "in_attesa";
   values.attivo = false;
+  values.dataIscrizione = todayRome();
   delete values.versione;
   delete values.dataAggiornamento;
-  if (await matricolaVolontarioGiaUsata(matricola)) {
-    return {
-      ...(await matricolaVolontarioDuplicataPayload(matricola)),
-      status: 409,
-    };
-  }
   try {
     const [created] = await db.transaction(async (tx) => {
-      const [row] = await tx
+      const [inserted] = await tx
         .insert(volontariTable)
         .values(values as typeof volontariTable.$inferInsert)
         .returning();
+      const matricola =
+        tipoVolontario === "TEMPORANEO"
+          ? await assignTemporaryVolunteerIdentifier(
+              tx,
+              inserted.id,
+              todayRome(),
+              actorId(req),
+            )
+          : await assignPermanentVolunteerIdentifier(
+              tx,
+              inserted.id,
+              inserted.centroAscoltoId,
+              todayRome(),
+              actorId(req),
+            );
+      const row = { ...inserted, matricola };
       await auditLogistica(tx, req, {
         entita: "volontario",
         id: row.id,
@@ -501,12 +565,15 @@ async function createVolontarioOne(
     });
     return { id: created.id };
   } catch (e) {
-    if (isVolontarioMatricolaUniqueViolation(e)) {
+    if (isVolontarioCodiceFiscaleUniqueViolation(e))
       return {
-        ...(await matricolaVolontarioDuplicataPayload(matricola)),
+        error: "Il codice fiscale è già associato a un altro volontario",
         status: 409,
       };
-    }
+    if (isVolontarioMatricolaUniqueViolation(e))
+      return { error: "Conflitto durante la generazione della matricola", status: 409 };
+    if (e instanceof VolunteerIdentifierError)
+      return { error: e.message, status: 422 };
     throw e;
   }
 }
@@ -622,6 +689,231 @@ router.get(
 );
 
 router.get(
+  "/volontari/:id/matricole",
+  requirePermission("logistica.volontari.view"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const [volunteer] = Number.isSafeInteger(id)
+      ? await db.select().from(volontariTable).where(eq(volontariTable.id, id))
+      : [];
+    if (!volunteer) {
+      res.status(404).json({ error: "Volontario non trovato" });
+      return;
+    }
+    if (
+      !canAccessCentro(volunteer.centroAscoltoId, callerCentroId(req)) ||
+      !inVisibleCentroSet(
+        volunteer.centroAscoltoId,
+        await visibleCentroIds(callerAreaOperativaId(req)),
+      )
+    ) {
+      res.status(403).json({ error: "Volontario non accessibile" });
+      return;
+    }
+    const identifiers = await db
+      .select({
+        id: matricoleVolontariTable.id,
+        matricola: matricoleVolontariTable.matricola,
+        tipoIdentificativo: matricoleVolontariTable.tipoIdentificativo,
+        stato: matricoleVolontariTable.stato,
+        origine: matricoleVolontariTable.origine,
+        dataInizioValidita: matricoleVolontariTable.dataInizioValidita,
+        dataFineValidita: matricoleVolontariTable.dataFineValidita,
+        dataAssegnazione: matricoleVolontariTable.dataAssegnazione,
+      })
+      .from(matricoleVolontariTable)
+      .where(eq(matricoleVolontariTable.volontarioId, id))
+      .orderBy(desc(matricoleVolontariTable.dataInizioValidita), desc(matricoleVolontariTable.id));
+    res.json(identifiers);
+  },
+);
+
+router.get(
+  "/volontari/:id/conversione-permanente/preview",
+  requirePermission("logistica.volontari.manage"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const [volunteer] = Number.isSafeInteger(id)
+      ? await db.select().from(volontariTable).where(eq(volontariTable.id, id))
+      : [];
+    if (!volunteer) {
+      res.status(404).json({ error: "Volontario non trovato" });
+      return;
+    }
+    if (
+      !canAccessCentro(volunteer.centroAscoltoId, callerCentroId(req)) ||
+      !inVisibleCentroSet(
+        volunteer.centroAscoltoId,
+        await visibleCentroIds(callerAreaOperativaId(req)),
+      )
+    ) {
+      res.status(403).json({ error: "Volontario non accessibile" });
+      return;
+    }
+    if (volunteer.tipoVolontario !== "TEMPORANEO") {
+      res.status(409).json({ error: "Il volontario è già permanente" });
+      return;
+    }
+    try {
+      res.json({
+        volontarioId: volunteer.id,
+        versioneVolontario: volunteer.versione,
+        matricolaAttuale: volunteer.matricola,
+        dataConversione: todayRome(),
+        preview: await previewPermanentVolunteerIdentifier(volunteer.centroAscoltoId),
+      });
+    } catch (error) {
+      if (error instanceof VolunteerIdentifierError) {
+        res.status(422).json({ error: error.message, code: error.code });
+        return;
+      }
+      throw error;
+    }
+  },
+);
+
+router.post(
+  "/volontari/:id/conversione-permanente",
+  requirePermission("logistica.volontari.manage"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const versione = parseRequiredVersion(req.body?.versioneVolontario ?? req.body?.versione);
+    const preview = req.body?.preview as PermanentIdentifierPreview | undefined;
+    if (!Number.isSafeInteger(id) || id <= 0 || versione == null || !preview) {
+      res.status(400).json({ error: "Conferma conversione non valida" });
+      return;
+    }
+    if (
+      typeof preview.matricola !== "string" ||
+      typeof preview.matricolaNormalizzata !== "string" ||
+      !Number.isSafeInteger(preview.configurazioneId) ||
+      !Number.isSafeInteger(preview.configurazioneVersione) ||
+      typeof preview.scopeKey !== "string" ||
+      !Number.isSafeInteger(preview.versioneProgressivo) ||
+      !Number.isSafeInteger(preview.prossimoNumero)
+    ) {
+      res.status(400).json({ error: "Preview conversione non valida" });
+      return;
+    }
+    try {
+      const converted = await db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(volontariTable)
+          .where(eq(volontariTable.id, id))
+          .for("update");
+        if (!existing) throw new Error("VOLUNTEER_NOT_FOUND");
+        if (
+          !canAccessCentro(existing.centroAscoltoId, callerCentroId(req)) ||
+          !inVisibleCentroSet(
+            existing.centroAscoltoId,
+            await visibleCentroIds(callerAreaOperativaId(req)),
+          )
+        )
+          throw new Error("VOLUNTEER_FORBIDDEN");
+        if (existing.versione !== versione) throw new Error("STALE_VERSION");
+        if (existing.tipoVolontario !== "TEMPORANEO")
+          throw new Error("ALREADY_PERMANENT");
+        const dataConversione = todayRome();
+        const nuovaMatricola = await assignPermanentVolunteerIdentifier(
+          tx,
+          existing.id,
+          existing.centroAscoltoId,
+          dataConversione,
+          actorId(req),
+          "CONVERSIONE",
+          preview,
+        );
+        const [row] = await tx
+          .update(volontariTable)
+          .set({
+            tipoVolontario: "PERMANENTE",
+            versione: sql`${volontariTable.versione} + 1`,
+            dataAggiornamento: new Date(),
+          })
+          .where(
+            and(
+              eq(volontariTable.id, existing.id),
+              eq(volontariTable.versione, versione),
+            ),
+          )
+          .returning();
+        if (!row) throw new Error("STALE_VERSION");
+        await appendVolontarioLedgerEvent(tx, {
+          sezione: "PERMANENTE",
+          tipoEvento: "CONVERSIONE_PERMANENTE",
+          volontarioId: row.id,
+          centroAscoltoId: row.centroAscoltoId,
+          dataEffettiva: dataConversione,
+          snapshot: await buildVolunteerEventSnapshot(tx, row, {
+            statoPrecedente: "TEMPORANEO",
+            nuovoStato: "PERMANENTE",
+            motivo: "conversione_volontario",
+            dataEffettiva: dataConversione,
+            versione: row.versione,
+            datiEvento: {
+              matricolaPrecedente: existing.matricola,
+              nuovaMatricola,
+              configurazioneId: preview.configurazioneId,
+              configurazioneVersione: preview.configurazioneVersione,
+            },
+          }),
+          utenteId: actorId(req),
+        });
+        await auditLogistica(tx, req, {
+          entita: "volontario",
+          id: row.id,
+          azione: "conversione_permanente",
+          precedente: {
+            tipoVolontario: existing.tipoVolontario,
+            matricola: existing.matricola,
+            versione: existing.versione,
+          },
+          nuovo: {
+            tipoVolontario: "PERMANENTE",
+            matricola: nuovaMatricola,
+            versione: row.versione,
+            dataConversione,
+          },
+        });
+        return row;
+      });
+      const [row] = await selectVolontario().where(eq(volontariTable.id, converted.id));
+      const state = (await operationalStatesForRows(db, [row], todayRome())).get(row.id);
+      res.json(fmt(row, state));
+    } catch (error) {
+      if (error instanceof VolunteerIdentifierError) {
+        res.status(error.code === "PREVIEW_CONVERSIONE_SCADUTA" ? 409 : 422).json({
+          error: error.message,
+          code: error.code,
+        });
+        return;
+      }
+      const code = error instanceof Error ? error.message : "";
+      if (code === "VOLUNTEER_NOT_FOUND") {
+        res.status(404).json({ error: "Volontario non trovato" });
+        return;
+      }
+      if (code === "VOLUNTEER_FORBIDDEN") {
+        res.status(403).json({ error: "Volontario non accessibile" });
+        return;
+      }
+      if (code === "STALE_VERSION" || code === "ALREADY_PERMANENT") {
+        res.status(409).json({
+          error:
+            code === "ALREADY_PERMANENT"
+              ? "Il volontario è già permanente"
+              : "Il volontario è stato modificato: rigenera la preview",
+          code,
+        });
+        return;
+      }
+      throw error;
+    }
+  },
+);
+
+router.get(
   "/volontari/:id",
   requirePermission("logistica.volontari.view"),
   async (req, res) => {
@@ -700,10 +992,24 @@ router.patch(
       return;
     }
     const updates: Record<string, unknown> = {};
+    if (req.body?.matricola !== undefined) {
+      res.status(400).json({
+        error: "La matricola non è modificabile manualmente",
+      });
+      return;
+    }
+    if (
+      req.body?.codiceFiscaleNonDisponibile !== undefined &&
+      typeof req.body.codiceFiscaleNonDisponibile !== "boolean"
+    ) {
+      res.status(400).json({
+        error: "codiceFiscaleNonDisponibile deve essere booleano",
+      });
+      return;
+    }
     for (const field of [
       "nome",
       "cognome",
-      "matricola",
       "tipoVolontario",
       "centroAscoltoId",
       "telefono",
@@ -712,7 +1018,10 @@ router.patch(
       "luogoNascita",
       "dataNascita",
       "indirizzoResidenza",
+      "indirizzoDomicilio",
       "codiceFiscale",
+      "codiceFiscaleNonDisponibile",
+      "codiceFiscaleNota",
       "ruoloVolontarioId",
       "patente",
       "mezzoPersonale",
@@ -733,29 +1042,23 @@ router.patch(
         .json({ error: textError ?? "Nome e cognome non possono essere vuoti" });
       return;
     }
-    if ("matricola" in updates) {
-      const matricola = normalizeVolontarioMatricola(updates.matricola);
-      if (!matricola) {
-        res.status(400).json({ error: MATRICOLA_OBBLIGATORIA_MSG });
-        return;
-      }
-      if (await matricolaVolontarioGiaUsata(matricola, existing.id)) {
-        res
-          .status(409)
-          .json(
-            await matricolaVolontarioDuplicataPayload(matricola, existing.id),
-          );
-        return;
-      }
-      updates.matricola = matricola;
-    }
     if ("tipoVolontario" in updates) {
       const tipo = String(updates.tipoVolontario).toUpperCase();
       if (tipo !== "PERMANENTE" && tipo !== "TEMPORANEO") {
         res.status(400).json({ error: "tipoVolontario non valido" });
         return;
       }
-      updates.tipoVolontario = tipo;
+      if (tipo !== existing.tipoVolontario) {
+        res.status(409).json({
+          error:
+            existing.tipoVolontario === "TEMPORANEO" && tipo === "PERMANENTE"
+              ? "Usa il workflow Converti in permanente"
+              : "Il tipo volontario non è modificabile direttamente",
+          code: "CONVERSIONE_RICHIESTA",
+        });
+        return;
+      }
+      delete updates.tipoVolontario;
     }
     if ("codiceFiscale" in updates) {
       const normalized = normalizeCodiceFiscale(updates.codiceFiscale);
@@ -781,6 +1084,30 @@ router.patch(
       }
       updates.codiceFiscale = normalized;
       updates.codiceFiscaleNormalizzato = normalized;
+    }
+    const nextCf =
+      "codiceFiscale" in updates
+        ? (updates.codiceFiscaleNormalizzato as string | null)
+        : existing.codiceFiscaleNormalizzato;
+    const nextUnavailable =
+      "codiceFiscaleNonDisponibile" in updates
+        ? updates.codiceFiscaleNonDisponibile === true
+        : existing.codiceFiscaleNonDisponibile;
+    const nextCfNote =
+      "codiceFiscaleNota" in updates
+        ? updates.codiceFiscaleNota
+        : existing.codiceFiscaleNota;
+    if ((nextCf && nextUnavailable) || (!nextCf && !nextUnavailable)) {
+      res.status(400).json({
+        error: "Inserisci il codice fiscale oppure dichiaralo non disponibile",
+      });
+      return;
+    }
+    if (nextUnavailable && (typeof nextCfNote !== "string" || !nextCfNote.trim())) {
+      res.status(400).json({
+        error: "Indica il motivo per cui il codice fiscale non è disponibile",
+      });
+      return;
     }
     const areaId = callerAreaOperativaId(req);
     if (caller != null) delete updates.centroAscoltoId;
@@ -891,6 +1218,43 @@ router.patch(
             attivo: updates.attivo ?? existing.attivo,
           },
         });
+        const identityFields = [
+          "nome",
+          "cognome",
+          "telefono",
+          "telefonoSecondario",
+          "email",
+          "luogoNascita",
+          "dataNascita",
+          "indirizzoResidenza",
+          "indirizzoDomicilio",
+          "codiceFiscale",
+          "codiceFiscaleNonDisponibile",
+          "codiceFiscaleNota",
+          "centroAscoltoId",
+          "ruoloVolontarioId",
+        ].filter((field) => field in updates);
+        if (identityFields.length) {
+          const date = todayRome();
+          await appendVolontarioLedgerEvent(tx, {
+            sezione: existing.tipoVolontario as "PERMANENTE" | "TEMPORANEO",
+            tipoEvento: "AGGIORNAMENTO_ANAGRAFICA",
+            volontarioId: row.id,
+            centroAscoltoId: row.centroAscoltoId,
+            dataEffettiva: date,
+            snapshot: await buildVolunteerEventSnapshot(tx, row, {
+              statoPrecedente: existing.tipoVolontario,
+              nuovoStato: row.tipoVolontario,
+              motivo: "aggiornamento_anagrafica",
+              dataEffettiva: date,
+              versione: row.versione,
+              datiEvento: {
+                campiModificati: identityFields,
+              },
+            }),
+            utenteId: actorId(req),
+          });
+        }
         if (
           typeof updates.attivo === "boolean" &&
           updates.attivo !== existing.attivo
@@ -945,16 +1309,11 @@ router.patch(
           });
         return;
       }
-      if (isVolontarioMatricolaUniqueViolation(e)) {
-        const matricola =
-          normalizeVolontarioMatricola(updates.matricola) ??
-          existing.matricola ??
-          "";
-        res
-          .status(409)
-          .json(
-            await matricolaVolontarioDuplicataPayload(matricola, existing.id),
-          );
+      if (isVolontarioCodiceFiscaleUniqueViolation(e)) {
+        res.status(409).json({
+          error: "Il codice fiscale è già associato a un altro volontario",
+          code: "CODICE_FISCALE_DUPLICATO",
+        });
         return;
       }
       throw e;

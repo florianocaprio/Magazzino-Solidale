@@ -24,6 +24,7 @@ import {
   lte,
   ne,
   or,
+  sql,
   type SQL,
 } from "drizzle-orm";
 import {
@@ -44,8 +45,19 @@ import {
   appendVolontarioLedgerEvent,
   buildVolunteerEventSnapshot,
   canonicalSnapshotHash,
+  verifyVolontarioLedgerChain,
 } from "../lib/volontariLedger";
 import { operationalStatesForRows } from "../lib/volontariOperational";
+import {
+  resolveVolunteerRegisterStatesAt,
+  VOLUNTEER_REGISTER_CORRECTION_FIELDS,
+  type StructuredVolunteerRegisterCorrection,
+} from "../lib/volontariRegisterResolver";
+import {
+  canAccessVolunteerOwnerScope,
+  resolveVolunteerOwnerScope,
+  volunteerOwnerScopeSql,
+} from "../lib/volontariScope";
 import {
   buildExtendedVolunteerWorkbook,
   buildHistoricalVolunteerWorkbook,
@@ -75,6 +87,7 @@ function params(req: Request) {
 async function scopedRows(
   req: Request,
   filters = params(req),
+  historicalResolution = false,
 ): Promise<
   | { ok: true; rows: ExportRow[]; reference: string; centerId: number | null }
   | { ok: false; status: 400 | 403; error: string }
@@ -89,13 +102,23 @@ async function scopedRows(
     filters.centroAscoltoId == null || filters.centroAscoltoId === ""
       ? null
       : Number(filters.centroAscoltoId);
-  const visibleIds = await visibleCentroIds(callerAreaOperativaId(req));
+  const callerAreaId = callerAreaOperativaId(req);
+  const visibleIds = await visibleCentroIds(callerAreaId);
+  const strictAreaCenterIds =
+    historicalResolution && callerAreaId != null
+      ? (
+          await db
+            .select({ id: centriAscoltoTable.id })
+            .from(centriAscoltoTable)
+            .where(eq(centriAscoltoTable.areaOperativaId, callerAreaId))
+        ).map((center) => center.id)
+      : visibleIds;
   if (
     requestedCenter != null &&
     (!Number.isSafeInteger(requestedCenter) ||
       requestedCenter <= 0 ||
       !canAccessCentro(requestedCenter, callerCentroId(req)) ||
-      !inVisibleCentroSet(requestedCenter, visibleIds))
+      !inVisibleCentroSet(requestedCenter, strictAreaCenterIds))
   ) {
     return { ok: false, status: 403, error: "Centro non accessibile" };
   }
@@ -104,7 +127,7 @@ async function scopedRows(
     typeof filters.tipo === "string" ? filters.tipo.toUpperCase() : "TUTTI";
   if (!["TUTTI", "PERMANENTE", "TEMPORANEO"].includes(tipo))
     return { ok: false, status: 400, error: "tipo non valido" };
-  if (tipo !== "TUTTI")
+  if (tipo !== "TUTTI" && !historicalResolution)
     conditions.push(eq(volontariTable.tipoVolontario, tipo));
   const roleId =
     filters.ruoloVolontarioId == null || filters.ruoloVolontarioId === ""
@@ -112,11 +135,11 @@ async function scopedRows(
       : Number(filters.ruoloVolontarioId);
   if (roleId != null && (!Number.isSafeInteger(roleId) || roleId <= 0))
     return { ok: false, status: 400, error: "ruolo non valido" };
-  if (roleId != null)
+  if (roleId != null && !historicalResolution)
     conditions.push(eq(volontariTable.ruoloVolontarioId, roleId));
   const search =
     typeof filters.search === "string" ? filters.search.trim() : "";
-  if (search) {
+  if (search && !historicalResolution) {
     conditions.push(
       or(
         ilike(volontariTable.nome, `%${search}%`),
@@ -125,6 +148,41 @@ async function scopedRows(
       )!,
     );
   }
+  const historicalCenterIds = historicalResolution
+    ? requestedCenter != null
+      ? [requestedCenter]
+      : callerCentroId(req) != null
+        ? [callerCentroId(req)!]
+        : callerAreaId != null
+          ? (strictAreaCenterIds ?? [])
+          : null
+    : null;
+  const historicalScope =
+    historicalCenterIds == null
+      ? undefined
+      : historicalCenterIds.length
+        ? or(
+            inArray(volontariTable.centroAscoltoId, historicalCenterIds),
+            inArray(
+              volontariTable.id,
+              db
+                .select({ volontarioId: registroVolontariEventiTable.volontarioId })
+                .from(registroVolontariEventiTable)
+                .where(
+                  and(
+                    inArray(
+                      registroVolontariEventiTable.centroAscoltoId,
+                      historicalCenterIds,
+                    ),
+                    lte(
+                      registroVolontariEventiTable.dataEffettiva,
+                      reference,
+                    ),
+                  ),
+                ),
+            ),
+          )
+        : sql`false`;
   const rows = await db
     .select({
       ...getTableColumns(volontariTable),
@@ -142,35 +200,39 @@ async function scopedRows(
     )
     .where(
       andScoped(
-        centroScopeFilter(volontariTable.centroAscoltoId, callerCentroId(req)),
-        idSetScopeFilter(volontariTable.centroAscoltoId, visibleIds),
-        requestedCenter == null
+        historicalResolution
+          ? historicalScope
+          : centroScopeFilter(
+              volontariTable.centroAscoltoId,
+              callerCentroId(req),
+            ),
+        historicalResolution
+          ? undefined
+          : idSetScopeFilter(volontariTable.centroAscoltoId, visibleIds),
+        historicalResolution || requestedCenter == null
           ? undefined
           : eq(volontariTable.centroAscoltoId, requestedCenter),
         ...conditions,
       ),
     )
     .orderBy(volontariTable.cognome, volontariTable.nome);
-  const states = await operationalStatesForRows(
-    db,
-    rows,
-    reference,
-    requestedCenter,
-  );
+  const states = historicalResolution
+    ? new Map()
+    : await operationalStatesForRows(db, rows, reference, requestedCenter);
   let filtered = rows;
   const stato =
     typeof filters.stato === "string" ? filters.stato.toLowerCase() : "tutti";
   if (!["tutti", "attivi", "non_attivi"].includes(stato))
     return { ok: false, status: 400, error: "stato non valido" };
-  if (stato === "attivi")
+  if (stato === "attivi" && !historicalResolution)
     filtered = rows.filter((row) => states.get(row.id)?.operativo);
-  if (stato === "non_attivi")
+  if (stato === "non_attivi" && !historicalResolution)
     filtered = rows.filter((row) => !states.get(row.id)?.operativo);
   const assicurazione =
     typeof filters.assicurazione === "string"
       ? filters.assicurazione.toUpperCase()
       : "";
-  if (assicurazione)
+  if (assicurazione && !historicalResolution)
     filtered = filtered.filter(
       (row) => states.get(row.id)?.statoAssicurazione === assicurazione,
     );
@@ -193,7 +255,7 @@ async function scopedRows(
       error: "Intervallo giornate di servizio non valido",
     };
   }
-  if (servizioDa || servizioA) {
+  if ((servizioDa || servizioA) && !historicalResolution) {
     const serviceConditions: SQL[] = [
       ne(giornateServizioVolontariTable.stato, "ANNULLATA"),
     ];
@@ -304,124 +366,114 @@ function historicalRows(
   }));
 }
 
-async function officialRegisterRows(rows: ExportRow[], reference: string) {
-  const ids = rows.map((row) => row.id);
-  const states = await operationalStatesForRows(db, rows, reference);
-  const [registrations, stateEvents, serviceDays] = ids.length
-    ? await Promise.all([
-        db
-          .select()
-          .from(registroVolontariEventiTable)
-          .where(
-            and(
-              inArray(registroVolontariEventiTable.volontarioId, ids),
-              eq(registroVolontariEventiTable.tipoEvento, "REGISTRAZIONE"),
-              lte(registroVolontariEventiTable.dataEffettiva, reference),
-            ),
-          )
-          .orderBy(asc(registroVolontariEventiTable.progressivo)),
-        db
-          .select()
-          .from(statiVolontariTable)
-          .where(
-            and(
-              inArray(statiVolontariTable.volontarioId, ids),
-              lte(statiVolontariTable.dataEffettiva, reference),
-            ),
-          )
-          .orderBy(
-            asc(statiVolontariTable.dataEffettiva),
-            asc(statiVolontariTable.id),
-          ),
-        db
-          .select()
-          .from(giornateServizioVolontariTable)
-          .where(
-            and(
-              inArray(giornateServizioVolontariTable.volontarioId, ids),
-              lte(giornateServizioVolontariTable.dataServizio, reference),
-              ne(giornateServizioVolontariTable.stato, "ANNULLATA"),
-            ),
-          )
-          .orderBy(asc(giornateServizioVolontariTable.dataServizio)),
-      ])
-    : [[], [], []];
-  const firstRegistration = new Map<number, (typeof registrations)[number]>();
-  for (const event of registrations) {
-    if (!firstRegistration.has(event.volontarioId)) {
-      firstRegistration.set(event.volontarioId, event);
-    }
-  }
-  return rows.map((row, index) => {
-    const state = states.get(row.id)!;
-    const registration = firstRegistration.get(row.id);
-    const registrationSnapshot = registration?.snapshot ?? {};
-    const volunteerStateEvents = stateEvents.filter(
-      (event) => event.volontarioId === row.id,
-    );
-    const latestStateEvent = volunteerStateEvents.at(-1);
-    const cessation = volunteerStateEvents
-      .filter(
-        (event) =>
-          event.tipoEvento === "SOSPENSIONE" &&
-          event.motivo === "dimissioni_cessazione",
-      )
-      .at(-1);
-    const volunteerServiceDays = serviceDays
-      .filter((event) => event.volontarioId === row.id)
-      .map((event) => event.dataServizio);
-    const serviceInterval = volunteerServiceDays.length
-      ? `${volunteerServiceDays[0]} – ${volunteerServiceDays.at(-1)}`
-      : "";
-    const origin =
-      typeof registrationSnapshot.origine === "string"
-        ? registrationSnapshot.origine
-        : row.dataInizioImportata
-          ? "IMPORT_VOLONTARI_2_0"
-          : "MANUALE";
-    const activityStart =
-      row.dataInizioImportata ??
-      registration?.dataEffettiva ??
-      todayRome(row.dataCreazione);
-    return {
-      Progressivo: String(index + 1),
-      Matricola: row.matricola ?? "",
-      Cognome: row.cognome,
-      Nome: row.nome,
-      "Codice fiscale": row.codiceFiscale ?? "",
-      "Data di nascita": row.dataNascita ?? "",
-      "Luogo di nascita": row.luogoNascita ?? "",
-      Residenza: row.indirizzoResidenza ?? "",
-      Domicilio: "",
-      "Tipo volontario": row.tipoVolontario,
-      "Data inizio attività/iscrizione": activityStart,
-      "Origine iscrizione": origin,
-      "Da Data importata": row.dataInizioImportata ?? "",
-      "Data cessazione": cessation?.dataEffettiva ?? "",
-      "Stato alla data di riferimento":
-        latestStateEvent?.tipoEvento === "SOSPENSIONE" &&
-        latestStateEvent.motivo === "dimissioni_cessazione"
-          ? "CESSATO"
-          : state.operativo
-            ? "ATTIVO"
-            : "NON ATTIVO",
-      "Motivo stato":
-        latestStateEvent?.tipoEvento === "SOSPENSIONE"
-          ? (latestStateEvent.motivo ?? state.motivoNonOperativo ?? "")
-          : (state.motivoNonOperativo ?? ""),
-      "Centro/Gruppo":
-        row.centroAscoltoNome ?? row.gruppoImportatoOriginale ?? "",
-      "Ruolo/Categoria":
-        row.ruoloCatalogoNome ?? row.categoriaImportataOriginale ?? row.ruolo,
-      "Scadenza assicurazione": state.scadenzaAssicurazione ?? "",
-      "Date servizio temporaneo": volunteerServiceDays.join(", "),
-      "Intervallo servizio temporaneo": serviceInterval,
-      "Data di riferimento": reference,
-      "Riferimento iscrizione": registration
-        ? `REG-${registration.progressivo}`
-        : "LEGACY-SENZA-EVENTO",
-    };
+async function officialRegisterRows(
+  rows: ExportRow[],
+  reference: string,
+  filters: Record<string, unknown>,
+  allowedCenterIds: number[] | null,
+) {
+  const servizioDa =
+    typeof filters.servizioDa === "string" ? filters.servizioDa : null;
+  const servizioA =
+    typeof filters.servizioA === "string" ? filters.servizioA : null;
+  const resolved = await resolveVolunteerRegisterStatesAt(rows, reference, {
+    servizioDa,
+    servizioA,
+    allowedCenterIds,
   });
+  const stateById = await operationalStatesForRows(db, rows, reference);
+  const tipo =
+    typeof filters.tipo === "string" ? filters.tipo.toUpperCase() : "TUTTI";
+  const stato =
+    typeof filters.stato === "string" ? filters.stato.toLowerCase() : "tutti";
+  const roleId =
+    filters.ruoloVolontarioId == null || filters.ruoloVolontarioId === ""
+      ? null
+      : Number(filters.ruoloVolontarioId);
+  const search =
+    typeof filters.search === "string"
+      ? filters.search.trim().toLocaleLowerCase("it")
+      : "";
+  const assicurazione =
+    typeof filters.assicurazione === "string"
+      ? filters.assicurazione.toUpperCase()
+      : "";
+  const filtered = resolved.filter((item) => {
+    const identity = item.identity;
+    if (
+      allowedCenterIds != null &&
+      (typeof identity.centroAscoltoId !== "number" ||
+        !allowedCenterIds.includes(identity.centroAscoltoId))
+    )
+      return false;
+    if (tipo !== "TUTTI" && identity.tipoVolontario !== tipo) return false;
+    if (stato === "attivi" && item.status !== "ATTIVO") return false;
+    if (stato === "non_attivi" && item.status === "ATTIVO") return false;
+    if (roleId != null && identity.ruoloVolontarioId !== roleId) return false;
+    if (
+      assicurazione &&
+      stateById.get(item.volontarioId)?.statoAssicurazione !== assicurazione
+    )
+      return false;
+    if (servizioDa || servizioA) {
+      if (identity.tipoVolontario !== "TEMPORANEO" || !item.serviceDays.length)
+        return false;
+    }
+    if (search) {
+      const haystack = [identity.nome, identity.cognome, identity.matricola]
+        .map((value) => String(value ?? "").toLocaleLowerCase("it"))
+        .join(" ");
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+  const incomplete = filtered.filter((item) => item.incomplete.length);
+  if (incomplete.length) {
+    const error = new Error("REGISTRO_VOLONTARI_INCOMPLETO") as Error & {
+      details?: unknown;
+    };
+    error.details = incomplete.map((item) => ({
+      volontarioId: item.volontarioId,
+      campi: item.incomplete,
+    }));
+    throw error;
+  }
+  return filtered
+    .sort((left, right) => left.progressivoRegistro - right.progressivoRegistro)
+    .map((item) => {
+      const identity = item.identity;
+      const operational = stateById.get(item.volontarioId);
+      const serviceInterval = item.serviceDays.length
+        ? `${item.serviceDays[0]} – ${item.serviceDays.at(-1)}`
+        : "";
+      return {
+        Progressivo: String(item.progressivoRegistro),
+        Matricola: String(identity.matricola ?? ""),
+        Cognome: String(identity.cognome ?? ""),
+        Nome: String(identity.nome ?? ""),
+        "Codice fiscale": String(identity.codiceFiscale ?? ""),
+        "Data di nascita": String(identity.dataNascita ?? ""),
+        "Luogo di nascita": String(identity.luogoNascita ?? ""),
+        Residenza: String(identity.indirizzoResidenza ?? ""),
+        Domicilio: String(identity.indirizzoDomicilio ?? ""),
+        "Tipo volontario": String(identity.tipoVolontario ?? ""),
+        "Data inizio attività/iscrizione": item.registrationDate ?? "",
+        "Origine iscrizione": item.origin,
+        "Da Data importata": String(identity.dataInizioImportata ?? ""),
+        "Data cessazione": item.cessationDate ?? "",
+        "Stato alla data di riferimento": item.status,
+        "Motivo stato": item.statusReason,
+        "Centro/Gruppo": String(identity.centroAscoltoNome ?? ""),
+        "Ruolo/Categoria": String(identity.ruoloNome ?? ""),
+        "Scadenza assicurazione": operational?.scadenzaAssicurazione ?? "",
+        "Date servizio temporaneo": item.serviceDays.join(", "),
+        "Intervallo servizio temporaneo": serviceInterval,
+        "Data di riferimento": reference,
+        "Riferimento iscrizione": item.registrationEventProgressive
+          ? `REG-${item.registrationEventProgressive}`
+          : `LEGACY-${item.progressivoRegistro}`,
+      };
+    });
 }
 
 function canReadFullLedger(req: Request): boolean {
@@ -538,7 +590,8 @@ router.post(
   "/volontari/registro/genera",
   requirePermission("logistica.volontari.export"),
   async (req, res) => {
-    const scoped = await scopedRows(req, params(req));
+    const appliedFilters = params(req);
+    const scoped = await scopedRows(req, appliedFilters, true);
     if (!scoped.ok) {
       res.status(scoped.status).json({ error: scoped.error });
       return;
@@ -548,7 +601,37 @@ router.post(
       res.status(400).json({ error: "Formato registro non valido" });
       return;
     }
-    const snapshot = await officialRegisterRows(scoped.rows, scoped.reference);
+    const areaId = callerAreaOperativaId(req);
+    const allowedCenterIds =
+      scoped.centerId != null
+        ? [scoped.centerId]
+        : areaId != null
+          ? (
+              await db
+                .select({ id: centriAscoltoTable.id })
+                .from(centriAscoltoTable)
+                .where(eq(centriAscoltoTable.areaOperativaId, areaId))
+            ).map((center) => center.id)
+          : null;
+    let snapshot: Awaited<ReturnType<typeof officialRegisterRows>>;
+    try {
+      snapshot = await officialRegisterRows(
+        scoped.rows,
+        scoped.reference,
+        appliedFilters,
+        allowedCenterIds,
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "REGISTRO_VOLONTARI_INCOMPLETO") {
+        res.status(422).json({
+          error: "Il registro contiene volontari privi dei dati storici obbligatori",
+          code: error.message,
+          dettagli: (error as Error & { details?: unknown }).details,
+        });
+        return;
+      }
+      throw error;
+    }
     const buffer =
       type === "PDF"
         ? buildSimpleLandscapePdf(
@@ -562,6 +645,7 @@ router.post(
         : buildOfficialVolunteerWorkbook(snapshot);
     const hashFile = createHash("sha256").update(buffer).digest("hex");
     const hashSnapshot = canonicalSnapshotHash(snapshot);
+    const ownerScope = await resolveVolunteerOwnerScope(req, scoped.centerId);
     const [emission] = await db.transaction(async (tx) => {
       const [created] = await tx
         .insert(emissioniRegistroVolontariTable)
@@ -572,6 +656,7 @@ router.post(
               ? String(req.body.filtri.tipo).toUpperCase()
               : null,
           centroAscoltoId: scoped.centerId,
+          ...ownerScope,
           filtri: params(req),
           dataRiferimento: scoped.reference,
           generatoDa: actorId(req),
@@ -593,6 +678,7 @@ router.post(
           numeroRighe: snapshot.length,
           hashFile,
           hashSnapshot,
+          scope: ownerScope,
         },
       });
       return [created];
@@ -621,6 +707,13 @@ router.get(
         tipo: emissioniRegistroVolontariTable.tipo,
         sezione: emissioniRegistroVolontariTable.sezione,
         centroAscoltoId: emissioniRegistroVolontariTable.centroAscoltoId,
+        scopeTipo: emissioniRegistroVolontariTable.scopeTipo,
+        scopeCentroId: emissioniRegistroVolontariTable.scopeCentroId,
+        scopeAreaOperativaId:
+          emissioniRegistroVolontariTable.scopeAreaOperativaId,
+        scopeCentroIdsSnapshot:
+          emissioniRegistroVolontariTable.scopeCentroIdsSnapshot,
+        scopeFingerprint: emissioniRegistroVolontariTable.scopeFingerprint,
         filtri: emissioniRegistroVolontariTable.filtri,
         dataRiferimento: emissioniRegistroVolontariTable.dataRiferimento,
         generatoDa: emissioniRegistroVolontariTable.generatoDa,
@@ -631,15 +724,15 @@ router.get(
         versioneLayout: emissioniRegistroVolontariTable.versioneLayout,
       })
       .from(emissioniRegistroVolontariTable)
+      .where(
+        volunteerOwnerScopeSql(req, {
+          scopeTipo: emissioniRegistroVolontariTable.scopeTipo,
+          scopeCentroId: emissioniRegistroVolontariTable.scopeCentroId,
+          scopeAreaOperativaId: emissioniRegistroVolontariTable.scopeAreaOperativaId,
+        }),
+      )
       .orderBy(desc(emissioniRegistroVolontariTable.generatoAt));
-    const visibleIds = await visibleCentroIds(callerAreaOperativaId(req));
-    res.json(
-      rows.filter(
-        (row) =>
-          canAccessCentro(row.centroAscoltoId, callerCentroId(req)) &&
-          inVisibleCentroSet(row.centroAscoltoId, visibleIds),
-      ),
-    );
+    res.json(rows);
   },
 );
 
@@ -658,13 +751,7 @@ router.get(
       res.status(404).json({ error: "Emissione non trovata" });
       return;
     }
-    if (
-      !canAccessCentro(row.centroAscoltoId, callerCentroId(req)) ||
-      !inVisibleCentroSet(
-        row.centroAscoltoId,
-        await visibleCentroIds(callerAreaOperativaId(req)),
-      )
-    ) {
+    if (!canAccessVolunteerOwnerScope(req, row)) {
       res.status(403).json({ error: "Emissione non accessibile" });
       return;
     }
@@ -704,24 +791,59 @@ router.get(
 );
 
 router.get(
+  "/volontari/registro/verifica-integrita",
+  requirePermission("logistica.volontari.manage"),
+  async (req, res) => {
+    if (!req.user?.isSuperAdmin) {
+      res.status(403).json({ error: "Funzione riservata al Super Admin" });
+      return;
+    }
+    const result = await verifyVolontarioLedgerChain();
+    await db.transaction((tx) =>
+      auditLogistica(tx, req, {
+        entita: "volontario",
+        id: 0,
+        azione: "verifica_integrita_ledger",
+        nuovo: result,
+      }),
+    );
+    res.status(result.valid ? 200 : 409).json(result);
+  },
+);
+
+router.get(
   "/volontari/registro/eventi",
   requirePermission("logistica.volontari.view"),
   async (req, res) => {
-    const visibleIds = await visibleCentroIds(callerAreaOperativaId(req));
+    const centerId = callerCentroId(req);
+    const areaId = callerAreaOperativaId(req);
+    const eventCenterIds =
+      centerId != null
+        ? [centerId]
+        : areaId != null
+          ? (
+              await db
+                .select({ id: centriAscoltoTable.id })
+                .from(centriAscoltoTable)
+                .where(eq(centriAscoltoTable.areaOperativaId, areaId))
+            ).map((center) => center.id)
+          : null;
     const rows = await db
       .select()
       .from(registroVolontariEventiTable)
+      .where(
+        eventCenterIds == null
+          ? undefined
+          : eventCenterIds.length
+            ? inArray(registroVolontariEventiTable.centroAscoltoId, eventCenterIds)
+            : sql`false`,
+      )
       .orderBy(desc(registroVolontariEventiTable.progressivo))
       .limit(500);
-    const scoped = rows.filter(
-      (row) =>
-        canAccessCentro(row.centroAscoltoId, callerCentroId(req)) &&
-        inVisibleCentroSet(row.centroAscoltoId, visibleIds),
-    );
     res.json(
       canReadFullLedger(req)
-        ? scoped
-        : scoped.map((row) => ({
+        ? rows
+        : rows.map((row) => ({
             ...row,
             snapshot: sanitizedLedgerSnapshot(row.snapshot),
           })),
@@ -756,15 +878,55 @@ router.post(
     }
     const motivo =
       typeof req.body?.motivo === "string" ? req.body.motivo.trim() : "";
-    if (
-      !motivo ||
-      !req.body?.snapshot ||
-      typeof req.body.snapshot !== "object" ||
-      Array.isArray(req.body.snapshot)
-    ) {
+    const requestedCorrections = req.body?.rettifiche;
+    if (!motivo || !Array.isArray(requestedCorrections) || !requestedCorrections.length || requestedCorrections.length > 20) {
       res
         .status(400)
-        .json({ error: "Motivo e snapshot di rettifica sono obbligatori" });
+        .json({ error: "Motivo e rettifiche strutturate sono obbligatori" });
+      return;
+    }
+    const corrections: StructuredVolunteerRegisterCorrection[] = [];
+    for (const item of requestedCorrections) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        res.status(400).json({ error: "Rettifica non valida" });
+        return;
+      }
+      const value = item as Record<string, unknown>;
+      if (
+        typeof value.campo !== "string" ||
+        !VOLUNTEER_REGISTER_CORRECTION_FIELDS.includes(
+          value.campo as (typeof VOLUNTEER_REGISTER_CORRECTION_FIELDS)[number],
+        ) ||
+        (value.nuovoValore != null &&
+          typeof value.nuovoValore !== "string" &&
+          typeof value.nuovoValore !== "number")
+      ) {
+        res.status(400).json({ error: "Campo o valore di rettifica non ammesso" });
+        return;
+      }
+      const previous = event.snapshot[value.campo];
+      if (JSON.stringify(value.valorePrecedente ?? null) !== JSON.stringify(previous ?? null)) {
+        res.status(409).json({
+          error: `Il valore precedente di ${value.campo} non coincide con l'evento`,
+          code: "RETTIFICA_VALORE_PRECEDENTE_NON_CORRISPONDENTE",
+        });
+        return;
+      }
+      corrections.push({
+        campo: value.campo as StructuredVolunteerRegisterCorrection["campo"],
+        valorePrecedente: (value.valorePrecedente ?? null) as string | number | null,
+        nuovoValore: (value.nuovoValore ?? null) as string | number | null,
+      });
+    }
+    const requestedEffectiveDate = req.body?.dataEffettiva ?? todayRome();
+    if (
+      typeof requestedEffectiveDate !== "string" ||
+      !isDateOnly(requestedEffectiveDate) ||
+      requestedEffectiveDate < event.dataEffettiva
+    ) {
+      res.status(400).json({
+        error: "La data di efficacia non può precedere l'evento rettificato",
+      });
       return;
     }
     const corrected = await db.transaction(async (tx) => {
@@ -774,10 +936,7 @@ router.post(
         .where(eq(volontariTable.id, event.volontarioId))
         .limit(1);
       if (!volunteer) throw new Error("VOLUNTEER_NOT_FOUND");
-      const dataEffettiva =
-        req.body?.dataEffettiva && isDateOnly(req.body.dataEffettiva)
-          ? req.body.dataEffettiva
-          : todayRome();
+      const dataEffettiva = requestedEffectiveDate;
       const correction = await appendVolontarioLedgerEvent(tx, {
         sezione: event.sezione as "PERMANENTE" | "TEMPORANEO",
         tipoEvento: "RETTIFICA",
@@ -793,7 +952,7 @@ router.post(
           motivo,
           dataEffettiva,
           riferimentoEventoId: event.id,
-          datiEvento: { datiRettificati: req.body.snapshot },
+          datiEvento: { rettifiche: corrections },
         }),
         eventoRettificatoId: event.id,
         utenteId: actorId(req),
@@ -806,6 +965,7 @@ router.post(
         nuovo: {
           eventoRettificaId: correction.id,
           motivo,
+          rettifiche: corrections,
           hashEvento: correction.hashEvento,
         },
       });

@@ -14,6 +14,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { utentiTable } from "./auth";
+import { areeOperativeTable } from "./areeOperative";
 import { centriAscoltoTable } from "./centri";
 import { ruoliVolontariTable } from "./ruoliVolontari";
 import { volontariTable } from "./volontari";
@@ -304,6 +305,145 @@ export const qualificheDeiVolontariTable = pgTable(
   ],
 );
 
+export const configurazioniMatricoleVolontariTable = pgTable(
+  "configurazioni_matricole_volontari",
+  {
+    id: serial("id").primaryKey(),
+    scopeTipo: varchar("scope_tipo", { length: 16 }).notNull().default("GLOBALE"),
+    versione: integer("versione").notNull(),
+    prefissoAssociazione: varchar("prefisso_associazione", { length: 12 }),
+    includiCodiceArea: boolean("includi_codice_area").notNull().default(true),
+    segmentoFisso: varchar("segmento_fisso", { length: 8 }),
+    separatore: varchar("separatore", { length: 1 }).notNull().default("-"),
+    cifreProgressivo: integer("cifre_progressivo").notNull().default(3),
+    numeroIniziale: integer("numero_iniziale").notNull().default(1),
+    ambitoProgressivo: varchar("ambito_progressivo", { length: 16 })
+      .notNull()
+      .default("PER_AREA"),
+    attiva: boolean("attiva").notNull().default(true),
+    aggiornataDa: integer("aggiornata_da").references(() => utentiTable.id, {
+      onDelete: "set null",
+    }),
+    dataCreazione: auditTimestamp("data_creazione"),
+    dataAggiornamento: auditTimestamp("data_aggiornamento"),
+  },
+  (table) => [
+    uniqueIndex("config_matricole_versione_unique").on(table.versione),
+    uniqueIndex("config_matricole_attiva_scope_unique")
+      .on(table.scopeTipo)
+      .where(sql`${table.attiva} = true`),
+    check("config_matricole_scope_check", sql`${table.scopeTipo} = 'GLOBALE'`),
+    check(
+      "config_matricole_separatore_check",
+      sql`${table.separatore} in ('','-','/')`,
+    ),
+    check(
+      "config_matricole_cifre_check",
+      sql`${table.cifreProgressivo} between 2 and 8`,
+    ),
+    check(
+      "config_matricole_iniziale_check",
+      sql`${table.numeroIniziale} > 0`,
+    ),
+    check(
+      "config_matricole_ambito_check",
+      sql`${table.ambitoProgressivo} in ('GLOBALE','PER_AREA')`,
+    ),
+  ],
+);
+
+export const progressiviMatricoleVolontariTable = pgTable(
+  "progressivi_matricole_volontari",
+  {
+    id: serial("id").primaryKey(),
+    configurazioneId: integer("configurazione_id")
+      .notNull()
+      .references(() => configurazioniMatricoleVolontariTable.id, {
+        onDelete: "restrict",
+      }),
+    scopeTipo: varchar("scope_tipo", { length: 16 }).notNull(),
+    scopeKey: varchar("scope_key", { length: 80 }).notNull(),
+    areaOperativaId: integer("area_operativa_id").references(
+      () => areeOperativeTable.id,
+      { onDelete: "restrict" },
+    ),
+    ultimoNumero: integer("ultimo_numero").notNull(),
+    versione: integer("versione").notNull().default(1),
+    dataAggiornamento: auditTimestamp("data_aggiornamento"),
+  },
+  (table) => [
+    uniqueIndex("progressivi_matricole_config_scope_unique").on(
+      table.configurazioneId,
+      table.scopeKey,
+    ),
+    check(
+      "progressivi_matricole_scope_check",
+      sql`${table.scopeTipo} in ('GLOBALE','AREA')`,
+    ),
+    check("progressivi_matricole_numero_check", sql`${table.ultimoNumero} > 0`),
+  ],
+);
+
+export const matricoleVolontariTable = pgTable(
+  "matricole_volontari",
+  {
+    id: serial("id").primaryKey(),
+    volontarioId: integer("volontario_id")
+      .notNull()
+      .references(() => volontariTable.id, { onDelete: "restrict" }),
+    matricola: varchar("matricola", { length: 40 }).notNull(),
+    matricolaNormalizzata: varchar("matricola_normalizzata", { length: 40 })
+      .notNull(),
+    tipoIdentificativo: varchar("tipo_identificativo", { length: 16 }).notNull(),
+    stato: varchar("stato", { length: 16 }).notNull(),
+    origine: varchar("origine", { length: 16 }).notNull(),
+    dataInizioValidita: date("data_inizio_validita").notNull(),
+    dataFineValidita: date("data_fine_validita"),
+    assegnataDa: integer("assegnata_da").references(() => utentiTable.id, {
+      onDelete: "set null",
+    }),
+    configurazioneId: integer("configurazione_id").references(
+      () => configurazioniMatricoleVolontariTable.id,
+      { onDelete: "restrict" },
+    ),
+    configurazioneVersione: integer("configurazione_versione"),
+    snapshotRegola: jsonb("snapshot_regola")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    noteTecniche: varchar("note_tecniche", { length: 240 }),
+    dataAssegnazione: auditTimestamp("data_assegnazione"),
+  },
+  (table) => [
+    uniqueIndex("matricole_volontari_normalizzata_unique").on(
+      table.matricolaNormalizzata,
+    ),
+    uniqueIndex("matricole_volontari_attiva_unique")
+      .on(table.volontarioId)
+      .where(sql`${table.stato} = 'ATTIVA'`),
+    index("matricole_volontari_volontario_idx").on(
+      table.volontarioId,
+      table.dataInizioValidita,
+    ),
+    check(
+      "matricole_volontari_tipo_check",
+      sql`${table.tipoIdentificativo} in ('TEMPORANEA','PERMANENTE','LEGACY')`,
+    ),
+    check(
+      "matricole_volontari_stato_check",
+      sql`${table.stato} in ('ATTIVA','STORICA')`,
+    ),
+    check(
+      "matricole_volontari_origine_check",
+      sql`${table.origine} in ('GENERATA','IMPORTATA','CONVERSIONE','BACKFILL')`,
+    ),
+    check(
+      "matricole_volontari_validita_check",
+      sql`${table.dataFineValidita} is null or ${table.dataFineValidita} >= ${table.dataInizioValidita}`,
+    ),
+  ],
+);
+
 export const importazioniVolontariTable = pgTable(
   "importazioni_volontari",
   {
@@ -316,10 +456,25 @@ export const importazioniVolontariTable = pgTable(
       length: 64,
     }).notNull(),
     chiaveIdempotenza: varchar("chiave_idempotenza", { length: 64 }),
+    hashDecisioniFinali: varchar("hash_decisioni_finali", { length: 64 }),
     centroAscoltoId: integer("centro_ascolto_id").references(
       () => centriAscoltoTable.id,
       { onDelete: "restrict" },
     ),
+    scopeTipo: varchar("scope_tipo", { length: 16 }).notNull(),
+    scopeCentroId: integer("scope_centro_id").references(
+      () => centriAscoltoTable.id,
+      { onDelete: "restrict" },
+    ),
+    scopeAreaOperativaId: integer("scope_area_operativa_id").references(
+      () => areeOperativeTable.id,
+      { onDelete: "restrict" },
+    ),
+    scopeCentroIdsSnapshot: jsonb("scope_centro_ids_snapshot")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    scopeFingerprint: varchar("scope_fingerprint", { length: 64 }).notNull(),
     stato: varchar("stato", { length: 20 }).notNull().default("ANALIZZATO"),
     numeroRighe: integer("numero_righe").notNull().default(0),
     creati: integer("creati").notNull().default(0),
@@ -339,6 +494,12 @@ export const importazioniVolontariTable = pgTable(
   (table) => [
     index("importazioni_volontari_hash_idx").on(table.sha256File),
     index("importazioni_volontari_scope_idx").on(table.centroAscoltoId),
+    index("importazioni_volontari_scope_owner_idx").on(
+      table.scopeTipo,
+      table.scopeCentroId,
+      table.scopeAreaOperativaId,
+      table.id,
+    ),
     uniqueIndex("importazioni_volontari_confermate_idempotenza_unique")
       .on(table.chiaveIdempotenza)
       .where(
@@ -351,6 +512,18 @@ export const importazioniVolontariTable = pgTable(
     check(
       "importazioni_volontari_sha_check",
       sql`${table.sha256File} ~ '^[0-9a-f]{64}$' and ${table.hashContenutoNormalizzato} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "importazioni_volontari_scope_tipo_check",
+      sql`(
+        (${table.scopeTipo} = 'CENTRO' and ${table.scopeCentroId} is not null)
+        or (${table.scopeTipo} = 'AREA' and ${table.scopeCentroId} is null and ${table.scopeAreaOperativaId} is not null)
+        or (${table.scopeTipo} = 'GLOBALE' and ${table.scopeCentroId} is null and ${table.scopeAreaOperativaId} is null)
+      )`,
+    ),
+    check(
+      "importazioni_volontari_scope_fingerprint_check",
+      sql`${table.scopeFingerprint} ~ '^[0-9a-f]{64}$'`,
     ),
   ],
 );
@@ -371,6 +544,12 @@ export const importazioniVolontariRigheTable = pgTable(
       () => volontariTable.id,
       { onDelete: "set null" },
     ),
+    versioneCandidato: integer("versione_candidato"),
+    fingerprintCandidato: varchar("fingerprint_candidato", { length: 64 }),
+    fingerprintMappingPreview: varchar("fingerprint_mapping_preview", {
+      length: 64,
+    }),
+    dataAnalisi: auditTimestamp("data_analisi"),
     ruoloPropostoId: integer("ruolo_proposto_id").references(
       () => ruoliVolontariTable.id,
       { onDelete: "set null" },
@@ -437,7 +616,7 @@ export const registroVolontariEventiTable = pgTable(
     ),
     check(
       "registro_volontari_evento_check",
-      sql`${table.tipoEvento} in ('REGISTRAZIONE','SOSPENSIONE_CESSAZIONE','RIATTIVAZIONE','GIORNATA_TEMPORANEA','RETTIFICA')`,
+      sql`${table.tipoEvento} in ('REGISTRAZIONE','SOSPENSIONE_CESSAZIONE','RIATTIVAZIONE','GIORNATA_TEMPORANEA','CONVERSIONE_PERMANENTE','AGGIORNAMENTO_ANAGRAFICA','RETTIFICA')`,
     ),
   ],
 );
@@ -452,6 +631,20 @@ export const emissioniRegistroVolontariTable = pgTable(
       () => centriAscoltoTable.id,
       { onDelete: "restrict" },
     ),
+    scopeTipo: varchar("scope_tipo", { length: 16 }).notNull(),
+    scopeCentroId: integer("scope_centro_id").references(
+      () => centriAscoltoTable.id,
+      { onDelete: "restrict" },
+    ),
+    scopeAreaOperativaId: integer("scope_area_operativa_id").references(
+      () => areeOperativeTable.id,
+      { onDelete: "restrict" },
+    ),
+    scopeCentroIdsSnapshot: jsonb("scope_centro_ids_snapshot")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    scopeFingerprint: varchar("scope_fingerprint", { length: 64 }).notNull(),
     filtri: jsonb("filtri").$type<Record<string, unknown>>().notNull(),
     dataRiferimento: date("data_riferimento").notNull(),
     generatoDa: integer("generato_da").references(() => utentiTable.id, {
@@ -468,6 +661,12 @@ export const emissioniRegistroVolontariTable = pgTable(
   (table) => [
     index("emissioni_registro_data_idx").on(table.dataRiferimento, table.generatoAt),
     index("emissioni_registro_scope_idx").on(table.centroAscoltoId),
+    index("emissioni_registro_scope_owner_idx").on(
+      table.scopeTipo,
+      table.scopeCentroId,
+      table.scopeAreaOperativaId,
+      table.generatoAt,
+    ),
     check(
       "emissioni_registro_tipo_check",
       sql`${table.tipo} in ('PDF','XLSX')`,
@@ -475,6 +674,18 @@ export const emissioniRegistroVolontariTable = pgTable(
     check(
       "emissioni_registro_hash_check",
       sql`${table.hashFile} ~ '^[0-9a-f]{64}$' and ${table.hashSnapshot} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "emissioni_registro_scope_tipo_check",
+      sql`(
+        (${table.scopeTipo} = 'CENTRO' and ${table.scopeCentroId} is not null)
+        or (${table.scopeTipo} = 'AREA' and ${table.scopeCentroId} is null and ${table.scopeAreaOperativaId} is not null)
+        or (${table.scopeTipo} = 'GLOBALE' and ${table.scopeCentroId} is null and ${table.scopeAreaOperativaId} is null)
+      )`,
+    ),
+    check(
+      "emissioni_registro_scope_fingerprint_check",
+      sql`${table.scopeFingerprint} ~ '^[0-9a-f]{64}$'`,
     ),
   ],
 );

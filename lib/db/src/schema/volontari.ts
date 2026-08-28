@@ -1,9 +1,13 @@
 import { sql } from "drizzle-orm";
-import { pgTable, serial, varchar, text, boolean, timestamp, integer, uniqueIndex, index, date, check } from "drizzle-orm/pg-core";
+import { pgSequence, pgTable, serial, varchar, text, boolean, timestamp, integer, uniqueIndex, index, date, check } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { centriAscoltoTable } from "./centri";
 import { ruoliVolontariTable } from "./ruoliVolontari";
+
+export const registroVolontariProgressivoSequence = pgSequence(
+  "registro_volontari_progressivo_seq",
+);
 
 export const volontariTable = pgTable(
   "volontari",
@@ -20,8 +24,17 @@ export const volontariTable = pgTable(
     luogoNascita: varchar("luogo_nascita", { length: 120 }),
     dataNascita: date("data_nascita"),
     indirizzoResidenza: varchar("indirizzo_residenza", { length: 240 }),
+    indirizzoDomicilio: varchar("indirizzo_domicilio", { length: 240 }),
     codiceFiscale: varchar("codice_fiscale", { length: 32 }),
     codiceFiscaleNormalizzato: varchar("codice_fiscale_normalizzato", { length: 32 }),
+    codiceFiscaleNonDisponibile: boolean("codice_fiscale_non_disponibile")
+      .notNull()
+      .default(false),
+    codiceFiscaleNota: varchar("codice_fiscale_nota", { length: 240 }),
+    dataIscrizione: date("data_iscrizione"),
+    progressivoRegistro: integer("progressivo_registro")
+      .notNull()
+      .default(sql`nextval('registro_volontari_progressivo_seq')`),
     dataInizioImportata: date("data_inizio_importata"),
     categoriaImportataOriginale: varchar("categoria_importata_originale", { length: 160 }),
     gruppoImportatoOriginale: varchar("gruppo_importato_originale", { length: 160 }),
@@ -42,7 +55,12 @@ export const volontariTable = pgTable(
   },
   (table) => [
     uniqueIndex("volontari_matricola_unique").on(table.matricola),
-    index("volontari_codice_fiscale_norm_idx").on(table.codiceFiscaleNormalizzato),
+    uniqueIndex("volontari_codice_fiscale_norm_unique")
+      .on(table.codiceFiscaleNormalizzato)
+      .where(sql`${table.codiceFiscaleNormalizzato} is not null`),
+    uniqueIndex("volontari_progressivo_registro_unique").on(
+      table.progressivoRegistro,
+    ),
     index("volontari_tipo_idx").on(table.tipoVolontario),
     check(
       "volontari_tipo_check",

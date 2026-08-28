@@ -5,13 +5,10 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioUpdateTipoVolontario } from './volontarioUpdateTipoVolontario';
 
 export interface VolontarioUpdate {
   nome?: string;
   cognome?: string;
-  matricola?: string;
-  tipoVolontario?: VolontarioUpdateTipoVolontario;
   /** @nullable */
   centroAscoltoId?: number | null;
   telefono?: string;
@@ -20,7 +17,10 @@ export interface VolontarioUpdate {
   luogoNascita?: string;
   dataNascita?: Date;
   indirizzoResidenza?: string;
+  indirizzoDomicilio?: string;
   codiceFiscale?: string;
+  codiceFiscaleNonDisponibile?: boolean;
+  codiceFiscaleNota?: string;
   /** @minimum 1 */
   ruoloVolontarioId?: number;
   patente?: boolean;

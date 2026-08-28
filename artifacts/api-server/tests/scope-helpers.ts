@@ -42,6 +42,8 @@ import {
   emissioniRegistroVolontariTable,
   giornateServizioVolontariTable,
   importazioniVolontariTable,
+  matricoleVolontariTable,
+  progressiviMatricoleVolontariTable,
   qualificheDeiVolontariTable,
   registroVolontariEventiTable,
   statiVolontariTable,
@@ -194,6 +196,8 @@ export interface SeedScope {
   turnoIds: number[];
   zonaIds: number[];
   areaOperativaIds: number[];
+  emissioneRegistroIds: number[];
+  importazioneVolontariIds: number[];
 }
 
 export function newScope(): SeedScope {
@@ -219,6 +223,8 @@ export function newScope(): SeedScope {
     turnoIds: [],
     zonaIds: [],
     areaOperativaIds: [],
+    emissioneRegistroIds: [],
+    importazioneVolontariIds: [],
   };
 }
 
@@ -316,9 +322,13 @@ export async function createBeneficiario(
 }
 
 export async function createAreaOperativa(scope: SeedScope): Promise<number> {
+  const codiceMatricola = rnd().toUpperCase();
   const [c] = await db
     .insert(areeOperativeTable)
-    .values({ nome: `AreaOperativa ${rnd()}` })
+    .values({
+      nome: `AreaOperativa ${rnd()}`,
+      codiceMatricola,
+    })
     .returning({ id: areeOperativeTable.id });
   scope.areaOperativaIds.push(c.id);
   return c.id;
@@ -740,6 +750,23 @@ export async function insertMovimento(
 
 /** Deletes every row created under this scope, in FK-safe (child→parent) order. */
 export async function cleanup(scope: SeedScope): Promise<void> {
+  if (scope.emissioneRegistroIds.length > 0) {
+    await db
+      .delete(emissioniRegistroVolontariTable)
+      .where(
+        inArray(
+          emissioniRegistroVolontariTable.id,
+          scope.emissioneRegistroIds,
+        ),
+      );
+  }
+  if (scope.importazioneVolontariIds.length > 0) {
+    await db
+      .delete(importazioniVolontariTable)
+      .where(
+        inArray(importazioniVolontariTable.id, scope.importazioneVolontariIds),
+      );
+  }
   const linkedConsegne =
     scope.beneficiarioIds.length > 0
       ? await db
@@ -914,6 +941,17 @@ export async function cleanup(scope: SeedScope): Promise<void> {
         sql`ALTER TABLE registro_volontari_eventi ENABLE TRIGGER registro_volontari_append_only_trg`,
       );
     }
+    await db.transaction(async (tx) => {
+      // Lo storico matricole è immutable in applicazione. Nei test abilitiamo
+      // la replica mode solo nella transazione di teardown, evitando di
+      // disabilitare globalmente il trigger durante l'esecuzione parallela.
+      await tx.execute(sql`SET LOCAL session_replication_role = 'replica'`);
+      await tx
+        .delete(matricoleVolontariTable)
+        .where(
+          inArray(matricoleVolontariTable.volontarioId, scope.volontarioIds),
+        );
+    });
     await db
       .delete(volontariTable)
       .where(inArray(volontariTable.id, scope.volontarioIds));
@@ -971,6 +1009,14 @@ export async function cleanup(scope: SeedScope): Promise<void> {
       .where(inArray(zoneUdsTable.id, scope.zonaIds));
   }
   if (scope.areaOperativaIds.length > 0) {
+    await db
+      .delete(progressiviMatricoleVolontariTable)
+      .where(
+        inArray(
+          progressiviMatricoleVolontariTable.areaOperativaId,
+          scope.areaOperativaIds,
+        ),
+      );
     await db
       .delete(areeOperativeTable)
       .where(inArray(areeOperativeTable.id, scope.areaOperativaIds));

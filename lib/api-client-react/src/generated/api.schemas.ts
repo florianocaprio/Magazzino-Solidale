@@ -1033,17 +1033,19 @@ export const VolontarioInputTipoVolontario = {
 export interface VolontarioInput {
   nome: string;
   cognome: string;
-  matricola: string;
   tipoVolontario?: VolontarioInputTipoVolontario;
   /** @nullable */
   centroAscoltoId?: number | null;
   telefono?: string;
   telefonoSecondario?: string;
   email?: string;
-  luogoNascita?: string;
-  dataNascita?: string;
-  indirizzoResidenza?: string;
+  luogoNascita: string;
+  dataNascita: string;
+  indirizzoResidenza: string;
+  indirizzoDomicilio?: string;
   codiceFiscale?: string;
+  codiceFiscaleNonDisponibile?: boolean;
+  codiceFiscaleNota?: string;
   /** @minimum 1 */
   ruoloVolontarioId: number;
   patente?: boolean;
@@ -2449,7 +2451,6 @@ export interface TurnoVolontarioPendingInput {
   centroAscoltoId: number;
   nome: string;
   cognome: string;
-  matricola: string;
   telefono?: string;
   email?: string;
   ruolo?: string;
@@ -3787,6 +3788,8 @@ export interface AreaOperativa {
   provincia?: string | null;
   /** @nullable */
   sigla?: string | null;
+  /** @nullable */
+  codiceMatricola?: string | null;
   attivo: boolean;
   /** @nullable */
   note?: string | null;
@@ -3799,6 +3802,11 @@ export interface AreaOperativaInput {
   provincia?: string;
   /** @maxLength 2 */
   sigla?: string;
+  /**
+     * @maxLength 8
+     * @pattern ^[A-Za-z0-9]+$
+     */
+  codiceMatricola?: string;
   attivo?: boolean;
   note?: string;
 }
@@ -3809,6 +3817,11 @@ export interface AreaOperativaUpdate {
   provincia?: string;
   /** @maxLength 2 */
   sigla?: string;
+  /**
+     * @maxLength 8
+     * @pattern ^[A-Za-z0-9]+$
+     */
+  codiceMatricola?: string;
   attivo?: boolean;
   note?: string;
 }
@@ -5973,6 +5986,111 @@ export interface BollaUpdate {
   noteConsegna?: string | null;
 }
 
+export type ConfigurazioneMatricoleVolontariScopeTipo = typeof ConfigurazioneMatricoleVolontariScopeTipo[keyof typeof ConfigurazioneMatricoleVolontariScopeTipo];
+
+
+export const ConfigurazioneMatricoleVolontariScopeTipo = {
+  GLOBALE: 'GLOBALE',
+} as const;
+
+export type ConfigurazioneMatricoleVolontariSeparatore = typeof ConfigurazioneMatricoleVolontariSeparatore[keyof typeof ConfigurazioneMatricoleVolontariSeparatore];
+
+
+export const ConfigurazioneMatricoleVolontariSeparatore = {
+  '': '',
+  '-': '-',
+  '/': '/',
+} as const;
+
+export type ConfigurazioneMatricoleVolontariAmbitoProgressivo = typeof ConfigurazioneMatricoleVolontariAmbitoProgressivo[keyof typeof ConfigurazioneMatricoleVolontariAmbitoProgressivo];
+
+
+export const ConfigurazioneMatricoleVolontariAmbitoProgressivo = {
+  GLOBALE: 'GLOBALE',
+  PER_AREA: 'PER_AREA',
+} as const;
+
+export interface ConfigurazioneMatricoleVolontari {
+  id: number;
+  scopeTipo: ConfigurazioneMatricoleVolontariScopeTipo;
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @maxLength 12
+     * @nullable
+     */
+  prefissoAssociazione?: string | null;
+  includiCodiceArea: boolean;
+  /**
+     * @maxLength 8
+     * @nullable
+     */
+  segmentoFisso?: string | null;
+  separatore: ConfigurazioneMatricoleVolontariSeparatore;
+  /**
+     * @minimum 2
+     * @maximum 8
+     */
+  cifreProgressivo: number;
+  /** @minimum 1 */
+  numeroIniziale: number;
+  ambitoProgressivo: ConfigurazioneMatricoleVolontariAmbitoProgressivo;
+  attiva: boolean;
+  /** @nullable */
+  aggiornataDa?: number | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export type ConfigurazioneMatricoleVolontariInputSeparatore = typeof ConfigurazioneMatricoleVolontariInputSeparatore[keyof typeof ConfigurazioneMatricoleVolontariInputSeparatore];
+
+
+export const ConfigurazioneMatricoleVolontariInputSeparatore = {
+  '': '',
+  '-': '-',
+  '/': '/',
+} as const;
+
+export type ConfigurazioneMatricoleVolontariInputAmbitoProgressivo = typeof ConfigurazioneMatricoleVolontariInputAmbitoProgressivo[keyof typeof ConfigurazioneMatricoleVolontariInputAmbitoProgressivo];
+
+
+export const ConfigurazioneMatricoleVolontariInputAmbitoProgressivo = {
+  GLOBALE: 'GLOBALE',
+  PER_AREA: 'PER_AREA',
+} as const;
+
+export interface ConfigurazioneMatricoleVolontariInput {
+  /**
+     * @maxLength 12
+     * @nullable
+     * @pattern ^[A-Za-z0-9]*$
+     */
+  prefissoAssociazione?: string | null;
+  includiCodiceArea: boolean;
+  /**
+     * @maxLength 8
+     * @nullable
+     * @pattern ^[A-Za-z0-9]*$
+     */
+  segmentoFisso?: string | null;
+  separatore: ConfigurazioneMatricoleVolontariInputSeparatore;
+  /**
+     * @minimum 2
+     * @maximum 8
+     */
+  cifreProgressivo: number;
+  /** @minimum 1 */
+  numeroIniziale: number;
+  ambitoProgressivo: ConfigurazioneMatricoleVolontariInputAmbitoProgressivo;
+}
+
+export interface ConfigurazioneMatricoleVolontariResponse {
+  configurazione: ConfigurazioneMatricoleVolontari | null;
+  /** @nullable */
+  esempio: string | null;
+  storico?: ConfigurazioneMatricoleVolontari[];
+}
+
 export type VolontarioTipoVolontario = typeof VolontarioTipoVolontario[keyof typeof VolontarioTipoVolontario];
 
 
@@ -6025,7 +6143,15 @@ export interface Volontario {
   /** @nullable */
   indirizzoResidenza?: string | null;
   /** @nullable */
+  indirizzoDomicilio?: string | null;
+  /** @nullable */
   codiceFiscale?: string | null;
+  codiceFiscaleNonDisponibile: boolean;
+  /** @nullable */
+  codiceFiscaleNota?: string | null;
+  /** @nullable */
+  dataIscrizione?: string | null;
+  progressivoRegistro: number;
   /** @nullable */
   dataInizioImportata?: string | null;
   /** @nullable */
@@ -6062,19 +6188,9 @@ export interface Volontario {
   dataAggiornamento: string;
 }
 
-export type VolontarioUpdateTipoVolontario = typeof VolontarioUpdateTipoVolontario[keyof typeof VolontarioUpdateTipoVolontario];
-
-
-export const VolontarioUpdateTipoVolontario = {
-  PERMANENTE: 'PERMANENTE',
-  TEMPORANEO: 'TEMPORANEO',
-} as const;
-
 export interface VolontarioUpdate {
   nome?: string;
   cognome?: string;
-  matricola?: string;
-  tipoVolontario?: VolontarioUpdateTipoVolontario;
   /** @nullable */
   centroAscoltoId?: number | null;
   telefono?: string;
@@ -6083,7 +6199,10 @@ export interface VolontarioUpdate {
   luogoNascita?: string;
   dataNascita?: string;
   indirizzoResidenza?: string;
+  indirizzoDomicilio?: string;
   codiceFiscale?: string;
+  codiceFiscaleNonDisponibile?: boolean;
+  codiceFiscaleNota?: string;
   /** @minimum 1 */
   ruoloVolontarioId?: number;
   patente?: boolean;
@@ -6094,6 +6213,75 @@ export interface VolontarioUpdate {
   note?: string;
   /** @minimum 1 */
   versione: number;
+}
+
+export type VolontarioIdentifierTipoIdentificativo = typeof VolontarioIdentifierTipoIdentificativo[keyof typeof VolontarioIdentifierTipoIdentificativo];
+
+
+export const VolontarioIdentifierTipoIdentificativo = {
+  TEMPORANEA: 'TEMPORANEA',
+  PERMANENTE: 'PERMANENTE',
+  LEGACY: 'LEGACY',
+} as const;
+
+export type VolontarioIdentifierStato = typeof VolontarioIdentifierStato[keyof typeof VolontarioIdentifierStato];
+
+
+export const VolontarioIdentifierStato = {
+  ATTIVA: 'ATTIVA',
+  STORICA: 'STORICA',
+} as const;
+
+export type VolontarioIdentifierOrigine = typeof VolontarioIdentifierOrigine[keyof typeof VolontarioIdentifierOrigine];
+
+
+export const VolontarioIdentifierOrigine = {
+  GENERATA: 'GENERATA',
+  IMPORTATA: 'IMPORTATA',
+  CONVERSIONE: 'CONVERSIONE',
+  BACKFILL: 'BACKFILL',
+} as const;
+
+export interface VolontarioIdentifier {
+  id: number;
+  matricola: string;
+  tipoIdentificativo: VolontarioIdentifierTipoIdentificativo;
+  stato: VolontarioIdentifierStato;
+  origine: VolontarioIdentifierOrigine;
+  dataInizioValidita: string;
+  /** @nullable */
+  dataFineValidita?: string | null;
+  dataAssegnazione: string;
+}
+
+export interface PermanentVolunteerIdentifierPreview {
+  matricola: string;
+  matricolaNormalizzata: string;
+  /** @minimum 1 */
+  configurazioneId: number;
+  /** @minimum 1 */
+  configurazioneVersione: number;
+  scopeKey: string;
+  /** @minimum 0 */
+  versioneProgressivo: number;
+  /** @minimum 1 */
+  prossimoNumero: number;
+}
+
+export interface VolontarioPermanentConversionPreviewResponse {
+  volontarioId: number;
+  /** @minimum 1 */
+  versioneVolontario: number;
+  /** @nullable */
+  matricolaAttuale: string | null;
+  dataConversione: string;
+  preview: PermanentVolunteerIdentifierPreview;
+}
+
+export interface VolontarioPermanentConversionInput {
+  /** @minimum 1 */
+  versioneVolontario: number;
+  preview: PermanentVolunteerIdentifierPreview;
 }
 
 export type VolontarioOperationalStateStatoAssicurazione = typeof VolontarioOperationalStateStatoAssicurazione[keyof typeof VolontarioOperationalStateStatoAssicurazione];
@@ -6278,6 +6466,15 @@ export interface VolontarioServiceDayUpdateInput {
   note?: string;
 }
 
+export type VolontariImportPreviewScopeTipo = typeof VolontariImportPreviewScopeTipo[keyof typeof VolontariImportPreviewScopeTipo];
+
+
+export const VolontariImportPreviewScopeTipo = {
+  CENTRO: 'CENTRO',
+  AREA: 'AREA',
+  GLOBALE: 'GLOBALE',
+} as const;
+
 export type VolontariImportPreviewRigheItem = { [key: string]: unknown };
 
 export interface VolontariImportPreview {
@@ -6290,6 +6487,13 @@ export interface VolontariImportPreview {
   sha256File: string;
   /** Hash canonico del contenuto normalizzato usato con il perimetro per l'idempotenza semantica. */
   hashContenutoNormalizzato: string;
+  scopeTipo?: VolontariImportPreviewScopeTipo;
+  /** @nullable */
+  scopeCentroId?: number | null;
+  /** @nullable */
+  scopeAreaOperativaId?: number | null;
+  scopeCentroIdsSnapshot?: number[];
+  scopeFingerprint?: string;
   /** SHA-256 del file appena ricevuto quando la risposta è un replay semantico. */
   sha256FileRichiesto?: string;
   /** SHA-256 binario dell'importazione confermata originaria quando la risposta è un replay. */
@@ -6299,7 +6503,51 @@ export interface VolontariImportPreview {
   righe: VolontariImportPreviewRigheItem[];
 }
 
-export type VolontariImportConfirmInputRigheItemCorrezioni = { [key: string]: unknown };
+/**
+ * @nullable
+ */
+export type VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario = typeof VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario[keyof typeof VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario] | null;
+
+
+export const VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario = {
+  PERMANENTE: 'PERMANENTE',
+  TEMPORANEO: 'TEMPORANEO',
+} as const;
+
+export type VolontariImportConfirmInputRigheItemCorrezioni = {
+  /** @nullable */
+  nome?: string | null;
+  /** @nullable */
+  cognome?: string | null;
+  /** @nullable */
+  matricola?: string | null;
+  /** @nullable */
+  luogoNascita?: string | null;
+  /** @nullable */
+  dataNascita?: string | null;
+  /** @nullable */
+  indirizzoResidenza?: string | null;
+  /** @nullable */
+  codiceFiscale?: string | null;
+  /** @nullable */
+  dataInizioImportata?: string | null;
+  /** @nullable */
+  scadenzaAssicurazione?: string | null;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  telefonoSecondario?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  gruppoOriginale?: string | null;
+  /** @nullable */
+  categoriaOriginale?: string | null;
+  /** @nullable */
+  tipoVolontario?: VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario;
+  /** @nullable */
+  dataServizio?: string | null;
+};
 
 export type VolontariImportConfirmInputRigheItem = {
   /** @minimum 2 */
@@ -6391,12 +6639,42 @@ export interface VolontariRegisterGenerateInput {
   filtri?: VolontariRegisterGenerateInputFiltri;
 }
 
-export type VolontariRegisterCorrectionInputSnapshot = { [key: string]: unknown };
+export type VolontariRegisterCorrectionInputRettificheItemCampo = typeof VolontariRegisterCorrectionInputRettificheItemCampo[keyof typeof VolontariRegisterCorrectionInputRettificheItemCampo];
+
+
+export const VolontariRegisterCorrectionInputRettificheItemCampo = {
+  matricola: 'matricola',
+  nome: 'nome',
+  cognome: 'cognome',
+  codiceFiscale: 'codiceFiscale',
+  dataNascita: 'dataNascita',
+  luogoNascita: 'luogoNascita',
+  indirizzoResidenza: 'indirizzoResidenza',
+  indirizzoDomicilio: 'indirizzoDomicilio',
+  tipoVolontario: 'tipoVolontario',
+  centroAscoltoId: 'centroAscoltoId',
+  centroAscoltoNome: 'centroAscoltoNome',
+  ruoloVolontarioId: 'ruoloVolontarioId',
+  ruoloNome: 'ruoloNome',
+  dataInizio: 'dataInizio',
+} as const;
+
+export type VolontariRegisterCorrectionInputRettificheItem = {
+  campo: VolontariRegisterCorrectionInputRettificheItemCampo;
+  /** @nullable */
+  valorePrecedente: string | number | null;
+  /** @nullable */
+  nuovoValore: string | number | null;
+};
 
 export interface VolontariRegisterCorrectionInput {
   motivo: string;
   dataEffettiva?: string;
-  snapshot: VolontariRegisterCorrectionInputSnapshot;
+  /**
+     * @minItems 1
+     * @maxItems 20
+     */
+  rettifiche: VolontariRegisterCorrectionInputRettificheItem[];
 }
 
 export type MezzoStato = typeof MezzoStato[keyof typeof MezzoStato];

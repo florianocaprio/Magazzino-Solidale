@@ -83,6 +83,10 @@ function cellText(value: unknown): string | null {
   return text || null;
 }
 
+function hasCellValue(value: unknown): boolean {
+  return value != null && String(value).trim() !== "";
+}
+
 export type ParsedVolunteerImportRow = {
   numeroRiga: number;
   originale: Record<string, unknown>;
@@ -150,10 +154,10 @@ export function parseVolontariWorkbook(buffer: Buffer): {
     const scadenzaAssicurazione = dateFromUnknown(scadenzaRaw);
     const dataServizio = dateFromUnknown(servizioRaw);
     const errori: string[] = [];
-    if (dataNascitaRaw != null && !dataNascita) errori.push("Data di nascita non valida");
-    if (dataInizioRaw != null && !dataInizioImportata) errori.push("Da Data non valida");
-    if (scadenzaRaw != null && !scadenzaAssicurazione) errori.push("A Data/scadenza assicurativa non valida");
-    if (servizioRaw != null && !dataServizio) errori.push("Data servizio non valida");
+    if (hasCellValue(dataNascitaRaw) && !dataNascita) errori.push("Data di nascita non valida");
+    if (hasCellValue(dataInizioRaw) && !dataInizioImportata) errori.push("Da Data non valida");
+    if (hasCellValue(scadenzaRaw) && !scadenzaAssicurazione) errori.push("A Data/scadenza assicurativa non valida");
+    if (hasCellValue(servizioRaw) && !dataServizio) errori.push("Data servizio non valida");
     return [{
       numeroRiga: offset + 2,
       originale,

@@ -13,6 +13,8 @@ export interface AreaOperativa {
   provincia?: string | null;
   /** @nullable */
   sigla?: string | null;
+  /** @nullable */
+  codiceMatricola?: string | null;
   attivo: boolean;
   /** @nullable */
   note?: string | null;

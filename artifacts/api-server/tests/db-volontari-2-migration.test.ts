@@ -12,6 +12,10 @@ const hardeningMigrationUrl = new URL(
   "../../../lib/db/updates/20260901_volontari_2_0_review_hardening.sql",
   import.meta.url,
 );
+const scopeTemporalMigrationUrl = new URL(
+  "../../../lib/db/updates/20260902_volontari_2_0_scope_temporal_hardening.sql",
+  import.meta.url,
+);
 
 afterAll(async () => {
   await pool.end();
@@ -21,12 +25,23 @@ describe("migrazione Volontari 2.0", () => {
   it("è additiva, idempotente e aggiorna senza perdere il volontario legacy", async () => {
     const migrationSql = await readFile(migrationUrl, "utf8");
     const hardeningMigrationSql = await readFile(hardeningMigrationUrl, "utf8");
+    const scopeTemporalMigrationSql = await readFile(
+      scopeTemporalMigrationUrl,
+      "utf8",
+    );
     expect(migrationSql).not.toMatch(/\bDELETE\s+FROM\b/i);
     expect(migrationSql).not.toMatch(/\bTRUNCATE\b/i);
     expect(migrationSql).not.toMatch(/\bDROP\s+(TABLE|COLUMN)\b/i);
     expect(hardeningMigrationSql).not.toMatch(/\bDELETE\s+FROM\b/i);
     expect(hardeningMigrationSql).not.toMatch(/\bTRUNCATE\b/i);
     expect(hardeningMigrationSql).not.toMatch(/\bDROP\s+(TABLE|COLUMN)\b/i);
+    expect(scopeTemporalMigrationSql).not.toMatch(/\bDELETE\s+FROM\b/i);
+    expect(scopeTemporalMigrationSql).not.toMatch(/\bTRUNCATE\b/i);
+    expect(scopeTemporalMigrationSql).not.toMatch(
+      /\bDROP\s+(TABLE|COLUMN)\b/i,
+    );
+    expect(scopeTemporalMigrationSql).toMatch(/Collisioni tra matricole/i);
+    expect(scopeTemporalMigrationSql).toMatch(/Codici fiscali duplicati/i);
 
     const client = await pool.connect();
     try {
@@ -35,6 +50,9 @@ describe("migrazione Volontari 2.0", () => {
         DROP TABLE IF EXISTS
           emissioni_registro_volontari,
           registro_volontari_eventi,
+          matricole_volontari,
+          progressivi_matricole_volontari,
+          configurazioni_matricole_volontari,
           importazioni_volontari_righe,
           importazioni_volontari,
           qualifiche_dei_volontari,
@@ -48,6 +66,7 @@ describe("migrazione Volontari 2.0", () => {
           stati_volontari
         CASCADE;
         DROP FUNCTION IF EXISTS volontari_registro_append_only();
+        DROP FUNCTION IF EXISTS matricole_volontari_no_delete();
         ALTER TABLE volontari
           DROP COLUMN IF EXISTS tipo_volontario,
           DROP COLUMN IF EXISTS telefono_secondario,
@@ -59,6 +78,14 @@ describe("migrazione Volontari 2.0", () => {
           DROP COLUMN IF EXISTS data_inizio_importata,
           DROP COLUMN IF EXISTS categoria_importata_originale,
           DROP COLUMN IF EXISTS gruppo_importato_originale;
+        ALTER TABLE volontari
+          DROP COLUMN IF EXISTS indirizzo_domicilio,
+          DROP COLUMN IF EXISTS codice_fiscale_non_disponibile,
+          DROP COLUMN IF EXISTS codice_fiscale_nota,
+          DROP COLUMN IF EXISTS data_iscrizione,
+          DROP COLUMN IF EXISTS progressivo_registro;
+        ALTER TABLE aree_operative
+          DROP COLUMN IF EXISTS codice_matricola;
         ALTER TABLE ruoli_volontari
           DROP COLUMN IF EXISTS nome_normalizzato,
           DROP COLUMN IF EXISTS descrizione,
@@ -86,11 +113,14 @@ describe("migrazione Volontari 2.0", () => {
       await client.query(migrationSql);
       await client.query(hardeningMigrationSql);
       await client.query(hardeningMigrationSql);
+      await client.query(scopeTemporalMigrationSql);
+      await client.query(scopeTemporalMigrationSql);
 
       const preserved = await client.query(
         `
         SELECT nome, cognome, matricola, ruolo_volontario_id, tipo_volontario,
-               attivo, stato_approvazione
+               attivo, stato_approvazione, data_iscrizione,
+               progressivo_registro
         FROM volontari WHERE id = $1
       `,
         [legacyVolunteer.rows[0].id],
@@ -103,6 +133,24 @@ describe("migrazione Volontari 2.0", () => {
         tipo_volontario: "PERMANENTE",
         attivo: true,
         stato_approvazione: "approvato",
+        data_iscrizione: null,
+        progressivo_registro: expect.any(Number),
+      });
+      const technicalIdentifier = await client.query<{
+        data_inizio_validita: Date;
+        data_validita_tecnica: string;
+      }>(
+        `
+        SELECT data_inizio_validita,
+               snapshot_regola->>'dataValiditaTecnica' AS data_validita_tecnica
+        FROM matricole_volontari
+        WHERE volontario_id = $1
+      `,
+        [legacyVolunteer.rows[0].id],
+      );
+      expect(technicalIdentifier.rows[0]).toMatchObject({
+        data_inizio_validita: expect.any(Date),
+        data_validita_tecnica: "true",
       });
       const structures = await client.query<{ name: string | null }>(`
         SELECT unnest(ARRAY[
@@ -112,7 +160,10 @@ describe("migrazione Volontari 2.0", () => {
           to_regclass('corsi_volontari_catalogo')::text,
           to_regclass('qualifiche_volontari_catalogo')::text,
           to_regclass('registro_volontari_eventi')::text,
-          to_regclass('emissioni_registro_volontari')::text
+          to_regclass('emissioni_registro_volontari')::text,
+          to_regclass('configurazioni_matricole_volontari')::text,
+          to_regclass('progressivi_matricole_volontari')::text,
+          to_regclass('matricole_volontari')::text
         ]) AS name
       `);
       expect(structures.rows.every((row) => row.name != null)).toBe(true);

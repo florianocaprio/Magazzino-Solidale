@@ -112,7 +112,6 @@ export default function Turni() {
   const [nuovoVolontario, setNuovoVolontario] = useState({
     nome: "",
     cognome: "",
-    matricola: "",
     ruoloVolontarioId: null as number | null,
     telefono: "",
     patente: false,
@@ -328,7 +327,7 @@ export default function Turni() {
   }
 
   function creaVolontarioPending() {
-    if (effectiveCentro == null || nuovoVolontario.ruoloVolontarioId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim() || !nuovoVolontario.matricola.trim()) {
+    if (effectiveCentro == null || nuovoVolontario.ruoloVolontarioId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim()) {
       return;
     }
     setVolontarioError(null);
@@ -338,7 +337,6 @@ export default function Turni() {
           centroAscoltoId: effectiveCentro,
           nome: nuovoVolontario.nome.trim(),
           cognome: nuovoVolontario.cognome.trim(),
-          matricola: nuovoVolontario.matricola.trim(),
           ruoloVolontarioId: nuovoVolontario.ruoloVolontarioId,
           telefono: nuovoVolontario.telefono.trim() || undefined,
           patente: nuovoVolontario.patente,
@@ -350,7 +348,7 @@ export default function Turni() {
           setPendingVolontari((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
           toast({ description: t("turni.pendingVolCreated", { defaultValue: "Volontario inserito in attesa di approvazione" }) });
-          setNuovoVolontario({ nome: "", cognome: "", matricola: "", ruoloVolontarioId: null, telefono: "", patente: false, note: "" });
+          setNuovoVolontario({ nome: "", cognome: "", ruoloVolontarioId: null, telefono: "", patente: false, note: "" });
           setVolontarioError(null);
           setVolontarioDialogOpen(false);
         },
@@ -867,17 +865,6 @@ export default function Turni() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>{t("volontari.matricola", { defaultValue: "Matricola" })}</Label>
-              <Input
-                value={nuovoVolontario.matricola}
-                onChange={(e) => {
-                  setVolontarioError(null);
-                  setNuovoVolontario((v) => ({ ...v, matricola: e.target.value }));
-                }}
-              />
-              {volontarioError ? <p className="text-sm text-destructive">{volontarioError}</p> : null}
-            </div>
-            <div className="space-y-1.5">
               <Label>{t("common.phone")}</Label>
               <Input
                 value={nuovoVolontario.telefono}
@@ -924,7 +911,6 @@ export default function Turni() {
                 createPendingVolontario.isPending ||
                 !nuovoVolontario.nome.trim() ||
                 !nuovoVolontario.cognome.trim() ||
-                !nuovoVolontario.matricola.trim() ||
                 nuovoVolontario.ruoloVolontarioId == null
               }
             >

@@ -118,6 +118,8 @@ import type {
   ConfigurazioneAmbiente,
   ConfigurazioneAmbientePubblica,
   ConfigurazioneAmbienteUpdate,
+  ConfigurazioneMatricoleVolontariInput,
+  ConfigurazioneMatricoleVolontariResponse,
   ConfirmVolontariImport200,
   Consegna,
   ConsegnaInput,
@@ -422,8 +424,11 @@ import type {
   VolontarioActionResult,
   VolontarioBulkInsuranceConfirmInput,
   VolontarioBulkInsuranceInput,
+  VolontarioIdentifier,
   VolontarioInput,
   VolontarioInsuranceVersionInput,
+  VolontarioPermanentConversionInput,
+  VolontarioPermanentConversionPreviewResponse,
   VolontarioRiattivazioneInput,
   VolontarioServiceDayInput,
   VolontarioServiceDayUpdateInput,
@@ -17335,6 +17340,142 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getUpdateSuperAdminConfigurazioneAmbienteMutationOptions(options));
     }
 
+export const getGetSuperAdminConfigurazioneMatricoleVolontariUrl = () => {
+
+
+
+
+  return `/api/super-admin/configurazione-matricole-volontari`
+}
+
+export const getSuperAdminConfigurazioneMatricoleVolontari = async ( options?: RequestInit): Promise<ConfigurazioneMatricoleVolontariResponse> => {
+
+  return customFetch<ConfigurazioneMatricoleVolontariResponse>(getGetSuperAdminConfigurazioneMatricoleVolontariUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSuperAdminConfigurazioneMatricoleVolontariQueryKey = () => {
+    return [
+    `/api/super-admin/configurazione-matricole-volontari`
+    ] as const;
+    }
+
+
+export const getGetSuperAdminConfigurazioneMatricoleVolontariQueryOptions = <TData = Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSuperAdminConfigurazioneMatricoleVolontariQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>> = ({ signal }) => getSuperAdminConfigurazioneMatricoleVolontari({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSuperAdminConfigurazioneMatricoleVolontariQueryResult = NonNullable<Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>>
+export type GetSuperAdminConfigurazioneMatricoleVolontariQueryError = ErrorType<unknown>
+
+
+
+export function useGetSuperAdminConfigurazioneMatricoleVolontari<TData = Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSuperAdminConfigurazioneMatricoleVolontari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSuperAdminConfigurazioneMatricoleVolontariQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateSuperAdminConfigurazioneMatricoleVolontariUrl = () => {
+
+
+
+
+  return `/api/super-admin/configurazione-matricole-volontari`
+}
+
+export const updateSuperAdminConfigurazioneMatricoleVolontari = async (configurazioneMatricoleVolontariInput: ConfigurazioneMatricoleVolontariInput, options?: RequestInit): Promise<ConfigurazioneMatricoleVolontariResponse> => {
+
+  return customFetch<ConfigurazioneMatricoleVolontariResponse>(getUpdateSuperAdminConfigurazioneMatricoleVolontariUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      configurazioneMatricoleVolontariInput,)
+  }
+);}
+
+
+
+
+export const getUpdateSuperAdminConfigurazioneMatricoleVolontariMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>, TError,{data: BodyType<ConfigurazioneMatricoleVolontariInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>, TError,{data: BodyType<ConfigurazioneMatricoleVolontariInput>}, TContext> => {
+
+const mutationKey = ['updateSuperAdminConfigurazioneMatricoleVolontari'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>, {data: BodyType<ConfigurazioneMatricoleVolontariInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateSuperAdminConfigurazioneMatricoleVolontari(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSuperAdminConfigurazioneMatricoleVolontariMutationResult = NonNullable<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>>
+    export type UpdateSuperAdminConfigurazioneMatricoleVolontariMutationBody = BodyType<ConfigurazioneMatricoleVolontariInput>
+    export type UpdateSuperAdminConfigurazioneMatricoleVolontariMutationError = ErrorType<unknown>
+
+    export const useUpdateSuperAdminConfigurazioneMatricoleVolontari = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>, TError,{data: BodyType<ConfigurazioneMatricoleVolontariInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSuperAdminConfigurazioneMatricoleVolontari>>,
+        TError,
+        {data: BodyType<ConfigurazioneMatricoleVolontariInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateSuperAdminConfigurazioneMatricoleVolontariMutationOptions(options));
+    }
+
 export const getListSuperAdminModuliUrl = () => {
 
 
@@ -19726,7 +19867,7 @@ export const confirmVolontariImport = async (volontariImportConfirmInput: Volont
 
 
 
-export const getConfirmVolontariImportMutationOptions = <TError = ErrorType<unknown>,
+export const getConfirmVolontariImportMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmVolontariImport>>, TError,{data: BodyType<VolontariImportConfirmInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof confirmVolontariImport>>, TError,{data: BodyType<VolontariImportConfirmInput>}, TContext> => {
 
@@ -19755,9 +19896,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ConfirmVolontariImportMutationResult = NonNullable<Awaited<ReturnType<typeof confirmVolontariImport>>>
     export type ConfirmVolontariImportMutationBody = BodyType<VolontariImportConfirmInput>
-    export type ConfirmVolontariImportMutationError = ErrorType<unknown>
+    export type ConfirmVolontariImportMutationError = ErrorType<void>
 
-    export const useConfirmVolontariImport = <TError = ErrorType<unknown>,
+    export const useConfirmVolontariImport = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmVolontariImport>>, TError,{data: BodyType<VolontariImportConfirmInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof confirmVolontariImport>>,
@@ -20541,7 +20682,7 @@ export const getListVolontariRegisterEmissionsQueryKey = () => {
     }
 
 
-export const getListVolontariRegisterEmissionsQueryOptions = <TData = Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListVolontariRegisterEmissionsQueryOptions = <TData = Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -20560,11 +20701,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListVolontariRegisterEmissionsQueryResult = NonNullable<Awaited<ReturnType<typeof listVolontariRegisterEmissions>>>
-export type ListVolontariRegisterEmissionsQueryError = ErrorType<unknown>
+export type ListVolontariRegisterEmissionsQueryError = ErrorType<void>
 
 
 
-export function useListVolontariRegisterEmissions<TData = Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError = ErrorType<unknown>>(
+export function useListVolontariRegisterEmissions<TData = Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError = ErrorType<void>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontariRegisterEmissions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -20612,7 +20753,7 @@ export const getDownloadVolontariRegisterEmissionQueryKey = (emissioneId: number
     }
 
 
-export const getDownloadVolontariRegisterEmissionQueryOptions = <TData = Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError = ErrorType<unknown>>(emissioneId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getDownloadVolontariRegisterEmissionQueryOptions = <TData = Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError = ErrorType<void>>(emissioneId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -20631,11 +20772,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type DownloadVolontariRegisterEmissionQueryResult = NonNullable<Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>>
-export type DownloadVolontariRegisterEmissionQueryError = ErrorType<unknown>
+export type DownloadVolontariRegisterEmissionQueryError = ErrorType<void>
 
 
 
-export function useDownloadVolontariRegisterEmission<TData = Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError = ErrorType<unknown>>(
+export function useDownloadVolontariRegisterEmission<TData = Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError = ErrorType<void>>(
  emissioneId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadVolontariRegisterEmission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -20724,6 +20865,83 @@ export function useListVolontariRegisterEvents<TData = Awaited<ReturnType<typeof
 
 
 
+export const getVerifyVolontariRegisterIntegrityUrl = () => {
+
+
+
+
+  return `/api/volontari/registro/verifica-integrita`
+}
+
+/**
+ * @summary Verifica diagnostica della catena ledger riservata al Super Admin
+ */
+export const verifyVolontariRegisterIntegrity = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getVerifyVolontariRegisterIntegrityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getVerifyVolontariRegisterIntegrityQueryKey = () => {
+    return [
+    `/api/volontari/registro/verifica-integrita`
+    ] as const;
+    }
+
+
+export const getVerifyVolontariRegisterIntegrityQueryOptions = <TData = Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getVerifyVolontariRegisterIntegrityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>> = ({ signal }) => verifyVolontariRegisterIntegrity({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type VerifyVolontariRegisterIntegrityQueryResult = NonNullable<Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>>
+export type VerifyVolontariRegisterIntegrityQueryError = ErrorType<void>
+
+
+/**
+ * @summary Verifica diagnostica della catena ledger riservata al Super Admin
+ */
+
+export function useVerifyVolontariRegisterIntegrity<TData = Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyVolontariRegisterIntegrity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getVerifyVolontariRegisterIntegrityQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getCorrectVolontariRegisterEventUrl = (eventoId: number,) => {
 
 
@@ -20788,6 +21006,214 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getCorrectVolontariRegisterEventMutationOptions(options));
+    }
+
+export const getListVolontarioIdentifiersUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/matricole`
+}
+
+export const listVolontarioIdentifiers = async (id: number, options?: RequestInit): Promise<VolontarioIdentifier[]> => {
+
+  return customFetch<VolontarioIdentifier[]>(getListVolontarioIdentifiersUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVolontarioIdentifiersQueryKey = (id: number,) => {
+    return [
+    `/api/volontari/${id}/matricole`
+    ] as const;
+    }
+
+
+export const getListVolontarioIdentifiersQueryOptions = <TData = Awaited<ReturnType<typeof listVolontarioIdentifiers>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontarioIdentifiers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVolontarioIdentifiersQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVolontarioIdentifiers>>> = ({ signal }) => listVolontarioIdentifiers(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVolontarioIdentifiers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVolontarioIdentifiersQueryResult = NonNullable<Awaited<ReturnType<typeof listVolontarioIdentifiers>>>
+export type ListVolontarioIdentifiersQueryError = ErrorType<unknown>
+
+
+
+export function useListVolontarioIdentifiers<TData = Awaited<ReturnType<typeof listVolontarioIdentifiers>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVolontarioIdentifiers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVolontarioIdentifiersQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPreviewVolontarioPermanentConversionUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/conversione-permanente/preview`
+}
+
+export const previewVolontarioPermanentConversion = async (id: number, options?: RequestInit): Promise<VolontarioPermanentConversionPreviewResponse> => {
+
+  return customFetch<VolontarioPermanentConversionPreviewResponse>(getPreviewVolontarioPermanentConversionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPreviewVolontarioPermanentConversionQueryKey = (id: number,) => {
+    return [
+    `/api/volontari/${id}/conversione-permanente/preview`
+    ] as const;
+    }
+
+
+export const getPreviewVolontarioPermanentConversionQueryOptions = <TData = Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPreviewVolontarioPermanentConversionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>> = ({ signal }) => previewVolontarioPermanentConversion(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type PreviewVolontarioPermanentConversionQueryResult = NonNullable<Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>>
+export type PreviewVolontarioPermanentConversionQueryError = ErrorType<unknown>
+
+
+
+export function usePreviewVolontarioPermanentConversion<TData = Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof previewVolontarioPermanentConversion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getPreviewVolontarioPermanentConversionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getConvertVolontarioToPermanentUrl = (id: number,) => {
+
+
+
+
+  return `/api/volontari/${id}/conversione-permanente`
+}
+
+export const convertVolontarioToPermanent = async (id: number,
+    volontarioPermanentConversionInput: VolontarioPermanentConversionInput, options?: RequestInit): Promise<Volontario> => {
+
+  return customFetch<Volontario>(getConvertVolontarioToPermanentUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      volontarioPermanentConversionInput,)
+  }
+);}
+
+
+
+
+export const getConvertVolontarioToPermanentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof convertVolontarioToPermanent>>, TError,{id: number;data: BodyType<VolontarioPermanentConversionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof convertVolontarioToPermanent>>, TError,{id: number;data: BodyType<VolontarioPermanentConversionInput>}, TContext> => {
+
+const mutationKey = ['convertVolontarioToPermanent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof convertVolontarioToPermanent>>, {id: number;data: BodyType<VolontarioPermanentConversionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  convertVolontarioToPermanent(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConvertVolontarioToPermanentMutationResult = NonNullable<Awaited<ReturnType<typeof convertVolontarioToPermanent>>>
+    export type ConvertVolontarioToPermanentMutationBody = BodyType<VolontarioPermanentConversionInput>
+    export type ConvertVolontarioToPermanentMutationError = ErrorType<void>
+
+    export const useConvertVolontarioToPermanent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof convertVolontarioToPermanent>>, TError,{id: number;data: BodyType<VolontarioPermanentConversionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof convertVolontarioToPermanent>>,
+        TError,
+        {id: number;data: BodyType<VolontarioPermanentConversionInput>},
+        TContext
+      > => {
+      return useMutation(getConvertVolontarioToPermanentMutationOptions(options));
     }
 
 export const getGetVolontarioUrl = (id: number,

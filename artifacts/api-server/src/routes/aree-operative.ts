@@ -13,6 +13,7 @@ function fmt(r: typeof areeOperativeTable.$inferSelect) {
     nome: r.nome,
     provincia: r.provincia ?? null,
     sigla: r.sigla ?? null,
+    codiceMatricola: r.codiceMatricola ?? null,
     attivo: r.attivo,
     note: r.note ?? null,
     dataCreazione: r.dataCreazione.toISOString(),
@@ -56,6 +57,8 @@ router.post("/aree-operative", requireGlobalAdmin, async (req, res) => {
   }
   const values = result.data;
   if (values.sigla) values.sigla = values.sigla.toUpperCase();
+  if (values.codiceMatricola)
+    values.codiceMatricola = values.codiceMatricola.toUpperCase();
   const [row] = await db.insert(areeOperativeTable).values(values).returning();
   res.status(201).json(fmt(row));
 });
@@ -69,6 +72,8 @@ router.patch("/aree-operative/:id", requireGlobalAdmin, async (req, res) => {
   }
   const values = result.data;
   if (values.sigla) values.sigla = values.sigla.toUpperCase();
+  if (values.codiceMatricola)
+    values.codiceMatricola = values.codiceMatricola.toUpperCase();
   const [row] = await db
     .update(areeOperativeTable)
     .set(values)

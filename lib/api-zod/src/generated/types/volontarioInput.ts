@@ -10,17 +10,19 @@ import type { VolontarioInputTipoVolontario } from './volontarioInputTipoVolonta
 export interface VolontarioInput {
   nome: string;
   cognome: string;
-  matricola: string;
   tipoVolontario?: VolontarioInputTipoVolontario;
   /** @nullable */
   centroAscoltoId?: number | null;
   telefono?: string;
   telefonoSecondario?: string;
   email?: string;
-  luogoNascita?: string;
-  dataNascita?: Date;
-  indirizzoResidenza?: string;
+  luogoNascita: string;
+  dataNascita: Date;
+  indirizzoResidenza: string;
+  indirizzoDomicilio?: string;
   codiceFiscale?: string;
+  codiceFiscaleNonDisponibile?: boolean;
+  codiceFiscaleNota?: string;
   /** @minimum 1 */
   ruoloVolontarioId: number;
   patente?: boolean;

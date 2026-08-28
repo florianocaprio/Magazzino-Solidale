@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { VolontariImportPreviewRigheItem } from './volontariImportPreviewRigheItem';
+import type { VolontariImportPreviewScopeTipo } from './volontariImportPreviewScopeTipo';
 
 export interface VolontariImportPreview {
   importazioneId: number;
@@ -17,6 +18,13 @@ export interface VolontariImportPreview {
   sha256File: string;
   /** Hash canonico del contenuto normalizzato usato con il perimetro per l'idempotenza semantica. */
   hashContenutoNormalizzato: string;
+  scopeTipo?: VolontariImportPreviewScopeTipo;
+  /** @nullable */
+  scopeCentroId?: number | null;
+  /** @nullable */
+  scopeAreaOperativaId?: number | null;
+  scopeCentroIdsSnapshot?: number[];
+  scopeFingerprint?: string;
   /** SHA-256 del file appena ricevuto quando la risposta è un replay semantico. */
   sha256FileRichiesto?: string;
   /** SHA-256 binario dell'importazione confermata originaria quando la risposta è un replay. */

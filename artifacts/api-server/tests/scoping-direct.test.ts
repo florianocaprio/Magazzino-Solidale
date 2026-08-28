@@ -179,9 +179,13 @@ describe("Volontari — scoping per centro", () => {
       .send({
         nome: "Mario",
         cognome: "Rossi",
-        matricola: "MR-001",
         ruoloVolontarioId,
         centroAscoltoId: centroB,
+        luogoNascita: "Roma",
+        dataNascita: "1990-01-02",
+        indirizzoResidenza: "Via Scoping 1",
+        codiceFiscaleNonDisponibile: true,
+        codiceFiscaleNota: "Non disponibile nel test automatico",
       });
     expect(res.status).toBe(201);
     scope.volontarioIds.push(res.body.id);

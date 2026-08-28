@@ -20,9 +20,9 @@ import {
   idSetScopeFilter,
 } from "../lib/centroScope";
 import {
+  assignPermanentVolunteerIdentifier,
   isVolontarioMatricolaUniqueViolation,
-  matricolaVolontarioDuplicataPayload,
-  matricolaVolontarioGiaUsata,
+  VolunteerIdentifierError,
 } from "../lib/volontariMatricola";
 import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
@@ -40,7 +40,10 @@ import {
   type PlanningSlot,
 } from "../lib/logisticaPolicy";
 import { auditLogistica } from "../lib/logisticaAudit";
-import { appendVolontarioLedgerEvent } from "../lib/volontariLedger";
+import {
+  appendVolontarioLedgerEvent,
+  buildVolunteerRegistrationSnapshot,
+} from "../lib/volontariLedger";
 import { todayRome } from "../lib/volontariDomain";
 
 const router: IRouter = Router();
@@ -464,17 +467,18 @@ router.post(
     res.status(resolved.status).json({ error: resolved.error });
     return;
   }
-  const nome = trimText(req.body?.nome);
-  const cognome = trimText(req.body?.cognome);
-  const matricola = trimText(req.body?.matricola);
-  if (!nome || !cognome || !matricola) {
-    res
-      .status(400)
-      .json({ error: "nome, cognome e matricola sono obbligatori" });
+  if (trimText(req.body?.matricola)) {
+    res.status(400).json({
+      error: "La matricola viene generata automaticamente dal sistema",
+    });
     return;
   }
-  if (await matricolaVolontarioGiaUsata(matricola)) {
-    res.status(409).json(await matricolaVolontarioDuplicataPayload(matricola));
+  const nome = trimText(req.body?.nome);
+  const cognome = trimText(req.body?.cognome);
+  if (!nome || !cognome) {
+    res
+      .status(400)
+      .json({ error: "nome e cognome sono obbligatori" });
     return;
   }
   const ruoloVolontarioId = toIntOrNull(req.body?.ruoloVolontarioId);
@@ -496,7 +500,6 @@ router.post(
       const [row] = await tx.insert(volontariTable).values({
         nome,
         cognome,
-        matricola,
         centroAscoltoId: resolved.centroAscoltoId,
         telefono: trimText(req.body?.telefono) || null,
         email: trimText(req.body?.email) || null,
@@ -507,23 +510,41 @@ router.post(
         maxConsegneTurno: 5,
         attivo: false,
         statoApprovazione: "in_attesa",
+        dataIscrizione: todayRome(),
+        codiceFiscaleNonDisponibile: true,
+        codiceFiscaleNota: "Anagrafica provvisoria inserita dalla pianificazione turni",
         note: trimText(req.body?.note) || "Inserito da pianificazione turni",
       }).returning();
+      const matricola = await assignPermanentVolunteerIdentifier(
+        tx,
+        row.id,
+        row.centroAscoltoId,
+        todayRome(),
+        req.user?.id && req.user.id > 0 ? req.user.id : null,
+      );
+      const createdRow = { ...row, matricola };
       await auditLogistica(tx, req, { entita: "volontario", id: row.id, azione: "creazione", nuovo: { origine: "turni", statoApprovazione: "in_attesa", attivo: false, versione: row.versione } });
       await appendVolontarioLedgerEvent(tx, {
         sezione: "PERMANENTE", tipoEvento: "REGISTRAZIONE",
         volontarioId: row.id, centroAscoltoId: resolved.centroAscoltoId,
         dataEffettiva: todayRome(),
-        snapshot: { origine: "turni", matricola: row.matricola, statoApprovazione: "in_attesa" },
+        snapshot: await buildVolunteerRegistrationSnapshot(tx, createdRow, {
+          origine: "MANUALE",
+          dataInizio: todayRome(),
+        }),
         utenteId: req.user?.id && req.user.id > 0 ? req.user.id : null,
       });
-      return row;
+      return createdRow;
     });
   } catch (e) {
     if (isVolontarioMatricolaUniqueViolation(e)) {
       res
         .status(409)
-        .json(await matricolaVolontarioDuplicataPayload(matricola));
+        .json({ error: "Conflitto durante la generazione della matricola" });
+      return;
+    }
+    if (e instanceof VolunteerIdentifierError) {
+      res.status(422).json({ error: e.message, code: e.code });
       return;
     }
     throw e;

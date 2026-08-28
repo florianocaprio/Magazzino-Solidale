@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import { assertViewportSafe, login } from "./helpers";
 
 type Role = { id: number; nome: string; attivo: boolean };
+type Center = { id: number; nome: string; attivo: boolean };
+type Area = { id: number; nome: string; attivo: boolean };
 type Volunteer = { id: number; versione: number; matricola: string };
 
 function todayRome(): string {
@@ -21,23 +23,64 @@ test("Volontari 2.0 mantiene lista, dossier e azioni accessibili", async ({
   page,
   viewport,
 }, testInfo) => {
-  const rolesResponse = await page.request.get("/api/ruoli-volontari");
+  const [rolesResponse, centersResponse, areasResponse] = await Promise.all([
+    page.request.get("/api/ruoli-volontari"),
+    page.request.get("/api/centri-ascolto"),
+    page.request.get("/api/aree-operative"),
+  ]);
   expect(rolesResponse.ok()).toBe(true);
+  expect(centersResponse.ok()).toBe(true);
+  expect(areasResponse.ok()).toBe(true);
   const role = ((await rolesResponse.json()) as Role[]).find(
     (item) => item.attivo,
   );
+  let area = ((await areasResponse.json()) as Area[]).find(
+    (item) => item.attivo,
+  );
+  if (!area) {
+    const areaResponse = await page.request.post("/api/aree-operative", {
+      data: {
+        nome: "Area Volontari E2E",
+        sigla: "VE",
+        codiceMatricola: "E2E",
+        attivo: true,
+        note: "Fixture sintetica Playwright",
+      },
+    });
+    expect(areaResponse.status()).toBe(201);
+    area = (await areaResponse.json()) as Area;
+  }
+  let center = ((await centersResponse.json()) as Center[]).find(
+    (item) => item.attivo,
+  );
+  if (!center) {
+    const centerResponse = await page.request.post("/api/centri-ascolto", {
+      data: {
+        nome: "Centro Volontari E2E",
+        areaOperativaId: area.id,
+        attivo: true,
+        note: "Fixture sintetica Playwright",
+      },
+    });
+    expect(centerResponse.status()).toBe(201);
+    center = (await centerResponse.json()) as Center;
+  }
   expect(role, "seed sintetico ruolo volontario mancante").toBeDefined();
 
   const suffix = `${testInfo.project.name.slice(0, 8).replace(/\W/g, "-")}-${Date.now().toString(36)}`;
-  const matricola = `E2E-VOL-${suffix}`;
   const createResponse = await page.request.post("/api/volontari", {
     data: {
       nome: "Ada",
       cognome: "Esempio",
-      matricola,
       tipoVolontario: "PERMANENTE",
       ruoloVolontarioId: role!.id,
+      centroAscoltoId: center!.id,
       email: `ada.${suffix}@example.test`,
+      luogoNascita: "Roma",
+      dataNascita: "1990-01-02",
+      indirizzoResidenza: "Via Esempio 1",
+      codiceFiscaleNonDisponibile: true,
+      codiceFiscaleNota: "Non disponibile nel test end-to-end",
     },
   });
   const createBody = (await createResponse.json()) as Volunteer & {
@@ -45,6 +88,7 @@ test("Volontari 2.0 mantiene lista, dossier e azioni accessibili", async ({
   };
   expect(createResponse.status(), JSON.stringify(createBody)).toBe(201);
   const created = createBody;
+  const matricola = created.matricola;
 
   const approvalResponse = await page.request.post(
     `/api/approvazioni-logistica/volontari/${created.id}/approva`,

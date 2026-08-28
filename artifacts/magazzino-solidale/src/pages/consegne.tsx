@@ -170,7 +170,7 @@ export default function Consegne() {
   const [pendingMezzi, setPendingMezzi] = useState<Mezzo[]>([]);
   const [volontarioDialogOpen, setVolontarioDialogOpen] = useState(false);
   const [mezzoDialogOpen, setMezzoDialogOpen] = useState(false);
-  const [nuovoVolontario, setNuovoVolontario] = useState({ nome: "", cognome: "", matricola: "", ruoloVolontarioId: null as number | null, telefono: "", patente: false, note: "" });
+  const [nuovoVolontario, setNuovoVolontario] = useState({ nome: "", cognome: "", ruoloVolontarioId: null as number | null, telefono: "", patente: false, note: "" });
   const [volontarioError, setVolontarioError] = useState<string | null>(null);
   const [nuovoMezzo, setNuovoMezzo] = useState({ tipo: "", targa: "", proprieta: "associazione", descrizione: "", note: "" });
 
@@ -342,7 +342,7 @@ export default function Consegne() {
   };
 
   const creaVolontarioPending = () => {
-    if (effectiveConsegnaCentroId == null || nuovoVolontario.ruoloVolontarioId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim() || !nuovoVolontario.matricola.trim()) {
+    if (effectiveConsegnaCentroId == null || nuovoVolontario.ruoloVolontarioId == null || !nuovoVolontario.nome.trim() || !nuovoVolontario.cognome.trim()) {
       return;
     }
     setVolontarioError(null);
@@ -352,7 +352,6 @@ export default function Consegne() {
           centroAscoltoId: effectiveConsegnaCentroId,
           nome: nuovoVolontario.nome.trim(),
           cognome: nuovoVolontario.cognome.trim(),
-          matricola: nuovoVolontario.matricola.trim(),
           ruoloVolontarioId: nuovoVolontario.ruoloVolontarioId,
           telefono: nuovoVolontario.telefono.trim() || undefined,
           patente: nuovoVolontario.patente,
@@ -364,7 +363,7 @@ export default function Consegne() {
           setPendingVolontari((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
           queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() });
           toast({ description: t("turni.pendingVolCreated", { defaultValue: "Volontario inserito in attesa di approvazione" }) });
-          setNuovoVolontario({ nome: "", cognome: "", matricola: "", ruoloVolontarioId: null, telefono: "", patente: false, note: "" });
+          setNuovoVolontario({ nome: "", cognome: "", ruoloVolontarioId: null, telefono: "", patente: false, note: "" });
           setVolontarioError(null);
           setVolontarioDialogOpen(false);
         },
@@ -1281,17 +1280,6 @@ export default function Consegne() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>{t("volontari.matricola", { defaultValue: "Matricola" })}</Label>
-                <Input
-                  value={nuovoVolontario.matricola}
-                  onChange={(e) => {
-                    setVolontarioError(null);
-                    setNuovoVolontario((v) => ({ ...v, matricola: e.target.value }));
-                  }}
-                />
-                {volontarioError ? <p className="text-sm text-destructive">{volontarioError}</p> : null}
-              </div>
-              <div className="space-y-2">
                 <Label>{t("common.phone", { defaultValue: "Telefono" })}</Label>
                 <Input value={nuovoVolontario.telefono} onChange={(e) => setNuovoVolontario((v) => ({ ...v, telefono: e.target.value }))} />
               </div>
@@ -1334,7 +1322,6 @@ export default function Consegne() {
                 effectiveConsegnaCentroId == null ||
                 !nuovoVolontario.nome.trim() ||
                 !nuovoVolontario.cognome.trim() ||
-                !nuovoVolontario.matricola.trim() ||
                 nuovoVolontario.ruoloVolontarioId == null
               }
             >

@@ -5593,6 +5593,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConfigurazioneAmbiente"
 
+  /super-admin/configurazione-matricole-volontari:
+    get:
+      operationId: getSuperAdminConfigurazioneMatricoleVolontari
+      tags: [super-admin, volontari]
+      responses:
+        "200":
+          description: Configurazione attiva e storico versioni delle matricole permanenti
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurazioneMatricoleVolontariResponse"
+    put:
+      operationId: updateSuperAdminConfigurazioneMatricoleVolontari
+      tags: [super-admin, volontari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigurazioneMatricoleVolontariInput"
+      responses:
+        "200":
+          description: Nuova versione della configurazione attivata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurazioneMatricoleVolontariResponse"
   /super-admin/moduli:
     get:
       operationId: listSuperAdminModuli
@@ -6424,6 +6451,8 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+        "403": { description: Batch fuori dallo scope proprietario del chiamante }
+        "409": { description: "Conflitto di concorrenza: CF, matricola o decisioni divergenti" }
 
   /volontari/formazione/corsi:
     get:
@@ -6555,6 +6584,7 @@ paths:
       tags: [volontari]
       responses:
         "200": { description: Emissioni riproducibili del registro }
+        "403": { description: Scope proprietario non accessibile }
 
   /volontari/registro/emissioni/{emissioneId}/file:
     get:
@@ -6564,6 +6594,8 @@ paths:
         - { name: emissioneId, in: path, required: true, schema: { type: integer } }
       responses:
         "200": { description: File originale byte-per-byte dell'emissione con integrità verificata e download sottoposto ad audit }
+        "403": { description: Emissione fuori dallo scope proprietario del chiamante }
+        "409": { description: Integrità del file o dello snapshot non verificata }
 
   /volontari/registro/eventi:
     get:
@@ -6571,6 +6603,16 @@ paths:
       tags: [volontari]
       responses:
         "200": { description: "Eventi append-only del registro; lo snapshot PII completo è restituito solo con permesso export/manage o privilegi amministrativi, altrimenti è sanificato" }
+
+  /volontari/registro/verifica-integrita:
+    get:
+      operationId: verifyVolontariRegisterIntegrity
+      tags: [volontari]
+      summary: Verifica diagnostica della catena ledger riservata al Super Admin
+      responses:
+        "200": { description: Catena ledger integra }
+        "403": { description: Funzione riservata al Super Admin }
+        "409": { description: Interruzione o alterazione rilevata nella catena ledger }
 
   /volontari/registro/eventi/{eventoId}/rettifica:
     post:
@@ -6585,6 +6627,53 @@ paths:
             schema: { $ref: "#/components/schemas/VolontariRegisterCorrectionInput" }
       responses:
         "201": { description: Evento di rettifica aggiunto senza alterare lo storico }
+
+  /volontari/{id}/matricole:
+    get:
+      operationId: listVolontarioIdentifiers
+      tags: [volontari]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Storico immutabile delle matricole del volontario
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VolontarioIdentifier" }
+
+  /volontari/{id}/conversione-permanente/preview:
+    get:
+      operationId: previewVolontarioPermanentConversion
+      tags: [volontari]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Preview non consumante della prossima matricola permanente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolontarioPermanentConversionPreviewResponse" }
+
+  /volontari/{id}/conversione-permanente:
+    post:
+      operationId: convertVolontarioToPermanent
+      tags: [volontari]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VolontarioPermanentConversionInput" }
+      responses:
+        "200":
+          description: Conversione atomica completata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Volontario" }
+        "409": { description: Preview o versione non più attuale }
 
   /volontari/{id}:
     get:
@@ -11528,8 +11617,6 @@ components:
           type: string
         cognome:
           type: string
-        matricola:
-          type: string
         telefono:
           type: string
         email:
@@ -11543,7 +11630,7 @@ components:
           type: boolean
         note:
           type: string
-      required: [centroAscoltoId, nome, cognome, matricola, ruoloVolontarioId]
+      required: [centroAscoltoId, nome, cognome, ruoloVolontarioId]
 
     TurnoMezzoPendingInput:
       type: object
@@ -12911,6 +12998,8 @@ components:
           type: ["string", "null"]
         sigla:
           type: ["string", "null"]
+        codiceMatricola:
+          type: ["string", "null"]
         attivo:
           type: boolean
         note:
@@ -12930,6 +13019,10 @@ components:
         sigla:
           type: string
           maxLength: 2
+        codiceMatricola:
+          type: string
+          maxLength: 8
+          pattern: "^[A-Za-z0-9]+$"
         attivo:
           type: boolean
         note:
@@ -12947,6 +13040,10 @@ components:
         sigla:
           type: string
           maxLength: 2
+        codiceMatricola:
+          type: string
+          maxLength: 8
+          pattern: "^[A-Za-z0-9]+$"
         attivo:
           type: boolean
         note:
@@ -15938,6 +16035,53 @@ components:
         noteConsegna:
           type: ["string", "null"]
 
+    ConfigurazioneMatricoleVolontari:
+      type: object
+      properties:
+        id: { type: integer }
+        scopeTipo: { type: string, enum: [GLOBALE] }
+        versione: { type: integer, minimum: 1 }
+        prefissoAssociazione: { type: ["string", "null"], maxLength: 12 }
+        includiCodiceArea: { type: boolean }
+        segmentoFisso: { type: ["string", "null"], maxLength: 8 }
+        separatore: { type: string, enum: ["", "-", "/"] }
+        cifreProgressivo: { type: integer, minimum: 2, maximum: 8 }
+        numeroIniziale: { type: integer, minimum: 1 }
+        ambitoProgressivo: { type: string, enum: [GLOBALE, PER_AREA] }
+        attiva: { type: boolean }
+        aggiornataDa: { type: ["integer", "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+      required:
+        [id, scopeTipo, versione, includiCodiceArea, separatore, cifreProgressivo, numeroIniziale, ambitoProgressivo, attiva, dataCreazione, dataAggiornamento]
+
+    ConfigurazioneMatricoleVolontariInput:
+      type: object
+      additionalProperties: false
+      properties:
+        prefissoAssociazione: { type: ["string", "null"], maxLength: 12, pattern: "^[A-Za-z0-9]*$" }
+        includiCodiceArea: { type: boolean }
+        segmentoFisso: { type: ["string", "null"], maxLength: 8, pattern: "^[A-Za-z0-9]*$" }
+        separatore: { type: string, enum: ["", "-", "/"] }
+        cifreProgressivo: { type: integer, minimum: 2, maximum: 8 }
+        numeroIniziale: { type: integer, minimum: 1 }
+        ambitoProgressivo: { type: string, enum: [GLOBALE, PER_AREA] }
+      required:
+        [includiCodiceArea, separatore, cifreProgressivo, numeroIniziale, ambitoProgressivo]
+
+    ConfigurazioneMatricoleVolontariResponse:
+      type: object
+      properties:
+        configurazione:
+          anyOf:
+            - { $ref: "#/components/schemas/ConfigurazioneMatricoleVolontari" }
+            - { type: "null" }
+        esempio: { type: ["string", "null"] }
+        storico:
+          type: array
+          items: { $ref: "#/components/schemas/ConfigurazioneMatricoleVolontari" }
+      required: [configurazione, esempio]
+
     # ── Volontari ─────────────────────────────────────────────────────────
     Volontario:
       type: object
@@ -15970,8 +16114,19 @@ components:
           format: date
         indirizzoResidenza:
           type: ["string", "null"]
+        indirizzoDomicilio:
+          type: ["string", "null"]
         codiceFiscale:
           type: ["string", "null"]
+        codiceFiscaleNonDisponibile:
+          type: boolean
+        codiceFiscaleNota:
+          type: ["string", "null"]
+        dataIscrizione:
+          type: ["string", "null"]
+          format: date
+        progressivoRegistro:
+          type: integer
         dataInizioImportata:
           type: ["string", "null"]
           format: date
@@ -16039,6 +16194,8 @@ components:
           statoAssicurazione,
           sospesoManualmente,
           statoApprovazione,
+          codiceFiscaleNonDisponibile,
+          progressivoRegistro,
           versione,
           dataCreazione,
           dataAggiornamento,
@@ -16050,8 +16207,6 @@ components:
         nome:
           type: string
         cognome:
-          type: string
-        matricola:
           type: string
         tipoVolontario:
           type: string
@@ -16071,7 +16226,13 @@ components:
           format: date
         indirizzoResidenza:
           type: string
+        indirizzoDomicilio:
+          type: string
         codiceFiscale:
+          type: string
+        codiceFiscaleNonDisponibile:
+          type: boolean
+        codiceFiscaleNota:
           type: string
         ruoloVolontarioId:
           type: integer
@@ -16085,7 +16246,8 @@ components:
           minimum: 0
         note:
           type: string
-      required: [nome, cognome, matricola, ruoloVolontarioId]
+      required:
+        [nome, cognome, luogoNascita, dataNascita, indirizzoResidenza, ruoloVolontarioId]
 
     VolontarioUpdate:
       type: object
@@ -16094,11 +16256,6 @@ components:
           type: string
         cognome:
           type: string
-        matricola:
-          type: string
-        tipoVolontario:
-          type: string
-          enum: [PERMANENTE, TEMPORANEO]
         centroAscoltoId:
           type: ["integer", "null"]
         telefono:
@@ -16114,7 +16271,13 @@ components:
           format: date
         indirizzoResidenza:
           type: string
+        indirizzoDomicilio:
+          type: string
         codiceFiscale:
+          type: string
+        codiceFiscaleNonDisponibile:
+          type: boolean
+        codiceFiscaleNota:
           type: string
         ruoloVolontarioId:
           type: integer
@@ -16134,6 +16297,56 @@ components:
           type: integer
           minimum: 1
       required: [versione]
+
+    VolontarioIdentifier:
+      type: object
+      properties:
+        id: { type: integer }
+        matricola: { type: string }
+        tipoIdentificativo:
+          type: string
+          enum: [TEMPORANEA, PERMANENTE, LEGACY]
+        stato: { type: string, enum: [ATTIVA, STORICA] }
+        origine:
+          type: string
+          enum: [GENERATA, IMPORTATA, CONVERSIONE, BACKFILL]
+        dataInizioValidita: { type: string, format: date }
+        dataFineValidita: { type: ["string", "null"], format: date }
+        dataAssegnazione: { type: string, format: date-time }
+      required:
+        [id, matricola, tipoIdentificativo, stato, origine, dataInizioValidita, dataAssegnazione]
+
+    PermanentVolunteerIdentifierPreview:
+      type: object
+      properties:
+        matricola: { type: string }
+        matricolaNormalizzata: { type: string }
+        configurazioneId: { type: integer, minimum: 1 }
+        configurazioneVersione: { type: integer, minimum: 1 }
+        scopeKey: { type: string }
+        versioneProgressivo: { type: integer, minimum: 0 }
+        prossimoNumero: { type: integer, minimum: 1 }
+      required:
+        [matricola, matricolaNormalizzata, configurazioneId, configurazioneVersione, scopeKey, versioneProgressivo, prossimoNumero]
+
+    VolontarioPermanentConversionPreviewResponse:
+      type: object
+      properties:
+        volontarioId: { type: integer }
+        versioneVolontario: { type: integer, minimum: 1 }
+        matricolaAttuale: { type: ["string", "null"] }
+        dataConversione: { type: string, format: date }
+        preview: { $ref: "#/components/schemas/PermanentVolunteerIdentifierPreview" }
+      required:
+        [volontarioId, versioneVolontario, matricolaAttuale, dataConversione, preview]
+
+    VolontarioPermanentConversionInput:
+      type: object
+      additionalProperties: false
+      properties:
+        versioneVolontario: { type: integer, minimum: 1 }
+        preview: { $ref: "#/components/schemas/PermanentVolunteerIdentifierPreview" }
+      required: [versioneVolontario, preview]
 
     VolontarioOperationalState:
       type: object
@@ -16336,6 +16549,13 @@ components:
         hashContenutoNormalizzato:
           type: string
           description: Hash canonico del contenuto normalizzato usato con il perimetro per l'idempotenza semantica.
+        scopeTipo: { type: string, enum: [CENTRO, AREA, GLOBALE] }
+        scopeCentroId: { type: ["integer", "null"] }
+        scopeAreaOperativaId: { type: ["integer", "null"] }
+        scopeCentroIdsSnapshot:
+          type: array
+          items: { type: integer }
+        scopeFingerprint: { type: string }
         sha256FileRichiesto:
           type: string
           description: SHA-256 del file appena ricevuto quando la risposta è un replay semantico.
@@ -16370,7 +16590,26 @@ components:
               ruoloVolontarioId: { type: ["integer", "null"], minimum: 1 }
               centroAscoltoId: { type: ["integer", "null"], minimum: 1 }
               creaRuolo: { type: boolean }
-              correzioni: { type: object, additionalProperties: true }
+              correzioni:
+                type: object
+                additionalProperties: false
+                properties:
+                  nome: { type: ["string", "null"] }
+                  cognome: { type: ["string", "null"] }
+                  matricola: { type: ["string", "null"] }
+                  luogoNascita: { type: ["string", "null"] }
+                  dataNascita: { type: ["string", "null"], format: date }
+                  indirizzoResidenza: { type: ["string", "null"] }
+                  codiceFiscale: { type: ["string", "null"] }
+                  dataInizioImportata: { type: ["string", "null"], format: date }
+                  scadenzaAssicurazione: { type: ["string", "null"], format: date }
+                  telefono: { type: ["string", "null"] }
+                  telefonoSecondario: { type: ["string", "null"] }
+                  email: { type: ["string", "null"] }
+                  gruppoOriginale: { type: ["string", "null"] }
+                  categoriaOriginale: { type: ["string", "null"] }
+                  tipoVolontario: { type: ["string", "null"], enum: [PERMANENTE, TEMPORANEO, null] }
+                  dataServizio: { type: ["string", "null"], format: date }
             required: [numeroRiga]
       required: [importazioneId, righe]
 
@@ -16407,10 +16646,21 @@ components:
         dataEffettiva:
           type: string
           format: date
-        snapshot:
-          type: object
-          additionalProperties: true
-      required: [motivo, snapshot]
+        rettifiche:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              campo:
+                type: string
+                enum: [matricola, nome, cognome, codiceFiscale, dataNascita, luogoNascita, indirizzoResidenza, indirizzoDomicilio, tipoVolontario, centroAscoltoId, centroAscoltoNome, ruoloVolontarioId, ruoloNome, dataInizio]
+              valorePrecedente: { type: ["string", "integer", "null"] }
+              nuovoValore: { type: ["string", "integer", "null"] }
+            required: [campo, valorePrecedente, nuovoValore]
+      required: [motivo, rettifiche]
 
     # ── Mezzi ─────────────────────────────────────────────────────────────
     Mezzo:

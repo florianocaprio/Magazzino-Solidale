@@ -87,7 +87,6 @@ import { useToast } from "@/hooks/use-toast";
 type Draft = {
   nome: string;
   cognome: string;
-  matricola: string;
   tipoVolontario: "PERMANENTE" | "TEMPORANEO";
   centroAscoltoId: number | null;
   ruoloVolontarioId: number;
@@ -97,7 +96,10 @@ type Draft = {
   luogoNascita: string;
   dataNascita: string;
   indirizzoResidenza: string;
+  indirizzoDomicilio: string;
   codiceFiscale: string;
+  codiceFiscaleNonDisponibile: boolean;
+  codiceFiscaleNota: string;
   patente: boolean;
   mezzoPersonale: boolean;
   maxConsegneTurno: number;
@@ -108,7 +110,6 @@ type Draft = {
 const emptyDraft = (centerId: number | null): Draft => ({
   nome: "",
   cognome: "",
-  matricola: "",
   tipoVolontario: "PERMANENTE",
   centroAscoltoId: centerId,
   ruoloVolontarioId: 0,
@@ -118,7 +119,10 @@ const emptyDraft = (centerId: number | null): Draft => ({
   luogoNascita: "",
   dataNascita: "",
   indirizzoResidenza: "",
+  indirizzoDomicilio: "",
   codiceFiscale: "",
+  codiceFiscaleNonDisponibile: false,
+  codiceFiscaleNota: "",
   patente: false,
   mezzoPersonale: false,
   maxConsegneTurno: 5,
@@ -312,7 +316,6 @@ export default function Volontari() {
       setDraft({
         nome: detail.nome,
         cognome: detail.cognome,
-        matricola: detail.matricola ?? "",
         tipoVolontario: detail.tipoVolontario,
         centroAscoltoId: detail.centroAscoltoId ?? null,
         ruoloVolontarioId: detail.ruoloVolontarioId ?? 0,
@@ -322,7 +325,16 @@ export default function Volontari() {
         luogoNascita: detail.luogoNascita ?? "",
         dataNascita: detail.dataNascita ?? "",
         indirizzoResidenza: detail.indirizzoResidenza ?? "",
+        indirizzoDomicilio:
+          (detail as Volontario & { indirizzoDomicilio?: string | null })
+            .indirizzoDomicilio ?? "",
         codiceFiscale: detail.codiceFiscale ?? "",
+        codiceFiscaleNonDisponibile:
+          (detail as Volontario & { codiceFiscaleNonDisponibile?: boolean })
+            .codiceFiscaleNonDisponibile ?? false,
+        codiceFiscaleNota:
+          (detail as Volontario & { codiceFiscaleNota?: string | null })
+            .codiceFiscaleNota ?? "",
         patente: detail.patente,
         mezzoPersonale: detail.mezzoPersonale,
         maxConsegneTurno: detail.maxConsegneTurno,
@@ -345,12 +357,27 @@ export default function Volontari() {
     if (
       !draft.nome.trim() ||
       !draft.cognome.trim() ||
-      !draft.matricola.trim() ||
+      !draft.luogoNascita.trim() ||
+      !draft.dataNascita ||
+      !draft.indirizzoResidenza.trim() ||
       draft.ruoloVolontarioId <= 0
     ) {
       toast({
         title: "Dati incompleti",
-        description: "Nome, cognome, matricola e ruolo sono obbligatori.",
+        description:
+          "Nome, cognome, nascita, residenza e ruolo sono obbligatori.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (
+      (!draft.codiceFiscale.trim() && !draft.codiceFiscaleNonDisponibile) ||
+      (draft.codiceFiscaleNonDisponibile && !draft.codiceFiscaleNota.trim())
+    ) {
+      toast({
+        title: "Codice fiscale incompleto",
+        description:
+          "Inserisci il codice fiscale oppure indica che non è disponibile e specifica il motivo.",
         variant: "destructive",
       });
       return;
@@ -370,17 +397,21 @@ export default function Volontari() {
     const payload = {
       nome: draft.nome.trim(),
       cognome: draft.cognome.trim(),
-      matricola: draft.matricola.trim(),
-      tipoVolontario: draft.tipoVolontario,
+      ...(!editing ? { tipoVolontario: draft.tipoVolontario } : {}),
       centroAscoltoId: lockedCenterId ?? draft.centroAscoltoId,
       ruoloVolontarioId: draft.ruoloVolontarioId,
       telefono: draft.telefono || undefined,
       telefonoSecondario: draft.telefonoSecondario || undefined,
       email: draft.email || undefined,
-      luogoNascita: draft.luogoNascita || undefined,
-      dataNascita: draft.dataNascita || undefined,
-      indirizzoResidenza: draft.indirizzoResidenza || undefined,
+      luogoNascita: draft.luogoNascita,
+      dataNascita: draft.dataNascita,
+      indirizzoResidenza: draft.indirizzoResidenza,
+      indirizzoDomicilio: draft.indirizzoDomicilio || undefined,
       codiceFiscale: draft.codiceFiscale || undefined,
+      codiceFiscaleNonDisponibile: draft.codiceFiscaleNonDisponibile,
+      codiceFiscaleNota: draft.codiceFiscaleNonDisponibile
+        ? draft.codiceFiscaleNota
+        : undefined,
       patente: draft.patente,
       mezzoPersonale: draft.mezzoPersonale,
       maxConsegneTurno: draft.maxConsegneTurno,
@@ -1119,25 +1150,38 @@ export default function Volontari() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Matricola *</Label>
+                  <Label>Codice fiscale *</Label>
                   <Input
-                    value={draft.matricola}
-                    onChange={(event) =>
-                      setField("matricola", event.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Codice fiscale</Label>
-                  <Input
+                    disabled={draft.codiceFiscaleNonDisponibile}
                     value={draft.codiceFiscale}
                     onChange={(event) =>
                       setField("codiceFiscale", event.target.value)
                     }
                   />
                 </div>
+                <label className="flex min-h-12 items-center gap-3 rounded-lg border p-3 sm:col-span-2">
+                  <Checkbox
+                    checked={draft.codiceFiscaleNonDisponibile}
+                    onCheckedChange={(checked) => {
+                      setField("codiceFiscaleNonDisponibile", checked === true);
+                      if (checked === true) setField("codiceFiscale", "");
+                    }}
+                  />
+                  Codice fiscale non disponibile
+                </label>
+                {draft.codiceFiscaleNonDisponibile && (
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Motivo indisponibilità *</Label>
+                    <Input
+                      value={draft.codiceFiscaleNota}
+                      onChange={(event) =>
+                        setField("codiceFiscaleNota", event.target.value)
+                      }
+                    />
+                  </div>
+                )}
                 <div className="space-y-1">
-                  <Label>Data di nascita</Label>
+                  <Label>Data di nascita *</Label>
                   <Input
                     type="date"
                     value={draft.dataNascita}
@@ -1147,7 +1191,7 @@ export default function Volontari() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Luogo di nascita</Label>
+                  <Label>Luogo di nascita *</Label>
                   <Input
                     value={draft.luogoNascita}
                     onChange={(event) =>
@@ -1156,11 +1200,20 @@ export default function Volontari() {
                   />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
-                  <Label>Indirizzo di residenza</Label>
+                  <Label>Indirizzo di residenza *</Label>
                   <Input
                     value={draft.indirizzoResidenza}
                     onChange={(event) =>
                       setField("indirizzoResidenza", event.target.value)
+                    }
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label>Indirizzo di domicilio</Label>
+                  <Input
+                    value={draft.indirizzoDomicilio}
+                    onChange={(event) =>
+                      setField("indirizzoDomicilio", event.target.value)
                     }
                   />
                 </div>
@@ -1200,6 +1253,7 @@ export default function Volontari() {
                 <div className="space-y-1">
                   <Label>Tipo volontario *</Label>
                   <Select
+                    disabled={editing != null}
                     value={draft.tipoVolontario}
                     onValueChange={(value) =>
                       setField(
@@ -1216,6 +1270,11 @@ export default function Volontari() {
                       <SelectItem value="TEMPORANEO">Temporaneo</SelectItem>
                     </SelectContent>
                   </Select>
+                  {!editing && (
+                    <p className="text-xs text-muted-foreground">
+                      La matricola verrà generata automaticamente al salvataggio.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>Ruolo *</Label>

@@ -5,10 +5,14 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontariRegisterCorrectionInputSnapshot } from './volontariRegisterCorrectionInputSnapshot';
+import type { VolontariRegisterCorrectionInputRettificheItem } from './volontariRegisterCorrectionInputRettificheItem';
 
 export interface VolontariRegisterCorrectionInput {
   motivo: string;
   dataEffettiva?: Date;
-  snapshot: VolontariRegisterCorrectionInputSnapshot;
+  /**
+     * @minItems 1
+     * @maxItems 20
+     */
+  rettifiche: VolontariRegisterCorrectionInputRettificheItem[];
 }

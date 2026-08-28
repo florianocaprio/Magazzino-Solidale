@@ -7,6 +7,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowRightLeft,
   BookOpenCheck,
   CalendarPlus,
   Pencil,
@@ -122,6 +123,30 @@ type Dossier = {
   corsi: VolunteerCourse[];
   qualifiche: VolunteerQualification[];
 };
+type IdentifierHistory = {
+  id: number;
+  matricola: string;
+  tipoIdentificativo: string;
+  stato: string;
+  origine: string;
+  dataInizioValidita: string;
+  dataFineValidita?: string | null;
+};
+type ConversionPreview = {
+  volontarioId: number;
+  versioneVolontario: number;
+  matricolaAttuale: string | null;
+  dataConversione: string;
+  preview: {
+    matricola: string;
+    matricolaNormalizzata: string;
+    configurazioneId: number;
+    configurazioneVersione: number;
+    scopeKey: string;
+    versioneProgressivo: number;
+    prossimoNumero: number;
+  };
+};
 type AddKind = "giornata" | "corso" | "qualifica";
 
 function today(): string {
@@ -185,6 +210,9 @@ export function VolontarioDossierSheet({
   const [activity, setActivity] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [conversionPreview, setConversionPreview] =
+    useState<ConversionPreview | null>(null);
+  const [conversionPending, setConversionPending] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const dossierQuery = useQuery({
@@ -211,6 +239,14 @@ export function VolontarioDossierSheet({
         "/api/volontari/formazione/qualifiche",
       ),
     enabled: open && canManage,
+  });
+  const identifiersQuery = useQuery({
+    queryKey: ["volontario-identificativi", volontario?.id],
+    queryFn: () =>
+      customFetch<IdentifierHistory[]>(
+        `/api/volontari/${volontario!.id}/matricole`,
+      ),
+    enabled: volontario != null,
   });
 
   useEffect(() => {
@@ -278,6 +314,68 @@ export function VolontarioDossierSheet({
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openConversion = async () => {
+    if (!volontario) return;
+    setConversionPending(true);
+    try {
+      setConversionPreview(
+        await customFetch<ConversionPreview>(
+          `/api/volontari/${volontario.id}/conversione-permanente/preview`,
+        ),
+      );
+    } catch (error) {
+      toast({
+        title: "Preview conversione non disponibile",
+        description: error instanceof Error ? error.message : "Errore",
+        variant: "destructive",
+      });
+    } finally {
+      setConversionPending(false);
+    }
+  };
+
+  const confirmConversion = async () => {
+    if (!volontario || !conversionPreview) return;
+    setConversionPending(true);
+    try {
+      await customFetch(
+        `/api/volontari/${volontario.id}/conversione-permanente`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            versioneVolontario: conversionPreview.versioneVolontario,
+            preview: conversionPreview.preview,
+          }),
+        },
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["volontario-detail", volontario.id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["volontario-dossier", volontario.id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["volontario-identificativi", volontario.id],
+        }),
+        queryClient.invalidateQueries({ queryKey: getListVolontariQueryKey() }),
+      ]);
+      toast({
+        title: "Conversione completata",
+        description: `Nuova matricola permanente: ${conversionPreview.preview.matricola}`,
+      });
+      setConversionPreview(null);
+    } catch (error) {
+      toast({
+        title: "Conversione non riuscita",
+        description: error instanceof Error ? error.message : "Errore",
+        variant: "destructive",
+      });
+    } finally {
+      setConversionPending(false);
     }
   };
 
@@ -352,6 +450,17 @@ export function VolontarioDossierSheet({
                       <ShieldCheck className="mr-2 h-4 w-4" /> Registra /
                       Rinnova
                     </Button>
+                    {dettaglio.tipoVolontario === "TEMPORANEO" && (
+                      <Button
+                        variant="secondary"
+                        className="min-h-11"
+                        onClick={openConversion}
+                        disabled={conversionPending}
+                      >
+                        <ArrowRightLeft className="mr-2 h-4 w-4" /> Converti in
+                        permanente
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -397,6 +506,14 @@ export function VolontarioDossierSheet({
                     <Field
                       label="Indirizzo di residenza"
                       value={dettaglio.indirizzoResidenza}
+                    />
+                    <Field
+                      label="Indirizzo di domicilio"
+                      value={
+                        (dettaglio as Volontario & {
+                          indirizzoDomicilio?: string | null;
+                        }).indirizzoDomicilio
+                      }
                     />
                     <Field label="Centro" value={dettaglio.centroAscoltoNome} />
                     <Field label="Cellulare" value={dettaglio.telefono} />
@@ -580,6 +697,32 @@ export function VolontarioDossierSheet({
                 </TabsContent>
 
                 <TabsContent value="storico" className="mt-4 space-y-5">
+                  <div>
+                    <h3 className="mb-2 font-semibold">Storico matricole</h3>
+                    {(identifiersQuery.data ?? []).length ? (
+                      identifiersQuery.data!.map((identifier) => (
+                        <div
+                          key={`matricola-${identifier.id}`}
+                          className="mb-2 rounded-lg border p-3 text-sm"
+                        >
+                          <div className="font-medium">
+                            {identifier.matricola}
+                          </div>
+                          <div className="mt-1 text-muted-foreground">
+                            {identifier.tipoIdentificativo} · {identifier.origine} · dal{" "}
+                            {identifier.dataInizioValidita}
+                            {identifier.dataFineValidita
+                              ? ` al ${identifier.dataFineValidita}`
+                              : " · attiva"}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Nessuno storico matricole disponibile.
+                      </p>
+                    )}
+                  </div>
                   {dettaglio.tipoVolontario === "TEMPORANEO" && (
                     <div>
                       <h3 className="mb-2 font-semibold">
@@ -646,6 +789,50 @@ export function VolontarioDossierSheet({
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog
+        open={conversionPreview != null}
+        onOpenChange={(next) => {
+          if (!next) setConversionPreview(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Converti in permanente</DialogTitle>
+            <DialogDescription>
+              La matricola temporanea resterà nello storico. La preview non
+              consuma il progressivo e verrà ricontrollata alla conferma.
+            </DialogDescription>
+          </DialogHeader>
+          {conversionPreview && (
+            <div className="space-y-3 rounded-xl border p-4 text-sm">
+              <Field
+                label="Matricola attuale"
+                value={conversionPreview.matricolaAttuale}
+              />
+              <Field
+                label="Nuova matricola permanente"
+                value={conversionPreview.preview.matricola}
+              />
+              <Field
+                label="Data conversione"
+                value={conversionPreview.dataConversione}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConversionPreview(null)}
+            >
+              Annulla
+            </Button>
+            <Button onClick={confirmConversion} disabled={conversionPending}>
+              Conferma conversione
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={addKind != null}
