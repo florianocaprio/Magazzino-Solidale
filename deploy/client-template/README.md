@@ -71,3 +71,10 @@ versionati nel repository.
 Non committare `.env.docker`, backup, dump o log. Conservare le credenziali in
 un password manager o vault aziendale. Dopo il primo accesso Super Admin,
 configurare ambiente, moduli funzionali e loghi documentali dal menu Super Admin.
+
+Il geocoding pubblico è disabilitato per default nel template cliente. Per
+autorizzare consapevolmente Nominatim pubblico impostare
+`MAPS_PUBLIC_GEOCODING_ALLOWED=true`; il servizio applica un intervallo minimo di
+1,1 secondi e conserva i risultati nella cache persistente. In alternativa,
+configurare `NOMINATIM_BASE_URL` con un provider approvato o self-hosted: i
+provider custom funzionano anche mantenendo il flag pubblico a `false`.
