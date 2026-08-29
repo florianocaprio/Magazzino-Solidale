@@ -2,13 +2,14 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
-import { db, pool, beneficiariTable, bolleTable, centriAscoltoTable, consegneTable, interventiTable, magazziniTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, pool, beneficiariTable, bolleTable, centriAscoltoTable, consegneTable, interventiTable, magazziniTable, mapsGeocodeCacheTable } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 import mapsRouter from "../src/routes/maps";
 import consegneRouter from "../src/routes/consegne";
 import { areaGuard } from "../src/middlewares/auth";
 import { dataCivileEuropeRome } from "../src/lib/interventiWorkflow";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
+import { normalizeMapsAddress } from "../src/lib/maps-geocoding";
 import {
   cleanup,
   createBeneficiario,
@@ -25,15 +26,43 @@ import {
 } from "./scope-helpers";
 
 let scope: SeedScope;
+let geocodeCacheKeys: string[];
 
 beforeAll(async () => {
   for (const code of ["CENTRO_ASCOLTO", "CONSEGNE", "MAGAZZINO_SOLIDALE", "BOLLE", "UDS"]) {
     await updateModuloAmbiente(code, true, null);
   }
 });
-beforeEach(() => { scope = newScope(); });
-afterEach(async () => { await cleanup(scope); });
+beforeEach(() => { scope = newScope(); geocodeCacheKeys = []; });
+afterEach(async () => {
+  await cleanup(scope);
+  if (geocodeCacheKeys.length) {
+    await db.delete(mapsGeocodeCacheTable)
+      .where(inArray(mapsGeocodeCacheTable.normalizedAddress, geocodeCacheKeys));
+  }
+});
 afterAll(async () => { await pool.end(); });
+
+async function cacheResolvedMapsAddresses(addresses: string[]) {
+  for (const [index, originalAddress] of addresses.entries()) {
+    const normalizedAddress = normalizeMapsAddress(originalAddress);
+    geocodeCacheKeys.push(normalizedAddress);
+    const values = {
+      normalizedAddress,
+      originalAddress,
+      latitude: (41.9 + index / 1_000).toFixed(7),
+      longitude: (12.5 + index / 1_000).toFixed(7),
+      provider: "test",
+      status: "resolved",
+      lastAttemptAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(mapsGeocodeCacheTable).values(values).onConflictDoUpdate({
+      target: mapsGeocodeCacheTable.normalizedAddress,
+      set: values,
+    });
+  }
+}
 
 function app(opts: {
   areaOperativaId?: number | null;
@@ -276,6 +305,12 @@ describe("MAPS — capability, scope e routing", () => {
     const deliveryB = await insertConsegna(scope, { beneficiarioId: beneficiaryB, magazzinoId: warehouseB });
     await db.update(consegneTable).set({ indirizzoConsegna: "Via Destinazione A 1" }).where(eq(consegneTable.id, deliveryA));
     await db.update(consegneTable).set({ indirizzoConsegna: "Via Destinazione B 1" }).where(eq(consegneTable.id, deliveryB));
+    await cacheResolvedMapsAddresses([
+      "Via Origine A 1",
+      "Via Destinazione A 1",
+      "Via Origine B 1",
+      "Via Destinazione B 1",
+    ]);
 
     expect((await request(app({ aree: [], isAdmin: true, areaOperativaId: areaOperativaA }))
       .get(`/maps/routes/consegne/${deliveryA}`)).status).toBe(200);
@@ -426,6 +461,7 @@ describe("MAPS — capability, scope e routing", () => {
       .send({ tipoConsegna: "domicilio" })).status).toBe(400);
 
     await db.update(beneficiariTable).set({ domicilio: "Via B" }).where(eq(beneficiariTable.id, beneficiary));
+    await cacheResolvedMapsAddresses(["Via Magazzino 1", "Via A"]);
     const route = await request(app({ centroId: centre, permessi: ["maps.route"] }))
       .get(`/maps/routes/consegne/${created.body.id}`);
     expect(route.status).toBe(200);
@@ -441,13 +477,21 @@ describe("MAPS — capability, scope e routing", () => {
     const beneficiary = await createBeneficiario(scope, centre, { areaOperativaId: areaOperativaA });
     const delivery = await insertConsegna(scope, { beneficiarioId: beneficiary, magazzinoId: warehouse });
     await db.update(consegneTable).set({ indirizzoConsegna: "Via A & B 2" }).where(eq(consegneTable.id, delivery));
+    await cacheResolvedMapsAddresses(["Via dell'Origine 1, Roma", "Via A & B 2"]);
 
     const allowed = await request(app({ areaOperativaId: areaOperativaA, centroId: centre, permessi: ["maps.route"] })).get(`/maps/routes/consegne/${delivery}`);
     expect(allowed.status).toBe(200);
     const url = new URL(allowed.body.url);
-    expect(url.searchParams.get("origin")).toBe("Via dell'Origine 1, Roma");
-    expect(url.searchParams.get("destination")).toBe("Via A & B 2");
+    expect(url.origin).toBe("https://www.openstreetmap.org");
+    expect(url.searchParams.get("engine")).toBe("fossgis_osrm_car");
+    expect(url.searchParams.get("route")).toBe("41.9,12.5;41.901,12.501");
     expect(allowed.body.url).not.toContain("Test");
+    expect(allowed.body.url).not.toContain("Via");
+    expect(allowed.body).toMatchObject({
+      origin: "Via dell'Origine 1, Roma",
+      destination: "Via A & B 2",
+      provider: "openstreetmap-directions",
+    });
     expect(Object.keys(allowed.body).sort()).toEqual(["destination", "origin", "provider", "url"]);
 
     const denied = await request(app({ areaOperativaId: areaOperativaB, permessi: ["maps.route"] })).get(`/maps/routes/consegne/${delivery}`);

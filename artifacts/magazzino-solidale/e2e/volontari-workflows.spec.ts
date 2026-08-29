@@ -238,7 +238,7 @@ test("pre-test finale: creazione atomica, domicilio, CF e import correggibile", 
   const temporaryPayload = {
     ...common, nome: "Tina", cognome: `Temporanea ${suffix}`, tipoVolontario: "TEMPORANEO",
   };
-  expect((await page.request.post("/api/volontari", { data: temporaryPayload })).status()).toBe(400);
+  expect((await page.request.post("/api/volontari", { data: temporaryPayload })).status()).toBe(422);
   const serviceDate = "2027-09-14";
   const temporaryResponse = await page.request.post("/api/volontari", {
     data: { ...temporaryPayload, dataServizio: serviceDate },
