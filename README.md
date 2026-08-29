@@ -252,9 +252,12 @@ un archivio geografico generale interrogabile.
 I percorsi esterni usano OpenStreetMap directions. La mappa integrata usa Leaflet
 con tile OpenStreetMap, configurabili tramite `MAPS_TILE_URL` e
 `MAPS_TILE_ATTRIBUTION`, senza chiavi browser. Il geocoding è cache-first lato
-server; il servizio pubblico Nominatim richiede `MAPS_PUBLIC_GEOCODING_ALLOWED=true`
-e resta limitato a una richiesta ogni 1,1 secondi. Per dati sensibili usare una
-istanza Nominatim self-hosted o un provider approvato.
+server: nell'ambiente locale/demo standard il Nominatim pubblico è abilitato e
+limitato a una richiesta ogni 1,1 secondi. Impostare
+`MAPS_PUBLIC_GEOCODING_ALLOWED=false` per disabilitarlo esplicitamente. Un
+`NOMINATIM_BASE_URL` custom/self-hosted non richiede l'abilitazione del provider
+pubblico. I template cliente partono invece con il provider pubblico disabilitato.
+Per dati sensibili usare un'istanza Nominatim self-hosted o un provider approvato.
 Gli indirizzi sono dati personali: vengono trasmessi al provider soltanto quelli
 strettamente necessari al geocoding o alla navigazione. I DTO MAPS sono
 minimizzati e non includono nomi, telefoni, codici beneficiario, note o contenuti

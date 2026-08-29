@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { schedulePriorityDowngrade } from "./lib/priorityDowngrade";
 import { initializeBaseData } from "./lib/baseData";
+import { mapsGeocodingStartupDiagnostics } from "./lib/maps-geocoding-config";
 
 const rawPort = process.env["PORT"];
 
@@ -30,6 +31,7 @@ async function start(): Promise<void> {
     }
 
     logger.info({ port }, "Server listening");
+    logger.info(mapsGeocodingStartupDiagnostics(), "maps geocoding");
 
     schedulePriorityDowngrade();
   });

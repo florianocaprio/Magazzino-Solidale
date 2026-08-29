@@ -32,6 +32,9 @@ services:
       UPLOAD_DIR: /app/uploads
       COOKIE_SAMESITE: lax
       COOKIE_SECURE: "false"
+      MAPS_PUBLIC_GEOCODING_ALLOWED: "${MAPS_PUBLIC_GEOCODING_ALLOWED:-true}"
+      NOMINATIM_BASE_URL: "${NOMINATIM_BASE_URL:-https://nominatim.openstreetmap.org}"
+      NOMINATIM_USER_AGENT: "${NOMINATIM_USER_AGENT:-MagazzinoSolidale/2.1 (+https://magazzino.angeliinmoto.it)}"
     volumes:
       - magazzino_uploads:/app/uploads
     expose:
