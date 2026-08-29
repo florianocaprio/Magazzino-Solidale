@@ -1051,9 +1051,12 @@ export type VolontarioInput = unknown & ({
   tipoVolontario?: VolontarioInputTipoVolontario;
   /** @nullable */
   centroAscoltoId?: number | null;
-  telefono?: string;
-  telefonoSecondario?: string;
-  email?: string;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  telefonoSecondario?: string | null;
+  /** @nullable */
+  email?: string | null;
   luogoNascita: string;
   dataNascita: string;
   indirizzoResidenza: string;
@@ -1078,7 +1081,8 @@ export type VolontarioInput = unknown & ({
   mezzoPersonale?: boolean;
   /** @minimum 0 */
   maxConsegneTurno?: number;
-  note?: string;
+  /** @nullable */
+  note?: string | null;
 });
 
 export interface VolontariBulkInput {
@@ -6129,6 +6133,7 @@ export type VolontarioStatoAssicurazione = typeof VolontarioStatoAssicurazione[k
 
 
 export const VolontarioStatoAssicurazione = {
+  TEMPORANEA: 'TEMPORANEA',
   MANCANTE: 'MANCANTE',
   VALIDA: 'VALIDA',
   IN_SCADENZA: 'IN_SCADENZA',
@@ -6219,9 +6224,12 @@ export interface VolontarioUpdate {
   cognome?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
-  telefono?: string;
-  telefonoSecondario?: string;
-  email?: string;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  telefonoSecondario?: string | null;
+  /** @nullable */
+  email?: string | null;
   luogoNascita?: string;
   dataNascita?: string;
   indirizzoResidenza?: string;
@@ -6244,10 +6252,67 @@ export interface VolontarioUpdate {
   mezzoPersonale?: boolean;
   /** @minimum 0 */
   maxConsegneTurno?: number;
-  attivo?: boolean;
-  note?: string;
+  /** @nullable */
+  note?: string | null;
   /** @minimum 1 */
   versione: number;
+}
+
+export interface VolontarioFieldErrors {
+  nome?: string;
+  cognome?: string;
+  matricola?: string;
+  tipoVolontario?: string;
+  codiceFiscale?: string;
+  codiceFiscaleNonDisponibile?: string;
+  codiceFiscaleNota?: string;
+  dataNascita?: string;
+  luogoNascita?: string;
+  indirizzoResidenza?: string;
+  indirizzoDomicilio?: string;
+  telefono?: string;
+  telefonoSecondario?: string;
+  email?: string;
+  centroAscoltoId?: string;
+  ruoloVolontarioId?: string;
+  maxConsegneTurno?: string;
+  dataServizio?: string;
+  patente?: string;
+  mezzoPersonale?: string;
+  versione?: string;
+}
+
+export type VolontarioValidationErrorResponseDetails = {
+  fieldErrors: VolontarioFieldErrors;
+  missingFields: string[];
+};
+
+export interface VolontarioValidationErrorResponse {
+  error: string;
+  code: string;
+  message: string;
+  fieldErrors: VolontarioFieldErrors;
+  missingFields: string[];
+  correlationId: string;
+  details: VolontarioValidationErrorResponseDetails;
+}
+
+export type VolontarioKnownConflictResponseCode = typeof VolontarioKnownConflictResponseCode[keyof typeof VolontarioKnownConflictResponseCode];
+
+
+export const VolontarioKnownConflictResponseCode = {
+  GIORNATA_TEMPORANEA_DUPLICATA: 'GIORNATA_TEMPORANEA_DUPLICATA',
+  ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO: 'ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO',
+  STALE_VERSION: 'STALE_VERSION',
+} as const;
+
+export interface VolontarioKnownConflictResponse {
+  error: string;
+  code?: VolontarioKnownConflictResponseCode;
+  message?: string;
+  correlationId?: string;
+  /** @minimum 1 */
+  giornataId?: number;
 }
 
 export type VolontarioIdentifierTipoIdentificativo = typeof VolontarioIdentifierTipoIdentificativo[keyof typeof VolontarioIdentifierTipoIdentificativo];
@@ -6323,6 +6388,7 @@ export type VolontarioOperationalStateStatoAssicurazione = typeof VolontarioOper
 
 
 export const VolontarioOperationalStateStatoAssicurazione = {
+  TEMPORANEA: 'TEMPORANEA',
   MANCANTE: 'MANCANTE',
   VALIDA: 'VALIDA',
   IN_SCADENZA: 'IN_SCADENZA',
@@ -6446,6 +6512,7 @@ export interface VolontarioBulkInsurancePreviewRow {
   esitoPrevisto: string;
   /** @nullable */
   esclusioneMotivo?: string | null;
+  code?: string;
 }
 
 export type VolontarioBulkInsuranceConfirmInputRigheItem = {
@@ -6689,6 +6756,7 @@ export type VolontariRegisterGenerateInputFiltriAssicurazione = typeof Volontari
 
 
 export const VolontariRegisterGenerateInputFiltriAssicurazione = {
+  TEMPORANEA: 'TEMPORANEA',
   MANCANTE: 'MANCANTE',
   VALIDA: 'VALIDA',
   IN_SCADENZA: 'IN_SCADENZA',
@@ -9174,6 +9242,7 @@ export type ListVolontariStatoAssicurazione = typeof ListVolontariStatoAssicuraz
 
 
 export const ListVolontariStatoAssicurazione = {
+  TEMPORANEA: 'TEMPORANEA',
   MANCANTE: 'MANCANTE',
   VALIDA: 'VALIDA',
   IN_SCADENZA: 'IN_SCADENZA',

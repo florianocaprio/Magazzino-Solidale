@@ -10,6 +10,7 @@ export type VolontariRegisterGenerateInputFiltriAssicurazione = typeof Volontari
 
 
 export const VolontariRegisterGenerateInputFiltriAssicurazione = {
+  TEMPORANEA: 'TEMPORANEA',
   MANCANTE: 'MANCANTE',
   VALIDA: 'VALIDA',
   IN_SCADENZA: 'IN_SCADENZA',

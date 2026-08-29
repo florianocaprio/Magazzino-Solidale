@@ -10,6 +10,7 @@ export type VolontarioOperationalStateStatoAssicurazione = typeof VolontarioOper
 
 
 export const VolontarioOperationalStateStatoAssicurazione = {
+  TEMPORANEA: 'TEMPORANEA',
   MANCANTE: 'MANCANTE',
   VALIDA: 'VALIDA',
   IN_SCADENZA: 'IN_SCADENZA',

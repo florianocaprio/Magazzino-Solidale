@@ -50,7 +50,10 @@ export async function operationalStatesForRows(
           lte(statiVolontariTable.dataEffettiva, riferimento),
         ),
       )
-      .orderBy(asc(statiVolontariTable.dataEffettiva), asc(statiVolontariTable.id)),
+      .orderBy(
+        asc(statiVolontariTable.dataEffettiva),
+        asc(statiVolontariTable.id),
+      ),
     executor
       .select({ volontarioId: giornateServizioVolontariTable.volontarioId })
       .from(giornateServizioVolontariTable)
@@ -58,11 +61,17 @@ export async function operationalStatesForRows(
         and(
           inArray(giornateServizioVolontariTable.volontarioId, ids),
           eq(giornateServizioVolontariTable.dataServizio, riferimento),
-          inArray(giornateServizioVolontariTable.stato, ["PIANIFICATA", "PRESENTE"]),
+          inArray(giornateServizioVolontariTable.stato, [
+            "PIANIFICATA",
+            "PRESENTE",
+          ]),
           centroAscoltoId == null
             ? undefined
             : or(
-                eq(giornateServizioVolontariTable.centroAscoltoId, centroAscoltoId),
+                eq(
+                  giornateServizioVolontariTable.centroAscoltoId,
+                  centroAscoltoId,
+                ),
                 isNull(giornateServizioVolontariTable.centroAscoltoId),
               ),
         ),
@@ -80,14 +89,18 @@ export async function operationalStatesForRows(
   return new Map(
     rows.map((row) => {
       const event = lastEvent.get(row.id);
-      const amministrativamenteAttivo = event
-        ? event.tipoEvento === "RIATTIVAZIONE"
-        : row.attivo;
+      // I nuovi record in attesa nascono con attivo=false, ma non sono sospesi.
+      // Per i legacy approvati senza storico manteniamo il valore amministrativo.
+      const sospesoManualmente = event
+        ? event.tipoEvento === "SOSPENSIONE"
+        : row.statoApprovazione === "approvato" && !row.attivo;
+      const amministrativamenteAttivo = !sospesoManualmente;
       return [
         row.id,
         evaluateOperationalState({
           approvazione: row.statoApprovazione,
           amministrativamenteAttivo,
+          sospesoManualmente,
           tipoVolontario: row.tipoVolontario,
           riferimento,
           coperture: coveragesById.get(row.id) ?? [],
@@ -114,5 +127,14 @@ export async function operationalStateForVolunteer(
     .from(volontariTable)
     .where(eq(volontariTable.id, volontarioId));
   if (!row) return null;
-  return (await operationalStatesForRows(executor, [row], riferimento, centroAscoltoId)).get(volontarioId) ?? null;
+  return (
+    (
+      await operationalStatesForRows(
+        executor,
+        [row],
+        riferimento,
+        centroAscoltoId,
+      )
+    ).get(volontarioId) ?? null
+  );
 }

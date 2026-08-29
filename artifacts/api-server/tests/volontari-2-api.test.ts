@@ -273,10 +273,9 @@ describe("Volontari 2.0 — dominio operativo e assicurazione", () => {
       motivoNonOperativo: "ASSICURAZIONE_SCADUTA",
     });
 
-    let temporary = await approve(
+    const temporary = await approve(
       await createVolunteer({ tipo: "TEMPORANEO" }),
     );
-    temporary = await insure(temporary, { dataDecorrenza: "2027-01-01" });
     const day = await request(app())
       .post(`/volontari/${temporary.id}/giornate`)
       .send({ dataServizio: "2027-05-10", stato: "PIANIFICATA" });
@@ -289,9 +288,226 @@ describe("Volontari 2.0 — dominio operativo e assicurazione", () => {
       `/volontari/${temporary.id}?dataRiferimento=2027-05-11`,
     );
     expect(onDay.body.operativo).toBe(true);
+    expect(onDay.body).toMatchObject({
+      statoAssicurazione: "TEMPORANEA",
+      scadenzaAssicurazione: null,
+    });
     expect(outsideDay.body).toMatchObject({
       operativo: false,
       motivoNonOperativo: "GIORNATA_TEMPORANEA_MANCANTE",
+    });
+  });
+
+  it("registra più giornate e rende idempotente il duplicato anche in concorrenza", async () => {
+    const temporary = await approve(
+      await createVolunteer({ tipo: "TEMPORANEO" }),
+    );
+    for (const dataServizio of ["2027-05-10", "2027-05-11"]) {
+      const response = await request(app())
+        .post(`/volontari/${temporary.id}/giornate`)
+        .send({ dataServizio, stato: "PIANIFICATA" });
+      expect(response.status, response.text).toBe(201);
+    }
+
+    const duplicate = await request(app())
+      .post(`/volontari/${temporary.id}/giornate`)
+      .send({ dataServizio: "2027-05-10", stato: "PRESENTE" });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body).toMatchObject({
+      error: "La giornata è già registrata",
+      code: "GIORNATA_TEMPORANEA_DUPLICATA",
+      message: "Esiste già una giornata di servizio per questa data",
+      correlationId: expect.any(String),
+      giornataId: expect.any(Number),
+    });
+
+    const concurrent = await Promise.all([
+      request(app())
+        .post(`/volontari/${temporary.id}/giornate`)
+        .send({ dataServizio: "2027-05-12", stato: "PIANIFICATA" }),
+      request(app())
+        .post(`/volontari/${temporary.id}/giornate`)
+        .send({ dataServizio: "2027-05-12", stato: "PIANIFICATA" }),
+    ]);
+    expect(concurrent.map((response) => response.status).sort()).toEqual([
+      201, 409,
+    ]);
+    const days = await db
+      .select()
+      .from(giornateServizioVolontariTable)
+      .where(eq(giornateServizioVolontariTable.volontarioId, temporary.id));
+    expect(days.map((day) => day.dataServizio).sort()).toEqual([
+      "2026-01-01",
+      "2027-05-10",
+      "2027-05-11",
+      "2027-05-12",
+    ]);
+    const ledger = await db
+      .select()
+      .from(registroVolontariEventiTable)
+      .where(
+        and(
+          eq(registroVolontariEventiTable.volontarioId, temporary.id),
+          eq(registroVolontariEventiTable.tipoEvento, "GIORNATA_TEMPORANEA"),
+        ),
+      );
+    expect(ledger).toHaveLength(4);
+  });
+
+  it("blocca l'assicurazione annuale del temporaneo e lo esclude dal bulk", async () => {
+    const temporary = await approve(
+      await createVolunteer({ tipo: "TEMPORANEO" }),
+    );
+    const before = await db
+      .select()
+      .from(copertureAssicurativeVolontariTable)
+      .where(
+        eq(copertureAssicurativeVolontariTable.volontarioId, temporary.id),
+      );
+    const insurance = await request(app())
+      .post(`/volontari/${temporary.id}/assicurazione`)
+      .send({
+        versione: temporary.versione,
+        modalita: "NUOVA_DA_DATA",
+        dataDecorrenza: "2027-01-01",
+        durataMesi: 12,
+      });
+    expect(insurance.status).toBe(409);
+    expect(insurance.body).toMatchObject({
+      code: "ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO",
+      message: "Per un volontario temporaneo registra una giornata di servizio",
+      correlationId: expect.any(String),
+    });
+    const preview = await request(app())
+      .post("/volontari/assicurazione/massivo/preview")
+      .send({
+        volontarioIds: [temporary.id],
+        modalita: "NUOVA_DA_DATA",
+        dataDecorrenza: "2027-01-01",
+        durataMesi: 12,
+      });
+    expect(preview.status, preview.text).toBe(200);
+    expect(preview.body.items[0]).toMatchObject({
+      volontarioId: temporary.id,
+      incluso: false,
+      esitoPrevisto: "ESCLUSO",
+      code: "ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO",
+    });
+    const after = await db
+      .select()
+      .from(copertureAssicurativeVolontariTable)
+      .where(
+        eq(copertureAssicurativeVolontariTable.volontarioId, temporary.id),
+      );
+    expect(after).toEqual(before);
+  });
+
+  it("rifiuta il duplicato di giornata quando il centro è null", async () => {
+    const [temporary] = await db
+      .insert(volontariTable)
+      .values({
+        nome: "Nora",
+        cognome: unique("Temporanea trasversale"),
+        matricola: unique("VT-NULL"),
+        tipoVolontario: "TEMPORANEO",
+        centroAscoltoId: null,
+        ruolo: "Volontario",
+        ruoloVolontarioId: ruoloId,
+        statoApprovazione: "approvato",
+        attivo: true,
+        codiceFiscaleNonDisponibile: true,
+        luogoNascita: "Roma",
+        dataNascita: "1990-01-02",
+        indirizzoResidenza: "Via Trasversale 1",
+      })
+      .returning();
+    scope.volontarioIds.push(temporary.id);
+    const payload = {
+      dataServizio: "2027-07-01",
+      centroAscoltoId: null,
+      stato: "PIANIFICATA",
+    };
+    const first = await request(app())
+      .post(`/volontari/${temporary.id}/giornate`)
+      .send(payload);
+    const duplicate = await request(app())
+      .post(`/volontari/${temporary.id}/giornate`)
+      .send(payload);
+    expect(first.status, first.text).toBe(201);
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.code).toBe("GIORNATA_TEMPORANEA_DUPLICATA");
+    const rows = await db
+      .select()
+      .from(giornateServizioVolontariTable)
+      .where(eq(giornateServizioVolontariTable.volontarioId, temporary.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].centroAscoltoId).toBeNull();
+  });
+
+  it("distingue attesa approvazione e sospensione amministrativa reale", async () => {
+    const pending = await createVolunteer({});
+    const pendingDetail = await request(app()).get(`/volontari/${pending.id}`);
+    expect(pendingDetail.status, pendingDetail.text).toBe(200);
+    expect(pendingDetail.body).toMatchObject({
+      statoApprovazione: "in_attesa",
+      sospesoManualmente: false,
+      motivoNonOperativo: "IN_ATTESA_APPROVAZIONE",
+    });
+    const pendingSuspend = await request(app())
+      .post(`/volontari/${pending.id}/sospendi`)
+      .send({
+        versione: pending.versione,
+        dataEffettiva: todayRome(),
+        motivo: "indisponibilita_temporanea",
+      });
+    expect(pendingSuspend.status).toBe(409);
+
+    const approved = await approve(pending);
+    const suspended = await request(app())
+      .post(`/volontari/${approved.id}/sospendi`)
+      .send({
+        versione: approved.versione,
+        dataEffettiva: todayRome(),
+        motivo: "indisponibilita_temporanea",
+      });
+    expect(suspended.status, suspended.text).toBe(200);
+    expect(suspended.body.stato.sospesoManualmente).toBe(true);
+    const reactivated = await request(app())
+      .post(`/volontari/${approved.id}/riattiva`)
+      .send({
+        versione: suspended.body.versione,
+        dataEffettiva: todayRome(),
+      });
+    expect(reactivated.status, reactivated.text).toBe(200);
+    expect(reactivated.body.stato.sospesoManualmente).toBe(false);
+  });
+
+  it("ignora nella sintesi la scadenza annuale legacy del temporaneo", async () => {
+    const temporary = await approve(
+      await createVolunteer({ tipo: "TEMPORANEO" }),
+    );
+    await db.insert(copertureAssicurativeVolontariTable).values({
+      volontarioId: temporary.id,
+      dataInizio: "2027-01-01",
+      dataFine: "2027-12-31",
+      durataMesi: 12,
+      tipoOperazione: "NUOVA_COPERTURA",
+    });
+    const detail = await request(app()).get(
+      `/volontari/${temporary.id}?dataRiferimento=2027-01-01`,
+    );
+    expect(detail.status, detail.text).toBe(200);
+    expect(detail.body).toMatchObject({
+      statoAssicurazione: "TEMPORANEA",
+      scadenzaAssicurazione: null,
+    });
+    const dossier = await request(app()).get(
+      `/volontari/${temporary.id}/dossier`,
+    );
+    expect(dossier.body.coperture).toHaveLength(1);
+    expect(dossier.body.statoOperativo).toMatchObject({
+      statoAssicurazione: "TEMPORANEA",
+      scadenzaAssicurazione: null,
     });
   });
 
@@ -762,7 +978,7 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
       Domicilio: "Via dell'Unità 7",
       "Data inizio attività/iscrizione": "2021-04-01",
       "Da Data importata": "2021-04-01",
-      "Scadenza assicurazione": "2028-12-31",
+      "Scadenza assicurazione": "",
       "Date servizio temporaneo": "2027-06-15",
       "Intervallo servizio temporaneo": "2027-06-15 – 2027-06-15",
     });
@@ -814,7 +1030,10 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
       "",
     ];
     const first = await analyze(workbook([rowA, rowB], "ordine-a-b"), centroId);
-    const second = await analyze(workbook([rowB, rowA], "ordine-b-a"), centroId);
+    const second = await analyze(
+      workbook([rowB, rowA], "ordine-b-a"),
+      centroId,
+    );
     expect(first.status, first.text).toBe(201);
     expect(second.status, second.text).toBe(201);
     expect(first.body.righe, JSON.stringify(first.body.righe)).toEqual(
@@ -853,7 +1072,10 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
   });
 
   it("blocca la conferma se il candidato cambia dopo la preview", async () => {
-    const centroId = await createCentro(scope, unique("Centro Concorrenza Import"));
+    const centroId = await createCentro(
+      scope,
+      unique("Centro Concorrenza Import"),
+    );
     const existing = await createVolunteer({
       centroAscoltoId: centroId,
       email: "prima@example.test",
@@ -884,7 +1106,10 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     ]);
     const preview = await analyze(file, centroId);
     expect(preview.status, preview.text).toBe(201);
-    expect(preview.body.righe[0], JSON.stringify(preview.body.righe[0])).toMatchObject({
+    expect(
+      preview.body.righe[0],
+      JSON.stringify(preview.body.righe[0]),
+    ).toMatchObject({
       stato: "AGGIORNAMENTO_CERTO",
       errori: [],
     });
@@ -1087,8 +1312,10 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
         matricola: "X".repeat(41),
         ruoloVolontarioId: ruoloId,
       });
-    expect(invalidLength.status).toBe(400);
-    expect(invalidLength.body.error).toMatch(/generata automaticamente/i);
+    expect(invalidLength.status).toBe(422);
+    expect(invalidLength.body.fieldErrors.matricola).toMatch(
+      /generata automaticamente/i,
+    );
 
     const first = await createVolunteer({
       codiceFiscale: "RSS MRA 80A01 H501 U",
@@ -1100,19 +1327,18 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
       dataNascita: "1980-01-01",
       indirizzoResidenza: "Via dell'Unità 3",
     });
-    const duplicate = await request(app())
-      .post("/volontari")
-      .send({
-        nome: "Altro",
-        cognome: "Sintetico",
-        ruoloVolontarioId: ruoloId,
-        centroAscoltoId: defaultCenterId,
-        codiceFiscale: "RSSMRA80A01H501U",
-        luogoNascita: "Roma",
-        dataNascita: "1982-02-02",
-        indirizzoResidenza: "Via Duplicato 2",
-      });
+    const duplicate = await request(app()).post("/volontari").send({
+      nome: "Altro",
+      cognome: "Sintetico",
+      ruoloVolontarioId: ruoloId,
+      centroAscoltoId: defaultCenterId,
+      codiceFiscale: "RSSMRA80A01H501U",
+      luogoNascita: "Roma",
+      dataNascita: "1982-02-02",
+      indirizzoResidenza: "Via Duplicato 2",
+    });
     expect(duplicate.status).toBe(409);
+    expect(duplicate.body.fieldErrors.codiceFiscale).toMatch(/già associato/i);
 
     const list = await request(app()).get(
       `/volontari?search=${first.matricola}`,
@@ -1586,10 +1812,12 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
         "",
         "",
         "",
-        (await db
-          .select({ nome: centriAscoltoTable.nome })
-          .from(centriAscoltoTable)
-          .where(eq(centriAscoltoTable.id, centerA)))[0].nome,
+        (
+          await db
+            .select({ nome: centriAscoltoTable.nome })
+            .from(centriAscoltoTable)
+            .where(eq(centriAscoltoTable.id, centerA))
+        )[0].nome,
         role.nome,
         "Permanente",
         "",
@@ -1627,9 +1855,7 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     scope.importazioneVolontariIds.push(globalBatch.body.importazioneId);
     expect(
       (
-        await request(
-          app({ centroAscoltoId: centerA, areaOperativaId: areaA }),
-        )
+        await request(app({ centroAscoltoId: centerA, areaOperativaId: areaA }))
           .post("/volontari/import/conferma")
           .send({ importazioneId: globalBatch.body.importazioneId, righe: [] })
       ).status,
@@ -1820,10 +2046,9 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     );
     const futureBook = XLSX.read(futureResponse.body, { type: "buffer" });
     expect(
-      XLSX.utils.sheet_to_json(
-        futureBook.Sheets[futureBook.SheetNames[0]],
-        { raw: true },
-      ),
+      XLSX.utils.sheet_to_json(futureBook.Sheets[futureBook.SheetNames[0]], {
+        raw: true,
+      }),
     ).toHaveLength(0);
 
     const pdf = await request(app())
@@ -1868,12 +2093,10 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
   it("limita le giornate temporanee per intervallo e Centro", async () => {
     const areaA = await createAreaOperativa(scope);
     const areaB = await createAreaOperativa(scope);
-    const centerA = (
-      await createCentroRec(scope, { areaOperativaId: areaA })
-    ).id;
-    const centerB = (
-      await createCentroRec(scope, { areaOperativaId: areaB })
-    ).id;
+    const centerA = (await createCentroRec(scope, { areaOperativaId: areaA }))
+      .id;
+    const centerB = (await createCentroRec(scope, { areaOperativaId: areaB }))
+      .id;
     const volunteer = await createVolunteer({
       tipo: "TEMPORANEO",
       centroAscoltoId: centerA,

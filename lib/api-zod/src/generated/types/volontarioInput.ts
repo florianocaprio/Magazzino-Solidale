@@ -13,9 +13,12 @@ export type VolontarioInput = unknown & ({
   tipoVolontario?: VolontarioInputTipoVolontario;
   /** @nullable */
   centroAscoltoId?: number | null;
-  telefono?: string;
-  telefonoSecondario?: string;
-  email?: string;
+  /** @nullable */
+  telefono?: string | null;
+  /** @nullable */
+  telefonoSecondario?: string | null;
+  /** @nullable */
+  email?: string | null;
   luogoNascita: string;
   dataNascita: Date;
   indirizzoResidenza: string;
@@ -40,5 +43,6 @@ export type VolontarioInput = unknown & ({
   mezzoPersonale?: boolean;
   /** @minimum 0 */
   maxConsegneTurno?: number;
-  note?: string;
+  /** @nullable */
+  note?: string | null;
 });

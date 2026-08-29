@@ -23,4 +23,5 @@ export interface VolontarioBulkInsurancePreviewRow {
   esitoPrevisto: string;
   /** @nullable */
   esclusioneMotivo?: string | null;
+  code?: string;
 }

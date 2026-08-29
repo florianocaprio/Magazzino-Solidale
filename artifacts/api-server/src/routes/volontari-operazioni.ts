@@ -11,7 +11,7 @@ import {
   statiVolontariTable,
   volontariTable,
 } from "@workspace/db";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   callerAreaOperativaId,
   callerCentroId,
@@ -75,6 +75,42 @@ function text(value: unknown, max = 2_000): string | null {
   return normalized ? normalized.slice(0, max) : null;
 }
 
+const TEMPORARY_INSURANCE_CODE =
+  "ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO";
+const TEMPORARY_INSURANCE_MESSAGE =
+  "Per un volontario temporaneo registra una giornata di servizio";
+
+function knownConflict(req: Request, code: string, message: string) {
+  return {
+    error: message,
+    code,
+    message,
+    correlationId: req.id == null ? randomUUID() : String(req.id),
+  };
+}
+
+function isServiceDayUniqueViolation(error: unknown): boolean {
+  let current = error;
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (!current || typeof current !== "object") return false;
+    const candidate = current as {
+      code?: string;
+      constraint?: string;
+      detail?: string;
+      cause?: unknown;
+    };
+    if (
+      candidate.code === "23505" &&
+      (candidate.constraint === "giornate_servizio_volontari_unique" ||
+        candidate.detail?.includes("giornate_servizio_volontari"))
+    ) {
+      return true;
+    }
+    current = candidate.cause;
+  }
+  return false;
+}
+
 const SUSPENSION_REASONS = [
   "indisponibilita_temporanea",
   "dimissioni_cessazione",
@@ -88,6 +124,9 @@ router.post(
   async (req, res) => {
     const scoped = await loadScopedVolunteer(req);
     if (!scoped.ok) { res.status(scoped.status).json({ error: scoped.error }); return; }
+    if (scoped.row.statoApprovazione !== "approvato") {
+      res.status(409).json({ error: "Un volontario non approvato non può essere sospeso" }); return;
+    }
     const versione = parseRequiredVersion(req.body?.versione);
     const dataEffettiva = req.body?.dataEffettiva ?? todayRome();
     const motivo = text(req.body?.motivo, 80);
@@ -260,6 +299,16 @@ router.post(
   async (req, res) => {
     const scoped = await loadScopedVolunteer(req);
     if (!scoped.ok) { res.status(scoped.status).json({ error: scoped.error }); return; }
+    if (scoped.row.tipoVolontario === "TEMPORANEO") {
+      res.status(409).json(
+        knownConflict(
+          req,
+          TEMPORARY_INSURANCE_CODE,
+          TEMPORARY_INSURANCE_MESSAGE,
+        ),
+      );
+      return;
+    }
     const versione = parseRequiredVersion(req.body?.versione);
     if (versione == null) { res.status(400).json({ error: "versione obbligatoria" }); return; }
     const values = await coverageValues(scoped.row.id, req.body as CoverageRequest);
@@ -307,6 +356,18 @@ router.post(
     if (allowed.length !== ids.length) { res.status(403).json({ error: "La selezione contiene volontari fuori perimetro" }); return; }
     const states = await operationalStatesForRows(db, allowed, todayRome());
     const items = await Promise.all(allowed.map(async (row) => {
+      if (row.tipoVolontario === "TEMPORANEO") {
+        return {
+          volontarioId: row.id, versione: row.versione,
+          volontario: `${row.cognome} ${row.nome}`,
+          vecchiaScadenza: null,
+          motivoNonOperativo: states.get(row.id)!.motivoNonOperativo,
+          nuovaDecorrenza: null, nuovaScadenza: null,
+          esitoPrevisto: "ESCLUSO", incluso: false,
+          esclusioneMotivo: TEMPORARY_INSURANCE_MESSAGE,
+          code: TEMPORARY_INSURANCE_CODE,
+        };
+      }
       const coverage = await coverageValues(row.id, req.body as CoverageRequest);
       const state = states.get(row.id)!;
       return coverage.ok ? {
@@ -350,6 +411,15 @@ router.post(
       for (const row of locked) {
         const input = selections.find((item: any) => Number(item.volontarioId) === row.id);
         if (parseRequiredVersion(input?.versione) !== row.versione) throw new Error("STALE_VERSION");
+        if (row.tipoVolontario === "TEMPORANEO") {
+          output.push({
+            volontarioId: row.id,
+            esito: "ESCLUSO",
+            motivo: TEMPORARY_INSURANCE_MESSAGE,
+            code: TEMPORARY_INSURANCE_CODE,
+          });
+          continue;
+        }
         const coverage = await coverageValues(row.id, req.body as CoverageRequest, tx);
         if (!coverage.ok) { output.push({ volontarioId: row.id, esito: "ESCLUSO", motivo: coverage.error }); continue; }
         const [created] = await tx.insert(copertureAssicurativeVolontariTable).values({
@@ -415,34 +485,81 @@ router.post(
       res.status(403).json({ error: "Centro della giornata non accessibile" }); return;
     }
     const state = await operationalStateForVolunteer(db, scoped.row.id, dataServizio, centroAscoltoId);
-    const created = await db.transaction(async (tx) => {
-      const [row] = await tx.insert(giornateServizioVolontariTable).values({
-        volontarioId: scoped.row.id, dataServizio, centroAscoltoId,
-        attivita: text(req.body?.attivita, 200), stato,
-        coperturaVerificata: state?.statoAssicurazione === "VALIDA" || state?.statoAssicurazione === "IN_SCADENZA",
-        note: text(req.body?.note), creatoDa: userId(req),
-      }).returning();
-      await appendVolontarioLedgerEvent(tx, {
-        sezione: "TEMPORANEO", tipoEvento: "GIORNATA_TEMPORANEA",
-        volontarioId: scoped.row.id, centroAscoltoId, dataEffettiva: dataServizio,
-        snapshot: await buildVolunteerEventSnapshot(tx, scoped.row, {
-          statoPrecedente: null,
-          nuovoStato: stato,
-          motivo: "giornata_temporanea",
-          dataEffettiva: dataServizio,
-          riferimentoEventoId: row.id,
-          datiEvento: {
-            giornataId: row.id,
-            attivita: row.attivita,
-            coperturaVerificata: row.coperturaVerificata,
-          },
-        }),
-        utenteId: userId(req),
-      });
-      await auditLogistica(tx, req, { entita: "volontario", id: scoped.row.id, azione: "giornata_temporanea", nuovo: { giornataId: row.id, dataServizio, stato } });
-      return row;
+    const duplicateResponse = () => ({
+      ...knownConflict(
+        req,
+        "GIORNATA_TEMPORANEA_DUPLICATA",
+        "Esiste già una giornata di servizio per questa data",
+      ),
+      error: "La giornata è già registrata",
     });
-    res.status(201).json(created);
+    try {
+      const created = await db.transaction(async (tx) => {
+        // Il lock sul volontario serializza anche il caso centro NULL, non
+        // coperto semanticamente da un indice UNIQUE PostgreSQL ordinario.
+        await tx
+          .select({ id: volontariTable.id })
+          .from(volontariTable)
+          .where(eq(volontariTable.id, scoped.row.id))
+          .for("update");
+        const [existing] = await tx
+          .select({ id: giornateServizioVolontariTable.id })
+          .from(giornateServizioVolontariTable)
+          .where(
+            and(
+              eq(giornateServizioVolontariTable.volontarioId, scoped.row.id),
+              eq(giornateServizioVolontariTable.dataServizio, dataServizio),
+              centroAscoltoId == null
+                ? isNull(giornateServizioVolontariTable.centroAscoltoId)
+                : eq(
+                    giornateServizioVolontariTable.centroAscoltoId,
+                    centroAscoltoId,
+                  ),
+            ),
+          )
+          .limit(1);
+        if (existing) return { duplicateId: existing.id } as const;
+        const [row] = await tx.insert(giornateServizioVolontariTable).values({
+          volontarioId: scoped.row.id, dataServizio, centroAscoltoId,
+          attivita: text(req.body?.attivita, 200), stato,
+          coperturaVerificata: state?.statoAssicurazione === "TEMPORANEA" || state?.statoAssicurazione === "VALIDA" || state?.statoAssicurazione === "IN_SCADENZA",
+          note: text(req.body?.note), creatoDa: userId(req),
+        }).returning();
+        await appendVolontarioLedgerEvent(tx, {
+          sezione: "TEMPORANEO", tipoEvento: "GIORNATA_TEMPORANEA",
+          volontarioId: scoped.row.id, centroAscoltoId, dataEffettiva: dataServizio,
+          snapshot: await buildVolunteerEventSnapshot(tx, scoped.row, {
+            statoPrecedente: null,
+            nuovoStato: stato,
+            motivo: "giornata_temporanea",
+            dataEffettiva: dataServizio,
+            riferimentoEventoId: row.id,
+            datiEvento: {
+              giornataId: row.id,
+              attivita: row.attivita,
+              coperturaVerificata: row.coperturaVerificata,
+            },
+          }),
+          utenteId: userId(req),
+        });
+        await auditLogistica(tx, req, { entita: "volontario", id: scoped.row.id, azione: "giornata_temporanea", nuovo: { giornataId: row.id, dataServizio, stato } });
+        return { row } as const;
+      });
+      if ("duplicateId" in created) {
+        res.status(409).json({
+          ...duplicateResponse(),
+          giornataId: created.duplicateId,
+        });
+        return;
+      }
+      res.status(201).json(created.row);
+    } catch (error) {
+      if (isServiceDayUniqueViolation(error)) {
+        res.status(409).json(duplicateResponse());
+        return;
+      }
+      throw error;
+    }
   },
 );
 

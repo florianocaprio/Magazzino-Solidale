@@ -9669,7 +9669,7 @@ export const ListVolontariQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
   "stato": zod.enum(['attivi', 'non_attivi', 'tutti']).optional(),
   "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']).optional(),
-  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']).optional(),
+  "statoAssicurazione": zod.enum(['TEMPORANEA', 'MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']).optional(),
   "ruoloVolontarioId": zod.coerce.number().optional(),
   "dataRiferimento": zod.date().optional(),
   "scadenzaDa": zod.date().optional(),
@@ -9715,7 +9715,7 @@ export const ListVolontariResponseItem = zod.object({
   "abilitatoAmministrativamente": zod.boolean(),
   "operativo": zod.boolean(),
   "motivoNonOperativo": zod.string().nullish(),
-  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "statoAssicurazione": zod.enum(['TEMPORANEA', 'MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
   "scadenzaAssicurazione": zod.coerce.date().nullish(),
   "sospesoManualmente": zod.boolean(),
   "giornataTemporaneaValida": zod.boolean().nullish(),
@@ -9738,9 +9738,9 @@ export const CreateVolontarioBody = zod.unknown().and(zod.object({
   "cognome": zod.string(),
   "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']).optional(),
   "centroAscoltoId": zod.number().nullish(),
-  "telefono": zod.string().optional(),
-  "telefonoSecondario": zod.string().optional(),
-  "email": zod.string().optional(),
+  "telefono": zod.string().nullish(),
+  "telefonoSecondario": zod.string().nullish(),
+  "email": zod.string().nullish(),
   "luogoNascita": zod.string(),
   "dataNascita": zod.coerce.date(),
   "indirizzoResidenza": zod.string(),
@@ -9753,7 +9753,7 @@ export const CreateVolontarioBody = zod.unknown().and(zod.object({
   "patente": zod.boolean().optional(),
   "mezzoPersonale": zod.boolean().optional(),
   "maxConsegneTurno": zod.number().min(createVolontarioBodyTwoMaxConsegneTurnoMin).optional(),
-  "note": zod.string().optional()
+  "note": zod.string().nullish()
 }))
 
 
@@ -9768,9 +9768,9 @@ export const BulkVolontariBody = zod.object({
   "cognome": zod.string(),
   "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO']).optional(),
   "centroAscoltoId": zod.number().nullish(),
-  "telefono": zod.string().optional(),
-  "telefonoSecondario": zod.string().optional(),
-  "email": zod.string().optional(),
+  "telefono": zod.string().nullish(),
+  "telefonoSecondario": zod.string().nullish(),
+  "email": zod.string().nullish(),
   "luogoNascita": zod.string(),
   "dataNascita": zod.coerce.date(),
   "indirizzoResidenza": zod.string(),
@@ -9783,7 +9783,7 @@ export const BulkVolontariBody = zod.object({
   "patente": zod.boolean().optional(),
   "mezzoPersonale": zod.boolean().optional(),
   "maxConsegneTurno": zod.number().min(bulkVolontariBodyRigheItemTwoMaxConsegneTurnoMin).optional(),
-  "note": zod.string().optional()
+  "note": zod.string().nullish()
 })))
 })
 
@@ -9834,7 +9834,7 @@ export const SuspendVolontarioResponse = zod.object({
   "stato": zod.object({
   "operativo": zod.boolean(),
   "motivoNonOperativo": zod.string().nullish(),
-  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "statoAssicurazione": zod.enum(['TEMPORANEA', 'MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
   "scadenzaAssicurazione": zod.coerce.date().nullish(),
   "sospesoManualmente": zod.boolean(),
   "giornataTemporaneaValida": zod.boolean().nullish()
@@ -9866,7 +9866,7 @@ export const ReactivateVolontarioResponse = zod.object({
   "stato": zod.object({
   "operativo": zod.boolean(),
   "motivoNonOperativo": zod.string().nullish(),
-  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "statoAssicurazione": zod.enum(['TEMPORANEA', 'MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
   "scadenzaAssicurazione": zod.coerce.date().nullish(),
   "sospesoManualmente": zod.boolean(),
   "giornataTemporaneaValida": zod.boolean().nullish()
@@ -9929,7 +9929,8 @@ export const PreviewBulkVolontariInsuranceResponse = zod.object({
   "vecchiaScadenza": zod.coerce.date().nullish(),
   "motivoNonOperativo": zod.string().nullish(),
   "esitoPrevisto": zod.string(),
-  "esclusioneMotivo": zod.string().nullish()
+  "esclusioneMotivo": zod.string().nullish(),
+  "code": zod.string().optional()
 }))
 })
 
@@ -10133,7 +10134,7 @@ export const GenerateVolontariRegisterBody = zod.object({
   "centroAscoltoId": zod.number().min(1).optional(),
   "ruoloVolontarioId": zod.number().min(1).optional(),
   "search": zod.string().optional(),
-  "assicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']).optional(),
+  "assicurazione": zod.enum(['TEMPORANEA', 'MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']).optional(),
   "dataServizio": zod.coerce.date().optional(),
   "servizioDa": zod.coerce.date().optional(),
   "servizioA": zod.coerce.date().optional()
@@ -10274,7 +10275,7 @@ export const ConvertVolontarioToPermanentResponse = zod.object({
   "abilitatoAmministrativamente": zod.boolean(),
   "operativo": zod.boolean(),
   "motivoNonOperativo": zod.string().nullish(),
-  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "statoAssicurazione": zod.enum(['TEMPORANEA', 'MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
   "scadenzaAssicurazione": zod.coerce.date().nullish(),
   "sospesoManualmente": zod.boolean(),
   "giornataTemporaneaValida": zod.boolean().nullish(),
@@ -10332,7 +10333,7 @@ export const GetVolontarioResponse = zod.object({
   "abilitatoAmministrativamente": zod.boolean(),
   "operativo": zod.boolean(),
   "motivoNonOperativo": zod.string().nullish(),
-  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "statoAssicurazione": zod.enum(['TEMPORANEA', 'MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
   "scadenzaAssicurazione": zod.coerce.date().nullish(),
   "sospesoManualmente": zod.boolean(),
   "giornataTemporaneaValida": zod.boolean().nullish(),
@@ -10358,9 +10359,9 @@ export const UpdateVolontarioBody = zod.object({
   "nome": zod.string().optional(),
   "cognome": zod.string().optional(),
   "centroAscoltoId": zod.number().nullish(),
-  "telefono": zod.string().optional(),
-  "telefonoSecondario": zod.string().optional(),
-  "email": zod.string().optional(),
+  "telefono": zod.string().nullish(),
+  "telefonoSecondario": zod.string().nullish(),
+  "email": zod.string().nullish(),
   "luogoNascita": zod.string().optional(),
   "dataNascita": zod.coerce.date().optional(),
   "indirizzoResidenza": zod.string().optional(),
@@ -10372,8 +10373,7 @@ export const UpdateVolontarioBody = zod.object({
   "patente": zod.boolean().optional(),
   "mezzoPersonale": zod.boolean().optional(),
   "maxConsegneTurno": zod.number().min(updateVolontarioBodyMaxConsegneTurnoMin).optional(),
-  "attivo": zod.boolean().optional(),
-  "note": zod.string().optional(),
+  "note": zod.string().nullish(),
   "versione": zod.number().min(1)
 })
 
@@ -10415,7 +10415,7 @@ export const UpdateVolontarioResponse = zod.object({
   "abilitatoAmministrativamente": zod.boolean(),
   "operativo": zod.boolean(),
   "motivoNonOperativo": zod.string().nullish(),
-  "statoAssicurazione": zod.enum(['MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
+  "statoAssicurazione": zod.enum(['TEMPORANEA', 'MANCANTE', 'VALIDA', 'IN_SCADENZA', 'SCADUTA', 'NON_ANCORA_VALIDA']),
   "scadenzaAssicurazione": zod.coerce.date().nullish(),
   "sospesoManualmente": zod.boolean(),
   "giornataTemporaneaValida": zod.boolean().nullish(),
