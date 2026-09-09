@@ -1,12 +1,23 @@
-# M0 — Decisioni progettuali da validare
+# M0 — Decisioni progettuali validate
 
-Tutte le decisioni di questo documento sono **raccomandazioni M0**. Non costituiscono approvazione né autorizzano schema o flussi nuovi. Le decisioni marcate “bloccante” devono essere validate prima della milestone indicata.
+Validazione umana registrata il 9 settembre 2026 sulla baseline documentale del commit `2966e1f892b61a03760b6687bbc7bcb0e7b2e78b`. Una decisione approvata definisce il requisito per le milestone successive, ma **non** significa che codice, schema, API, migrazioni o test siano già stati realizzati. Le sezioni possono inoltre conservare dettagli progettuali demandati a una milestone futura, indicati separatamente dai requisiti già approvati.
 
-## Esito della verifica documentale M0
+## Esito della validazione umana M0
 
-Sono **vincoli già acquisiti dallo scenario**, non scelte ancora da approvare: separare raccolta logica e dettaglio fisico; non raggruppare automaticamente il legacy; usare un solo input principale di quantità; permettere richieste con sole note; applicare sempre `Area → eventuale Magazzino`; derivare l'attore dalla sessione backend; conservare gli eventi significativi in append-only; non introdurre consegne parziali implicitamente.
+Sono approvati:
 
-Restano invece **raccomandazioni da validare da Floriano**: forma concreta delle nuove entità e migrazioni; lotto “Generale” unico per Area; proprietà catalogo `quantitaFrazionabile`; cardinalità e nomi esatti degli stati proposti; soglia minima aggregata; tabella/helper audit comuni. Il superamento dei test M0 certifica coerenza e fattibilità della specifica, non trasforma queste proposte in decisioni umane approvate.
+1. lotto logico di sistema `Generale` unico per Area operativa, sempre disponibile, non archiviabile e non assegnato retroattivamente al legacy;
+2. proprietà di catalogo `quantitaFrazionabile`, con `pz`/`cf` non frazionabili e kg/litri frazionabili di default, senza arrotondamento del legacy;
+3. pratica di carico persistente separata dalle contabilizzazioni incrementali immutabili;
+4. `richiesta_magazzino` autonoma, valida anche con sole note e senza prodotti;
+5. al massimo un documento operativo attivo e una pianificazione/consegna attiva per richiesta, conservando gli annullati nello storico;
+6. stati interni `in_trasporto` e `rientro_atteso`, senza introdurre consegne parziali;
+7. interfaccia basata su azioni operative semplici, senza esporre la complessità degli stati interni;
+8. audit comune append-only e transazionale, attore dalla sessione backend, snapshot codice/matricola e correlation ID;
+9. conservazione dell'autore nullo per il legacy e visualizzazione “Non disponibile — dato precedente”;
+10. regola M1B per la scorta minima di Area descritta in D5, che esclude soglie aggregate arbitrarie.
+
+Restano da definire nelle milestone indicate i dettagli implementativi, fra cui il nome del requisito di catalogo che renderà obbligatorio il codice lotto fisico quando la tracciabilità reale lo richiede e l'eventuale futura policy di soglia Area/prodotto×magazzino. Non sono decisioni che riaprono M0.
 
 ## Invarianti trasversali
 
@@ -23,7 +34,9 @@ Restano invece **raccomandazioni da validare da Floriano**: forma concreta delle
 
 ## D1 — Lotto logico e dettaglio fisico
 
-**Raccomandazione.** Conservare l'attuale `lotti` come dettaglio/partita fisica e aggiungere in M2 un'entità superiore `lotto_logico` che descriva raccolta o attività multiprodotto.
+**Decisione approvata.** Conservare l'attuale `lotti` come dettaglio/partita fisica e aggiungere in M2 un'entità superiore `lotto_logico` che descriva raccolta o attività multiprodotto.
+
+Il **lotto logico/operativo** è ciò che il volontario seleziona durante carico, scarico e preparazione, per esempio `Generale`, `Raccolta PAM 12/09/2026` o `Donazione X`. Il **lotto fisico/produttore** è invece l'eventuale codice presente sulla confezione o sulla merce. Un lotto logico può contenere più prodotti e, per lo stesso prodotto, più dettagli fisici con scadenze diverse.
 
 Relazioni proposte:
 
@@ -52,21 +65,22 @@ Il lotto logico contiene codice, descrizione, Area operativa, date indicative, n
 
 **Impatto.** Nuova relazione e migrazione conservativa in M2; adeguamento OpenAPI/client, carichi, viste giacenza e documenti successivi.
 
-**Stato/blocco.** Da validare; blocca M2 e condiziona M3–M4.
+**Stato.** Requisito approvato in M0; non implementato e non testato. Schema, migrazione conservativa e prove sono demandati a M2 e condizionano M3–M4.
 
 ### Lotto logico “Generale”
 
-**Raccomandazione.** Un solo lotto logico di sistema “Generale” per ogni Area operativa, stabile, sempre disponibile e non archiviabile. Non è una partita fisica e non crea merce. Non deve essere globale fra aree.
+**Decisione approvata.** Un solo lotto logico di sistema “Generale” per ogni Area operativa, stabile, sempre disponibile e non archiviabile. È un vero lotto logico operativo di default, non è una partita fisica, non crea merce e non deve essere globale fra aree.
 
 - È preselezionato per un carico privo di attività specifica, ma resta visibile e confermato prima della registrazione.
-- Se `gestioneLotto=true`, il dettaglio fisico richiede comunque il codice lotto reale; “Generale” non lo sostituisce.
-- Se `gestioneLotto=false`, viene comunque creato un dettaglio fisico con codice fisico nullable, perché quantità, magazzino, fondo, scadenza e lineage devono restare separati.
+- Il codice lotto fisico/produttore è nullable e non diventa obbligatorio per il solo fatto che il prodotto partecipa alla gestione lotti del Magazzino Solidale; `Generale` non sostituisce né inventa tale codice.
+- In M2 verrà definito un requisito separato del prodotto per rendere obbligatorio il codice fisico/produttore quando la reale tracciabilità lo richiede. Il nome definitivo del campo sarà scelto in M2 e non è definito o implementato in M0.
+- Anche senza codice lotto fisico viene creato un dettaglio distinto, perché quantità, magazzino, fondo, scadenza e lineage devono restare separati.
 - I dati legacy non vengono assegnati retroattivamente a “Generale”: `lotto_logico_id` resta nullo con classificazione `legacy_non_ricostruibile` fino a una riconciliazione documentata.
 - Un'Area legacy nulla non riceve automaticamente un “Generale”. Le nuove operazioni richiedono Area valida.
 
 **Perché.** Un default globale attraverserebbe il confine territoriale e renderebbe ambigua la chiusura; un default per prodotto moltiplicherebbe contenitori privi di significato per il volontario.
 
-**Stato/blocco.** Da validare; blocca la migrazione M2.
+**Stato.** Requisito approvato in M0; non implementato e non testato. La migrazione resta attività M2.
 
 ### Ciclo di vita
 
@@ -81,7 +95,7 @@ Il lotto “Generale” non viene chiuso. Una raccolta ordinaria può essere chi
 
 ## D2 — Catalogo e quantità
 
-**Raccomandazione.** Il catalogo resta globale; Area e magazzino entrano solo nelle proiezioni di disponibilità e nei flussi operativi.
+**Decisione approvata.** Il catalogo resta globale; Area e magazzino entrano solo nelle proiezioni di disponibilità e nei flussi operativi.
 
 Ogni riga presenta un solo input principale `quantita`, etichettato con l'unità canonica del prodotto. Le dimensioni derivate vengono calcolate e storicizzate dal backend:
 
@@ -90,15 +104,15 @@ Ogni riga presenta un solo input principale `quantita`, etichettato con l'unità
 - fattore noto: peso/volume derivato, non secondo campo obbligatorio;
 - fattore mancante: si raccoglie il dato aggiuntivo solo se semanticamente distinto e richiesto dal processo.
 
-Per evitare una lista di stringhe implicita, M2 dovrebbe introdurre una proprietà catalogo `quantitaFrazionabile` con default migrato dall'unità e vincolo backend. Il valore usato dall'operazione e il fattore vengono copiati sulle righe/movimenti per conservare la semantica storica.
+M2 introdurrà la proprietà esplicita di catalogo `quantitaFrazionabile`, con default `false` per `pz` e `cf` e `true` per kg/litri, applicata con vincolo backend. Il valore usato dall'operazione e il fattore vengono copiati sulle righe/movimenti per conservare la semantica storica.
 
 **Legacy.** Una query di preflight elenca prodotti indivisibili con frazioni. Queste righe non sono arrotondate: vengono marcate come anomalia, continuano a essere leggibili e richiedono una scelta esplicita di riclassificazione, rettifica o mantenimento legacy.
 
-**Stato/blocco.** Da validare; blocca M2 e i contratti M3/M4.
+**Stato.** Requisito approvato in M0; non implementato e non testato. Implementazione e bonifica non distruttiva sono demandate a M2 e ai contratti M3/M4.
 
 ## D3 — Pratica di carico e integrazioni
 
-**Raccomandazione.** Separare l'identità della pratica dall'identità di ogni contabilizzazione.
+**Decisione approvata.** Separare l'identità persistente della pratica dall'identità di ogni contabilizzazione incrementale immutabile.
 
 - `carico_pratica`: testata persistente, versione ottimistica, stato `bozza`, `aperta`, `chiusa`, `annullata`; descrizione obbligatoria.
 - `carico_riga`: ID stabile; modificabile finché non contabilizzata; porta prodotto, dettaglio fisico proposto, quantità e origine.
@@ -115,7 +129,7 @@ Esempio vincolante: riga A da 80 contabilizzata nell'integrazione 1 + nuova riga
 
 **Riutilizzo.** Estendere `createWarehouseLoad`, advisory lock, hash, `InventoryDecimal`, lineage riga/lotto/movimento e transazioni esistenti.
 
-**Stato/blocco.** Da validare; blocca M3A.
+**Stato.** Requisito approvato in M0; non implementato e non testato. Realizzazione e prove sono demandate a M3A.
 
 ### Import AGEA/FSE+
 
@@ -137,9 +151,9 @@ Stato attuale verificato: solo XLSX; staging, mapping, ricalcolo, versioni, tran
 
 ## D4 — Richiesta, documento e consegna
 
-**Raccomandazione.** Introdurre una `richiesta_magazzino` autonoma, rappresentabile con intestatario e note ma senza righe prodotto. Non riutilizzare una bolla o un intervento materiale incompleto come richiesta.
+**Decisione approvata.** Introdurre una `richiesta_magazzino` autonoma, rappresentabile con intestatario e note ma senza righe prodotto. Non riutilizzare una bolla o un intervento materiale incompleto come richiesta.
 
-Cardinalità raccomandata, ancora da validare:
+Cardinalità approvata:
 
 - una sorgente materiale di Centro/pianificazione/intervento ha `0..1` richiesta attiva, protetta da chiave sorgente univoca;
 - ogni richiesta ha esattamente un destinatario (`beneficiario`, `ente`, `magazzino`) e una sola Area; il Centro richiedente è obbligatorio quando la sorgente è il Centro di Ascolto;
@@ -154,11 +168,13 @@ Campi minimi: destinatario tipizzato, beneficiario/ente/magazzino FK coerente, A
 
 **Perché.** La coda corrente basata su bolla richiede prodotti, mentre `interventi_materiali` richiede almeno descrizione/unità/quantità. Nessuna delle due rappresenta fedelmente “serve materiale descritto nelle note”.
 
-**Stato/blocco.** Da validare; blocca M5A e influenza M4A.
+**Stato.** Entità e cardinalità attive approvate in M0; non implementate e non testate. Realizzazione e prove sono demandate a M5A e influenzano M4A.
 
 ### Stati e transizioni proposte
 
 Gli stati della tabella descrivono l'orchestrazione della **richiesta**. Non rinominano automaticamente gli stati oggi presenti su `bolle`, `consegne` o `trasferimenti`: la corrispondenza tra gli aggregati dovrà essere definita in M4/M5 con transizioni atomiche e compatibilità esplicita.
+
+Gli stati interni `in_trasporto` e `rientro_atteso` sono approvati. L'interfaccia dovrà esporli attraverso azioni operative semplici e comprensibili, senza obbligare il volontario a conoscere la macchina a stati interna.
 
 | Da                                     | Comando → A                                         | Permesso/attore              | Prerequisiti ed effetto quantità                                                  | Documento/audit                        | Retry/conflitto                                            |
 | -------------------------------------- | --------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------- |
@@ -196,7 +212,7 @@ Il documento comune usa un discriminatore e FK esclusive:
 
 L'unificazione è di servizio e interfaccia, non una fusione forzata di tabelle. L'attuale `trasferimenti` può restare aggregate root specializzato dietro un adattatore comune. Partenza crea uscita/in-transito; ricezione crea entrata collegata al movimento origine; differenze producono eventi espliciti. Nessuna disponibilità al deposito destino prima della ricezione.
 
-**Stato/blocco.** Da validare; blocca M4A/M4B.
+**Stato.** È approvato il limite di un documento operativo attivo per richiesta. La forma esatta del documento/adattatore tipizzato e dei destinatari resta dettaglio progettuale di M4A/M4B; non è implementata né testata.
 
 ## D5 — Giacenze, Area e autorizzazioni
 
@@ -230,13 +246,15 @@ Il “richiesto” è una domanda e non entra nella formula della disponibilità
 
 Aggregazione esclusivamente per `prodottoId + unitaMisuraCanonica`; kg, litri, pezzi e confezioni non si sommano fra loro. I fattori servono a colonne derivate, non a una fusione implicita.
 
-**Scorte minime.** Raccomandazione da validare prima di M1B: nell'aggregato Area usare una sola `prodotti.scortaMinima` come soglia dell'Area (`max`, non somma), finché non esiste una policy esplicita prodotto×magazzino. Non moltiplicare la soglia per il numero dei depositi. Alternativa strutturale M2: tabella di soglie per deposito e soglia Area esplicita, aggregabili solo quando configurate.
+**Scorte minime — decisione approvata.** Sul singolo magazzino M1B mantiene la semantica esistente della scorta minima. Nell'aggregato di Area mostra le quantità aggregate, ma non dichiara l'intera Area sotto o sopra scorta usando `max(prodotti.scortaMinima)` o un'altra soglia arbitraria; le soglie non vengono sommate né moltiplicate. Se utile, può mostrare un indicatore derivato come “N magazzini sotto scorta”, calcolato sui singoli magazzini accessibili.
 
-**Stato/blocco.** Regole Area da validare; la semantica scorta minima blocca GEO-04/M1B.
+Un'eventuale soglia esplicita di Area o una policy prodotto×magazzino è una decisione strutturale demandata a M2.
+
+**Stato.** Comportamento M1B approvato in M0; non implementato e non testato. L'eventuale modello strutturale M2 non è definito in M0.
 
 ## D6 — Contratto audit comune
 
-**Raccomandazione.** Aggiungere in M1C un registro append-only `audit_eventi` e un helper transazionale comune, riutilizzando i registri verticali come proiezioni/collegamenti invece di estenderli impropriamente.
+**Decisione approvata.** Aggiungere in M1C un registro append-only `audit_eventi` e un helper transazionale comune, riutilizzando i registri verticali come proiezioni/collegamenti invece di estenderli impropriamente.
 
 L'attore è ricavato esclusivamente da `req.user`/sessione autenticata nel backend. Un eventuale `operatoreId` ricevuto dal client viene escluso dal contratto o ignorato/rifiutato; può esistere un campo separato per incaricato/trasportatore, che non modifica l'autore dell'evento. L'`operatoreId` aggiornabile di una testata può continuare a indicare l'ultimo operatore per compatibilità, ma non sostituisce mai la sequenza append-only degli autori.
 
@@ -268,7 +286,7 @@ Copertura progressiva:
 - M5: richieste, preparazione e sincronizzazioni sociali;
 - M6: censimento finale di tutte le mutazioni e test di assenza segreti.
 
-**Stato/blocco.** Da validare; blocca M1C e condiziona ogni schema successivo.
+**Stato.** Requisito approvato in M0; non implementato e non testato. Realizzazione e prove iniziano in M1C e condizionano ogni schema successivo.
 
 ## D7 — Interfaccia e compatibilità
 
@@ -292,6 +310,8 @@ Percorso del volontario:
 - il magazziniere apre la richiesta, assegna prodotti e lotti disponibili, poi la marca pronta;
 - la consegna viene confermata una volta dallo stesso servizio, indipendentemente dal menu di ingresso.
 
+La complessità degli stati interni resta nascosta dietro queste azioni operative semplici; i nomi tecnici possono comparire nei dettagli diagnostici o amministrativi, non come prerequisito per completare il lavoro ordinario.
+
 Semantica controlli:
 
 - selezione persistente: `aria-selected`/`aria-pressed` appropriato e indicatore non solo cromatico;
@@ -303,14 +323,10 @@ Semantica controlli:
 
 Componenti candidati da riutilizzare/estendere: `Button`, `Tabs`, `Switch`, `ExportButtons`, `BarcodeScannerButton`, `useAuth`, `useListAreeOperative`, `useListMagazzini`, query client comune e namespace i18n. Nessuna voce nuova compare prima che route, API, permesso e test siano operativi.
 
-**Stato/blocco.** Menu e percorsi da validare; M1A può procedere sulle tre correzioni UX indipendenti, mentre ristrutturazione menu attende M4/M6.
+**Stato.** È approvata la semplificazione degli stati in azioni operative. Ordine del menu e percorsi restano da validare visivamente nelle rispettive milestone; le correzioni UX indipendenti appartengono a M1A, mentre la ristrutturazione del menu attende M4/M6. Nulla è implementato o testato dalla chiusura M0.
 
-## Decisioni richieste a Floriano prima dei moduli bloccati
+## Chiusura delle decisioni M0
 
-1. Confermare “Generale” unico per Area, sempre aperto e non assegnato ai dati legacy.
-2. Confermare la proprietà esplicita `quantitaFrazionabile` e che `cf` sia indivisibile di default.
-3. Confermare pratica di carico aperta con registrazioni incrementali immutabili.
-4. Confermare la nuova entità richiesta senza righe e la cardinalità un documento attivo per richiesta.
-5. Confermare gli stati `in_trasporto` e `rientro_atteso`, senza consegne parziali.
-6. Confermare il trattamento temporaneo della scorta minima Area come singola soglia, non somma per deposito.
-7. Confermare registro audit comune transazionale con snapshot della matricola/codice.
+Le decisioni umane richieste da M0 sono state registrate come approvate. La precedente proposta di usare `max(prodotti.scortaMinima)` per l'Area è respinta e sostituita dalla regola D5; il codice lotto fisico/produttore è separato semanticamente dal lotto logico e dalla generica partecipazione del prodotto alla gestione lotti.
+
+M0 è chiuso sul piano decisionale. Tutte le righe marcate “non implementato” o “non testato” restano lavoro delle rispettive milestone e non possono essere considerate soddisfatte dalla sola approvazione documentale.

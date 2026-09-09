@@ -48,7 +48,7 @@ Non sono stati aggiunti script o Compose alternativi: per M0 sono bastati Postgr
 - Gate fresh baseline superato: schema push sul solo DB vuoto, 33 migrazioni, seed, CRUD API, replay e checksum.
 - Database/volume originali non azzerati e non migrati.
 
-### Decisioni che richiedono validazione
+### Decisioni che richiedevano validazione al termine dello sviluppo
 
 1. `lotti` resta dettaglio fisico; nuovo `lotto_logico` è contenitore multiprodotto.
 2. “Generale” è unico per Area e non assorbe automaticamente il legacy.
@@ -57,7 +57,7 @@ Non sono stati aggiunti script o Compose alternativi: per M0 sono bastati Postgr
 5. Richiesta magazzino autonoma, rappresentabile con sole note.
 6. Documento con destinatario tipizzato, mantenendo il trasferimento come workflow specializzato.
 7. Stato “affidato/in trasporto” distinto da prenotato, consegnato e rientrato.
-8. Soglia minima Area usata una volta, non moltiplicata, finché non esiste policy per deposito.
+8. Proposta temporanea di una singola soglia minima Area; successivamente respinta e sostituita nella chiusura M0.
 9. Registro audit comune transazionale con snapshot del codice autore.
 
 ### Difetti/rischi assegnati
@@ -100,7 +100,7 @@ I controlli di sviluppo sono terminati; fermarsi senza commit. La prossima azion
 ## M0 — test
 
 Data: 9 settembre 2026
-Stato: **M0 test automatici superati — pronto per validazione Floriano/ChatGPT**.
+Stato al termine della fase: **M0 test automatici superati — pronto per validazione Floriano/ChatGPT**. La validazione umana successiva è registrata nella sezione di chiusura.
 
 ### Perimetro ed esito
 
@@ -132,20 +132,61 @@ Stato: **M0 test automatici superati — pronto per validazione Floriano/ChatGPT
 
 Due esecuzioni diagnostiche complete della suite API, svolte mentre i container applicativi pubblicavano `58080`/`58082`, hanno registrato un errore intermittente ciascuna in test diversi. La risposta HTML Nginx ricevuta da Supertest ha dimostrato una collisione con la gamma di porte effimere del sistema. Dopo l'arresto dei soli container applicativi, il rerun completo sopra indicato è risultato verde.
 
-### Decisioni consolidate e decisioni umane aperte
+### Decisioni consolidate e decisioni umane aperte al termine dei test
 
 Sono confermati come vincoli dello scenario: distinzione lotto logico/dettaglio fisico, un solo input quantità, richiesta iniziale anche con sole note, selezione Area→Magazzino, autore derivato esclusivamente dalla sessione backend, cronologia append-only e assenza di consegne parziali implicite.
 
-Restano proposte da approvare prima dell'implementazione: cardinalità esatta del lotto “Generale” per Area, proprietà `quantitaFrazionabile`, nomi/cardinalità/stati delle nuove entità, policy della soglia minima di Area e forma tecnica del registro audit comune. `DECISIONI.md` distingue questi punti dai vincoli già imposti dallo scenario.
+Al termine dei test restavano proposte da approvare: cardinalità del lotto “Generale” per Area, proprietà `quantitaFrazionabile`, pratica di carico, richiesta/cardinalità, stati interni, policy della scorta minima di Area e audit comune. La sezione di chiusura registra l'esito umano e le due rettifiche.
 
 ### Avvisi e passaggi manuali
 
 - Verificare manualmente che il filesystem contenente il backup durevole sia cifrato e incluso nella policy di conservazione prevista.
-- Eseguire con Floriano la validazione delle proposte architetturali ancora aperte.
+- La validazione umana, allora pendente, è stata completata nella chiusura M0.
 - Tablet, tastiera touch e fotocamera richiedono prova fisica nelle milestone pertinenti; non sono certificati da M0.
 - Restano non bloccanti la deprecazione PostgreSQL `client.query()` nei test, i warning Vite sourcemap/chunk e il requisito `PORT`/`BASE_PATH` della build root.
 - Evitare porte host nella gamma effimera durante i test Supertest oppure arrestare preventivamente i container applicativi.
 
 ### Condizione di arresto
 
-Il gate automatico M0 è completato. Dopo la creazione e pubblicazione del solo commit candidato sul branch M0, fermarsi senza merge, senza modificare `main` e senza avviare M1A.
+Il gate automatico M0 è stato completato e il commit candidato `2966e1f892b61a03760b6687bbc7bcb0e7b2e78b` è stato pubblicato sul solo branch M0. La chiusura resta documentale: nessun merge, nessuna modifica di `main` e nessun avvio di M1A.
+
+## M0 — chiusura e validazione umana
+
+Data: 9 settembre 2026
+Base validata: `2966e1f892b61a03760b6687bbc7bcb0e7b2e78b`
+Stato: **M0 validato umanamente e chiuso; requisiti successivi non implementati e relativi test non eseguiti**.
+
+### Perimetro della chiusura
+
+- aggiornamento esclusivamente documentale sul branch `codex/magazzino-workflow-unificato`;
+- nessuna modifica a codice applicativo, schema, OpenAPI, migrazioni o file generati;
+- nessun merge o push di `main`;
+- nessun avvio di M1A.
+
+### Decisioni approvate
+
+1. Un lotto logico di sistema `Generale` è unico per Area operativa, sempre disponibile, non archiviabile e non assegnato retroattivamente ai dati legacy.
+2. `quantitaFrazionabile` è una proprietà esplicita del catalogo: `pz` e `cf` non frazionabili, kg/litri frazionabili di default, senza arrotondamento automatico del legacy.
+3. La pratica di carico è persistente e distinta dalle contabilizzazioni incrementali immutabili.
+4. `richiesta_magazzino` è autonoma e può nascere con sole note, senza prodotti.
+5. Una richiesta ha al massimo un documento operativo attivo e una pianificazione/consegna attiva; i collegamenti annullati restano nello storico.
+6. Gli stati interni `in_trasporto` e `rientro_atteso` sono ammessi senza consegne parziali.
+7. L'interfaccia nasconde la macchina a stati dietro azioni operative semplici.
+8. L'audit comune è append-only e transazionale, con attore dalla sessione backend, snapshot codice/matricola e correlation ID.
+9. Il legacy senza autore resta nullo ed è mostrato come “Non disponibile — dato precedente”.
+10. In M1B l'Area mostra quantità aggregate senza essere dichiarata sotto/sopra scorta mediante una soglia arbitraria.
+
+### Rettifiche registrate
+
+- Il lotto logico/operativo selezionato dal volontario è distinto dall'eventuale lotto fisico/produttore. Può contenere più prodotti e più dettagli fisici dello stesso prodotto con scadenze diverse.
+- Il codice lotto fisico non è obbligatorio per il solo fatto che il prodotto partecipa alla gestione lotti. Un requisito di tracciabilità separato, con nome ancora da scegliere, sarà definito e implementato in M2.
+- Il lotto `Generale` è il lotto logico operativo di default, ma non rappresenta né inventa un codice lotto fisico.
+- È respinta la precedente proposta `max(prodotti.scortaMinima)` per l'Area. M1B mantiene la soglia sul singolo magazzino e può mostrare “N magazzini sotto scorta”; non somma né moltiplica soglie. Un'eventuale policy esplicita di Area o prodotto×magazzino è demandata a M2.
+
+### Stato di implementazione e prova
+
+La validazione riguarda i requisiti, non il software futuro. Le righe pertinenti di `MATRICE_VALIDAZIONE.md` riportano quindi insieme `APP-M0` e lo stato tecnico effettivo `NI`, `PB` o `NE`. Nessuna delle approvazioni viene dichiarata già implementata o testata.
+
+### Condizione di arresto
+
+M0 è chiuso. Dopo il commit e il push di questa registrazione sul solo branch M0, fermarsi. L'avvio di M1A richiede un prompt successivo esplicito.

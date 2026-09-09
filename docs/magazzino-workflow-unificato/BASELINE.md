@@ -2,7 +2,7 @@
 
 Data ricognizione: 9 settembre 2026
 Revisione osservata: `787d7c5436d5fa4c0edb24be373d055946d402ce`
-Stato: baseline M0 con test automatici completati; non equivale alla validazione umana di Floriano/ChatGPT.
+Stato: baseline M0 con test automatici completati e validazione umana registrata sul commit `2966e1f892b61a03760b6687bbc7bcb0e7b2e78b`; i requisiti futuri non sono implementati.
 
 ## Git e provenienza della base
 
@@ -86,7 +86,7 @@ Sorgente, copia e secondo ripristino hanno prodotto gli stessi conteggi, gli ste
 | verifica marker fixture e ledger post-suite                                     | fresh DB M0                                          | superato: nessun prodotto/magazzino/utente con i prefissi controllati; ledger 33                                       |
 | ricontrollo sorgente/copia post-test                                            | query aggregate read-only                            | superato: conteggi invariati e coincidenti                                                                             |
 
-Nessuna prova qui riportata equivale a validazione umana o a test su tablet.
+Le prove qui riportate non sostituiscono la validazione umana, registrata separatamente sul commit candidato `2966e1f892b61a03760b6687bbc7bcb0e7b2e78b`, né una prova fisica su tablet.
 
 ## Validazione automatica `##test M0`
 
@@ -118,5 +118,5 @@ Nessuna prova qui riportata equivale a validazione umana o a test su tablet.
 - **Verificato nel codice:** mappa di file, endpoint, schema, permessi, transazioni e gap sopra riportati.
 - **Verificato mediante esecuzione:** Git, inventario Docker, backup durevole e secondo ripristino, replay sulla copia popolata, fresh gate, immagini web/API della stessa SHA, smoke/browser test e suite/build elencati.
 - **Da implementare:** tutti i requisiti della matrice, salvo componenti legacy riutilizzabili.
-- **Proposta da validare umanamente:** le scelte architetturali esplicitamente marcate in `DECISIONI.md`.
-- **Non verificato automaticamente:** prova fisica su tablet/fotocamera, cifratura del filesystem di backup, validazione manuale di Floriano e futura migrazione del nuovo schema.
+- **Validato umanamente:** le decisioni M0 e le rettifiche su lotto fisico e scorta minima Area registrate in `DECISIONI.md`; approvazione distinta da implementazione e test delle milestone successive.
+- **Non verificato automaticamente:** prova fisica su tablet/fotocamera, cifratura del filesystem di backup e futura migrazione del nuovo schema.
