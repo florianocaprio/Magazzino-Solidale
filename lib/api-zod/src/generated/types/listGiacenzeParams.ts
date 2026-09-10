@@ -8,6 +8,15 @@
 import type { FondoOrigine } from './fondoOrigine';
 
 export type ListGiacenzeParams = {
+/**
+ * Area Operativa che delimita sempre la consultazione delle giacenze.
+ * @minimum 1
+ */
+areaOperativaId: number;
+/**
+ * Magazzino opzionale, che deve appartenere all'Area Operativa richiesta.
+ * @minimum 1
+ */
 magazzinoId?: number;
 sottoscortaOnly?: boolean;
 fsePlusOnly?: boolean;

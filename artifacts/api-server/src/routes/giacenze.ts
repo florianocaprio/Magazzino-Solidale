@@ -5,13 +5,15 @@ import {
   lottiTable,
   prodottiTable,
   magazziniTable,
+  areeOperativeTable,
   type FondoOrigine,
 } from "@workspace/db";
 import { eq, and, gt, sum, min, sql } from "drizzle-orm";
 import {
   callerCentroId,
   callerAreaOperativaId,
-  visibleMagazzinoIds,
+  canAccessCentro,
+  centroScopeFilter,
   magazzinoScopeFilter,
 } from "../lib/centroScope";
 import {
@@ -25,11 +27,20 @@ import { InventoryDecimal } from "../lib/inventoryDecimal";
 
 const router: IRouter = Router();
 
+function positiveInteger(raw: string | undefined): number | null {
+  if (!raw || !/^\d+$/.test(raw)) return null;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value > 0 && value <= 2_147_483_647
+    ? value
+    : null;
+}
+
 router.get(
   "/giacenze",
   requirePermission("magazzino.view"),
   async (req, res) => {
     const {
+      areaOperativaId,
       magazzinoId,
       prodottoId,
       sottoscortaOnly,
@@ -39,9 +50,96 @@ router.get(
       scadenzaA,
     } = req.query as Record<string, string>;
 
+    const selectedAreaId = positiveInteger(areaOperativaId);
+    if (selectedAreaId == null) {
+      res.status(400).json({
+        error:
+          "areaOperativaId è obbligatorio e deve essere un intero positivo",
+      });
+      return;
+    }
+
+    const callerAreaId = callerAreaOperativaId(req);
+    if (callerAreaId != null && callerAreaId !== selectedAreaId) {
+      res
+        .status(403)
+        .json({ error: "Area Operativa non accessibile per il tuo profilo" });
+      return;
+    }
+
+    const [selectedArea] = await db
+      .select({ id: areeOperativeTable.id, nome: areeOperativeTable.nome })
+      .from(areeOperativeTable)
+      .where(eq(areeOperativeTable.id, selectedAreaId));
+    if (!selectedArea) {
+      res.status(404).json({ error: "Area Operativa inesistente" });
+      return;
+    }
+
+    const selectedMagazzinoId = magazzinoId
+      ? positiveInteger(magazzinoId)
+      : null;
+    if (magazzinoId && selectedMagazzinoId == null) {
+      res
+        .status(400)
+        .json({ error: "magazzinoId deve essere un intero positivo" });
+      return;
+    }
+    if (sottoscortaOnly === "true" && selectedMagazzinoId == null) {
+      res.status(400).json({
+        error:
+          "Il filtro sottoscorta è disponibile solo selezionando un magazzino",
+      });
+      return;
+    }
+
+    const callerCentro = callerCentroId(req);
+    if (selectedMagazzinoId != null) {
+      const [selectedMagazzino] = await db
+        .select({
+          id: magazziniTable.id,
+          areaOperativaId: magazziniTable.areaOperativaId,
+          centroAscoltoId: magazziniTable.centroAscoltoId,
+        })
+        .from(magazziniTable)
+        .where(eq(magazziniTable.id, selectedMagazzinoId));
+      if (!selectedMagazzino) {
+        res.status(404).json({ error: "Magazzino non trovato" });
+        return;
+      }
+      if (selectedMagazzino.areaOperativaId !== selectedAreaId) {
+        res.status(400).json({
+          error:
+            "Il magazzino selezionato non appartiene all'Area Operativa richiesta",
+        });
+        return;
+      }
+      if (!canAccessCentro(selectedMagazzino.centroAscoltoId, callerCentro)) {
+        res
+          .status(403)
+          .json({ error: "Magazzino non accessibile per il tuo profilo" });
+        return;
+      }
+    }
+
+    const warehouseScope = centroScopeFilter(
+      magazziniTable.centroAscoltoId,
+      callerCentro,
+    );
+    const visibleWarehouses = await db
+      .select({ id: magazziniTable.id })
+      .from(magazziniTable)
+      .where(
+        and(
+          eq(magazziniTable.areaOperativaId, selectedAreaId),
+          warehouseScope,
+          selectedMagazzinoId == null
+            ? undefined
+            : eq(magazziniTable.id, selectedMagazzinoId),
+        ),
+      );
+
     const conditions = [gt(lottiTable.quantitaResidua, "0")];
-    if (magazzinoId)
-      conditions.push(eq(lottiTable.magazzinoId, parseInt(magazzinoId)));
     if (prodottoId)
       conditions.push(eq(lottiTable.prodottoId, parseInt(prodottoId)));
     if (fsePlusOnly === "true")
@@ -59,10 +157,7 @@ router.get(
       conditions.push(sql`${lottiTable.dataScadenza} <= ${scadenzaA}`);
     const scope = magazzinoScopeFilter(
       lottiTable.magazzinoId,
-      await visibleMagazzinoIds(
-        callerCentroId(req),
-        callerAreaOperativaId(req),
-      ),
+      visibleWarehouses.map((warehouse) => warehouse.id),
     );
     if (scope) conditions.push(scope);
 
@@ -115,14 +210,16 @@ router.get(
       const giacenzaDistribuibilePrecisa = InventoryDecimal.parse(
         r.giacenzaDistribuibile ?? "0",
       );
-      const disponibileRealePreciso = giacenzaDistribuibilePrecisa.subtract(
-        impegnatoPreciso,
-      );
+      const disponibileRealePreciso =
+        giacenzaDistribuibilePrecisa.subtract(impegnatoPreciso);
       const scortaMinimaPrecisa = InventoryDecimal.parse(r.scortaMinima ?? "0");
       const impegnato = parseDbNumber(impegnatoPreciso.toDb());
       const sm = parseDbNumber(scortaMinimaPrecisa.toDb());
       const disponibileReale = parseDbNumber(disponibileRealePreciso.toDb());
       return {
+        ambito: "magazzino" as const,
+        areaOperativaId: selectedArea.id,
+        areaOperativaNome: selectedArea.nome,
         prodottoId: r.prodottoId,
         prodottoNome: r.prodottoNome,
         prodottoCodice: r.prodottoCodice,
@@ -152,6 +249,98 @@ router.get(
         prossimaScadenza: r.prossimaScadenza ?? null,
       };
     });
+
+    if (selectedMagazzinoId == null) {
+      type AreaGiacenza = Omit<
+        (typeof result)[number],
+        | "ambito"
+        | "magazzinoId"
+        | "magazzinoNome"
+        | "scortaMinima"
+        | "scortaMinimaPrecisa"
+        | "scortaConsigliata"
+        | "sottoscorta"
+      > & {
+        ambito: "area";
+        magazzinoId: null;
+        magazzinoNome: null;
+        scortaMinima: null;
+        scortaMinimaPrecisa: null;
+        scortaConsigliata: null;
+        sottoscorta: null;
+      };
+      const aggregate = new Map<string, AreaGiacenza>();
+      for (const row of result) {
+        const key = `${row.prodottoId}:${row.unitaMisura}`;
+        const current = aggregate.get(key);
+        if (!current) {
+          aggregate.set(key, {
+            ...row,
+            ambito: "area" as const,
+            magazzinoId: null,
+            magazzinoNome: null,
+            scortaMinima: null,
+            scortaMinimaPrecisa: null,
+            scortaConsigliata: null,
+            sottoscorta: null,
+          });
+          continue;
+        }
+
+        const quantitaTotalePrecisa = InventoryDecimal.parse(
+          current.quantitaTotalePrecisa,
+        ).add(InventoryDecimal.parse(row.quantitaTotalePrecisa));
+        const giacenzaFisicaPrecisa = InventoryDecimal.parse(
+          current.giacenzaFisicaPrecisa,
+        ).add(InventoryDecimal.parse(row.giacenzaFisicaPrecisa));
+        const giacenzaScadutaPrecisa = InventoryDecimal.parse(
+          current.giacenzaScadutaPrecisa,
+        ).add(InventoryDecimal.parse(row.giacenzaScadutaPrecisa));
+        const giacenzaDistribuibilePrecisa = InventoryDecimal.parse(
+          current.giacenzaDistribuibilePrecisa,
+        ).add(InventoryDecimal.parse(row.giacenzaDistribuibilePrecisa));
+        const impegnatoPreciso = InventoryDecimal.parse(
+          current.impegnatoPreciso,
+        ).add(InventoryDecimal.parse(row.impegnatoPreciso));
+        const disponibileRealePreciso = InventoryDecimal.parse(
+          current.disponibileRealePrecisa,
+          { allowNegative: true },
+        ).add(
+          InventoryDecimal.parse(row.disponibileRealePrecisa, {
+            allowNegative: true,
+          }),
+        );
+
+        aggregate.set(key, {
+          ...current,
+          quantitaTotale: parseDbNumber(quantitaTotalePrecisa.toDb()),
+          quantitaTotalePrecisa: quantitaTotalePrecisa.toDb(),
+          giacenzaFisica: parseDbNumber(giacenzaFisicaPrecisa.toDb()),
+          giacenzaFisicaPrecisa: giacenzaFisicaPrecisa.toDb(),
+          giacenzaScaduta: parseDbNumber(giacenzaScadutaPrecisa.toDb()),
+          giacenzaScadutaPrecisa: giacenzaScadutaPrecisa.toDb(),
+          giacenzaDistribuibile: parseDbNumber(
+            giacenzaDistribuibilePrecisa.toDb(),
+          ),
+          giacenzaDistribuibilePrecisa: giacenzaDistribuibilePrecisa.toDb(),
+          impegnato: parseDbNumber(impegnatoPreciso.toDb()),
+          impegnatoPreciso: impegnatoPreciso.toDb(),
+          disponibileReale: parseDbNumber(disponibileRealePreciso.toDb()),
+          disponibileRealePrecisa: disponibileRealePreciso.toDb(),
+          lottiAttivi: current.lottiAttivi + row.lottiAttivi,
+          prossimaScadenza:
+            current.prossimaScadenza == null
+              ? row.prossimaScadenza
+              : row.prossimaScadenza == null
+                ? current.prossimaScadenza
+                : current.prossimaScadenza < row.prossimaScadenza
+                  ? current.prossimaScadenza
+                  : row.prossimaScadenza,
+        });
+      }
+      res.json([...aggregate.values()]);
+      return;
+    }
 
     const filtered =
       sottoscortaOnly === "true" ? result.filter((r) => r.sottoscorta) : result;

@@ -55,17 +55,20 @@ function newRiga(): RigaDraft {
 
 function RigheEditor({
   magazzinoId,
+  areaOperativaId,
   righe,
   setRighe,
 }: {
   magazzinoId: number;
+  areaOperativaId: number;
   righe: RigaDraft[];
   setRighe: (r: RigaDraft[]) => void;
 }) {
   const { t } = useTranslation();
+  const giacenzeParams = { areaOperativaId, magazzinoId };
   const { data: giacenze } = useListGiacenze(
-    { magazzinoId },
-    { query: { enabled: !!magazzinoId, queryKey: getListGiacenzeQueryKey({ magazzinoId }) } },
+    giacenzeParams,
+    { query: { enabled: areaOperativaId > 0 && magazzinoId > 0, queryKey: getListGiacenzeQueryKey(giacenzeParams) } },
   );
   const { data: prodotti } = useListProdotti();
   const { toast } = useToast();
@@ -239,9 +242,11 @@ function NuovoScaricoForm({
   const { toast } = useToast();
 
   const magazzinoIdNum = magazzinoId ? parseInt(magazzinoId) : 0;
+  const magazzinoAreaId = magazzini?.find((m) => m.id === magazzinoIdNum)?.areaOperativaId ?? 0;
+  const giacenzeParams = { areaOperativaId: magazzinoAreaId, magazzinoId: magazzinoIdNum };
   const { data: giacenze } = useListGiacenze(
-    { magazzinoId: magazzinoIdNum },
-    { query: { enabled: !!magazzinoId, queryKey: getListGiacenzeQueryKey({ magazzinoId: magazzinoIdNum }) } },
+    giacenzeParams,
+    { query: { enabled: !!magazzinoId && magazzinoAreaId > 0, queryKey: getListGiacenzeQueryKey(giacenzeParams) } },
   );
 
   const reset = () => {
@@ -260,6 +265,7 @@ function NuovoScaricoForm({
   });
   const canSubmit =
     !!magazzinoId &&
+    magazzinoAreaId > 0 &&
     !!causale &&
     (causale !== "altro" || !!causaleAltro.trim()) &&
     righeValide.length > 0 &&
@@ -312,7 +318,7 @@ function NuovoScaricoForm({
             <Select value={magazzinoId} onValueChange={(v) => { setMagazzinoId(v); setRighe([newRiga()]); }}>
               <SelectTrigger aria-label={t("scarichi.magazzino")}><SelectValue placeholder={t("scarichi.selectMagazzino")} /></SelectTrigger>
               <SelectContent>
-                {magazzini?.filter((m) => m.stato === "attivo").map((m) => (
+                {magazzini?.filter((m) => m.stato === "attivo" && m.areaOperativaId != null).map((m) => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                 ))}
               </SelectContent>
@@ -354,7 +360,7 @@ function NuovoScaricoForm({
           <div className="space-y-2">
             <Label>{t("scarichi.prodottiDaScaricare")}</Label>
             {magazzinoId ? (
-              <RigheEditor magazzinoId={parseInt(magazzinoId)} righe={righe} setRighe={setRighe} />
+              <RigheEditor magazzinoId={parseInt(magazzinoId)} areaOperativaId={magazzinoAreaId} righe={righe} setRighe={setRighe} />
             ) : (
               <p className="text-sm text-muted-foreground rounded-md border border-dashed p-3 text-center">
                 {t("scarichi.selezionaPrimaMagazzino")}

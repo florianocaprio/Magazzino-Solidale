@@ -11,6 +11,7 @@ import {
   cleanup,
   type SeedScope,
   createCentro,
+  createAreaOperativa,
   createMagazzino,
   createProdotto,
   createFornitore,
@@ -32,6 +33,8 @@ let bootScope: SeedScope;
 let operatoreId: number;
 let centroA: number;
 let centroB: number;
+let areaA: number;
+let areaB: number;
 let magA: number;
 let magNull: number;
 let magB: number;
@@ -49,11 +52,13 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   scope = newScope();
+  areaA = await createAreaOperativa(scope);
+  areaB = await createAreaOperativa(scope);
   centroA = await createCentro(scope);
   centroB = await createCentro(scope);
-  magA = await createMagazzino(scope, centroA);
+  magA = await createMagazzino(scope, centroA, { areaOperativaId: areaA });
   magNull = await createMagazzino(scope, null);
-  magB = await createMagazzino(scope, centroB);
+  magB = await createMagazzino(scope, centroB, { areaOperativaId: areaB });
   prod = await createProdotto(scope);
   forn = await createFornitore(scope, null);
 });
@@ -205,24 +210,36 @@ describe("Trasferimenti — scoping via magazzini visibili (origine O destino)",
 });
 
 describe("Giacenze — scoping via magazzino visibile", () => {
-  it("lista: A vede le giacenze di magA + magazzino comune, non quelle di magB", async () => {
+  it("lista: A aggrega soltanto la propria Area e non include magazzini legacy o di altre Aree", async () => {
     await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
     await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
     await createLotto(scope, { prodottoId: prod, magazzinoId: magNull, quantita: 10 });
-    const res = await request(appAs(giacenzeRouter, centroA)).get("/giacenze");
+    const res = await request(appAs(giacenzeRouter, centroA)).get(
+      `/giacenze?areaOperativaId=${areaA}`,
+    );
     expect(res.status).toBe(200);
-    const magIds = (res.body as Array<{ magazzinoId: number }>).map((r) => r.magazzinoId);
-    expect(magIds).toContain(magA);
-    expect(magIds).toContain(magNull);
-    expect(magIds).not.toContain(magB);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0]).toMatchObject({
+      ambito: "area",
+      areaOperativaId: areaA,
+      magazzinoId: null,
+      quantitaTotale: 10,
+    });
   });
 
-  it("lista: un utente senza centro vede tutte le giacenze", async () => {
+  it("lista: un utente senza centro può consultare un magazzino per volta nella relativa Area", async () => {
     await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
     await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
-    const res = await request(appAs(giacenzeRouter, null)).get("/giacenze");
-    const magIds = (res.body as Array<{ magazzinoId: number }>).map((r) => r.magazzinoId);
-    expect(magIds).toEqual(expect.arrayContaining([magA, magB]));
+    const [resA, resB] = await Promise.all([
+      request(appAs(giacenzeRouter, null)).get(
+        `/giacenze?areaOperativaId=${areaA}&magazzinoId=${magA}`,
+      ),
+      request(appAs(giacenzeRouter, null)).get(
+        `/giacenze?areaOperativaId=${areaB}&magazzinoId=${magB}`,
+      ),
+    ]);
+    expect(resA.body[0]).toMatchObject({ magazzinoId: magA });
+    expect(resB.body[0]).toMatchObject({ magazzinoId: magB });
   });
 });
 

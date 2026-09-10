@@ -300,7 +300,7 @@ export function CreaiBollaDialog({ open, onClose, consegnaId, lockedBeneficiario
             <Select value={magazzinoId} onValueChange={setMagazzinoId}>
               <SelectTrigger aria-label={t("bolle.magazzinoUscitaLabel")}><SelectValue placeholder={t("bolle.magazzinoPlaceholder")} /></SelectTrigger>
               <SelectContent>
-                {magazzini?.filter((m) => m.stato === "attivo").map(m => (
+                {magazzini?.filter((m) => m.stato === "attivo" && m.areaOperativaId != null).map(m => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                 ))}
               </SelectContent>
@@ -410,6 +410,7 @@ function ModificaBollaDialog({
   };
 
   const magazzinoCambiato = parseInt(mId) !== magazzinoId;
+  const magazzinoAreaId = magazzini?.find((m) => m.id === parseInt(mId))?.areaOperativaId ?? null;
 
   const onSubmit = () => {
     if (magazzinoCambiato && hasRighe) {
@@ -424,7 +425,7 @@ function ModificaBollaDialog({
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
           queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey({ magazzinoId: parseInt(mId) }) });
+          queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey(magazzinoAreaId == null ? undefined : { areaOperativaId: magazzinoAreaId, magazzinoId: parseInt(mId) }) });
           toast({ title: t("bolle.bollaAggiornata") });
           onClose();
         },
@@ -477,7 +478,7 @@ function ModificaBollaDialog({
             <Select value={mId} onValueChange={setMId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {magazzini?.filter((m) => m.stato === "attivo").map(m => (
+                {magazzini?.filter((m) => m.stato === "attivo" && m.areaOperativaId != null).map(m => (
                   <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                 ))}
               </SelectContent>
@@ -511,7 +512,12 @@ function AggiungiProdottoDialog({
   const [unitaMisura, setUnitaMisura] = useState("pz");
   const [scanProdotto, setScanProdotto] = useState("");
 
-  const { data: giacenze } = useListGiacenze({ magazzinoId });
+  const { data: magazzini } = useListMagazzini();
+  const areaOperativaId = magazzini?.find((m) => m.id === magazzinoId)?.areaOperativaId ?? 0;
+  const giacenzeParams = { areaOperativaId, magazzinoId };
+  const { data: giacenze } = useListGiacenze(giacenzeParams, {
+    query: { enabled: open && areaOperativaId > 0, queryKey: getListGiacenzeQueryKey(giacenzeParams) },
+  });
   const { data: prodotti } = useListProdotti();
   const { data: lotti } = useListLotti({ magazzinoId, prodottoId: prodottoId ? parseInt(prodottoId) : undefined });
   const { data: bollaCorrente } = useGetBolla(bollaId, {
@@ -593,7 +599,7 @@ function AggiungiProdottoDialog({
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
-          queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey({ magazzinoId }) });
+          queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey(giacenzeParams) });
           toast({ title: t("bolle.prodottoAggiunto") });
           // mantieni il dialog aperto per aggiungere altri prodotti: resetta i campi
           setProdottoId(""); setLottoId(""); setQuantita(""); setUnitaMisura("pz");

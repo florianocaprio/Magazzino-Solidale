@@ -1604,10 +1604,19 @@ paths:
       operationId: listGiacenze
       tags: [giacenze]
       parameters:
-        - name: magazzinoId
+        - name: areaOperativaId
           in: query
+          required: true
+          description: Area Operativa che delimita sempre la consultazione delle giacenze.
           schema:
             type: integer
+            minimum: 1
+        - name: magazzinoId
+          in: query
+          description: Magazzino opzionale, che deve appartenere all'Area Operativa richiesta.
+          schema:
+            type: integer
+            minimum: 1
         - name: sottoscortaOnly
           in: query
           schema:
@@ -1638,6 +1647,9 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Giacenza"
+        "400": { description: Parametri territoriali o filtro sottoscorta non validi }
+        "403": { description: Area Operativa o magazzino non accessibili }
+        "404": { description: Area Operativa o magazzino non trovati }
 
   # ─── PREPARAZIONE CONSEGNE ───────────────────────────────────────────────────
   /preparazione-consegne:
@@ -10902,6 +10914,13 @@ components:
     Giacenza:
       type: object
       properties:
+        ambito:
+          type: string
+          enum: [area, magazzino]
+        areaOperativaId:
+          type: integer
+        areaOperativaNome:
+          type: string
         prodottoId:
           type: integer
         prodottoNome:
@@ -10913,9 +10932,9 @@ components:
         unitaMisura:
           type: string
         magazzinoId:
-          type: integer
+          type: [integer, "null"]
         magazzinoNome:
-          type: string
+          type: [string, "null"]
         quantitaTotale:
           type: number
         quantitaTotalePrecisa:
@@ -10944,19 +10963,24 @@ components:
         disponibileRealePrecisa:
           $ref: "#/components/schemas/QuantitaContabileConSegno"
         scortaMinima:
-          type: number
+          type: [number, "null"]
         scortaMinimaPrecisa:
-          $ref: "#/components/schemas/QuantitaContabile"
+          anyOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
         scortaConsigliata:
-          type: number
+          type: [number, "null"]
         sottoscorta:
-          type: boolean
+          type: [boolean, "null"]
         lottiAttivi:
           type: integer
         prossimaScadenza:
           type: ["string", "null"]
       required:
         [
+          ambito,
+          areaOperativaId,
+          areaOperativaNome,
           prodottoId,
           prodottoNome,
           prodottoCodice,
@@ -10970,12 +10994,14 @@ components:
           giacenzaDistribuibile,
           impegnato,
           disponibileReale,
-          quantitaPrecisa,
+          quantitaTotalePrecisa,
           giacenzaFisicaPrecisa,
+          giacenzaScadutaPrecisa,
           giacenzaDistribuibilePrecisa,
           impegnatoPreciso,
           disponibileRealePrecisa,
           scortaMinima,
+          scortaMinimaPrecisa,
           scortaConsigliata,
           sottoscorta,
           lottiAttivi,

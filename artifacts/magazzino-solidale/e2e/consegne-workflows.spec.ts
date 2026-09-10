@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { assertViewportSafe, login, selectOption } from "./helpers";
 
-type Identifiable = { id: number; nome: string };
+type Identifiable = { id: number; nome: string; areaOperativaId: number };
 type Prodotto = { id: number; codice: string };
 type Giacenza = { prodottoId: number; disponibileReale: number };
 
@@ -24,7 +24,7 @@ async function runConsegnaLifecycle(
   )!;
   const readStock = async () => {
     const response = await page.request.get(
-      `/api/giacenze?magazzinoId=${warehouse.id}`,
+      `/api/giacenze?areaOperativaId=${warehouse.areaOperativaId}&magazzinoId=${warehouse.id}`,
     );
     return (
       ((await response.json()) as Giacenza[]).find(

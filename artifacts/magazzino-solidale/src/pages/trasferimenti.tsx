@@ -53,15 +53,20 @@ function newRiga(): RigaDraft {
 
 function RigheEditor({
   magazzinoId,
+  areaOperativaId,
   righe,
   setRighe,
 }: {
   magazzinoId: number;
+  areaOperativaId: number;
   righe: RigaDraft[];
   setRighe: (r: RigaDraft[]) => void;
 }) {
   const { t } = useTranslation();
-  const { data: giacenze } = useListGiacenze({ magazzinoId });
+  const { data: giacenze } = useListGiacenze(
+    { areaOperativaId, magazzinoId },
+    { query: { enabled: areaOperativaId > 0 && magazzinoId > 0, queryKey: getListGiacenzeQueryKey({ areaOperativaId, magazzinoId }) } },
+  );
 
   const update = (key: string, patch: Partial<RigaDraft>) =>
     setRighe(righe.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -192,9 +197,11 @@ function NuovoTrasferimentoForm({
   const { toast } = useToast();
 
   const origineIdNum = origineId ? parseInt(origineId) : 0;
+  const origineAreaId = magazzini?.find((m) => m.id === origineIdNum)?.areaOperativaId ?? 0;
+  const giacenzeParams = { areaOperativaId: origineAreaId, magazzinoId: origineIdNum };
   const { data: origineGiacenze } = useListGiacenze(
-    { magazzinoId: origineIdNum },
-    { query: { enabled: !!origineId, queryKey: getListGiacenzeQueryKey({ magazzinoId: origineIdNum }) } },
+    giacenzeParams,
+    { query: { enabled: !!origineId && origineAreaId > 0, queryKey: getListGiacenzeQueryKey(giacenzeParams) } },
   );
 
   const reset = () => {
@@ -222,6 +229,7 @@ function NuovoTrasferimentoForm({
     (trasportatore === "altro" && trasportatoreAltro.trim().length > 0);
   const canSubmit =
     !!origineId &&
+    origineAreaId > 0 &&
     !!destinoId &&
     origineId !== destinoId &&
     righeValide.length > 0 &&
@@ -278,7 +286,7 @@ function NuovoTrasferimentoForm({
               <Select value={origineId} onValueChange={(v) => { setOrigineId(v); setRighe([newRiga()]); }}>
                 <SelectTrigger aria-label={t("trasferimenti.magazzinoPartenza")}><SelectValue placeholder={t("trasferimenti.selectOrigine")} /></SelectTrigger>
                 <SelectContent>
-                  {magazzini?.filter((m) => m.stato === "attivo").map((m) => (
+                  {magazzini?.filter((m) => m.stato === "attivo" && m.areaOperativaId != null).map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
                   ))}
                 </SelectContent>
@@ -323,7 +331,7 @@ function NuovoTrasferimentoForm({
           <div className="space-y-2">
             <Label>{t("trasferimenti.prodottiDaTrasferire")}</Label>
             {origineId ? (
-              <RigheEditor magazzinoId={parseInt(origineId)} righe={righe} setRighe={setRighe} />
+              <RigheEditor magazzinoId={parseInt(origineId)} areaOperativaId={origineAreaId} righe={righe} setRighe={setRighe} />
             ) : (
               <p className="text-sm text-muted-foreground rounded-md border border-dashed p-3 text-center">
                 {t("trasferimenti.selezionaPrimaMagazzino")}
@@ -374,11 +382,14 @@ function ModificaTrasferimentoForm({
   const updateTrasferimento = useUpdateTrasferimento();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { data: magazzini } = useListMagazzini();
 
   const origineIdNum = trasferimento.magazzinoOrigineId;
+  const origineAreaId = magazzini?.find((m) => m.id === origineIdNum)?.areaOperativaId ?? 0;
+  const giacenzeParams = { areaOperativaId: origineAreaId, magazzinoId: origineIdNum };
   const { data: origineGiacenze } = useListGiacenze(
-    { magazzinoId: origineIdNum },
-    { query: { enabled: open, queryKey: getListGiacenzeQueryKey({ magazzinoId: origineIdNum }) } },
+    giacenzeParams,
+    { query: { enabled: open && origineAreaId > 0, queryKey: getListGiacenzeQueryKey(giacenzeParams) } },
   );
 
   const righeValide = righe.filter((r) => r.prodottoId && parseFloat(r.quantita || "0") > 0);
@@ -386,7 +397,7 @@ function ModificaTrasferimentoForm({
     const giac = origineGiacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
     return parseFloat(r.quantita) > Math.max(0, giac?.disponibileReale ?? 0);
   });
-  const canSubmit = righeValide.length > 0 && !hasEccesso && !updateTrasferimento.isPending;
+  const canSubmit = origineAreaId > 0 && righeValide.length > 0 && !hasEccesso && !updateTrasferimento.isPending;
 
   const onSubmit = () => {
     if (!canSubmit) return;
@@ -436,7 +447,7 @@ function ModificaTrasferimentoForm({
 
           <div className="space-y-2">
             <Label>{t("trasferimenti.prodottiDaTrasferire")}</Label>
-            <RigheEditor magazzinoId={origineIdNum} righe={righe} setRighe={setRighe} />
+            <RigheEditor magazzinoId={origineIdNum} areaOperativaId={origineAreaId} righe={righe} setRighe={setRighe} />
           </div>
 
           <div className="space-y-2">

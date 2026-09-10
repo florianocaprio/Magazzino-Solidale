@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { login, selectOption } from "./helpers";
 
-type Magazzino = { id: number; nome: string };
+type Magazzino = { id: number; nome: string; areaOperativaId: number };
 type Prodotto = { id: number; codice: string };
 type Giacenza = { prodottoId: number; disponibileReale: number };
 
@@ -26,7 +26,7 @@ test("Cassa Emporio forza un accesso tracciato, calcola credito e chiude la spes
   )!;
   const readStock = async () => {
     const response = await page.request.get(
-      `/api/giacenze?magazzinoId=${warehouse.id}`,
+      `/api/giacenze?areaOperativaId=${warehouse.areaOperativaId}&magazzinoId=${warehouse.id}`,
     );
     return (
       ((await response.json()) as Giacenza[]).find(

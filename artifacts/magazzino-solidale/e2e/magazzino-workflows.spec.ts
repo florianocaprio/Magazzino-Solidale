@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { login, selectOption } from "./helpers";
 
-type Magazzino = { id: number; nome: string };
+type Magazzino = { id: number; nome: string; areaOperativaId: number };
 type Prodotto = { id: number; codice: string };
 type Giacenza = { prodottoId: number; disponibileReale: number };
 type Lotto = {
@@ -119,7 +119,7 @@ test.describe("workflow Magazzino reali", () => {
       (item) => item.codice === "DEMO-PASTA-500",
     )!;
     const stockBeforeResponse = await page.request.get(
-      `/api/giacenze?magazzinoId=${warehouse.id}`,
+      `/api/giacenze?areaOperativaId=${warehouse.areaOperativaId}&magazzinoId=${warehouse.id}`,
     );
     const stockBefore = ((await stockBeforeResponse.json()) as Giacenza[]).find(
       (item) => item.prodottoId === product.id,
@@ -176,7 +176,7 @@ test.describe("workflow Magazzino reali", () => {
     ).toBeVisible();
 
     const stockAfterResponse = await page.request.get(
-      `/api/giacenze?magazzinoId=${warehouse.id}`,
+      `/api/giacenze?areaOperativaId=${warehouse.areaOperativaId}&magazzinoId=${warehouse.id}`,
     );
     const stockAfter = ((await stockAfterResponse.json()) as Giacenza[]).find(
       (item) => item.prodottoId === product.id,
@@ -218,9 +218,9 @@ test.describe("workflow Magazzino reali", () => {
     const product = ((await productsResponse.json()) as Prodotto[]).find(
       (item) => item.codice === "DEMO-PASTA-500",
     )!;
-    const readStock = async (warehouseId: number) => {
+    const readStock = async (warehouse: Magazzino) => {
       const response = await page.request.get(
-        `/api/giacenze?magazzinoId=${warehouseId}`,
+        `/api/giacenze?areaOperativaId=${warehouse.areaOperativaId}&magazzinoId=${warehouse.id}`,
       );
       return (
         ((await response.json()) as Giacenza[]).find(
@@ -228,8 +228,8 @@ test.describe("workflow Magazzino reali", () => {
         )?.disponibileReale ?? 0
       );
     };
-    const originBefore = await readStock(origin.id);
-    const destinationBefore = await readStock(destination.id);
+    const originBefore = await readStock(origin);
+    const destinationBefore = await readStock(destination);
 
     await page.goto("/trasferimenti");
     await page.getByRole("button", { name: /^nuovo$/i }).click();
@@ -288,7 +288,7 @@ test.describe("workflow Magazzino reali", () => {
     await row.getByRole("button", { name: /avvia/i }).click();
     expect((await dispatchResponse).status()).toBe(200);
     await expect(row).toContainText(/in transito/i);
-    expect(await readStock(origin.id)).toBe(originBefore - 1);
+    expect(await readStock(origin)).toBe(originBefore - 1);
 
     row = page.getByRole("row").filter({ hasText: created.codice });
     const receiveResponse = page.waitForResponse(
@@ -299,7 +299,7 @@ test.describe("workflow Magazzino reali", () => {
     await row.getByRole("button", { name: /conferma ric/i }).click();
     expect((await receiveResponse).status()).toBe(200);
     await expect(row).toContainText(/completato/i);
-    expect(await readStock(destination.id)).toBe(destinationBefore + 1);
+    expect(await readStock(destination)).toBe(destinationBefore + 1);
     await expect(
       row.getByRole("button", { name: /conferma ric/i }),
     ).toHaveCount(0);

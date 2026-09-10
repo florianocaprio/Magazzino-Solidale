@@ -9,6 +9,7 @@ import {
   cleanup,
   type SeedScope,
   createBeneficiario,
+  createAreaOperativa,
   createCentro,
   createLotto,
   createMagazzino,
@@ -40,6 +41,7 @@ let scope: SeedScope;
 let operatoreId: number;
 let centroA: number;
 let centroB: number;
+let areaA: number;
 let magA: number;
 let magB: number;
 let prod: number;
@@ -48,6 +50,9 @@ let beneficiarioB: number;
 
 const appAs = (centro: number | null) =>
   makeScopedApp(giacenzeRouter, { id: operatoreId, centroAscoltoId: centro });
+
+const giacenzeUrl = (magazzinoId: number) =>
+  `/giacenze?areaOperativaId=${areaA}&magazzinoId=${magazzinoId}`;
 
 const rowFor = (rows: GiacenzaBody[], magazzinoId: number): GiacenzaBody => {
   const row = rows.find((item) => item.magazzinoId === magazzinoId);
@@ -93,10 +98,11 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   scope = newScope();
+  areaA = await createAreaOperativa(scope);
   centroA = await createCentro(scope);
   centroB = await createCentro(scope);
-  magA = await createMagazzino(scope, centroA);
-  magB = await createMagazzino(scope, centroB);
+  magA = await createMagazzino(scope, centroA, { areaOperativaId: areaA });
+  magB = await createMagazzino(scope, centroB, { areaOperativaId: areaA });
   prod = await createProdotto(scope);
   beneficiarioA = await createBeneficiario(scope, centroA);
   beneficiarioB = await createBeneficiario(scope, centroB);
@@ -115,7 +121,7 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
   it("espone giacenza fisica, impegnato zero e disponibile reale senza prenotazioni", async () => {
     await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 12.5 });
 
-    const res = await request(appAs(centroA)).get("/giacenze");
+    const res = await request(appAs(centroA)).get(giacenzeUrl(magA));
 
     expect(res.status).toBe(200);
     expect(rowFor(res.body, magA)).toMatchObject({
@@ -152,7 +158,7 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
       quantita: 3,
     });
 
-    const res = await request(appAs(centroA)).get("/giacenze");
+    const res = await request(appAs(centroA)).get(giacenzeUrl(magA));
 
     expect(res.status).toBe(200);
     expect(rowFor(res.body, magA)).toMatchObject({
@@ -169,7 +175,7 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
     const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
     await prenota({ beneficiarioId: beneficiarioA, magazzinoId: magA, lottoId, quantita: 4 });
 
-    const res = await request(appAs(centroA)).get("/giacenze");
+    const res = await request(appAs(centroA)).get(giacenzeUrl(magA));
 
     expect(res.status).toBe(200);
     expect(rowFor(res.body, magA)).toMatchObject({
@@ -185,7 +191,7 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
     const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 100 });
     await prenota({ beneficiarioId: beneficiarioA, magazzinoId: magA, lottoId, quantita: 90 });
 
-    const res = await request(appAs(centroA)).get("/giacenze");
+    const res = await request(appAs(centroA)).get(giacenzeUrl(magA));
 
     expect(res.status).toBe(200);
     expect(rowFor(res.body, magA)).toMatchObject({
@@ -213,7 +219,7 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
       quantita: 0.000001,
     });
 
-    const res = await request(appAs(centroA)).get("/giacenze");
+    const res = await request(appAs(centroA)).get(giacenzeUrl(magA));
     const row = rowFor(res.body, magA);
     expect(res.status).toBe(200);
     expect(row).toMatchObject({
@@ -231,7 +237,7 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
     await prenota({ beneficiarioId: beneficiarioA, magazzinoId: magA, lottoId, quantita: 3, stato: "rilasciata" });
     await prenota({ beneficiarioId: beneficiarioA, magazzinoId: magA, lottoId, quantita: 4, stato: "convertita_in_scarico" });
 
-    const res = await request(appAs(centroA)).get("/giacenze");
+    const res = await request(appAs(centroA)).get(giacenzeUrl(magA));
 
     expect(res.status).toBe(200);
     expect(rowFor(res.body, magA)).toMatchObject({
@@ -247,7 +253,7 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
     await prenota({ beneficiarioId: beneficiarioA, magazzinoId: magA, lottoId: lottoA, quantita: 3 });
     await prenota({ beneficiarioId: beneficiarioB, magazzinoId: magB, lottoId: lottoB, quantita: 9 });
 
-    const res = await request(appAs(centroA)).get("/giacenze");
+    const res = await request(appAs(centroA)).get(giacenzeUrl(magA));
 
     expect(res.status).toBe(200);
     const rows = res.body as GiacenzaBody[];
@@ -261,11 +267,14 @@ describe("GET /giacenze — prenotazioni magazzino", () => {
     await prenota({ beneficiarioId: beneficiarioA, magazzinoId: magA, lottoId: lottoA, quantita: 3 });
     await prenota({ beneficiarioId: beneficiarioB, magazzinoId: magB, lottoId: lottoB, quantita: 9 });
 
-    const res = await request(appAs(null)).get("/giacenze");
+    const [resA, resB] = await Promise.all([
+      request(appAs(null)).get(giacenzeUrl(magA)),
+      request(appAs(null)).get(giacenzeUrl(magB)),
+    ]);
 
-    expect(res.status).toBe(200);
-    const rows = res.body as GiacenzaBody[];
-    expect(rowFor(rows, magA)).toMatchObject({ giacenzaFisica: 10, impegnato: 3, disponibileReale: 7 });
-    expect(rowFor(rows, magB)).toMatchObject({ giacenzaFisica: 20, impegnato: 9, disponibileReale: 11 });
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+    expect(rowFor(resA.body, magA)).toMatchObject({ giacenzaFisica: 10, impegnato: 3, disponibileReale: 7 });
+    expect(rowFor(resB.body, magB)).toMatchObject({ giacenzaFisica: 20, impegnato: 9, disponibileReale: 11 });
   });
 });

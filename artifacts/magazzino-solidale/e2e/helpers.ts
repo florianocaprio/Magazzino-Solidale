@@ -7,7 +7,7 @@ export async function login(page: Page) {
   if (!password) throw new Error("E2E_PASSWORD is required");
   await page.goto("/login");
   await page.getByLabel(/username|nome utente/i).fill(username);
-  await page.getByLabel(/password/i).fill(password);
+  await page.getByLabel(/^password$/i).fill(password);
   await page.getByRole("button", { name: /accedi|sign in|login/i }).click();
   await expect(page).toHaveURL(/\/$/);
 }

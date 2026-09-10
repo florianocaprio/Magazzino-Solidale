@@ -2239,8 +2239,13 @@ export const ListMovimentiResponseItem = zod.object({
 export const ListMovimentiResponse = zod.array(ListMovimentiResponseItem)
 
 
+
+
+
+
 export const ListGiacenzeQueryParams = zod.object({
-  "magazzinoId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().min(1).describe('Area Operativa che delimita sempre la consultazione delle giacenze.'),
+  "magazzinoId": zod.coerce.number().min(1).optional().describe('Magazzino opzionale, che deve appartenere all\'Area Operativa richiesta.'),
   "sottoscortaOnly": zod.coerce.boolean().optional(),
   "fsePlusOnly": zod.coerce.boolean().optional(),
   "prodottoId": zod.coerce.number().optional(),
@@ -2255,33 +2260,36 @@ export const listGiacenzeResponseGiacenzaScadutaPrecisaRegExp = new RegExp('^[0-
 export const listGiacenzeResponseGiacenzaDistribuibilePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const listGiacenzeResponseImpegnatoPrecisoRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const listGiacenzeResponseDisponibileRealePrecisaRegExp = new RegExp('^-?[0-9]+(?:\\.[0-9]{1,6})?$');
-export const listGiacenzeResponseScortaMinimaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listGiacenzeResponseScortaMinimaPrecisaOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 export const ListGiacenzeResponseItem = zod.object({
+  "ambito": zod.enum(['area', 'magazzino']),
+  "areaOperativaId": zod.number(),
+  "areaOperativaNome": zod.string(),
   "prodottoId": zod.number(),
   "prodottoNome": zod.string(),
   "prodottoCodice": zod.string(),
   "tipoProdotto": zod.string(),
   "unitaMisura": zod.string(),
-  "magazzinoId": zod.number(),
-  "magazzinoNome": zod.string(),
+  "magazzinoId": zod.number().nullable(),
+  "magazzinoNome": zod.string().nullable(),
   "quantitaTotale": zod.number(),
-  "quantitaTotalePrecisa": zod.string().regex(listGiacenzeResponseQuantitaTotalePrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "quantitaTotalePrecisa": zod.string().regex(listGiacenzeResponseQuantitaTotalePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "giacenzaFisica": zod.number().describe('Quantità fisicamente presente, inclusi i lotti scaduti.'),
   "giacenzaScaduta": zod.number().describe('Quantità fisicamente presente su lotti scaduti alla data civile Europe\/Rome.'),
   "giacenzaDistribuibile": zod.number().describe('Quantità fisica non scaduta e quindi distribuibile alla data civile Europe\/Rome.'),
   "giacenzaFisicaPrecisa": zod.string().regex(listGiacenzeResponseGiacenzaFisicaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
-  "giacenzaScadutaPrecisa": zod.string().regex(listGiacenzeResponseGiacenzaScadutaPrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "giacenzaScadutaPrecisa": zod.string().regex(listGiacenzeResponseGiacenzaScadutaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "giacenzaDistribuibilePrecisa": zod.string().regex(listGiacenzeResponseGiacenzaDistribuibilePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "impegnato": zod.number(),
   "impegnatoPreciso": zod.string().regex(listGiacenzeResponseImpegnatoPrecisoRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "disponibileReale": zod.number(),
   "disponibileRealePrecisa": zod.string().regex(listGiacenzeResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto con segno per le rettifiche; lo zero non è ammesso dal runtime.'),
-  "scortaMinima": zod.number(),
-  "scortaMinimaPrecisa": zod.string().regex(listGiacenzeResponseScortaMinimaPrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
-  "scortaConsigliata": zod.number(),
-  "sottoscorta": zod.boolean(),
+  "scortaMinima": zod.number().nullable(),
+  "scortaMinimaPrecisa": zod.union([zod.string().regex(listGiacenzeResponseScortaMinimaPrecisaOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]),
+  "scortaConsigliata": zod.number().nullable(),
+  "sottoscorta": zod.boolean().nullable(),
   "lottiAttivi": zod.number(),
   "prossimaScadenza": zod.string().nullish()
 })

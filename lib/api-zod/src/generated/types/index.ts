@@ -321,6 +321,7 @@ export * from './getVolontariCaricoFascia';
 export * from './getVolontariCaricoParams';
 export * from './getVolontarioDossier200';
 export * from './giacenza';
+export * from './giacenzaAmbito';
 export * from './giacenzaMagazzinoReport';
 export * from './healthStatus';
 export * from './impostazioniEmail';

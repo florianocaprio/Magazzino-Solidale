@@ -5217,7 +5217,7 @@ export function useListMovimenti<TData = Awaited<ReturnType<typeof listMovimenti
 
 
 
-export const getListGiacenzeUrl = (params?: ListGiacenzeParams,) => {
+export const getListGiacenzeUrl = (params: ListGiacenzeParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -5232,7 +5232,7 @@ export const getListGiacenzeUrl = (params?: ListGiacenzeParams,) => {
   return stringifiedParams.length > 0 ? `/api/giacenze?${stringifiedParams}` : `/api/giacenze`
 }
 
-export const listGiacenze = async (params?: ListGiacenzeParams, options?: RequestInit): Promise<Giacenza[]> => {
+export const listGiacenze = async (params: ListGiacenzeParams, options?: RequestInit): Promise<Giacenza[]> => {
 
   return customFetch<Giacenza[]>(getListGiacenzeUrl(params),
   {
@@ -5254,7 +5254,7 @@ export const getListGiacenzeQueryKey = (params?: ListGiacenzeParams,) => {
     }
 
 
-export const getListGiacenzeQueryOptions = <TData = Awaited<ReturnType<typeof listGiacenze>>, TError = ErrorType<unknown>>(params?: ListGiacenzeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGiacenze>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListGiacenzeQueryOptions = <TData = Awaited<ReturnType<typeof listGiacenze>>, TError = ErrorType<void>>(params: ListGiacenzeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGiacenze>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -5273,12 +5273,12 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListGiacenzeQueryResult = NonNullable<Awaited<ReturnType<typeof listGiacenze>>>
-export type ListGiacenzeQueryError = ErrorType<unknown>
+export type ListGiacenzeQueryError = ErrorType<void>
 
 
 
-export function useListGiacenze<TData = Awaited<ReturnType<typeof listGiacenze>>, TError = ErrorType<unknown>>(
- params?: ListGiacenzeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGiacenze>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useListGiacenze<TData = Awaited<ReturnType<typeof listGiacenze>>, TError = ErrorType<void>>(
+ params: ListGiacenzeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGiacenze>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 

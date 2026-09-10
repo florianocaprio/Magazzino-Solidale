@@ -2016,16 +2016,29 @@ export interface MovimentoInput {
   note?: string;
 }
 
+export type GiacenzaAmbito = typeof GiacenzaAmbito[keyof typeof GiacenzaAmbito];
+
+
+export const GiacenzaAmbito = {
+  area: 'area',
+  magazzino: 'magazzino',
+} as const;
+
 export interface Giacenza {
+  ambito: GiacenzaAmbito;
+  areaOperativaId: number;
+  areaOperativaNome: string;
   prodottoId: number;
   prodottoNome: string;
   prodottoCodice: string;
   tipoProdotto: string;
   unitaMisura: string;
-  magazzinoId: number;
-  magazzinoNome: string;
+  /** @nullable */
+  magazzinoId: number | null;
+  /** @nullable */
+  magazzinoNome: string | null;
   quantitaTotale: number;
-  quantitaTotalePrecisa?: QuantitaContabile;
+  quantitaTotalePrecisa: QuantitaContabile;
   /** Quantità fisicamente presente, inclusi i lotti scaduti. */
   giacenzaFisica: number;
   /** Quantità fisicamente presente su lotti scaduti alla data civile Europe/Rome. */
@@ -2033,16 +2046,19 @@ export interface Giacenza {
   /** Quantità fisica non scaduta e quindi distribuibile alla data civile Europe/Rome. */
   giacenzaDistribuibile: number;
   giacenzaFisicaPrecisa: QuantitaContabile;
-  giacenzaScadutaPrecisa?: QuantitaContabile;
+  giacenzaScadutaPrecisa: QuantitaContabile;
   giacenzaDistribuibilePrecisa: QuantitaContabile;
   impegnato: number;
   impegnatoPreciso: QuantitaContabile;
   disponibileReale: number;
   disponibileRealePrecisa: QuantitaContabileConSegno;
-  scortaMinima: number;
-  scortaMinimaPrecisa?: QuantitaContabile;
-  scortaConsigliata: number;
-  sottoscorta: boolean;
+  /** @nullable */
+  scortaMinima: number | null;
+  scortaMinimaPrecisa: QuantitaContabile | null;
+  /** @nullable */
+  scortaConsigliata: number | null;
+  /** @nullable */
+  sottoscorta: boolean | null;
   lottiAttivi: number;
   /** @nullable */
   prossimaScadenza?: string | null;
@@ -8638,6 +8654,15 @@ limit?: number;
 };
 
 export type ListGiacenzeParams = {
+/**
+ * Area Operativa che delimita sempre la consultazione delle giacenze.
+ * @minimum 1
+ */
+areaOperativaId: number;
+/**
+ * Magazzino opzionale, che deve appartenere all'Area Operativa richiesta.
+ * @minimum 1
+ */
 magazzinoId?: number;
 sottoscortaOnly?: boolean;
 fsePlusOnly?: boolean;
