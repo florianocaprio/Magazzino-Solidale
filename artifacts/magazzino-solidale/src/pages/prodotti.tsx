@@ -33,7 +33,16 @@ import { Label } from "@/components/ui/label";
 import { ExportButtons } from "@/components/export-buttons";
 import { generateProdottiBarcodePdf } from "@/lib/prodotti-barcode-pdf";
 import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
-import { MoreHorizontal, Plus, Pencil, Trash2, Filter, PackagePlus, Barcode, Upload } from "lucide-react";
+import {
+  MoreHorizontal,
+  Plus,
+  Pencil,
+  Trash2,
+  Filter,
+  PackagePlus,
+  Download,
+  Upload,
+} from "lucide-react";
 import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { useAuth } from "@/lib/auth";
 import { todayEuropeRome } from "@/lib/europe-rome";
@@ -531,6 +540,7 @@ export default function Prodotti() {
             title={t("prodotti.title")}
           />
           <Button
+            type="button"
             variant="outline"
             className="gap-2"
             disabled={(prodotti ?? []).length === 0}
@@ -550,15 +560,31 @@ export default function Prodotti() {
               )
             }
           >
-            <Barcode className="h-4 w-4" /> {t("prodotti.exportBarcodes")}
+            <Download className="h-4 w-4" aria-hidden="true" />{" "}
+            {t("prodotti.exportBarcodes")}
           </Button>
           {canManageProducts && (
             <>
-              <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
-                <Upload className="h-4 w-4" /> {t("bulkImport.button")}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsImportOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={isImportOpen}
+                className="gap-2"
+              >
+                <Upload className="h-4 w-4" aria-hidden="true" />{" "}
+                {t("bulkImport.button")}
               </Button>
-              <Button onClick={handleCreate} className="gap-2">
-                <Plus className="h-4 w-4" /> {t("prodotti.newProduct")}
+              <Button
+                type="button"
+                onClick={handleCreate}
+                aria-haspopup="dialog"
+                aria-expanded={isFormOpen}
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />{" "}
+                {t("prodotti.newProduct")}
               </Button>
             </>
           )}

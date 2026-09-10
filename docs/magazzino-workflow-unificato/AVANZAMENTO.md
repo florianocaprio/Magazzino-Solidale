@@ -190,3 +190,54 @@ La validazione riguarda i requisiti, non il software futuro. Le righe pertinenti
 ### Condizione di arresto
 
 M0 è chiuso. Dopo il commit e il push di questa registrazione sul solo branch M0, fermarsi. L'avvio di M1A richiede un prompt successivo esplicito.
+
+## M1A — sviluppo e test automatici
+
+Sviluppo: 9 settembre 2026; test automatici: 10 settembre 2026
+Base di sviluppo: `3ebbcaab04206be16530c2ddb5298c0bbdb74f12`
+Stato: **M1A test automatici superati — pronto per revisione e validazione manuale**.
+
+### Perimetro autorizzato
+
+- feedback immediato e stato persistente per il componente `Button` comune;
+- chiarezza delle quattro azioni principali del Catalogo prodotti;
+- semantica di download per la generazione dei codici a barre;
+- controllo accessibile per mostrare o nascondere la password nel login;
+- test frontend mirati e soli controlli di sviluppo pertinenti.
+
+Sono rimasti esclusi schema, migrazioni, API, OpenAPI, tipi generati, logiche di dominio e workflow operativi. Non sono state avviate M1B o M1C; il commit e il push riguardano esclusivamente il candidato M1A e non coinvolgono `main`.
+
+### Modifiche implementate
+
+- Il `Button` comune ora espone un feedback di pressione immediato e rende visibili gli stati persistenti `data-state=open/on`, `aria-expanded=true`, `aria-pressed=true` e `aria-selected=true`, conservando focus da tastiera, stato disabilitato, varianti, `asChild` e area tattile minima.
+- Nel Catalogo i comandi restano nello stesso ordine e con gli stessi permessi: Esporta mostra anche lo stato asincrono e blocca avvii duplicati; Codici a barre usa icona e testo espliciti di download; Importa e Nuovo prodotto dichiarano apertura e stato dei rispettivi dialoghi.
+- La generazione barcode conserva il flusso PDF esistente: la modifica riguarda solo la semantica visiva del comando.
+- Il login offre mostra/nascondi password con pulsante non-submit, etichetta accessibile localizzata, `aria-pressed` e valore/autocomplete invariati.
+- Le nuove stringhe sono presenti nelle sei lingue già gestite dall'applicazione.
+
+### Controlli di sviluppo e test
+
+| Controllo                                                                                                                                                                                                                                    | Esito                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `pnpm --filter @workspace/magazzino-solidale exec vitest run --config vitest.unit.config.ts src/components/ui/button.test.tsx src/components/export-buttons.test.tsx src/components/prodotti-m1a.test.tsx src/components/login-m1a.test.tsx` | superato: 4 file, 13 test, 0 falliti   |
+| `pnpm --filter @workspace/magazzino-solidale run test`                                                                                                                                                                                       | superato: 64 file, 341 test, 0 falliti |
+| `pnpm run typecheck`                                                                                                                                                                                                                         | superato per l'intero workspace        |
+| `PORT=19176 BASE_PATH=/ MAPS_PUBLIC_GEOCODING_ALLOWED=false pnpm run build`                                                                                                                                                                  | superato; soli warning baseline        |
+| `pnpm --filter @workspace/magazzino-solidale run build:budget`                                                                                                                                                                               | superato: 1252,2 KiB / 347,2 KiB gzip  |
+| `pnpm exec bash scripts/test-web-runtime-config.sh`                                                                                                                                                                                          | superato                               |
+| Prettier write/check su 11 file M1A                                                                                                                                                                                                          | superato                               |
+| Prettier check integrale su `pages/prodotti.tsx` e `i18n/namespaces/prodotti.ts`                                                                                                                                                             | warning di baseline riprodotto su HEAD |
+| `git diff --check`                                                                                                                                                                                                                           | superato                               |
+| verifica fisica tablet/touch/tastiera                                                                                                                                                                                                        | non eseguita; richiede prova manuale   |
+
+I test mirati coprono tutte le varianti del pulsante comune, azioni non persistenti, stati aperto/premuto/selezionato, disabled, `asChild`, focus e target touch; apertura/chiusura Radix, race di doppio avvio XLSX/PDF e contenuto passato agli exporter; semantica e permessi del Catalogo; apertura e chiusura di Import/Sheet; toggle, focus, submit ed errore login. Il ripristino del loading in caso di errore è inoltre garantito dal blocco `finally` presente in entrambi i percorsi export.
+
+Le quattro nuove chiavi risultano presenti una sola volta per ciascuna delle sei lingue, senza stringhe UI hard-coded; inizializzazione dei namespace e accessi tipizzati sono coperti dal typecheck. La suite passa da 60 file/328 test della baseline M0 a 64 file/341 test per i quattro file e tredici test M1A.
+
+Il prompt di test riportava un diff precedente di 13 file, `+1323/-1253`. Al preflight il churn esteso era già stato rimosso: 9 file tracciati `+222/-84` e 4 nuovi test per 598 righe. Il candidato finale è di 13 file, `+946/-52`, incluse 749 righe di test; `--ignore-all-space` ha isolato formattazione locale e riallineamenti Markdown, senza line ending, riordini automatici o whitespace estranei.
+
+I due file Catalogo erano già integralmente non conformi a Prettier nella revisione di partenza. Le sole porzioni M1A sono state allineate all'output del formatter; la formattazione completa avrebbe prodotto un diff esteso e non funzionale, quindi è stata esclusa dal perimetro conservativo della milestone.
+
+### Condizione di arresto e prossima azione
+
+Il candidato M1A viene raccolto in un singolo commit e pubblicato esclusivamente sul branch autorizzato. La successiva ricostruzione Docker e la validazione visiva/manuale dovranno usare quella SHA; fino ad allora non devono essere avviate M1B o M1C né effettuati merge su `main`.

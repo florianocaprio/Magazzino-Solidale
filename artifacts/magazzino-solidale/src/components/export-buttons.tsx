@@ -5,8 +5,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, FileSpreadsheet, FileText } from "lucide-react";
-import { useState } from "react";
+import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { exportToXlsx, exportToPdf, type ExportColumn } from "@/lib/export";
@@ -44,10 +44,15 @@ export function ExportButtons<T>({
   const { t } = useTranslation();
   const { user } = useAuth();
   const [exportLoading, setExportLoading] = useState(false);
-  const generatedBy = user ? `${user.nome ?? ""} ${user.cognome ?? ""}`.trim() || user.username : undefined;
+  const exportInFlight = useRef(false);
+  const generatedBy = user
+    ? `${user.nome ?? ""} ${user.cognome ?? ""}`.trim() || user.username
+    : undefined;
   const empty = disabled || (rows.length === 0 && !loadRows);
-  const resolveRows = () => loadRows ? loadRows() : Promise.resolve(rows);
+  const resolveRows = () => (loadRows ? loadRows() : Promise.resolve(rows));
   const handlePdfExport = async () => {
+    if (exportInFlight.current) return;
+    exportInFlight.current = true;
     setExportLoading(true);
     try {
       const exportRows = await resolveRows();
@@ -65,11 +70,14 @@ export function ExportButtons<T>({
         branding: { ...branding, logoDataUrl },
       });
     } finally {
+      exportInFlight.current = false;
       setExportLoading(false);
     }
   };
 
   const handleXlsxExport = async () => {
+    if (exportInFlight.current) return;
+    exportInFlight.current = true;
     setExportLoading(true);
     try {
       const exportRows = await resolveRows();
@@ -77,6 +85,7 @@ export function ExportButtons<T>({
       await beforeExport?.("xlsx", exportRows);
       exportToXlsx(filename, sheetName ?? title, exportRows, columns);
     } finally {
+      exportInFlight.current = false;
       setExportLoading(false);
     }
   };
@@ -84,21 +93,38 @@ export function ExportButtons<T>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size} disabled={empty || exportLoading} className="gap-2">
-          <Download className="h-4 w-4" /> {t("common.export")}
+        <Button
+          variant={variant}
+          size={size}
+          disabled={empty || exportLoading}
+          aria-busy={exportLoading}
+          className="gap-2"
+        >
+          {exportLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Download className="h-4 w-4" aria-hidden="true" />
+          )}
+          {exportLoading ? t("common.exporting") : t("common.export")}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem
+          disabled={exportLoading}
           onClick={() => void handleXlsxExport()}
         >
-          <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" /> {t("common.exportExcel")}
+          <FileSpreadsheet
+            className="h-4 w-4 mr-2 text-green-600"
+            aria-hidden="true"
+          />{" "}
+          {t("common.exportExcel")}
         </DropdownMenuItem>
         <DropdownMenuItem
           disabled={exportLoading}
           onClick={() => void handlePdfExport()}
         >
-          <FileText className="h-4 w-4 mr-2 text-red-600" /> {t("common.exportPdf")}
+          <FileText className="h-4 w-4 mr-2 text-red-600" aria-hidden="true" />{" "}
+          {t("common.exportPdf")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

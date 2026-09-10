@@ -1,7 +1,7 @@
 export const prodotti = {
   it: {
     title: "Catalogo Prodotti",
-    exportBarcodes: "Codici a barre",
+    exportBarcodes: "Scarica codici a barre",
     barcodeListTitle: "Catalogo Prodotti — Codici a Barre",
     barcodeTipo: "Tipo",
     barcodeUm: "UM",
@@ -103,7 +103,7 @@ export const prodotti = {
   },
   es: {
     title: "Catálogo de Productos",
-    exportBarcodes: "Códigos de barras",
+    exportBarcodes: "Descargar códigos de barras",
     barcodeListTitle: "Catálogo de Productos — Códigos de Barras",
     barcodeTipo: "Tipo",
     barcodeUm: "UM",
@@ -204,7 +204,7 @@ export const prodotti = {
   },
   en: {
     title: "Product Catalogue",
-    exportBarcodes: "Barcodes",
+    exportBarcodes: "Download barcodes",
     barcodeListTitle: "Product Catalogue — Barcodes",
     barcodeTipo: "Type",
     barcodeUm: "UM",
@@ -305,7 +305,7 @@ export const prodotti = {
   },
   fr: {
     title: "Catalogue de produits",
-    exportBarcodes: "Codes-barres",
+    exportBarcodes: "Télécharger les codes-barres",
     barcodeListTitle: "Catalogue de produits — Codes-barres",
     barcodeTipo: "Type",
     barcodeUm: "UM",
@@ -406,7 +406,7 @@ export const prodotti = {
   },
   de: {
     title: "Produktkatalog",
-    exportBarcodes: "Barcodes",
+    exportBarcodes: "Barcodes herunterladen",
     barcodeListTitle: "Produktkatalog — Barcodes",
     barcodeTipo: "Typ",
     barcodeUm: "ME",
@@ -507,7 +507,7 @@ export const prodotti = {
   },
   ar: {
     title: "كتالوج المنتجات",
-    exportBarcodes: "الرموز الشريطية",
+    exportBarcodes: "تنزيل الرموز الشريطية",
     barcodeListTitle: "كتالوج المنتجات — الرموز الشريطية",
     barcodeTipo: "النوع",
     barcodeUm: "الوحدة",

@@ -6,6 +6,8 @@ export const login = {
     forgotPassword: "Password dimenticata?",
     signIn: "Accedi",
     errorInvalid: "Username o password non corretti.",
+    showPassword: "Mostra password",
+    hidePassword: "Nascondi password",
   },
   es: {
     subtitle: "Inicia sesión para continuar",
@@ -14,6 +16,8 @@ export const login = {
     forgotPassword: "¿Olvidaste la contraseña?",
     signIn: "Acceder",
     errorInvalid: "Usuario o contraseña incorrectos.",
+    showPassword: "Mostrar contraseña",
+    hidePassword: "Ocultar contraseña",
   },
   en: {
     subtitle: "Sign in to continue",
@@ -22,6 +26,8 @@ export const login = {
     forgotPassword: "Forgot password?",
     signIn: "Sign in",
     errorInvalid: "Incorrect username or password.",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
   },
   fr: {
     subtitle: "Connectez-vous pour continuer",
@@ -30,6 +36,8 @@ export const login = {
     forgotPassword: "Mot de passe oublié ?",
     signIn: "Se connecter",
     errorInvalid: "Nom d'utilisateur ou mot de passe incorrect.",
+    showPassword: "Afficher le mot de passe",
+    hidePassword: "Masquer le mot de passe",
   },
   de: {
     subtitle: "Melden Sie sich an, um fortzufahren",
@@ -38,6 +46,8 @@ export const login = {
     forgotPassword: "Passwort vergessen?",
     signIn: "Anmelden",
     errorInvalid: "Benutzername oder Passwort falsch.",
+    showPassword: "Passwort anzeigen",
+    hidePassword: "Passwort ausblenden",
   },
   ar: {
     subtitle: "سجّل الدخول للمتابعة",
@@ -46,5 +56,7 @@ export const login = {
     forgotPassword: "هل نسيت كلمة المرور؟",
     signIn: "تسجيل الدخول",
     errorInvalid: "اسم المستخدم أو كلمة المرور غير صحيحة.",
+    showPassword: "إظهار كلمة المرور",
+    hidePassword: "إخفاء كلمة المرور",
   },
 } as const;
