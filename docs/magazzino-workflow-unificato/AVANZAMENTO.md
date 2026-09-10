@@ -363,3 +363,15 @@ La fixture frontend dedicata verifica A1 attivo con 10 pezzi e A2 inattivo con 2
 | Prettier pertinente e `git diff --check`     | superati                                               |
 
 Backend, OpenAPI, generated code, schema e migrazioni sono invariati. La matrice GEO-01..04 resta `OK-M1B/NE-MAN`; rebuild Docker, validazione manuale, M1C, M2 e merge su `main` non sono stati avviati.
+
+## M1B — validazione manuale
+
+Data: 11 settembre 2026
+
+Candidato validato: `27bff709565726b73f9fa09c2e0e3875fe0982b5`
+
+Stato: **M1B validato manualmente da Floriano** (`OK-M1B/OK-MAN-M1B`).
+
+Floriano ha completato con esito positivo il dry run manuale del candidato Docker M1B. La validazione copre GEO-01, GEO-02, GEO-03, GEO-04 e CAT-01: selezione Area→Magazzino, aggregato di Area, isolamento degli scope, reset al cambio Area, assenza di una soglia arbitraria di Area, consultazione dei magazzini inattivi, esclusione del legacy senza Area, export contestuali, filtro FSE+, consumer collegati e permanenza del Catalogo come anagrafica globale.
+
+Gli esiti tecnici M1B già registrati restano invariati. Questa chiusura documentale non modifica codice, schema, API, migrazioni o output generati e non anticipa M1C o M2.
