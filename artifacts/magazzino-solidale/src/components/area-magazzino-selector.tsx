@@ -15,15 +15,13 @@ export function activeOperationalAreas(
   return (areas ?? []).filter((area) => area.attivo);
 }
 
-export function operationalWarehousesForArea(
+export function warehousesForArea(
   warehouses: Magazzino[] | undefined,
   areaOperativaId: number | null,
 ): Magazzino[] {
   if (areaOperativaId == null) return [];
   return (warehouses ?? []).filter(
-    (warehouse) =>
-      warehouse.areaOperativaId === areaOperativaId &&
-      warehouse.stato === "attivo",
+    (warehouse) => warehouse.areaOperativaId === areaOperativaId,
   );
 }
 
@@ -89,6 +87,9 @@ export function AreaMagazzinoSelector({
             {warehouses.map((warehouse) => (
               <SelectItem key={warehouse.id} value={String(warehouse.id)}>
                 {warehouse.nome}
+                {warehouse.stato !== "attivo"
+                  ? ` — ${t("common.inactive")}`
+                  : ""}
               </SelectItem>
             ))}
           </SelectContent>

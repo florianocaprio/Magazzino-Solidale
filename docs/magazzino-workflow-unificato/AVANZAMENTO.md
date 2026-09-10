@@ -340,3 +340,26 @@ Il primo tentativo Playwright non ha avviato i workflow perché mancava `E2E_PAS
 - Le Aree inattive restano escluse dalla scelta operativa; un eventuale percorso storico richiede una decisione futura.
 - `Area Operativa = undefined` in Dashboard resta un follow-up non bloccante e fuori M1B.
 - M1C, M2, rebuild Docker candidato e merge su `main` non sono stati avviati.
+
+## M1B — correzione post-code-review
+
+Data: 10 settembre 2026
+
+Base della correzione: `f48e838b6d68b07f670ecac9afffb2689b31c802`
+
+Stato: **M1B test automatici superati — pronto per validazione Docker/manuale** (`OK-M1B/NE-MAN`).
+
+La code review ha rilevato una difformità tra l'aggregato Area, che include tutti i magazzini accessibili appartenenti esattamente all'Area, e il selector Giacenze, che mostrava soltanto quelli attivi. Poiché Giacenze è una vista consultiva, il helper è stato rinominato `warehousesForArea` e ora mantiene anche i depositi inattivi dell'Area selezionata. Nel menu questi sono identificati dal suffisso localizzato `common.inactive`; i magazzini di altre Aree e quelli legacy senza Area restano esclusi.
+
+La fixture frontend dedicata verifica A1 attivo con 10 pezzi e A2 inattivo con 20 pezzi: l'aggregato Area continua a mostrare 30, A2 è selezionabile come consultazione e la query risultante contiene sia l'Area sia il relativo `magazzinoId`, mostrando i 20 pezzi del deposito. I filtri `stato === "attivo"` di Bolle, Scarichi e Trasferimenti sono rimasti invariati, quindi questa correzione non riabilita i magazzini inattivi per operazioni di scrittura.
+
+| Controllo                                    | Esito                                                  |
+| -------------------------------------------- | ------------------------------------------------------ |
+| test frontend M1B mirati                     | superato: 1 file, 21 test                              |
+| suite frontend completa                      | superata: 65 file, 362 test                            |
+| test backend mirati M1B/prenotazioni/scoping | superato: 3 file, 38 test                              |
+| `pnpm run typecheck`                         | superato per l'intero workspace                        |
+| codegen React/Zod                            | superato; nessuna modifica a OpenAPI o output generati |
+| Prettier pertinente e `git diff --check`     | superati                                               |
+
+Backend, OpenAPI, generated code, schema e migrazioni sono invariati. La matrice GEO-01..04 resta `OK-M1B/NE-MAN`; rebuild Docker, validazione manuale, M1C, M2 e merge su `main` non sono stati avviati.

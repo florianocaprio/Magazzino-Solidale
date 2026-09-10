@@ -138,7 +138,7 @@ const labels: Record<string, string> = {
     "Seleziona un'Area Operativa per consultare le giacenze.",
   "giacenze.noActiveAreas": "Nessuna Area Operativa attiva accessibile.",
   "giacenze.noAreaWarehouses":
-    "Nessun magazzino attivo accessibile nell'Area selezionata.",
+    "Nessun magazzino accessibile nell'Area selezionata.",
   "giacenze.warehouse": "Magazzino",
   "giacenze.allAreaWarehouses": "Tutti i magazzini dell'Area",
   "giacenze.exportSubtitleSottoscorta": "Solo prodotti sottoscorta",
@@ -160,6 +160,7 @@ const labels: Record<string, string> = {
   "giacenze.noResults": "Nessuna giacenza trovata.",
   "giacenze.statusSottoscorta": "Sottoscorta",
   "giacenze.statusRegolare": "Regolare",
+  "common.inactive": "Inattivo",
 };
 
 vi.mock("react-i18next", () => ({
@@ -186,13 +187,14 @@ const warehouse = (
   id: number,
   nome: string,
   areaOperativaId: number | null,
+  stato: "attivo" | "inattivo" = "attivo",
 ) => ({
   id,
   codice: `M-${id}`,
   nome,
   areaOperativaId,
   tipoMagazzino: "logistico",
-  stato: "attivo",
+  stato,
   dataCreazione: "2026-01-01T00:00:00.000Z",
 });
 const stock = (
@@ -200,6 +202,7 @@ const stock = (
   ambito: "area" | "magazzino",
   magazzinoId: number | null,
   prodottoNome: string,
+  quantita = 30,
 ) => ({
   ambito,
   areaOperativaId,
@@ -211,18 +214,18 @@ const stock = (
   unitaMisura: "kg",
   magazzinoId,
   magazzinoNome: magazzinoId == null ? null : `Mag ${magazzinoId}`,
-  quantitaTotale: 30,
-  quantitaTotalePrecisa: "30.000000",
-  giacenzaFisica: 30,
+  quantitaTotale: quantita,
+  quantitaTotalePrecisa: quantita.toFixed(6),
+  giacenzaFisica: quantita,
   giacenzaScaduta: 0,
-  giacenzaDistribuibile: 30,
-  giacenzaFisicaPrecisa: "30.000000",
+  giacenzaDistribuibile: quantita,
+  giacenzaFisicaPrecisa: quantita.toFixed(6),
   giacenzaScadutaPrecisa: "0.000000",
-  giacenzaDistribuibilePrecisa: "30.000000",
+  giacenzaDistribuibilePrecisa: quantita.toFixed(6),
   impegnato: 2,
   impegnatoPreciso: "2.000000",
-  disponibileReale: 28,
-  disponibileRealePrecisa: "28.000000",
+  disponibileReale: quantita - 2,
+  disponibileRealePrecisa: (quantita - 2).toFixed(6),
   scortaMinima: ambito === "area" ? null : 5,
   scortaMinimaPrecisa: ambito === "area" ? null : "5.000000",
   scortaConsigliata: ambito === "area" ? null : 10,
@@ -326,6 +329,49 @@ describe("Giacenze M1B — Area Operativa → Magazzino", () => {
     expect(option("Mag A2")).toBeDefined();
     expect(document.body.textContent).not.toContain("Mag B1");
     expect(document.body.textContent).not.toContain("Legacy");
+  });
+
+  it("mantiene consultabile un Magazzino inattivo e riconcilia il totale Area", async () => {
+    mocks.warehouses = [
+      warehouse(11, "Mag A1", 1),
+      warehouse(12, "Mag A2", 1, "inattivo"),
+      warehouse(21, "Mag B1", 2),
+      warehouse(90, "Legacy", null, "inattivo"),
+    ];
+    mocks.responseFor = (params) => {
+      const areaId = Number(params.areaOperativaId);
+      const magazzinoId = params.magazzinoId
+        ? Number(params.magazzinoId)
+        : null;
+      if (areaId !== 1) return [];
+      if (magazzinoId === 11) {
+        return [stock(1, "magazzino", 11, "Prodotto A1", 10)];
+      }
+      if (magazzinoId === 12) {
+        return [stock(1, "magazzino", 12, "Prodotto A2", 20)];
+      }
+      return [stock(1, "area", null, "Prodotto Area A", 30)];
+    };
+
+    await act(async () => root.render(<Giacenze />));
+    await click(option("Area A"));
+
+    expect(option("Mag A1")).toBeDefined();
+    const inactiveWarehouse = option("Mag A2 — Inattivo");
+    expect(document.querySelector("tbody")?.textContent).toContain("30");
+    expect(document.body.textContent).not.toContain("Mag B1");
+    expect(document.body.textContent).not.toContain("Legacy");
+
+    await click(inactiveWarehouse);
+
+    expect(mocks.giacenzeCalls.at(-1)?.params).toMatchObject({
+      areaOperativaId: 1,
+      magazzinoId: 12,
+    });
+    expect(document.querySelector("tbody")?.textContent).toContain(
+      "Prodotto A2",
+    );
+    expect(document.querySelector("tbody")?.textContent).toContain("20");
   });
 
   it("Tutti i magazzini dell'Area invia Area senza Magazzino", async () => {
@@ -500,7 +546,7 @@ describe("Giacenze M1B — Area Operativa → Magazzino", () => {
     await click(option("Area A"));
 
     expect(document.body.textContent).toContain(
-      "Nessun magazzino attivo accessibile nell'Area selezionata.",
+      "Nessun magazzino accessibile nell'Area selezionata.",
     );
   });
 

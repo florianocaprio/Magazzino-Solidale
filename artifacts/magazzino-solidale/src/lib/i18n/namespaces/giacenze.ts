@@ -12,8 +12,7 @@ export const giacenze = {
     selectArea: "Seleziona Area Operativa",
     selectAreaHelp: "Seleziona un'Area Operativa per consultare le giacenze.",
     noActiveAreas: "Nessuna Area Operativa attiva accessibile.",
-    noAreaWarehouses:
-      "Nessun magazzino attivo accessibile nell'Area selezionata.",
+    noAreaWarehouses: "Nessun magazzino accessibile nell'Area selezionata.",
     warehouse: "Magazzino",
     allAreaWarehouses: "Tutti i magazzini dell'Area",
     warehouseFallback: "Magazzino",
@@ -54,8 +53,7 @@ export const giacenze = {
     selectAreaHelp:
       "Selecciona un Área Operativa para consultar las existencias.",
     noActiveAreas: "No hay Áreas Operativas activas accesibles.",
-    noAreaWarehouses:
-      "No hay almacenes activos accesibles en el Área seleccionada.",
+    noAreaWarehouses: "No hay almacenes accesibles en el Área seleccionada.",
     warehouse: "Almacén",
     allAreaWarehouses: "Todos los almacenes del Área",
     warehouseFallback: "Almacén",
@@ -95,7 +93,7 @@ export const giacenze = {
     selectArea: "Select Operational Area",
     selectAreaHelp: "Select an Operational Area to view stock.",
     noActiveAreas: "No accessible active Operational Areas.",
-    noAreaWarehouses: "No accessible active warehouses in the selected Area.",
+    noAreaWarehouses: "No accessible warehouses in the selected Area.",
     warehouse: "Warehouse",
     allAreaWarehouses: "All warehouses in the Area",
     warehouseFallback: "Warehouse",
@@ -136,8 +134,7 @@ export const giacenze = {
     selectAreaHelp:
       "Sélectionnez une Zone opérationnelle pour consulter les stocks.",
     noActiveAreas: "Aucune Zone opérationnelle active accessible.",
-    noAreaWarehouses:
-      "Aucun entrepôt actif accessible dans la Zone sélectionnée.",
+    noAreaWarehouses: "Aucun entrepôt accessible dans la Zone sélectionnée.",
     warehouse: "Entrepôt",
     allAreaWarehouses: "Tous les entrepôts de la Zone",
     warehouseFallback: "Entrepôt",
@@ -177,7 +174,7 @@ export const giacenze = {
     selectArea: "Betriebsbereich auswählen",
     selectAreaHelp: "Wählen Sie einen Betriebsbereich, um Bestände anzuzeigen.",
     noActiveAreas: "Keine zugänglichen aktiven Betriebsbereiche.",
-    noAreaWarehouses: "Keine zugänglichen aktiven Lager im gewählten Bereich.",
+    noAreaWarehouses: "Keine zugänglichen Lager im gewählten Bereich.",
     warehouse: "Lager",
     allAreaWarehouses: "Alle Lager des Bereichs",
     warehouseFallback: "Lager",
@@ -217,7 +214,7 @@ export const giacenze = {
     selectArea: "اختر منطقة التشغيل",
     selectAreaHelp: "اختر منطقة تشغيل لعرض المخزون.",
     noActiveAreas: "لا توجد مناطق تشغيل نشطة متاحة.",
-    noAreaWarehouses: "لا توجد مستودعات نشطة متاحة في المنطقة المحددة.",
+    noAreaWarehouses: "لا توجد مستودعات متاحة في المنطقة المحددة.",
     warehouse: "المستودع",
     allAreaWarehouses: "جميع مستودعات المنطقة",
     warehouseFallback: "المستودع",

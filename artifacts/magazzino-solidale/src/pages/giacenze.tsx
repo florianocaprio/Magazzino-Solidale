@@ -9,7 +9,7 @@ import {
 import {
   activeOperationalAreas,
   AreaMagazzinoSelector,
-  operationalWarehousesForArea,
+  warehousesForArea,
 } from "@/components/area-magazzino-selector";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -51,7 +51,7 @@ export default function Giacenze() {
   const { data: magazzini } = useListMagazzini();
   const areeAttive = activeOperationalAreas(aree);
   const selectedAreaId = areaId ? Number(areaId) : null;
-  const magazziniArea = operationalWarehousesForArea(magazzini, selectedAreaId);
+  const magazziniArea = warehousesForArea(magazzini, selectedAreaId);
 
   useEffect(() => {
     if (areeAttive.length === 1 && !areaId) {
