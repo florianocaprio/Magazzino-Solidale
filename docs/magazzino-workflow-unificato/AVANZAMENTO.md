@@ -375,3 +375,188 @@ Stato: **M1B validato manualmente da Floriano** (`OK-M1B/OK-MAN-M1B`).
 Floriano ha completato con esito positivo il dry run manuale del candidato Docker M1B. La validazione copre GEO-01, GEO-02, GEO-03, GEO-04 e CAT-01: selezione Area→Magazzino, aggregato di Area, isolamento degli scope, reset al cambio Area, assenza di una soglia arbitraria di Area, consultazione dei magazzini inattivi, esclusione del legacy senza Area, export contestuali, filtro FSE+, consumer collegati e permanenza del Catalogo come anagrafica globale.
 
 Gli esiti tecnici M1B già registrati restano invariati. Questa chiusura documentale non modifica codice, schema, API, migrazioni o output generati e non anticipa M1C o M2.
+
+## M1C — sviluppo
+
+Data: 15 settembre 2026
+
+Base di sviluppo: `6f82e87300483aed86240bd135c13919d7b6eb3a`
+
+Stato: **M1C pronto per `##test`, da validare** (`DEV-M1C/NE-TEST-M1C`).
+
+### Contratto audit candidato
+
+- La nuova tabella `audit_eventi` registra azione, entità, correlazione, attore o processo di sistema, snapshot dell'autore e dell'eventuale iniziatore, riferimenti documentali, contesto operativo, date distinte, motivo, differenze allowlist, metadati sanitizzati, operation key ed evento precedente.
+- Gli ID di Area, Centro e Magazzino sono snapshot storici senza FK live. Le sole FK verso utente usano `ON DELETE SET NULL`; lo snapshot del codice resta obbligatoriamente conservato. Non è stato creato un utente fittizio `SYSTEM`.
+- Un trigger DB impedisce `UPDATE` e `DELETE` degli eventi. L'unica eccezione tecnica ammessa è l'azzeramento delle FK attore/iniziatore causato da `ON DELETE SET NULL`, senza possibilità di cambiare gli altri campi o gli snapshot.
+- `recordAuditEvent` usa la transaction ricevuta, non apre transazioni autonome e non effettua scritture best-effort. Se l'audit obbligatorio fallisce, falliscono anche testata, quantità e movimenti dello stesso comando.
+- Il contesto umano è costruito dalla sessione backend; matricola e, in assenza, username diventano snapshot. I campi client che tentano di attribuire l'autore non vengono usati.
+- Un correlation ID viene creato una volta per comando e condiviso dagli effetti della stessa transazione. Dove il dominio possiede già una idempotency key, l'operation key la riusa e il replay non genera un secondo evento.
+- `previousEventId` indica l'ultimo evento già committato e osservabile della stessa coppia `entitaTipo + entitaId`. Non è una serializzazione globale: due comandi realmente concorrenti possono condividere lo stesso predecessore; la correlazione, l'identità dell'entità e il timestamp restano le chiavi autorevoli per la ricostruzione.
+- `changes` e `metadata` accettano esclusivamente chiavi allowlist e applicano una seconda sanitizzazione ricorsiva. Password, token, cookie, autorizzazioni, credenziali SMTP, reset link e payload personali non necessari non vengono conservati.
+- `motivo` viene normalizzato con trim, sanitizzato e limitato a 1.000 caratteri. Non riceve automaticamente note sociali o interi payload.
+
+### Schema, migrazione e Lista movimenti
+
+- La migrazione `20260911_m1c_audit_eventi.sql`, successiva alle 33 baseline, crea `audit_eventi`, i relativi indici e il trigger append-only, quindi aggiunge `movimenti.audit_evento_id` nullable con indice e FK.
+- Nessun movimento legacy viene riscritto o collegato retroattivamente. `movimenti.operatore_id` resta compatibile; i nuovi movimenti umani M1C ricevono l'utente di sessione.
+- `/movimenti` espone `operatoreCodice` e `auditEventoId`. La sorgente preferita è lo snapshot audit; per un record pre-M1C con autore usa il fallback `matricola corrente ?? username`; senza autore restituisce `null`.
+- La Lista movimenti e il relativo export aggiungono soltanto la colonna localizzata `Operatore`. Il valore nullo è mostrato come “Non disponibile — dato precedente”; nome, cognome ed email non sono esposti.
+- OpenAPI è la sorgente della modifica e i client React/Zod sono stati rigenerati con il codegen ufficiale. Non sono stati aggiunti endpoint o voci menu per consultare direttamente l'audit.
+
+### Censimento dei registri esistenti
+
+| Registro esistente                                                        | Finalità                                                            | Mantenuto | Sostituito | Relazione con `audit_eventi`                                                    |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------- | --------- | ---------- | ------------------------------------------------------------------------------- |
+| `system_logs`                                                             | login, logout, sicurezza, diagnostica e log tecnici best-effort     | sì        | no         | resta distinto; non certifica le transazioni business                           |
+| `audit_configurazioni` e audit verticali Mensa/Emporio                    | modifiche configurative e controlli specifici di modulo             | sì        | no         | proiezioni verticali; l'eventuale convergenza viene valutata nelle milestone    |
+| `interventi_storico_stati`                                                | cronologia di dominio degli interventi                              | sì        | no         | continua a descrivere il workflow e non sostituisce l'autore comune del comando |
+| staging/import AGEA, incluso `note_audit`                                 | acquisizione, classificazione e tracciabilità dell'import           | sì        | no         | integrazione completa rinviata a M3                                             |
+| export/eventi e riconciliazioni FSE+                                      | rendicontazione, copertura degli eventi esportati e riconciliazione | sì        | no         | registro compliance verticale, non duplicato in M1C                             |
+| `registro_volontari_eventi` e registri matricole/assegnazioni volontari 2 | storia immutabile e temporale del sottodominio volontari            | sì        | no         | resta verticale; non viene trasformato in audit inventariale                    |
+| `movimenti`                                                               | ledger inventariale                                                 | sì        | no         | ogni nuovo movimento coperto punta all'evento business mediante `auditEventoId` |
+
+### Censimento dei percorsi inventariali e documentali
+
+| Percorso                                     | Servizio/scrittura                            | Transazionale | Autore candidato                             | Audit M1C | Decisione                                                                                                |
+| -------------------------------------------- | --------------------------------------------- | ------------- | -------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------- |
+| Carico magazzino multilinea                  | `createWarehouseLoad`                         | sì            | sessione backend                             | sì        | un evento per comando; tutti i lotti/movimenti condividono evento e autore; replay idempotente invariato |
+| Rettifica inventariale esistente             | `rettificaInventariale`                       | sì            | sessione backend                             | sì        | nuovo evento motivato e movimento collegato                                                              |
+| Carico/rettifica da route lotti legacy       | `createWarehouseLoad`/`rettificaInventariale` | sì            | sessione backend                             | sì        | gli adattatori esistenti passano il contesto comune                                                      |
+| Ricezione approvvigionamento                 | `createWarehouseLoad`                         | sì            | sessione backend                             | sì        | il comando propaga un contesto stabile ai carichi generati                                               |
+| Scarico manuale e FEFO                       | `creaScaricoInventariale`                     | sì            | sessione backend                             | sì        | un evento collega tutti i movimenti prodotti dai lotti FEFO                                              |
+| Storno scarico invocato dai percorsi coperti | `stornaScaricoInventariale`                   | sì            | sessione backend propagata                   | sì        | movimento di storno collegato all'evento obbligatorio                                                    |
+| Bolla: creazione                             | route `bolle`                                 | sì            | sessione backend                             | sì        | evento `BOLLA_CREATA`                                                                                    |
+| Bolla: conferma/prenotazione                 | route `bolle`                                 | sì            | sessione backend                             | sì        | evento `BOLLA_CONFERMATA`; l'evento precedente conserva la sequenza                                      |
+| Bolla: consegna/scarico                      | `completeBollaDelivery`                       | sì            | sessione backend                             | sì        | evento `BOLLA_CONSEGNATA`; movimenti attribuiti al consegnante                                           |
+| Bolla: annullamento/storno                   | route `bolle` e `stornoRigaTx`                | sì            | sessione backend                             | sì        | evento `BOLLA_ANNULLATA`; gli eventuali storni puntano allo stesso evento                                |
+| Trasferimento: creazione                     | `createTransferRequest`                       | sì            | sessione backend                             | sì        | operation key esistente riusata quando disponibile                                                       |
+| Trasferimento: avvio/in-transito             | route `trasferimenti`                         | sì            | sessione backend                             | sì        | movimento uscita e transizione condividono l'evento                                                      |
+| Trasferimento: ricezione                     | route `trasferimenti`                         | sì            | sessione backend                             | sì        | movimento entrata e transizione condividono l'evento                                                     |
+| Creazione trasferimento Mensa                | route `mensa`/`createTransferRequest`         | sì            | sessione backend                             | sì        | coperto perché usa il servizio trasferimenti comune                                                      |
+| Import/carichi AGEA                          | `createWarehouseLoad` da workflow import      | sì            | processo verticale esistente                 | no        | il ledger resta invariato; actor system/initiated-by e operation key dell'import vengono integrati in M3 |
+| Scarichi verticali Interventi, Mensa e FSE+  | caller verticali di `scaricoInventory`        | sì            | semantica verticale esistente                | no        | non sono scarico manuale M1C; integrazione rinviata alle milestone M4/M5 e al censimento finale M6       |
+| Movimenti Emporio                            | `speseEmporio`                                | sì            | semantica verticale Emporio esistente        | no        | modulo fuori dal perimetro M1C; convergenza audit rinviata al censimento M6                              |
+| Seed/demo                                    | `environmentData`                             | sì            | processo di inizializzazione                 | no        | fixture ambientale, non comando business runtime; nessun evento storico artificiale                      |
+| Catalogo e nuovo modello lotti               | route e servizi futuri                        | da definire   | da sessione backend                          | no        | rinviati a M2 come previsto da D6                                                                        |
+| Richiesta magazzino e sociale                | servizi futuri                                | da definire   | da sessione backend o sistema con iniziatore | no        | rinviati a M5                                                                                            |
+
+La presenza temporanea di un log tecnico e di un evento business per lo stesso comando non è una duplicazione semantica: il primo resta diagnostico/best-effort, il secondo è parte atomica dell'operazione.
+
+### Evidenza migrazione su copia popolata
+
+La prova ha usato una copia PostgreSQL isolata di `magazzino_m1b_manual`; il database originale `magazzino-postgres` e la porta `5434` non sono stati usati. I conteggi sono stati acquisiti prima e immediatamente dopo la migrazione, prima dell'esecuzione delle fixture di test.
+
+| Dato                                | Prima M1C | Dopo M1C |
+| ----------------------------------- | --------- | -------- |
+| lotti                               | 21        | 21       |
+| quantità caricata complessiva lotti | 1741      | 1741     |
+| quantità residua complessiva lotti  | 1624      | 1624     |
+| movimenti                           | 37        | 37       |
+| quantità complessiva movimenti      | 1701      | 1701     |
+| movimenti senza autore              | 35        | 35       |
+| movimenti con `auditEventoId`       | —         | 0        |
+| eventi `audit_eventi`               | —         | 0        |
+| prenotazioni                        | 6         | 6        |
+| bolle                               | 25        | 25       |
+| trasferimenti                       | 3         | 3        |
+| scarichi                            | 10        | 10       |
+| carichi                             | 2         | 2        |
+
+La migrazione è risultata applicata una volta e le altre 33 sono state riconosciute come già presenti. Quantità, conteggi, autore nullo e assenza di eventi retroattivi sono rimasti invariati.
+
+### Controlli di sviluppo eseguiti
+
+| Controllo                                                                                       | Esito                                                                                                                                 |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| test helper, append-only, sanitizzazione e migrazione DB                                        | superati nella regressione backend mirata                                                                                             |
+| test carico/idempotenza/spoof/snapshot/rollback, scarico FEFO, bolle, trasferimenti e movimenti | superati: 8 file, 110 test, 0 falliti, su copia PostgreSQL isolata                                                                    |
+| test frontend formatter operatore                                                               | superati: 1 file, 2 test, 0 falliti                                                                                                   |
+| fresh database gate finale                                                                      | superato: schema, 34 migrazioni, seed, health/login/password, CRUD API, replay, checksum e stato con 0 pending/mismatch/out-of-order  |
+| codegen ufficiale React/Zod                                                                     | superato; output rigenerato dalla sorgente OpenAPI                                                                                    |
+| `pnpm run typecheck`                                                                            | superato per l'intero workspace                                                                                                       |
+| Prettier sui file nuovi/già conformi e `git diff --check`                                       | superati; sui 16 file legacy già non conformi il check riproduce esclusivamente warning presenti nella HEAD, senza formatting massivo |
+
+I test di sviluppo coprono la sequenza A crea/B conferma/C consegna, actor ID e snapshot distinti, movimento finale attribuito a C, spoof dei campi autore, conservazione dello snapshot dopo cambio matricola/disattivazione, rollback totale su errore audit, replay del carico senza duplicati, scarico FEFO su due lotti con un solo evento, storno bolla collegato all'annullamento, sanitizzazione dei JSON e fallback/null della Lista movimenti.
+
+### Limiti e prossima fase
+
+- Le integrazioni verticali rinviate nella matrice restano esplicite e non sono state adattate artificialmente prima delle rispettive milestone.
+- L'append-only applicativo e DB impedisce correzioni in place; ogni futura rettifica dovrà creare un nuovo evento correlato.
+- I controlli eseguiti appartengono a `##sviluppo M1C`: non equivalgono alla suite completa `##test M1C`, a una code review conclusiva o a validazione umana.
+- Il candidato M1C resta intenzionalmente non committato nel working tree; non sono stati avviati M2, merge o modifiche a `main`.
+
+## M1C — test automatici
+
+Data: 15 settembre 2026
+
+Base testata: `6f82e87300483aed86240bd135c13919d7b6eb3a`
+
+Stato: **test automatici M1C superati; prova manuale non eseguita** (`OK-M1C/NE-MAN`).
+
+### Correzioni e precisazioni consolidate in test
+
+- La policy di `motivo` applica trim, sanitizzazione e limite di 1.000 caratteri.
+- La suite del migration runner riconosce 34 file e verifica che `20260911_m1c_audit_eventi.sql` sia l'ultima migrazione in coda.
+- I test verificano direttamente entrambe le FK utente `ON DELETE SET NULL`, preservando gli snapshot, e respingono `UPDATE`/`DELETE` applicativi dell'audit.
+- La unique idempotente è composta da `(azione, operation_key)`: il replay della stessa azione restituisce lo stesso evento, mentre la stessa stringa in azioni/domìni differenti non collide.
+- `previousEventId` resta circoscritto alla stessa entità; sotto concorrenza rappresenta un predecessore valido osservato e può ramificare, senza promettere una catena strettamente lineare.
+
+### Censimento completo delle scritture `movimenti`
+
+| Punto di scrittura                      | Origine runtime                      | `operatoreId` nuovi record | `auditEventoId` | Copertura                                                                   |
+| --------------------------------------- | ------------------------------------ | -------------------------- | --------------- | --------------------------------------------------------------------------- |
+| `routes/trasferimenti.ts` uscita FEFO   | richiesta umana autenticata          | sì, utente del comando     | sì              | M1C, evento avvio                                                           |
+| `routes/trasferimenti.ts` entrata       | richiesta umana autenticata          | sì, utente ricevente       | sì              | M1C, evento ricezione distinto                                              |
+| `lib/bollaDelivery.ts` consegna         | richiesta umana autenticata          | sì, utente consegnante     | sì              | M1C, evento consegna                                                        |
+| `lib/bollaDelivery.ts` storno           | richiesta umana autenticata          | sì, utente annullante      | sì              | M1C, evento annullamento                                                    |
+| `lib/scaricoInventory.ts` FEFO          | umano o caller verticale autenticato | sì                         | sì/null         | M1C per scarico manuale; audit verticale rinviato, autore comunque presente |
+| `lib/scaricoInventory.ts` lotto esatto  | umano o caller verticale autenticato | sì                         | sì/null         | stessa regola del FEFO                                                      |
+| `lib/scaricoInventory.ts` storno        | umano o caller verticale autenticato | sì                         | sì/null         | M1C nei percorsi coperti; audit verticale rinviato                          |
+| `lib/inventoryLedger.ts` carico         | umano o processo con iniziatore      | sì per richieste umane     | sì/null         | M1C nei carichi coperti; integrazione AGEA completa rinviata a M3           |
+| `lib/inventoryLedger.ts` rettifica      | richiesta umana autenticata          | sì                         | sì              | M1C                                                                         |
+| `lib/speseEmporio.ts` scarico           | richiesta umana autenticata          | sì                         | null            | audit Emporio rinviato; anonimato vietato e testato                         |
+| `lib/speseEmporio.ts` storno            | richiesta umana autenticata          | sì                         | null            | audit Emporio rinviato; anonimato vietato e testato                         |
+| `lib/environmentData.ts` movimento demo | inizializzazione sistema             | null                       | null            | ammesso: dato sintetico, non richiesta umana                                |
+
+I caller verticali Interventi, Mensa, FSE+ ed Emporio sono stati provati esplicitamente: tutti i nuovi movimenti prodotti dalle richieste umane riportano l'utente autenticato. I percorsi seed/demo restano gli unici nuovi record intenzionalmente senza autore; i record legacy non vengono alterati.
+
+### Database isolati e migrazioni
+
+- Copia popolata: container `magazzino-m1c-populated-test-20260915`, database `magazzino_m1c_populated_test`, porta host `55442`, derivato in sola lettura dalla baseline M1B.
+- Fresh DB: container `magazzino-m1c-fresh-test-20260915`, database `magazzino_m1c_fresh_test`, porta host `55443`.
+- Regressione mirata preliminare: database disposable M1C v3 sulla porta `55441`.
+- `magazzino-postgres` e la porta `5434` non sono stati usati. Sul populated DB non è stato eseguito `drizzle-kit push`; il precedente prompt interattivo osservato in sviluppo non costituisce un errore M1C e non è stato ripetuto.
+
+La copia popolata è passata da 33 a 34 migrazioni tramite il solo runner versionato. Il replay ha prodotto `0 applied / 34 skipped`; checksum, pending e out-of-order sono a zero. Prima e dopo sono rimasti invariati: 21 lotti, quantità residua 1.624, 37 movimenti di cui 35 senza autore, 6 prenotazioni, 25 bolle, 3 trasferimenti, 10 scarichi e 2 carichi. Subito dopo la migrazione erano presenti 0 eventi audit e 0 collegamenti retroattivi dai movimenti.
+
+Il fresh gate su database realmente vuoto ha completato schema, 34 migrazioni, seed, login e cambio password, CRUD smoke, replay, checksum e stato finale senza pending/mismatch/out-of-order. Tabella, trigger append-only, indice operation key e FK movimento sono presenti anche nello schema fresh finale.
+
+### Esiti dei gate
+
+| Gate                                 | Esito                                                                                           |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| regressione backend mirata           | 10 file, 260 test passati, 0 fallimenti                                                         |
+| migration runner con PostgreSQL      | 24 test passati, 0 skip, 0 fallimenti                                                           |
+| API completa, esecuzione finale      | 108 file, 1.169 test passati, 2 skip, 0 fallimenti                                              |
+| frontend completa                    | 66 file, 364 test passati, 0 fallimenti                                                         |
+| codegen React/Zod                    | completato dalla sorgente OpenAPI; nessuna differenza inattesa                                  |
+| `pnpm run typecheck`                 | completato per l'intero workspace                                                               |
+| build con `PORT=19176 BASE_PATH=/`   | completata; warning Vite sourcemap/chunk e dimensione bundle API già appartenenti alla baseline |
+| bundle budget                        | superato: entry 1.256,2 KiB / 348,0 KiB gzip                                                    |
+| runtime config web                   | superato                                                                                        |
+| Prettier mirato e `git diff --check` | superati; nessun formatting massivo dei file legacy                                             |
+
+La prima esecuzione API completa ha registrato un singolo 404/403 nel test UDS, estraneo a M1C. Lo stesso test è passato isolatamente e il rerun completo è risultato interamente verde; non è stato modificato codice UDS. Restano warning non bloccanti del driver `pg` sui test concorrenti e i warning build baseline sopra indicati; non sono emersi nuovi warning funzionali M1C.
+
+### Evidenze funzionali M1C
+
+- AUD-01: A crea, B conferma e C consegna; eventi, snapshot e correlation ID sono distinti, la testata indica C e il movimento finale è attribuito a C senza perdere A/B.
+- AUD-02: `operatoreId`, `actorUserId` e `creatoDa` inviati dal client non cambiano l'attore, sempre derivato dalla sessione. Il fallimento audit causa rollback sia del carico sia della conferma Bolla, lasciando stock, movimenti, prenotazioni e stato documento invariati.
+- AUD-03: lo snapshot matricola resta invariato dopo cambio/disattivazione e cancellazione account; senza matricola viene usato lo username.
+- AUD-04: nessun backfill; la Lista movimenti usa snapshot audit, fallback matricola/username corrente per legacy noto e null localizzato per legacy sconosciuto, senza esporre nome, cognome o email.
+- Carico multilinea: un evento, più movimenti con lo stesso audit/autore e quantità totale corretta; replay e payload incompatibile con stessa key non duplicano audit, stock o movimenti.
+- FEFO, Bolle e Trasferimenti: movimenti multipli condividono l'evento del comando; creazione/conferma/consegna/annullamento e creazione/avvio/ricezione producono gli eventi attesi; uscita e ricezione trasferimento usano i rispettivi utenti.
+- Sanitizzazione: allowlist e filtro ricorsivo coprono password/hash, token, cookie, authorization, segreti SMTP, reset link, session identifier e valori annidati; non viene salvato l'intero `req.body`.
+
+La validazione manuale/fisica resta esplicitamente non eseguita. Non sono stati avviati Docker candidato, M2, merge o modifiche a `main`.

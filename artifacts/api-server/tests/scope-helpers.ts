@@ -67,6 +67,8 @@ export function makeScopedApp(
     centroAscoltoId: number | null;
     areaOperativaId?: number | null;
     zonaUdsId?: number | null;
+    username?: string;
+    matricola?: string | null;
     aree?: string[];
     permessi?: string[];
     isAdmin?: boolean;
@@ -84,6 +86,8 @@ export function makeScopedApp(
           centroAscoltoId: number | null;
           areaOperativaId: number | null;
           zonaUdsId: number | null;
+          username?: string;
+          matricola?: string | null;
           aree: string[];
           permessi: string[];
           isAdmin: boolean;
@@ -95,6 +99,8 @@ export function makeScopedApp(
       centroAscoltoId: user.centroAscoltoId,
       areaOperativaId: user.areaOperativaId ?? null,
       zonaUdsId: user.zonaUdsId ?? null,
+      username: user.username,
+      matricola: user.matricola,
       aree: user.aree ?? ["analisi", "sociale", "uds", "magazzino"],
       // Questi test isolano lo scoping territoriale, non l'RBAC.
       permessi: user.permessi ?? [
@@ -724,6 +730,7 @@ export async function insertMovimento(
     fondoOrigine?: typeof movimentiTable.$inferInsert.fondoOrigine;
     operazioneDistribuzioneId?: number | null;
     canaleOperativo?: typeof movimentiTable.$inferInsert.canaleOperativo;
+    operatoreId?: number | null;
   },
 ): Promise<number> {
   void scope;
@@ -743,6 +750,7 @@ export async function insertMovimento(
       fondoOrigine: opts.fondoOrigine,
       operazioneDistribuzioneId: opts.operazioneDistribuzioneId ?? null,
       canaleOperativo: opts.canaleOperativo,
+      operatoreId: opts.operatoreId ?? null,
     })
     .returning({ id: movimentiTable.id });
   return m.id;

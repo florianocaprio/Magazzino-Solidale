@@ -20,6 +20,7 @@ import {
   InventoryLedgerError,
   requireOperationalMagazzino,
 } from "../lib/inventoryLedger";
+import { auditContextFromRequest } from "../lib/auditEvent";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 import { withDocumentCodeRetry } from "../lib/documentCode";
 
@@ -294,6 +295,7 @@ router.patch("/approvvigionamenti/:id", async (req, res) => {
       res.status(409).json({ error: "La ricezione richiede Magazzino e Fornitore" }); return;
     }
     try {
+      const audit = auditContextFromRequest(req);
       await db.transaction(async (tx) => {
         const [claimed] = await tx.update(approvvigionamentiTable)
           .set({ stato: "completato", versione: sql`${approvvigionamentiTable.versione} + 1` })
@@ -322,6 +324,7 @@ router.patch("/approvvigionamenti/:id", async (req, res) => {
             causale: "acquisto",
             note: riga.note,
             operatoreId: req.user!.id,
+            audit,
           });
           await tx.update(approvvigionamentoRigheTable).set({ quantitaRicevuta: riga.quantitaRichiesta }).where(eq(approvvigionamentoRigheTable.id, riga.id));
         }

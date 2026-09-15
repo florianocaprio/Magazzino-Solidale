@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { loadAllPages } from "@/lib/paged-export";
+import { movementOperatorLabel } from "@/lib/movement-operator";
 
 export default function Movimenti() {
   const { t } = useTranslation();
@@ -76,6 +77,14 @@ export default function Movimenti() {
               { header: t("movimenti.colCausale"), accessor: (m) => m.tipoDettaglio },
               { header: t("movimenti.colProdotto"), accessor: (m) => m.prodottoNome },
               { header: t("movimenti.colMagazzino"), accessor: (m) => m.magazzinoNome },
+              {
+                header: t("movimenti.colOperatore"),
+                accessor: (m) =>
+                  movementOperatorLabel(
+                    m.operatoreCodice,
+                    t("movimenti.operatorUnavailable"),
+                  ),
+              },
               { header: t("movimenti.colQuantita"), accessor: (m) => m.quantita != null ? parseFloat(String(m.quantita)) : "" },
               { header: t("movimenti.colUM"), accessor: (m) => m.unitaMisura },
               { header: t("movimenti.colNote"), accessor: (m) => m.note },
@@ -138,6 +147,7 @@ export default function Movimenti() {
                 <TableHead>{t("movimenti.colTipo")}</TableHead>
                 <TableHead>{t("movimenti.colProdotto")}</TableHead>
                 <TableHead>{t("movimenti.colMagazzino")}</TableHead>
+                <TableHead>{t("movimenti.colOperatore")}</TableHead>
                 <TableHead className="text-right">{t("movimenti.colQuantita")}</TableHead>
               </TableRow>
             </TableHeader>
@@ -149,12 +159,13 @@ export default function Movimenti() {
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
                   </TableRow>
                 ))
               ) : movimenti?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">{t("movimenti.noResults")}</TableCell>
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">{t("movimenti.noResults")}</TableCell>
                 </TableRow>
               ) : movimenti?.map((m) => (
                 <TableRow key={m.id}>
@@ -175,6 +186,12 @@ export default function Movimenti() {
                   </TableCell>
                   <TableCell className="font-medium">{m.prodottoNome}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{m.magazzinoNome}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {movementOperatorLabel(
+                      m.operatoreCodice,
+                      t("movimenti.operatorUnavailable"),
+                    )}
+                  </TableCell>
                   <TableCell className={`text-right font-bold ${m.tipoMovimento === 'carico' ? 'text-green-600' : 'text-amber-600'}`}>
                     {m.tipoMovimento === 'carico' ? '+' : '-'}{m.quantita} <span className="text-xs font-normal text-muted-foreground">{m.unitaMisura}</span>
                   </TableCell>

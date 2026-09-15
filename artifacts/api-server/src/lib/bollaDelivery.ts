@@ -27,6 +27,12 @@ import {
   lockAndAuthorizeBeneficiaryReportingContextTx,
 } from "./reporting/eventSnapshots";
 import type { BeneficiarioAccessScope } from "./beneficiarioPolicy";
+import {
+  auditFields,
+  auditUserId,
+  recordAuditEvent,
+  type AuditCommandContext,
+} from "./auditEvent";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 const PRENOTAZIONE_CONVERTITA = "convertita_in_scarico";
@@ -209,6 +215,7 @@ export async function stornoRigaTx(
   riga: { id: number },
   bollaId: number,
   operatoreId: number,
+  auditEventoId: number | null = null,
 ) {
   const movimenti = await tx
     .select()
@@ -268,6 +275,7 @@ export async function stornoRigaTx(
       operazioneDistribuzioneId: mov.operazioneDistribuzioneId,
       canaleOperativo: mov.canaleOperativo,
       operatoreId,
+      auditEventoId,
       documentoRiferimento: mov.documentoRiferimento,
       note: `Storno del movimento #${mov.id}${mov.note ? ` — ${mov.note}` : ""}`,
     });
@@ -294,7 +302,11 @@ export async function scarichiFisiciBolla(
 async function convertiPrenotazioniAttiveInScarico(
   tx: Tx,
   bolla: typeof bolleTable.$inferSelect,
-  opts: { dataMovimento: string; operatoreId: number },
+  opts: {
+    dataMovimento: string;
+    operatoreId: number;
+    auditEventoId: number | null;
+  },
 ): Promise<number> {
   const prenotazioni = await tx
     .select({ p: prenotazioniMagazzinoTable, r: bollaRigheTable })
@@ -372,6 +384,7 @@ async function convertiPrenotazioniAttiveInScarico(
       unitaMisura,
       beneficiarioId: bolla.beneficiarioId,
       operatoreId: opts.operatoreId,
+      auditEventoId: opts.auditEventoId,
       bollaId: bolla.id,
       bollaRigaId: prenotazione.rigaBollaId,
       fondoOrigine: lotto.fondoOrigine,
@@ -447,7 +460,7 @@ async function syncConsegnaDaBollaTx(
 
 export async function completeBollaDelivery(opts: {
   bollaId: number;
-  userId: number;
+  audit: AuditCommandContext;
   noteRicezione?: string | null;
   confermaRicezione?: boolean;
   allowAlreadyConsegnata?: boolean;
@@ -520,12 +533,34 @@ export async function completeBollaDelivery(opts: {
     };
 
     await requireOperationalMagazzino(tx, effectiveBolla.magazzinoId);
+    const operatoreId = auditUserId(opts.audit);
+    const auditEventoId = await recordAuditEvent(tx, {
+      command: opts.audit,
+      azione: "BOLLA_CONSEGNATA",
+      entitaTipo: "bolla",
+      entitaId: effectiveBolla.id,
+      documentoTipo: "bolla",
+      documentoId: effectiveBolla.id,
+      areaOperativaIdSnapshot: effectiveBolla.areaOperativaIdSnapshot,
+      centroAscoltoIdSnapshot: effectiveBolla.centroAscoltoIdSnapshot,
+      magazzinoIdSnapshot: effectiveBolla.magazzinoId,
+      dataOperativa: dataMovimento,
+      changes: auditFields(
+        { statoPrecedente: current.stato, statoNuovo: "consegnato" },
+        ["statoPrecedente", "statoNuovo"],
+      ),
+      metadata: auditFields(
+        { confermaRicezione: opts.confermaRicezione ?? true },
+        ["confermaRicezione"],
+      ),
+    });
     const convertite = await convertiPrenotazioniAttiveInScarico(
       tx,
       effectiveBolla,
       {
         dataMovimento,
-        operatoreId: opts.userId,
+        operatoreId,
+        auditEventoId,
       },
     );
     if (convertite === 0) {
@@ -544,7 +579,7 @@ export async function completeBollaDelivery(opts: {
         stato: "consegnato",
         confermaRicezione: opts.confermaRicezione ?? true,
         noteRicezione: opts.noteRicezione ?? null,
-        operatoreId: opts.userId,
+        operatoreId,
         ...effectiveReportingSnapshot,
       })
       .where(eq(bolleTable.id, opts.bollaId))
@@ -555,7 +590,7 @@ export async function completeBollaDelivery(opts: {
       updated ?? {
         ...effectiveBolla,
         stato: "consegnato",
-        operatoreId: opts.userId,
+        operatoreId,
       },
     );
     await syncInterventoBollaTx(tx, opts.bollaId);

@@ -52,6 +52,7 @@ import {
   isReportingSnapshotConcurrencyError,
   lockAndAuthorizeBeneficiaryReportingContextTx,
 } from "../lib/reporting/eventSnapshots";
+import { auditContextFromRequest } from "../lib/auditEvent";
 
 const router: IRouter = Router();
 
@@ -512,6 +513,7 @@ router.post(
 
     let newId: number;
     try {
+      const audit = auditContextFromRequest(req);
       newId = await withDocumentCodeRetry("SCAR", (codice) =>
         db.transaction(async (tx) => {
           const reportingSnapshot =
@@ -535,6 +537,7 @@ router.post(
               body.causale === "altro" ? (body.causaleAltro ?? null) : null,
             note: body.note ?? null,
             operatoreId: req.user!.id,
+            audit,
             beneficiarioId,
             documentoRiferimento: codice,
             lottoPolicy,

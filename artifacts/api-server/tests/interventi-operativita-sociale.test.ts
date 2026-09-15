@@ -510,6 +510,14 @@ describe("gestione operativa degli interventi Sociali", () => {
       centroAscoltoIdSnapshot: centroRoma,
       territorioClassificazione: "attribuito",
     });
+    const [movement] = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.operazioneDistribuzioneId, operation.id));
+    expect(movement).toMatchObject({
+      operatoreId: operatoreRoma,
+      auditEventoId: null,
+    });
 
     const invalid = await request(makeApp())
       .post(`/interventi/${id}/salva-operativita`)

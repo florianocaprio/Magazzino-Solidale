@@ -27,6 +27,7 @@ import {
   rettificaInventariale,
   RETTIFICA_CAUSALI,
 } from "../lib/inventoryLedger";
+import { auditContextFromRequest } from "../lib/auditEvent";
 import { addDaysToCivilDate, dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 
 const router: IRouter = Router();
@@ -192,6 +193,7 @@ router.post(
           causale,
           note: typeof body.note === "string" ? body.note.trim() || null : null,
           operatoreId: req.user!.id,
+          audit: auditContextFromRequest(req),
         }),
       );
       res.status(201).json(lottoJson(row));
@@ -334,6 +336,7 @@ router.post(
             ? body.dataMovimento
             : dataCivileEuropeRome(new Date()),
           operatoreId: req.user!.id,
+          audit: auditContextFromRequest(req),
         }),
       );
       res.json(lottoJson(row));

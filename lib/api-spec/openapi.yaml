@@ -10850,6 +10850,11 @@ components:
           type: [string, "null"]
         operatoreId:
           type: ["integer", "null"]
+        operatoreCodice:
+          type: ["string", "null"]
+          description: Snapshot del codice attore audit; fallback all'operatore legacy corrente.
+        auditEventoId:
+          type: ["integer", "null"]
         documentoRiferimento:
           type: ["string", "null"]
         note:

@@ -75,6 +75,11 @@ import {
   fseDistributionNatureCondition,
   fseNetDistributedQuantity,
 } from "../lib/reporting/fseCanonicalFacts";
+import {
+  auditContextFromRequest,
+  auditFields,
+  recordAuditEvent,
+} from "../lib/auditEvent";
 
 const router: IRouter = Router();
 
@@ -607,6 +612,7 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
     res.status(400).json({ error: "Il Magazzino selezionato non è attivo" });
     return;
   }
+  const centroBeneficiarioId = await beneficiarioCentroId(body.beneficiarioId);
   if (body.volontarioConsegnaId != null && body.trasportatoreNome != null) {
     res.status(400).json({ error: "Indicare un volontario OPPURE un trasportatore esterno, non entrambi" });
     return;
@@ -647,6 +653,7 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
     return;
   }
   const dataBolla = body.dataBolla ?? dataCivileEuropeRome(new Date());
+  const audit = auditContextFromRequest(req);
   const row = await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('bolle.numero_bolla'))`);
     const anno = Number(dataBolla.slice(0, 4));
@@ -672,6 +679,19 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
       stato: "bozza",
       operatoreId: req.user!.id,
     }).returning();
+    await recordAuditEvent(tx, {
+      command: audit,
+      azione: "BOLLA_CREATA",
+      entitaTipo: "bolla",
+      entitaId: created.id,
+      documentoTipo: "bolla",
+      documentoId: created.id,
+      areaOperativaIdSnapshot: magazzino.areaOperativaId,
+      centroAscoltoIdSnapshot: centroBeneficiarioId,
+      magazzinoIdSnapshot: created.magazzinoId,
+      dataOperativa: created.dataBolla,
+      changes: auditFields({ statoNuovo: "bozza" }, ["statoNuovo"]),
+    });
     return created;
   });
   const det = await buildDettaglio(row.id);
@@ -948,6 +968,7 @@ router.post("/bolle/:id/conferma", requirePermission("bolle.deliver"), async (re
   }
 
   try {
+    const audit = auditContextFromRequest(req);
     await db.transaction(async (tx) => {
       const current = await lockBolla(tx, bollaId);
       await requireOperationalMagazzino(tx, current.magazzinoId);
@@ -967,6 +988,23 @@ router.post("/bolle/:id/conferma", requirePermission("bolle.deliver"), async (re
       await tx.update(bolleTable)
         .set({ stato: "confermato", operatoreId: req.user!.id })
         .where(eq(bolleTable.id, bollaId));
+      await recordAuditEvent(tx, {
+        command: audit,
+        azione: "BOLLA_CONFERMATA",
+        entitaTipo: "bolla",
+        entitaId: current.id,
+        documentoTipo: "bolla",
+        documentoId: current.id,
+        areaOperativaIdSnapshot: current.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot: current.centroAscoltoIdSnapshot,
+        magazzinoIdSnapshot: current.magazzinoId,
+        dataOperativa: current.dataBolla,
+        changes: auditFields(
+          { statoPrecedente: current.stato, statoNuovo: "confermato" },
+          ["statoPrecedente", "statoNuovo"],
+        ),
+        metadata: auditFields({ numeroRighe: righe.length }, ["numeroRighe"]),
+      });
     });
   } catch (err) {
     if (handleBollaActionError(err, res)) return;
@@ -995,7 +1033,7 @@ router.post("/bolle/:id/consegna", requirePermission("bolle.deliver"), async (re
   try {
     await completeBollaDelivery({
       bollaId,
-      userId: req.user!.id,
+      audit: auditContextFromRequest(req),
       noteRicezione,
       confermaRicezione,
       beneficiaryAccessScope: beneficiarioAccessScopeFromRequest(req),
@@ -1234,11 +1272,31 @@ router.post("/bolle/:id/annulla", requirePermission("bolle.cancel"), async (req,
   }
 
   try {
+    const audit = auditContextFromRequest(req);
     await db.transaction(async (tx) => {
       const current = await lockBolla(tx, bollaId);
       if (current.stato === "annullato") {
         throw new BollaActionError(400, "La bolla è già annullata");
       }
+
+      const auditEventoId = await recordAuditEvent(tx, {
+        command: audit,
+        azione: "BOLLA_ANNULLATA",
+        entitaTipo: "bolla",
+        entitaId: current.id,
+        documentoTipo: "bolla",
+        documentoId: current.id,
+        areaOperativaIdSnapshot: current.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot: current.centroAscoltoIdSnapshot,
+        magazzinoIdSnapshot: current.magazzinoId,
+        dataOperativa: dataCivileEuropeRome(new Date()),
+        motivo:
+          typeof req.body?.motivo === "string" ? req.body.motivo : null,
+        changes: auditFields(
+          { statoPrecedente: current.stato, statoNuovo: "annullato" },
+          ["statoPrecedente", "statoNuovo"],
+        ),
+      });
 
       const activePrenotazioni = await tx
         .select({ id: prenotazioniMagazzinoTable.id })
@@ -1260,7 +1318,13 @@ router.post("/bolle/:id/annulla", requirePermission("bolle.cancel"), async (req,
         if (scarichi > 0) {
           const righe = await tx.select().from(bollaRigheTable).where(eq(bollaRigheTable.bollaId, bollaId));
           for (const riga of righe) {
-            await stornoRigaTx(tx, riga, bollaId, req.user!.id);
+            await stornoRigaTx(
+              tx,
+              riga,
+              bollaId,
+              req.user!.id,
+              auditEventoId,
+            );
           }
         }
       }

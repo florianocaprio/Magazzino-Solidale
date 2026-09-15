@@ -26,6 +26,12 @@ import {
   type DistributionOperationInput,
 } from "./distributionLedger";
 import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
+import {
+  auditFields,
+  auditUserId,
+  recordAuditEvent,
+  type AuditCommandContext,
+} from "./auditEvent";
 
 export type InventoryTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
@@ -65,6 +71,7 @@ export interface ScaricoInventarialeInput {
   causaleAltro?: string | null;
   note?: string | null;
   operatoreId: number;
+  audit?: AuditCommandContext;
   beneficiarioId?: number | null;
   documentoRiferimento?: string | null;
   lottoPolicy?: LottoSelectionPolicy;
@@ -84,6 +91,7 @@ interface StornoScaricoInventarialeInput {
   tipoDettaglio: string;
   note: string;
   rejectAlreadyReversed?: boolean;
+  audit?: AuditCommandContext;
 }
 
 async function impegnatoAttivoLotto(
@@ -107,6 +115,7 @@ async function scaricaRigaFefo(
   input: ScaricoInventarialeInput,
   riga: ScaricoInventarialeRiga,
   operationId: number | null,
+  auditEventoId: number | null,
 ): Promise<void> {
   let rimanente: InventoryDecimal;
   try {
@@ -178,6 +187,7 @@ async function scaricaRigaFefo(
       unitaMisura: riga.unitaMisura,
       beneficiarioId: input.beneficiarioId ?? null,
       operatoreId: input.operatoreId,
+      auditEventoId,
       fondoOrigine: lotto.fondoOrigine,
       naturaContabile: input.source?.naturaContabile ?? "ALTRO",
       dominioOrigine: input.source?.dominioOrigine ?? "MAGAZZINO",
@@ -204,6 +214,7 @@ async function scaricaRigaLottoEsatto(
   input: ScaricoInventarialeInput,
   riga: ScaricoInventarialeRiga,
   operationId: number | null,
+  auditEventoId: number | null,
 ): Promise<void> {
   const quantity = positiveInventoryDecimal(riga.quantita);
   const [lotto] = await tx
@@ -260,6 +271,7 @@ async function scaricaRigaLottoEsatto(
     unitaMisura: riga.unitaMisura,
     beneficiarioId: input.beneficiarioId ?? null,
     operatoreId: input.operatoreId,
+    auditEventoId,
     fondoOrigine: lotto.fondoOrigine,
     naturaContabile: input.source?.naturaContabile ?? "ALTRO",
     dominioOrigine: input.source?.dominioOrigine ?? "MAGAZZINO",
@@ -342,6 +354,32 @@ export async function creaScaricoInventariale(
         },
       };
 
+  const auditEventoId = input.audit
+    ? await recordAuditEvent(tx, {
+        command: input.audit,
+        azione: "SCARICO_MAGAZZINO_CREATO",
+        entitaTipo: "scarico",
+        entitaId: scarico.id,
+        documentoTipo: "scarico",
+        documentoId: scarico.id,
+        centroAscoltoIdSnapshot: input.centroAscoltoId,
+        magazzinoIdSnapshot: input.magazzinoId,
+        dataOperativa: input.dataScarico,
+        motivo: input.causaleAltro ?? null,
+        metadata: auditFields(
+          {
+            causale: input.causale,
+            numeroRighe: input.righe.length,
+            documentoRiferimento: input.documentoRiferimento,
+          },
+          ["causale", "numeroRighe", "documentoRiferimento"],
+        ),
+      })
+    : null;
+  if (input.audit) {
+    movementInput.operatoreId = auditUserId(input.audit);
+  }
+
   await tx.insert(scaricoRigheTable).values(
     input.righe.map((riga) => ({
       scaricoId: scarico.id,
@@ -353,9 +391,21 @@ export async function creaScaricoInventariale(
   );
   for (const riga of input.righe) {
     if (riga.lottoId != null) {
-      await scaricaRigaLottoEsatto(tx, movementInput, riga, operationId);
+      await scaricaRigaLottoEsatto(
+        tx,
+        movementInput,
+        riga,
+        operationId,
+        auditEventoId,
+      );
     } else {
-      await scaricaRigaFefo(tx, movementInput, riga, operationId);
+      await scaricaRigaFefo(
+        tx,
+        movementInput,
+        riga,
+        operationId,
+        auditEventoId,
+      );
     }
   }
   if (movementInput.source?.naturaContabile === "DISTRIBUZIONE_FINALE") {
@@ -388,6 +438,25 @@ export async function stornaScaricoInventariale(
       "Movimenti inventariali dello scarico non trovati",
     );
   }
+  const auditEventoId = input.audit
+    ? await recordAuditEvent(tx, {
+        command: input.audit,
+        azione: "SCARICO_MAGAZZINO_STORNATO",
+        entitaTipo: "movimento",
+        entitaId: movements[0].id,
+        documentoTipo: "scarico",
+        magazzinoIdSnapshot: movements[0].magazzinoId,
+        dataOperativa: input.dataMovimento,
+        motivo: input.note,
+        metadata: auditFields(
+          { documentoRiferimento: input.documentoRiferimento },
+          ["documentoRiferimento"],
+        ),
+      })
+    : null;
+  const operatoreId = input.audit
+    ? auditUserId(input.audit)
+    : input.operatoreId;
   for (const movement of movements) {
     if (movement.lottoId == null) {
       throw new InventoryError("Movimento senza Lotto non stornabile");
@@ -438,7 +507,8 @@ export async function stornaScaricoInventariale(
       rigaOrigineId: movement.rigaOrigineId,
       operazioneDistribuzioneId: movement.operazioneDistribuzioneId,
       canaleOperativo: movement.canaleOperativo,
-      operatoreId: input.operatoreId,
+      operatoreId,
+      auditEventoId,
       documentoRiferimento: input.documentoRiferimento,
       note: input.note,
     });

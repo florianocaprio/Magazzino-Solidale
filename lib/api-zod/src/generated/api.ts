@@ -2232,6 +2232,8 @@ export const ListMovimentiResponseItem = zod.object({
   "operazioneDistribuzioneId": zod.number().nullish(),
   "canaleOperativo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish().describe('Snapshot del codice attore audit; fallback all\'operatore legacy corrente.'),
+  "auditEventoId": zod.number().nullish(),
   "documentoRiferimento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "dataCreazione": zod.string()

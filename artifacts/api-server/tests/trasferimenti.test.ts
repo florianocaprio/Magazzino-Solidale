@@ -9,7 +9,7 @@ import {
 } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
-import { db, pool, trasferimentiTable } from "@workspace/db";
+import { auditEventiTable, db, pool, trasferimentiTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import {
   makeApp,
@@ -101,6 +101,16 @@ describe("POST /trasferimenti — unità di misura canonica", () => {
   });
 
   it("deriva pz dal Prodotto e la conserva nei movimenti di uscita e entrata", async () => {
+    const dispatcherId = await createUtente(scope);
+    const receiverId = await createUtente(scope);
+    const dispatcherApp = makeApp(dispatcherId, {
+      username: `dispatcher_${dispatcherId}`,
+      matricola: "M1C-DISPATCHER",
+    });
+    const receiverApp = makeApp(receiverId, {
+      username: `receiver_${receiverId}`,
+      matricola: "M1C-RECEIVER",
+    });
     const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
     await createLotto({ prodottoId, magazzinoId: origineId, quantita: 3 });
     const created = await request(app)
@@ -116,14 +126,14 @@ describe("POST /trasferimenti — unità di misura canonica", () => {
     scope.trasferimentoIds.push(created.body.id);
     expect(
       (
-        await request(app)
+        await request(dispatcherApp)
           .post(`/trasferimenti/${created.body.id}/avvia`)
           .send({ versione: created.body.versione })
       ).status,
     ).toBe(200);
     expect(
       (
-        await request(app)
+        await request(receiverApp)
           .post(`/trasferimenti/${created.body.id}/conferma`)
           .send({ versione: created.body.versione + 1 })
       ).status,
@@ -135,6 +145,43 @@ describe("POST /trasferimenti — unità di misura canonica", () => {
     expect(movements.every((movement) => movement.unitaMisura === "pz")).toBe(
       true,
     );
+    const events = await db
+      .select()
+      .from(auditEventiTable)
+      .where(
+        and(
+          eq(auditEventiTable.entitaTipo, "trasferimento"),
+          eq(auditEventiTable.entitaId, created.body.id),
+        ),
+      );
+    expect(events.map((event) => event.azione)).toEqual(
+      expect.arrayContaining([
+        "TRASFERIMENTO_CREATO",
+        "TRASFERIMENTO_AVVIATO",
+        "TRASFERIMENTO_RICEVUTO",
+      ]),
+    );
+    const actorByAction = new Map(
+      events.map((event) => [event.azione, event.actorUserId]),
+    );
+    expect(actorByAction.get("TRASFERIMENTO_CREATO")).toBe(operatoreId);
+    expect(actorByAction.get("TRASFERIMENTO_AVVIATO")).toBe(dispatcherId);
+    expect(actorByAction.get("TRASFERIMENTO_RICEVUTO")).toBe(receiverId);
+    const eventByAction = new Map(
+      events.map((event) => [event.azione, event.id]),
+    );
+    expect(
+      movements.find((movement) => movement.tipoDettaglio === "uscita"),
+    ).toMatchObject({
+      operatoreId: dispatcherId,
+      auditEventoId: eventByAction.get("TRASFERIMENTO_AVVIATO"),
+    });
+    expect(
+      movements.find((movement) => movement.tipoDettaglio === "entrata"),
+    ).toMatchObject({
+      operatoreId: receiverId,
+      auditEventoId: eventByAction.get("TRASFERIMENTO_RICEVUTO"),
+    });
   });
 });
 

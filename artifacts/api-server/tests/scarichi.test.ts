@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
-import { pool } from "@workspace/db";
+import { auditEventiTable, db, pool } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
   ensureAmbienteModuli,
   listModuliFunzionali,
@@ -147,6 +148,20 @@ describe("POST /scarichi — scarico FEFO", () => {
       expect(m.magazzinoId).toBe(magazzinoId);
       expect(m.prodottoId).toBe(prodottoId);
     }
+    const auditIds = new Set(movimenti.map((m) => m.auditEventoId));
+    expect(auditIds.size).toBe(1);
+    const auditId = movimenti[0].auditEventoId;
+    expect(auditId).not.toBeNull();
+    const [audit] = await db
+      .select()
+      .from(auditEventiTable)
+      .where(eq(auditEventiTable.id, auditId!));
+    expect(audit).toMatchObject({
+      azione: "SCARICO_MAGAZZINO_CREATO",
+      entitaTipo: "scarico",
+      entitaId: res.body.id,
+      actorUserId: operatoreId,
+    });
   });
 
   it("usa la data di carico come tiebreak quando le scadenze coincidono", async () => {

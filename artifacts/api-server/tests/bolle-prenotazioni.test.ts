@@ -21,6 +21,7 @@ import {
   interventiTable,
   interventiStoricoStatiTable,
   operazioniDistribuzioneMagazzinoTable,
+  auditEventiTable,
 } from "@workspace/db";
 import { and, asc, eq } from "drizzle-orm";
 import bolleRouter from "../src/routes/bolle";
@@ -139,6 +140,152 @@ afterAll(async () => {
 });
 
 describe("Bolle — prenotazione merce su conferma", () => {
+  it("registra la catena audit A crea, B conferma e C consegna", async () => {
+    const actorA = await createUtente(scope, { centroId: centroA });
+    const actorB = await createUtente(scope, { centroId: centroA });
+    const actorC = await createUtente(scope, { centroId: centroA });
+    const appFor = (id: number, matricola: string) =>
+      makeScopedApp(bolleRouter, {
+        id,
+        centroAscoltoId: centroA,
+        matricola,
+      });
+    const lottoId = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 10,
+    });
+
+    const created = await request(appFor(actorA, "AUD-A")).post("/bolle").send({
+      beneficiarioId: benA,
+      magazzinoId: magA,
+    });
+    expect(created.status).toBe(201);
+    scope.bollaIds.push(created.body.id);
+    expect(
+      (
+        await request(appFor(actorA, "AUD-A"))
+          .post(`/bolle/${created.body.id}/righe`)
+          .send({ prodottoId: prod, lottoId, quantita: 4 })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await request(appFor(actorB, "AUD-B"))
+          .post(`/bolle/${created.body.id}/conferma`)
+          .send({})
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(appFor(actorC, "AUD-C"))
+          .post(`/bolle/${created.body.id}/consegna`)
+          .send({ confermaRicezione: true })
+      ).status,
+    ).toBe(200);
+
+    const events = await db
+      .select()
+      .from(auditEventiTable)
+      .where(
+        and(
+          eq(auditEventiTable.entitaTipo, "bolla"),
+          eq(auditEventiTable.entitaId, created.body.id),
+        ),
+      )
+      .orderBy(asc(auditEventiTable.id));
+    expect(events.map((event) => event.azione)).toEqual([
+      "BOLLA_CREATA",
+      "BOLLA_CONFERMATA",
+      "BOLLA_CONSEGNATA",
+    ]);
+    expect(events.map((event) => event.actorUserId)).toEqual([
+      actorA,
+      actorB,
+      actorC,
+    ]);
+    expect(events.map((event) => event.actorCodeSnapshot)).toEqual([
+      "AUD-A",
+      "AUD-B",
+      "AUD-C",
+    ]);
+    expect(new Set(events.map((event) => event.correlationId)).size).toBe(3);
+    expect(
+      events.every((event) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          event.correlationId,
+        ),
+      ),
+    ).toBe(true);
+    expect(events.map((event) => event.previousEventId)).toEqual([
+      null,
+      events[0].id,
+      events[1].id,
+    ]);
+    expect(
+      events.every(
+        (event, index) =>
+          index === 0 ||
+          event.registratoAt.getTime() >=
+            events[index - 1].registratoAt.getTime(),
+      ),
+    ).toBe(true);
+    const [movement] = await movimentiBolla(created.body.id);
+    expect(movement).toMatchObject({
+      operatoreId: actorC,
+      auditEventoId: events[2].id,
+    });
+    const [header] = await db
+      .select({ operatoreId: bolleTable.operatoreId })
+      .from(bolleTable)
+      .where(eq(bolleTable.id, created.body.id));
+    expect(header.operatoreId).toBe(actorC);
+  });
+
+  it("annulla prenotazioni e stato Bolla se l'audit di conferma fallisce", async () => {
+    const lottoId = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, {
+      beneficiarioId: benA,
+      magazzinoId: magA,
+    });
+    await insertBollaRiga(scope, {
+      bollaId,
+      prodottoId: prod,
+      lottoId,
+      quantita: 4,
+    });
+    const invalidAuditApp = makeScopedApp(bolleRouter, {
+      id: operatoreId,
+      centroAscoltoId: centroA,
+      matricola: "X".repeat(161),
+    });
+
+    const response = await request(invalidAuditApp)
+      .post(`/bolle/${bollaId}/conferma`)
+      .send({});
+
+    expect(response.status).toBe(500);
+    expect(await bollaStato(bollaId)).toBe("bozza");
+    expect(await lottoResidua(lottoId)).toBe(10);
+    expect(await prenotazioniBolla(bollaId)).toHaveLength(0);
+    expect(await movimentiBolla(bollaId)).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(auditEventiTable)
+        .where(
+          and(
+            eq(auditEventiTable.entitaTipo, "bolla"),
+            eq(auditEventiTable.entitaId, bollaId),
+          ),
+        ),
+    ).toHaveLength(0);
+  });
+
   it("crea sempre in bozza, rifiuta campi server-managed e rende immutabile una Bolla consegnata", async () => {
     const rejected = await request(appAs(centroA)).post("/bolle").send({
       beneficiarioId: benA,
@@ -711,7 +858,22 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       movimentoOrigineId: movements[0].id,
       operatoreId,
     });
-    const [interventoAnnullato] = await db.select().from(interventiTable).where(eq(interventiTable.bollaId, bollaId));
+    const [cancellationEvent] = await db
+      .select()
+      .from(auditEventiTable)
+      .where(
+        and(
+          eq(auditEventiTable.azione, "BOLLA_ANNULLATA"),
+          eq(auditEventiTable.entitaTipo, "bolla"),
+          eq(auditEventiTable.entitaId, bollaId),
+        ),
+      );
+    expect(cancellationEvent).toBeDefined();
+    expect(movements[1].auditEventoId).toBe(cancellationEvent.id);
+    const [interventoAnnullato] = await db
+      .select()
+      .from(interventiTable)
+      .where(eq(interventiTable.bollaId, bollaId));
     expect(interventoAnnullato).toMatchObject({
       id: interventoConsegnato.id,
       bollaId,

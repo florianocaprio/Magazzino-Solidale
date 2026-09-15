@@ -98,6 +98,7 @@ import {
   InventoryDecimalError,
   positiveInventoryDecimal,
 } from "../lib/inventoryDecimal";
+import { auditContextFromRequest } from "../lib/auditEvent";
 
 const router: IRouter = Router();
 router.use("/mensa", requireModulo("MENSA"));
@@ -2464,6 +2465,7 @@ router.post(
         ),
         note: optionalText(req.body?.note, "Le note", 2000),
         operatoreId: req.user!.id,
+        audit: auditContextFromRequest(req, { operationKey: idempotencyKey }),
         righe: normalized,
         afterCreate: async (tx, transfer) => {
           await tx.insert(auditConfigurazioniTable).values(

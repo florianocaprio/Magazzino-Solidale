@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   carichiMagazzinoRigheTable,
   carichiMagazzinoTable,
+  auditEventiTable,
   db,
   lottiTable,
   magazziniTable,
@@ -18,6 +19,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import carichiRouter from "../src/routes/carichi";
 import lottiRouter from "../src/routes/lotti";
+import movimentiRouter from "../src/routes/movimenti";
 import {
   ensureAmbienteModuli,
   listModuliFunzionali,
@@ -34,12 +36,17 @@ let prodottoPezziId: number;
 let originalLottiAttivo = true;
 const suffix = `${process.pid}${Date.now().toString(36)}`;
 
-function makeApp(userId: number): Express {
+function makeApp(
+  userId: number,
+  actorCode: string | null = "M1C-CARICHI-AUDIT",
+): Express {
   const instance = express();
   instance.use(express.json());
   instance.use((req, _res, next) => {
     req.user = {
       id: userId,
+      username: `carichi_2_0a_${suffix}`,
+      matricola: actorCode,
       isAdmin: false,
       isSuperAdmin: false,
       aree: ["magazzino"],
@@ -52,6 +59,7 @@ function makeApp(userId: number): Express {
   });
   instance.use(carichiRouter);
   instance.use(lottiRouter);
+  instance.use(movimentiRouter);
   return instance;
 }
 
@@ -233,7 +241,30 @@ describe("POST /carichi — Magazzino 2.0A", () => {
       movements.every(
         (movement) =>
           movement.naturaContabile === "CARICO" &&
-          movement.caricoMagazzinoRigaId != null,
+          movement.caricoMagazzinoRigaId != null &&
+          movement.operatoreId === operatoreId,
+      ),
+    ).toBe(true);
+    expect(
+      movements.reduce(
+        (total, movement) => total + Number(movement.quantita),
+        0,
+      ),
+    ).toBeCloseTo(53.928077, 6);
+    const auditEvents = await db
+      .select()
+      .from(auditEventiTable)
+      .where(
+        and(
+          eq(auditEventiTable.entitaTipo, "carico_magazzino"),
+          eq(auditEventiTable.entitaId, response.body.id),
+        ),
+      );
+    expect(auditEvents).toHaveLength(1);
+    expect(auditEvents[0].actorUserId).toBe(operatoreId);
+    expect(
+      movements.every(
+        (movement) => movement.auditEventoId === auditEvents[0].id,
       ),
     ).toBe(true);
   });
@@ -262,13 +293,151 @@ describe("POST /carichi — Magazzino 2.0A", () => {
         .from(carichiMagazzinoTable)
         .where(eq(carichiMagazzinoTable.idempotencyKey, key)),
     ).toHaveLength(1);
-    expect(
-      await db
-        .select()
-        .from(movimentiTable)
-        .where(eq(movimentiTable.entitaOrigineId, first.body.id)),
-    ).toHaveLength(1);
+    const movements = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.entitaOrigineId, first.body.id));
+    expect(movements).toHaveLength(1);
+    const auditEvents = await db
+      .select()
+      .from(auditEventiTable)
+      .where(eq(auditEventiTable.operationKey, key));
+    expect(auditEvents).toHaveLength(1);
+    expect(movements[0].auditEventoId).toBe(auditEvents[0].id);
     expect(replay.body.requestHash).toBeUndefined();
+  });
+
+  it("deriva l'attore dalla sessione, ignora spoof payload e conserva lo snapshot", async () => {
+    const originalCode = `M1C-A-${suffix}`.slice(0, 20);
+    const changedCode = `M1C-Z-${suffix}`.slice(0, 20);
+    await db
+      .update(utentiTable)
+      .set({ matricola: originalCode, attivo: true })
+      .where(eq(utentiTable.id, operatoreId));
+    const actorApp = makeApp(operatoreId, originalCode);
+    const response = await request(actorApp)
+      .post("/carichi")
+      .send({
+        magazzinoId,
+        origineCarico: "RACCOLTA_ALIMENTARE",
+        dataCarico: "2026-08-29",
+        idempotencyKey: `actor-${suffix}`,
+        operatoreId: 2_000_000_000,
+        actorUserId: 2_000_000_000,
+        creatoDa: 2_000_000_000,
+        righe: [
+          {
+            prodottoId: prodottoLiberoId,
+            fondoOrigine: "NESSUN_FONDO",
+            quantitaOperativa: "1",
+          },
+        ],
+      });
+    expect(response.status).toBe(201);
+
+    const [movement] = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.entitaOrigineId, response.body.id));
+    const [audit] = await db
+      .select()
+      .from(auditEventiTable)
+      .where(eq(auditEventiTable.id, movement.auditEventoId!));
+    expect(audit).toMatchObject({
+      actorType: "user",
+      actorUserId: operatoreId,
+      actorCodeSnapshot: originalCode,
+    });
+    expect(movement.operatoreId).toBe(operatoreId);
+
+    await db
+      .update(utentiTable)
+      .set({ matricola: changedCode, attivo: false })
+      .where(eq(utentiTable.id, operatoreId));
+    const [persisted] = await db
+      .select()
+      .from(auditEventiTable)
+      .where(eq(auditEventiTable.id, audit.id));
+    expect(persisted.actorCodeSnapshot).toBe(originalCode);
+    const listed = await request(actorApp)
+      .get("/movimenti")
+      .query({ magazzinoId });
+    expect(listed.status).toBe(200);
+    expect(
+      listed.body.find((item: { id: number }) => item.id === movement.id)
+        .operatoreCodice,
+    ).toBe(originalCode);
+    await db
+      .update(utentiTable)
+      .set({ matricola: null, attivo: true })
+      .where(eq(utentiTable.id, operatoreId));
+  });
+
+  it("usa lo username come snapshot quando la matricola è assente", async () => {
+    const username = `carichi_2_0a_${suffix}`;
+    const usernameApp = makeApp(operatoreId, null);
+    const response = await request(usernameApp)
+      .post("/carichi")
+      .send({
+        magazzinoId,
+        origineCarico: "RACCOLTA_ALIMENTARE",
+        dataCarico: "2026-08-29",
+        idempotencyKey: `username-fallback-${suffix}`,
+        righe: [
+          {
+            prodottoId: prodottoLiberoId,
+            fondoOrigine: "NESSUN_FONDO",
+            quantitaOperativa: "1",
+          },
+        ],
+      });
+    expect(response.status).toBe(201);
+
+    const [audit] = await db
+      .select()
+      .from(auditEventiTable)
+      .where(
+        and(
+          eq(auditEventiTable.entitaTipo, "carico_magazzino"),
+          eq(auditEventiTable.entitaId, response.body.id),
+        ),
+      );
+    expect(audit.actorCodeSnapshot).toBe(username);
+  });
+
+  it("annulla carico, lotti e movimenti quando l'inserimento audit fallisce", async () => {
+    const before = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM carichi_magazzino WHERE magazzino_id = $1) AS carichi,
+         (SELECT count(*)::int FROM lotti WHERE magazzino_id = $1) AS lotti,
+         (SELECT count(*)::int FROM movimenti WHERE magazzino_id = $1) AS movimenti`,
+      [magazzinoId],
+    );
+    const badAuditApp = makeApp(operatoreId, "X".repeat(161));
+    const response = await request(badAuditApp)
+      .post("/carichi")
+      .send({
+        magazzinoId,
+        origineCarico: "RACCOLTA_ALIMENTARE",
+        dataCarico: "2026-08-29",
+        idempotencyKey: `audit-failure-${suffix}`,
+        righe: [
+          {
+            prodottoId: prodottoLiberoId,
+            fondoOrigine: "NESSUN_FONDO",
+            quantitaOperativa: "1",
+          },
+        ],
+      });
+    expect(response.status).toBe(500);
+    const after = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM carichi_magazzino WHERE magazzino_id = $1) AS carichi,
+         (SELECT count(*)::int FROM lotti WHERE magazzino_id = $1) AS lotti,
+         (SELECT count(*)::int FROM movimenti WHERE magazzino_id = $1) AS movimenti`,
+      [magazzinoId],
+    );
+    expect(after.rows[0]).toEqual(before.rows[0]);
   });
 
   it("lega la idempotency key al contenuto normalizzato", async () => {
@@ -306,6 +475,18 @@ describe("POST /carichi — Magazzino 2.0A", () => {
       const conflict = await postCarico(changed);
       expect(conflict.status).toBe(409);
     }
+    expect(
+      await db
+        .select()
+        .from(auditEventiTable)
+        .where(eq(auditEventiTable.operationKey, key)),
+    ).toHaveLength(1);
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.entitaOrigineId, first.body.id)),
+    ).toHaveLength(1);
   });
 
   it("non espone un carico precedente se la stessa key viene usata in un altro Magazzino", async () => {

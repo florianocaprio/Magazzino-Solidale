@@ -3373,6 +3373,10 @@ describe("Modulo Mensa", () => {
         ),
       );
     expect(InventoryDecimal.parse(movementA.quantita).toDb()).toBe("2.000000");
+    expect(movementA).toMatchObject({
+      operatoreId: fixture.userId,
+      auditEventoId: null,
+    });
 
     const reversalA = await request(app)
       .post(`/mensa/consumi/${first.body.id}/storno`)
@@ -3455,6 +3459,13 @@ describe("Modulo Mensa", () => {
       .from(movimentiTable)
       .where(eq(movimentiTable.operazioneDistribuzioneId, operation.id));
     expect(finalLedger).toHaveLength(4);
+    expect(
+      finalLedger.every(
+        (movement) =>
+          movement.operatoreId === fixture.userId &&
+          movement.auditEventoId === null,
+      ),
+    ).toBe(true);
     expect(
       finalLedger
         .filter((movement) => movement.naturaContabile === "STORNO")

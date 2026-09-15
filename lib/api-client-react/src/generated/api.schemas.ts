@@ -1994,6 +1994,13 @@ export interface Movimento {
   canaleOperativo?: string | null;
   /** @nullable */
   operatoreId?: number | null;
+  /**
+     * Snapshot del codice attore audit; fallback all'operatore legacy corrente.
+     * @nullable
+     */
+  operatoreCodice?: string | null;
+  /** @nullable */
+  auditEventoId?: number | null;
   /** @nullable */
   documentoRiferimento?: string | null;
   /** @nullable */

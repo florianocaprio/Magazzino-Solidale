@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { auditEventiTable } from "./auditEventi";
 
 export const movimentiTable = pgTable("movimenti", {
   id: serial("id").primaryKey(),
@@ -47,6 +48,10 @@ export const movimentiTable = pgTable("movimenti", {
   operazioneDistribuzioneId: integer("operazione_distribuzione_id"),
   canaleOperativo: varchar("canale_operativo", { length: 40 }),
   operatoreId: integer("operatore_id"),
+  auditEventoId: integer("audit_evento_id").references(
+    () => auditEventiTable.id,
+    { onDelete: "restrict" },
+  ),
   documentoRiferimento: varchar("documento_riferimento", { length: 100 }),
   note: text("note"),
   dataCreazione: timestamp("data_creazione").notNull().defaultNow(),

@@ -2,9 +2,11 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
   FONDI_ORIGINE,
+  auditEventiTable,
   movimentiTable,
   prodottiTable,
   magazziniTable,
+  utentiTable,
   type FondoOrigine,
 } from "@workspace/db";
 import { eq, and, gte, lte, desc, sql, type SQL } from "drizzle-orm";
@@ -108,6 +110,9 @@ router.get(
         mov: movimentiTable,
         prodottoNome: prodottiTable.nome,
         magazzinoNome: magazziniTable.nome,
+        auditActorCode: auditEventiTable.actorCodeSnapshot,
+        operatoreMatricola: utentiTable.matricola,
+        operatoreUsername: utentiTable.username,
       })
       .from(movimentiTable)
       .leftJoin(prodottiTable, eq(movimentiTable.prodottoId, prodottiTable.id))
@@ -115,6 +120,11 @@ router.get(
         magazziniTable,
         eq(movimentiTable.magazzinoId, magazziniTable.id),
       )
+      .leftJoin(
+        auditEventiTable,
+        eq(movimentiTable.auditEventoId, auditEventiTable.id),
+      )
+      .leftJoin(utentiTable, eq(movimentiTable.operatoreId, utentiTable.id))
       .where(where)
       .orderBy(desc(movimentiTable.dataCreazione))
       .limit(limit)
@@ -153,6 +163,12 @@ router.get(
         operazioneDistribuzioneId: r.mov.operazioneDistribuzioneId,
         canaleOperativo: r.mov.canaleOperativo,
         operatoreId: r.mov.operatoreId ?? null,
+        operatoreCodice:
+          r.auditActorCode ??
+          r.operatoreMatricola ??
+          r.operatoreUsername ??
+          null,
+        auditEventoId: r.mov.auditEventoId ?? null,
         documentoRiferimento: r.mov.documentoRiferimento ?? null,
         note: r.mov.note ?? null,
         dataCreazione: r.mov.dataCreazione.toISOString(),

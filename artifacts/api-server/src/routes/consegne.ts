@@ -41,6 +41,7 @@ import {
   completeBollaDelivery,
   handleBollaActionError,
 } from "../lib/bollaDelivery";
+import { auditContextFromRequest } from "../lib/auditEvent";
 import { requireAllModuli } from "../lib/featureFlags";
 import {
   ConsegnaPlanningError,
@@ -967,7 +968,7 @@ router.post(
     try {
       await completeBollaDelivery({
         bollaId: bollaPronta.id,
-        userId: req.user!.id,
+        audit: auditContextFromRequest(req),
         confermaRicezione: true,
         allowAlreadyConsegnata: true,
         beneficiaryAccessScope: beneficiarioAccessScopeFromRequest(req),

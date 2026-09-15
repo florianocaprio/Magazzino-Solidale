@@ -519,6 +519,8 @@ describe("Magazzino 2.0C — API FSE+", () => {
       lottoId,
       fondoOrigine: "FSE_PLUS",
       naturaContabile: "RESO",
+      operatoreId: userId,
+      auditEventoId: null,
     });
     expect(Number(movement.quantita)).toBe(4);
 
@@ -563,6 +565,8 @@ describe("Magazzino 2.0C — API FSE+", () => {
       tipoMovimento: "rettifica_positiva",
       naturaContabile: "STORNO",
       fondoOrigine: "FSE_PLUS",
+      operatoreId: userId,
+      auditEventoId: null,
     });
     expect(Number(compensation.quantita)).toBe(4);
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import request from "supertest";
-import { pool } from "@workspace/db";
+import { db, pool, utentiTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import lottiRouter from "../src/routes/lotti";
 import trasferimentiRouter from "../src/routes/trasferimenti";
 import giacenzeRouter from "../src/routes/giacenze";
@@ -254,6 +255,13 @@ describe("Movimenti — scoping via magazzino visibile", () => {
     expect(ids).toContain(mA);
     expect(ids).toContain(mNull);
     expect(ids).not.toContain(mB);
+    expect(
+      res.body.find((movement: { id: number }) => movement.id === mA),
+    ).toMatchObject({
+      operatoreId: null,
+      operatoreCodice: null,
+      auditEventoId: null,
+    });
   });
 
   it("lista: il caller globale vede tutti i movimenti", async () => {
@@ -261,6 +269,47 @@ describe("Movimenti — scoping via magazzino visibile", () => {
     const mB = await insertMovimento(scope, { magazzinoId: magB, prodottoId: prod });
     const res = await request(appAs(movimentiRouter, null)).get("/movimenti");
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([mA, mB]));
+  });
+
+  it("usa matricola/username corrente come fallback per movimenti pre-audit", async () => {
+    const matricola = `LEG-${operatoreId}`.slice(0, 20);
+    const [operator] = await db
+      .select({ username: utentiTable.username })
+      .from(utentiTable)
+      .where(eq(utentiTable.id, operatoreId));
+    await db
+      .update(utentiTable)
+      .set({ matricola })
+      .where(eq(utentiTable.id, operatoreId));
+    const movementId = await insertMovimento(scope, {
+      magazzinoId: magA,
+      prodottoId: prod,
+      operatoreId,
+    });
+    const res = await request(appAs(movimentiRouter, centroA)).get(
+      `/movimenti?magazzinoId=${magA}`,
+    );
+    expect(res.status).toBe(200);
+    expect(
+      res.body.find((movement: { id: number }) => movement.id === movementId),
+    ).toMatchObject({
+      operatoreId,
+      operatoreCodice: matricola,
+      auditEventoId: null,
+    });
+
+    await db
+      .update(utentiTable)
+      .set({ matricola: null })
+      .where(eq(utentiTable.id, operatoreId));
+    const usernameFallback = await request(appAs(movimentiRouter, centroA)).get(
+      `/movimenti?magazzinoId=${magA}`,
+    );
+    expect(
+      usernameFallback.body.find(
+        (movement: { id: number }) => movement.id === movementId,
+      ),
+    ).toMatchObject({ operatoreCodice: operator.username });
   });
 
   it("POST: non può registrare un movimento su un magazzino di un altro centro → 403", async () => {

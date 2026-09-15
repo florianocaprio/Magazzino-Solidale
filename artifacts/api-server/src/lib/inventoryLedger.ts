@@ -26,6 +26,12 @@ import {
   InventoryQuantityDimensionsError,
   resolveInventoryQuantityDimensions,
 } from "./inventoryQuantityDimensions";
+import {
+  auditFields,
+  auditUserId,
+  recordAuditEvent,
+  type AuditCommandContext,
+} from "./auditEvent";
 
 export class InventoryLedgerError extends Error {
   constructor(
@@ -175,6 +181,7 @@ export interface WarehouseLoadInput {
   idempotencyKey?: string | null;
   executionContext?: "manual" | "system";
   creatoDa: number;
+  audit?: AuditCommandContext;
   righe: WarehouseLoadLineInput[];
 }
 
@@ -542,6 +549,30 @@ export async function createWarehouseLoad(
     })
     .returning();
 
+  const auditEventoId = input.audit
+    ? await recordAuditEvent(tx, {
+        command: input.audit,
+        azione: "CARICO_MAGAZZINO_CREATO",
+        entitaTipo: "carico_magazzino",
+        entitaId: carico.id,
+        documentoTipo: "carico_magazzino",
+        documentoId: carico.id,
+        areaOperativaIdSnapshot: magazzino.areaOperativaId,
+        centroAscoltoIdSnapshot: magazzino.centroAscoltoId,
+        magazzinoIdSnapshot: input.magazzinoId,
+        dataOperativa: input.dataCarico,
+        metadata: auditFields(
+          {
+            origineCarico: input.origineCarico,
+            numeroDocumento: carico.numeroDocumento,
+            numeroRighe: normalizedLines.length,
+          },
+          ["origineCarico", "numeroDocumento", "numeroRighe"],
+        ),
+      })
+    : null;
+  const operatoreId = input.audit ? auditUserId(input.audit) : input.creatoDa;
+
   const createdLines: WarehouseLoadResult["righe"] = [];
   const resolvedParties = new Map<string, typeof lottiTable.$inferSelect>();
   for (const line of normalizedLines) {
@@ -640,7 +671,8 @@ export async function createWarehouseLoad(
       entitaOrigineId: carico.id,
       rigaOrigineId: riga.id,
       caricoMagazzinoRigaId: riga.id,
-      operatoreId: input.creatoDa,
+      operatoreId,
+      auditEventoId,
       documentoRiferimento: optionalText(input.numeroDocumento, 100),
       note: optionalText(line.input.note ?? input.note, 4000),
     });
@@ -690,6 +722,7 @@ export interface CaricoInventarialeInput {
   causale: "acquisto" | "donazione" | "fse_plus";
   note?: string | null;
   operatoreId: number;
+  audit?: AuditCommandContext;
 }
 
 /** Crea la giacenza iniziale e il relativo evento contabile in modo atomico. */
@@ -711,6 +744,7 @@ export async function creaCaricoInventariale(
     note: input.note,
     executionContext: "manual",
     creatoDa: input.operatoreId,
+    audit: input.audit,
     righe: [
       {
         prodottoId: input.prodottoId,
@@ -733,6 +767,7 @@ export interface RettificaInventarialeInput {
   note?: string | null;
   dataMovimento: string;
   operatoreId: number;
+  audit?: AuditCommandContext;
 }
 
 /** Rettifica la giacenza con lock pessimista e registra sempre un nuovo evento. */
@@ -795,6 +830,31 @@ export async function rettificaInventariale(
     unitaMisura: lotto.unitaMisura,
     fattorePartita: lotto.lotto.fattoreKgLtPezzo,
   });
+  const auditEventoId = input.audit
+    ? await recordAuditEvent(tx, {
+        command: input.audit,
+        azione: "RETTIFICA_INVENTARIO",
+        entitaTipo: "lotto",
+        entitaId: lotto.lotto.id,
+        documentoTipo: "lotto",
+        documentoId: lotto.lotto.id,
+        magazzinoIdSnapshot: lotto.lotto.magazzinoId,
+        dataOperativa: input.dataMovimento,
+        motivo: motivazione || null,
+        changes: auditFields(
+          {
+            quantitaPrecedente: lotto.lotto.quantitaResidua,
+            quantitaNuova: nuovaQuantita.toDb(),
+            delta: delta.toDb(),
+          },
+          ["quantitaPrecedente", "quantitaNuova", "delta"],
+        ),
+        metadata: auditFields({ causale: input.causale }, ["causale"]),
+      })
+    : null;
+  const operatoreId = input.audit
+    ? auditUserId(input.audit)
+    : input.operatoreId;
   await tx.insert(movimentiTable).values({
     tipoMovimento: delta.isPositive()
       ? "rettifica_positiva"
@@ -817,7 +877,8 @@ export async function rettificaInventariale(
     dominioOrigine: "MAGAZZINO",
     entitaOrigineTipo: "lotto",
     entitaOrigineId: lotto.lotto.id,
-    operatoreId: input.operatoreId,
+    operatoreId,
+    auditEventoId,
     documentoRiferimento: lotto.lotto.documentoCarico,
     note: [motivazione, input.note?.trim()].filter(Boolean).join(" — ") || null,
   });

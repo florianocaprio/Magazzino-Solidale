@@ -2053,10 +2053,28 @@ describe("Cassa Emporio", () => {
       ),
     ).toBe(true);
     expect(
+      originalMovements
+        .filter((movement) => movement.lottoId === lottoId)
+        .every(
+          (movement) =>
+            movement.operatoreId === operatorUserId &&
+            movement.auditEventoId === null,
+        ),
+    ).toBe(true);
+    expect(
       compensations
         .filter((movement) => movement.lottoId === lottoId)
         .reduce((sum, movement) => sum + Number(movement.quantita), 0),
     ).toBe(2);
+    expect(
+      compensations
+        .filter((movement) => movement.lottoId === lottoId)
+        .every(
+          (movement) =>
+            movement.operatoreId === operatorUserId &&
+            movement.auditEventoId === null,
+        ),
+    ).toBe(true);
     expect(
       audit.some(
         (event) =>

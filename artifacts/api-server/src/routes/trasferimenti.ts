@@ -52,6 +52,11 @@ import {
 import { InventoryDecimal } from "../lib/inventoryDecimal";
 import { resolveInventoryQuantityDimensions } from "../lib/inventoryQuantityDimensions";
 import { operationalStateForVolunteer } from "../lib/volontariOperational";
+import {
+  auditContextFromRequest,
+  auditFields,
+  recordAuditEvent,
+} from "../lib/auditEvent";
 
 const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
@@ -251,6 +256,7 @@ async function trasferimentoUscitaFEFO(
     rigaOrigineId: number;
     trasferimentoCodice: string;
     operatoreId: number;
+    auditEventoId: number;
   },
 ) {
   let rimanente = InventoryDecimal.parse(opts.quantita);
@@ -306,6 +312,7 @@ async function trasferimentoUscitaFEFO(
       unitaMisura: opts.unitaMisura,
       fornitoreId: lotto.fornitoreId,
       operatoreId: opts.operatoreId,
+      auditEventoId: opts.auditEventoId,
       trasferimentoId: opts.trasferimentoId,
       fondoOrigine: lotto.fondoOrigine,
       naturaContabile: "TRASFERIMENTO_INTERNO_USCITA",
@@ -764,6 +771,7 @@ router.post("/trasferimenti", async (req, res) => {
       trasportatoreNome: trasportatore.nome,
       note: body.note,
       operatoreId: req.user!.id,
+      audit: auditContextFromRequest(req),
       righe: body.righe,
     });
   } catch (error) {
@@ -1156,6 +1164,7 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
   const dataEsecuzione = dataCivileEuropeRome(new Date());
 
   try {
+    const audit = auditContextFromRequest(req);
     await db.transaction(async (tx) => {
       await requireOperationalMagazzino(tx, current.magazzinoOrigineId);
       const [claimed] = await tx
@@ -1175,6 +1184,24 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
         )
         .returning({ id: trasferimentiTable.id });
       if (!claimed) throw new Error("VERSIONE_TRASFERIMENTO_SUPERATA");
+      const auditEventoId = await recordAuditEvent(tx, {
+        command: audit,
+        azione: "TRASFERIMENTO_AVVIATO",
+        entitaTipo: "trasferimento",
+        entitaId: current.id,
+        documentoTipo: "trasferimento",
+        documentoId: current.id,
+        magazzinoIdSnapshot: current.magazzinoOrigineId,
+        dataOperativa: dataEsecuzione,
+        changes: auditFields(
+          { statoPrecedente: current.stato, statoNuovo: "in_transito" },
+          ["statoPrecedente", "statoNuovo"],
+        ),
+        metadata: auditFields(
+          { magazzinoDestinoId: current.magazzinoDestinoId },
+          ["magazzinoDestinoId"],
+        ),
+      });
       for (const r of righe) {
         await trasferimentoUscitaFEFO(tx, {
           prodottoId: r.prodottoId,
@@ -1186,6 +1213,7 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
           rigaOrigineId: r.id,
           trasferimentoCodice: current.codice,
           operatoreId: req.user!.id,
+          auditEventoId,
         });
       }
       if (current.mensaId != null) {
@@ -1279,6 +1307,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
   const dataConferma = body.dataConferma ?? dataCivileEuropeRome(new Date());
 
   try {
+    const audit = auditContextFromRequest(req);
     await db.transaction(async (tx) => {
       await requireOperationalMagazzino(tx, current.magazzinoDestinoId);
       const [claimed] = await tx
@@ -1299,6 +1328,24 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
         )
         .returning({ id: trasferimentiTable.id });
       if (!claimed) throw new Error("VERSIONE_TRASFERIMENTO_SUPERATA");
+      const auditEventoId = await recordAuditEvent(tx, {
+        command: audit,
+        azione: "TRASFERIMENTO_RICEVUTO",
+        entitaTipo: "trasferimento",
+        entitaId: current.id,
+        documentoTipo: "trasferimento",
+        documentoId: current.id,
+        magazzinoIdSnapshot: current.magazzinoDestinoId,
+        dataOperativa: dataConferma,
+        changes: auditFields(
+          { statoPrecedente: current.stato, statoNuovo: "completato" },
+          ["statoPrecedente", "statoNuovo"],
+        ),
+        metadata: auditFields(
+          { magazzinoOrigineId: current.magazzinoOrigineId },
+          ["magazzinoOrigineId"],
+        ),
+      });
       // I movimenti di uscita portano il lotto origine: lo si rilegge per copiare
       // scadenza, codice lotto e provenienza nei lotti creati a destinazione.
       const uscite = await tx
@@ -1403,6 +1450,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
           unitaMisura: u.m.unitaMisura,
           fornitoreId: u.lotto?.fornitoreId ?? null,
           operatoreId: req.user!.id,
+          auditEventoId,
           trasferimentoId: id,
           movimentoOrigineId: u.m.id,
           fondoOrigine: u.m.fondoOrigine,

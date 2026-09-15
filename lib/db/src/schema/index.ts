@@ -3,6 +3,7 @@ export * from "./prodotti";
 export * from "./fornitori";
 export * from "./lotti";
 export * from "./movimenti";
+export * from "./auditEventi";
 export * from "./inventoryAccounting";
 export * from "./ageaImports";
 export * from "./fseReporting";

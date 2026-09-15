@@ -24,6 +24,7 @@ import {
   InventoryLedgerError,
   type WarehouseLoadResult,
 } from "../lib/inventoryLedger";
+import { auditContextFromRequest } from "../lib/auditEvent";
 import { InventoryDecimal } from "../lib/inventoryDecimal";
 import { canonicalInventoryFactor } from "../lib/inventoryQuantityDimensions";
 import { requireModulo } from "../lib/featureFlags";
@@ -215,6 +216,10 @@ router.post(
       return;
     }
     try {
+      const audit = auditContextFromRequest(req, {
+        operationKey:
+          typeof body.idempotencyKey === "string" ? body.idempotencyKey : null,
+      });
       const result = await db.transaction((tx) =>
         createWarehouseLoad(tx, {
           magazzinoId: body.magazzinoId,
@@ -228,6 +233,7 @@ router.post(
           idempotencyKey: body.idempotencyKey,
           executionContext: "manual",
           creatoDa: req.user!.id,
+          audit,
           righe: body.righe,
         }),
       );

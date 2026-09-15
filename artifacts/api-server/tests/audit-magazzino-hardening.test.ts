@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { and, eq } from "drizzle-orm";
 import {
+  auditEventiTable,
   db,
   lottiTable,
   magazziniTable,
@@ -173,6 +174,19 @@ describe("audit hardening del giornale inventariale", () => {
       "rettifica_positiva",
       "rettifica_negativa",
     ]);
+    expect(movements.every((row) => row.auditEventoId != null)).toBe(true);
+    const rettificaEvents = await db
+      .select()
+      .from(auditEventiTable)
+      .where(
+        and(
+          eq(auditEventiTable.entitaTipo, "lotto"),
+          eq(auditEventiTable.entitaId, loaded.body.id),
+        ),
+      );
+    expect(rettificaEvents).toHaveLength(2);
+    expect(rettificaEvents.every((event) => event.actorUserId === operatoreId))
+      .toBe(true);
   });
 
   it("rifiuta una rettifica sotto zero senza modificare Lotto o giornale", async () => {

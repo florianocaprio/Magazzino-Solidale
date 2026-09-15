@@ -286,7 +286,7 @@ Copertura progressiva:
 - M5: richieste, preparazione e sincronizzazioni sociali;
 - M6: censimento finale di tutte le mutazioni e test di assenza segreti.
 
-**Stato.** Requisito approvato in M0; non implementato e non testato. Realizzazione e prove iniziano in M1C e condizionano ogni schema successivo.
+**Stato.** Requisito approvato in M0. Il candidato M1C introduce il registro e l'helper comune, usa FK `ON DELETE SET NULL` soltanto per attore/iniziatore e conserva Area, Centro e Magazzino come ID snapshot senza FK live. Non espone endpoint o menu audit. La fase `##test M1C` automatica è superata (`OK-M1C/NE-MAN`); la validazione manuale/umana non è ancora eseguita. `previousEventId` rappresenta l'ultimo evento committato osservabile della stessa entità, non una catena strettamente serializzata: comandi concorrenti possono condividere il predecessore senza alterare eventi o correlazioni.
 
 ## D7 — Interfaccia e compatibilità
 

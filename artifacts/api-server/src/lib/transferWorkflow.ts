@@ -10,6 +10,12 @@ import {
   InventoryDecimalError,
   positiveInventoryDecimal,
 } from "./inventoryDecimal";
+import {
+  auditFields,
+  auditUserId,
+  recordAuditEvent,
+  type AuditCommandContext,
+} from "./auditEvent";
 
 export class TransferRequestError extends Error {
   constructor(
@@ -37,6 +43,7 @@ export interface TransferRequestInput {
   trasportatoreNome?: string | null;
   note?: string | null;
   operatoreId: number;
+  audit?: AuditCommandContext;
   mensaId?: number | null;
   idempotencyKey?: string | null;
   righe: TransferRequestRow[];
@@ -132,11 +139,34 @@ export async function createTransferRequest(input: TransferRequestInput) {
           trasportatoreVolontarioId: input.trasportatoreVolontarioId ?? null,
           trasportatoreNome: input.trasportatoreNome ?? null,
           note: input.note ?? null,
-          operatoreId: input.operatoreId,
+          operatoreId: input.audit
+            ? auditUserId(input.audit)
+            : input.operatoreId,
           mensaId: input.mensaId ?? null,
           idempotencyKey: input.idempotencyKey ?? null,
         })
         .returning();
+      if (input.audit) {
+        await recordAuditEvent(tx, {
+          command: input.audit,
+          azione: "TRASFERIMENTO_CREATO",
+          entitaTipo: "trasferimento",
+          entitaId: created.id,
+          documentoTipo: "trasferimento",
+          documentoId: created.id,
+          magazzinoIdSnapshot: created.magazzinoOrigineId,
+          dataOperativa: created.dataRichiesta,
+          changes: auditFields({ statoNuovo: created.stato }, ["statoNuovo"]),
+          metadata: auditFields(
+            {
+              magazzinoOrigineId: created.magazzinoOrigineId,
+              magazzinoDestinoId: created.magazzinoDestinoId,
+              numeroRighe: normalizedRows.length,
+            },
+            ["magazzinoOrigineId", "magazzinoDestinoId", "numeroRighe"],
+          ),
+        });
+      }
       await tx.insert(trasferimentoRigheTable).values(
         normalizedRows.map((row) => ({
           trasferimentoId: created.id,
