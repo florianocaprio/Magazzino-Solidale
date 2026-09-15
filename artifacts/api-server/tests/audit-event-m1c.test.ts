@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { auditEventiTable, db, pool, utentiTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
+  AuditOperationKeyConflictError,
   auditFields,
   recordAuditEvent,
   systemAuditContext,
@@ -149,6 +150,76 @@ describe("audit_eventi M1C", () => {
     expect(event.initiatedByCodeSnapshot).toBe(initiatorCode);
   });
 
+  it("applica al DB le combinazioni valide dell'iniziatore di sistema", async () => {
+    const initiatorCode = `DBI-${suffix}`.slice(0, 20);
+    const [{ id: initiatorId }] = await db
+      .insert(utentiTable)
+      .values({
+        username: `audit_db_init_${suffix}`.slice(0, 60),
+        passwordHash: "x",
+        nome: "Audit",
+        cognome: "DB Initiator",
+        matricola: initiatorCode,
+      })
+      .returning({ id: utentiTable.id });
+
+    const pureSystem = await pool.query<{ id: number }>(
+      `INSERT INTO audit_eventi
+         (correlation_id, azione, entita_tipo, entita_id, actor_type,
+          actor_code_snapshot)
+       VALUES ($1, 'M1C_DB_PURE_SYSTEM', 'test', $2, 'system', 'M1C_TEST_SYSTEM')
+       RETURNING id`,
+      [randomUUID(), userId],
+    );
+    const activeInitiator = await pool.query<{ id: number }>(
+      `INSERT INTO audit_eventi
+         (correlation_id, azione, entita_tipo, entita_id, actor_type,
+          actor_code_snapshot, initiated_by_user_id,
+          initiated_by_code_snapshot)
+       VALUES ($1, 'M1C_DB_ACTIVE_INITIATOR', 'test', $2, 'system',
+          'M1C_TEST_SYSTEM', $3, $4)
+       RETURNING id`,
+      [randomUUID(), userId, initiatorId, initiatorCode],
+    );
+
+    await expect(
+      pool.query(
+        `INSERT INTO audit_eventi
+           (correlation_id, azione, entita_tipo, entita_id, actor_type,
+            actor_code_snapshot, initiated_by_user_id)
+         VALUES ($1, 'M1C_DB_INVALID_INITIATOR', 'test', $2, 'system',
+            'M1C_TEST_SYSTEM', $3)`,
+        [randomUUID(), userId, initiatorId],
+      ),
+    ).rejects.toMatchObject({ code: "23514" });
+
+    await db.delete(utentiTable).where(eq(utentiTable.id, initiatorId));
+
+    const result = await pool.query<{
+      id: number;
+      initiated_by_user_id: number | null;
+      initiated_by_code_snapshot: string | null;
+    }>(
+      `SELECT id, initiated_by_user_id, initiated_by_code_snapshot
+       FROM audit_eventi
+       WHERE id = ANY($1::integer[])
+       ORDER BY id`,
+      [[pureSystem.rows[0]!.id, activeInitiator.rows[0]!.id]],
+    );
+    expect(result.rows).toEqual([
+      {
+        id: pureSystem.rows[0]!.id,
+        initiated_by_user_id: null,
+        initiated_by_code_snapshot: null,
+      },
+      {
+        id: activeInitiator.rows[0]!.id,
+        initiated_by_user_id: null,
+        initiated_by_code_snapshot: initiatorCode,
+      },
+    ]);
+  });
+
   it("conserva lo snapshot attore se la FK utente viene azzerata", async () => {
     const actorCode = `ACT-${suffix}`.slice(0, 20);
     const [{ id: actorId }] = await db
@@ -272,6 +343,101 @@ describe("audit_eventi M1C", () => {
 
     expect(replayId).toBe(firstId);
     expect(otherDomainId).not.toBe(firstId);
+  });
+
+  it("serializza replay concorrenti della stessa operazione ed entità", async () => {
+    const operationKey = `concurrent-key-${suffix}`;
+    const ids = await Promise.all(
+      ["A", "B"].map(() =>
+        db.transaction((tx) =>
+          recordAuditEvent(tx, {
+            command: systemAuditContext({
+              actorCode: "M1C_TEST_SYSTEM",
+              operationKey,
+            }),
+            azione: "M1C_CONCURRENT_IDEMPOTENT",
+            entitaTipo: "concurrent-idempotency-test",
+            entitaId: userId,
+          }),
+        ),
+      ),
+    );
+
+    expect(ids[1]).toBe(ids[0]);
+    const result = await pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM audit_eventi
+       WHERE azione = 'M1C_CONCURRENT_IDEMPOTENT'
+         AND operation_key = $1`,
+      [operationKey],
+    );
+    expect(result.rows[0]?.count).toBe("1");
+  });
+
+  it("rifiuta il riuso della stessa operationKey per entità diverse", async () => {
+    const operationKey = `entity-conflict-${suffix}`;
+    const firstId = await db.transaction((tx) =>
+      recordAuditEvent(tx, {
+        command: systemAuditContext({
+          actorCode: "M1C_TEST_SYSTEM",
+          operationKey,
+        }),
+        azione: "M1C_ENTITY_CONFLICT",
+        entitaTipo: "entity-conflict-test",
+        entitaId: userId,
+      }),
+    );
+    const rollbackUsername = `audit_rollback_${suffix}`.slice(0, 60);
+
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.insert(utentiTable).values({
+          username: rollbackUsername,
+          passwordHash: "x",
+          nome: "Audit",
+          cognome: "Rollback",
+        });
+        await recordAuditEvent(tx, {
+          command: systemAuditContext({
+            actorCode: "M1C_TEST_SYSTEM",
+            operationKey,
+          }),
+          azione: "M1C_ENTITY_CONFLICT",
+          entitaTipo: "entity-conflict-test",
+          entitaId: userId + 1,
+        });
+      }),
+    ).rejects.toBeInstanceOf(AuditOperationKeyConflictError);
+
+    await expect(
+      db.transaction((tx) =>
+        recordAuditEvent(tx, {
+          command: systemAuditContext({
+            actorCode: "M1C_TEST_SYSTEM",
+            operationKey,
+          }),
+          azione: "M1C_ENTITY_CONFLICT",
+          entitaTipo: "other-entity-conflict-test",
+          entitaId: userId,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "AUDIT_OPERATION_KEY_CONFLICT" });
+
+    const events = await db
+      .select()
+      .from(auditEventiTable)
+      .where(eq(auditEventiTable.operationKey, operationKey));
+    const rollbackUsers = await db
+      .select({ id: utentiTable.id })
+      .from(utentiTable)
+      .where(eq(utentiTable.username, rollbackUsername));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      id: firstId,
+      entitaTipo: "entity-conflict-test",
+      entitaId: userId,
+    });
+    expect(rollbackUsers).toHaveLength(0);
   });
 
   it("collega previousEventId soltanto alla stessa entità e usa UUID distinti", async () => {

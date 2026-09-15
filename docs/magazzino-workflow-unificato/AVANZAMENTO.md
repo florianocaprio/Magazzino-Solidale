@@ -497,7 +497,7 @@ Stato: **test automatici M1C superati; prova manuale non eseguita** (`OK-M1C/NE-
 ### Correzioni e precisazioni consolidate in test
 
 - La policy di `motivo` applica trim, sanitizzazione e limite di 1.000 caratteri.
-- La suite del migration runner riconosce 34 file e verifica che `20260911_m1c_audit_eventi.sql` sia l'ultima migrazione in coda.
+- La suite del migration runner riconosce 35 file e verifica che `20260916_m1c_audit_hardening.sql` sia l'ultima migrazione in coda.
 - I test verificano direttamente entrambe le FK utente `ON DELETE SET NULL`, preservando gli snapshot, e respingono `UPDATE`/`DELETE` applicativi dell'audit.
 - La unique idempotente è composta da `(azione, operation_key)`: il replay della stessa azione restituisce lo stesso evento, mentre la stessa stringa in azioni/domìni differenti non collide.
 - `previousEventId` resta circoscritto alla stessa entità; sotto concorrenza rappresenta un predecessore valido osservato e può ramificare, senza promettere una catena strettamente lineare.
@@ -560,3 +560,36 @@ La prima esecuzione API completa ha registrato un singolo 404/403 nel test UDS, 
 - Sanitizzazione: allowlist e filtro ricorsivo coprono password/hash, token, cookie, authorization, segreti SMTP, reset link, session identifier e valori annidati; non viene salvato l'intero `req.body`.
 
 La validazione manuale/fisica resta esplicitamente non eseguita. Non sono stati avviati Docker candidato, M2, merge o modifiche a `main`.
+
+## M1C — correzione post-code-review
+
+Data: 16 settembre 2026
+
+Base corretta: `0cecd5cd4857b17afbeb65672a75a579a5c6343d`
+
+Stato: **hardening M1C verificato automaticamente; prova manuale non eseguita** (`OK-M1C/NE-MAN`).
+
+### Idempotenza audit e integrità DB
+
+- Ogni `operationKey` audit acquisisce ora un advisory transaction lock deterministico e non globale, namespaced su `audit-operation:<azione>:<operationKey>`, prima del lookup.
+- Il replay con stessa azione, chiave, `entitaTipo` ed `entitaId` restituisce lo stesso evento. La stessa azione/chiave associata a un tipo o ID differente solleva `AUDIT_OPERATION_KEY_CONFLICT`; l'errore resta nella transazione del comando e ne provoca il rollback, senza eventi o collegamenti spuri.
+- Il test PostgreSQL concorrente avvia due transazioni sulla stessa azione/chiave/entità: entrambe completano con lo stesso ID e resta una sola riga audit.
+- La nuova migrazione incrementale `20260916_m1c_audit_hardening.sql` non modifica la migrazione M1C già pubblicata. Il vincolo ammette un attore di puro sistema senza iniziatore, un iniziatore attivo con ID e snapshot e un iniziatore storico con ID azzerato e snapshot conservato; respinge invece un ID iniziatore privo di snapshot.
+- La cancellazione dell'iniziatore continua a usare la FK `ON DELETE SET NULL`: il trigger append-only consente il solo azzeramento tecnico dell'ID e conserva lo snapshot.
+
+### Confini funzionali confermati
+
+- Il registro supporta eventi con `actorType=system`, `actorUserId=null` e nessun iniziatore umano. Questo non abilita automaticamente i servizi inventariali a omettere `operatoreId` o `creatoDa`: i percorsi umani M1C restano obbligatoriamente attribuiti tramite sessione e `auditUserId()`.
+- Le operazioni realmente automatiche senza operatore umano saranno integrate nel rispettivo workflow quando necessario, in particolare in M3 e nel censimento finale M6; schema e servizi Carichi non sono stati ampliati in questa correzione.
+- `audit_eventi.motivo`, trim, limite e sanitizzazione sono disponibili in M1C. La Rettifica usa già una causale strutturata obbligatoria e richiede il testo quando `causale=altro`.
+- L'annullamento Bolla continua invece a poter avvenire senza motivo testuale. L'obbligatorietà della ragione e la relativa esperienza utente restano requisito CAN-01 di M4B: M1C non lo completa e il flusso Bolla non è stato modificato.
+
+### Gate della correzione
+
+- Populated DB isolato: partenza con 34 migrazioni applicate, applicazione della sola 35ª e replay con `0 applied / 35 skipped`. Prima e dopo restano 21 lotti, quantità residua 1.624, 37 movimenti di cui 35 senza autore, 6 prenotazioni, 25 bolle, 3 trasferimenti, 10 scarichi e 2 carichi; restano inoltre 0 eventi audit e 0 collegamenti retroattivi dai movimenti. Pending, checksum mismatch e out-of-order sono a zero.
+- Fresh DB isolato: bootstrap da database vuoto, schema Drizzle, 35 migrazioni, seed, health/login/cambio password, CRUD, replay, verifica checksum e stato finale senza pending/mismatch/out-of-order completati. Trigger append-only e nuovo vincolo validato sono presenti.
+- Test backend mirati: 5 file e 83 test superati, inclusi helper audit, migrazioni M1C/hardening, idempotenza e rollback Carichi, Bolle e Trasferimenti.
+- Migration runner PostgreSQL: 24 test superati. Suite API completa: 108 file, 1.173 test superati e 2 skip, senza fallimenti; resta il warning baseline del driver `pg` sui test concorrenti.
+- `pnpm install --frozen-lockfile --offline`, typecheck workspace e codegen React/Zod sono completati; OpenAPI e output generati non hanno differenze. Prettier mirato e `git diff --check` sono i controlli documentali finali.
+
+Non sono stati costruiti container Docker applicativi, né avviati M2 o merge su `main`.

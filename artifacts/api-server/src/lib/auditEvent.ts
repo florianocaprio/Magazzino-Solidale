@@ -5,7 +5,7 @@ import {
   type AuditJsonObject,
   type AuditJsonValue,
 } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { InventoryTransaction } from "./scaricoInventory";
 
 const SENSITIVE_PATTERN =
@@ -166,6 +166,15 @@ export interface RecordAuditEventInput {
   previousEventId?: number | null;
 }
 
+export class AuditOperationKeyConflictError extends Error {
+  readonly code = "AUDIT_OPERATION_KEY_CONFLICT";
+
+  constructor() {
+    super("AUDIT_OPERATION_KEY_CONFLICT");
+    this.name = "AuditOperationKeyConflictError";
+  }
+}
+
 /**
  * Inserisce un evento nella transazione del chiamante. Non apre transazioni e
  * non intercetta errori: un fallimento dell'audit annulla l'intero comando.
@@ -176,8 +185,15 @@ export async function recordAuditEvent(
 ): Promise<number> {
   const operationKey = input.command.operationKey?.trim() || null;
   if (operationKey) {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`audit-operation:${input.azione}:${operationKey}`}, 0))`,
+    );
     const [existing] = await tx
-      .select({ id: auditEventiTable.id })
+      .select({
+        id: auditEventiTable.id,
+        entitaTipo: auditEventiTable.entitaTipo,
+        entitaId: auditEventiTable.entitaId,
+      })
       .from(auditEventiTable)
       .where(
         and(
@@ -185,7 +201,15 @@ export async function recordAuditEvent(
           eq(auditEventiTable.operationKey, operationKey),
         ),
       );
-    if (existing) return existing.id;
+    if (existing) {
+      if (
+        existing.entitaTipo !== input.entitaTipo ||
+        existing.entitaId !== input.entitaId
+      ) {
+        throw new AuditOperationKeyConflictError();
+      }
+      return existing.id;
+    }
   }
 
   let previousEventId = input.previousEventId;

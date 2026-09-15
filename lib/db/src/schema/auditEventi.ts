@@ -76,7 +76,10 @@ export const auditEventiTable = pgTable(
       sql`(${table.actorType} = 'user'
             and ${table.initiatedByUserId} is null
             and ${table.initiatedByCodeSnapshot} is null)
-          or (${table.actorType} = 'system' and ${table.actorUserId} is null)`,
+          or (${table.actorType} = 'system'
+            and ${table.actorUserId} is null
+            and (${table.initiatedByUserId} is null
+              or ${table.initiatedByCodeSnapshot} is not null))`,
     ),
     index("audit_eventi_correlation_idx").on(table.correlationId),
     index("audit_eventi_action_idx").on(table.azione),
