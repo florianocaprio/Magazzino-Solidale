@@ -593,3 +593,15 @@ Stato: **hardening M1C verificato automaticamente; prova manuale non eseguita** 
 - `pnpm install --frozen-lockfile --offline`, typecheck workspace e codegen React/Zod sono completati; OpenAPI e output generati non hanno differenze. Prettier mirato e `git diff --check` sono i controlli documentali finali.
 
 Non sono stati costruiti container Docker applicativi, né avviati M2 o merge su `main`.
+
+## M1C — validazione manuale
+
+Data: 16 settembre 2026
+
+Candidato validato: `42352c37cb7b3e7eea4ddb38844d1527b711a8c5`
+
+Stato: **M1C validato manualmente da Floriano** (`OK-M1C/OK-MAN-M1C`).
+
+Floriano ha completato con esito positivo il dry run manuale del candidato Docker M1C. La validazione copre AUD-01, AUD-02, AUD-03 e AUD-04: sequenza multiutente A crea/B opera/C conclude, attribuzione dei nuovi movimenti tramite matricola dell'utente autenticato, storico legacy con fallback sicuro, coerenza di stock e prenotazioni, assenza di una nuova UI Audit e permanenza del registro comune come infrastruttura backend.
+
+Gli esiti automatici M1C e del successivo hardening restano invariati. Questa chiusura documentale non modifica codice, schema, API, migrazioni o output generati e costituisce la base autorizzata per M2.
