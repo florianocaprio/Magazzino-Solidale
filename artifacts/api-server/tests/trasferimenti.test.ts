@@ -33,6 +33,7 @@ import {
   getLottiInMagazzino,
   type SeedScope,
 } from "./helpers";
+import logicalLotsRouter from "../src/routes/lotti-logici";
 
 let app: Express;
 let scope: SeedScope;
@@ -69,6 +70,17 @@ async function creaTrasferimento(opts: {
   return res.body;
 }
 
+async function getLogicalLotState(logicalLotId: number) {
+  const response = await request(app).get(`/lotti-logici/${logicalLotId}`);
+  expect(response.status).toBe(200);
+  return response.body as {
+    inTransito: boolean;
+    esaurito: boolean;
+    maiCaricato: boolean;
+    quantitaResiduaPrecisa: string;
+  };
+}
+
 beforeAll(async () => {
   // The operator user is reused across the whole suite (transfers stamp its id);
   // it is cleaned up once in afterAll.
@@ -79,6 +91,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   scope = newScope();
   app = makeApp(operatoreId);
+  app.use(logicalLotsRouter);
   origineId = await createMagazzino(scope, "Origine Test");
   destinoId = await createMagazzino(scope, "Destino Test");
 });
@@ -383,7 +396,7 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
       .returning();
     scope.lottoLogicoIds.push(logicalLot.id);
     const prodottoId = await createProdotto(scope);
-    await createLotto({
+    const sourceLotId = await createLotto({
       prodottoId,
       magazzinoId: origineId,
       quantita: 5,
@@ -392,6 +405,7 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
     });
 
     const transfer = await creaTrasferimento({ prodottoId, quantita: 5 });
+    expect(transfer.righe[0].lottoId).toBeNull();
     expect(
       (
         await request(app)
@@ -399,6 +413,12 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
           .send({ versione: transfer.versione })
       ).status,
     ).toBe(200);
+    expect(Number((await getLotto(sourceLotId)).quantitaResidua)).toBe(0);
+    expect(await getLogicalLotState(logicalLot.id)).toMatchObject({
+      inTransito: true,
+      esaurito: false,
+      maiCaricato: false,
+    });
     await db
       .update(lottiLogiciTable)
       .set({ stato: "chiuso" })
@@ -413,6 +433,100 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
       lottoLogicoId: logicalLot.id,
       codiceLotto: "PAM-FISICO",
     });
+    const sameAreaState = await getLogicalLotState(logicalLot.id);
+    expect(sameAreaState).toMatchObject({
+      inTransito: false,
+      esaurito: false,
+      maiCaricato: false,
+    });
+    expect(Number(sameAreaState.quantitaResiduaPrecisa)).toBe(5);
+  });
+
+  it("deriva il transito dal ledger quando FEFO usa più partite senza lotto esplicito", async () => {
+    const [logicalLot] = await db
+      .insert(lottiLogiciTable)
+      .values({
+        areaOperativaId: scope.areaOperativaIds[0],
+        codice: `MULTI-${Date.now()}`,
+        descrizione: "Raccolta FEFO multi-lotto",
+      })
+      .returning();
+    scope.lottoLogicoIds.push(logicalLot.id);
+    const prodottoId = await createProdotto(scope);
+    const firstLotId = await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 5,
+      lottoLogicoId: logicalLot.id,
+      codiceLotto: "MULTI-A",
+      dataScadenza: "2027-01-31",
+    });
+    const secondLotId = await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 5,
+      lottoLogicoId: logicalLot.id,
+      codiceLotto: "MULTI-B",
+      dataScadenza: "2027-02-28",
+    });
+
+    const transfer = await creaTrasferimento({ prodottoId, quantita: 10 });
+    expect(transfer.righe[0].lottoId).toBeNull();
+    const started = await request(app)
+      .post(`/trasferimenti/${transfer.id}/avvia`)
+      .send({ versione: transfer.versione });
+    expect(started.status).toBe(200);
+    expect(started.body.stato).toBe("in_transito");
+
+    const outputs = (await getMovimentiForTrasferimento(transfer.id)).filter(
+      (movement) => movement.tipoDettaglio === "uscita",
+    );
+    expect(outputs).toHaveLength(2);
+    expect(new Set(outputs.map((movement) => movement.lottoId))).toEqual(
+      new Set([firstLotId, secondLotId]),
+    );
+    const state = await getLogicalLotState(logicalLot.id);
+    expect(state).toMatchObject({
+      inTransito: true,
+      esaurito: false,
+      maiCaricato: false,
+    });
+    expect(Number(state.quantitaResiduaPrecisa)).toBe(0);
+  });
+
+  it("mantiene inTransito su un trasferimento parziale materializzato nel ledger", async () => {
+    const [logicalLot] = await db
+      .insert(lottiLogiciTable)
+      .values({
+        areaOperativaId: scope.areaOperativaIds[0],
+        codice: `PART-${Date.now()}`,
+        descrizione: "Raccolta trasferimento parziale",
+      })
+      .returning();
+    scope.lottoLogicoIds.push(logicalLot.id);
+    const prodottoId = await createProdotto(scope);
+    await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 20,
+      lottoLogicoId: logicalLot.id,
+      codiceLotto: "PART-A",
+    });
+
+    const transfer = await creaTrasferimento({ prodottoId, quantita: 5 });
+    expect(transfer.righe[0].lottoId).toBeNull();
+    const started = await request(app)
+      .post(`/trasferimenti/${transfer.id}/avvia`)
+      .send({ versione: transfer.versione });
+    expect(started.status).toBe(200);
+
+    const state = await getLogicalLotState(logicalLot.id);
+    expect(state).toMatchObject({
+      inTransito: true,
+      esaurito: false,
+      maiCaricato: false,
+    });
+    expect(Number(state.quantitaResiduaPrecisa)).toBe(15);
   });
 
   it("assegna il Generale di destinazione nei trasferimenti cross-Area e conserva la provenienza", async () => {
@@ -468,6 +582,11 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
           .send({ versione: transfer.versione })
       ).status,
     ).toBe(200);
+    expect(await getLogicalLotState(sourceLogicalLot.id)).toMatchObject({
+      inTransito: true,
+      esaurito: false,
+      maiCaricato: false,
+    });
     expect(
       (
         await request(app)
@@ -493,6 +612,20 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
     const output = movements.find((row) => row.tipoDettaglio === "uscita");
     const input = movements.find((row) => row.tipoDettaglio === "entrata");
     expect(input?.movimentoOrigineId).toBe(output?.id);
+    const sourceState = await getLogicalLotState(sourceLogicalLot.id);
+    expect(sourceState).toMatchObject({
+      inTransito: false,
+      esaurito: true,
+      maiCaricato: false,
+    });
+    expect(Number(sourceState.quantitaResiduaPrecisa)).toBe(0);
+    const destinationState = await getLogicalLotState(destinationGeneral.id);
+    expect(destinationState).toMatchObject({
+      inTransito: false,
+      esaurito: false,
+      maiCaricato: false,
+    });
+    expect(Number(destinationState.quantitaResiduaPrecisa)).toBe(4);
   });
 
   it("ricrea i lotti a destinazione preservando scadenza/codiceLotto/fornitore", async () => {

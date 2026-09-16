@@ -3,8 +3,8 @@ import {
   db,
   lottiLogiciTable,
   lottiTable,
+  movimentiTable,
   trasferimentiTable,
-  trasferimentoRigheTable,
 } from "@workspace/db";
 import { and, asc, eq, inArray, ne, or, sql, sum } from "drizzle-orm";
 import {
@@ -76,21 +76,24 @@ async function derivedState(logicalLotId: number) {
     .from(lottiTable)
     .where(eq(lottiTable.lottoLogicoId, logicalLotId));
   const [inTransit] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(trasferimentoRigheTable)
+    .select({ id: movimentiTable.id })
+    .from(movimentiTable)
     .innerJoin(
       trasferimentiTable,
-      eq(trasferimentoRigheTable.trasferimentoId, trasferimentiTable.id),
+      eq(movimentiTable.trasferimentoId, trasferimentiTable.id),
     )
-    .innerJoin(lottiTable, eq(trasferimentoRigheTable.lottoId, lottiTable.id))
+    .innerJoin(lottiTable, eq(movimentiTable.lottoId, lottiTable.id))
     .where(
       and(
         eq(lottiTable.lottoLogicoId, logicalLotId),
         eq(trasferimentiTable.stato, "in_transito"),
+        eq(movimentiTable.tipoMovimento, "trasferimento"),
+        eq(movimentiTable.tipoDettaglio, "uscita"),
       ),
-    );
+    )
+    .limit(1);
   const dettagli = stock?.dettagli ?? 0;
-  const inTransito = (inTransit?.count ?? 0) > 0;
+  const inTransito = inTransit != null;
   const quantitaResiduaPrecisa = stock?.residuo ?? "0";
   return {
     maiCaricato: dettagli === 0,

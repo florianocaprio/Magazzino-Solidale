@@ -740,3 +740,31 @@ Gli skip API sono invariati e non nascondono scenari M2; la fixture esterna AGEA
 Non sono stati costruiti container Docker candidati, eseguiti test manuali, avviati M3, effettuati merge o modifiche a `main`.
 
 Condizione di arresto: **M2 test automatici superati — pronto per code review**.
+
+## M2 — correzione post-code-review dello stato derivato
+
+Data: 16 settembre 2026
+
+Base corretta: `7868aaff9a3442f4c17b8361750496f98c50134a`
+
+Stato: **hardening LOT-03 verificato automaticamente; prova Docker/manuale non eseguita** (`OK-M2/NE-MAN`).
+
+Il calcolo `inTransito` del lotto logico non usa più `trasferimento_righe.lotto_id`, perché una riga richiesta può omettere la partita e lasciare che sia FEFO a selezionarla soltanto durante l'avvio. La fonte attendibile è ora il ledger materializzato: la query cerca un trasferimento con stato `in_transito`, un movimento collegato con `tipoMovimento=trasferimento` e `tipoDettaglio=uscita`, quindi risale dal `lottoId` effettivo al relativo `lottoLogicoId`. La ricerca si arresta alla prima corrispondenza.
+
+Le semantiche derivate restano:
+
+- `maiCaricato=true` soltanto senza alcun dettaglio fisico;
+- `inTransito=true` quando almeno una partita del lotto logico è realmente uscita per un trasferimento ancora in transito;
+- `esaurito=true` soltanto con almeno un dettaglio fisico, residuo complessivo zero e nessun trasferimento materializzato in transito.
+
+La regressione su PostgreSQL isolato copre:
+
+- riga Trasferimento senza `lottoId`, FEFO su una partita da 10, residuo origine zero, `inTransito=true` ed `esaurito=false`;
+- FEFO su due partite da 5 dello stesso lotto logico, con due movimenti di uscita reali e stato derivato ancora in transito;
+- trasferimento parziale di 5 su 20, con residuo 15, `inTransito=true` ed `esaurito=false`;
+- ricezione same-Area, che rimuove il transito e conserva lotto logico e residuo complessivo a destinazione;
+- ricezione cross-Area, che rimuove il transito dalla raccolta sorgente, assegna la merce al `Generale` ricevente e conserva il lineage nei movimenti.
+
+I test mirati Lotto Logico M2, Trasferimenti e Giacenze M1B hanno chiuso 3 file e 48 test senza fallimenti. Il typecheck dell'intero workspace, Prettier pertinente e `git diff --check` sono verdi. Non sono stati modificati schema, migrazioni, OpenAPI, generated o modello Trasferimenti.
+
+LOT-03 riconosce quindi correttamente il transito già materializzato nel ledger; resta parziale soltanto per rientro e altri comportamenti M4B non ancora implementati. Non sono stati costruiti container applicativi candidati, avviati M3 o effettuati merge/modifiche a `main`.
