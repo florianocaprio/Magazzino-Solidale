@@ -15,6 +15,8 @@ import {
   prodottiTable,
   systemLogsTable,
   utentiTable,
+  areeOperativeTable,
+  lottiLogiciTable,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import carichiRouter from "../src/routes/carichi";
@@ -34,6 +36,8 @@ let prodottoLiberoId: number;
 let prodottoLottoId: number;
 let prodottoPezziId: number;
 let originalLottiAttivo = true;
+let areaOperativaId: number;
+let lottoGeneraleId: number;
 const suffix = `${process.pid}${Date.now().toString(36)}`;
 
 function makeApp(
@@ -107,11 +111,25 @@ beforeAll(async () => {
       cognome: "Carichi",
     })
     .returning({ id: utentiTable.id });
+  [{ id: areaOperativaId }] = await db
+    .insert(areeOperativeTable)
+    .values({ nome: `Area carichi ${suffix}` })
+    .returning({ id: areeOperativeTable.id });
+  [{ id: lottoGeneraleId }] = await db
+    .insert(lottiLogiciTable)
+    .values({
+      areaOperativaId,
+      codice: "GENERALE",
+      descrizione: "Generale",
+      isGenerale: true,
+    })
+    .returning({ id: lottiLogiciTable.id });
   [{ id: magazzinoId }] = await db
     .insert(magazziniTable)
     .values({
       codice: `C20A-${suffix}`.slice(0, 20),
       nome: `Magazzino carichi ${suffix}`,
+      areaOperativaId,
     })
     .returning({ id: magazziniTable.id });
   [{ id: altroMagazzinoId }] = await db
@@ -119,6 +137,7 @@ beforeAll(async () => {
     .values({
       codice: `C20B-${suffix}`.slice(0, 20),
       nome: `Altro magazzino carichi ${suffix}`,
+      areaOperativaId,
     })
     .returning({ id: magazziniTable.id });
   [{ id: prodottoLiberoId }] = await db
@@ -128,7 +147,8 @@ beforeAll(async () => {
       nome: "Prodotto senza lotto 2.0A",
       tipoProdotto: "alimentare",
       unitaMisura: "kg",
-      gestioneLotto: false,
+      quantitaFrazionabile: true,
+      lottoFisicoObbligatorio: false,
       gestioneScadenza: false,
     })
     .returning({ id: prodottiTable.id });
@@ -139,7 +159,8 @@ beforeAll(async () => {
       nome: "Prodotto con lotto 2.0A",
       tipoProdotto: "alimentare",
       unitaMisura: "kg",
-      gestioneLotto: true,
+      quantitaFrazionabile: true,
+      lottoFisicoObbligatorio: true,
       gestioneScadenza: true,
     })
     .returning({ id: prodottiTable.id });
@@ -150,7 +171,7 @@ beforeAll(async () => {
       nome: "Prodotto pezzi 2.0A-R1",
       tipoProdotto: "alimentare",
       unitaMisura: "pz",
-      gestioneLotto: true,
+      lottoFisicoObbligatorio: true,
       gestioneScadenza: true,
     })
     .returning({ id: prodottiTable.id });
@@ -190,6 +211,12 @@ afterAll(async () => {
   await db
     .delete(magazziniTable)
     .where(eq(magazziniTable.id, altroMagazzinoId));
+  await db
+    .delete(lottiLogiciTable)
+    .where(eq(lottiLogiciTable.id, lottoGeneraleId));
+  await db
+    .delete(areeOperativeTable)
+    .where(eq(areeOperativeTable.id, areaOperativaId));
   await db
     .delete(systemLogsTable)
     .where(eq(systemLogsTable.actorUserId, operatoreId));
@@ -502,12 +529,14 @@ describe("POST /carichi — Magazzino 2.0A", () => {
       ],
     };
     const first = await postCarico(body);
-    const conflict = await request(app).post("/carichi").send({
-      magazzinoId: altroMagazzinoId,
-      origineCarico: "RACCOLTA_ALIMENTARE",
-      dataCarico: "2026-08-29",
-      ...body,
-    });
+    const conflict = await request(app)
+      .post("/carichi")
+      .send({
+        magazzinoId: altroMagazzinoId,
+        origineCarico: "RACCOLTA_ALIMENTARE",
+        dataCarico: "2026-08-29",
+        ...body,
+      });
     expect(first.status).toBe(201);
     expect(conflict.status).toBe(409);
     expect(conflict.body.id).toBeUndefined();
@@ -537,24 +566,22 @@ describe("POST /carichi — Magazzino 2.0A", () => {
     expect(ids.size).toBe(1);
   });
 
-  it.each([
-    "AGEA_SIFEAD",
-    "RETTIFICA_INVENTARIO",
-    "SALDO_INIZIALE",
-    "LEGACY",
-  ])("rifiuta l'origine riservata %s dal flusso manuale", async (origine) => {
-    const response = await postCarico({
-      origineCarico: origine,
-      righe: [
-        {
-          prodottoId: prodottoLiberoId,
-          fondoOrigine: "NESSUN_FONDO",
-          quantitaOperativa: "1",
-        },
-      ],
-    });
-    expect(response.status).toBe(403);
-  });
+  it.each(["AGEA_SIFEAD", "RETTIFICA_INVENTARIO", "SALDO_INIZIALE", "LEGACY"])(
+    "rifiuta l'origine riservata %s dal flusso manuale",
+    async (origine) => {
+      const response = await postCarico({
+        origineCarico: origine,
+        righe: [
+          {
+            prodottoId: prodottoLiberoId,
+            fondoOrigine: "NESSUN_FONDO",
+            quantitaOperativa: "1",
+          },
+        ],
+      });
+      expect(response.status).toBe(403);
+    },
+  );
 
   it("contabilizza Pezzi, Kg/Lt e fattore coerenti e ne salva lo snapshot", async () => {
     const response = await postCarico({
@@ -588,7 +615,7 @@ describe("POST /carichi — Magazzino 2.0A", () => {
     });
   });
 
-  it("blocca senza creare una terza Partita quando i lotti legacy sono ambigui", async () => {
+  it("non adotta lotti legacy ambigui e crea una nuova Partita nel Generale", async () => {
     await db.insert(lottiTable).values([
       {
         prodottoId: prodottoLottoId,
@@ -625,7 +652,7 @@ describe("POST /carichi — Magazzino 2.0A", () => {
         },
       ],
     });
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(201);
     const candidates = await db
       .select()
       .from(lottiTable)
@@ -636,11 +663,21 @@ describe("POST /carichi — Magazzino 2.0A", () => {
         ),
       );
     expect(
-      candidates.filter((lotto) => lotto.codiceLottoNormalizzato === "LEGACY R1"),
-    ).toHaveLength(0);
+      candidates.filter(
+        (lotto) => lotto.codiceLottoNormalizzato === "LEGACY R1",
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        id: response.body.righe[0].lottoId,
+        lottoLogicoId: lottoGeneraleId,
+      }),
+    ]);
+    expect(
+      candidates.filter((lotto) => lotto.lottoLogicoId == null),
+    ).toHaveLength(2);
   });
 
-  it("adotta in modo deterministico una sola Partita legacy compatibile", async () => {
+  it("non adotta una Partita legacy compatibile e la lascia senza lotto logico", async () => {
     const [legacy] = await db
       .insert(lottiTable)
       .values({
@@ -668,16 +705,25 @@ describe("POST /carichi — Magazzino 2.0A", () => {
       ],
     });
     expect(response.status).toBe(201);
-    expect(response.body.righe[0].lottoId).toBe(legacy.id);
-    const [adopted] = await db
+    expect(response.body.righe[0].lottoId).not.toBe(legacy.id);
+    const [unchanged] = await db
       .select()
       .from(lottiTable)
       .where(eq(lottiTable.id, legacy.id));
-    expect(adopted.codiceLottoNormalizzato).toBe("LEGACY UNICA R1");
-    expect(adopted.quantitaResidua).toBe("1.000001");
+    expect(unchanged.codiceLottoNormalizzato).toBeNull();
+    expect(Number(unchanged.quantitaResidua)).toBe(1);
+    const [created] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.id, response.body.righe[0].lottoId));
+    expect(created).toMatchObject({
+      lottoLogicoId: lottoGeneraleId,
+      codiceLottoNormalizzato: "LEGACY UNICA R1",
+    });
+    expect(Number(created.quantitaResidua)).toBe(0.000001);
   });
 
-  it("rifiuta un fattore diverso da quello già fissato sulla Partita", async () => {
+  it("mantiene distinte le Partite con fattori diversi", async () => {
     const first = await postCarico({
       idempotencyKey: `factor-a-${suffix}`,
       righe: [
@@ -705,10 +751,13 @@ describe("POST /carichi — Magazzino 2.0A", () => {
       ],
     });
     expect(first.status).toBe(201);
-    expect(conflict.status).toBe(409);
+    expect(conflict.status).toBe(201);
+    expect(conflict.body.righe[0].lottoId).not.toBe(
+      first.body.righe[0].lottoId,
+    );
   });
 
-  it("mantiene stabile il replay se la Partita acquisisce un fattore dopo il primo Carico", async () => {
+  it("mantiene stabile il replay se lo stesso codice riceve una Partita con fattore distinto", async () => {
     const key = `factor-late-replay-${suffix}`;
     const line = {
       prodottoId: prodottoPezziId,
@@ -725,6 +774,9 @@ describe("POST /carichi — Magazzino 2.0A", () => {
     const replay = await postCarico({ idempotencyKey: key, righe: [line] });
     expect(first.status).toBe(201);
     expect(factorLoad.status).toBe(201);
+    expect(factorLoad.body.righe[0].lottoId).not.toBe(
+      first.body.righe[0].lottoId,
+    );
     expect(replay.status).toBe(200);
     expect(replay.body.id).toBe(first.body.id);
     expect(replay.body.replay).toBe(true);
@@ -886,12 +938,10 @@ describe("POST /carichi — Magazzino 2.0A", () => {
     expect(second.status).toBe(201);
     expect(second.body.righe[0].lottoId).toBe(first.body.righe[0].lottoId);
 
-    const filtered = await request(app)
-      .get("/lotti")
-      .query({
-        magazzinoId,
-        origineCaricoPresente: "RACCOLTA_ALIMENTARE",
-      });
+    const filtered = await request(app).get("/lotti").query({
+      magazzinoId,
+      origineCaricoPresente: "RACCOLTA_ALIMENTARE",
+    });
     expect(filtered.status).toBe(200);
     expect(
       filtered.body.filter(

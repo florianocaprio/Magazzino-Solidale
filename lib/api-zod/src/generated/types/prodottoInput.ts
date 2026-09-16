@@ -13,7 +13,9 @@ export interface ProdottoInput {
   tipoProdotto: string;
   unitaMisura: string;
   codiceBarre?: string;
-  gestioneLotto?: boolean;
+  /** Se omesso, il backend deriva il default dall'unità di misura */
+  quantitaFrazionabile?: boolean;
+  lottoFisicoObbligatorio?: boolean;
   gestioneScadenza?: boolean;
   fsePlus?: boolean;
   scortaMinima?: number;

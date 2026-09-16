@@ -15,6 +15,7 @@ import {
   ruoliTable,
   utentiTable,
   lottiTable,
+  lottiLogiciTable,
   scarichiTable,
   scaricoRigheTable,
   approvvigionamentiTable,
@@ -192,6 +193,7 @@ export interface SeedScope {
   ruoloVolontarioIds: number[];
   utenteIds: number[];
   lottoIds: number[];
+  lottoLogicoIds: number[];
   scaricoIds: number[];
   approvvigionamentoIds: number[];
   consegnaIds: number[];
@@ -219,6 +221,7 @@ export function newScope(): SeedScope {
     ruoloVolontarioIds: [],
     utenteIds: [],
     lottoIds: [],
+    lottoLogicoIds: [],
     scaricoIds: [],
     approvvigionamentoIds: [],
     consegnaIds: [],
@@ -337,6 +340,16 @@ export async function createAreaOperativa(scope: SeedScope): Promise<number> {
     })
     .returning({ id: areeOperativeTable.id });
   scope.areaOperativaIds.push(c.id);
+  const [general] = await db
+    .insert(lottiLogiciTable)
+    .values({
+      areaOperativaId: c.id,
+      codice: "GENERALE",
+      descrizione: "Generale",
+      isGenerale: true,
+    })
+    .returning({ id: lottiLogiciTable.id });
+  scope.lottoLogicoIds.push(general.id);
   return c.id;
 }
 
@@ -353,14 +366,23 @@ export async function createZona(
   return { id: z.id, nome };
 }
 
-export async function createProdotto(scope: SeedScope): Promise<number> {
+export async function createProdotto(scope: SeedScope,
+  opts: {
+    unitaMisura?: string;
+    quantitaFrazionabile?: boolean;
+  } = {},
+): Promise<number> {
+  const unitaMisura = opts.unitaMisura ?? "kg";
   const [p] = await db
     .insert(prodottiTable)
     .values({
       codice: `PRD-${rnd()}`,
       nome: `Prodotto ${rnd()}`,
       tipoProdotto: "alimentare",
-      unitaMisura: "kg",
+      unitaMisura,
+      quantitaFrazionabile:
+        opts.quantitaFrazionabile ??
+        ["kg", "l", "lt"].includes(unitaMisura.trim().toLowerCase()),
       fsePlus: false,
     })
     .returning({ id: prodottiTable.id });
@@ -764,8 +786,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
       .where(
         inArray(
           emissioniRegistroVolontariTable.id,
-          scope.emissioneRegistroIds,
-        ),
+          scope.emissioneRegistroIds),
       );
   }
   if (scope.importazioneVolontariIds.length > 0) {
@@ -1025,6 +1046,9 @@ export async function cleanup(scope: SeedScope): Promise<void> {
           scope.areaOperativaIds,
         ),
       );
+    await db
+      .delete(lottiLogiciTable)
+      .where(inArray(lottiLogiciTable.areaOperativaId, scope.areaOperativaIds));
     await db
       .delete(areeOperativeTable)
       .where(inArray(areeOperativeTable.id, scope.areaOperativaIds));

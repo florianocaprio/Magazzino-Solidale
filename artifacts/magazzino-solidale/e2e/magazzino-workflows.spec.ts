@@ -21,6 +21,57 @@ test.describe("workflow Magazzino reali", () => {
     await login(page);
   });
 
+  test("Catalogo resta anagrafico e preserva la scelta esplicita sulla frazionabilità", async ({
+    page,
+  }) => {
+    const suffix = Date.now();
+    await page.goto("/prodotti");
+    await expect(
+      page.getByRole("heading", { name: /catalogo prodotti/i }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /^carica$/i })).toHaveCount(
+      0,
+    );
+    await expect(
+      page.getByRole("combobox", { name: /magazzino/i }),
+    ).toHaveCount(0);
+
+    await page.getByRole("button", { name: /nuovo prodotto/i }).click();
+    const sheet = page.getByRole("dialog", { name: /nuovo prodotto/i });
+    const fractional = sheet.getByRole("switch", {
+      name: /quantità frazionabile/i,
+    });
+    await expect(fractional).not.toBeChecked();
+
+    const unit = sheet.getByRole("combobox", { name: /unità.*misura/i });
+    await selectOption(page, unit, /chilogrammi/i);
+    await expect(fractional).toBeChecked();
+    await fractional.click();
+    await expect(fractional).not.toBeChecked();
+    await selectOption(page, unit, /pezzi/i);
+    await selectOption(page, unit, /chilogrammi/i);
+    await expect(fractional).not.toBeChecked();
+    await expect(
+      sheet.getByRole("switch", { name: /lotto fisico obbligatorio/i }),
+    ).not.toBeChecked();
+
+    await sheet.getByLabel(/^nome$/i).fill(`Prodotto Catalogo E2E ${suffix}`);
+    const createResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/prodotti") &&
+        response.request().method() === "POST",
+    );
+    await sheet.getByRole("button", { name: /crea prodotto/i }).click();
+    const response = await createResponse;
+    expect(response.status()).toBe(201);
+    expect(await response.json()).toMatchObject({
+      unitaMisura: "kg",
+      quantitaFrazionabile: false,
+      lottoFisicoObbligatorio: false,
+    });
+    await expect(sheet).toBeHidden();
+  });
+
   test("Carico multi-riga valida lotto/scadenza, contabilizza e protegge il draft", async ({
     page,
   }) => {

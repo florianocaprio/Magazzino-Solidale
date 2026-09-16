@@ -28,7 +28,11 @@ import {
   RETTIFICA_CAUSALI,
 } from "../lib/inventoryLedger";
 import { auditContextFromRequest } from "../lib/auditEvent";
-import { addDaysToCivilDate, dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
+import {
+  addDaysToCivilDate,
+  dataCivileEuropeRome,
+  isDateOnly,
+} from "../lib/interventiWorkflow";
 
 const router: IRouter = Router();
 
@@ -104,6 +108,7 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
     rows.map((r) => ({
       id: r.lotto.id,
       prodottoId: r.lotto.prodottoId,
+      lottoLogicoId: r.lotto.lottoLogicoId ?? null,
       prodottoNome: r.prodottoNome ?? null,
       codiceLotto: r.lotto.codiceLotto ?? null,
       dataScadenza: r.lotto.dataScadenza ?? null,
@@ -172,6 +177,9 @@ router.post(
       const row = await db.transaction((tx) =>
         creaCaricoInventariale(tx, {
           prodottoId: body.prodottoId,
+          lottoLogicoId: positiveInteger(body.lottoLogicoId)
+            ? body.lottoLogicoId
+            : null,
           codiceLotto:
             typeof body.codiceLotto === "string"
               ? body.codiceLotto.trim() || null

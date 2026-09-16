@@ -8,6 +8,7 @@ import {
   centriAscoltoTable,
   areeOperativeTable,
   db,
+  lottiLogiciTable,
   pool,
   ruoliTable,
   utentiTable,
@@ -132,10 +133,16 @@ afterAll(async () => {
     await db.delete(zoneUdsTable).where(eq(zoneUdsTable.id, createdZoneId));
   }
   if (createdAreaOperativaId) {
-    await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, createdAreaOperativaId));
+    await db.delete(lottiLogiciTable)
+      .where(eq(lottiLogiciTable.areaOperativaId, createdAreaOperativaId));
+    await db
+      .delete(areeOperativeTable).where(eq(areeOperativeTable.id, createdAreaOperativaId));
   }
   if (sentinelAreaOperativaId) {
-    await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, sentinelAreaOperativaId));
+    await db.delete(lottiLogiciTable)
+      .where(eq(lottiLogiciTable.areaOperativaId, sentinelAreaOperativaId));
+    await db
+      .delete(areeOperativeTable).where(eq(areeOperativeTable.id, sentinelAreaOperativaId));
   }
   await db
     .delete(auditConfigurazioniTable)

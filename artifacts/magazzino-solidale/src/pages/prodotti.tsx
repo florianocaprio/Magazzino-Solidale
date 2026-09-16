@@ -1,55 +1,54 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   useListProdotti,
   useCreateProdotto,
   useUpdateProdotto,
   useDeleteProdotto,
-  useListMagazzini,
-  useListLotti,
   useListFornitori,
   useBulkProdotti,
-  useCreateLotto,
   getListProdottiQueryKey,
-  getListGiacenzeQueryKey,
-  getListLottiQueryKey,
-  getListMovimentiQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from "@/components/ui/sheet";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+} from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { ExportButtons } from "@/components/export-buttons";
 import { generateProdottiBarcodePdf } from "@/lib/prodotti-barcode-pdf";
-import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult } from "@/components/bulk-import-dialog";
+import { BulkImportDialog, matchByName, parseBoolCell, type MapRowResult,
+} from "@/components/bulk-import-dialog";
 import {
   MoreHorizontal,
   Plus,
   Pencil,
   Trash2,
   Filter,
-  PackagePlus,
   Download,
   Upload,
 } from "lucide-react";
 import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { useAuth } from "@/lib/auth";
-import { todayEuropeRome } from "@/lib/europe-rome";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import * as z from "zod";
+import { fractionalQuantityAfterUnitChange } from "@/lib/product-quantity-form";
 
 const makeFormSchema = (t: (key: string) => string) => {
   const optionalNonNegativeNumber = z.preprocess(
@@ -64,7 +63,8 @@ const makeFormSchema = (t: (key: string) => string) => {
     tipoProdotto: z.string().min(1, t("common.requiredField")),
     unitaMisura: z.string().min(1, t("common.requiredField")),
     codiceBarre: z.string().optional(),
-    gestioneLotto: z.boolean().default(false),
+    quantitaFrazionabile: z.boolean().default(false),
+    lottoFisicoObbligatorio: z.boolean().default(false),
     gestioneScadenza: z.boolean().default(false),
     fsePlus: z.boolean().default(false),
     scortaMinima: z.coerce.number().min(0).default(0),
@@ -73,7 +73,7 @@ const makeFormSchema = (t: (key: string) => string) => {
     creditoSolidaleValore: z.coerce.number().min(0, t("prodotti.errCreditoSolidaleNonNegative")).default(0),
     quantitaMassimaPerSpesa: optionalNonNegativeNumber,
     quantitaMassimaMensile: optionalNonNegativeNumber,
-    note: z.string().optional()
+    note: z.string().optional(),
   });
 };
 
@@ -84,7 +84,8 @@ const apiErrorMessage = (e: unknown) =>
   (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
   "Operazione non riuscita";
 
-type OptionalBulkNumberResult = { ok: true; value: number | undefined } | { ok: false; error: string };
+type OptionalBulkNumberResult =
+  | { ok: true; value: number | undefined } | { ok: false; error: string };
 
 function parseOptionalBulkNumber(
   value: string | undefined,
@@ -97,296 +98,16 @@ function parseOptionalBulkNumber(
   return { ok: true, value: n };
 }
 
-const makeCaricoSchema = (t: (key: string) => string) => z.object({
-  magazzinoId: z.string().min(1, t("prodotti.errSelectMagazzino")),
-  quantita: z.coerce.number().positive(t("prodotti.errQuantitaPositive")),
-  dataCarico: z.string().min(1, t("common.requiredField")),
-  causale: z.enum(["acquisto", "donazione", "fse_plus"]),
-  provenienza: z.enum(["fseplus", "fornitore"]),
-  fornitoreId: z.string().optional(),
-  codiceLotto: z.string().optional(),
-  dataScadenza: z.string().optional(),
-  note: z.string().optional(),
-}).refine((d) => d.provenienza !== "fornitore" || (d.fornitoreId && d.fornitoreId.length > 0), {
-  message: t("prodotti.errSelectFornitore"),
-  path: ["fornitoreId"],
-});
-
-type CaricoValues = z.infer<ReturnType<typeof makeCaricoSchema>>;
-
-type Prodotto = {
-  id: number;
-  nome: string;
-  unitaMisura: string;
-  gestioneLotto: boolean;
-  gestioneScadenza: boolean;
-  fsePlus: boolean;
-  fornitoreId: number | null;
-};
-
-function CaricoForm({ prodotto, onClose }: { prodotto: Prodotto; onClose: () => void }) {
-  const { t } = useTranslation();
-  const { data: magazzini } = useListMagazzini();
-  const { data: fornitori } = useListFornitori();
-  const createLotto = useCreateLotto();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  const caricoSchema = makeCaricoSchema(t);
-
-  const form = useForm<CaricoValues>({
-    resolver: zodResolver(caricoSchema),
-    defaultValues: {
-      magazzinoId: "",
-      quantita: 0,
-      dataCarico: todayEuropeRome(),
-      causale: "donazione",
-      provenienza: prodotto.fsePlus ? "fseplus" : "fornitore",
-      fornitoreId: !prodotto.fsePlus && prodotto.fornitoreId ? String(prodotto.fornitoreId) : "",
-      codiceLotto: "",
-      dataScadenza: "",
-      note: "",
-    },
-  });
-
-  const provenienza = form.watch("provenienza");
-
-  const submitting = createLotto.isPending;
-
-  const onSubmit = (data: CaricoValues) => {
-    createLotto.mutate(
-      {
-        data: {
-          prodottoId: prodotto.id,
-          magazzinoId: parseInt(data.magazzinoId),
-          dataCarico: data.dataCarico,
-          quantitaCaricata: data.quantita,
-          causale: data.causale,
-          fsePlus: data.provenienza === "fseplus",
-          fornitoreId: data.provenienza === "fornitore" && data.fornitoreId ? parseInt(data.fornitoreId) : undefined,
-          codiceLotto: data.codiceLotto || undefined,
-          dataScadenza: data.dataScadenza || undefined,
-          note: data.note || undefined,
-        },
-      },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getListLottiQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getListMovimentiQueryKey() });
-          toast({
-            title: t("prodotti.toastCaricoTitle"),
-            description: t("prodotti.toastCaricoDesc", { quantita: data.quantita, um: prodotto.unitaMisura, nome: prodotto.nome }),
-          });
-          onClose();
-        },
-        onError: () =>
-          toast({ title: t("prodotti.toastErrorTitle"), description: t("prodotti.toastCaricoError"), variant: "destructive" }),
-      },
-    );
-  };
-
-  return (
-    <Sheet open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{t("prodotti.loadTitle")}</SheetTitle>
-          <SheetDescription>
-            {t("prodotti.loadDescription", { nome: prodotto.nome })}
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField control={form.control} name="magazzinoId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("prodotti.loadMagazzino")}</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("prodotti.selectMagazzino")} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {magazzini?.filter((m) => m.stato === "attivo").map((m) => (
-                        <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="quantita" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("prodotti.quantityWithUm", { um: prodotto.unitaMisura })}</FormLabel>
-                    <FormControl><Input type="number" min="0" step="any" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="dataCarico" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("prodotti.dataCarico")}</FormLabel>
-                    <FormControl><Input type="date" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-
-              <FormField control={form.control} name="causale" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("prodotti.causale")}</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("prodotti.selectCausale")} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="donazione">{t("prodotti.causale_donazione")}</SelectItem>
-                      <SelectItem value="acquisto">{t("prodotti.causale_acquisto")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-
-              <FormField control={form.control} name="provenienza" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("prodotti.provenienza")}</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="fseplus">{t("prodotti.provenienza_fseplus")}</SelectItem>
-                      <SelectItem value="fornitore">{t("prodotti.provenienza_fornitore")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-
-              {provenienza === "fornitore" && (
-                <FormField control={form.control} name="fornitoreId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("prodotti.fornitore")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder={t("prodotti.selectFornitore")} /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {fornitori?.filter((f) => f.attivo).map((f) => (
-                          <SelectItem key={f.id} value={f.id.toString()}>{f.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              )}
-
-              {(prodotto.gestioneLotto || prodotto.gestioneScadenza) && (
-                <div className="grid grid-cols-2 gap-4">
-                  {prodotto.gestioneLotto && (
-                    <FormField control={form.control} name="codiceLotto" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("prodotti.codiceLotto")}</FormLabel>
-                        <FormControl><Input placeholder={t("prodotti.optional")} {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  )}
-                  {prodotto.gestioneScadenza && (
-                    <FormField control={form.control} name="dataScadenza" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("prodotti.dataScadenza")}</FormLabel>
-                        <FormControl><Input type="date" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  )}
-                </div>
-              )}
-
-              <FormField control={form.control} name="note" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("common.notes")}</FormLabel>
-                  <FormControl><Input placeholder={t("prodotti.optional")} {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-
-              <div className="pt-6 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
-                <Button type="submit" disabled={submitting} className="gap-2">
-                  <PackagePlus className="h-4 w-4" /> {t("prodotti.registraCarico")}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-function ProdottoLotti({ prodottoId }: { prodottoId: number }) {
-  const { t } = useTranslation();
-  const { data: lotti, isLoading } = useListLotti(
-    { prodottoId },
-    { query: { queryKey: getListLottiQueryKey({ prodottoId }) } },
-  );
-
-  return (
-    <div className="pt-4 border-t space-y-2">
-      <Label className="text-sm font-medium">{t("prodotti.lottiTitle")}</Label>
-      {isLoading ? (
-        <Skeleton className="h-12 w-full" />
-      ) : !lotti || lotti.length === 0 ? (
-        <p className="text-[0.8rem] text-muted-foreground">{t("prodotti.noLotti")}</p>
-      ) : (
-        <div className="rounded-lg border divide-y">
-          {lotti.map((l) => (
-            <div key={l.id} className="flex items-center justify-between gap-2 p-2 text-sm">
-              <div className="min-w-0">
-                <div className="font-medium truncate">
-                  {l.codiceLotto || <span className="text-muted-foreground italic">{t("prodotti.senzaCodice")}</span>}
-                  <span className="text-muted-foreground font-normal"> · {l.magazzinoNome}</span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {t("prodotti.residuoLabel")} {l.quantitaResidua}
-                  {l.dataScadenza ? ` · ${t("prodotti.scadShort")} ${new Date(l.dataScadenza).toLocaleDateString("it-IT")}` : ""}
-                </div>
-              </div>
-              {l.fsePlus ? (
-                <Badge variant="outline" className="border-none bg-blue-500/15 text-blue-700 shrink-0">FSE+</Badge>
-              ) : l.fornitoreNome ? (
-                <Badge variant="outline" className="shrink-0">{l.fornitoreNome}</Badge>
-              ) : (
-                <span className="text-muted-foreground text-xs italic shrink-0">{t("prodotti.provenienzaNd")}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function Prodotti() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const canManageProducts = hasPermission("magazzino.products.manage");
-  const canReceiveStock = hasPermission("magazzino.stock.receive");
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState("all");
   
   const { data: prodotti, isLoading } = useListProdotti({ 
     search: search || undefined,
-    tipo: tipoFilter !== "all" ? tipoFilter : undefined
+    tipo: tipoFilter !== "all" ? tipoFilter : undefined,
   });
   
   const queryClient = useQueryClient();
@@ -395,8 +116,6 @@ export default function Prodotti() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [caricoProdotto, setCaricoProdotto] = useState<Prodotto | null>(null);
-
   const createProdotto = useCreateProdotto();
   const updateProdotto = useUpdateProdotto();
   const deleteProdotto = useDeleteProdotto();
@@ -411,11 +130,15 @@ export default function Prodotti() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       codice: "", nome: "", descrizione: "", tipoProdotto: "alimentare",
-      unitaMisura: "pz", gestioneLotto: false, gestioneScadenza: false, fsePlus: false,
+      unitaMisura: "pz",
+      quantitaFrazionabile: false,
+      lottoFisicoObbligatorio: false,
+      gestioneScadenza: false, fsePlus: false,
       scortaMinima: 0, scortaConsigliata: 0, abilitatoEmporio: false, creditoSolidaleValore: 0,
-      quantitaMassimaPerSpesa: null, quantitaMassimaMensile: null, note: "", codiceBarre: ""
-    }
+      quantitaMassimaPerSpesa: null, quantitaMassimaMensile: null, note: "", codiceBarre: "",
+    },
   });
+  const quantitaFrazionabileImpostata = useRef(false);
   const abilitatoEmporio = form.watch("abilitatoEmporio");
 
   const handleEdit = (prodotto: any) => {
@@ -427,7 +150,8 @@ export default function Prodotti() {
       tipoProdotto: prodotto.tipoProdotto,
       unitaMisura: prodotto.unitaMisura,
       codiceBarre: prodotto.codiceBarre || "",
-      gestioneLotto: prodotto.gestioneLotto,
+      quantitaFrazionabile: prodotto.quantitaFrazionabile,
+      lottoFisicoObbligatorio: prodotto.lottoFisicoObbligatorio,
       gestioneScadenza: prodotto.gestioneScadenza,
       fsePlus: prodotto.fsePlus,
       scortaMinima: prodotto.scortaMinima,
@@ -436,8 +160,9 @@ export default function Prodotti() {
       creditoSolidaleValore: prodotto.creditoSolidaleValore ?? 0,
       quantitaMassimaPerSpesa: prodotto.quantitaMassimaPerSpesa ?? null,
       quantitaMassimaMensile: prodotto.quantitaMassimaMensile ?? null,
-      note: prodotto.note || ""
+      note: prodotto.note || "",
     });
+    quantitaFrazionabileImpostata.current = true;
     setIsFormOpen(true);
   };
 
@@ -445,10 +170,14 @@ export default function Prodotti() {
     setEditingId(null);
     form.reset({
       codice: "", nome: "", descrizione: "", tipoProdotto: "alimentare",
-      unitaMisura: "pz", gestioneLotto: false, gestioneScadenza: false, fsePlus: false,
+      unitaMisura: "pz",
+      quantitaFrazionabile: false,
+      lottoFisicoObbligatorio: false,
+      gestioneScadenza: false, fsePlus: false,
       scortaMinima: 0, scortaConsigliata: 0, abilitatoEmporio: false, creditoSolidaleValore: 0,
-      quantitaMassimaPerSpesa: null, quantitaMassimaMensile: null, note: "", codiceBarre: ""
+      quantitaMassimaPerSpesa: null, quantitaMassimaMensile: null, note: "", codiceBarre: "",
     });
+    quantitaFrazionabileImpostata.current = false;
     setIsFormOpen(true);
   };
 
@@ -462,26 +191,31 @@ export default function Prodotti() {
       } else if (message.toLowerCase().includes("codice prodotto")) {
         form.setError("codice", { type: "server", message });
       }
-      toast({ title: t("prodotti.toastErrorTitle"), description: message, variant: "destructive" });
+      toast({ title: t("prodotti.toastErrorTitle"), description: message, variant: "destructive",
+      });
     };
     if (editingId) {
       updateProdotto.mutate({ id: editingId, data }, {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey(),
+            });
           toast({ title: t("prodotti.toastUpdated") });
           setIsFormOpen(false);
         },
         onError: handleError,
-      });
+      },
+      );
     } else {
       createProdotto.mutate({ data }, {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey(),
+            });
           toast({ title: t("prodotti.toastCreated") });
           setIsFormOpen(false);
         },
         onError: handleError,
-      });
+      },
+      );
     }
   };
 
@@ -489,20 +223,24 @@ export default function Prodotti() {
     if (!deletingId) return;
     deleteProdotto.mutate({ id: deletingId }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey(),
+          });
         toast({ title: t("prodotti.toastDeleted") });
         setDeletingId(null);
-      }
-    });
+      },
+      },
+    );
   };
 
   const handleReactivate = (id: number) => {
     updateProdotto.mutate({ id, data: { attivo: true } }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListProdottiQueryKey(),
+          });
         toast({ title: "Prodotto riattivato" });
       },
-    });
+    },
+    );
   };
 
   const tipoColors: Record<string, string> = {
@@ -530,11 +268,16 @@ export default function Prodotti() {
               { header: t("common.name"), accessor: (p) => p.nome },
               { header: t("common.type"), accessor: (p) => p.tipoProdotto },
               { header: t("prodotti.colUm"), accessor: (p) => p.unitaMisura },
-              { header: t("prodotti.colScortaMinima"), accessor: (p) => p.scortaMinima != null ? parseFloat(String(p.scortaMinima)) : "" },
-              { header: t("prodotti.abilitatoEmporio"), accessor: (p) => p.abilitatoEmporio ? t("common.yes") : t("common.no") },
-              { header: t("prodotti.creditoSolidaleValore"), accessor: (p) => p.creditoSolidaleValore ?? 0 },
-              { header: t("prodotti.quantitaMassimaPerSpesa"), accessor: (p) => p.quantitaMassimaPerSpesa ?? "" },
-              { header: t("prodotti.quantitaMassimaMensile"), accessor: (p) => p.quantitaMassimaMensile ?? "" },
+              { header: t("prodotti.colScortaMinima"), accessor: (p) => p.scortaMinima != null ? parseFloat(String(p.scortaMinima)) : "",
+              },
+              { header: t("prodotti.abilitatoEmporio"), accessor: (p) => p.abilitatoEmporio ? t("common.yes") : t("common.no"),
+              },
+              { header: t("prodotti.creditoSolidaleValore"), accessor: (p) => p.creditoSolidaleValore ?? 0,
+              },
+              { header: t("prodotti.quantitaMassimaPerSpesa"), accessor: (p) => p.quantitaMassimaPerSpesa ?? "",
+              },
+              { header: t("prodotti.quantitaMassimaMensile"), accessor: (p) => p.quantitaMassimaMensile ?? "",
+              },
             ]}
             filename="prodotti"
             title={t("prodotti.title")}
@@ -548,7 +291,8 @@ export default function Prodotti() {
               generateProdottiBarcodePdf(
                 (prodotti ?? []).map((p) => ({
                   nome: p.nome,
-                  tipo: t(`prodotti.type_${p.tipoProdotto}`, p.tipoProdotto.replace("_", " ")),
+                  tipo: t(`prodotti.type_${p.tipoProdotto}`, p.tipoProdotto.replace("_", " "),
+                  ),
                   um: p.unitaMisura,
                   code: p.codiceBarre || p.codice,
                 })),
@@ -599,41 +343,67 @@ export default function Prodotti() {
         columns={[
           { key: "codice", header: t("common.code"), example: "PRD-001" },
           { key: "nome", header: t("common.name"), example: "Pasta 500g" },
-          { key: "tipoProdotto", header: t("common.type"), example: "alimentare" },
+          { key: "tipoProdotto", header: t("common.type"), example: "alimentare",
+          },
           { key: "unitaMisura", header: t("prodotti.colUm"), example: "pz" },
           { key: "descrizione", header: t("common.description"), example: "" },
           { key: "codiceBarre", header: t("prodotti.barcode"), example: "" },
-          { key: "gestioneLotto", header: t("prodotti.gestioneLotto"), example: "No" },
-          { key: "gestioneScadenza", header: t("prodotti.gestioneScadenza"), example: "No" },
+          { key: "quantitaFrazionabile", header: t("prodotti.quantitaFrazionabile"), example: "No",
+          },
+          { key: "lottoFisicoObbligatorio",
+            header: t("prodotti.lottoFisicoObbligatorio"),
+            example: "No",
+          },
+          {
+            key: "gestioneScadenza", header: t("prodotti.gestioneScadenza"), example: "No",
+          },
           { key: "fsePlus", header: "FSE+", example: "No" },
-          { key: "scortaMinima", header: t("prodotti.colScortaMinima"), example: 0 },
-          { key: "scortaConsigliata", header: t("prodotti.scortaConsigliata"), example: 0 },
-          { key: "abilitatoEmporio", header: t("prodotti.abilitatoEmporio"), example: "No" },
-          { key: "creditoSolidaleValore", header: t("prodotti.creditoSolidaleValore"), example: 1 },
-          { key: "quantitaMassimaPerSpesa", header: t("prodotti.quantitaMassimaPerSpesa"), example: "" },
-          { key: "quantitaMassimaMensile", header: t("prodotti.quantitaMassimaMensile"), example: "" },
+          { key: "scortaMinima", header: t("prodotti.colScortaMinima"), example: 0,
+          },
+          { key: "scortaConsigliata", header: t("prodotti.scortaConsigliata"), example: 0,
+          },
+          { key: "abilitatoEmporio", header: t("prodotti.abilitatoEmporio"), example: "No",
+          },
+          { key: "creditoSolidaleValore", header: t("prodotti.creditoSolidaleValore"), example: 1,
+          },
+          { key: "quantitaMassimaPerSpesa", header: t("prodotti.quantitaMassimaPerSpesa"), example: "",
+          },
+          { key: "quantitaMassimaMensile", header: t("prodotti.quantitaMassimaMensile"), example: "",
+          },
           { key: "fornitore", header: t("prodotti.fornitore"), example: "" },
         ]}
         mapRow={(r): MapRowResult<Record<string, unknown>> => {
-          if (!r.nome) return { error: t("bulkImport.requiredMissing", { field: t("common.name") }) };
-          if (!r.tipoProdotto) return { error: t("bulkImport.requiredMissing", { field: t("common.type") }) };
-          if (!r.unitaMisura) return { error: t("bulkImport.requiredMissing", { field: t("prodotti.colUm") }) };
+          if (!r.nome) return { error: t("bulkImport.requiredMissing", { field: t("common.name"),
+              }),
+            };
+          if (!r.tipoProdotto) return { error: t("bulkImport.requiredMissing", { field: t("common.type"),
+              }),
+            };
+          if (!r.unitaMisura) return { error: t("bulkImport.requiredMissing", { field: t("prodotti.colUm"),
+              }),
+            };
           let fornitoreId: number | undefined;
           if (r.fornitore) {
             const f = matchByName(fornitori, r.fornitore, (x) => x.nome);
-            if (!f) return { error: t("bulkImport.unknownRef", { field: t("prodotti.fornitore"), value: r.fornitore }) };
+            if (!f) return { error: t("bulkImport.unknownRef", { field: t("prodotti.fornitore"), value: r.fornitore,
+                }),
+              };
             fornitoreId = f.id;
           }
           let scortaMinima: number | undefined;
           if (r.scortaMinima) {
             const n = Number(r.scortaMinima);
-            if (Number.isNaN(n)) return { error: t("bulkImport.invalidNumber", { field: t("prodotti.colScortaMinima") }) };
+            if (Number.isNaN(n)) return { error: t("bulkImport.invalidNumber", { field: t("prodotti.colScortaMinima"),
+                }),
+              };
             scortaMinima = n;
           }
           let scortaConsigliata: number | undefined;
           if (r.scortaConsigliata) {
             const n = Number(r.scortaConsigliata);
-            if (Number.isNaN(n)) return { error: t("bulkImport.invalidNumber", { field: t("prodotti.scortaConsigliata") }) };
+            if (Number.isNaN(n)) return { error: t("bulkImport.invalidNumber", { field: t("prodotti.scortaConsigliata"),
+                }),
+              };
             scortaConsigliata = n;
           }
           const creditoSolidaleValore = parseOptionalBulkNumber(
@@ -663,7 +433,11 @@ export default function Prodotti() {
               unitaMisura: r.unitaMisura,
               descrizione: r.descrizione || undefined,
               codiceBarre: r.codiceBarre || undefined,
-              gestioneLotto: parseBoolCell(r.gestioneLotto),
+              quantitaFrazionabile:
+                r.quantitaFrazionabile === undefined
+                  ? undefined
+                  : parseBoolCell(r.quantitaFrazionabile),
+              lottoFisicoObbligatorio: parseBoolCell(r.lottoFisicoObbligatorio),
               gestioneScadenza: parseBoolCell(r.gestioneScadenza),
               fsePlus: parseBoolCell(r.fsePlus),
               scortaMinima,
@@ -741,16 +515,20 @@ export default function Prodotti() {
                     {t("prodotti.noProductsFound")}
                   </TableCell>
                 </TableRow>
-              ) : prodotti?.map((prodotto) => (
+              ) : (
+                prodotti?.map((prodotto) => (
                 <TableRow key={prodotto.id} className={!prodotto.attivo ? "opacity-60" : undefined}>
                   <TableCell className="font-medium text-xs font-mono">{prodotto.codice}</TableCell>
                   <TableCell>
                     <div className="font-medium">{prodotto.nome}</div>
-                    {prodotto.descrizione && <div className="text-xs text-muted-foreground truncate max-w-[250px]">{prodotto.descrizione}</div>}
+                    {prodotto.descrizione && (
+                        <div className="text-xs text-muted-foreground truncate max-w-[250px]">{prodotto.descrizione}</div>
+                      )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={`capitalize ${tipoColors[prodotto.tipoProdotto] || tipoColors.altro}`}>
-                      {t(`prodotti.type_${prodotto.tipoProdotto}`, prodotto.tipoProdotto.replace('_', ' '))}
+                      {t(`prodotti.type_${prodotto.tipoProdotto}`, prodotto.tipoProdotto.replace("_", " "),
+                        )}
                     </Badge>
                   </TableCell>
                   <TableCell>{prodotto.unitaMisura}</TableCell>
@@ -760,15 +538,25 @@ export default function Prodotti() {
                       {prodotto.gestioneScadenza && (
                         <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-700 border-amber-200">{t("prodotti.badgeScadenza")}</Badge>
                       )}
-                      {prodotto.gestioneLotto && (
-                        <Badge variant="outline" className="text-xs">{t("prodotti.badgeLotto")}</Badge>
+                      {prodotto.lottoFisicoObbligatorio && (
+                        <Badge variant="outline" className="text-xs">{t("prodotti.badgeLottoFisico")}</Badge>
                       )}
-                      {prodotto.abilitatoEmporio && (
+                      {prodotto.quantitaFrazionabile && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-blue-500/10 text-blue-700 border-blue-200"
+                          >
+                            {t("prodotti.badgeFrazionabile")}
+                          </Badge>
+                        )}
+                        {prodotto.abilitatoEmporio && (
                         <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-700 border-emerald-200">
                           {t("prodotti.badgeEmporio")}
                         </Badge>
                       )}
-                      {!prodotto.attivo && <Badge variant="secondary">Inattivo</Badge>}
+                      {!prodotto.attivo && (
+                          <Badge variant="secondary">Inattivo</Badge>
+                        )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -780,34 +568,30 @@ export default function Prodotti() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {canReceiveStock && prodotto.attivo && <DropdownMenuItem onClick={() => setCaricoProdotto({
-                          id: prodotto.id,
-                          nome: prodotto.nome,
-                          unitaMisura: prodotto.unitaMisura,
-                          gestioneLotto: prodotto.gestioneLotto,
-                          gestioneScadenza: prodotto.gestioneScadenza,
-                          fsePlus: prodotto.fsePlus,
-                          fornitoreId: prodotto.fornitoreId ?? null,
-                        })}>
-                          <PackagePlus className="mr-2 h-4 w-4" />
-                          {t("prodotti.loadToWarehouse")}
-                        </DropdownMenuItem>}
-                        {canManageProducts && <DropdownMenuItem onClick={() => handleEdit(prodotto)}>
+                        {canManageProducts && (
+                            <DropdownMenuItem
+                              onClick={() => handleEdit(prodotto)}>
                           <Pencil className="mr-2 h-4 w-4" />
                           {t("common.edit")}
-                        </DropdownMenuItem>}
-                        {canManageProducts && prodotto.attivo && <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(prodotto.id)}>
+                        </DropdownMenuItem>
+                          )}
+                        {canManageProducts && prodotto.attivo && (
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeletingId(prodotto.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
                           {t("prodotti.deactivate")}
-                        </DropdownMenuItem>}
-                        {canManageProducts && !prodotto.attivo && <DropdownMenuItem onClick={() => handleReactivate(prodotto.id)}>
-                          Riattiva prodotto
-                        </DropdownMenuItem>}
+                        </DropdownMenuItem>
+                          )}
+                        {canManageProducts && !prodotto.attivo && (
+                            <DropdownMenuItem onClick={() => handleReactivate(prodotto.id)}>
+                              Riattiva prodotto
+                            </DropdownMenuItem>
+                          )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -879,7 +663,22 @@ export default function Prodotti() {
                   <FormField control={form.control} name="unitaMisura" render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("prodotti.unitOfMeasure")}</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={(value) => {
+                            field.onChange(value);
+                            form.setValue(
+                              "quantitaFrazionabile",
+                              fractionalQuantityAfterUnitChange({
+                                unitOfMeasure: value,
+                                currentValue: form.getValues(
+                                  "quantitaFrazionabile",
+                                ),
+                                explicitlySet:
+                                  quantitaFrazionabileImpostata.current,
+                              }),
+                              { shouldDirty: true },
+                            );
+                          }}
+                          value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder={t("prodotti.selectUm")} />
@@ -915,6 +714,32 @@ export default function Prodotti() {
                 </div>
 
                 <div className="space-y-4 pt-4 border-t">
+                  <FormField
+                    control={form.control}
+                    name="quantitaFrazionabile"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                    <FormLabel>
+                            {t("prodotti.quantitaFrazionabile")}
+                          </FormLabel>
+                          <p className="text-[0.8rem] text-muted-foreground">
+                            {t("prodotti.quantitaFrazionabileDesc")}
+                          </p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={(checked) => {
+                              quantitaFrazionabileImpostata.current = true;
+                              field.onChange(checked);
+                            }}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
                   <div>
                     <h4 className="text-sm font-medium">{t("prodotti.emporioSection")}</h4>
                     <p className="text-[0.8rem] text-muted-foreground">{t("prodotti.creditoSolidaleHelp")}</p>
@@ -933,8 +758,10 @@ export default function Prodotti() {
                           checked={field.value}
                           onCheckedChange={(checked) => {
                             field.onChange(checked);
-                            if (checked && Number(form.getValues("creditoSolidaleValore") ?? 0) <= 0) {
-                              form.setValue("creditoSolidaleValore", 1, { shouldDirty: true, shouldValidate: true });
+                            if (checked && Number(form.getValues("creditoSolidaleValore") ?? 0,
+                                ) <= 0) {
+                              form.setValue("creditoSolidaleValore", 1, { shouldDirty: true, shouldValidate: true,
+                                });
                             }
                           }}
                           disabled={!emporioAbilitato}
@@ -1002,11 +829,12 @@ export default function Prodotti() {
                     </FormItem>
                   )} />
 
-                  <FormField control={form.control} name="gestioneLotto" render={({ field }) => (
+                  <FormField control={form.control} name="lottoFisicoObbligatorio"
+                    render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                       <div className="space-y-0.5">
-                        <FormLabel>{t("prodotti.gestioneLotto")}</FormLabel>
-                        <p className="text-[0.8rem] text-muted-foreground">{t("prodotti.gestioneLottoDesc")}</p>
+                        <FormLabel>{t("prodotti.lottoFisicoObbligatorio")}</FormLabel>
+                        <p className="text-[0.8rem] text-muted-foreground">{t("prodotti.lottoFisicoObbligatorioDesc")}</p>
                       </div>
                       <FormControl>
                         <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -1026,8 +854,6 @@ export default function Prodotti() {
                     </FormItem>
                   )} />
                 </div>
-
-                {editingId && <ProdottoLotti prodottoId={editingId} />}
 
                 <div className="pt-4 border-t">
                   <FormField control={form.control} name="descrizione" render={({ field }) => (
@@ -1052,10 +878,6 @@ export default function Prodotti() {
           </div>
         </SheetContent>
       </Sheet>
-
-      {caricoProdotto && (
-        <CaricoForm prodotto={caricoProdotto} onClose={() => setCaricoProdotto(null)} />
-      )}
 
       <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
         <AlertDialogContent>

@@ -99,6 +99,10 @@ import {
   positiveInventoryDecimal,
 } from "../lib/inventoryDecimal";
 import { auditContextFromRequest } from "../lib/auditEvent";
+import {
+  ProductOperationalQuantityError,
+  validateProductOperationalQuantity,
+} from "../lib/productQuantity";
 
 const router: IRouter = Router();
 router.use("/mensa", requireModulo("MENSA"));
@@ -2711,11 +2715,25 @@ router.post(
           id: prodottiTable.id,
           unitaMisura: prodottiTable.unitaMisura,
           attivo: prodottiTable.attivo,
+          quantitaFrazionabile: prodottiTable.quantitaFrazionabile,
+          nome: prodottiTable.nome,
         })
         .from(prodottiTable)
         .where(eq(prodottiTable.id, prodottoId));
       if (!prodotto || !prodotto.attivo) {
         throw new MensaError(400, "Il prodotto non è disponibile");
+      }
+      try {
+        quantita = validateProductOperationalQuantity({
+          quantita: quantita.toDb(),
+          quantitaFrazionabile: prodotto.quantitaFrazionabile,
+          prodottoLabel: prodotto.nome,
+        });
+      } catch (error) {
+        if (error instanceof ProductOperationalQuantityError) {
+          throw new MensaError(400, error.message);
+        }
+        throw error;
       }
       const note = optionalText(req.body?.note, "Le note", 2000);
       const codice = consumoCodice(idempotencyKey);

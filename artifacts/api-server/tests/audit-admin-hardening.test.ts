@@ -8,6 +8,7 @@ import {
   centriAscoltoTable,
   areeOperativeTable,
   db,
+  lottiLogiciTable,
   magazziniTable,
   menseTable,
   politicheCreditoSolidaleTable,
@@ -183,9 +184,12 @@ beforeEach(async () => {
     { areaOperativaId: null, isAdmin: true, isSuperAdmin: true },
     adminRoleId,
   );
-  globalAdmin = await createUser({ areaOperativaId: null, isAdmin: true }, adminRoleId);
-  adminA = await createUser({ areaOperativaId: areaA, isAdmin: true }, adminRoleId);
-  adminB = await createUser({ areaOperativaId: areaB, isAdmin: true }, adminRoleId);
+  globalAdmin = await createUser({ areaOperativaId: null, isAdmin: true }, adminRoleId,
+  );
+  adminA = await createUser({ areaOperativaId: areaA, isAdmin: true }, adminRoleId,
+  );
+  adminB = await createUser({ areaOperativaId: areaB, isAdmin: true }, adminRoleId,
+  );
   operator = await createUser(
     { areaOperativaId: areaA, isAdmin: false },
     operatorRoleId,
@@ -238,6 +242,10 @@ afterEach(async () => {
       .where(inArray(centriAscoltoTable.id, ids.centri.splice(0)));
   if (ids.aree.length)
     await db
+      .delete(lottiLogiciTable)
+      .where(inArray(lottiLogiciTable.areaOperativaId, ids.aree));
+  if (ids.aree.length)
+    await db
       .delete(areeOperativeTable)
       .where(inArray(areeOperativeTable.id, ids.aree.splice(0)));
   if (ids.ruoliVolontari.length)
@@ -281,9 +289,9 @@ describe("audit hardening Amministrazione/Core", () => {
           .send({ nome: "Violazione" })
       ).status,
     ).toBe(403);
-    expect((await request(scopedApp).delete(`/aree-operative/${areaB}`)).status).toBe(
-      403,
-    );
+    expect((await request(scopedApp).delete(`/aree-operative/${areaB}`)).status,
+    ).toBe(
+      403);
 
     const globalApp = appAs(globalAdmin, areaOperativaRouter);
     const created = await request(globalApp)
@@ -294,9 +302,9 @@ describe("audit hardening Amministrazione/Core", () => {
   });
 
   it("ADM-01 disattiva l'Area senza scollegare le dipendenze", async () => {
-    const response = await request(appAs(superAdmin, areaOperativaRouter)).delete(
-      `/aree-operative/${areaA}`,
-    );
+    const response = await request(appAs(superAdmin, areaOperativaRouter),
+    ).delete(
+      `/aree-operative/${areaA}`);
     expect(response.status).toBe(204);
     const [area] = await db
       .select()
@@ -484,7 +492,8 @@ describe("audit hardening Amministrazione/Core", () => {
       ).status,
     ).toBe(400);
 
-    const centerBoundApp = appAs({ ...adminA, centroAscoltoId: centroA }, magazziniRouter);
+    const centerBoundApp = appAs({ ...adminA, centroAscoltoId: centroA }, magazziniRouter,
+    );
     const centerBound = await request(centerBoundApp).post("/magazzini").send({
       nome: "Centro vincolato",
       areaOperativaId: areaA,
@@ -569,7 +578,8 @@ describe("audit hardening Amministrazione/Core", () => {
   });
 
   it("impedisce nuove relazioni operative con Aree e Centri disattivati", async () => {
-    const globalApp = appAs(globalAdmin, utentiRouter, centriRouter, politicheRouter);
+    const globalApp = appAs(globalAdmin, utentiRouter, centriRouter, politicheRouter,
+    );
     await db.update(areeOperativeTable).set({ attivo: false }).where(eq(areeOperativeTable.id, areaA));
 
     const userToken = suffix();
@@ -633,7 +643,8 @@ describe("audit hardening Amministrazione/Core", () => {
 
     const [existingPolicy] = await db
       .insert(politicheCreditoSolidaleTable)
-      .values({ nome: `Policy storica ${suffix()}`, areaOperativaId: areaA, centroAscoltoId: centroA })
+      .values({ nome: `Policy storica ${suffix()}`, areaOperativaId: areaA, centroAscoltoId: centroA,
+      })
       .returning({ id: politicheCreditoSolidaleTable.id });
     ids.politiche.push(existingPolicy.id);
     expect(
@@ -649,7 +660,8 @@ describe("audit hardening Amministrazione/Core", () => {
     const [globalPolicy, otherPolicy] = await db
       .insert(politicheCreditoSolidaleTable)
       .values([
-        { nome: `Globale ${suffix()}`, areaOperativaId: null, centroAscoltoId: null },
+        { nome: `Globale ${suffix()}`, areaOperativaId: null, centroAscoltoId: null,
+        },
         {
           nome: `Area B ${suffix()}`,
           areaOperativaId: areaB,

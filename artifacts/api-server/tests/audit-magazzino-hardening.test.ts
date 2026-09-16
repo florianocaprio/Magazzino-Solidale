@@ -18,7 +18,8 @@ import trasferimentiRouter from "../src/routes/trasferimenti";
 import { withDocumentCodeRetry } from "../src/lib/documentCode";
 import {
   cleanup,
-  createCentro,
+  createAreaOperativa,
+  createCentroRec,
   createFornitore,
   createMagazzino,
   createProdotto,
@@ -46,7 +47,8 @@ const permissions = [
   "magazzino.transfers.receive",
 ];
 
-const appFor = (router: Parameters<typeof makeScopedApp>[0], overrides: { id?: number; permessi?: string[]; aree?: string[] } = {}) =>
+const appFor = (router: Parameters<typeof makeScopedApp>[0], overrides: { id?: number; permessi?: string[]; aree?: string[] } = {},
+) =>
   makeScopedApp(router, {
     id: overrides.id ?? operatoreId,
     centroAscoltoId: centroId,
@@ -69,8 +71,9 @@ async function carica(quantita = 10, operatorId = operatoreId) {
 
 beforeEach(async () => {
   scope = newScope();
-  centroId = await createCentro(scope);
-  magazzinoId = await createMagazzino(scope, centroId);
+  const areaOperativaId = await createAreaOperativa(scope);
+  centroId = (await createCentroRec(scope, { areaOperativaId })).id;
+  magazzinoId = await createMagazzino(scope, centroId, { areaOperativaId });
   prodottoId = await createProdotto(scope);
   fornitoreId = await createFornitore(scope, null);
   operatoreId = await createUtente(scope, { centroId });
@@ -104,7 +107,8 @@ describe("audit hardening del giornale inventariale", () => {
   it("crea Lotto e Movimento di carico nella stessa operazione", async () => {
     const response = await carica(12);
     expect(response.status).toBe(201);
-    expect(response.body).toMatchObject({ quantitaCaricata: 12, quantitaResidua: 12 });
+    expect(response.body).toMatchObject({ quantitaCaricata: 12, quantitaResidua: 12,
+    });
     scope.lottoIds.push(response.body.id);
 
     const [movimento] = await db.select().from(movimentiTable).where(eq(movimentiTable.lottoId, response.body.id));
@@ -121,13 +125,15 @@ describe("audit hardening del giornale inventariale", () => {
     const before = await db.select({ id: lottiTable.id }).from(lottiTable).where(and(
       eq(lottiTable.magazzinoId, magazzinoId),
       eq(lottiTable.prodottoId, prodottoId),
-    ));
+    ),
+      );
     const response = await carica(3, 2_000_000_000);
     expect(response.status).toBe(500);
     const after = await db.select({ id: lottiTable.id }).from(lottiTable).where(and(
       eq(lottiTable.magazzinoId, magazzinoId),
       eq(lottiTable.prodottoId, prodottoId),
-    ));
+    ),
+      );
     expect(after).toEqual(before);
   });
 
@@ -185,7 +191,8 @@ describe("audit hardening del giornale inventariale", () => {
         ),
       );
     expect(rettificaEvents).toHaveLength(2);
-    expect(rettificaEvents.every((event) => event.actorUserId === operatoreId))
+    expect(rettificaEvents.every((event) => event.actorUserId === operatoreId),
+    )
       .toBe(true);
   });
 
@@ -198,7 +205,8 @@ describe("audit hardening del giornale inventariale", () => {
     expect(response.status).toBe(409);
     const [lotto] = await db.select().from(lottiTable).where(eq(lottiTable.id, loaded.body.id));
     expect(Number(lotto.quantitaResidua)).toBe(2);
-    expect(await db.select().from(movimentiTable).where(eq(movimentiTable.lottoId, loaded.body.id))).toHaveLength(1);
+    expect(await db.select().from(movimentiTable).where(eq(movimentiTable.lottoId, loaded.body.id)),
+    ).toHaveLength(1);
   });
 
   it("rende POST /movimenti indisponibile e pagina oltre il vecchio limite", async () => {
@@ -215,7 +223,8 @@ describe("audit hardening del giornale inventariale", () => {
       unitaMisura: "kg",
       documentoRiferimento: `PAG-${index}`,
       operatoreId,
-    })));
+    })),
+    );
     const secondPage = await request(appFor(movimentiRouter)).get("/movimenti").query({ magazzinoId, page: 2, limit: 100 });
     expect(secondPage.status).toBe(200);
     expect(secondPage.body).toHaveLength(5);
@@ -243,12 +252,16 @@ describe("audit hardening del giornale inventariale", () => {
   });
 
   it("applica RBAC agli Scarichi e vieta il cambio stato generico del Trasferimento", async () => {
-    const socialOnly = appFor(scarichiRouter, { aree: ["sociale"], permessi: [] });
+    const socialOnly = appFor(scarichiRouter, { aree: ["sociale"], permessi: [],
+    });
     expect((await request(socialOnly).get("/scarichi")).status).toBe(403);
-    expect((await request(appFor(scarichiRouter, { permessi: ["magazzino.view"] })).get("/scarichi")).status).toBe(200);
+    expect((await request(appFor(scarichiRouter, { permessi: ["magazzino.view"] }),
+        ).get("/scarichi")).status,
+    ).toBe(200);
 
     const destinoId = await createMagazzino(scope, centroId);
-    const transferId = await insertTrasferimento(scope, { origineId: magazzinoId, destinoId });
+    const transferId = await insertTrasferimento(scope, { origineId: magazzinoId, destinoId,
+    });
     const response = await request(appFor(trasferimentiRouter))
       .patch(`/trasferimenti/${transferId}`)
       .send({ versione: 1, stato: "in_transito" });

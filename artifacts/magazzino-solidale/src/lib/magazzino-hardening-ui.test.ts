@@ -9,24 +9,36 @@ async function source(relativePath: string): Promise<string> {
 describe("hardening UI Magazzino", () => {
   it("scorre tutte le pagine per gli export senza N+1", async () => {
     const fetchPage = vi.fn(async (page: number, limit: number) => {
-      if (page === 1) return Array.from({ length: limit }, (_, index) => index + 1);
-      if (page === 2) return Array.from({ length: limit }, (_, index) => index + limit + 1);
+      if (page === 1)
+        return Array.from({ length: limit }, (_, index) => index + 1);
+      if (page === 2)
+        return Array.from({ length: limit }, (_, index) => index + limit + 1);
       return [201, 202, 203];
     });
 
     const result = await loadAllPages(fetchPage, 100);
 
     expect(result).toHaveLength(203);
-    expect(fetchPage.mock.calls).toEqual([[1, 100], [2, 100], [3, 100]]);
+    expect(fetchPage.mock.calls).toEqual([
+      [1, 100],
+      [2, 100],
+      [3, 100],
+    ]);
   });
 
-  it("protegge i pulsanti Carico, Scarico e Rettifica con permessi distinti", async () => {
+  it("separa il Catalogo dai comandi Carico e protegge i workflow inventariali", async () => {
     const [prodotti, lotti, scarichi] = await Promise.all([
       source("../pages/prodotti.tsx"),
       source("../pages/lotti.tsx"),
       source("../pages/scarichi.tsx"),
     ]);
-    expect(prodotti).toContain('hasPermission("magazzino.stock.receive")');
+    expect(prodotti).not.toContain('hasPermission("magazzino.stock.receive")');
+    expect(prodotti).not.toContain("useCreateLotto");
+    expect(prodotti).not.toContain("CaricoForm");
+    expect(prodotti).not.toContain("gestioneLotto");
+    expect(prodotti).not.toContain("quantitaCaricata");
+    expect(prodotti).toContain("quantitaFrazionabile");
+    expect(prodotti).toContain("lottoFisicoObbligatorio");
     expect(lotti).toContain('hasPermission("magazzino.stock.receive")');
     expect(lotti).toContain('hasPermission("magazzino.stock.adjust")');
     expect(scarichi).toContain('hasPermission("magazzino.stock.issue")');
@@ -37,8 +49,12 @@ describe("hardening UI Magazzino", () => {
       source("../pages/trasferimenti.tsx"),
       source("../pages/bolle.tsx"),
     ]);
-    expect(trasferimenti).toContain('hasPermission("magazzino.transfers.dispatch")');
-    expect(trasferimenti).toContain('hasPermission("magazzino.transfers.receive")');
+    expect(trasferimenti).toContain(
+      'hasPermission("magazzino.transfers.dispatch")',
+    );
+    expect(trasferimenti).toContain(
+      'hasPermission("magazzino.transfers.receive")',
+    );
     expect(bolle).toContain('hasPermission("bolle.manage")');
     expect(bolle).toContain('hasPermission("bolle.deliver")');
     expect(bolle).toContain('hasPermission("bolle.cancel")');
@@ -46,7 +62,6 @@ describe("hardening UI Magazzino", () => {
 
   it("esclude Magazzini inattivi dai selettori delle nuove operazioni", async () => {
     const files = await Promise.all([
-      source("../pages/prodotti.tsx"),
       source("../pages/lotti.tsx"),
       source("../pages/trasferimenti.tsx"),
       source("../pages/bolle.tsx"),

@@ -14,6 +14,8 @@ import {
   carichiMagazzinoRigheTable,
   carichiMagazzinoTable,
   operazioniDistribuzioneMagazzinoTable,
+  areeOperativeTable,
+  lottiLogiciTable,
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import trasferimentiRouter from "../src/routes/trasferimenti";
@@ -82,6 +84,8 @@ export interface SeedScope {
   utenteIds: number[];
   trasferimentoIds: number[];
   scaricoIds: number[];
+  areaOperativaIds: number[];
+  lottoLogicoIds: number[];
 }
 
 export function newScope(): SeedScope {
@@ -92,6 +96,8 @@ export function newScope(): SeedScope {
     utenteIds: [],
     trasferimentoIds: [],
     scaricoIds: [],
+    areaOperativaIds: [],
+    lottoLogicoIds: [],
   };
 }
 
@@ -115,9 +121,30 @@ export async function createMagazzino(
   scope: SeedScope,
   nome: string,
 ): Promise<number> {
+  if (scope.areaOperativaIds.length === 0) {
+    const [area] = await db
+      .insert(areeOperativeTable)
+      .values({ nome: `Area test ${rnd()}` })
+      .returning({ id: areeOperativeTable.id });
+    scope.areaOperativaIds.push(area.id);
+    const [general] = await db
+      .insert(lottiLogiciTable)
+      .values({
+        areaOperativaId: area.id,
+        codice: "GENERALE",
+        descrizione: "Generale",
+        isGenerale: true,
+      })
+      .returning({ id: lottiLogiciTable.id });
+    scope.lottoLogicoIds.push(general.id);
+  }
   const [m] = await db
     .insert(magazziniTable)
-    .values({ codice: `TST-${rnd()}`, nome })
+    .values({
+      codice: `TST-${rnd()}`,
+      nome,
+      areaOperativaId: scope.areaOperativaIds[0],
+    })
     .returning();
   scope.magazzinoIds.push(m.id);
   return m.id;
@@ -137,7 +164,11 @@ export async function createFornitore(
 
 export async function createProdotto(
   scope: SeedScope,
-  opts: { unitaMisura?: string; fsePlus?: boolean } = {},
+  opts: {
+    unitaMisura?: string;
+    fsePlus?: boolean;
+    quantitaFrazionabile?: boolean;
+  } = {},
 ): Promise<number> {
   const [p] = await db
     .insert(prodottiTable)
@@ -146,6 +177,11 @@ export async function createProdotto(
       nome: `Prodotto ${rnd()}`,
       tipoProdotto: "alimentare",
       unitaMisura: opts.unitaMisura ?? "kg",
+      quantitaFrazionabile:
+        opts.quantitaFrazionabile ??
+        ["kg", "l", "lt"].includes(
+          (opts.unitaMisura ?? "kg").trim().toLowerCase(),
+        ),
       fsePlus: opts.fsePlus ?? false,
     })
     .returning();
@@ -157,16 +193,36 @@ export async function createLotto(opts: {
   prodottoId: number;
   magazzinoId: number;
   quantita: number;
+  lottoLogicoId?: number | null;
   dataScadenza?: string | null;
   dataCarico?: string;
   codiceLotto?: string | null;
   fornitoreId?: number | null;
   fsePlus?: boolean;
 }): Promise<number> {
+  const [warehouse] = await db
+    .select({ areaOperativaId: magazziniTable.areaOperativaId })
+    .from(magazziniTable)
+    .where(eq(magazziniTable.id, opts.magazzinoId));
+  const [logicalLot] = warehouse?.areaOperativaId
+    ? await db
+        .select({ id: lottiLogiciTable.id })
+        .from(lottiLogiciTable)
+        .where(
+          and(
+            eq(lottiLogiciTable.areaOperativaId, warehouse.areaOperativaId),
+            eq(lottiLogiciTable.isGenerale, true),
+          ),
+        )
+    : [];
   const [l] = await db
     .insert(lottiTable)
     .values({
       prodottoId: opts.prodottoId,
+      lottoLogicoId:
+        opts.lottoLogicoId === undefined
+          ? (logicalLot?.id ?? null)
+          : opts.lottoLogicoId,
       magazzinoId: opts.magazzinoId,
       codiceLotto: opts.codiceLotto ?? null,
       dataScadenza: opts.dataScadenza ?? null,
@@ -283,6 +339,16 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db
       .delete(magazziniTable)
       .where(inArray(magazziniTable.id, scope.magazzinoIds));
+  }
+  if (scope.lottoLogicoIds.length > 0) {
+    await db
+      .delete(lottiLogiciTable)
+      .where(inArray(lottiLogiciTable.id, scope.lottoLogicoIds));
+  }
+  if (scope.areaOperativaIds.length > 0) {
+    await db
+      .delete(areeOperativeTable)
+      .where(inArray(areeOperativeTable.id, scope.areaOperativaIds));
   }
   if (scope.utenteIds.length > 0) {
     await db

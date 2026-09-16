@@ -32,6 +32,14 @@ import {
   recordAuditEvent,
   type AuditCommandContext,
 } from "./auditEvent";
+import {
+  LogicalLotError,
+  resolveOpenLogicalLotForWarehouse,
+} from "./logicalLots";
+import {
+  ProductOperationalQuantityError,
+  validateProductOperationalQuantity,
+} from "./productQuantity";
 
 export class InventoryLedgerError extends Error {
   constructor(
@@ -92,10 +100,23 @@ export function normalizeInventoryLotCode(value: string | null | undefined): {
 export function inventoryPartyBusinessKey(input: {
   magazzinoId: number;
   prodottoId: number;
+  lottoLogicoId: number;
   fondoOrigine: FondoOrigine;
+  fornitoreId: number | null;
   lottoNormalizzato: string;
+  dataScadenza: string | null;
+  fattoreKgLtPezzo: string | null;
 }): string {
-  return `${input.magazzinoId}:${input.prodottoId}:${input.fondoOrigine}:${input.lottoNormalizzato}`;
+  return [
+    input.magazzinoId,
+    input.prodottoId,
+    input.lottoLogicoId,
+    input.fondoOrigine,
+    input.fornitoreId ?? "-",
+    input.lottoNormalizzato,
+    input.dataScadenza ?? "-",
+    input.fattoreKgLtPezzo ?? "-",
+  ].join(":");
 }
 
 export async function lockInventoryPartyBusinessKeys(
@@ -114,8 +135,12 @@ export async function findInventoryPartyCandidates(
   input: {
     magazzinoId: number;
     prodottoId: number;
+    lottoLogicoId: number;
     fondoOrigine: FondoOrigine;
+    fornitoreId: number | null;
     lottoNormalizzato: string;
+    dataScadenza: string | null;
+    fattoreKgLtPezzo: string | null;
   },
 ) {
   return tx
@@ -125,7 +150,17 @@ export async function findInventoryPartyCandidates(
       and(
         eq(lottiTable.magazzinoId, input.magazzinoId),
         eq(lottiTable.prodottoId, input.prodottoId),
+        eq(lottiTable.lottoLogicoId, input.lottoLogicoId),
         eq(lottiTable.fondoOrigine, input.fondoOrigine),
+        input.fornitoreId == null
+          ? sql`${lottiTable.fornitoreId} is null`
+          : eq(lottiTable.fornitoreId, input.fornitoreId),
+        input.dataScadenza == null
+          ? sql`${lottiTable.dataScadenza} is null`
+          : eq(lottiTable.dataScadenza, input.dataScadenza),
+        input.fattoreKgLtPezzo == null
+          ? sql`${lottiTable.fattoreKgLtPezzo} is null`
+          : eq(lottiTable.fattoreKgLtPezzo, input.fattoreKgLtPezzo),
         or(
           eq(lottiTable.codiceLottoNormalizzato, input.lottoNormalizzato),
           and(
@@ -171,6 +206,7 @@ export interface WarehouseLoadLineInput {
 
 export interface WarehouseLoadInput {
   magazzinoId: number;
+  lottoLogicoId?: number | null;
   origineCarico: OrigineCarico;
   numeroDocumento?: string | null;
   dataDocumento?: string | null;
@@ -275,6 +311,18 @@ export async function createWarehouseLoad(
   }
 
   const magazzino = await requireOperationalMagazzino(tx, input.magazzinoId);
+  let lottoLogico;
+  try {
+    ({ lotto: lottoLogico } = await resolveOpenLogicalLotForWarehouse(tx, {
+      magazzinoId: input.magazzinoId,
+      lottoLogicoId: input.lottoLogicoId,
+    }));
+  } catch (error) {
+    if (error instanceof LogicalLotError) {
+      throw new InventoryLedgerError(error.status, error.message);
+    }
+    throw error;
+  }
   const prodottoIds = [...new Set(input.righe.map((riga) => riga.prodottoId))];
   if (prodottoIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
     throw new InventoryLedgerError(400, "Prodotto non valido");
@@ -337,7 +385,7 @@ export async function createWarehouseLoad(
       );
     }
     const lotto = normalizeInventoryLotCode(riga.codiceLotto);
-    if (prodotto.gestioneLotto && lotto.original == null) {
+    if (prodotto.lottoFisicoObbligatorio && lotto.original == null) {
       throw new InventoryLedgerError(
         400,
         `Codice lotto obbligatorio alla riga ${index + 1}`,
@@ -364,8 +412,12 @@ export async function createWarehouseLoad(
           : inventoryPartyBusinessKey({
               magazzinoId: input.magazzinoId,
               prodottoId: prodotto.id,
+              lottoLogicoId: lottoLogico.id,
               fondoOrigine: riga.fondoOrigine,
+              fornitoreId,
               lottoNormalizzato: lotto.normalized,
+              dataScadenza,
+              fattoreKgLtPezzo: canonicalInventoryFactor(riga.fattoreKgLtPezzo),
             }),
       dimensions: null as ReturnType<
         typeof resolveInventoryQuantityDimensions
@@ -396,8 +448,14 @@ export async function createWarehouseLoad(
         candidates = await findInventoryPartyCandidates(tx, {
           magazzinoId: input.magazzinoId,
           prodottoId: line.prodotto.id,
+          lottoLogicoId: lottoLogico.id,
           fondoOrigine: line.input.fondoOrigine,
+          fornitoreId,
           lottoNormalizzato: line.lotto.normalized,
+          dataScadenza: line.dataScadenza,
+          fattoreKgLtPezzo: canonicalInventoryFactor(
+            line.input.fattoreKgLtPezzo,
+          ),
         });
       }
       if (candidates.length > 1) {
@@ -432,7 +490,11 @@ export async function createWarehouseLoad(
           line.existingLotto?.fattoreKgLtPezzo ??
           (line.partyKey ? factorByParty.get(line.partyKey) : null),
       });
-      line.quantita = InventoryDecimal.parse(line.dimensions.quantitaOperativa);
+      line.quantita = validateProductOperationalQuantity({
+        quantita: line.dimensions.quantitaOperativa,
+        quantitaFrazionabile: line.prodotto.quantitaFrazionabile,
+        prodottoLabel: line.prodotto.nome,
+      });
       if (line.partyKey && line.dimensions.fattoreKgLtPezzo) {
         factorByParty.set(line.partyKey, line.dimensions.fattoreKgLtPezzo);
       }
@@ -440,6 +502,12 @@ export async function createWarehouseLoad(
       if (error instanceof InventoryQuantityDimensionsError) {
         throw new InventoryLedgerError(
           error.status,
+          `Riga ${line.numeroRiga}: ${error.message}`,
+        );
+      }
+      if (error instanceof ProductOperationalQuantityError) {
+        throw new InventoryLedgerError(
+          400,
           `Riga ${line.numeroRiga}: ${error.message}`,
         );
       }
@@ -473,6 +541,7 @@ export async function createWarehouseLoad(
 
   const normalizedRequestHash = requestHash({
     magazzinoId: input.magazzinoId,
+    lottoLogicoId: lottoLogico.id,
     origineCarico: input.origineCarico,
     numeroDocumento: optionalText(input.numeroDocumento, 100),
     dataDocumento: input.dataDocumento ?? null,
@@ -611,6 +680,7 @@ export async function createWarehouseLoad(
         .insert(lottiTable)
         .values({
           prodottoId: line.prodotto.id,
+          lottoLogicoId: lottoLogico.id,
           codiceLotto: line.lotto.original,
           codiceLottoNormalizzato: line.lotto.normalized,
           dataScadenza: line.dataScadenza,
@@ -711,6 +781,7 @@ export async function createWarehouseLoad(
 
 export interface CaricoInventarialeInput {
   prodottoId: number;
+  lottoLogicoId?: number | null;
   codiceLotto?: string | null;
   dataScadenza?: string | null;
   dataCarico: string;
@@ -732,6 +803,7 @@ export async function creaCaricoInventariale(
 ) {
   const result = await createWarehouseLoad(tx, {
     magazzinoId: input.magazzinoId,
+    lottoLogicoId: input.lottoLogicoId,
     origineCarico:
       input.causale === "acquisto"
         ? "ACQUISTO"

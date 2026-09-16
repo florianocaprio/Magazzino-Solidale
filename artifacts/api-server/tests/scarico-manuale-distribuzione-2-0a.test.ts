@@ -93,6 +93,7 @@ beforeAll(async () => {
       nome: "Prodotto distribuzione manuale",
       tipoProdotto: "alimentare",
       unitaMisura: "kg",
+      quantitaFrazionabile: true,
     })
     .returning({ id: prodottiTable.id });
   [{ id: lottoId }] = await db
@@ -208,7 +209,8 @@ describe("scarico manuale beneficiario 2.0A", () => {
         `UPDATE beneficiari
          SET area_operativa_id = $1, centro_ascolto_id = $2, num_componenti = 4
          WHERE id = $3`,
-        [areaOperativaAlternativaId, centroAscoltoAlternativoId, beneficiarioId],
+        [areaOperativaAlternativaId, centroAscoltoAlternativoId, beneficiarioId,
+        ],
       );
 
       const responsePromise = Promise.resolve(

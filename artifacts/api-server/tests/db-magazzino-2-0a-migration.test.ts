@@ -32,6 +32,11 @@ describe("migration progressiva Magazzino 2.0A", () => {
           (SELECT count(*)::int FROM movimenti) AS movimenti,
           (SELECT count(*)::int FROM prodotti) AS prodotti
       `);
+      // M2 aggiunge una vista diagnostica sulle colonne quantitative. Il test
+      // rigioca qui le migration 2.0A in una transazione isolata: la vista va
+      // rimossa temporaneamente prima degli ALTER TYPE legacy e torna al
+      // rollback finale insieme al resto della prova.
+      await client.query("DROP VIEW IF EXISTS m2_anomalie_quantita_legacy");
       await client.query(migrationSql);
       await client.query(migrationSql);
       await client.query(r1MigrationSql);

@@ -171,7 +171,7 @@ type LedgerRow = {
   prodotto_id: number;
   prodotto_codice: string;
   prodotto_nome: string;
-  prodotto_gestione_lotto: boolean;
+  prodotto_lotto_fisico_obbligatorio: boolean;
   lotto_id: number | null;
   codice_lotto: string | null;
   lotto_fse_plus: boolean | null;
@@ -336,7 +336,7 @@ function qualityForLine(row: LedgerRow): string[] {
     row.origine_carico !== "AGEA_SIFEAD"
   )
     result.push("CARICO_FSE_LOCALE_DA_VERIFICARE");
-  if (row.prodotto_gestione_lotto && row.lotto_id == null)
+  if (row.prodotto_lotto_fisico_obbligatorio && row.lotto_id == null)
     result.push("LOTTO_MANCANTE");
   if (
     ["RETTIFICA_POSITIVA", "RETTIFICA_NEGATIVA", "SCARTO"].includes(
@@ -522,7 +522,7 @@ async function ledgerRows(
   const result = await executor.execute(sql`
     SELECT mv.id, mv.data_movimento, mv.magazzino_id, mg.area_operativa_id,
            mg.centro_ascolto_id, mv.prodotto_id, p.codice AS prodotto_codice,
-           p.nome AS prodotto_nome, p.gestione_lotto AS prodotto_gestione_lotto,
+           p.nome AS prodotto_nome, p.lotto_fisico_obbligatorio AS prodotto_lotto_fisico_obbligatorio,
            mv.lotto_id, l.codice_lotto, l.data_scadenza, l.data_carico,
            l.fse_plus AS lotto_fse_plus,
            mv.quantita, mv.quantita_pezzi, mv.quantita_kg_lt,
@@ -644,7 +644,7 @@ function canonicalCandidateRowsSql(input: {
       AND (op.numero_pasti IS NULL OR (${peopleMissing})))
     OR (${channel} = 'UDS_STRADA' AND op.indigenti_saltuari IS NULL)
   )`;
-  const lotMissing = sql`p.gestione_lotto = true AND mv.lotto_id IS NULL`;
+  const lotMissing = sql`p.lotto_fisico_obbligatorio = true AND mv.lotto_id IS NULL`;
   const adjustmentReasonMissing = sql`mv.natura_contabile IN (
       'RETTIFICA_POSITIVA', 'RETTIFICA_NEGATIVA', 'SCARTO'
     ) AND COALESCE(NULLIF(btrim(mv.note), ''), NULLIF(btrim(mv.documento_riferimento), '')) IS NULL`;

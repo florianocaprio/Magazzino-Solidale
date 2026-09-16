@@ -7,6 +7,7 @@ import {
   centriAscoltoTable,
   areeOperativeTable,
   db,
+  lottiLogiciTable,
   lottiTable,
   magazziniTable,
   pool,
@@ -18,6 +19,7 @@ import app from "../src/app";
 import { runEnvironmentDataCli } from "../src/cli/environment-data";
 import { initializeBaseData } from "../src/lib/baseData";
 import {
+  DEMO_AREA_NAME,
   DEMO_LOT_CODES,
   DEMO_PRODUCT_CODES,
   DEMO_WAREHOUSE_CODES,
@@ -114,7 +116,10 @@ afterAll(async () => {
       .where(eq(centriAscoltoTable.id, createdCentroId));
   }
   if (createdAreaOperativaId) {
-    await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, createdAreaOperativaId));
+    await db.delete(lottiLogiciTable)
+      .where(eq(lottiLogiciTable.areaOperativaId, createdAreaOperativaId));
+    await db
+      .delete(areeOperativeTable).where(eq(areeOperativeTable.id, createdAreaOperativaId));
   }
   await adminAgent?.post("/api/auth/logout");
   await db
@@ -196,7 +201,8 @@ describe("BUG-DB-01 - DB vergine e autenticazione", () => {
       areaOperativaId: 2_147_483_000,
     });
     expect(invalidCentre.status).toBe(400);
-    expect(invalidCentre.body.error).toBe("L'Area Operativa selezionata non esiste");
+    expect(invalidCentre.body.error).toBe("L'Area Operativa selezionata non esiste",
+    );
   });
 });
 
@@ -267,6 +273,29 @@ describe("BUG-DB-01 - seed, stampa e reset protetti", () => {
         .from(lottiTable)
         .where(inArray(lottiTable.codiceLotto, [...DEMO_LOT_CODES])),
     ).toHaveLength(8);
+
+    const [demoArea] = await db
+      .select({ id: areeOperativeTable.id })
+      .from(areeOperativeTable)
+      .where(eq(areeOperativeTable.nome, DEMO_AREA_NAME));
+    const logicalLots = await db
+      .select({
+        id: lottiLogiciTable.id,
+        isGenerale: lottiLogiciTable.isGenerale,
+      })
+      .from(lottiLogiciTable)
+      .where(eq(lottiLogiciTable.areaOperativaId, demoArea.id));
+    expect(logicalLots).toEqual([
+      expect.objectContaining({ isGenerale: true }),
+    ]);
+    const demoLots = await db
+      .select({ lottoLogicoId: lottiTable.lottoLogicoId })
+      .from(lottiTable)
+      .where(inArray(lottiTable.codiceLotto, [...DEMO_LOT_CODES]));
+    expect(demoLots).toHaveLength(8);
+    expect(
+      demoLots.every((lotto) => lotto.lottoLogicoId === logicalLots[0].id),
+    ).toBe(true);
 
     const reset = await runEnvironmentDataCli([
       "reset-demo-magazzino",

@@ -9,6 +9,8 @@ import type { LottoInputCausale } from './lottoInputCausale';
 
 export interface LottoInput {
   prodottoId: number;
+  /** @nullable */
+  lottoLogicoId?: number | null;
   codiceLotto?: string;
   dataScadenza?: string;
   dataCarico: string;

@@ -9,7 +9,15 @@ import {
 } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
-import { auditEventiTable, db, pool, trasferimentiTable } from "@workspace/db";
+import {
+  areeOperativeTable,
+  auditEventiTable,
+  db,
+  lottiLogiciTable,
+  magazziniTable,
+  pool,
+  trasferimentiTable,
+} from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import {
   makeApp,
@@ -85,6 +93,21 @@ afterAll(async () => {
 });
 
 describe("POST /trasferimenti — unità di misura canonica", () => {
+  it("rifiuta quantità frazionarie per un Prodotto non frazionabile", async () => {
+    const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
+    const response = await request(app)
+      .post("/trasferimenti")
+      .send({
+        magazzinoOrigineId: origineId,
+        magazzinoDestinoId: destinoId,
+        dataRichiesta: "2026-06-24",
+        trasportatoreNome: "Trasporto test",
+        righe: [{ prodottoId, quantita: "1.5", unitaMisura: "pz" }],
+      });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/numero intero/i);
+  });
+
   it("rifiuta l'unità legacy difforme dal Prodotto senza creare il trasferimento", async () => {
     const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
     const response = await request(app)
@@ -349,6 +372,129 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
 });
 
 describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
+  it("preserva il lotto logico nella stessa Area anche se viene chiuso durante il transito", async () => {
+    const [logicalLot] = await db
+      .insert(lottiLogiciTable)
+      .values({
+        areaOperativaId: scope.areaOperativaIds[0],
+        codice: `PAM-${Date.now()}`,
+        descrizione: "Raccolta PAM",
+      })
+      .returning();
+    scope.lottoLogicoIds.push(logicalLot.id);
+    const prodottoId = await createProdotto(scope);
+    await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 5,
+      lottoLogicoId: logicalLot.id,
+      codiceLotto: "PAM-FISICO",
+    });
+
+    const transfer = await creaTrasferimento({ prodottoId, quantita: 5 });
+    expect(
+      (
+        await request(app)
+          .post(`/trasferimenti/${transfer.id}/avvia`)
+          .send({ versione: transfer.versione })
+      ).status,
+    ).toBe(200);
+    await db
+      .update(lottiLogiciTable)
+      .set({ stato: "chiuso" })
+      .where(eq(lottiLogiciTable.id, logicalLot.id));
+
+    const received = await request(app)
+      .post(`/trasferimenti/${transfer.id}/conferma`)
+      .send({ versione: transfer.versione + 1 });
+    expect(received.status).toBe(200);
+    const [destinationLot] = await getLottiInMagazzino(destinoId);
+    expect(destinationLot).toMatchObject({
+      lottoLogicoId: logicalLot.id,
+      codiceLotto: "PAM-FISICO",
+    });
+  });
+
+  it("assegna il Generale di destinazione nei trasferimenti cross-Area e conserva la provenienza", async () => {
+    const sourceAreaId = scope.areaOperativaIds[0];
+    const [sourceLogicalLot] = await db
+      .insert(lottiLogiciTable)
+      .values({
+        areaOperativaId: sourceAreaId,
+        codice: `DON-${Date.now()}`,
+        descrizione: "Donazione origine",
+      })
+      .returning();
+    scope.lottoLogicoIds.push(sourceLogicalLot.id);
+    const [destinationArea] = await db
+      .insert(areeOperativeTable)
+      .values({ nome: `Area destinazione ${Date.now()}` })
+      .returning();
+    scope.areaOperativaIds.push(destinationArea.id);
+    const [destinationGeneral] = await db
+      .insert(lottiLogiciTable)
+      .values({
+        areaOperativaId: destinationArea.id,
+        codice: "GENERALE",
+        descrizione: "Generale",
+        isGenerale: true,
+      })
+      .returning();
+    scope.lottoLogicoIds.push(destinationGeneral.id);
+    const [destinationWarehouse] = await db
+      .insert(magazziniTable)
+      .values({
+        codice: `DST-${Math.random().toString(36).slice(2, 8)}`,
+        nome: "Destinazione altra Area",
+        areaOperativaId: destinationArea.id,
+      })
+      .returning();
+    scope.magazzinoIds.push(destinationWarehouse.id);
+    destinoId = destinationWarehouse.id;
+
+    const prodottoId = await createProdotto(scope);
+    await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 4,
+      lottoLogicoId: sourceLogicalLot.id,
+      codiceLotto: "DON-FISICO",
+    });
+    const transfer = await creaTrasferimento({ prodottoId, quantita: 4 });
+    expect(
+      (
+        await request(app)
+          .post(`/trasferimenti/${transfer.id}/avvia`)
+          .send({ versione: transfer.versione })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(app)
+          .post(`/trasferimenti/${transfer.id}/conferma`)
+          .send({ versione: transfer.versione + 1 })
+      ).status,
+    ).toBe(200);
+
+    const [destinationLot] = await getLottiInMagazzino(destinoId);
+    expect(destinationLot.lottoLogicoId).toBe(destinationGeneral.id);
+    expect(destinationLot.lottoLogicoId).not.toBe(sourceLogicalLot.id);
+    const copiedLogicalLots = await db
+      .select()
+      .from(lottiLogiciTable)
+      .where(
+        and(
+          eq(lottiLogiciTable.areaOperativaId, destinationArea.id),
+          eq(lottiLogiciTable.codice, sourceLogicalLot.codice),
+        ),
+      );
+    expect(copiedLogicalLots).toHaveLength(0);
+    const movements = await getMovimentiForTrasferimento(transfer.id);
+    const output = movements.find((row) => row.tipoDettaglio === "uscita");
+    const input = movements.find((row) => row.tipoDettaglio === "entrata");
+    expect(input?.movimentoOrigineId).toBe(output?.id);
+  });
+
   it("ricrea i lotti a destinazione preservando scadenza/codiceLotto/fornitore", async () => {
     const prodottoId = await createProdotto(scope);
     const fornitoreId = await createFornitore(scope, "Fornitore Test");

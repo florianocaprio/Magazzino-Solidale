@@ -71,7 +71,10 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { AgeaImportWizard } from "@/components/agea-import-wizard";
-import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import {
+  UnsavedChangesDialog,
+  useUnsavedChangesGuard,
+} from "@/hooks/use-unsaved-changes-guard";
 
 type DraftRiga = {
   key: number;
@@ -135,9 +138,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
   const [origineCarico, setOrigineCarico] = useState<OrigineCaricoManuale>(
     "RACCOLTA_ALIMENTARE",
   );
-  const [dataCarico, setDataCarico] = useState(
-    todayEuropeRome(),
-  );
+  const [dataCarico, setDataCarico] = useState(todayEuropeRome());
   const [numeroDocumento, setNumeroDocumento] = useState("");
   const [dataDocumento, setDataDocumento] = useState("");
   const [fornitoreId, setFornitoreId] = useState("");
@@ -148,7 +149,27 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
   const [idempotencyKey] = useState(
     () => `ui-carico-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
-  const isDirty = !!magazzinoId || origineCarico !== "RACCOLTA_ALIMENTARE" || dataCarico !== todayEuropeRome() || !!numeroDocumento || !!dataDocumento || !!fornitoreId || !!descrizione || !!note || righe.length !== 1 || righe.some((riga) => !!riga.prodottoId || !!riga.quantitaOperativa || riga.fondoOrigine !== "NESSUN_FONDO" || !!riga.codiceLotto || !!riga.dataScadenza || !!riga.quantitaPezzi || !!riga.quantitaKgLt || !!riga.fattoreKgLtPezzo);
+  const isDirty =
+    !!magazzinoId ||
+    origineCarico !== "RACCOLTA_ALIMENTARE" ||
+    dataCarico !== todayEuropeRome() ||
+    !!numeroDocumento ||
+    !!dataDocumento ||
+    !!fornitoreId ||
+    !!descrizione ||
+    !!note ||
+    righe.length !== 1 ||
+    righe.some(
+      (riga) =>
+        !!riga.prodottoId ||
+        !!riga.quantitaOperativa ||
+        riga.fondoOrigine !== "NESSUN_FONDO" ||
+        !!riga.codiceLotto ||
+        !!riga.dataScadenza ||
+        !!riga.quantitaPezzi ||
+        !!riga.quantitaKgLt ||
+        !!riga.fattoreKgLtPezzo,
+    );
   const unsavedGuard = useUnsavedChangesGuard(isDirty);
   const requestClose = () => unsavedGuard.requestClose(onClose);
 
@@ -181,7 +202,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
         next.push(
           `Riga ${index + 1}: fattore non valido (massimo 9 decimali).`,
         );
-      if (prodotto?.gestioneLotto && !riga.codiceLotto.trim())
+      if (prodotto?.lottoFisicoObbligatorio && !riga.codiceLotto.trim())
         next.push(`Riga ${index + 1}: codice lotto obbligatorio.`);
       if (prodotto?.gestioneScadenza && !riga.dataScadenza)
         next.push(`Riga ${index + 1}: scadenza obbligatoria.`);
@@ -213,7 +234,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
               fondoOrigine: riga.fondoOrigine,
               quantitaOperativa: riga.quantitaOperativa.replace(",", "."),
               unitaMisuraOperativa: prodotto.unitaMisura,
-              codiceLotto: prodotto.gestioneLotto
+              codiceLotto: prodotto.lottoFisicoObbligatorio
                 ? riga.codiceLotto.trim()
                 : null,
               dataScadenza: prodotto.gestioneScadenza
@@ -459,7 +480,9 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                           })
                         }
                       >
-                        <SelectTrigger aria-label={`Prodotto riga ${index + 1}`}>
+                        <SelectTrigger
+                          aria-label={`Prodotto riga ${index + 1}`}
+                        >
                           <SelectValue placeholder="Seleziona prodotto" />
                         </SelectTrigger>
                         <SelectContent>
@@ -513,7 +536,7 @@ function NuovoCaricoDialog({ onClose }: { onClose: () => void }) {
                         </SelectContent>
                       </Select>
                     </div>
-                    {prodotto?.gestioneLotto && (
+                    {prodotto?.lottoFisicoObbligatorio && (
                       <div className="space-y-2">
                         <Label>Codice lotto *</Label>
                         <Input

@@ -64,7 +64,6 @@ import {
   intervalloGiornoEuropeRome,
 } from "../lib/interventiViste";
 import { auditEmporioTx } from "../lib/emporioAudit";
-import { quantitaCompatibileConUnitaMisuraEmporio } from "../lib/emporioQuantita";
 import { beneficiarioAccessScopeFromRequest } from "../lib/beneficiarioPolicy";
 import {
   BeneficiaryReportingScopeError,
@@ -75,6 +74,10 @@ import {
   InventoryDecimalError,
   positiveInventoryDecimal,
 } from "../lib/inventoryDecimal";
+import {
+  ProductOperationalQuantityError,
+  validateProductOperationalQuantity,
+} from "../lib/productQuantity";
 
 const router: IRouter = Router();
 router.use(
@@ -128,8 +131,6 @@ const MSG_PRODOTTO_NON_ABILITATO =
   "Il prodotto non è abilitato per Emporio. Abilitalo nella scheda prodotto prima di aggiungerlo al carrello.";
 const MSG_PRODOTTO_SENZA_CREDITO =
   "Il prodotto non ha un Valore Credito Solidale configurato. Imposta il valore nella scheda prodotto.";
-const MSG_QUANTITA_PZ_INTERA =
-  'I prodotti con unità di misura "pz" richiedono una quantità intera positiva.';
 const MSG_GIACENZA_INSUFFICIENTE =
   "La quantità richiesta supera la giacenza disponibile nel magazzino Emporio selezionato.";
 const MSG_LIMITE_SPESA =
@@ -352,7 +353,13 @@ async function validateMagazzinoEmporio(
     .where(eq(magazziniTable.id, id));
   if (!magazzino || !["emporio", "misto"].includes(magazzino.tipoMagazzino))
     return { error: MSG_MAGAZZINO_EMPORIO, status: 400 };
-  if (!(await canAccessMagazzino(id, callerCentroId(req), callerAreaOperativaId(req))))
+  if (
+    !(await canAccessMagazzino(
+      id,
+      callerCentroId(req),
+      callerAreaOperativaId(req),
+    ))
+  )
     return {
       error: "Magazzino non accessibile per il tuo profilo",
       status: 403,
@@ -596,10 +603,19 @@ async function buildRigaValues(
     return { error: MSG_PRODOTTO_NON_ABILITATO, status: 400 } as const;
   if (creditoUnitario <= 0)
     return { error: MSG_PRODOTTO_SENZA_CREDITO, status: 400 } as const;
-  if (!quantitaCompatibileConUnitaMisuraEmporio(quantita, prodotto.unitaMisura))
-    return { error: MSG_QUANTITA_PZ_INTERA, status: 400 } as const;
-
-  const quantity = InventoryDecimal.parse(quantita);
+  let quantity: InventoryDecimal;
+  try {
+    quantity = validateProductOperationalQuantity({
+      quantita,
+      quantitaFrazionabile: prodotto.quantitaFrazionabile,
+      prodottoLabel: prodotto.nome,
+    });
+  } catch (error) {
+    if (error instanceof ProductOperationalQuantityError) {
+      return { error: error.message, status: 400 } as const;
+    }
+    throw error;
+  }
   const creditQuantity = Number(quantity.toCanonical());
   const otherQuantity = await quantitaProdottoInSessionePrecisa(
     executor,
@@ -642,9 +658,7 @@ async function buildRigaValues(
   );
   if (!disponibile.isPositive())
     return { error: MSG_GIACENZA_INSUFFICIENTE, status: 400 } as const;
-  if (
-    totalQuantityForProduct.compare(disponibile) > 0
-  )
+  if (totalQuantityForProduct.compare(disponibile) > 0)
     return { error: MSG_GIACENZA_INSUFFICIENTE, status: 400 } as const;
 
   return {
@@ -662,9 +676,7 @@ async function buildRigaValues(
       unitaMisura: prodotto.unitaMisura,
       creditoUnitario: asMoney(creditoUnitario),
       creditoTotale: asMoney(creditoUnitario * creditQuantity),
-      giacenzaDisponibileAlMomento: asMoney(
-        parseDbNumber(disponibile.toDb()),
-      ),
+      giacenzaDisponibileAlMomento: asMoney(parseDbNumber(disponibile.toDb())),
       limitePerSpesa:
         limitePerSpesa == null
           ? null
@@ -687,7 +699,9 @@ router.get(
     if (!(await assertEmporioEnabled(res))) return;
     const query = req.query as Record<string, string>;
     const q = asText(query.search);
-    const requestedAreaOperativaId = asInt(query.areaOperativaId ?? query.areaId);
+    const requestedAreaOperativaId = asInt(
+      query.areaOperativaId ?? query.areaId,
+    );
     const magazzinoEmporioId = asInt(query.magazzinoEmporioId);
     const dateBounds = dayBounds(asText(query.data));
     if (!q && requestedAreaOperativaId == null && magazzinoEmporioId == null) {
@@ -791,9 +805,13 @@ router.get(
         )!,
       );
     } else if (requestedAreaOperativaId != null) {
-      conditions.push(eq(beneficiariTable.areaOperativaId, requestedAreaOperativaId));
+      conditions.push(
+        eq(beneficiariTable.areaOperativaId, requestedAreaOperativaId),
+      );
     } else if (!q && selectedMagazzino?.areaOperativaId != null) {
-      conditions.push(eq(beneficiariTable.areaOperativaId, selectedMagazzino.areaOperativaId));
+      conditions.push(
+        eq(beneficiariTable.areaOperativaId, selectedMagazzino.areaOperativaId),
+      );
     }
     const centroFilter = centroScopeFilter(
       beneficiariTable.centroAscoltoId,
@@ -1025,7 +1043,9 @@ router.get(
       );
     const requestedAreaOperativaId = asInt(q.areaOperativaId ?? q.areaId);
     if (requestedAreaOperativaId != null)
-      conditions.push(eq(sessioniCassaEmporioTable.areaOperativaId, requestedAreaOperativaId));
+      conditions.push(
+        eq(sessioniCassaEmporioTable.areaOperativaId, requestedAreaOperativaId),
+      );
     const dateBounds = dayBounds(asText(q.data));
     if (dateBounds != null) {
       conditions.push(
@@ -1071,7 +1091,10 @@ router.get(
     if (zonaFilter) conditions.push(zonaFilter);
     const magazzinoFilter = magazzinoScopeFilter(
       sessioniCassaEmporioTable.magazzinoEmporioId,
-      await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req)),
+      await visibleMagazzinoIds(
+        callerCentroId(req),
+        callerAreaOperativaId(req),
+      ),
     );
     if (magazzinoFilter) conditions.push(magazzinoFilter);
     const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -1174,7 +1197,8 @@ router.post(
     }
     if (magazzino.magazzino.areaOperativaId !== beneficiario!.areaOperativaId) {
       res.status(400).json({
-        error: "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario.",
+        error:
+          "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario.",
       });
       return;
     }
@@ -1346,7 +1370,8 @@ router.post(
     }
     if (magazzino.magazzino.areaOperativaId !== beneficiario!.areaOperativaId) {
       res.status(400).json({
-        error: "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario.",
+        error:
+          "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario.",
       });
       return;
     }

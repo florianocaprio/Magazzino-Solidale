@@ -11,6 +11,11 @@ import type { OrigineCaricoManuale } from './origineCaricoManuale';
 export interface CaricoMagazzinoInput {
   /** @minimum 1 */
   magazzinoId: number;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  lottoLogicoId?: number | null;
   origineCarico: OrigineCaricoManuale;
   /** @nullable */
   numeroDocumento?: string | null;

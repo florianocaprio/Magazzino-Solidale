@@ -11,9 +11,14 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { lottiLogiciTable } from "./lottiLogici";
 
 export const lottiTable = pgTable("lotti", {
   id: serial("id").primaryKey(),
+  lottoLogicoId: integer("lotto_logico_id").references(
+    () => lottiLogiciTable.id,
+    { onDelete: "restrict" },
+  ),
   prodottoId: integer("prodotto_id").notNull(),
   codiceLotto: varchar("codice_lotto", { length: 80 }),
   dataScadenza: date("data_scadenza"),

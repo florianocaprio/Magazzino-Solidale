@@ -41,7 +41,6 @@ import {
 import { parseDbNumber } from "./disponibilitaMagazzino";
 import { auditEmporioTx } from "./emporioAudit";
 import { magazzinoScopeFilter } from "./centroScope";
-import { quantitaCompatibileConUnitaMisuraEmporio } from "./emporioQuantita";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
 import {
   dateTimeEuropeRomeToUtc,
@@ -67,6 +66,10 @@ import {
   markDistributionOperationReversed,
 } from "./distributionLedger";
 import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimensions";
+import {
+  ProductOperationalQuantityError,
+  validateProductOperationalQuantity,
+} from "./productQuantity";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 
@@ -332,17 +335,18 @@ async function validateRigheFinali(
         "L'unità di misura del Prodotto è cambiata: aggiornare il carrello prima della chiusura.",
       );
     }
-    const quantitaRiga = InventoryDecimal.parse(riga.quantita);
-    if (
-      !quantitaCompatibileConUnitaMisuraEmporio(
-        quantitaRiga.toDb(),
-        riga.unitaMisura ?? prodotto.unitaMisura,
-      )
-    ) {
-      throw new SpesaEmporioError(
-        409,
-        'Il carrello contiene una quantità frazionaria per un prodotto in "pz": è necessaria una verifica manuale.',
-      );
+    let quantitaRiga: InventoryDecimal;
+    try {
+      quantitaRiga = validateProductOperationalQuantity({
+        quantita: riga.quantita,
+        quantitaFrazionabile: prodotto.quantitaFrazionabile,
+        prodottoLabel: prodotto.nome,
+      });
+    } catch (error) {
+      if (error instanceof ProductOperationalQuantityError) {
+        throw new SpesaEmporioError(409, error.message);
+      }
+      throw error;
     }
     quantityByProduct.set(
       riga.prodottoId,

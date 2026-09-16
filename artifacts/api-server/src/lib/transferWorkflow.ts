@@ -7,15 +7,15 @@ import {
 import { inArray } from "drizzle-orm";
 import { withDocumentCodeRetry } from "./documentCode";
 import {
-  InventoryDecimalError,
-  positiveInventoryDecimal,
-} from "./inventoryDecimal";
-import {
   auditFields,
   auditUserId,
   recordAuditEvent,
   type AuditCommandContext,
 } from "./auditEvent";
+import {
+  ProductOperationalQuantityError,
+  validateProductOperationalQuantity,
+} from "./productQuantity";
 
 export class TransferRequestError extends Error {
   constructor(
@@ -79,6 +79,8 @@ export async function normalizeTransferRows(
       id: prodottiTable.id,
       unitaMisura: prodottiTable.unitaMisura,
       attivo: prodottiTable.attivo,
+      quantitaFrazionabile: prodottiTable.quantitaFrazionabile,
+      nome: prodottiTable.nome,
     })
     .from(prodottiTable)
     .where(inArray(prodottiTable.id, productIds));
@@ -92,9 +94,14 @@ export async function normalizeTransferRows(
   return rows.map((row) => {
     let quantity;
     try {
-      quantity = positiveInventoryDecimal(row.quantita);
+      const product = productById.get(row.prodottoId)!;
+      quantity = validateProductOperationalQuantity({
+        quantita: row.quantita,
+        quantitaFrazionabile: product.quantitaFrazionabile,
+        prodottoLabel: product.nome,
+      });
     } catch (error) {
-      if (!(error instanceof InventoryDecimalError)) throw error;
+      if (!(error instanceof ProductOperationalQuantityError)) throw error;
       throw new TransferRequestError(400, error.message);
     }
     const product = productById.get(row.prodottoId)!;

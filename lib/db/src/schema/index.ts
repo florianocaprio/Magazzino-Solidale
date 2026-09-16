@@ -2,6 +2,7 @@ export * from "./magazzini";
 export * from "./prodotti";
 export * from "./fornitori";
 export * from "./lotti";
+export * from "./lottiLogici";
 export * from "./movimenti";
 export * from "./auditEventi";
 export * from "./inventoryAccounting";

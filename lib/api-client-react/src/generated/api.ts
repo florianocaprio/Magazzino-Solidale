@@ -253,6 +253,7 @@ import type {
   ListGiornateMensaParams,
   ListInterventiOperatoriParams,
   ListInterventiParams,
+  ListLottiLogiciParams,
   ListLottiParams,
   ListMensaAbilitazioniParams,
   ListMenseParams,
@@ -277,6 +278,10 @@ import type {
   LoginInput,
   Lotto,
   LottoInput,
+  LottoLogico,
+  LottoLogicoInput,
+  LottoLogicoTransitionInput,
+  LottoLogicoUpdate,
   LottoUpdate,
   Magazzino,
   MagazzinoInput,
@@ -4779,6 +4784,490 @@ export const useReverseFseOpcReturn = <TError = ErrorType<FseBadRequestResponse 
         TContext
       > => {
       return useMutation(getReverseFseOpcReturnMutationOptions(options));
+    }
+
+export const getListLottiLogiciUrl = (params?: ListLottiLogiciParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/lotti-logici?${stringifiedParams}` : `/api/lotti-logici`
+}
+
+/**
+ * @summary Elenca i lotti logici dell'Area Operativa
+ */
+export const listLottiLogici = async (params?: ListLottiLogiciParams, options?: RequestInit): Promise<LottoLogico[]> => {
+
+  return customFetch<LottoLogico[]>(getListLottiLogiciUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListLottiLogiciQueryKey = (params?: ListLottiLogiciParams,) => {
+    return [
+    `/api/lotti-logici`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListLottiLogiciQueryOptions = <TData = Awaited<ReturnType<typeof listLottiLogici>>, TError = ErrorType<unknown>>(params?: ListLottiLogiciParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLottiLogici>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListLottiLogiciQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listLottiLogici>>> = ({ signal }) => listLottiLogici(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listLottiLogici>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListLottiLogiciQueryResult = NonNullable<Awaited<ReturnType<typeof listLottiLogici>>>
+export type ListLottiLogiciQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Elenca i lotti logici dell'Area Operativa
+ */
+
+export function useListLottiLogici<TData = Awaited<ReturnType<typeof listLottiLogici>>, TError = ErrorType<unknown>>(
+ params?: ListLottiLogiciParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLottiLogici>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListLottiLogiciQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateLottoLogicoUrl = () => {
+
+
+
+
+  return `/api/lotti-logici`
+}
+
+export const createLottoLogico = async (lottoLogicoInput: LottoLogicoInput, options?: RequestInit): Promise<LottoLogico> => {
+
+  return customFetch<LottoLogico>(getCreateLottoLogicoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      lottoLogicoInput,)
+  }
+);}
+
+
+
+
+export const getCreateLottoLogicoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createLottoLogico>>, TError,{data: BodyType<LottoLogicoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createLottoLogico>>, TError,{data: BodyType<LottoLogicoInput>}, TContext> => {
+
+const mutationKey = ['createLottoLogico'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createLottoLogico>>, {data: BodyType<LottoLogicoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createLottoLogico(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateLottoLogicoMutationResult = NonNullable<Awaited<ReturnType<typeof createLottoLogico>>>
+    export type CreateLottoLogicoMutationBody = BodyType<LottoLogicoInput>
+    export type CreateLottoLogicoMutationError = ErrorType<unknown>
+
+    export const useCreateLottoLogico = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createLottoLogico>>, TError,{data: BodyType<LottoLogicoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createLottoLogico>>,
+        TError,
+        {data: BodyType<LottoLogicoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateLottoLogicoMutationOptions(options));
+    }
+
+export const getGetLottoLogicoUrl = (id: number,) => {
+
+
+
+
+  return `/api/lotti-logici/${id}`
+}
+
+export const getLottoLogico = async (id: number, options?: RequestInit): Promise<LottoLogico> => {
+
+  return customFetch<LottoLogico>(getGetLottoLogicoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLottoLogicoQueryKey = (id: number,) => {
+    return [
+    `/api/lotti-logici/${id}`
+    ] as const;
+    }
+
+
+export const getGetLottoLogicoQueryOptions = <TData = Awaited<ReturnType<typeof getLottoLogico>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLottoLogico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLottoLogicoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLottoLogico>>> = ({ signal }) => getLottoLogico(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLottoLogico>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLottoLogicoQueryResult = NonNullable<Awaited<ReturnType<typeof getLottoLogico>>>
+export type GetLottoLogicoQueryError = ErrorType<unknown>
+
+
+
+export function useGetLottoLogico<TData = Awaited<ReturnType<typeof getLottoLogico>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLottoLogico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLottoLogicoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateLottoLogicoUrl = (id: number,) => {
+
+
+
+
+  return `/api/lotti-logici/${id}`
+}
+
+export const updateLottoLogico = async (id: number,
+    lottoLogicoUpdate: LottoLogicoUpdate, options?: RequestInit): Promise<LottoLogico> => {
+
+  return customFetch<LottoLogico>(getUpdateLottoLogicoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      lottoLogicoUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateLottoLogicoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLottoLogico>>, TError,{id: number;data: BodyType<LottoLogicoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateLottoLogico>>, TError,{id: number;data: BodyType<LottoLogicoUpdate>}, TContext> => {
+
+const mutationKey = ['updateLottoLogico'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLottoLogico>>, {id: number;data: BodyType<LottoLogicoUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateLottoLogico(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateLottoLogicoMutationResult = NonNullable<Awaited<ReturnType<typeof updateLottoLogico>>>
+    export type UpdateLottoLogicoMutationBody = BodyType<LottoLogicoUpdate>
+    export type UpdateLottoLogicoMutationError = ErrorType<unknown>
+
+    export const useUpdateLottoLogico = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLottoLogico>>, TError,{id: number;data: BodyType<LottoLogicoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateLottoLogico>>,
+        TError,
+        {id: number;data: BodyType<LottoLogicoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateLottoLogicoMutationOptions(options));
+    }
+
+export const getCloseLottoLogicoUrl = (id: number,) => {
+
+
+
+
+  return `/api/lotti-logici/${id}/chiudi`
+}
+
+export const closeLottoLogico = async (id: number,
+    lottoLogicoTransitionInput?: LottoLogicoTransitionInput, options?: RequestInit): Promise<LottoLogico> => {
+
+  return customFetch<LottoLogico>(getCloseLottoLogicoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      lottoLogicoTransitionInput,)
+  }
+);}
+
+
+
+
+export const getCloseLottoLogicoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeLottoLogico>>, TError,{id: number;data?: BodyType<LottoLogicoTransitionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof closeLottoLogico>>, TError,{id: number;data?: BodyType<LottoLogicoTransitionInput>}, TContext> => {
+
+const mutationKey = ['closeLottoLogico'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof closeLottoLogico>>, {id: number;data?: BodyType<LottoLogicoTransitionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  closeLottoLogico(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CloseLottoLogicoMutationResult = NonNullable<Awaited<ReturnType<typeof closeLottoLogico>>>
+    export type CloseLottoLogicoMutationBody = BodyType<LottoLogicoTransitionInput> | undefined
+    export type CloseLottoLogicoMutationError = ErrorType<unknown>
+
+    export const useCloseLottoLogico = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeLottoLogico>>, TError,{id: number;data?: BodyType<LottoLogicoTransitionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof closeLottoLogico>>,
+        TError,
+        {id: number;data?: BodyType<LottoLogicoTransitionInput>},
+        TContext
+      > => {
+      return useMutation(getCloseLottoLogicoMutationOptions(options));
+    }
+
+export const getReopenLottoLogicoUrl = (id: number,) => {
+
+
+
+
+  return `/api/lotti-logici/${id}/riapri`
+}
+
+export const reopenLottoLogico = async (id: number,
+    lottoLogicoTransitionInput: LottoLogicoTransitionInput, options?: RequestInit): Promise<LottoLogico> => {
+
+  return customFetch<LottoLogico>(getReopenLottoLogicoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      lottoLogicoTransitionInput,)
+  }
+);}
+
+
+
+
+export const getReopenLottoLogicoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reopenLottoLogico>>, TError,{id: number;data: BodyType<LottoLogicoTransitionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reopenLottoLogico>>, TError,{id: number;data: BodyType<LottoLogicoTransitionInput>}, TContext> => {
+
+const mutationKey = ['reopenLottoLogico'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reopenLottoLogico>>, {id: number;data: BodyType<LottoLogicoTransitionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reopenLottoLogico(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReopenLottoLogicoMutationResult = NonNullable<Awaited<ReturnType<typeof reopenLottoLogico>>>
+    export type ReopenLottoLogicoMutationBody = BodyType<LottoLogicoTransitionInput>
+    export type ReopenLottoLogicoMutationError = ErrorType<unknown>
+
+    export const useReopenLottoLogico = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reopenLottoLogico>>, TError,{id: number;data: BodyType<LottoLogicoTransitionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reopenLottoLogico>>,
+        TError,
+        {id: number;data: BodyType<LottoLogicoTransitionInput>},
+        TContext
+      > => {
+      return useMutation(getReopenLottoLogicoMutationOptions(options));
+    }
+
+export const getArchiveLottoLogicoUrl = (id: number,) => {
+
+
+
+
+  return `/api/lotti-logici/${id}/archivia`
+}
+
+export const archiveLottoLogico = async (id: number,
+    lottoLogicoTransitionInput?: LottoLogicoTransitionInput, options?: RequestInit): Promise<LottoLogico> => {
+
+  return customFetch<LottoLogico>(getArchiveLottoLogicoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      lottoLogicoTransitionInput,)
+  }
+);}
+
+
+
+
+export const getArchiveLottoLogicoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveLottoLogico>>, TError,{id: number;data?: BodyType<LottoLogicoTransitionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof archiveLottoLogico>>, TError,{id: number;data?: BodyType<LottoLogicoTransitionInput>}, TContext> => {
+
+const mutationKey = ['archiveLottoLogico'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveLottoLogico>>, {id: number;data?: BodyType<LottoLogicoTransitionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  archiveLottoLogico(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveLottoLogicoMutationResult = NonNullable<Awaited<ReturnType<typeof archiveLottoLogico>>>
+    export type ArchiveLottoLogicoMutationBody = BodyType<LottoLogicoTransitionInput> | undefined
+    export type ArchiveLottoLogicoMutationError = ErrorType<unknown>
+
+    export const useArchiveLottoLogico = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveLottoLogico>>, TError,{id: number;data?: BodyType<LottoLogicoTransitionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof archiveLottoLogico>>,
+        TError,
+        {id: number;data?: BodyType<LottoLogicoTransitionInput>},
+        TContext
+      > => {
+      return useMutation(getArchiveLottoLogicoMutationOptions(options));
     }
 
 export const getListLottiUrl = (params?: ListLottiParams,) => {

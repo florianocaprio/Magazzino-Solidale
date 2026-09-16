@@ -22,6 +22,7 @@ import {
   lockInventoryPartyBusinessKeys,
 } from "./inventoryLedger";
 import type { InventoryTransaction } from "./scaricoInventory";
+import { resolveOpenLogicalLotForWarehouse } from "./logicalLots";
 import {
   AGEA_PARSER_VERSION,
   AGEA_TRACE_CODE,
@@ -612,7 +613,7 @@ async function rebuildImport(
       warnings.push("FATTORE_MANCANTE");
     if (hasPositiveBalance && first.prodottoIdSnapshot) {
       const product = productsById.get(first.prodottoIdSnapshot);
-      if (product?.gestioneLotto && !effectiveLot(first).normalized)
+      if (product?.lottoFisicoObbligatorio && !effectiveLot(first).normalized)
         errors.push("LOTTO_DA_COMPLETARE");
       if (
         product?.gestioneScadenza &&
@@ -1161,6 +1162,9 @@ async function revalidateBootstrapParties(
   magazzinoId: number,
   parties: Array<typeof importazioniAgeaPartiteTable.$inferSelect>,
 ): Promise<void> {
+  const logicalLot = await resolveOpenLogicalLotForWarehouse(tx, {
+    magazzinoId,
+  });
   const keyed = parties.map((party) => {
     if (
       party.prodottoId == null ||
@@ -1181,8 +1185,12 @@ async function revalidateBootstrapParties(
         ? inventoryPartyBusinessKey({
             magazzinoId,
             prodottoId: party.prodottoId,
+            lottoLogicoId: logicalLot.lotto.id,
             fondoOrigine,
+            fornitoreId: null,
             lottoNormalizzato: party.lottoNormalizzato,
+            dataScadenza: party.dataScadenzaRisolta,
+            fattoreKgLtPezzo: party.fattoreKgLtPezzo,
           })
         : null,
     };
@@ -1196,8 +1204,12 @@ async function revalidateBootstrapParties(
     const candidates = await findInventoryPartyCandidates(tx, {
       magazzinoId,
       prodottoId: party.prodottoId!,
+      lottoLogicoId: logicalLot.lotto.id,
       fondoOrigine,
+      fornitoreId: null,
       lottoNormalizzato: party.lottoNormalizzato!,
+      dataScadenza: party.dataScadenzaRisolta,
+      fattoreKgLtPezzo: party.fattoreKgLtPezzo,
     });
     const expectedId = party.existingLottoId ?? null;
     const candidate = candidates.length === 1 ? candidates[0] : null;

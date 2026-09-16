@@ -12,6 +12,8 @@ export interface Lotto {
   id: number;
   prodottoId: number;
   /** @nullable */
+  lottoLogicoId?: number | null;
+  /** @nullable */
   prodottoNome?: string | null;
   /** @nullable */
   codiceLotto?: string | null;

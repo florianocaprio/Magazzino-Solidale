@@ -10,6 +10,7 @@ import {
   db,
   magazziniTable,
   lottiTable,
+  lottiLogiciTable,
   movimentiTable,
   mensaAbilitazioniTable,
   mensaAccessiTable,
@@ -64,6 +65,7 @@ const ids = {
   lots: [] as number[],
   consumptions: [] as number[],
   issues: [] as number[],
+  logicalLots: [] as number[],
 };
 const rnd = () => Math.random().toString(36).slice(2, 9);
 
@@ -131,6 +133,24 @@ async function createFixture() {
     .values({ nome: `Milano ${rnd()}` })
     .returning({ id: areeOperativeTable.id });
   ids.areeOperative.push(rome.id, milan.id);
+  const logicalLots = await db
+    .insert(lottiLogiciTable)
+    .values([
+      {
+        areaOperativaId: rome.id,
+        codice: "GENERALE",
+        descrizione: "Generale",
+        isGenerale: true,
+      },
+      {
+        areaOperativaId: milan.id,
+        codice: "GENERALE",
+        descrizione: "Generale",
+        isGenerale: true,
+      },
+    ])
+    .returning({ id: lottiLogiciTable.id });
+  ids.logicalLots.push(...logicalLots.map((lot) => lot.id));
   const warehouses = await db
     .insert(magazziniTable)
     .values([
@@ -384,6 +404,10 @@ afterEach(async () => {
     await db
       .delete(magazziniTable)
       .where(inArray(magazziniTable.id, ids.warehouses.splice(0)));
+  if (ids.logicalLots.length)
+    await db
+      .delete(lottiLogiciTable)
+      .where(inArray(lottiLogiciTable.id, ids.logicalLots.splice(0)));
   if (ids.centers.length)
     await db
       .delete(centriAscoltoTable)
@@ -2956,6 +2980,7 @@ describe("Modulo Mensa", () => {
         nome: "Prodotto consumo futuro",
         tipoProdotto: "alimentare",
         unitaMisura: "kg",
+        quantitaFrazionabile: true,
         attivo: true,
       })
       .returning({ id: prodottiTable.id });
@@ -3024,6 +3049,7 @@ describe("Modulo Mensa", () => {
           nome: `${input.nome} ${rnd()}`,
           tipoProdotto: "alimentare",
           unitaMisura: input.unitaMisura,
+          quantitaFrazionabile: ["kg", "l", "lt"].includes(input.unitaMisura),
           attivo: true,
         })
         .returning({ id: prodottiTable.id });
@@ -3143,6 +3169,7 @@ describe("Modulo Mensa", () => {
         nome: "Prodotto consumo Mensa",
         tipoProdotto: "alimentare",
         unitaMisura: "kg",
+        quantitaFrazionabile: true,
         attivo: true,
       })
       .returning({ id: prodottiTable.id });
@@ -3288,6 +3315,52 @@ describe("Modulo Mensa", () => {
     expect(Number(restored.quantity)).toBe(1);
   });
 
+  it("rifiuta un consumo frazionario per un Prodotto non frazionabile", async () => {
+    const fixture = await createFixture();
+    const [product] = await db
+      .insert(prodottiTable)
+      .values({
+        codice: `PNF-${rnd()}`,
+        nome: "Prodotto Mensa non frazionabile",
+        tipoProdotto: "alimentare",
+        unitaMisura: "pz",
+        quantitaFrazionabile: false,
+        attivo: true,
+      })
+      .returning({ id: prodottiTable.id });
+    ids.products.push(product.id);
+    const [lot] = await db
+      .insert(lottiTable)
+      .values({
+        prodottoId: product.id,
+        dataCarico: dataServizioMensa(),
+        quantitaCaricata: "2.00",
+        quantitaResidua: "2.00",
+        magazzinoId: fixture.warehouseIds[0],
+      })
+      .returning({ id: lottiTable.id });
+    ids.lots.push(lot.id);
+    const response = await request(makeApp(fixture))
+      .post("/mensa/consumi")
+      .send({
+        mensaId: fixture.mensaA,
+        dataServizio: dataServizioMensa(),
+        tipoServizio: "pranzo",
+        prodottoId: product.id,
+        quantita: "0.5",
+        causale: "consumo",
+        idempotencyKey: `non-frazionabile-${rnd()}`,
+      });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("numero intero");
+    expect(
+      Number(
+        (await db.select().from(lottiTable).where(eq(lottiTable.id, lot.id)))[0]
+          .quantitaResidua,
+      ),
+    ).toBe(2);
+  });
+
   it("Magazzino 2.0A-R2 — riconcilia il riuso della stessa giornata dopo uno storno completo", async () => {
     const fixture = await createFixture();
     const products = await db
@@ -3298,6 +3371,7 @@ describe("Modulo Mensa", () => {
           nome: "Prodotto Mensa R2 A",
           tipoProdotto: "alimentare",
           unitaMisura: "kg",
+          quantitaFrazionabile: true,
           attivo: true,
         },
         {
@@ -3305,6 +3379,7 @@ describe("Modulo Mensa", () => {
           nome: "Prodotto Mensa R2 B",
           tipoProdotto: "alimentare",
           unitaMisura: "kg",
+          quantitaFrazionabile: true,
           attivo: true,
         },
       ])

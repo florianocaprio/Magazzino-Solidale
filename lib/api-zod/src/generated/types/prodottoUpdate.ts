@@ -13,7 +13,8 @@ export interface ProdottoUpdate {
   tipoProdotto?: string;
   unitaMisura?: string;
   codiceBarre?: string;
-  gestioneLotto?: boolean;
+  quantitaFrazionabile?: boolean;
+  lottoFisicoObbligatorio?: boolean;
   gestioneScadenza?: boolean;
   fsePlus?: boolean;
   scortaMinima?: number;

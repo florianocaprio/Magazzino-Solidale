@@ -57,6 +57,10 @@ import {
   auditFields,
   recordAuditEvent,
 } from "../lib/auditEvent";
+import {
+  LogicalLotError,
+  resolveOpenLogicalLotForWarehouse,
+} from "../lib/logicalLots";
 
 const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
@@ -733,9 +737,7 @@ router.post("/trasferimenti", async (req, res) => {
   if (
     righeInput.length === 0 ||
     righeInput.some(
-      (r) =>
-        !Number.isSafeInteger(r.prodottoId) ||
-        r.prodottoId <= 0,
+      (r) => !Number.isSafeInteger(r.prodottoId) || r.prodottoId <= 0,
     )
   ) {
     res.status(400).json({
@@ -1309,7 +1311,24 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
   try {
     const audit = auditContextFromRequest(req);
     await db.transaction(async (tx) => {
-      await requireOperationalMagazzino(tx, current.magazzinoDestinoId);
+      const destinationWarehouse = await requireOperationalMagazzino(
+        tx,
+        current.magazzinoDestinoId,
+      );
+      const [sourceWarehouse] = await tx
+        .select()
+        .from(magazziniTable)
+        .where(eq(magazziniTable.id, current.magazzinoOrigineId));
+      if (
+        destinationWarehouse.areaOperativaId == null ||
+        !sourceWarehouse ||
+        sourceWarehouse.areaOperativaId == null
+      ) {
+        throw new InventoryLedgerError(
+          409,
+          "I Magazzini del trasferimento devono appartenere a un'Area Operativa",
+        );
+      }
       const [claimed] = await tx
         .update(trasferimentiTable)
         .set({
@@ -1364,8 +1383,29 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
         const qty = u.m.quantita;
         let destLotto: typeof lottiTable.$inferSelect | undefined;
         const normalized = u.lotto?.codiceLottoNormalizzato ?? null;
+        let lottoLogicoId = u.lotto?.lottoLogicoId ?? null;
+        if (
+          lottoLogicoId == null ||
+          sourceWarehouse.areaOperativaId !==
+            destinationWarehouse.areaOperativaId
+        ) {
+          try {
+            lottoLogicoId = (
+              await resolveOpenLogicalLotForWarehouse(tx, {
+                magazzinoId: current.magazzinoDestinoId,
+              })
+            ).lotto.id;
+          } catch (error) {
+            if (error instanceof LogicalLotError) {
+              throw new InventoryLedgerError(error.status, error.message);
+            }
+            throw error;
+          }
+        }
         if (normalized != null) {
-          const lockKey = `${current.magazzinoDestinoId}:${u.m.prodottoId}:${u.m.fondoOrigine}:${normalized}`;
+          const fattoreKgLtPezzo =
+            u.m.fattoreKgLtPezzo ?? u.lotto?.fattoreKgLtPezzo ?? null;
+          const lockKey = `${current.magazzinoDestinoId}:${u.m.prodottoId}:${lottoLogicoId}:${u.m.fondoOrigine}:${u.lotto?.fornitoreId ?? "-"}:${normalized}:${u.lotto?.dataScadenza ?? "-"}:${fattoreKgLtPezzo ?? "-"}`;
           await tx.execute(
             sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
           );
@@ -1376,8 +1416,18 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
               and(
                 eq(lottiTable.magazzinoId, current.magazzinoDestinoId),
                 eq(lottiTable.prodottoId, u.m.prodottoId),
+                eq(lottiTable.lottoLogicoId, lottoLogicoId),
                 eq(lottiTable.fondoOrigine, u.m.fondoOrigine),
                 eq(lottiTable.codiceLottoNormalizzato, normalized),
+                u.lotto?.fornitoreId == null
+                  ? isNull(lottiTable.fornitoreId)
+                  : eq(lottiTable.fornitoreId, u.lotto.fornitoreId),
+                u.lotto?.dataScadenza == null
+                  ? isNull(lottiTable.dataScadenza)
+                  : eq(lottiTable.dataScadenza, u.lotto.dataScadenza),
+                fattoreKgLtPezzo == null
+                  ? isNull(lottiTable.fattoreKgLtPezzo)
+                  : eq(lottiTable.fattoreKgLtPezzo, fattoreKgLtPezzo),
               ),
             )
             .for("update");
@@ -1418,6 +1468,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
             .insert(lottiTable)
             .values({
               prodottoId: u.m.prodottoId,
+              lottoLogicoId,
               codiceLotto: u.lotto?.codiceLotto ?? null,
               codiceLottoNormalizzato: normalized,
               dataScadenza: u.lotto?.dataScadenza ?? null,

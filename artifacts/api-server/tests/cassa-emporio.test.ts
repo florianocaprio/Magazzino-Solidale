@@ -263,6 +263,7 @@ async function createProdotto(opts: {
   codice?: string;
   codiceBarre?: string;
   unitaMisura?: string;
+  quantitaFrazionabile?: boolean;
   dataScadenza?: string | null;
   fsePlus?: boolean;
 }): Promise<number> {
@@ -274,6 +275,11 @@ async function createProdotto(opts: {
       descrizione: "Prodotto Emporio",
       tipoProdotto: "alimenti",
       unitaMisura: opts.unitaMisura ?? "pz",
+      quantitaFrazionabile:
+        opts.quantitaFrazionabile ??
+        ["kg", "l", "lt"].includes(
+          (opts.unitaMisura ?? "pz").trim().toLowerCase(),
+        ),
       codiceBarre:
         opts.codiceBarre ??
         `200${Math.floor(Math.random() * 1_000_000_000)
@@ -2548,6 +2554,7 @@ describe("Cassa Emporio", () => {
     const prodottoGrammiId = await createProdotto({
       magazzinoId: fixture.magazzinoId,
       unitaMisura: "g",
+      quantitaFrazionabile: true,
     });
     const prodottoLitriId = await createProdotto({
       magazzinoId: fixture.magazzinoId,
@@ -2556,6 +2563,7 @@ describe("Cassa Emporio", () => {
     const prodottoMillilitriId = await createProdotto({
       magazzinoId: fixture.magazzinoId,
       unitaMisura: "ml",
+      quantitaFrazionabile: true,
     });
 
     const pz = await addProduct(sessione.body.id, prodottoPzId, 1);
@@ -2566,7 +2574,7 @@ describe("Cassa Emporio", () => {
       0.5,
     );
     expect(pzFrazionario.status).toBe(400);
-    expect(pzFrazionario.body.error).toContain('unità di misura "pz"');
+    expect(pzFrazionario.body.error).toContain("numero intero");
     let versione = await getSessionVersion(sessione.body.id);
     const duePezzi = await request(makeApp())
       .patch(`/cassa-emporio/sessioni/${sessione.body.id}/righe/${pz.body.id}`)
@@ -2581,7 +2589,7 @@ describe("Cassa Emporio", () => {
         )
         .send({ quantita, versione });
       expect(frazionaria.status).toBe(400);
-      expect(frazionaria.body.error).toContain('unità di misura "pz"');
+      expect(frazionaria.body.error).toContain("numero intero");
     }
 
     expect((await addProduct(sessione.body.id, prodottoKgId, 0.5)).status).toBe(
@@ -2606,7 +2614,7 @@ describe("Cassa Emporio", () => {
     ).toBe(200);
     const chiusuraLegacy = await postSessionAction(sessione.body.id, "chiudi");
     expect(chiusuraLegacy.status).toBe(409);
-    expect(chiusuraLegacy.body.error).toContain("verifica manuale");
+    expect(chiusuraLegacy.body.error).toContain("numero intero");
     expect(
       await db
         .select()

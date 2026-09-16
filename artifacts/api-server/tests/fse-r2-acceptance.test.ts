@@ -141,7 +141,7 @@ beforeAll(async () => {
       nome: "Prodotto acceptance R2",
       tipoProdotto: "alimentare",
       unitaMisura: "pz",
-      gestioneLotto: true,
+      lottoFisicoObbligatorio: true,
     })
     .returning({ id: prodottiTable.id });
   [{ id: lotId }] = await db

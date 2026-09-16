@@ -179,9 +179,9 @@ async function disponibilitaPerScarico(
   if (policy === "scaduto") {
     value = InventoryDecimal.parse(disponibilita.giacenzaScadutaPrecisa);
   } else if (policy === "qualsiasi") {
-    value = InventoryDecimal.parse(disponibilita.giacenzaFisicaPrecisa).subtract(
-      InventoryDecimal.parse(disponibilita.impegnatoPreciso),
-    );
+    value = InventoryDecimal.parse(
+      disponibilita.giacenzaFisicaPrecisa,
+    ).subtract(InventoryDecimal.parse(disponibilita.impegnatoPreciso));
   } else {
     value = InventoryDecimal.parse(disponibilita.disponibileRealePrecisa, {
       allowNegative: true,
@@ -203,11 +203,9 @@ router.get(
       limit < 1 ||
       limit > 100
     ) {
-      res
-        .status(400)
-        .json({
-          error: "Paginazione non valida: page >= 1 e limit tra 1 e 100",
-        });
+      res.status(400).json({
+        error: "Paginazione non valida: page >= 1 e limit tra 1 e 100",
+      });
       return;
     }
     // Centro is enforced via scarichi's own column; area operativa is enforced via the
@@ -400,11 +398,9 @@ router.post(
         !Number.isSafeInteger(body.beneficiarioId) ||
         body.beneficiarioId <= 0
       ) {
-        res
-          .status(400)
-          .json({
-            error: "Beneficiario obbligatorio per la distribuzione finale",
-          });
+        res.status(400).json({
+          error: "Beneficiario obbligatorio per la distribuzione finale",
+        });
         return;
       }
       if (
@@ -414,11 +410,9 @@ router.post(
         ) ||
         !CANALI_OPERATIVI.includes(body.canaleOperativo as CanaleOperativo)
       ) {
-        res
-          .status(400)
-          .json({
-            error: "Canale operativo non valido per la distribuzione finale",
-          });
+        res.status(400).json({
+          error: "Canale operativo non valido per la distribuzione finale",
+        });
         return;
       }
       const [beneficiario] = await db
@@ -590,7 +584,7 @@ router.post(
         return;
       }
       if (error instanceof InventoryError) {
-        res.status(409).json({ error: error.message });
+        res.status(error.status).json({ error: error.message });
         return;
       }
       if (error instanceof InventoryLedgerError) {

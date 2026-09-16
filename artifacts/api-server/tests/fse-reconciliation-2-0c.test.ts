@@ -207,7 +207,7 @@ beforeAll(async () => {
       nome: "Prodotto recon",
       tipoProdotto: "alimentare",
       unitaMisura: "pz",
-      gestioneLotto: true,
+      lottoFisicoObbligatorio: true,
     })
     .returning({ id: prodottiTable.id });
   [{ id: lottoId }] = await db

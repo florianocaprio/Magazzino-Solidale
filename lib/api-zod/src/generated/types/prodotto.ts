@@ -16,7 +16,8 @@ export interface Prodotto {
   unitaMisura: string;
   /** @nullable */
   codiceBarre?: string | null;
-  gestioneLotto: boolean;
+  quantitaFrazionabile: boolean;
+  lottoFisicoObbligatorio: boolean;
   gestioneScadenza: boolean;
   fsePlus: boolean;
   scortaMinima: number;

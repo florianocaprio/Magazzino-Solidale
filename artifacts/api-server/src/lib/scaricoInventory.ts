@@ -4,6 +4,7 @@ import {
   lottiTable,
   movimentiTable,
   prenotazioniMagazzinoTable,
+  prodottiTable,
   scarichiTable,
   scaricoRigheTable,
 } from "@workspace/db";
@@ -32,12 +33,23 @@ import {
   recordAuditEvent,
   type AuditCommandContext,
 } from "./auditEvent";
+import {
+  ProductOperationalQuantityError,
+  validateProductOperationalQuantity,
+} from "./productQuantity";
 
 export type InventoryTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
 >[0];
 
-export class InventoryError extends Error {}
+export class InventoryError extends Error {
+  constructor(
+    message: string,
+    readonly status = 409,
+  ) {
+    super(message);
+  }
+}
 
 export interface ScaricoInventarialeRiga {
   prodottoId: number;
@@ -380,11 +392,44 @@ export async function creaScaricoInventariale(
     movementInput.operatoreId = auditUserId(input.audit);
   }
 
+  const productIds = [...new Set(input.righe.map((riga) => riga.prodottoId))];
+  const products = await tx
+    .select({
+      id: prodottiTable.id,
+      nome: prodottiTable.nome,
+      quantitaFrazionabile: prodottiTable.quantitaFrazionabile,
+    })
+    .from(prodottiTable)
+    .where(inArray(prodottiTable.id, productIds));
+  if (products.length !== productIds.length) {
+    throw new InventoryError("Uno o più Prodotti non esistono");
+  }
+  const productById = new Map(products.map((product) => [product.id, product]));
+  const normalizedQuantities = new Map<number, string>();
+  input.righe.forEach((riga, index) => {
+    const product = productById.get(riga.prodottoId)!;
+    try {
+      normalizedQuantities.set(
+        index,
+        validateProductOperationalQuantity({
+          quantita: riga.quantita,
+          quantitaFrazionabile: product.quantitaFrazionabile,
+          prodottoLabel: product.nome,
+        }).toDb(),
+      );
+    } catch (error) {
+      if (error instanceof ProductOperationalQuantityError) {
+        throw new InventoryError(error.message, 400);
+      }
+      throw error;
+    }
+  });
+
   await tx.insert(scaricoRigheTable).values(
-    input.righe.map((riga) => ({
+    input.righe.map((riga, index) => ({
       scaricoId: scarico.id,
       prodottoId: riga.prodottoId,
-      quantita: positiveInventoryDecimal(riga.quantita).toDb(),
+      quantita: normalizedQuantities.get(index)!,
       unitaMisura: riga.unitaMisura,
       note: riga.note ?? null,
     })),

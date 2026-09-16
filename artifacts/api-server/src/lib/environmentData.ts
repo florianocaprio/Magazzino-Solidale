@@ -13,6 +13,7 @@ import {
   db,
   fornitoriTable,
   interventiTable,
+  lottiLogiciTable,
   lottiTable,
   magazziniTable,
   mezziTable,
@@ -37,6 +38,7 @@ import {
   volontariTable,
   zoneUdsTable,
 } from "@workspace/db";
+import { ensureGeneralLogicalLot } from "./logicalLots";
 import { DEFAULT_POLICY_NAME } from "./seedPoliticheCreditoSolidale";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -241,9 +243,16 @@ export async function seedDemoWarehouseData(
           sigla: "DE",
           note: `${DEMO_MARKER}: dato territoriale sintetico`,
         })
-        .returning({ id: areeOperativeTable.id, note: areeOperativeTable.note });
+        .returning({
+          id: areeOperativeTable.id,
+          note: areeOperativeTable.note,
+        });
       createdAree += 1;
     }
+    const generalLogicalLot = await ensureGeneralLogicalLot(tx, {
+      areaOperativaId: area.id,
+      creatoDa: actorUserId,
+    });
 
     let [centro] = await tx
       .select({ id: centriAscoltoTable.id, note: centriAscoltoTable.note })
@@ -329,7 +338,7 @@ export async function seedDemoWarehouseData(
             descrizione: `${DEMO_MARKER}: prodotto non reale`,
             tipoProdotto: product.tipoProdotto,
             unitaMisura: product.unitaMisura,
-            gestioneLotto: true,
+            lottoFisicoObbligatorio: true,
             gestioneScadenza: true,
             scortaMinima: "2.00",
             scortaConsigliata: "10.00",
@@ -369,6 +378,7 @@ export async function seedDemoWarehouseData(
           .insert(lottiTable)
           .values({
             prodottoId: productIds[index],
+            lottoLogicoId: generalLogicalLot.id,
             codiceLotto: lotCode,
             dataScadenza: futureDate(8 + index * 2),
             dataCarico: today,
@@ -935,6 +945,9 @@ export async function resetDemoWarehouseData(
     let deletedAree = 0;
     if (demoArea) {
       if (!(await demoAreaHasReferences(tx, demoArea.id))) {
+        await tx
+          .delete(lottiLogiciTable)
+          .where(eq(lottiLogiciTable.areaOperativaId, demoArea.id));
         const rows = await tx
           .delete(areeOperativeTable)
           .where(eq(areeOperativeTable.id, demoArea.id))
@@ -1020,6 +1033,9 @@ async function resetWarehouseOperationalData(
   const deletedLotti = await tx
     .delete(lottiTable)
     .returning({ id: lottiTable.id });
+  const deletedLottiLogici = await tx
+    .delete(lottiLogiciTable)
+    .returning({ id: lottiLogiciTable.id });
   const deletedProdotti = await tx
     .delete(prodottiTable)
     .returning({ id: prodottiTable.id });
@@ -1047,6 +1063,7 @@ async function resetWarehouseOperationalData(
     deletedApprovvigionamenti: deletedApprovvigionamenti.length,
     deletedConsegne: deletedConsegne.length,
     deletedLotti: deletedLotti.length,
+    deletedLottiLogici: deletedLottiLogici.length,
     deletedProdotti: deletedProdotti.length,
     deletedFornitori: deletedFornitori.length,
     deletedMagazzini: deletedMagazzini.length,

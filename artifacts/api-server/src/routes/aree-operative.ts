@@ -1,9 +1,18 @@
 import { Router, type IRouter } from "express";
 import { db, areeOperativeTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { CreateAreaOperativaBody, UpdateAreaOperativaBody } from "@workspace/api-zod";
+import {
+  CreateAreaOperativaBody,
+  UpdateAreaOperativaBody,
+} from "@workspace/api-zod";
 import { callerAreaOperativaId } from "../lib/centroScope";
 import { requireGlobalAdmin } from "../lib/adminScope";
+import { ensureGeneralLogicalLot } from "../lib/logicalLots";
+import {
+  auditFields,
+  recordAuditEvent,
+  systemAuditContext,
+} from "../lib/auditEvent";
 
 const router: IRouter = Router();
 
@@ -25,7 +34,10 @@ router.get("/aree-operative", async (req, res) => {
   const areaOperativaId = callerAreaOperativaId(req);
   const rows =
     areaOperativaId == null
-      ? await db.select().from(areeOperativeTable).orderBy(areeOperativeTable.nome)
+      ? await db
+          .select()
+          .from(areeOperativeTable)
+          .orderBy(areeOperativeTable.nome)
       : await db
           .select()
           .from(areeOperativeTable)
@@ -41,7 +53,10 @@ router.get("/aree-operative/:id", async (req, res) => {
     res.status(403).json({ error: "Area non accessibile per il tuo profilo" });
     return;
   }
-  const [row] = await db.select().from(areeOperativeTable).where(eq(areeOperativeTable.id, id));
+  const [row] = await db
+    .select()
+    .from(areeOperativeTable)
+    .where(eq(areeOperativeTable.id, id));
   if (!row) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -59,7 +74,38 @@ router.post("/aree-operative", requireGlobalAdmin, async (req, res) => {
   if (values.sigla) values.sigla = values.sigla.toUpperCase();
   if (values.codiceMatricola)
     values.codiceMatricola = values.codiceMatricola.toUpperCase();
-  const [row] = await db.insert(areeOperativeTable).values(values).returning();
+  const initiator = req.user!;
+  const row = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(areeOperativeTable)
+      .values(values)
+      .returning();
+    const generale = await ensureGeneralLogicalLot(tx, {
+      areaOperativaId: created.id,
+      creatoDa: initiator.id,
+    });
+    await recordAuditEvent(tx, {
+      command: systemAuditContext({
+        actorCode: "m2-area-general",
+        initiatedByUserId: initiator.id,
+        initiatedByCodeSnapshot:
+          initiator.matricola?.trim() ||
+          initiator.username?.trim() ||
+          `utente-${initiator.id}`,
+      }),
+      azione: "LOTTO_LOGICO_GENERALE_CREATO",
+      entitaTipo: "lotto_logico",
+      entitaId: generale.id,
+      areaOperativaIdSnapshot: created.id,
+      changes: auditFields(generale, [
+        "codice",
+        "descrizione",
+        "stato",
+        "isGenerale",
+      ]),
+    });
+    return created;
+  });
   res.status(201).json(fmt(row));
 });
 

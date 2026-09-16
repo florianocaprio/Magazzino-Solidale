@@ -1141,7 +1141,9 @@ export interface ProdottoInput {
   tipoProdotto: string;
   unitaMisura: string;
   codiceBarre?: string;
-  gestioneLotto?: boolean;
+  /** Se omesso, il backend deriva il default dall'unità di misura */
+  quantitaFrazionabile?: boolean;
+  lottoFisicoObbligatorio?: boolean;
   gestioneScadenza?: boolean;
   fsePlus?: boolean;
   scortaMinima?: number;
@@ -1344,7 +1346,8 @@ export interface Prodotto {
   unitaMisura: string;
   /** @nullable */
   codiceBarre?: string | null;
-  gestioneLotto: boolean;
+  quantitaFrazionabile: boolean;
+  lottoFisicoObbligatorio: boolean;
   gestioneScadenza: boolean;
   fsePlus: boolean;
   scortaMinima: number;
@@ -1380,7 +1383,8 @@ export interface ProdottoUpdate {
   tipoProdotto?: string;
   unitaMisura?: string;
   codiceBarre?: string;
-  gestioneLotto?: boolean;
+  quantitaFrazionabile?: boolean;
+  lottoFisicoObbligatorio?: boolean;
   gestioneScadenza?: boolean;
   fsePlus?: boolean;
   scortaMinima?: number;
@@ -1846,6 +1850,11 @@ export interface CaricoMagazzinoRigaInput {
 export interface CaricoMagazzinoInput {
   /** @minimum 1 */
   magazzinoId: number;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  lottoLogicoId?: number | null;
   origineCarico: OrigineCaricoManuale;
   /** @nullable */
   numeroDocumento?: string | null;
@@ -1867,9 +1876,78 @@ export interface CaricoMagazzinoInput {
   righe: CaricoMagazzinoRigaInput[];
 }
 
+export type LottoLogicoStato = typeof LottoLogicoStato[keyof typeof LottoLogicoStato];
+
+
+export const LottoLogicoStato = {
+  aperto: 'aperto',
+  chiuso: 'chiuso',
+  archiviato: 'archiviato',
+} as const;
+
+export interface LottoLogico {
+  id: number;
+  areaOperativaId: number;
+  codice: string;
+  descrizione: string;
+  /** @nullable */
+  dataInizio?: string | null;
+  /** @nullable */
+  dataFine?: string | null;
+  /** @nullable */
+  note?: string | null;
+  stato: LottoLogicoStato;
+  isGenerale: boolean;
+  /** @nullable */
+  creatoDa?: number | null;
+  /** @nullable */
+  aggiornatoDa?: number | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+  maiCaricato: boolean;
+  esaurito: boolean;
+  inTransito: boolean;
+  quantitaResiduaPrecisa: QuantitaContabile;
+}
+
+export interface LottoLogicoInput {
+  /** @minimum 1 */
+  areaOperativaId: number;
+  /** @maxLength 80 */
+  codice: string;
+  /** @maxLength 200 */
+  descrizione: string;
+  /** @nullable */
+  dataInizio?: string | null;
+  /** @nullable */
+  dataFine?: string | null;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface LottoLogicoUpdate {
+  /** @maxLength 80 */
+  codice?: string;
+  /** @maxLength 200 */
+  descrizione?: string;
+  /** @nullable */
+  dataInizio?: string | null;
+  /** @nullable */
+  dataFine?: string | null;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface LottoLogicoTransitionInput {
+  /** @maxLength 1000 */
+  motivo?: string;
+}
+
 export interface Lotto {
   id: number;
   prodottoId: number;
+  /** @nullable */
+  lottoLogicoId?: number | null;
   /** @nullable */
   prodottoNome?: string | null;
   /** @nullable */
@@ -1914,6 +1992,8 @@ export const LottoInputCausale = {
 
 export interface LottoInput {
   prodottoId: number;
+  /** @nullable */
+  lottoLogicoId?: number | null;
   codiceLotto?: string;
   dataScadenza?: string;
   dataCarico: string;
@@ -8626,6 +8706,14 @@ pageSize?: FsePageSizeParameter;
 magazzinoId?: FseOptionalMagazzinoIdParameter;
 dataCompetenzaDa?: FseOptionalDataDaParameter;
 dataCompetenzaA?: FseOptionalDataAParameter;
+};
+
+export type ListLottiLogiciParams = {
+/**
+ * @minimum 1
+ */
+areaOperativaId?: number;
+includeStorico?: boolean;
 };
 
 export type ListLottiParams = {

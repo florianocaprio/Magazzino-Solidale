@@ -77,7 +77,7 @@ beforeAll(async () => {
       nome: "=Prodotto formula injection",
       tipoProdotto: "alimentare",
       unitaMisura: "pz",
-      gestioneLotto: true,
+      lottoFisicoObbligatorio: true,
       gestioneScadenza: true,
     })
     .returning({ id: prodottiTable.id });

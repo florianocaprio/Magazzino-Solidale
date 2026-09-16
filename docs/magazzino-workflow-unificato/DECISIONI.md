@@ -55,7 +55,7 @@ lotto/dettaglio_fisico
   └─ quantità caricata/residua
 ```
 
-Il dettaglio fisico conserva un proprio ID e non viene fuso automaticamente con righe aventi gli stessi valori. Un eventuale consolidamento è ammesso solo da un servizio che confronti almeno prodotto, magazzino, fondo, provenienza/fornitore, codice lotto fisico normalizzato, scadenza effettiva, unità e fattore, mantenendo comunque il lineage dei carichi.
+Il dettaglio fisico conserva un proprio ID e non viene fuso automaticamente con righe aventi gli stessi valori. Un eventuale consolidamento è ammesso solo da un servizio che confronti almeno prodotto, magazzino, lotto logico, fondo, provenienza/fornitore, codice lotto fisico normalizzato, scadenza effettiva, unità e fattore, mantenendo comunque il lineage dei carichi.
 
 Il lotto logico contiene codice, descrizione, Area operativa, date indicative, note, stato e autori. La sua data termine/scadenza è organizzativa; il FEFO usa esclusivamente la scadenza effettiva del dettaglio fisico.
 
@@ -65,7 +65,7 @@ Il lotto logico contiene codice, descrizione, Area operativa, date indicative, n
 
 **Impatto.** Nuova relazione e migrazione conservativa in M2; adeguamento OpenAPI/client, carichi, viste giacenza e documenti successivi.
 
-**Stato.** Requisito approvato in M0; non implementato e non testato. Schema, migrazione conservativa e prove sono demandati a M2 e condizionano M3–M4.
+**Stato.** Implementazione candidata verificata automaticamente in M2 (`OK-M2/NE-MAN`): schema, migrazione conservativa, servizio di carico, lifecycle API, audit e regressioni sono coperti. La UI operativa M3, i completamenti M4 e la prova manuale M2 non sono ancora eseguiti.
 
 ### Lotto logico “Generale”
 
@@ -73,14 +73,14 @@ Il lotto logico contiene codice, descrizione, Area operativa, date indicative, n
 
 - È preselezionato per un carico privo di attività specifica, ma resta visibile e confermato prima della registrazione.
 - Il codice lotto fisico/produttore è nullable e non diventa obbligatorio per il solo fatto che il prodotto partecipa alla gestione lotti del Magazzino Solidale; `Generale` non sostituisce né inventa tale codice.
-- In M2 verrà definito un requisito separato del prodotto per rendere obbligatorio il codice fisico/produttore quando la reale tracciabilità lo richiede. Il nome definitivo del campo sarà scelto in M2 e non è definito o implementato in M0.
+- M2 definisce il requisito separato `lottoFisicoObbligatorio`: se `true` il codice fisico/produttore è obbligatorio; se `false` resta opzionale. Il precedente `gestioneLotto` è rinominato preservandone i valori e non governa il lotto logico.
 - Anche senza codice lotto fisico viene creato un dettaglio distinto, perché quantità, magazzino, fondo, scadenza e lineage devono restare separati.
 - I dati legacy non vengono assegnati retroattivamente a “Generale”: `lotto_logico_id` resta nullo con classificazione `legacy_non_ricostruibile` fino a una riconciliazione documentata.
 - Un'Area legacy nulla non riceve automaticamente un “Generale”. Le nuove operazioni richiedono Area valida.
 
 **Perché.** Un default globale attraverserebbe il confine territoriale e renderebbe ambigua la chiusura; un default per prodotto moltiplicherebbe contenitori privi di significato per il volontario.
 
-**Stato.** Requisito approvato in M0; non implementato e non testato. La migrazione resta attività M2.
+**Stato.** Implementazione candidata verificata automaticamente in M2 (`OK-M2/NE-MAN`): migrazione, nuove Aree e seed/demo creano un solo `Generale`; i 21 dettagli legacy restano null e le API ne proteggono struttura e lifecycle. La prova manuale M2 resta pendente.
 
 ### Ciclo di vita
 
@@ -93,6 +93,12 @@ Il lotto logico contiene codice, descrizione, Area operativa, date indicative, n
 
 Il lotto “Generale” non viene chiuso. Una raccolta ordinaria può essere chiusa anche con residuo, ma non viene dichiarata esaurita finché resta merce o transito.
 
+### Regola lotto logico nei trasferimenti
+
+**Decisione implementativa M2.** Alla ricezione di un trasferimento fra magazzini della stessa Area, il dettaglio fisico di destinazione conserva il `lottoLogicoId` sorgente, anche se il lotto è stato chiuso mentre la merce era già in transito. Se origine e destinazione appartengono ad Aree diverse, il dettaglio di destinazione viene invece associato al `Generale` dell'Area ricevente: non conserva un riferimento cross-Area, non resta senza lotto logico e non clona automaticamente il lotto nominativo sorgente.
+
+La provenienza resta ricostruibile dal trasferimento, dai movimenti di uscita e ingresso e da `movimentoOrigineId`. Questa regola è verificata automaticamente in M2; visualizzazione completa, prenotazioni e gestione definitiva delle ulteriori condizioni di transito/rientro restano in LOT-02/LOT-03 per M4B.
+
 ## D2 — Catalogo e quantità
 
 **Decisione approvata.** Il catalogo resta globale; Area e magazzino entrano solo nelle proiezioni di disponibilità e nei flussi operativi.
@@ -104,11 +110,11 @@ Ogni riga presenta un solo input principale `quantita`, etichettato con l'unità
 - fattore noto: peso/volume derivato, non secondo campo obbligatorio;
 - fattore mancante: si raccoglie il dato aggiuntivo solo se semanticamente distinto e richiesto dal processo.
 
-M2 introdurrà la proprietà esplicita di catalogo `quantitaFrazionabile`, con default `false` per `pz` e `cf` e `true` per kg/litri, applicata con vincolo backend. Il valore usato dall'operazione e il fattore vengono copiati sulle righe/movimenti per conservare la semantica storica.
+M2 introduce la proprietà esplicita di catalogo `quantitaFrazionabile`, con default `false` per `pz`, `cf` e `conf` e `true` per `kg`, `l` e `lt`, applicata con validazione backend comune. Il valore esplicito prevale sempre sull'unità dopo la creazione. Il valore usato dall'operazione e il fattore vengono copiati sulle righe/movimenti per conservare la semantica storica.
 
 **Legacy.** Una query di preflight elenca prodotti indivisibili con frazioni. Queste righe non sono arrotondate: vengono marcate come anomalia, continuano a essere leggibili e richiedono una scelta esplicita di riclassificazione, rettifica o mantenimento legacy.
 
-**Stato.** Requisito approvato in M0; non implementato e non testato. Implementazione e bonifica non distruttiva sono demandate a M2 e ai contratti M3/M4.
+**Stato.** Implementazione candidata verificata automaticamente in M2 (`OK-M2/NE-MAN`): default, override, helper fixed-point, flussi ordinari, diagnostica legacy e rettifica amministrativa sono coperti dalle suite complete. Nessun dato storico viene arrotondato o corretto. La prova manuale M2 resta pendente.
 
 ## D3 — Pratica di carico e integrazioni
 

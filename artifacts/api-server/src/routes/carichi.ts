@@ -223,6 +223,10 @@ router.post(
       const result = await db.transaction((tx) =>
         createWarehouseLoad(tx, {
           magazzinoId: body.magazzinoId,
+          lottoLogicoId:
+            Number.isSafeInteger(body.lottoLogicoId) && body.lottoLogicoId > 0
+              ? body.lottoLogicoId
+              : null,
           origineCarico: body.origineCarico,
           numeroDocumento: body.numeroDocumento,
           dataDocumento: body.dataDocumento,

@@ -1422,6 +1422,137 @@ paths:
         "409": { $ref: "#/components/responses/FseConflict" }
 
   # ─── LOTTI ───────────────────────────────────────────────────────────────────
+  /lotti-logici:
+    get:
+      operationId: listLottiLogici
+      tags: [lotti-logici]
+      summary: Elenca i lotti logici dell'Area Operativa
+      parameters:
+        - name: areaOperativaId
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: includeStorico
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Lotti logici visibili nell'Area
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/LottoLogico" }
+    post:
+      operationId: createLottoLogico
+      tags: [lotti-logici]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LottoLogicoInput" }
+      responses:
+        "201":
+          description: Lotto logico creato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoLogico" }
+
+  /lotti-logici/{id}:
+    get:
+      operationId: getLottoLogico
+      tags: [lotti-logici]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Lotto logico
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoLogico" }
+    patch:
+      operationId: updateLottoLogico
+      tags: [lotti-logici]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LottoLogicoUpdate" }
+      responses:
+        "200":
+          description: Lotto logico aggiornato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoLogico" }
+
+  /lotti-logici/{id}/chiudi:
+    post:
+      operationId: closeLottoLogico
+      tags: [lotti-logici]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LottoLogicoTransitionInput" }
+      responses:
+        "200":
+          description: Lotto logico chiuso
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoLogico" }
+
+  /lotti-logici/{id}/riapri:
+    post:
+      operationId: reopenLottoLogico
+      tags: [lotti-logici]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LottoLogicoTransitionInput" }
+      responses:
+        "200":
+          description: Lotto logico riaperto
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoLogico" }
+
+  /lotti-logici/{id}/archivia:
+    post:
+      operationId: archiveLottoLogico
+      tags: [lotti-logici]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LottoLogicoTransitionInput" }
+      responses:
+        "200":
+          description: Lotto logico archiviato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoLogico" }
+
   /lotti:
     get:
       operationId: listLotti
@@ -1647,7 +1778,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Giacenza"
-        "400": { description: Parametri territoriali o filtro sottoscorta non validi }
+        "400":
+          {
+            description: Parametri territoriali o filtro sottoscorta non validi,
+          }
         "403": { description: Area Operativa o magazzino non accessibili }
         "404": { description: Area Operativa o magazzino non trovati }
 
@@ -2450,13 +2584,15 @@ paths:
         required: true
         content:
           multipart/form-data:
-            schema: { $ref: "#/components/schemas/BeneficiariFseWorkbookUpload" }
+            schema:
+              { $ref: "#/components/schemas/BeneficiariFseWorkbookUpload" }
       responses:
         "200":
           description: Preview e classificazione righe
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/BeneficiariFsePreviewResult" }
+              schema:
+                { $ref: "#/components/schemas/BeneficiariFsePreviewResult" }
         "400": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
         "401": { $ref: "#/components/responses/BeneficiariFseUnauthorized" }
         "403": { $ref: "#/components/responses/BeneficiariFseForbidden" }
@@ -2472,13 +2608,17 @@ paths:
         required: true
         content:
           multipart/form-data:
-            schema: { $ref: "#/components/schemas/BeneficiariFseWorkbookImportUpload" }
+            schema:
+              {
+                $ref: "#/components/schemas/BeneficiariFseWorkbookImportUpload",
+              }
       responses:
         "200":
           description: Esito batch
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/BeneficiariFseImportResult" }
+              schema:
+                { $ref: "#/components/schemas/BeneficiariFseImportResult" }
         "400": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
         "401": { $ref: "#/components/responses/BeneficiariFseUnauthorized" }
         "403": { $ref: "#/components/responses/BeneficiariFseForbidden" }
@@ -2500,7 +2640,8 @@ paths:
           description: Candidati, esportabili e blocchi
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/BeneficiariFseExportPreflight" }
+              schema:
+                { $ref: "#/components/schemas/BeneficiariFseExportPreflight" }
         "400": { $ref: "#/components/responses/BeneficiariFseBadRequest" }
         "401": { $ref: "#/components/responses/BeneficiariFseUnauthorized" }
         "403": { $ref: "#/components/responses/BeneficiariFseForbidden" }
@@ -6180,7 +6321,15 @@ paths:
           required: false
           schema:
             type: string
-            enum: [TEMPORANEA, MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
+            enum:
+              [
+                TEMPORANEA,
+                MANCANTE,
+                VALIDA,
+                IN_SCADENZA,
+                SCADUTA,
+                NON_ANCORA_VALIDA,
+              ]
         - name: ruoloVolontarioId
           in: query
           required: false
@@ -6240,12 +6389,18 @@ paths:
           description: Dati anagrafici non validi
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
+              schema:
+                {
+                  $ref: "#/components/schemas/VolontarioValidationErrorResponse",
+                }
         "409":
           description: Codice fiscale duplicato
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
+              schema:
+                {
+                  $ref: "#/components/schemas/VolontarioValidationErrorResponse",
+                }
 
   /volontari/bulk:
     post:
@@ -6332,7 +6487,8 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/VolontarioRiattivazioneInput" }
+            schema:
+              { $ref: "#/components/schemas/VolontarioRiattivazioneInput" }
       responses:
         "200":
           description: Riattivazione amministrativa registrata
@@ -6350,7 +6506,8 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/VolontarioInsuranceVersionInput" }
+            schema:
+              { $ref: "#/components/schemas/VolontarioInsuranceVersionInput" }
       responses:
         "201":
           description: Copertura storicizzata
@@ -6361,7 +6518,8 @@ paths:
           description: Copertura annuale non applicabile a un volontario temporaneo o versione non aggiornata
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/VolontarioKnownConflictResponse" }
+              schema:
+                { $ref: "#/components/schemas/VolontarioKnownConflictResponse" }
 
   /volontari/assicurazione/massivo/preview:
     post:
@@ -6371,7 +6529,8 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/VolontarioBulkInsuranceInput" }
+            schema:
+              { $ref: "#/components/schemas/VolontarioBulkInsuranceInput" }
       responses:
         "200":
           description: Anteprima rinnovo massivo
@@ -6382,7 +6541,10 @@ paths:
                 properties:
                   items:
                     type: array
-                    items: { $ref: "#/components/schemas/VolontarioBulkInsurancePreviewRow" }
+                    items:
+                      {
+                        $ref: "#/components/schemas/VolontarioBulkInsurancePreviewRow",
+                      }
                 required: [items]
 
   /volontari/assicurazione/massivo/conferma:
@@ -6393,7 +6555,10 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/VolontarioBulkInsuranceConfirmInput" }
+            schema:
+              {
+                $ref: "#/components/schemas/VolontarioBulkInsuranceConfirmInput",
+              }
       responses:
         "200": { description: Rinnovo massivo completato }
 
@@ -6427,7 +6592,8 @@ paths:
           description: Giornata già registrata per volontario, data e centro
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/VolontarioKnownConflictResponse" }
+              schema:
+                { $ref: "#/components/schemas/VolontarioKnownConflictResponse" }
 
   /volontari/{id}/giornate/{giornataId}:
     patch:
@@ -6435,12 +6601,18 @@ paths:
       tags: [volontari]
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
-        - { name: giornataId, in: path, required: true, schema: { type: integer } }
+        - {
+            name: giornataId,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/VolontarioServiceDayUpdateInput" }
+            schema:
+              { $ref: "#/components/schemas/VolontarioServiceDayUpdateInput" }
       responses:
         "200": { description: Giornata aggiornata }
 
@@ -6450,7 +6622,12 @@ paths:
       tags: [volontari]
       parameters:
         - { name: centroAscoltoId, in: query, schema: { type: integer } }
-        - { name: x-file-name, in: header, required: true, schema: { type: string } }
+        - {
+            name: x-file-name,
+            in: header,
+            required: true,
+            schema: { type: string },
+          }
       requestBody:
         required: true
         content:
@@ -6483,8 +6660,12 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-        "403": { description: Batch fuori dallo scope proprietario del chiamante }
-        "409": { description: "Conflitto di concorrenza: CF, matricola o decisioni divergenti" }
+        "403":
+          { description: Batch fuori dallo scope proprietario del chiamante }
+        "409":
+          {
+            description: "Conflitto di concorrenza: CF, matricola o decisioni divergenti",
+          }
 
   /volontari/formazione/corsi:
     get:
@@ -6508,7 +6689,12 @@ paths:
       operationId: updateVolontariCourseCatalog
       tags: [volontari]
       parameters:
-        - { name: catalogoId, in: path, required: true, schema: { type: integer } }
+        - {
+            name: catalogoId,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
       requestBody:
         required: true
         content:
@@ -6553,7 +6739,12 @@ paths:
       operationId: updateVolontariQualificationCatalog
       tags: [volontari]
       parameters:
-        - { name: catalogoId, in: path, required: true, schema: { type: integer } }
+        - {
+            name: catalogoId,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
       requestBody:
         required: true
         content:
@@ -6606,9 +6797,13 @@ paths:
         required: false
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/VolontariRegisterGenerateInput" }
+            schema:
+              { $ref: "#/components/schemas/VolontariRegisterGenerateInput" }
       responses:
-        "200": { description: "Registro ufficiale separato dagli export storico e operativo, emesso in PDF Unicode o XLSX con snapshot e hash persistiti" }
+        "200":
+          {
+            description: "Registro ufficiale separato dagli export storico e operativo, emesso in PDF Unicode o XLSX con snapshot e hash persistiti",
+          }
 
   /volontari/registro/emissioni:
     get:
@@ -6623,18 +6818,33 @@ paths:
       operationId: downloadVolontariRegisterEmission
       tags: [volontari]
       parameters:
-        - { name: emissioneId, in: path, required: true, schema: { type: integer } }
+        - {
+            name: emissioneId,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
       responses:
-        "200": { description: File originale byte-per-byte dell'emissione con integrità verificata e download sottoposto ad audit }
-        "403": { description: Emissione fuori dallo scope proprietario del chiamante }
-        "409": { description: Integrità del file o dello snapshot non verificata }
+        "200":
+          {
+            description: File originale byte-per-byte dell'emissione con integrità verificata e download sottoposto ad audit,
+          }
+        "403":
+          {
+            description: Emissione fuori dallo scope proprietario del chiamante,
+          }
+        "409":
+          { description: Integrità del file o dello snapshot non verificata }
 
   /volontari/registro/eventi:
     get:
       operationId: listVolontariRegisterEvents
       tags: [volontari]
       responses:
-        "200": { description: "Eventi append-only del registro; lo snapshot PII completo è restituito solo con permesso export/manage o privilegi amministrativi, altrimenti è sanificato" }
+        "200":
+          {
+            description: "Eventi append-only del registro; lo snapshot PII completo è restituito solo con permesso export/manage o privilegi amministrativi, altrimenti è sanificato",
+          }
 
   /volontari/registro/verifica-integrita:
     get:
@@ -6644,21 +6854,33 @@ paths:
       responses:
         "200": { description: Catena ledger integra }
         "403": { description: Funzione riservata al Super Admin }
-        "409": { description: Interruzione o alterazione rilevata nella catena ledger }
+        "409":
+          {
+            description: Interruzione o alterazione rilevata nella catena ledger,
+          }
 
   /volontari/registro/eventi/{eventoId}/rettifica:
     post:
       operationId: correctVolontariRegisterEvent
       tags: [volontari]
       parameters:
-        - { name: eventoId, in: path, required: true, schema: { type: integer } }
+        - {
+            name: eventoId,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/VolontariRegisterCorrectionInput" }
+            schema:
+              { $ref: "#/components/schemas/VolontariRegisterCorrectionInput" }
       responses:
-        "201": { description: Evento di rettifica aggiunto senza alterare lo storico }
+        "201":
+          {
+            description: Evento di rettifica aggiunto senza alterare lo storico,
+          }
 
   /volontari/{id}/matricole:
     get:
@@ -6686,12 +6908,18 @@ paths:
           description: Preview non consumante della prossima matricola permanente
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/VolontarioPermanentConversionPreviewResponse" }
+              schema:
+                {
+                  $ref: "#/components/schemas/VolontarioPermanentConversionPreviewResponse",
+                }
         "422":
           description: Anagrafica incompleta o configurazione matricola non valida
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
+              schema:
+                {
+                  $ref: "#/components/schemas/VolontarioValidationErrorResponse",
+                }
 
   /volontari/{id}/conversione-permanente:
     post:
@@ -6703,7 +6931,10 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/VolontarioPermanentConversionInput" }
+            schema:
+              {
+                $ref: "#/components/schemas/VolontarioPermanentConversionInput",
+              }
       responses:
         "200":
           description: Conversione atomica completata
@@ -6715,7 +6946,10 @@ paths:
           description: Anagrafica incompleta o configurazione matricola non valida
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
+              schema:
+                {
+                  $ref: "#/components/schemas/VolontarioValidationErrorResponse",
+                }
 
   /volontari/{id}:
     get:
@@ -6766,12 +7000,18 @@ paths:
           description: Dati anagrafici non validi
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
+              schema:
+                {
+                  $ref: "#/components/schemas/VolontarioValidationErrorResponse",
+                }
         "409":
           description: Codice fiscale duplicato, versione obsoleta o modifica riservata a un workflow dedicato
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/VolontarioValidationErrorResponse" }
+              schema:
+                {
+                  $ref: "#/components/schemas/VolontarioValidationErrorResponse",
+                }
     delete:
       operationId: deleteVolontario
       tags: [volontari]
@@ -8763,8 +9003,10 @@ components:
         "Nome Referente fascicolo": { type: string }
         "Cognome Referente fascicolo": { type: string }
         "Codice fascicolo": { type: string }
-        "Data di presa in carico": { anyOf: [{ type: string }, { type: number }] }
-        "Numero componenti fascicolo": { anyOf: [{ type: string }, { type: number }] }
+        "Data di presa in carico":
+          { anyOf: [{ type: string }, { type: number }] }
+        "Numero componenti fascicolo":
+          { anyOf: [{ type: string }, { type: number }] }
         "Tipologia di Attività": { type: string }
         "Stato attuale": { type: string }
         "Donne": { anyOf: [{ type: string }, { type: number }] }
@@ -8773,10 +9015,13 @@ components:
         "Età 18-29": { anyOf: [{ type: string }, { type: number }] }
         "Età 30-64": { anyOf: [{ type: string }, { type: number }] }
         "Età>=65": { anyOf: [{ type: string }, { type: number }] }
-        "Origine straniera e minoranze": { anyOf: [{ type: string }, { type: number }] }
+        "Origine straniera e minoranze":
+          { anyOf: [{ type: string }, { type: number }] }
         "Disabili": { anyOf: [{ type: string }, { type: number }] }
-        "Cittadini di Paesi Terzi": { anyOf: [{ type: string }, { type: number }] }
-        "Senzatetto o colpiti da esclusione abitativa": { anyOf: [{ type: string }, { type: number }] }
+        "Cittadini di Paesi Terzi":
+          { anyOf: [{ type: string }, { type: number }] }
+        "Senzatetto o colpiti da esclusione abitativa":
+          { anyOf: [{ type: string }, { type: number }] }
       required:
         [
           "Nome Referente fascicolo",
@@ -8850,13 +9095,23 @@ components:
         codiceFascicolo: { type: [string, "null"] }
         classificazione:
           type: string
-          enum: [nuovo, da_collegare, da_aggiornare, invariato, possibile_duplicato, conflitto, errore]
+          enum:
+            [
+              nuovo,
+              da_collegare,
+              da_aggiornare,
+              invariato,
+              possibile_duplicato,
+              conflitto,
+              errore,
+            ]
         errori: { type: array, items: { type: string } }
         warning: { type: array, items: { type: string } }
         beneficiarioId: { type: integer }
         duplicati:
           type: array
-          items: { $ref: "#/components/schemas/BeneficiariFseDuplicateCandidate" }
+          items:
+            { $ref: "#/components/schemas/BeneficiariFseDuplicateCandidate" }
       required: [numeroRiga, codiceFascicolo, classificazione, errori, warning]
     BeneficiariFsePreviewResult:
       type: object
@@ -8947,13 +9202,31 @@ components:
       properties:
         candidati: { type: integer }
         esportabili: { type: integer }
-        bloccati: { type: array, items: { $ref: "#/components/schemas/BeneficiariFseExportIssue" } }
-        warning: { type: array, items: { $ref: "#/components/schemas/BeneficiariFseExportIssue" } }
+        bloccati:
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/BeneficiariFseExportIssue" },
+          }
+        warning:
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/BeneficiariFseExportIssue" },
+          }
         centroAscoltoId: { type: integer }
         areaOperativaId: { type: integer }
         dataRiferimento: { type: string, format: date }
         soloAttivi: { type: boolean, const: true }
-      required: [candidati, esportabili, bloccati, warning, centroAscoltoId, areaOperativaId, dataRiferimento, soloAttivi]
+      required:
+        [
+          candidati,
+          esportabili,
+          bloccati,
+          warning,
+          centroAscoltoId,
+          areaOperativaId,
+          dataRiferimento,
+          soloAttivi,
+        ]
     BeneficiarioFseUpdate:
       type: object
       additionalProperties: false
@@ -8982,13 +9255,15 @@ components:
         eta1829: { type: integer }
         eta3064: { type: integer }
         eta65Plus: { type: integer }
-      required: [numeroComponenti, donne, uomini, eta017, eta1829, eta3064, eta65Plus]
+      required:
+        [numeroComponenti, donne, uomini, eta017, eta1829, eta3064, eta65Plus]
     BeneficiarioFseDemografia:
       allOf:
         - $ref: "#/components/schemas/BeneficiarioFseSnapshot"
         - type: object
           properties:
-            origine: { type: string, enum: [anagrafica_calcolata, snapshot_fse] }
+            origine:
+              { type: string, enum: [anagrafica_calcolata, snapshot_fse] }
             dettaglioCompleto: { type: boolean }
             problemi: { type: array, items: { type: string } }
           required: [origine, dettaglioCompleto, problemi]
@@ -9002,8 +9277,13 @@ components:
     BeneficiarioFseComparison:
       type: object
       properties:
-        stato: { type: string, enum: [coerente, non_allineato, non_confrontabile] }
-        differenze: { type: array, items: { $ref: "#/components/schemas/BeneficiarioFseDifference" } }
+        stato:
+          { type: string, enum: [coerente, non_allineato, non_confrontabile] }
+        differenze:
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/BeneficiarioFseDifference" },
+          }
       required: [stato, differenze]
     BeneficiarioFseProfile:
       type: object
@@ -9070,14 +9350,27 @@ components:
         componentiDettagliati: { type: integer }
         demografia: { $ref: "#/components/schemas/BeneficiarioFseDemografia" }
         confronto: { $ref: "#/components/schemas/BeneficiarioFseComparison" }
-      required: [profilo, snapshot, disabili, componentiDichiarati, componentiDettagliati, demografia, confronto]
+      required:
+        [
+          profilo,
+          snapshot,
+          disabili,
+          componentiDichiarati,
+          componentiDettagliati,
+          demografia,
+          confronto,
+        ]
     BeneficiariFseError:
       type: object
       properties:
         error: { type: string }
         errori: { type: array, items: { type: string } }
         warning: { type: array, items: { type: string } }
-        bloccati: { type: array, items: { $ref: "#/components/schemas/BeneficiariFseExportIssue" } }
+        bloccati:
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/BeneficiariFseExportIssue" },
+          }
       required: [error]
     FseErrorResponse:
       type: object
@@ -9357,7 +9650,8 @@ components:
           items: { type: string, enum: [open, route, convert_delivery] }
         latitude: { type: [number, "null"] }
         longitude: { type: [number, "null"] }
-        locationStatus: { type: string, enum: [resolved, pending, not_found, error] }
+        locationStatus:
+          { type: string, enum: [resolved, pending, not_found, error] }
     MapsRoute:
       type: object
       required: [origin, destination, provider, url]
@@ -9973,7 +10267,9 @@ components:
           type: string
         codiceBarre:
           type: ["string", "null"]
-        gestioneLotto:
+        quantitaFrazionabile:
+          type: boolean
+        lottoFisicoObbligatorio:
           type: boolean
         gestioneScadenza:
           type: boolean
@@ -10016,7 +10312,8 @@ components:
           nome,
           tipoProdotto,
           unitaMisura,
-          gestioneLotto,
+          quantitaFrazionabile,
+          lottoFisicoObbligatorio,
           gestioneScadenza,
           fsePlus,
           scortaMinima,
@@ -10044,7 +10341,10 @@ components:
           type: string
         codiceBarre:
           type: string
-        gestioneLotto:
+        quantitaFrazionabile:
+          type: boolean
+          description: Se omesso, il backend deriva il default dall'unità di misura
+        lottoFisicoObbligatorio:
           type: boolean
         gestioneScadenza:
           type: boolean
@@ -10093,7 +10393,9 @@ components:
           type: string
         codiceBarre:
           type: string
-        gestioneLotto:
+        quantitaFrazionabile:
+          type: boolean
+        lottoFisicoObbligatorio:
           type: boolean
         gestioneScadenza:
           type: boolean
@@ -10658,6 +10960,7 @@ components:
       type: object
       properties:
         magazzinoId: { type: integer, minimum: 1 }
+        lottoLogicoId: { type: [integer, "null"], minimum: 1 }
         origineCarico:
           $ref: "#/components/schemas/OrigineCaricoManuale"
         numeroDocumento: { type: [string, "null"] }
@@ -10675,6 +10978,73 @@ components:
       required: [magazzinoId, origineCarico, dataCarico, righe]
 
     # ── Lotti ─────────────────────────────────────────────────────────────
+    LottoLogico:
+      type: object
+      properties:
+        id: { type: integer }
+        areaOperativaId: { type: integer }
+        codice: { type: string }
+        descrizione: { type: string }
+        dataInizio: { type: [string, "null"], format: date }
+        dataFine: { type: [string, "null"], format: date }
+        note: { type: [string, "null"] }
+        stato:
+          type: string
+          enum: [aperto, chiuso, archiviato]
+        isGenerale: { type: boolean }
+        creatoDa: { type: [integer, "null"] }
+        aggiornatoDa: { type: [integer, "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+        maiCaricato: { type: boolean }
+        esaurito: { type: boolean }
+        inTransito: { type: boolean }
+        quantitaResiduaPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
+      required:
+        [
+          id,
+          areaOperativaId,
+          codice,
+          descrizione,
+          stato,
+          isGenerale,
+          dataCreazione,
+          dataAggiornamento,
+          maiCaricato,
+          esaurito,
+          inTransito,
+          quantitaResiduaPrecisa,
+        ]
+
+    LottoLogicoInput:
+      type: object
+      additionalProperties: false
+      properties:
+        areaOperativaId: { type: integer, minimum: 1 }
+        codice: { type: string, maxLength: 80 }
+        descrizione: { type: string, maxLength: 200 }
+        dataInizio: { type: [string, "null"], format: date }
+        dataFine: { type: [string, "null"], format: date }
+        note: { type: [string, "null"] }
+      required: [areaOperativaId, codice, descrizione]
+
+    LottoLogicoUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        codice: { type: string, maxLength: 80 }
+        descrizione: { type: string, maxLength: 200 }
+        dataInizio: { type: [string, "null"], format: date }
+        dataFine: { type: [string, "null"], format: date }
+        note: { type: [string, "null"] }
+
+    LottoLogicoTransitionInput:
+      type: object
+      additionalProperties: false
+      properties:
+        motivo: { type: string, maxLength: 1000 }
+
     Lotto:
       type: object
       properties:
@@ -10682,6 +11052,8 @@ components:
           type: integer
         prodottoId:
           type: integer
+        lottoLogicoId:
+          type: [integer, "null"]
         prodottoNome:
           type: ["string", "null"]
         codiceLotto:
@@ -10743,6 +11115,8 @@ components:
       properties:
         prodottoId:
           type: integer
+        lottoLogicoId:
+          type: [integer, "null"]
         codiceLotto:
           type: string
         dataScadenza:
@@ -12971,7 +13345,8 @@ components:
           type: string
         dataAggiornamento:
           type: string
-      required: [id, nome, nomeNormalizzato, attivo, dataCreazione, dataAggiornamento]
+      required:
+        [id, nome, nomeNormalizzato, attivo, dataCreazione, dataAggiornamento]
 
     RuoloVolontarioInput:
       type: object
@@ -16127,21 +16502,41 @@ components:
         dataCreazione: { type: string, format: date-time }
         dataAggiornamento: { type: string, format: date-time }
       required:
-        [id, scopeTipo, versione, includiCodiceArea, separatore, cifreProgressivo, numeroIniziale, ambitoProgressivo, attiva, dataCreazione, dataAggiornamento]
+        [
+          id,
+          scopeTipo,
+          versione,
+          includiCodiceArea,
+          separatore,
+          cifreProgressivo,
+          numeroIniziale,
+          ambitoProgressivo,
+          attiva,
+          dataCreazione,
+          dataAggiornamento,
+        ]
 
     ConfigurazioneMatricoleVolontariInput:
       type: object
       additionalProperties: false
       properties:
-        prefissoAssociazione: { type: ["string", "null"], maxLength: 12, pattern: "^[A-Za-z0-9]*$" }
+        prefissoAssociazione:
+          { type: ["string", "null"], maxLength: 12, pattern: "^[A-Za-z0-9]*$" }
         includiCodiceArea: { type: boolean }
-        segmentoFisso: { type: ["string", "null"], maxLength: 8, pattern: "^[A-Za-z0-9]*$" }
+        segmentoFisso:
+          { type: ["string", "null"], maxLength: 8, pattern: "^[A-Za-z0-9]*$" }
         separatore: { type: string, enum: ["", "-", "/"] }
         cifreProgressivo: { type: integer, minimum: 2, maximum: 8 }
         numeroIniziale: { type: integer, minimum: 1 }
         ambitoProgressivo: { type: string, enum: [GLOBALE, PER_AREA] }
       required:
-        [includiCodiceArea, separatore, cifreProgressivo, numeroIniziale, ambitoProgressivo]
+        [
+          includiCodiceArea,
+          separatore,
+          cifreProgressivo,
+          numeroIniziale,
+          ambitoProgressivo,
+        ]
 
     ConfigurazioneMatricoleVolontariResponse:
       type: object
@@ -16153,7 +16548,8 @@ components:
         esempio: { type: ["string", "null"] }
         storico:
           type: array
-          items: { $ref: "#/components/schemas/ConfigurazioneMatricoleVolontari" }
+          items:
+            { $ref: "#/components/schemas/ConfigurazioneMatricoleVolontari" }
       required: [configurazione, esempio]
 
     # ── Volontari ─────────────────────────────────────────────────────────
@@ -16232,7 +16628,15 @@ components:
           type: ["string", "null"]
         statoAssicurazione:
           type: string
-          enum: [TEMPORANEA, MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
+          enum:
+            [
+              TEMPORANEA,
+              MANCANTE,
+              VALIDA,
+              IN_SCADENZA,
+              SCADUTA,
+              NON_ANCORA_VALIDA,
+            ]
         scadenzaAssicurazione:
           type: ["string", "null"]
           format: date
@@ -16327,7 +16731,14 @@ components:
         note:
           type: ["string", "null"]
       required:
-        [nome, cognome, luogoNascita, dataNascita, indirizzoResidenza, ruoloVolontarioId]
+        [
+          nome,
+          cognome,
+          luogoNascita,
+          dataNascita,
+          indirizzoResidenza,
+          ruoloVolontarioId,
+        ]
       allOf:
         - if:
             properties:
@@ -16432,7 +16843,16 @@ components:
               type: array
               items: { type: string }
           required: [fieldErrors, missingFields]
-      required: [error, code, message, fieldErrors, missingFields, correlationId, details]
+      required:
+        [
+          error,
+          code,
+          message,
+          fieldErrors,
+          missingFields,
+          correlationId,
+          details,
+        ]
 
     VolontarioKnownConflictResponse:
       type: object
@@ -16466,7 +16886,15 @@ components:
         dataFineValidita: { type: ["string", "null"], format: date }
         dataAssegnazione: { type: string, format: date-time }
       required:
-        [id, matricola, tipoIdentificativo, stato, origine, dataInizioValidita, dataAssegnazione]
+        [
+          id,
+          matricola,
+          tipoIdentificativo,
+          stato,
+          origine,
+          dataInizioValidita,
+          dataAssegnazione,
+        ]
 
     PermanentVolunteerIdentifierPreview:
       type: object
@@ -16479,7 +16907,15 @@ components:
         versioneProgressivo: { type: integer, minimum: 0 }
         prossimoNumero: { type: integer, minimum: 1 }
       required:
-        [matricola, matricolaNormalizzata, configurazioneId, configurazioneVersione, scopeKey, versioneProgressivo, prossimoNumero]
+        [
+          matricola,
+          matricolaNormalizzata,
+          configurazioneId,
+          configurazioneVersione,
+          scopeKey,
+          versioneProgressivo,
+          prossimoNumero,
+        ]
 
     VolontarioPermanentConversionPreviewResponse:
       type: object
@@ -16488,16 +16924,24 @@ components:
         versioneVolontario: { type: integer, minimum: 1 }
         matricolaAttuale: { type: ["string", "null"] }
         dataConversione: { type: string, format: date }
-        preview: { $ref: "#/components/schemas/PermanentVolunteerIdentifierPreview" }
+        preview:
+          { $ref: "#/components/schemas/PermanentVolunteerIdentifierPreview" }
       required:
-        [volontarioId, versioneVolontario, matricolaAttuale, dataConversione, preview]
+        [
+          volontarioId,
+          versioneVolontario,
+          matricolaAttuale,
+          dataConversione,
+          preview,
+        ]
 
     VolontarioPermanentConversionInput:
       type: object
       additionalProperties: false
       properties:
         versioneVolontario: { type: integer, minimum: 1 }
-        preview: { $ref: "#/components/schemas/PermanentVolunteerIdentifierPreview" }
+        preview:
+          { $ref: "#/components/schemas/PermanentVolunteerIdentifierPreview" }
       required: [versioneVolontario, preview]
 
     VolontarioOperationalState:
@@ -16509,7 +16953,15 @@ components:
           type: ["string", "null"]
         statoAssicurazione:
           type: string
-          enum: [TEMPORANEA, MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA]
+          enum:
+            [
+              TEMPORANEA,
+              MANCANTE,
+              VALIDA,
+              IN_SCADENZA,
+              SCADUTA,
+              NON_ANCORA_VALIDA,
+            ]
         scadenzaAssicurazione:
           type: ["string", "null"]
           format: date
@@ -16547,7 +16999,13 @@ components:
           format: date
         motivo:
           type: string
-          enum: [indisponibilita_temporanea, dimissioni_cessazione, sospensione_organizzativa, altro]
+          enum:
+            [
+              indisponibilita_temporanea,
+              dimissioni_cessazione,
+              sospensione_organizzativa,
+              altro,
+            ]
         note:
           type: string
       required: [versione, motivo]
@@ -16712,7 +17170,16 @@ components:
         centroPropostoId: { type: ["integer", "null"] }
         errori: { type: array, items: { type: string } }
         avvisi: { type: array, items: { type: string } }
-      required: [numeroRiga, stato, datiOriginali, datiNormalizzati, matricolaProposta, errori, avvisi]
+      required:
+        [
+          numeroRiga,
+          stato,
+          datiOriginali,
+          datiNormalizzati,
+          matricolaProposta,
+          errori,
+          avvisi,
+        ]
       additionalProperties: true
 
     VolontariImportPreview:
@@ -16748,7 +17215,17 @@ components:
         righe:
           type: array
           items: { $ref: "#/components/schemas/VolontariImportPreviewRow" }
-      required: [importazioneId, nomeFile, stato, hashFile, sha256File, hashContenutoNormalizzato, numeroRighe, righe]
+      required:
+        [
+          importazioneId,
+          nomeFile,
+          stato,
+          hashFile,
+          sha256File,
+          hashContenutoNormalizzato,
+          numeroRighe,
+          righe,
+        ]
 
     VolontariImportConfirmInput:
       type: object
@@ -16780,14 +17257,20 @@ components:
                   dataNascita: { type: ["string", "null"], format: date }
                   indirizzoResidenza: { type: ["string", "null"] }
                   codiceFiscale: { type: ["string", "null"] }
-                  dataInizioImportata: { type: ["string", "null"], format: date }
-                  scadenzaAssicurazione: { type: ["string", "null"], format: date }
+                  dataInizioImportata:
+                    { type: ["string", "null"], format: date }
+                  scadenzaAssicurazione:
+                    { type: ["string", "null"], format: date }
                   telefono: { type: ["string", "null"] }
                   telefonoSecondario: { type: ["string", "null"] }
                   email: { type: ["string", "null"] }
                   gruppoOriginale: { type: ["string", "null"] }
                   categoriaOriginale: { type: ["string", "null"] }
-                  tipoVolontario: { type: ["string", "null"], enum: [PERMANENTE, TEMPORANEO, null] }
+                  tipoVolontario:
+                    {
+                      type: ["string", "null"],
+                      enum: [PERMANENTE, TEMPORANEO, null],
+                    }
                   dataServizio: { type: ["string", "null"], format: date }
             required: [numeroRiga]
       required: [importazioneId, righe]
@@ -16811,7 +17294,19 @@ components:
             centroAscoltoId: { type: integer, minimum: 1 }
             ruoloVolontarioId: { type: integer, minimum: 1 }
             search: { type: string }
-            assicurazione: { type: string, enum: [TEMPORANEA, MANCANTE, VALIDA, IN_SCADENZA, SCADUTA, NON_ANCORA_VALIDA] }
+            assicurazione:
+              {
+                type: string,
+                enum:
+                  [
+                    TEMPORANEA,
+                    MANCANTE,
+                    VALIDA,
+                    IN_SCADENZA,
+                    SCADUTA,
+                    NON_ANCORA_VALIDA,
+                  ],
+              }
             dataServizio: { type: string, format: date }
             servizioDa: { type: string, format: date }
             servizioA: { type: string, format: date }
@@ -16835,7 +17330,23 @@ components:
             properties:
               campo:
                 type: string
-                enum: [matricola, nome, cognome, codiceFiscale, dataNascita, luogoNascita, indirizzoResidenza, indirizzoDomicilio, tipoVolontario, centroAscoltoId, centroAscoltoNome, ruoloVolontarioId, ruoloNome, dataInizio]
+                enum:
+                  [
+                    matricola,
+                    nome,
+                    cognome,
+                    codiceFiscale,
+                    dataNascita,
+                    luogoNascita,
+                    indirizzoResidenza,
+                    indirizzoDomicilio,
+                    tipoVolontario,
+                    centroAscoltoId,
+                    centroAscoltoNome,
+                    ruoloVolontarioId,
+                    ruoloNome,
+                    dataInizio,
+                  ]
               valorePrecedente: { type: ["string", "integer", "null"] }
               nuovoValore: { type: ["string", "integer", "null"] }
             required: [campo, valorePrecedente, nuovoValore]

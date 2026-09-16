@@ -605,3 +605,138 @@ Stato: **M1C validato manualmente da Floriano** (`OK-M1C/OK-MAN-M1C`).
 Floriano ha completato con esito positivo il dry run manuale del candidato Docker M1C. La validazione copre AUD-01, AUD-02, AUD-03 e AUD-04: sequenza multiutente A crea/B opera/C conclude, attribuzione dei nuovi movimenti tramite matricola dell'utente autenticato, storico legacy con fallback sicuro, coerenza di stock e prenotazioni, assenza di una nuova UI Audit e permanenza del registro comune come infrastruttura backend.
 
 Gli esiti automatici M1C e del successivo hardening restano invariati. Questa chiusura documentale non modifica codice, schema, API, migrazioni o output generati e costituisce la base autorizzata per M2.
+
+## M2 — sviluppo
+
+Data: 16 settembre 2026
+
+SHA iniziale richiesta: `42352c37cb7b3e7eea4ddb38844d1527b711a8c5`
+
+Commit documentale di chiusura M1C: `44e05ac14e4af22f4385573285f2e42401cf8f2e`
+
+Base M2: `44e05ac14e4af22f4385573285f2e42401cf8f2e`
+
+Stato: **M2 pronto per `##test`, da validare** (`DEV-M2/NE-TEST-M2`). Il candidato M2 resta intenzionalmente nel working tree: non è stato creato né pubblicato alcun commit applicativo M2.
+
+### Catalogo globale e quantità
+
+- `prodotti` resta globale: non riceve Area, Magazzino o Centro. Il Catalogo conserva CRUD, ricerca, import e download barcode, ma non presenta più azione `Carica`, `CaricoForm`, selettori di deposito/fornitore o quantità di stock.
+- `quantitaFrazionabile` è una proprietà persistita `NOT NULL`. Il default backend e la proposta iniziale della UI sono `true` soltanto per `kg`, `l` e `lt`; `pz`, `cf`, `conf` e le altre unità sono `false`. Dopo una scelta esplicita, il cambio U.M. non sovrascrive il valore.
+- Il controllo di dominio comune `validateProductOperationalQuantity` usa `InventoryDecimal`: accetta interi semantici per prodotti non frazionabili e respinge nuove frazioni, senza `Math.round` o conversioni anticipate a `number`.
+- La validazione è applicata a Carico, Scarico, Bolla, Trasferimento e agli input umani Emporio/Mensa. Le rettifiche inventariali motivate restano escluse dal blocco, così una frazione legacy può essere sanata senza autorizzare nuovi flussi ordinari frazionari.
+- L'import bulk supporta i due nuovi campi, applica i default backend se la colonna non è presente, conserva `magazzino.products.manage` e registra audit per ogni prodotto creato. Creazione, modifica, attivazione e disattivazione Catalogo sono transazionali con audit M1C allowlist e attore di sessione.
+
+### Lotto fisico e lotto logico
+
+- La scelta definitiva per il precedente `gestioneLotto` è `lottoFisicoObbligatorio`. La migrazione rinomina la colonna, preserva tutti i valori preesistenti e il nuovo contratto elimina l'ambiguità: il flag richiede solo il codice del produttore; tutti i prodotti possono appartenere a un lotto logico.
+- La nuova entità `lotti_logici` appartiene a un'Area e contiene codice, descrizione, date organizzative, note, stato `aperto|chiuso|archiviato`, flag `isGenerale`, autori e timestamp. Sono presenti FK Area, codice univoco nell'Area, unico `Generale` parziale per Area e check di stato/`Generale` aperto.
+- Ogni Area esistente, anche inattiva, riceve esattamente un `GENERALE`; ogni nuova Area lo crea nella stessa transazione tramite helper idempotente. L'audit usa actor system `m2-area-general` e conserva l'utente iniziatore. `Generale` non è modificabile, chiudibile o archiviabile dall'API e non esiste endpoint distruttivo.
+- I comandi espliciti create/update/close/reopen/archive usano `magazzino.view` in lettura e `magazzino.stock.receive` in gestione, rispettano lo scope Area e richiedono un motivo per la riapertura. Le mutazioni e i relativi eventi audit avvengono nella stessa transazione.
+- `lotti.lottoLogicoId` è una FK nullable. Tutti i 21 dettagli fisici storici restano `null`; non vengono assegnati retroattivamente a `Generale`. I nuovi carichi risolvono il `Generale` quando il chiamante legacy omette l'ID e rifiutano magazzini senza Area, lotti di un'altra Area o non aperti.
+- La business key fisica include magazzino, prodotto, lotto logico, fondo, fornitore, codice produttore normalizzato, scadenza e fattore. Un codice uguale in `Generale` e in una raccolta non viene fuso; fattori o scadenze differenti restano dettagli separati. Senza codice fisico non viene inventato `GENERALE`, `N/A` o altro valore sintetico.
+- `maiCaricato` è distinto da `esaurito`. Quest'ultimo è derivato solo in presenza di dettagli, residuo preciso zero e assenza dimostrata di trasferimenti `in_transito`; non è una colonna o uno stato persistito. LOT-02/LOT-03 restano fondazioni parziali da completare in M4B.
+
+### API, frontend e generated
+
+- La sorgente OpenAPI espone `quantitaFrazionabile`, `lottoFisicoObbligatorio`, `lottoLogicoId`, DTO e sette operazioni per i lotti logici. React client e validatori/tipi Zod sono stati rigenerati con il codegen ufficiale, senza modifiche manuali ai generated.
+- Il Catalogo mostra controlli e badge localizzati per frazionabilità e lotto fisico nelle sei lingue esistenti. La UI non mostra quantità modificabili né strumenti di carico.
+- Non è stata introdotta una voce top-level “Lotti” e non è stata costruita una UI temporanea separata: lifecycle e selector M2 sono verificabili via API; l'integrazione operativa definitiva resta nel Carico M3.
+- La Giacenza M1B continua ad aggregare per prodotto e U.M.; il lotto logico non moltiplica le righe aggregate.
+
+### Migrazione 36 e populated DB isolato
+
+La migrazione aggiunta è `lib/db/updates/20260917_m2_catalogo_lotti_logici.sql`, successiva alle 35 M1C. La prova pulita ha usato una copia isolata del candidato M1C; `magazzino-postgres` e la porta `5434` non sono stati usati.
+
+| Dato                                       | Prima M2      | Dopo M2     |
+| ------------------------------------------ | ------------- | ----------- |
+| prodotti                                   | 12            | 12          |
+| distribuzione U.M.                         | `cf=2, pz=10` | invariata   |
+| requisito lotto fisico true/false          | `6/6`         | `6/6`       |
+| prodotti con scadenza                      | 7             | 7           |
+| prodotti frazionabili                      | —             | 0           |
+| lotti fisici                               | 21            | 21          |
+| quantità caricata/residua                  | `1741/1624`   | `1741/1624` |
+| movimenti / quantità                       | `37/1701`     | `37/1701`   |
+| prenotazioni / quantità                    | `6/60,01`     | `6/60,01`   |
+| righe Bolla / quantità                     | `24/114,01`   | `24/114,01` |
+| righe Trasferimento / quantità             | `3/25`        | `3/25`      |
+| righe Scarico / quantità                   | `13/31`       | `13/31`     |
+| righe Carico / quantità operativa          | `2/234`       | `2/234`     |
+| eventi audit                               | 0             | 0           |
+| Aree / Magazzini con Area / Magazzini null | `6/9/1`       | `6/9/1`     |
+| lotti logici `Generale`                    | —             | 6           |
+| dettagli fisici legacy con lotto logico    | —             | `0/21`      |
+
+La diagnostica ha trovato due record reali `anomalia_quantita_legacy`, uno in `bolla_righe.quantita` e uno in `prenotazioni_magazzino.quantita`. Sono rimasti invariati e leggibili. Una fixture isolata aggiuntiva con caricato `500,5` e residuo `417,5` ha confermato che la migrazione non arrotonda neppure i dettagli fisici; la vista diagnostica li classifica senza correggerli. Il replay SQL è idempotente.
+
+### Fresh DB e controlli di sviluppo
+
+- Il fresh gate isolato ha completato schema, tutte le 36 migrazioni, seed, bootstrap mode senza utenti predefiniti, creazione del primo Super Admin tramite setup, login/cambio password, CRUD Area con `Generale`, replay, checksum e stato senza pending, mismatch o out-of-order.
+- Test Catalogo/quantità/lotti logici e helper fixed-point: 2 file, 31 test passati.
+- Regressioni Carico e Scarico: 3 file, 42 test passati; Trasferimenti, Bolle e Giacenze M1B: 3 file, 61 test passati.
+- Regressione AGEA: 19 test passati e 1 fixture esterna opzionale saltata. Regressioni Emporio, Mensa e FSE: 5 file, 143 test passati.
+- Frontend Catalogo/hardening/Giacenze: 3 file, 28 test passati; contratto OpenAPI/generated: 2 test passati.
+- Dopo codegen e pulizia del diff, la riesecuzione mirata backend ha chiuso 6 file/96 test e quella frontend i 3 file/28 test pertinenti. In precedenza lo script unit frontend, pur invocato indicando i tre file, aveva eseguito anche l'intera suite unit del workspace: 66 file/364 test, tutti verdi. Questo controllo aggiuntivo non apre né sostituisce la fase separata `##test M2`; suite backend finale completa, Docker e manuale restano non eseguiti.
+- `pnpm run typecheck`, codegen ufficiale, Prettier pertinente e `git diff --check` completati con esito positivo.
+
+### Limiti e arresto
+
+- La pratica Carico persistente M3A, l'import unificato M3B, il DDT e gli stati consegna M4, la richiesta Magazzino M5 e la regressione integrata non sono stati anticipati.
+- Il lifecycle lotto logico è disponibile via API, non tramite una nuova pagina primaria. La selezione contestuale definitiva appartiene a M3.
+- Non sono stati costruiti container applicativi M2, eseguiti test manuali M2, creati commit M2, effettuati push M2 o merge su `main`.
+
+Condizione di arresto: **M2 pronto per `##test`, da validare**.
+
+## M2 — test automatici
+
+Data: 16 settembre 2026
+
+Base M2 verificata: `44e05ac14e4af22f4385573285f2e42401cf8f2e`
+
+Stato: **test automatici M2 superati; prova Docker/manuale non eseguita** (`OK-M2/NE-MAN`).
+
+### Correzioni emerse durante la validazione
+
+- La ricezione di un trasferimento conserva il lotto logico sorgente fra magazzini della stessa Area, anche se il lotto viene chiuso mentre la merce è in transito. Fra Aree differenti assegna invece il `Generale` dell'Area di destinazione, senza clonare il lotto nominativo e conservando il lineage tramite trasferimento, movimenti e `movimentoOrigineId`.
+- Il seed/demo crea e riusa transazionalmente il `Generale` dell'Area e collega a esso tutti i nuovi dettagli fisici. I percorsi di reset eliminano i lotti logici prima delle Aree interessate.
+- Le fixture di compatibilità che creano Aree o magazzini sono state adeguate al vincolo M2 senza modificare la semantica dei flussi esistenti. Il test del migration runner ora attende 36 migrazioni.
+
+### Migrazione e database isolati
+
+- Populated gate: copia M1C isolata con 35 migrazioni, aggiornata esclusivamente dal runner ufficiale alla migrazione 36. Il replay ha saltato tutte le 36 migrazioni e lo stato finale riporta zero pending, mismatch o out-of-order.
+- I conteggi applicativi sono rimasti invariati: 12 prodotti, 21 lotti fisici, 37 movimenti, 6 prenotazioni, 24 righe Bolla, 3 trasferimenti, 10 scarichi e 2 carichi. Checksum del precedente requisito lotto fisico e delle quantità dei lotti invariati.
+- Sono stati creati 6 `Generale` aperti per 6 Aree; tutti i 21 dettagli fisici legacy mantengono `lotto_logico_id=null`.
+- Le due anomalie frazionarie reali preesistenti, in `bolla_righe` e `prenotazioni_magazzino`, restano identiche e leggibili. Nessuna quantità è stata arrotondata o corretta.
+- Fresh gate: database realmente vuoto con 36 migrazioni, seed base senza utenti, bootstrap del primo Super Admin, login e cambio password, CRUD Area con `Generale`, prodotti `pz`/`kg`, lotto logico, carico frazionario coerente e Giacenze completati. Il replay e i checksum sono verdi.
+- Il database originale `magazzino-postgres` non è stato interrogato né modificato e sul populated DB non è stato usato `drizzle-kit push`.
+
+### Evidenze funzionali e di sicurezza
+
+- Il rename runtime è univoco su `lottoFisicoObbligatorio`; `gestioneLotto` resta solo nella migrazione, nella documentazione storica e nei test di compatibilità espliciti. I valori dei prodotti esistenti sono preservati.
+- Default backend e UI, override espliciti e PATCH dell'unità senza riscrivere la frazionabilità sono verificati. Il validatore comune usa `InventoryDecimal` e protegge Carico, Lotto/Carico legacy, Scarico, Bolla, Trasferimento, Emporio, Mensa, FSE+ e AGEA; la rettifica amministrativa motivata resta l'unico percorso ammesso per sanare una frazione legacy.
+- CRUD e bulk Catalogo richiedono `magazzino.products.manage`, restano globali e producono audit transazionale con attore di sessione e payload allowlist. Un errore audit provoca rollback della mutazione.
+- Il Catalogo frontend è solo anagrafica: non contiene `Carica`, quantità di stock, selettori di magazzino/fornitore o altre azioni inventariali. Le proprietà M2 sono localizzate nelle sei lingue e non è stata aggiunta una voce primaria “Lotti”.
+- Lotto logico multiprodotto, dettagli fisici distinti per business key, codice produttore nullable quando consentito, scope Area, protezioni del `Generale`, lifecycle completo e audit/rollback sono verificati. Un utente limitato all'Area A non può gestire o usare un lotto dell'Area B.
+- La Giacenza M1B continua a raggruppare per prodotto e unità, include il legacy con lotto logico nullo e non moltiplica le righe per lotto logico.
+- LOT-02 e LOT-03 restano parziali: M2 dimostra collegamento, trasferimento same/cross-Area e ricezione a lotto chiuso; prenotazioni, visualizzazione completa, rientro e completamento del workflow restano M4B.
+
+### Esiti dei gate finali
+
+| Gate                              | Esito                                                                               |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| migration runner PostgreSQL reale | 2 file, 24 test passati, 0 fallimenti                                               |
+| suite API completa                | 111 file, 1.216 test passati, 2 skip, 0 fallimenti                                  |
+| suite frontend completa           | 67 file, 368 test passati, 0 fallimenti                                             |
+| E2E desktop reali                 | 4 test passati: Catalogo, Carico, Scarico+Bolla/FEFO e Trasferimento                |
+| codegen React/Zod                 | due esecuzioni ufficiali con output identico; nessuna modifica manuale ai generated |
+| `pnpm run typecheck`              | completato senza errori per l'intero workspace                                      |
+| build workspace                   | completata con `PORT=4173 BASE_PATH=/`; API, frontend e mockup senza errori         |
+| bundle budget                     | entry 1.257,4 KiB / 348,5 KiB gzip; delta M1C +1,2 KiB / +0,5 KiB gzip              |
+| runtime config web                | PASS                                                                                |
+| Prettier e `git diff --check`     | controlli pertinenti superati; nessun formatting massivo introdotto                 |
+
+Gli skip API sono invariati e non nascondono scenari M2; la fixture esterna AGEA resta opzionale e documentata. Restano non bloccanti i warning baseline del driver `pg`, i warning sourcemap/chunk Vite e il warning di dimensione del bundle API. Il bootstrap fresh registra inoltre il warning best-effort preesistente del system log con attore tecnico `0`; i file responsabili sono invariati rispetto alla base M2.
+
+Non sono stati costruiti container Docker candidati, eseguiti test manuali, avviati M3, effettuati merge o modifiche a `main`.
+
+Condizione di arresto: **M2 test automatici superati — pronto per code review**.

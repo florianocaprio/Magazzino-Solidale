@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from "vitest";
 import request from "supertest";
 import type { Express } from "express";
 import { auditEventiTable, db, pool } from "@workspace/db";
@@ -86,6 +94,23 @@ afterAll(async () => {
 });
 
 describe("POST /scarichi — scarico FEFO", () => {
+  it("rifiuta quantità frazionarie per un Prodotto non frazionabile", async () => {
+    const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
+    const lottoId = await createLotto({
+      prodottoId,
+      magazzinoId,
+      quantita: 5,
+    });
+    const response = await creaScarico({
+      prodottoId,
+      quantita: 1.5,
+      unitaMisura: "pz",
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/numero intero/i);
+    expect(Number((await getLotto(lottoId)).quantitaResidua)).toBe(5);
+  });
+
   it("blocca le API quando il modulo è disabilitato e conserva lo storico alla riabilitazione", async () => {
     const prodottoId = await createProdotto(scope);
     await createLotto({ prodottoId, magazzinoId, quantita: 5 });
@@ -139,7 +164,9 @@ describe("POST /scarichi — scarico FEFO", () => {
     // Movimenti scarico: uno per lotto toccato, con le quantità FEFO.
     const movimenti = await getScaricoMovimentiForMagazzino(magazzinoId);
     expect(movimenti).toHaveLength(2);
-    const perLotto = new Map(movimenti.map((m) => [m.lottoId, parseFloat(m.quantita)]));
+    const perLotto = new Map(
+      movimenti.map((m) => [m.lottoId, parseFloat(m.quantita)]),
+    );
     expect(perLotto.get(lottoA)).toBe(10);
     expect(perLotto.get(lottoB)).toBe(5);
     for (const m of movimenti) {
@@ -194,7 +221,11 @@ describe("POST /scarichi — scarico FEFO", () => {
     const prodottoId = await createProdotto(scope);
     await createLotto({ prodottoId, magazzinoId, quantita: 8 });
 
-    const res = await creaScarico({ prodottoId, quantita: 3, causale: "rubata" });
+    const res = await creaScarico({
+      prodottoId,
+      quantita: 3,
+      causale: "rubata",
+    });
     expect(res.status).toBe(201);
     scope.scaricoIds.push(res.body.id);
 
@@ -264,7 +295,11 @@ describe("POST /scarichi — scarico FEFO", () => {
     await createLotto({ prodottoId, magazzinoId, quantita: 6 });
 
     // Il client invia "kg" ma il prodotto è in "lt" → deve prevalere il prodotto.
-    const res = await creaScarico({ prodottoId, quantita: 2, unitaMisura: "kg" });
+    const res = await creaScarico({
+      prodottoId,
+      quantita: 2,
+      unitaMisura: "kg",
+    });
     expect(res.status).toBe(201);
     scope.scaricoIds.push(res.body.id);
 
@@ -293,7 +328,11 @@ describe("POST /scarichi — scarico FEFO", () => {
     const prodottoId = await createProdotto(scope);
     const lottoId = await createLotto({ prodottoId, magazzinoId, quantita: 5 });
 
-    const res = await creaScarico({ prodottoId, quantita: 1, causale: "inventata" });
+    const res = await creaScarico({
+      prodottoId,
+      quantita: 1,
+      causale: "inventata",
+    });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/causale/i);
 

@@ -140,6 +140,30 @@ afterAll(async () => {
 });
 
 describe("Bolle — prenotazione merce su conferma", () => {
+  it("rifiuta una riga frazionaria per un Prodotto non frazionabile", async () => {
+    const pieceProduct = await createProdotto(scope, { unitaMisura: "pz" });
+    const lottoId = await createLotto(scope, {
+      prodottoId: pieceProduct,
+      magazzinoId: magA,
+      quantita: 10,
+    });
+    const created = await request(appAs(centroA)).post("/bolle").send({
+      beneficiarioId: benA,
+      magazzinoId: magA,
+    });
+    expect(created.status).toBe(201);
+    scope.bollaIds.push(created.body.id);
+    const response = await request(appAs(centroA))
+      .post(`/bolle/${created.body.id}/righe`)
+      .send({
+        prodottoId: pieceProduct,
+        lottoId,
+        quantita: "1.5",
+      });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/numero intero/i);
+  });
+
   it("registra la catena audit A crea, B conferma e C consegna", async () => {
     const actorA = await createUtente(scope, { centroId: centroA });
     const actorB = await createUtente(scope, { centroId: centroA });
@@ -300,7 +324,8 @@ describe("Bolle — prenotazione merce su conferma", () => {
     scope.bollaIds.push(created.body.id);
 
     const altroBeneficiario = await createBeneficiario(scope, centroA);
-    const delivered = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "consegnato" });
+    const delivered = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "consegnato",
+    });
     const patch = await request(appAs(centroA)).patch(`/bolle/${delivered}`).send({ beneficiarioId: altroBeneficiario });
     expect([400, 409]).toContain(patch.status);
     const [unchanged] = await db.select().from(bolleTable).where(eq(bolleTable.id, delivered));
@@ -309,9 +334,12 @@ describe("Bolle — prenotazione merce su conferma", () => {
   });
 
   it("conferma una bolla con disponibilita reale sufficiente creando prenotazioni senza scalare lotti o creare movimenti", async () => {
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
-    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4,
+    });
 
     const res = await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({});
 
@@ -329,9 +357,12 @@ describe("Bolle — prenotazione merce su conferma", () => {
   });
 
   it("fallisce se la disponibilita reale e insufficiente e lascia bolla, lotti e prenotazioni invariati", async () => {
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const bollaPrenotata = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "confermato" });
-    const rigaPrenotata = await insertBollaRiga(scope, { bollaId: bollaPrenotata, prodottoId: prod, lottoId, quantita: 8 });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const bollaPrenotata = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "confermato",
+    });
+    const rigaPrenotata = await insertBollaRiga(scope, { bollaId: bollaPrenotata, prodottoId: prod, lottoId, quantita: 8,
+    });
     await insertPrenotazioneMagazzino(scope, {
       bollaId: bollaPrenotata,
       rigaBollaId: rigaPrenotata,
@@ -340,8 +371,10 @@ describe("Bolle — prenotazione merce su conferma", () => {
       magazzinoId: magA,
       quantita: 8,
     });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
-    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 3 });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 3,
+    });
 
     const res = await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({});
 
@@ -353,13 +386,19 @@ describe("Bolle — prenotazione merce su conferma", () => {
   });
 
   it("usa le prenotazioni della prima bolla per bloccare una seconda bolla oltre il disponibile reale", async () => {
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const primaBolla = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
-    await insertBollaRiga(scope, { bollaId: primaBolla, prodottoId: prod, lottoId, quantita: 8 });
-    const secondaBolla = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
-    await insertBollaRiga(scope, { bollaId: secondaBolla, prodottoId: prod, lottoId, quantita: 3 });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const primaBolla = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    await insertBollaRiga(scope, { bollaId: primaBolla, prodottoId: prod, lottoId, quantita: 8,
+    });
+    const secondaBolla = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    await insertBollaRiga(scope, { bollaId: secondaBolla, prodottoId: prod, lottoId, quantita: 3,
+    });
 
-    expect((await request(appAs(centroA)).post(`/bolle/${primaBolla}/conferma`).send({})).status).toBe(200);
+    expect((await request(appAs(centroA)).post(`/bolle/${primaBolla}/conferma`).send({})).status,
+    ).toBe(200);
     const res = await request(appAs(centroA)).post(`/bolle/${secondaBolla}/conferma`).send({});
 
     expect(res.status).toBe(409);
@@ -380,14 +419,18 @@ describe("Bolle — prenotazione merce su conferma", () => {
       quantita: 60,
       dataScadenza: "2098-06-01",
     });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
-    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId: null, quantita: 70 });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId: null, quantita: 70,
+    });
 
     const res = await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({});
 
     expect(res.status).toBe(200);
     const prenotazioni = await prenotazioniBolla(bollaId);
-    expect(prenotazioni.map((p) => ({ lottoId: p.lottoId, quantita: p.quantita, stato: p.stato }))).toEqual([
+    expect(prenotazioni.map((p) => ({ lottoId: p.lottoId, quantita: p.quantita, stato: p.stato,
+      })),
+    ).toEqual([
       { lottoId: lottoA, quantita: "40.00", stato: "attiva" },
       { lottoId: lottoB, quantita: "30.00", stato: "attiva" },
     ]);
@@ -398,9 +441,12 @@ describe("Bolle — prenotazione merce su conferma", () => {
   });
 
   it("blocca aggiunta e cancellazione righe su bolla confermata", async () => {
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "confermato" });
-    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 2 });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "confermato",
+    });
+    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 2,
+    });
 
     const add = await request(appAs(centroA)).post(`/bolle/${bollaId}/righe`).send({ prodottoId: prod, lottoId, quantita: 1 });
     const del = await request(appAs(centroA)).delete(`/bolle/${bollaId}/righe/${rigaId}`).send({});
@@ -440,7 +486,8 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
     const res = await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({});
 
     expect(res.status).toBe(200);
-    expect((await prenotazioniBolla(bollaId)).map((p) => p.lottoId)).toEqual([valido]);
+    expect((await prenotazioniBolla(bollaId)).map((p) => p.lottoId)).toEqual([valido,
+    ]);
     expect(await lottoResidua(scaduto)).toBe(8);
   });
 
@@ -504,7 +551,8 @@ describe("Bolle — inserimento righe con scope operativo", () => {
     });
 
     expect(res.status).toBe(403);
-    expect(JSON.stringify(res.body)).not.toContain(lotto.codiceLotto ?? "codice-impossibile");
+    expect(JSON.stringify(res.body)).not.toContain(lotto.codiceLotto ?? "codice-impossibile",
+    );
   });
 
   it("rifiuta lotto inesistente, scaduto o non coerente con prodotto/magazzino e accetta un lotto valido", async () => {
@@ -533,10 +581,14 @@ describe("Bolle — inserimento righe con scope operativo", () => {
     });
     const path = `/bolle/${bollaId}/righe`;
 
-    expect((await request(appAs(centroA)).post(path).send({ prodottoId: prod, lottoId: 2_000_000_000, quantita: 1 })).status).toBe(404);
-    expect((await request(appAs(centroA)).post(path).send({ prodottoId: prod, lottoId: scaduto, quantita: 1 })).status).toBe(409);
-    expect((await request(appAs(centroA)).post(path).send({ prodottoId: altroProdotto, lottoId: valido, quantita: 1 })).status).toBe(400);
-    expect((await request(appAs(centroA)).post(path).send({ prodottoId: prod, lottoId: altroMagazzino, quantita: 1 })).status).toBe(404);
+    expect((await request(appAs(centroA)).post(path).send({ prodottoId: prod, lottoId: 2_000_000_000, quantita: 1 })).status,
+    ).toBe(404);
+    expect((await request(appAs(centroA)).post(path).send({ prodottoId: prod, lottoId: scaduto, quantita: 1 })).status,
+    ).toBe(409);
+    expect((await request(appAs(centroA)).post(path).send({ prodottoId: altroProdotto, lottoId: valido, quantita: 1 })).status,
+    ).toBe(400);
+    expect((await request(appAs(centroA)).post(path).send({ prodottoId: prod, lottoId: altroMagazzino, quantita: 1 })).status,
+    ).toBe(404);
     const accepted = await request(appAs(centroA)).post(path).send({ prodottoId: prod, lottoId: valido, quantita: 1 });
     expect(accepted.status).toBe(201);
     expect(accepted.body).toMatchObject({
@@ -574,17 +626,23 @@ describe("Bolle — inserimento righe con scope operativo", () => {
       magazzinoId: magB,
     });
 
-    expect((await request(socialApp).post(`/bolle/${propria}/righe`).send({ prodottoId: prod, lottoId: lottoA, quantita: 1 })).status).toBe(201);
-    expect((await request(socialApp).post(`/bolle/${altrui}/righe`).send({ prodottoId: prod, lottoId: lottoB, quantita: 1 })).status).toBe(403);
+    expect((await request(socialApp).post(`/bolle/${propria}/righe`).send({ prodottoId: prod, lottoId: lottoA, quantita: 1 })).status,
+    ).toBe(201);
+    expect((await request(socialApp).post(`/bolle/${altrui}/righe`).send({ prodottoId: prod, lottoId: lottoB, quantita: 1 })).status,
+    ).toBe(403);
   });
 });
 
 describe("Bolle — consegna e annullo prenotazioni", () => {
   it("consegna una bolla confermata convertendo prenotazioni in scarico fisico", async () => {
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
-    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
-    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4,
+    });
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status,
+    ).toBe(200);
 
     const res = await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({ confermaRicezione: true });
 
@@ -712,7 +770,8 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
     const operations = await db.select().from(operazioniDistribuzioneMagazzinoTable).where(and(
       eq(operazioniDistribuzioneMagazzinoTable.dominioOrigine, "BOLLA"),
       eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, bolla),
-    ));
+    ),
+      );
     expect(operations).toHaveLength(1);
     expect(operations[0]).toMatchObject({
       areaOperativaIdSnapshot: historicalArea,
@@ -757,14 +816,19 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       areaOperativaId: currentArea,
       centroAscoltoId: currentCentre.id,
     });
-    expect(currentReport.kpi.find((item) => item.key === "pacchiDistribuiti")?.value).toBe(0);
+    expect(currentReport.kpi.find((item) => item.key === "pacchiDistribuiti")?.value,
+    ).toBe(0);
   });
 
   it("blocca la consegna se il lotto prenotato non ha piu residuo sufficiente", async () => {
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
-    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
-    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4,
+    });
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status,
+    ).toBe(200);
     await db.update(lottiTable).set({ quantitaResidua: "2.00" }).where(eq(lottiTable.id, lottoId));
 
     const res = await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({ confermaRicezione: true });
@@ -772,7 +836,8 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
     expect(res.status).toBe(409);
     expect(await bollaStato(bollaId)).toBe("confermato");
     expect(await lottoResidua(lottoId)).toBe(2);
-    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["attiva"]);
+    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["attiva",
+    ]);
     expect(await movimentiBolla(bollaId)).toHaveLength(0);
   });
 
@@ -793,7 +858,8 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       lottoId,
       quantita: 4,
     });
-    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status,
+    ).toBe(200);
     await db.update(lottiTable).set({ dataScadenza: "2000-01-01" }).where(eq(lottiTable.id, lottoId));
 
     const res = await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({});
@@ -802,22 +868,28 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
     expect(res.body.error).toMatch(/scaduto/i);
     expect(await bollaStato(bollaId)).toBe("confermato");
     expect(await lottoResidua(lottoId)).toBe(10);
-    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["attiva"]);
+    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["attiva",
+    ]);
     expect(await movimentiBolla(bollaId)).toHaveLength(0);
   });
 
   it("annulla una bolla confermata nuova rilasciando prenotazioni senza scalare lotti o creare movimenti", async () => {
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA });
-    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
-    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4,
+    });
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status,
+    ).toBe(200);
 
     const res = await request(appAs(centroA)).post(`/bolle/${bollaId}/annulla`).send({});
 
     expect(res.status).toBe(200);
     expect(res.body.stato).toBe("annullato");
     expect(await lottoResidua(lottoId)).toBe(10);
-    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["rilasciata"]);
+    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["rilasciata",
+    ]);
     expect(await movimentiBolla(bollaId)).toHaveLength(0);
   });
 
@@ -837,8 +909,10 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       lottoId,
       quantita: 4,
     });
-    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
-    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({ confermaRicezione: true })).status).toBe(200);
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status,
+    ).toBe(200);
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({ confermaRicezione: true })).status,
+    ).toBe(200);
     expect(await lottoResidua(lottoId)).toBe(6);
     const [interventoConsegnato] = await db.select().from(interventiTable).where(eq(interventiTable.bollaId, bollaId));
     expect(interventoConsegnato).toMatchObject({
@@ -881,8 +955,10 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       stato: "annullato",
       operatoreId,
     });
-    expect(interventoAnnullato.motivoAnnullamento).toContain("Consegna annullata dal test");
-    const storico = await db.select().from(interventiStoricoStatiTable).where(eq(interventiStoricoStatiTable.interventoId, interventoConsegnato.id));
+    expect(interventoAnnullato.motivoAnnullamento).toContain("Consegna annullata dal test",
+    );
+    const storico = await db.select().from(interventiStoricoStatiTable).where(eq(interventiStoricoStatiTable.interventoId, interventoConsegnato.id),
+      );
     expect(storico).toHaveLength(1);
     expect(storico[0]).toMatchObject({
       statoPrecedente: "concluso",
@@ -894,7 +970,9 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
     expect(duplicate.status).toBe(400);
     expect(await lottoResidua(lottoId)).toBe(10);
     expect(await movimentiBolla(bollaId)).toHaveLength(2);
-    expect(await db.select().from(interventiStoricoStatiTable).where(eq(interventiStoricoStatiTable.interventoId, interventoConsegnato.id))).toHaveLength(1);
+    expect(await db.select().from(interventiStoricoStatiTable).where(eq(interventiStoricoStatiTable.interventoId, interventoConsegnato.id),
+        ),
+    ).toHaveLength(1);
   });
 
   it("rollbacka storno e stato Intervento se l'audit dell'annullamento fallisce", async () => {
@@ -913,14 +991,17 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       lottoId,
       quantita: 4,
     });
-    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
-    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({})).status).toBe(200);
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status,
+    ).toBe(200);
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({})).status,
+    ).toBe(200);
     const [interventoPrima] = await db.select().from(interventiTable).where(eq(interventiTable.bollaId, bollaId));
 
     await expect(
       db.transaction(async (tx) => {
         await stornoRigaTx(tx, { id: rigaId }, bollaId, operatoreId);
-        await annullaInterventoDaBollaTx(tx, bollaId, 2_000_000_000, "Errore simulato");
+        await annullaInterventoDaBollaTx(tx, bollaId, 2_000_000_000, "Errore simulato",
+        );
       }),
     ).rejects.toBeDefined();
 
@@ -931,13 +1012,18 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
       id: interventoPrima.id,
       stato: "concluso",
     });
-    expect(await db.select().from(interventiStoricoStatiTable).where(eq(interventiStoricoStatiTable.interventoId, interventoPrima.id))).toHaveLength(0);
+    expect(await db.select().from(interventiStoricoStatiTable).where(eq(interventiStoricoStatiTable.interventoId, interventoPrima.id),
+        ),
+    ).toHaveLength(0);
   });
 
   it("tratta una bolla legacy confermata con movimenti scarico come gia scaricata e non scala di nuovo alla consegna", async () => {
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "confermato" });
-    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "confermato",
+    });
+    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4,
+    });
     await db.update(lottiTable).set({ quantitaResidua: "6.00" }).where(eq(lottiTable.id, lottoId));
     await db.insert(movimentiTable).values({
       tipoMovimento: "scarico",
@@ -966,11 +1052,16 @@ describe("Bolle — consegna e annullo prenotazioni", () => {
 
 describe("Consegne — completa converte le prenotazioni bolla", () => {
   it("completa una consegna collegata a bolla confermata convertendo prenotazioni in scarico fisico", async () => {
-    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA });
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId });
-    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
-    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
+    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId,
+    });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4,
+    });
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status,
+    ).toBe(200);
 
     const res = await request(consegneAppAs(centroA)).post(`/consegne/${consegnaId}/completa`).send({});
 
@@ -978,7 +1069,8 @@ describe("Consegne — completa converte le prenotazioni bolla", () => {
     expect(res.body.stato).toBe("effettuata");
     expect(await bollaStato(bollaId)).toBe("consegnato");
     expect(await lottoResidua(lottoId)).toBe(6);
-    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["convertita_in_scarico"]);
+    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["convertita_in_scarico",
+    ]);
     expect(await movimentiBolla(bollaId)).toHaveLength(1);
 
     const [consegna] = await db.select().from(consegneTable).where(eq(consegneTable.id, consegnaId));
@@ -987,10 +1079,14 @@ describe("Consegne — completa converte le prenotazioni bolla", () => {
   });
 
   it("completa una consegna legacy senza scalare lotti o duplicare movimenti", async () => {
-    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA });
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId, stato: "confermato" });
-    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
+    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId, stato: "confermato",
+    });
+    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4,
+    });
     await db.update(lottiTable).set({ quantitaResidua: "6.00" }).where(eq(lottiTable.id, lottoId));
     await db.insert(movimentiTable).values({
       tipoMovimento: "scarico",
@@ -1018,12 +1114,18 @@ describe("Consegne — completa converte le prenotazioni bolla", () => {
   });
 
   it("non scarica due volte su doppia chiamata completa/consegna", async () => {
-    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA });
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId });
-    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
-    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status).toBe(200);
-    expect((await request(consegneAppAs(centroA)).post(`/consegne/${consegnaId}/completa`).send({})).status).toBe(200);
+    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId,
+    });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4,
+    });
+    expect((await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({})).status,
+    ).toBe(200);
+    expect((await request(consegneAppAs(centroA)).post(`/consegne/${consegnaId}/completa`).send({})).status,
+    ).toBe(200);
 
     const completaBis = await request(consegneAppAs(centroA)).post(`/consegne/${consegnaId}/completa`).send({});
     const consegnaBis = await request(appAs(centroA)).post(`/bolle/${bollaId}/consegna`).send({});
@@ -1123,12 +1225,18 @@ describe("Report e preparazione — semantica merce impegnata/consegnata", () =>
     const before = (await request(reportAppAs(null)).get("/report/fse-plus?anno=2026")).body.beneficiariTotali as number;
     const benConfermato = await createBeneficiario(scope, centroA);
     const benConsegnato = await createBeneficiario(scope, centroA);
-    const lottoConfermato = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 5, fsePlus: true });
-    const lottoConsegnato = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 5, fsePlus: true });
-    const bollaConfermata = await insertBolla(scope, { beneficiarioId: benConfermato, magazzinoId: magA, stato: "confermato" });
-    const bollaConsegnata = await insertBolla(scope, { beneficiarioId: benConsegnato, magazzinoId: magA, stato: "consegnato" });
-    await insertBollaRiga(scope, { bollaId: bollaConfermata, prodottoId: prod, lottoId: lottoConfermato, quantita: 5 });
-    const rigaConsegnata = await insertBollaRiga(scope, { bollaId: bollaConsegnata, prodottoId: prod, lottoId: lottoConsegnato, quantita: 5 });
+    const lottoConfermato = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 5, fsePlus: true,
+    });
+    const lottoConsegnato = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 5, fsePlus: true,
+    });
+    const bollaConfermata = await insertBolla(scope, { beneficiarioId: benConfermato, magazzinoId: magA, stato: "confermato",
+    });
+    const bollaConsegnata = await insertBolla(scope, { beneficiarioId: benConsegnato, magazzinoId: magA, stato: "consegnato",
+    });
+    await insertBollaRiga(scope, { bollaId: bollaConfermata, prodottoId: prod, lottoId: lottoConfermato, quantita: 5,
+    });
+    const rigaConsegnata = await insertBollaRiga(scope, { bollaId: bollaConsegnata, prodottoId: prod, lottoId: lottoConsegnato, quantita: 5,
+    });
     await insertMovimento(scope, {
       magazzinoId: magA,
       prodottoId: prod,
@@ -1145,9 +1253,12 @@ describe("Report e preparazione — semantica merce impegnata/consegnata", () =>
   });
 
   it("preparazione consegne usa il disponibile reale e non propone merce già impegnata", async () => {
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const bollaPrenotata = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "confermato" });
-    const rigaPrenotata = await insertBollaRiga(scope, { bollaId: bollaPrenotata, prodottoId: prod, lottoId, quantita: 8 });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10,
+    });
+    const bollaPrenotata = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, stato: "confermato",
+    });
+    const rigaPrenotata = await insertBollaRiga(scope, { bollaId: bollaPrenotata, prodottoId: prod, lottoId, quantita: 8,
+    });
     await insertPrenotazioneMagazzino(scope, {
       bollaId: bollaPrenotata,
       rigaBollaId: rigaPrenotata,
@@ -1156,11 +1267,15 @@ describe("Report e preparazione — semantica merce impegnata/consegnata", () =>
       magazzinoId: magA,
       quantita: 8,
     });
-    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA });
-    const bollaDaPreparare = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId });
-    await insertBollaRiga(scope, { bollaId: bollaDaPreparare, prodottoId: prod, lottoId, quantita: 3 });
+    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magA,
+    });
+    const bollaDaPreparare = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magA, consegnaId,
+    });
+    await insertBollaRiga(scope, { bollaId: bollaDaPreparare, prodottoId: prod, lottoId, quantita: 3,
+    });
 
-    const res = await request(preparazioneAppAs(centroA)).get(`/preparazione-consegne?magazzinoId=${magA}`);
+    const res = await request(preparazioneAppAs(centroA)).get(`/preparazione-consegne?magazzinoId=${magA}`,
+    );
 
     expect(res.status).toBe(200);
     expect(res.body.righe).toEqual([
@@ -1176,9 +1291,12 @@ describe("Report e preparazione — semantica merce impegnata/consegnata", () =>
 
 describe("Bolle — scoping prenotazioni", () => {
   it("impedisce a un utente del centro A di confermare merce del magazzino del centro B", async () => {
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magB });
-    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magB,
+    });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4,
+    });
 
     const res = await request(appAs(centroA)).post(`/bolle/${bollaId}/conferma`).send({});
 
@@ -1188,9 +1306,12 @@ describe("Bolle — scoping prenotazioni", () => {
   });
 
   it("anche un utente globale rispetta la disponibilita reale", async () => {
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
-    const bollaPrenotata = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magB, stato: "confermato" });
-    const rigaPrenotata = await insertBollaRiga(scope, { bollaId: bollaPrenotata, prodottoId: prod, lottoId, quantita: 9 });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10,
+    });
+    const bollaPrenotata = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magB, stato: "confermato",
+    });
+    const rigaPrenotata = await insertBollaRiga(scope, { bollaId: bollaPrenotata, prodottoId: prod, lottoId, quantita: 9,
+    });
     await insertPrenotazioneMagazzino(scope, {
       bollaId: bollaPrenotata,
       rigaBollaId: rigaPrenotata,
@@ -1199,8 +1320,10 @@ describe("Bolle — scoping prenotazioni", () => {
       magazzinoId: magB,
       quantita: 9,
     });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magB });
-    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 2 });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benB, magazzinoId: magB,
+    });
+    await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 2,
+    });
 
     const res = await request(appAs(null)).post(`/bolle/${bollaId}/conferma`).send({});
 
@@ -1209,10 +1332,14 @@ describe("Bolle — scoping prenotazioni", () => {
   });
 
   it("completa consegna rispetta anche lo scope del magazzino della bolla", async () => {
-    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magB });
-    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
-    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magB, consegnaId, stato: "confermato" });
-    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4 });
+    const consegnaId = await insertConsegna(scope, { beneficiarioId: benA, magazzinoId: magB,
+    });
+    const lottoId = await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10,
+    });
+    const bollaId = await insertBolla(scope, { beneficiarioId: benA, magazzinoId: magB, consegnaId, stato: "confermato",
+    });
+    const rigaId = await insertBollaRiga(scope, { bollaId, prodottoId: prod, lottoId, quantita: 4,
+    });
     await insertPrenotazioneMagazzino(scope, {
       bollaId,
       rigaBollaId: rigaId,
@@ -1226,7 +1353,8 @@ describe("Bolle — scoping prenotazioni", () => {
 
     expect(res.status).toBe(403);
     expect(await lottoResidua(lottoId)).toBe(10);
-    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["attiva"]);
+    expect((await prenotazioniBolla(bollaId)).map((p) => p.stato)).toEqual(["attiva",
+    ]);
     expect(await bollaStato(bollaId)).toBe("confermato");
   });
 });

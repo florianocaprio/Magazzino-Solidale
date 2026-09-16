@@ -14,6 +14,7 @@ import {
   importazioniAgeaPartiteTable,
   importazioniAgeaTable,
   lottiTable,
+  lottiLogiciTable,
   mappatureProdottiEsterniTable,
   magazziniTable,
   movimentiEsterniAgeaTable,
@@ -48,6 +49,8 @@ let scopeAreaId: number;
 let foreignAreaId: number;
 let productId: number;
 let originalLotti = true;
+let scopeGeneralId: number;
+let foreignGeneralId: number;
 let acceptanceWarehouseId: number | null = null;
 let acceptanceReconciliationId: number | null = null;
 let manyToOneWarehouseId: number | null = null;
@@ -292,9 +295,31 @@ beforeAll(async () => {
     .insert(areeOperativeTable)
     .values({ nome: `Area esterna AGEA ${suffix}` })
     .returning({ id: areeOperativeTable.id });
+  [{ id: scopeGeneralId }] = await db
+    .insert(lottiLogiciTable)
+    .values({
+      areaOperativaId: scopeAreaId,
+      codice: "GENERALE",
+      descrizione: "Generale",
+      isGenerale: true,
+    })
+    .returning({ id: lottiLogiciTable.id });
+  [{ id: foreignGeneralId }] = await db
+    .insert(lottiLogiciTable)
+    .values({
+      areaOperativaId: foreignAreaId,
+      codice: "GENERALE",
+      descrizione: "Generale",
+      isGenerale: true,
+    })
+    .returning({ id: lottiLogiciTable.id });
   [{ id: warehouseId }] = await db
     .insert(magazziniTable)
-    .values({ codice: `AGEA-${suffix}`.slice(0, 20), nome: `AGEA ${suffix}` })
+    .values({
+      codice: `AGEA-${suffix}`.slice(0, 20),
+      nome: `AGEA ${suffix}`,
+      areaOperativaId: scopeAreaId,
+    })
     .returning({ id: magazziniTable.id });
   [{ id: foreignWarehouseId }] = await db
     .insert(magazziniTable)
@@ -311,7 +336,8 @@ beforeAll(async () => {
       nome: "Pasta AGEA interna",
       tipoProdotto: "alimentare",
       unitaMisura: "kg",
-      gestioneLotto: true,
+      quantitaFrazionabile: true,
+      lottoFisicoObbligatorio: true,
       gestioneScadenza: false,
     })
     .returning({ id: prodottiTable.id });
@@ -539,6 +565,9 @@ afterAll(async () => {
     .where(eq(systemLogsTable.actorUserId, userId));
   await db.delete(utentiTable).where(eq(utentiTable.id, userId));
   await db
+    .delete(lottiLogiciTable)
+    .where(inArray(lottiLogiciTable.id, [scopeGeneralId, foreignGeneralId]));
+  await db
     .delete(areeOperativeTable)
     .where(eq(areeOperativeTable.id, scopeAreaId));
   await db
@@ -679,6 +708,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       .values({
         codice: `AGEACT-${suffix}`.slice(0, 20),
         nome: `AGEA conteggi ${suffix}`,
+        areaOperativaId: scopeAreaId,
       })
       .returning({ id: magazziniTable.id });
     concurrencyWarehouseIds.push(countWarehouseId);
@@ -832,7 +862,8 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
         nome: "Pasta AGEA interna B",
         tipoProdotto: "alimentare",
         unitaMisura: "kg",
-        gestioneLotto: true,
+        quantitaFrazionabile: true,
+        lottoFisicoObbligatorio: true,
         gestioneScadenza: false,
       })
       .returning({ id: prodottiTable.id });
@@ -944,6 +975,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       .values({
         codice: `AGEAM-${suffix}`.slice(0, 20),
         nome: `AGEA many-to-one ${suffix}`,
+        areaOperativaId: scopeAreaId,
       })
       .returning({ id: magazziniTable.id });
     const analyzed = await request(app)
@@ -1008,6 +1040,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       .values({
         codice: `AGEACM-${suffix}`.slice(0, 20),
         nome: `AGEA merge conflict ${suffix}`,
+        areaOperativaId: scopeAreaId,
       })
       .returning({ id: magazziniTable.id });
     concurrencyWarehouseIds.push(conflictWarehouseId);
@@ -1018,7 +1051,8 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
         nome: "Pasta AGEA conflitto",
         tipoProdotto: "alimentare",
         unitaMisura: "kg",
-        gestioneLotto: true,
+        quantitaFrazionabile: true,
+        lottoFisicoObbligatorio: true,
         gestioneScadenza: true,
       })
       .returning({ id: prodottiTable.id });
@@ -1335,6 +1369,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       .values({
         codice: `AGEAPR-${suffix}`.slice(0, 20),
         nome: `AGEA party race ${suffix}`,
+        areaOperativaId: scopeAreaId,
       })
       .returning({ id: magazziniTable.id });
     concurrencyWarehouseIds.push(raceWarehouseId);
@@ -1515,6 +1550,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       .values({
         codice: `AGEAC-${suffix}`.slice(0, 20),
         nome: `AGEA concurrency ${suffix}`,
+        areaOperativaId: scopeAreaId,
       })
       .returning({ id: magazziniTable.id });
     concurrencyWarehouseIds.push(bootstrapWarehouseId);
@@ -1552,6 +1588,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       .values({
         codice: `AGEAGD-${suffix}`.slice(0, 20),
         nome: `AGEA date gruppo ${suffix}`,
+        areaOperativaId: scopeAreaId,
       })
       .returning({ id: magazziniTable.id });
     concurrencyWarehouseIds.push(groupWarehouseId);
@@ -1730,6 +1767,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
         .values({
           codice: `AGEAR-${suffix}`.slice(0, 20),
           nome: `AGEA reale ${suffix}`,
+          areaOperativaId: scopeAreaId,
         })
         .returning({ id: magazziniTable.id });
       const descriptions = [
@@ -1761,7 +1799,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
           nome: `Prodotto acceptance AGEA ${index + 1}`,
           tipoProdotto: "alimentare",
           unitaMisura: useKg ? "kg" : "pz",
-          gestioneLotto: true,
+          lottoFisicoObbligatorio: true,
           gestioneScadenza: false,
         };
       });
@@ -1868,9 +1906,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
         ),
       ).toHaveLength(80);
       expect(
-        reconciliation.rows.filter(
-          (row) => row.tipoRiga === "SALDO_PARTITA",
-        ),
+        reconciliation.rows.filter((row) => row.tipoRiga === "SALDO_PARTITA"),
       ).toHaveLength(7);
       expect(
         reconciliation.rows.filter(

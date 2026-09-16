@@ -215,7 +215,8 @@ export const DeleteMagazzinoResponse = zod.object({
   "tipoProdotto": zod.string(),
   "unitaMisura": zod.string(),
   "codiceBarre": zod.string().nullish(),
-  "gestioneLotto": zod.boolean(),
+  "quantitaFrazionabile": zod.boolean(),
+  "lottoFisicoObbligatorio": zod.boolean(),
   "gestioneScadenza": zod.boolean(),
   "fsePlus": zod.boolean(),
   "scortaMinima": zod.number(),
@@ -253,7 +254,8 @@ export const ListProdottiResponseItem = zod.object({
   "tipoProdotto": zod.string(),
   "unitaMisura": zod.string(),
   "codiceBarre": zod.string().nullish(),
-  "gestioneLotto": zod.boolean(),
+  "quantitaFrazionabile": zod.boolean(),
+  "lottoFisicoObbligatorio": zod.boolean(),
   "gestioneScadenza": zod.boolean(),
   "fsePlus": zod.boolean(),
   "scortaMinima": zod.number(),
@@ -282,7 +284,8 @@ export const CreateProdottoBody = zod.object({
   "tipoProdotto": zod.string(),
   "unitaMisura": zod.string(),
   "codiceBarre": zod.string().optional(),
-  "gestioneLotto": zod.boolean().optional(),
+  "quantitaFrazionabile": zod.boolean().optional().describe('Se omesso, il backend deriva il default dall\'unità di misura'),
+  "lottoFisicoObbligatorio": zod.boolean().optional(),
   "gestioneScadenza": zod.boolean().optional(),
   "fsePlus": zod.boolean().optional(),
   "scortaMinima": zod.number().optional(),
@@ -309,7 +312,8 @@ export const BulkProdottiBody = zod.object({
   "tipoProdotto": zod.string(),
   "unitaMisura": zod.string(),
   "codiceBarre": zod.string().optional(),
-  "gestioneLotto": zod.boolean().optional(),
+  "quantitaFrazionabile": zod.boolean().optional().describe('Se omesso, il backend deriva il default dall\'unità di misura'),
+  "lottoFisicoObbligatorio": zod.boolean().optional(),
   "gestioneScadenza": zod.boolean().optional(),
   "fsePlus": zod.boolean().optional(),
   "scortaMinima": zod.number().optional(),
@@ -349,7 +353,8 @@ export const GetProdottoResponse = zod.object({
   "tipoProdotto": zod.string(),
   "unitaMisura": zod.string(),
   "codiceBarre": zod.string().nullish(),
-  "gestioneLotto": zod.boolean(),
+  "quantitaFrazionabile": zod.boolean(),
+  "lottoFisicoObbligatorio": zod.boolean(),
   "gestioneScadenza": zod.boolean(),
   "fsePlus": zod.boolean(),
   "scortaMinima": zod.number(),
@@ -381,7 +386,8 @@ export const UpdateProdottoBody = zod.object({
   "tipoProdotto": zod.string().optional(),
   "unitaMisura": zod.string().optional(),
   "codiceBarre": zod.string().optional(),
-  "gestioneLotto": zod.boolean().optional(),
+  "quantitaFrazionabile": zod.boolean().optional(),
+  "lottoFisicoObbligatorio": zod.boolean().optional(),
   "gestioneScadenza": zod.boolean().optional(),
   "fsePlus": zod.boolean().optional(),
   "scortaMinima": zod.number().optional(),
@@ -408,7 +414,8 @@ export const UpdateProdottoResponse = zod.object({
   "tipoProdotto": zod.string(),
   "unitaMisura": zod.string(),
   "codiceBarre": zod.string().nullish(),
-  "gestioneLotto": zod.boolean(),
+  "quantitaFrazionabile": zod.boolean(),
+  "lottoFisicoObbligatorio": zod.boolean(),
   "gestioneScadenza": zod.boolean(),
   "fsePlus": zod.boolean(),
   "scortaMinima": zod.number(),
@@ -483,6 +490,7 @@ export const ListCarichiResponse = zod.array(ListCarichiResponseItem)
 
 
 
+
 export const createCaricoBodyIdempotencyKeyMax = 120;
 
 
@@ -495,6 +503,7 @@ export const createCaricoBodyRigheItemFattoreKgLtPezzoOneRegExp = new RegExp('^[
 
 export const CreateCaricoBody = zod.object({
   "magazzinoId": zod.number().min(1),
+  "lottoLogicoId": zod.number().min(1).nullish(),
   "origineCarico": zod.enum(['RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'ALTRO']).describe('Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.'),
   "numeroDocumento": zod.string().nullish(),
   "dataDocumento": zod.coerce.date().nullish(),
@@ -1251,7 +1260,8 @@ export const ListAgeaMappatureProdottiResponseItem = zod.object({
   "tipoProdotto": zod.string(),
   "unitaMisura": zod.string(),
   "codiceBarre": zod.string().nullish(),
-  "gestioneLotto": zod.boolean(),
+  "quantitaFrazionabile": zod.boolean(),
+  "lottoFisicoObbligatorio": zod.boolean(),
   "gestioneScadenza": zod.boolean(),
   "fsePlus": zod.boolean(),
   "scortaMinima": zod.number(),
@@ -1314,7 +1324,8 @@ export const UpdateAgeaMappaturaProdottoResponse = zod.object({
   "tipoProdotto": zod.string(),
   "unitaMisura": zod.string(),
   "codiceBarre": zod.string().nullish(),
-  "gestioneLotto": zod.boolean(),
+  "quantitaFrazionabile": zod.boolean(),
+  "lottoFisicoObbligatorio": zod.boolean(),
   "gestioneScadenza": zod.boolean(),
   "fsePlus": zod.boolean(),
   "scortaMinima": zod.number(),
@@ -1998,6 +2009,252 @@ export const ReverseFseOpcReturnBody = zod.object({
 export const ReverseFseOpcReturnResponse = zod.record(zod.string(), zod.unknown())
 
 
+/**
+ * @summary Elenca i lotti logici dell'Area Operativa
+ */
+
+export const listLottiLogiciQueryIncludeStoricoDefault = false;
+
+export const ListLottiLogiciQueryParams = zod.object({
+  "areaOperativaId": zod.coerce.number().min(1).optional(),
+  "includeStorico": zod.coerce.boolean().default(listLottiLogiciQueryIncludeStoricoDefault)
+})
+
+export const listLottiLogiciResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const ListLottiLogiciResponseItem = zod.object({
+  "id": zod.number(),
+  "areaOperativaId": zod.number(),
+  "codice": zod.string(),
+  "descrizione": zod.string(),
+  "dataInizio": zod.coerce.date().nullish(),
+  "dataFine": zod.coerce.date().nullish(),
+  "note": zod.string().nullish(),
+  "stato": zod.enum(['aperto', 'chiuso', 'archiviato']),
+  "isGenerale": zod.boolean(),
+  "creatoDa": zod.number().nullish(),
+  "aggiornatoDa": zod.number().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "maiCaricato": zod.boolean(),
+  "esaurito": zod.boolean(),
+  "inTransito": zod.boolean(),
+  "quantitaResiduaPrecisa": zod.string().regex(listLottiLogiciResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
+})
+export const ListLottiLogiciResponse = zod.array(ListLottiLogiciResponseItem)
+
+
+
+export const createLottoLogicoBodyCodiceMax = 80;
+
+export const createLottoLogicoBodyDescrizioneMax = 200;
+
+
+
+export const CreateLottoLogicoBody = zod.object({
+  "areaOperativaId": zod.number().min(1),
+  "codice": zod.string().max(createLottoLogicoBodyCodiceMax),
+  "descrizione": zod.string().max(createLottoLogicoBodyDescrizioneMax),
+  "dataInizio": zod.coerce.date().nullish(),
+  "dataFine": zod.coerce.date().nullish(),
+  "note": zod.string().nullish()
+})
+
+
+
+
+
+export const GetLottoLogicoParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const getLottoLogicoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const GetLottoLogicoResponse = zod.object({
+  "id": zod.number(),
+  "areaOperativaId": zod.number(),
+  "codice": zod.string(),
+  "descrizione": zod.string(),
+  "dataInizio": zod.coerce.date().nullish(),
+  "dataFine": zod.coerce.date().nullish(),
+  "note": zod.string().nullish(),
+  "stato": zod.enum(['aperto', 'chiuso', 'archiviato']),
+  "isGenerale": zod.boolean(),
+  "creatoDa": zod.number().nullish(),
+  "aggiornatoDa": zod.number().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "maiCaricato": zod.boolean(),
+  "esaurito": zod.boolean(),
+  "inTransito": zod.boolean(),
+  "quantitaResiduaPrecisa": zod.string().regex(getLottoLogicoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
+})
+
+
+
+
+
+export const UpdateLottoLogicoParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const updateLottoLogicoBodyCodiceMax = 80;
+
+export const updateLottoLogicoBodyDescrizioneMax = 200;
+
+
+
+export const UpdateLottoLogicoBody = zod.object({
+  "codice": zod.string().max(updateLottoLogicoBodyCodiceMax).optional(),
+  "descrizione": zod.string().max(updateLottoLogicoBodyDescrizioneMax).optional(),
+  "dataInizio": zod.coerce.date().nullish(),
+  "dataFine": zod.coerce.date().nullish(),
+  "note": zod.string().nullish()
+})
+
+export const updateLottoLogicoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const UpdateLottoLogicoResponse = zod.object({
+  "id": zod.number(),
+  "areaOperativaId": zod.number(),
+  "codice": zod.string(),
+  "descrizione": zod.string(),
+  "dataInizio": zod.coerce.date().nullish(),
+  "dataFine": zod.coerce.date().nullish(),
+  "note": zod.string().nullish(),
+  "stato": zod.enum(['aperto', 'chiuso', 'archiviato']),
+  "isGenerale": zod.boolean(),
+  "creatoDa": zod.number().nullish(),
+  "aggiornatoDa": zod.number().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "maiCaricato": zod.boolean(),
+  "esaurito": zod.boolean(),
+  "inTransito": zod.boolean(),
+  "quantitaResiduaPrecisa": zod.string().regex(updateLottoLogicoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
+})
+
+
+
+
+
+export const CloseLottoLogicoParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const closeLottoLogicoBodyMotivoMax = 1000;
+
+
+
+export const CloseLottoLogicoBody = zod.object({
+  "motivo": zod.string().max(closeLottoLogicoBodyMotivoMax).optional()
+})
+
+export const closeLottoLogicoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const CloseLottoLogicoResponse = zod.object({
+  "id": zod.number(),
+  "areaOperativaId": zod.number(),
+  "codice": zod.string(),
+  "descrizione": zod.string(),
+  "dataInizio": zod.coerce.date().nullish(),
+  "dataFine": zod.coerce.date().nullish(),
+  "note": zod.string().nullish(),
+  "stato": zod.enum(['aperto', 'chiuso', 'archiviato']),
+  "isGenerale": zod.boolean(),
+  "creatoDa": zod.number().nullish(),
+  "aggiornatoDa": zod.number().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "maiCaricato": zod.boolean(),
+  "esaurito": zod.boolean(),
+  "inTransito": zod.boolean(),
+  "quantitaResiduaPrecisa": zod.string().regex(closeLottoLogicoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
+})
+
+
+
+
+
+export const ReopenLottoLogicoParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const reopenLottoLogicoBodyMotivoMax = 1000;
+
+
+
+export const ReopenLottoLogicoBody = zod.object({
+  "motivo": zod.string().max(reopenLottoLogicoBodyMotivoMax).optional()
+})
+
+export const reopenLottoLogicoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const ReopenLottoLogicoResponse = zod.object({
+  "id": zod.number(),
+  "areaOperativaId": zod.number(),
+  "codice": zod.string(),
+  "descrizione": zod.string(),
+  "dataInizio": zod.coerce.date().nullish(),
+  "dataFine": zod.coerce.date().nullish(),
+  "note": zod.string().nullish(),
+  "stato": zod.enum(['aperto', 'chiuso', 'archiviato']),
+  "isGenerale": zod.boolean(),
+  "creatoDa": zod.number().nullish(),
+  "aggiornatoDa": zod.number().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "maiCaricato": zod.boolean(),
+  "esaurito": zod.boolean(),
+  "inTransito": zod.boolean(),
+  "quantitaResiduaPrecisa": zod.string().regex(reopenLottoLogicoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
+})
+
+
+
+
+
+export const ArchiveLottoLogicoParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const archiveLottoLogicoBodyMotivoMax = 1000;
+
+
+
+export const ArchiveLottoLogicoBody = zod.object({
+  "motivo": zod.string().max(archiveLottoLogicoBodyMotivoMax).optional()
+})
+
+export const archiveLottoLogicoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const ArchiveLottoLogicoResponse = zod.object({
+  "id": zod.number(),
+  "areaOperativaId": zod.number(),
+  "codice": zod.string(),
+  "descrizione": zod.string(),
+  "dataInizio": zod.coerce.date().nullish(),
+  "dataFine": zod.coerce.date().nullish(),
+  "note": zod.string().nullish(),
+  "stato": zod.enum(['aperto', 'chiuso', 'archiviato']),
+  "isGenerale": zod.boolean(),
+  "creatoDa": zod.number().nullish(),
+  "aggiornatoDa": zod.number().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date(),
+  "maiCaricato": zod.boolean(),
+  "esaurito": zod.boolean(),
+  "inTransito": zod.boolean(),
+  "quantitaResiduaPrecisa": zod.string().regex(archiveLottoLogicoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
+})
+
+
 export const ListLottiQueryParams = zod.object({
   "prodottoId": zod.coerce.number().optional(),
   "magazzinoId": zod.coerce.number().optional(),
@@ -2013,6 +2270,7 @@ export const listLottiResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+
 export const ListLottiResponseItem = zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
+  "lottoLogicoId": zod.number().nullish(),
   "prodottoNome": zod.string().nullish(),
   "codiceLotto": zod.string().nullish(),
   "dataScadenza": zod.string().nullish(),
@@ -2043,6 +2301,7 @@ export const createLottoBodyQuantitaCaricataExclusiveMin = 0;
 
 export const CreateLottoBody = zod.object({
   "prodottoId": zod.number(),
+  "lottoLogicoId": zod.number().nullish(),
   "codiceLotto": zod.string().optional(),
   "dataScadenza": zod.string().optional(),
   "dataCarico": zod.string(),
@@ -2067,6 +2326,7 @@ export const getLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(
 export const GetLottoResponse = zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
+  "lottoLogicoId": zod.number().nullish(),
   "prodottoNome": zod.string().nullish(),
   "codiceLotto": zod.string().nullish(),
   "dataScadenza": zod.string().nullish(),
@@ -2108,6 +2368,7 @@ export const updateLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9
 export const UpdateLottoResponse = zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
+  "lottoLogicoId": zod.number().nullish(),
   "prodottoNome": zod.string().nullish(),
   "codiceLotto": zod.string().nullish(),
   "dataScadenza": zod.string().nullish(),
@@ -2155,6 +2416,7 @@ export const rettificaLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[
 export const RettificaLottoResponse = zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
+  "lottoLogicoId": zod.number().nullish(),
   "prodottoNome": zod.string().nullish(),
   "codiceLotto": zod.string().nullish(),
   "dataScadenza": zod.string().nullish(),
