@@ -840,10 +840,16 @@ export interface RettificaInventarialeInput {
   dataMovimento: string;
   operatoreId: number;
   audit?: AuditCommandContext;
+  origine?: {
+    entitaTipo: string;
+    entitaId: number;
+    rigaOrigineId?: number | null;
+    documentoRiferimento?: string | null;
+  };
 }
 
-/** Rettifica la giacenza con lock pessimista e registra sempre un nuovo evento. */
-export async function rettificaInventariale(
+/** Rettifica la giacenza con lock pessimista e restituisce anche l'evento contabile creato. */
+export async function rettificaInventarialeConEsito(
   tx: InventoryTransaction,
   input: RettificaInventarialeInput,
 ) {
@@ -927,32 +933,46 @@ export async function rettificaInventariale(
   const operatoreId = input.audit
     ? auditUserId(input.audit)
     : input.operatoreId;
-  await tx.insert(movimentiTable).values({
-    tipoMovimento: delta.isPositive()
-      ? "rettifica_positiva"
-      : "rettifica_negativa",
-    tipoDettaglio: input.causale,
-    dataMovimento: input.dataMovimento,
-    magazzinoId: lotto.lotto.magazzinoId,
-    prodottoId: lotto.lotto.prodottoId,
-    lottoId: lotto.lotto.id,
-    quantita: delta.abs().toDb(),
-    quantitaPezzi: dimensions.quantitaPezzi,
-    quantitaKgLt: dimensions.quantitaKgLt,
-    fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
-    unitaMisura: lotto.unitaMisura,
-    fornitoreId: lotto.lotto.fornitoreId,
-    fondoOrigine: lotto.lotto.fondoOrigine,
-    naturaContabile: delta.isPositive()
-      ? "RETTIFICA_POSITIVA"
-      : "RETTIFICA_NEGATIVA",
-    dominioOrigine: "MAGAZZINO",
-    entitaOrigineTipo: "lotto",
-    entitaOrigineId: lotto.lotto.id,
-    operatoreId,
-    auditEventoId,
-    documentoRiferimento: lotto.lotto.documentoCarico,
-    note: [motivazione, input.note?.trim()].filter(Boolean).join(" — ") || null,
-  });
-  return aggiornato;
+  const [movimento] = await tx
+    .insert(movimentiTable)
+    .values({
+      tipoMovimento: delta.isPositive()
+        ? "rettifica_positiva"
+        : "rettifica_negativa",
+      tipoDettaglio: input.causale,
+      dataMovimento: input.dataMovimento,
+      magazzinoId: lotto.lotto.magazzinoId,
+      prodottoId: lotto.lotto.prodottoId,
+      lottoId: lotto.lotto.id,
+      quantita: delta.abs().toDb(),
+      quantitaPezzi: dimensions.quantitaPezzi,
+      quantitaKgLt: dimensions.quantitaKgLt,
+      fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
+      unitaMisura: lotto.unitaMisura,
+      fornitoreId: lotto.lotto.fornitoreId,
+      fondoOrigine: lotto.lotto.fondoOrigine,
+      naturaContabile: delta.isPositive()
+        ? "RETTIFICA_POSITIVA"
+        : "RETTIFICA_NEGATIVA",
+      dominioOrigine: "MAGAZZINO",
+      entitaOrigineTipo: input.origine?.entitaTipo ?? "lotto",
+      entitaOrigineId: input.origine?.entitaId ?? lotto.lotto.id,
+      rigaOrigineId: input.origine?.rigaOrigineId ?? null,
+      operatoreId,
+      auditEventoId,
+      documentoRiferimento:
+        input.origine?.documentoRiferimento ?? lotto.lotto.documentoCarico,
+      note:
+        [motivazione, input.note?.trim()].filter(Boolean).join(" — ") || null,
+    })
+    .returning();
+  return { lotto: aggiornato, movimento, auditEventoId };
+}
+
+/** Compatibilità per i consumer storici: mantiene il risultato Lotto originario. */
+export async function rettificaInventariale(
+  tx: InventoryTransaction,
+  input: RettificaInventarialeInput,
+) {
+  return (await rettificaInventarialeConEsito(tx, input)).lotto;
 }

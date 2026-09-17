@@ -10,6 +10,7 @@ export * from "./ageaImports";
 export * from "./fseReporting";
 export * from "./fseFascicoliSociali";
 export * from "./carichiMagazzino";
+export * from "./caricoPratiche";
 export * from "./operazioniDistribuzioneMagazzino";
 export * from "./volontari";
 export * from "./volontari2";

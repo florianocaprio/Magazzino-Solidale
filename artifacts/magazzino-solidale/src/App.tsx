@@ -40,6 +40,7 @@ const Dashboard = lazy(() => import("@/pages/dashboard"));
 const Magazzini = lazy(() => import("@/pages/magazzini"));
 const Prodotti = lazy(() => import("@/pages/prodotti"));
 const Lotti = lazy(() => import("@/pages/lotti"));
+const CaricoMerce = lazy(() => import("@/pages/carico-merce"));
 const Giacenze = lazy(() => import("@/pages/giacenze"));
 const PreparazioneConsegne = lazy(() => import("@/pages/preparazione-consegne"));
 const Volontari = lazy(() => import("@/pages/volontari"));
@@ -287,6 +288,17 @@ function AppRoutes() {
               <RequireModulo codice="LOTTI">
                 <RequirePermission permission="magazzino.view">
                   <Lotti />
+                </RequirePermission>
+              </RequireModulo>
+            </Guard>
+          )}
+        </Route>
+        <Route path="/carico-merce">
+          {() => (
+            <Guard area="magazzino">
+              <RequireModulo codice="LOTTI">
+                <RequirePermission permission="magazzino.view">
+                  <CaricoMerce />
                 </RequirePermission>
               </RequireModulo>
             </Guard>

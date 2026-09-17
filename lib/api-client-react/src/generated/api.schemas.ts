@@ -1876,6 +1876,248 @@ export interface CaricoMagazzinoInput {
   righe: CaricoMagazzinoRigaInput[];
 }
 
+export type CaricoPraticaStato = typeof CaricoPraticaStato[keyof typeof CaricoPraticaStato];
+
+
+export const CaricoPraticaStato = {
+  bozza: 'bozza',
+  aperta: 'aperta',
+  chiusa: 'chiusa',
+  annullata: 'annullata',
+} as const;
+
+export interface CaricoPratica {
+  id: number;
+  codice: string;
+  versione: number;
+  stato: CaricoPraticaStato;
+  areaOperativaId: number;
+  magazzinoId: number;
+  /** @nullable */
+  magazzinoNome?: string | null;
+  lottoLogicoId: number;
+  /** @nullable */
+  lottoLogicoDescrizione?: string | null;
+  origineCarico: OrigineCaricoManuale;
+  dataCarico: string;
+  descrizione: string;
+  /** @nullable */
+  fornitoreId?: number | null;
+  /** @nullable */
+  numeroDocumento?: string | null;
+  /** @nullable */
+  dataDocumento?: string | null;
+  /** @nullable */
+  note?: string | null;
+  creatoDa: number;
+  aggiornatoDa: number;
+  numeroRighe?: number;
+  numeroRigheRegistrate?: number;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export interface CaricoPraticaRiga {
+  id: number;
+  caricoPraticaId: number;
+  /** @nullable */
+  clientId?: string | null;
+  prodottoId: number;
+  prodottoNome: string;
+  prodottoCodice: string;
+  fondoOrigine: FondoOrigine;
+  quantita?: QuantitaContabile | null;
+  unitaMisura: string;
+  quantitaFrazionabile: boolean;
+  lottoFisicoObbligatorio: boolean;
+  gestioneScadenza: boolean;
+  /** @nullable */
+  codiceLottoProduttore?: string | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
+  /** @nullable */
+  note?: string | null;
+  registrata: boolean;
+  /** @nullable */
+  registrataAt?: string | null;
+  /** @nullable */
+  integrazioneId?: number | null;
+  /** @nullable */
+  caricoMagazzinoRigaId?: number | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export interface CaricoIntegrazione {
+  id: number;
+  caricoMagazzinoId: number;
+  versioneRisultante: number;
+  attoreId: number;
+  dataRegistrazione: string;
+}
+
+export type CaricoPraticaDettaglio = CaricoPratica & ({
+  areaOperativaNome: string;
+  lottoLogicoCodice: string;
+  /** @nullable */
+  fornitoreNome?: string | null;
+  righe: CaricoPraticaRiga[];
+  integrazioni: CaricoIntegrazione[];
+});
+
+export interface CaricoPraticaRigaInput {
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  clientId?: string | null;
+  /** @minimum 1 */
+  prodottoId: number;
+  fondoOrigine: FondoOrigine;
+  quantita?: QuantitaContabile | null;
+  /**
+     * @maxLength 80
+     * @nullable
+     */
+  codiceLottoProduttore?: string | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface CaricoPraticaInput {
+  /** @minimum 1 */
+  areaOperativaId: number;
+  /** @minimum 1 */
+  magazzinoId: number;
+  /** @minimum 1 */
+  lottoLogicoId: number;
+  origineCarico: OrigineCaricoManuale;
+  dataCarico: string;
+  /** @minLength 1 */
+  descrizione: string;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  fornitoreId?: number | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  numeroDocumento?: string | null;
+  /** @nullable */
+  dataDocumento?: string | null;
+  /** @nullable */
+  note?: string | null;
+  righe?: CaricoPraticaRigaInput[];
+}
+
+export type CaricoPraticaRigaCreateInput = CaricoPraticaRigaInput & {
+  /** @minimum 1 */
+  versione: number;
+};
+
+export type CaricoPraticaRigaUpdateInput = CaricoPraticaRigaInput & {
+  /** @minimum 1 */
+  versione: number;
+};
+
+export interface CaricoPraticaUpdate {
+  /** @minimum 1 */
+  versione: number;
+  /** @minimum 1 */
+  areaOperativaId?: number;
+  /** @minimum 1 */
+  magazzinoId?: number;
+  /** @minimum 1 */
+  lottoLogicoId?: number;
+  origineCarico?: OrigineCaricoManuale;
+  dataCarico?: string;
+  /** @minLength 1 */
+  descrizione?: string;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  fornitoreId?: number | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  numeroDocumento?: string | null;
+  /** @nullable */
+  dataDocumento?: string | null;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface CaricoPraticaVersioneInput {
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface CaricoPraticaMotivoInput {
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  motivo: string;
+}
+
+export interface CaricoPraticaRegistrazioneInput {
+  /** @minimum 1 */
+  versione: number;
+  /** @minItems 1 */
+  rigaIds: number[];
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  idempotencyKey: string;
+}
+
+export interface CaricoPraticaRegistrazioneResult {
+  praticaId: number;
+  integrazioneId: number;
+  caricoMagazzinoId: number;
+  versione: number;
+  rigaIds: number[];
+  replay: boolean;
+}
+
+export interface CaricoPraticaRettificaInput {
+  /** @minimum 1 */
+  versione: number;
+  quantita: QuantitaContabile;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  motivo: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  idempotencyKey: string;
+}
+
+export interface CaricoPraticaRettificaResult {
+  praticaId: number;
+  rigaId: number;
+  rettificaId?: number;
+  lottoId: number;
+  movimentoId: number;
+  quantita: QuantitaContabile;
+  versione: number;
+  replay: boolean;
+}
+
 export type LottoLogicoStato = typeof LottoLogicoStato[keyof typeof LottoLogicoStato];
 
 
@@ -8475,6 +8717,21 @@ search?: string;
 export type ListCarichiParams = {
 magazzinoId?: number;
 origineCarico?: OrigineCarico;
+da?: string;
+a?: string;
+};
+
+export type ListCaricoPraticheParams = {
+/**
+ * @minimum 1
+ */
+areaOperativaId: number;
+/**
+ * @minimum 1
+ */
+magazzinoId?: number;
+stato?: CaricoPraticaStato;
+q?: string;
 da?: string;
 a?: string;
 };

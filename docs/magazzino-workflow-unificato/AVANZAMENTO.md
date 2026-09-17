@@ -776,3 +776,105 @@ Floriano ha dichiarato esplicitamente M2 validato sul candidato `ca1b3aa5c0444ae
 CAT-02, QTY-01 e LOT-01 passano a `OK-M2/OK-MAN-M2`. LOT-02 e LOT-03 restano fondazioni parziali M2: la validazione manuale non certifica prenotazioni, rientro, visualizzazione completa o gli altri completamenti demandati a M4B. Gli esiti automatici, i dati legacy e le milestone precedenti restano invariati.
 
 Questa chiusura documentale non modifica codice, schema, API, migrazioni o output generati e costituisce la base autorizzata per M3A.
+
+## M3A — sviluppo Carico Merce persistente
+
+Data: 17 settembre 2026
+
+Base reale M3A: `fdb856164f2316f100759ae16e7157f9f9e87676`, commit documentale che registra la validazione manuale M2 sulla SHA `ca1b3aa5c0444aef8be61d1caf349c41dc436abc`.
+
+Stato: **candidato locale di sviluppo** (`DEV-M3A/NE-TEST-M3A`). Le modifiche M3A restano intenzionalmente senza commit e senza push; Docker candidato, suite complete, E2E reale e validazione manuale appartengono alla fase separata `##test M3A`.
+
+### Mappatura D3 e semantica
+
+- `carico_pratiche` conserva ID/codice stabile, versione ottimistica, stati `bozza|aperta|chiusa|annullata`, Area, Magazzino, lotto logico, provenienza/documento, autori e timestamp.
+- `carico_pratica_righe` conserva le righe di lavoro anche incomplete. Una bozza non crea lotti fisici, carichi contabili o movimenti; una riga registrata riceve gli snapshot di U.M. e frazionabilità e non è più modificabile o eliminabile dagli endpoint ordinari.
+- `carico_integrazioni` collega ogni comando idempotente alla testata contabile preesistente `carichi_magazzino`; `carico_integrazione_righe` collega univocamente la riga di lavoro alla riga contabile e impedisce a livello DB una seconda contabilizzazione.
+- Gli effetti inventariali riusano esclusivamente `createWarehouseLoad` nella stessa transazione di integrazione, link, snapshot, audit e avanzamento versione. I consumer legacy `/carichi` e AGEA restano invariati e continuano a usare lo stesso servizio.
+- `carico_pratica_rettifiche` collega la rettifica negativa motivata e idempotente a pratica, riga, lotto, movimento e audit. Se una partita consolida più fonti, la merce è prenotata/distribuita o le rettifiche precedenti esauriscono la quota ricostruibile, il comando viene bloccato senza forzare attribuzioni.
+
+### Concorrenza, lifecycle e audit
+
+- Ogni mutazione controlla la versione richiesta; un dato superato restituisce `409`. La registrazione usa chiave stabile, hash semantico, advisory lock e lock della pratica; il replay concluso precede la nuova validazione di versione/stato ma resta subordinato allo scope attuale.
+- La prima registrazione porta la pratica ad `aperta`; le successive aggiungono integrazioni. `chiusa` blocca nuove righe, `riapri` e `annulla` richiedono motivo, e l'annullamento M3A è ammesso soltanto su bozza senza effetti. Chiudere la pratica non chiude il lotto logico.
+- Creazione/modifica bozza, righe, registrazione, chiusura, riapertura, annullamento e rettifica usano attore di sessione e audit nella transazione. Il test di errore audit sulla rettifica dimostra rollback di quantità, movimento e link.
+
+### API e interfaccia
+
+- OpenAPI espone elenco/dettaglio, testata, righe, registrazione, rettifica e lifecycle; client React e Zod sono rigenerati dal codegen ufficiale.
+- La voce primaria Magazzino è ora `Carico Merce` e apre `/carico-merce`; `/lotti`, storico Partite, rettifiche e import AGEA restano raggiungibili come percorso legacy.
+- La pagina elenca pratiche per Area, Magazzino opzionale, ricerca, stato e date; il dettaglio mostra testata, righe da registrare, righe già registrate e integrazioni. Per i nuovi ingressi propone soltanto magazzini attivi della stessa Area.
+- Il prodotto si sceglie da elenco scorrevole, ricerca nome/codice/barcode o `BarcodeScannerButton`. Barcode ignoto e fotocamera non disponibile non eliminano il lavoro; letture duplicate ravvicinate sono ignorate. La quantità usa un solo input per U.M. e normalizza la virgola senza arrotondare.
+- `Generale — nessuna raccolta specifica` è il default visibile; una raccolta aperta può essere scelta o creata contestualmente usando il servizio M2. Pending, conferma prima della registrazione, idempotency key conservata dopo esito incerto e avviso di uscita con modifiche locali sono inclusi.
+
+### Migrazione 37 e database isolati
+
+La migrazione aggiunta è `20260918_m3a_carico_pratiche.sql`, successiva alle 36 pubblicate. Il runner ufficiale ha aggiornato una nuova copia populated da 35 a 37 migrazioni; M2 e M3A sono state applicate in ordine, poi verificate senza pending o checksum mismatch.
+
+| Evidenza populated                           | Prima                                                                   | Dopo      |
+| -------------------------------------------- | ----------------------------------------------------------------------- | --------- |
+| prodotti / lotti / movimenti                 | 12 / 21 / 37                                                            | invariati |
+| prenotazioni / carichi / audit               | 6 / 2 / 0                                                               | invariati |
+| quantità prenotata / movimenti               | 60,010000 / 1701,000000                                                 | invariate |
+| hash stock per magazzino/prodotto/fondo/U.M. | `d05b63e2f6ae6ef2aa59b207377ae1ae`                                      | identico  |
+| hash prenotazioni / movimenti                | `ec87615b7ad5bccf4af768b6baa2fab9` / `1ca0c6d395d4a2659b9d4234616325a9` | identici  |
+| pratiche / rettifiche M3A                    | —                                                                       | 0 / 0     |
+
+Il fresh gate separato è partito da zero tabelle, ha materializzato lo schema, applicato e ripetuto tutte le 37 migrazioni, eseguito lo smoke API/CRUD e chiuso con zero pending, mismatch o out-of-order. L'utente `sadmin` e le password usate dal gate sono esclusivamente fixture temporanee del database isolato e non sono state scritte nel repository; il bootstrap applicativo e i suoi test preesistenti non sono stati modificati.
+
+### Controlli di sviluppo eseguiti
+
+- Backend M3A: 11 test passati su bozza cross-sessione, autori/versioni, 80+20, atomicità, retry sequenziale/concorrente, payload/key incompatibili, immutabilità, rettifica/impegni/audit rollback, lifecycle, gara registrazione/chiusura, riga estranea, lotto chiuso e scope.
+- Regressione M1B/M1C/M2 e consumer legacy carichi/AGEA: 8 file, 101 test passati e 1 skip opzionale preesistente.
+- Frontend M3A e hardening esistente: 2 file, 10 test passati. Lo scenario Playwright reale 80+20 è predisposto ma non eseguito, come richiesto dal confine fra sviluppo e `##test`.
+- Migration runner: 10 test passati; fresh gate e replay 37/37 verdi.
+- Codegen ufficiale React/Zod, typecheck API/frontend/librerie e Prettier pertinente eseguiti. Suite complete, build/budget, Docker candidato e prova fisica fotocamera/tablet non sono stati eseguiti in questa fase.
+
+### Confine e rischi residui
+
+- M3B non è iniziato: XLSX/XLS/CSV FSE+/AGEA non confluiscono ancora nella pratica M3A; il percorso import corrente è preservato e dichiarato legacy.
+- La rettifica collegata è volutamente prudente: una partita consolidata da più apporti viene bloccata perché l'attribuzione non è affidabile. Non è stata introdotta una procedura generale di reso/storno logistico M4B.
+- L'E2E preparato, la prova scanner su dispositivo reale e l'ispezione UX nelle sei lingue restano evidenze della successiva fase `##test M3A`; non sono considerate validate ora.
+- Database originale `magazzino-postgres`, servizi/volumi originali, Docker candidato M2 e remoto di produzione non sono stati usati o modificati.
+
+Condizione di arresto: **M3A pronto per `##test`, da validare**.
+
+## M3A — test automatici Carico Merce persistente
+
+Data: 17 settembre 2026
+
+Base verificata: `fdb856164f2316f100759ae16e7157f9f9e87676`.
+
+Stato: **test automatici M3A superati** (`OK-M3A/NE-MAN`). Docker candidato, prova scanner su dispositivo fisico e validazione manuale restano intenzionalmente non eseguiti.
+
+### Correzioni emerse durante il test
+
+- I selettori M3A hanno ora etichette accessibili distinte per Area, Magazzino, stato e attività, riutilizzando le traduzioni esistenti.
+- Lo scenario Playwright non riusa più la stessa pagina: crea una bozza, chiude il primo contesto browser, accede da un secondo contesto e riprende la pratica. Un terzo contesto verifica il conflitto `409` fra due versioni concorrenti.
+- La verifica Giacenze attende esplicitamente la risposta della seconda registrazione, così il controllo finale di 80+20=100 misura lo stock contabilizzato e non una risposta anticipata.
+
+### Migrazioni e database isolati
+
+- Su una copia popolata M2 con 35 migrazioni registrate, il runner ufficiale ha applicato M2 e M3A fino a 37/37. Il secondo passaggio ha applicato zero migrazioni; verifica e stato hanno chiuso con zero pending, mismatch, mancanti o fuori ordine.
+- Prodotti, lotti fisici, movimenti, prenotazioni, carichi e bolle sono rimasti invariati. Gli hash semantici pre/post di stock, movimenti e prenotazioni sono rispettivamente `16355aa31bdc0c107614f89ef5670649`, `225b58842ed693e96c4daa288b20f610` e `6543192f88adc65f2606ae208050b9a3`.
+- Il fresh gate è partito da zero tabelle, ha materializzato lo schema e registrato tutte le 37 migrazioni. Senza utenti iniziali, il primo account creato dall'API è diventato SuperAdmin, ha completato login e cambio password obbligatorio, quindi ha creato Area, lotto `Generale`, Magazzino e prodotto.
+- Sul database fresh la bozza non ha prodotto carichi, lotti o movimenti; la registrazione ha creato una sola integrazione, un carico, un lotto e un movimento, con residuo e Giacenze pari a 10.
+
+### Funzionale, concorrenza e regressione
+
+- Backend M3A: 1 file, 11/11 test passati. Sono coperti bozza cross-sessione, autori/versioni, 80+20, atomicità, replay, richieste incompatibili, concorrenza, immutabilità, rettifica e lifecycle.
+- Migration runner con PostgreSQL reale: 24/24 test passati, inclusi 14 test di integrazione.
+- Frontend completo: 68 file, 374/374 test passati.
+- Playwright desktop 1440×900: 1/1 scenario passato con tre contesti browser, ripresa reale della bozza, due integrazioni e conflitto di versione concorrente.
+- Suite backend completa: i tentativi concorrente e seriale hanno evidenziato soltanto test preesistenti sensibili a isolamento/ordine. Ogni caso emerso è passato isolatamente: `fase5-super-admin`, `consegne-pagination-rbac` e `volontari-2-api` insieme 43/43; `m2-catalogo-lotti-logici` 14/14. Non è stata introdotta una correzione estranea a M3A.
+- Codegen React/Zod eseguito due volte con output byte-identico. Typecheck workspace, build con `PORT=5173 BASE_PATH=/`, Prettier pertinente e `git diff --check` sono verdi.
+- Bundle frontend principale: 1277,7 KiB, 353,6 KiB gzip, entro il budget corrente. Restano gli avvisi preesistenti Vite su sourcemap e chunk oltre 500 KiB.
+
+### Limiti e osservazioni
+
+- Il bootstrap fresh emette ancora un warning preesistente quando tenta il log di sistema `USER_CREATED` con attore sintetico `0`; la creazione, il ruolo SuperAdmin e il flusso successivo riescono. Il codice bootstrap non è stato modificato in M3A.
+- Non sono state eseguite la prova fisica fotocamera/tablet, l'ispezione manuale nelle sei lingue o la validazione umana.
+- Non è stata costruita un'immagine Docker applicativa candidata. PostgreSQL, reti e volumi usati dai gate sono esclusivamente temporanei e separati dagli ambienti originali.
+- M3B non è iniziato; import XLSX/XLS/CSV e flussi logistici successivi restano fuori perimetro.
+
+Condizione di arresto: **M3A test automatici superati — pronto per code review**.

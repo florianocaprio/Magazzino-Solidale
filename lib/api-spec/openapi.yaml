@@ -425,6 +425,302 @@ paths:
                 items:
                   $ref: "#/components/schemas/CaricoMagazzinoRiga"
 
+  # ─── PRATICHE DI CARICO M3A ─────────────────────────────────────────────────
+  /carico-pratiche:
+    get:
+      operationId: listCaricoPratiche
+      tags: [carichi]
+      parameters:
+        - name: areaOperativaId
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: magazzinoId
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: stato
+          in: query
+          schema:
+            $ref: "#/components/schemas/CaricoPraticaStato"
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: da
+          in: query
+          schema: { type: string, format: date }
+        - name: a
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Pratiche visibili nell'Area e nei Magazzini autorizzati
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CaricoPratica"
+    post:
+      operationId: createCaricoPratica
+      tags: [carichi]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoPraticaInput"
+      responses:
+        "201":
+          description: Bozza persistente senza effetti inventariali
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaDettaglio"
+
+  /carico-pratiche/{id}:
+    get:
+      operationId: getCaricoPratica
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Pratica con righe di lavoro e integrazioni immutabili
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaDettaglio"
+    patch:
+      operationId: updateCaricoPratica
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoPraticaUpdate"
+      responses:
+        "200":
+          description: Pratica aggiornata con controllo versione
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaDettaglio"
+
+  /carico-pratiche/{id}/righe:
+    post:
+      operationId: addCaricoPraticaRiga
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoPraticaRigaCreateInput"
+      responses:
+        "201":
+          description: Riga di lavoro aggiunta alla bozza
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaDettaglio"
+
+  /carico-pratiche/{id}/righe/{rigaId}:
+    patch:
+      operationId: updateCaricoPraticaRiga
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: rigaId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoPraticaRigaUpdateInput"
+      responses:
+        "200":
+          description: Riga non ancora registrata aggiornata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaDettaglio"
+    delete:
+      operationId: deleteCaricoPraticaRiga
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: rigaId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoPraticaVersioneInput"
+      responses:
+        "200":
+          description: Riga di lavoro rimossa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaDettaglio"
+
+  /carico-pratiche/{id}/registra:
+    post:
+      operationId: registerCaricoPratica
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoPraticaRegistrazioneInput"
+      responses:
+        "200":
+          description: Replay della registrazione già conclusa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaRegistrazioneResult"
+        "201":
+          description: Sole righe selezionate contabilizzate atomicamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaRegistrazioneResult"
+
+  /carico-pratiche/{id}/righe/{rigaId}/rettifica:
+    post:
+      operationId: rectifyCaricoPraticaRiga
+      tags: [carichi]
+      summary: Registra una rettifica negativa motivata sulla riga contabilizzata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: rigaId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoPraticaRettificaInput"
+      responses:
+        "200":
+          description: Replay della rettifica già conclusa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaRettificaResult"
+        "201":
+          description: Rettifica aggiuntiva collegata alla riga e al movimento
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaRettificaResult"
+  /carico-pratiche/{id}/chiudi:
+    post:
+      operationId: closeCaricoPratica
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoPraticaVersioneInput"
+      responses:
+        "200":
+          description: Pratica chiusa esplicitamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaDettaglio"
+
+  /carico-pratiche/{id}/riapri:
+    post:
+      operationId: reopenCaricoPratica
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoPraticaMotivoInput"
+      responses:
+        "200":
+          description: Pratica riaperta senza riaprire il lotto logico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaDettaglio"
+
+  /carico-pratiche/{id}/annulla:
+    post:
+      operationId: cancelCaricoPratica
+      tags: [carichi]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaricoPraticaMotivoInput"
+      responses:
+        "200":
+          description: Bozza senza effetti inventariali annullata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaricoPraticaDettaglio"
+
   # ─── IMPORT AGEA/SIFEAD 2.0B ────────────────────────────────────────────────
   /agea/importazioni:
     get:
@@ -10976,6 +11272,292 @@ components:
           items:
             $ref: "#/components/schemas/CaricoMagazzinoRigaInput"
       required: [magazzinoId, origineCarico, dataCarico, righe]
+
+    CaricoPraticaStato:
+      type: string
+      enum: [bozza, aperta, chiusa, annullata]
+
+    CaricoPratica:
+      type: object
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        versione: { type: integer }
+        stato:
+          $ref: "#/components/schemas/CaricoPraticaStato"
+        areaOperativaId: { type: integer }
+        magazzinoId: { type: integer }
+        magazzinoNome: { type: [string, "null"] }
+        lottoLogicoId: { type: integer }
+        lottoLogicoDescrizione: { type: [string, "null"] }
+        origineCarico:
+          $ref: "#/components/schemas/OrigineCaricoManuale"
+        dataCarico: { type: string, format: date }
+        descrizione: { type: string }
+        fornitoreId: { type: [integer, "null"] }
+        numeroDocumento: { type: [string, "null"] }
+        dataDocumento: { type: [string, "null"], format: date }
+        note: { type: [string, "null"] }
+        creatoDa: { type: integer }
+        aggiornatoDa: { type: integer }
+        numeroRighe: { type: integer }
+        numeroRigheRegistrate: { type: integer }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+      required:
+        [
+          id,
+          codice,
+          versione,
+          stato,
+          areaOperativaId,
+          magazzinoId,
+          lottoLogicoId,
+          origineCarico,
+          dataCarico,
+          descrizione,
+          creatoDa,
+          aggiornatoDa,
+          dataCreazione,
+          dataAggiornamento,
+        ]
+
+    CaricoPraticaRiga:
+      type: object
+      properties:
+        id: { type: integer }
+        caricoPraticaId: { type: integer }
+        clientId: { type: [string, "null"] }
+        prodottoId: { type: integer }
+        prodottoNome: { type: string }
+        prodottoCodice: { type: string }
+        fondoOrigine:
+          $ref: "#/components/schemas/FondoOrigine"
+        quantita:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        unitaMisura: { type: string }
+        quantitaFrazionabile: { type: boolean }
+        lottoFisicoObbligatorio: { type: boolean }
+        gestioneScadenza: { type: boolean }
+        codiceLottoProduttore: { type: [string, "null"] }
+        dataScadenza: { type: [string, "null"], format: date }
+        fattoreKgLtPezzo:
+          oneOf:
+            - $ref: "#/components/schemas/FattoreContabile"
+            - type: "null"
+        note: { type: [string, "null"] }
+        registrata: { type: boolean }
+        registrataAt: { type: [string, "null"], format: date-time }
+        integrazioneId: { type: [integer, "null"] }
+        caricoMagazzinoRigaId: { type: [integer, "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+      required:
+        [
+          id,
+          caricoPraticaId,
+          prodottoId,
+          prodottoNome,
+          prodottoCodice,
+          fondoOrigine,
+          unitaMisura,
+          quantitaFrazionabile,
+          lottoFisicoObbligatorio,
+          gestioneScadenza,
+          registrata,
+          dataCreazione,
+          dataAggiornamento,
+        ]
+
+    CaricoIntegrazione:
+      type: object
+      properties:
+        id: { type: integer }
+        caricoMagazzinoId: { type: integer }
+        versioneRisultante: { type: integer }
+        attoreId: { type: integer }
+        dataRegistrazione: { type: string, format: date-time }
+      required:
+        [id, caricoMagazzinoId, versioneRisultante, attoreId, dataRegistrazione]
+
+    CaricoPraticaDettaglio:
+      allOf:
+        - $ref: "#/components/schemas/CaricoPratica"
+        - type: object
+          properties:
+            areaOperativaNome: { type: string }
+            lottoLogicoCodice: { type: string }
+            fornitoreNome: { type: [string, "null"] }
+            righe:
+              type: array
+              items:
+                $ref: "#/components/schemas/CaricoPraticaRiga"
+            integrazioni:
+              type: array
+              items:
+                $ref: "#/components/schemas/CaricoIntegrazione"
+          required: [areaOperativaNome, lottoLogicoCodice, righe, integrazioni]
+
+    CaricoPraticaRigaInput:
+      type: object
+      additionalProperties: false
+      properties:
+        clientId: { type: [string, "null"], maxLength: 100 }
+        prodottoId: { type: integer, minimum: 1 }
+        fondoOrigine:
+          $ref: "#/components/schemas/FondoOrigine"
+        quantita:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        codiceLottoProduttore: { type: [string, "null"], maxLength: 80 }
+        dataScadenza: { type: [string, "null"], format: date }
+        fattoreKgLtPezzo:
+          oneOf:
+            - $ref: "#/components/schemas/FattoreContabile"
+            - type: "null"
+        note: { type: [string, "null"] }
+      required: [prodottoId, fondoOrigine]
+
+    CaricoPraticaInput:
+      type: object
+      additionalProperties: false
+      properties:
+        areaOperativaId: { type: integer, minimum: 1 }
+        magazzinoId: { type: integer, minimum: 1 }
+        lottoLogicoId: { type: integer, minimum: 1 }
+        origineCarico:
+          $ref: "#/components/schemas/OrigineCaricoManuale"
+        dataCarico: { type: string, format: date }
+        descrizione: { type: string, minLength: 1 }
+        fornitoreId: { type: [integer, "null"], minimum: 1 }
+        numeroDocumento: { type: [string, "null"], maxLength: 100 }
+        dataDocumento: { type: [string, "null"], format: date }
+        note: { type: [string, "null"] }
+        righe:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaricoPraticaRigaInput"
+      required:
+        [
+          areaOperativaId,
+          magazzinoId,
+          lottoLogicoId,
+          origineCarico,
+          dataCarico,
+          descrizione,
+        ]
+
+    CaricoPraticaRigaCreateInput:
+      allOf:
+        - $ref: "#/components/schemas/CaricoPraticaRigaInput"
+        - type: object
+          required: [versione]
+          properties:
+            versione: { type: integer, minimum: 1 }
+
+    CaricoPraticaRigaUpdateInput:
+      allOf:
+        - $ref: "#/components/schemas/CaricoPraticaRigaInput"
+        - type: object
+          required: [versione]
+          properties:
+            versione: { type: integer, minimum: 1 }
+
+    CaricoPraticaUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        versione: { type: integer, minimum: 1 }
+        areaOperativaId: { type: integer, minimum: 1 }
+        magazzinoId: { type: integer, minimum: 1 }
+        lottoLogicoId: { type: integer, minimum: 1 }
+        origineCarico:
+          $ref: "#/components/schemas/OrigineCaricoManuale"
+        dataCarico: { type: string, format: date }
+        descrizione: { type: string, minLength: 1 }
+        fornitoreId: { type: [integer, "null"], minimum: 1 }
+        numeroDocumento: { type: [string, "null"], maxLength: 100 }
+        dataDocumento: { type: [string, "null"], format: date }
+        note: { type: [string, "null"] }
+      required: [versione]
+
+    CaricoPraticaVersioneInput:
+      type: object
+      additionalProperties: false
+      properties:
+        versione: { type: integer, minimum: 1 }
+      required: [versione]
+
+    CaricoPraticaMotivoInput:
+      type: object
+      additionalProperties: false
+      properties:
+        versione: { type: integer, minimum: 1 }
+        motivo: { type: string, minLength: 1, maxLength: 1000 }
+      required: [versione, motivo]
+
+    CaricoPraticaRegistrazioneInput:
+      type: object
+      additionalProperties: false
+      properties:
+        versione: { type: integer, minimum: 1 }
+        rigaIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: integer, minimum: 1 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 100 }
+      required: [versione, rigaIds, idempotencyKey]
+
+    CaricoPraticaRegistrazioneResult:
+      type: object
+      properties:
+        praticaId: { type: integer }
+        integrazioneId: { type: integer }
+        caricoMagazzinoId: { type: integer }
+        versione: { type: integer }
+        rigaIds:
+          type: array
+          items: { type: integer }
+        replay: { type: boolean }
+      required:
+        [
+          praticaId,
+          integrazioneId,
+          caricoMagazzinoId,
+          versione,
+          rigaIds,
+          replay,
+        ]
+
+    CaricoPraticaRettificaInput:
+      type: object
+      additionalProperties: false
+      properties:
+        versione: { type: integer, minimum: 1 }
+        quantita:
+          $ref: "#/components/schemas/QuantitaContabile"
+        motivo: { type: string, minLength: 1, maxLength: 1000 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 100 }
+      required: [versione, quantita, motivo, idempotencyKey]
+
+    CaricoPraticaRettificaResult:
+      type: object
+      properties:
+        praticaId: { type: integer }
+        rigaId: { type: integer }
+        rettificaId: { type: integer }
+        lottoId: { type: integer }
+        movimentoId: { type: integer }
+        quantita:
+          $ref: "#/components/schemas/QuantitaContabile"
+        versione: { type: integer }
+        replay: { type: boolean }
+      required:
+        [praticaId, rigaId, lottoId, movimentoId, quantita, versione, replay]
 
     # ── Lotti ─────────────────────────────────────────────────────────────
     LottoLogico:

@@ -135,7 +135,7 @@ Esempio vincolante: riga A da 80 contabilizzata nell'integrazione 1 + nuova riga
 
 **Riutilizzo.** Estendere `createWarehouseLoad`, advisory lock, hash, `InventoryDecimal`, lineage riga/lotto/movimento e transazioni esistenti.
 
-**Stato.** Requisito approvato in M0; non implementato e non testato. Realizzazione e prove sono demandate a M3A.
+**Stato.** Requisito approvato in M0 e implementato nel candidato M3A: `carico_pratiche` conserva testata, stato e versione; `carico_pratica_righe` conserva il lavoro; `carico_integrazioni` e `carico_integrazione_righe` collegano in modo immutabile le righe al solo motore contabile `carichi_magazzino`. La fase automatica `##test M3A` è superata (`OK-M3A/NE-MAN`); Docker candidato, prova fisica e validazione umana non sono ancora eseguiti.
 
 ### Import AGEA/FSE+
 

@@ -39,7 +39,8 @@ export async function ensureGeneralLogicalLot(
         eq(lottiLogiciTable.areaOperativaId, input.areaOperativaId),
         eq(lottiLogiciTable.isGenerale, true),
       ),
-    );
+    )
+    .for("update");
   if (!logicalLot) {
     throw new LogicalLotError(
       500,

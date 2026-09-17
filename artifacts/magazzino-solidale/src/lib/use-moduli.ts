@@ -14,6 +14,7 @@ export const MODULO_BY_ROUTE: Record<string, string> = {
   "/preparazione-consegne": "MAGAZZINO_SOLIDALE",
   "/scarichi": "SCARICHI",
   "/lotti": "LOTTI",
+  "/carico-merce": "LOTTI",
   "/trasferimenti": "TRASFERIMENTI",
   "/approvvigionamenti": "APPROVVIGIONAMENTI",
   "/volontari": "VOLONTARI",

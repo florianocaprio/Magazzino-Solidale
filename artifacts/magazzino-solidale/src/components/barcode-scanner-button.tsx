@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
+import {
+  BrowserMultiFormatReader,
+  type IScannerControls,
+} from "@zxing/browser";
 import { DecodeHintType, BarcodeFormat } from "@zxing/library";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +27,19 @@ const FORMATS = [
   BarcodeFormat.CODABAR,
   BarcodeFormat.QR_CODE,
 ];
+
+export function barcodeCameraErrorKey(error: unknown): string {
+  const name = (error as { name?: string })?.name;
+  if (name === "NotAllowedError" || name === "SecurityError")
+    return "barcodeScanner.errPermission";
+  if (
+    name === "NotFoundError" ||
+    name === "DevicesNotFoundError" ||
+    name === "OverconstrainedError"
+  )
+    return "barcodeScanner.errNoCamera";
+  return "barcodeScanner.errGeneric";
+}
 
 interface BarcodeScannerButtonProps {
   /** Called with the decoded barcode text once a code is recognized. */
@@ -107,18 +123,7 @@ export function BarcodeScannerButton({
         controlsRef.current = controls;
       } catch (e) {
         if (cancelled) return;
-        const name = (e as { name?: string })?.name;
-        if (name === "NotAllowedError" || name === "SecurityError") {
-          setError(t("barcodeScanner.errPermission"));
-        } else if (
-          name === "NotFoundError" ||
-          name === "DevicesNotFoundError" ||
-          name === "OverconstrainedError"
-        ) {
-          setError(t("barcodeScanner.errNoCamera"));
-        } else {
-          setError(t("barcodeScanner.errGeneric"));
-        }
+        setError(t(barcodeCameraErrorKey(e)));
       }
     };
 
@@ -173,7 +178,11 @@ export function BarcodeScannerButton({
               </div>
             </div>
           )}
-          <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setOpen(false)}
+          >
             {t("barcodeScanner.cancel")}
           </Button>
         </DialogContent>

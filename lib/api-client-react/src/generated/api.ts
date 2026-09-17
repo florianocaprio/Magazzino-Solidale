@@ -108,6 +108,18 @@ import type {
   CaricoMagazzinoDettaglio,
   CaricoMagazzinoInput,
   CaricoMagazzinoRiga,
+  CaricoPratica,
+  CaricoPraticaDettaglio,
+  CaricoPraticaInput,
+  CaricoPraticaMotivoInput,
+  CaricoPraticaRegistrazioneInput,
+  CaricoPraticaRegistrazioneResult,
+  CaricoPraticaRettificaInput,
+  CaricoPraticaRettificaResult,
+  CaricoPraticaRigaCreateInput,
+  CaricoPraticaRigaUpdateInput,
+  CaricoPraticaUpdate,
+  CaricoPraticaVersioneInput,
   CentroAscolto,
   CentroAscoltoInput,
   CentroAscoltoUpdate,
@@ -233,6 +245,7 @@ import type {
   ListBeneficiariParams,
   ListBolleParams,
   ListCarichiParams,
+  ListCaricoPraticheParams,
   ListConsegneParams,
   ListConsumiMensaParams,
   ListCreditoSolidaleBeneficiariParams,
@@ -1896,6 +1909,826 @@ export function useListCaricoRighe<TData = Awaited<ReturnType<typeof listCaricoR
 
 
 
+
+export const getListCaricoPraticheUrl = (params: ListCaricoPraticheParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/carico-pratiche?${stringifiedParams}` : `/api/carico-pratiche`
+}
+
+export const listCaricoPratiche = async (params: ListCaricoPraticheParams, options?: RequestInit): Promise<CaricoPratica[]> => {
+
+  return customFetch<CaricoPratica[]>(getListCaricoPraticheUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCaricoPraticheQueryKey = (params?: ListCaricoPraticheParams,) => {
+    return [
+    `/api/carico-pratiche`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCaricoPraticheQueryOptions = <TData = Awaited<ReturnType<typeof listCaricoPratiche>>, TError = ErrorType<unknown>>(params: ListCaricoPraticheParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCaricoPratiche>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCaricoPraticheQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCaricoPratiche>>> = ({ signal }) => listCaricoPratiche(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCaricoPratiche>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCaricoPraticheQueryResult = NonNullable<Awaited<ReturnType<typeof listCaricoPratiche>>>
+export type ListCaricoPraticheQueryError = ErrorType<unknown>
+
+
+
+export function useListCaricoPratiche<TData = Awaited<ReturnType<typeof listCaricoPratiche>>, TError = ErrorType<unknown>>(
+ params: ListCaricoPraticheParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCaricoPratiche>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCaricoPraticheQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCaricoPraticaUrl = () => {
+
+
+
+
+  return `/api/carico-pratiche`
+}
+
+export const createCaricoPratica = async (caricoPraticaInput: CaricoPraticaInput, options?: RequestInit): Promise<CaricoPraticaDettaglio> => {
+
+  return customFetch<CaricoPraticaDettaglio>(getCreateCaricoPraticaUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoPraticaInput,)
+  }
+);}
+
+
+
+
+export const getCreateCaricoPraticaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaricoPratica>>, TError,{data: BodyType<CaricoPraticaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCaricoPratica>>, TError,{data: BodyType<CaricoPraticaInput>}, TContext> => {
+
+const mutationKey = ['createCaricoPratica'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCaricoPratica>>, {data: BodyType<CaricoPraticaInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCaricoPratica(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCaricoPraticaMutationResult = NonNullable<Awaited<ReturnType<typeof createCaricoPratica>>>
+    export type CreateCaricoPraticaMutationBody = BodyType<CaricoPraticaInput>
+    export type CreateCaricoPraticaMutationError = ErrorType<unknown>
+
+    export const useCreateCaricoPratica = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaricoPratica>>, TError,{data: BodyType<CaricoPraticaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCaricoPratica>>,
+        TError,
+        {data: BodyType<CaricoPraticaInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCaricoPraticaMutationOptions(options));
+    }
+
+export const getGetCaricoPraticaUrl = (id: number,) => {
+
+
+
+
+  return `/api/carico-pratiche/${id}`
+}
+
+export const getCaricoPratica = async (id: number, options?: RequestInit): Promise<CaricoPraticaDettaglio> => {
+
+  return customFetch<CaricoPraticaDettaglio>(getGetCaricoPraticaUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCaricoPraticaQueryKey = (id: number,) => {
+    return [
+    `/api/carico-pratiche/${id}`
+    ] as const;
+    }
+
+
+export const getGetCaricoPraticaQueryOptions = <TData = Awaited<ReturnType<typeof getCaricoPratica>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaricoPratica>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCaricoPraticaQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCaricoPratica>>> = ({ signal }) => getCaricoPratica(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCaricoPratica>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCaricoPraticaQueryResult = NonNullable<Awaited<ReturnType<typeof getCaricoPratica>>>
+export type GetCaricoPraticaQueryError = ErrorType<unknown>
+
+
+
+export function useGetCaricoPratica<TData = Awaited<ReturnType<typeof getCaricoPratica>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaricoPratica>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCaricoPraticaQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateCaricoPraticaUrl = (id: number,) => {
+
+
+
+
+  return `/api/carico-pratiche/${id}`
+}
+
+export const updateCaricoPratica = async (id: number,
+    caricoPraticaUpdate: CaricoPraticaUpdate, options?: RequestInit): Promise<CaricoPraticaDettaglio> => {
+
+  return customFetch<CaricoPraticaDettaglio>(getUpdateCaricoPraticaUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoPraticaUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateCaricoPraticaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaUpdate>}, TContext> => {
+
+const mutationKey = ['updateCaricoPratica'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCaricoPratica>>, {id: number;data: BodyType<CaricoPraticaUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCaricoPratica(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCaricoPraticaMutationResult = NonNullable<Awaited<ReturnType<typeof updateCaricoPratica>>>
+    export type UpdateCaricoPraticaMutationBody = BodyType<CaricoPraticaUpdate>
+    export type UpdateCaricoPraticaMutationError = ErrorType<unknown>
+
+    export const useUpdateCaricoPratica = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCaricoPratica>>,
+        TError,
+        {id: number;data: BodyType<CaricoPraticaUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateCaricoPraticaMutationOptions(options));
+    }
+
+export const getAddCaricoPraticaRigaUrl = (id: number,) => {
+
+
+
+
+  return `/api/carico-pratiche/${id}/righe`
+}
+
+export const addCaricoPraticaRiga = async (id: number,
+    caricoPraticaRigaCreateInput: CaricoPraticaRigaCreateInput, options?: RequestInit): Promise<CaricoPraticaDettaglio> => {
+
+  return customFetch<CaricoPraticaDettaglio>(getAddCaricoPraticaRigaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoPraticaRigaCreateInput,)
+  }
+);}
+
+
+
+
+export const getAddCaricoPraticaRigaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addCaricoPraticaRiga>>, TError,{id: number;data: BodyType<CaricoPraticaRigaCreateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addCaricoPraticaRiga>>, TError,{id: number;data: BodyType<CaricoPraticaRigaCreateInput>}, TContext> => {
+
+const mutationKey = ['addCaricoPraticaRiga'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addCaricoPraticaRiga>>, {id: number;data: BodyType<CaricoPraticaRigaCreateInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addCaricoPraticaRiga(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddCaricoPraticaRigaMutationResult = NonNullable<Awaited<ReturnType<typeof addCaricoPraticaRiga>>>
+    export type AddCaricoPraticaRigaMutationBody = BodyType<CaricoPraticaRigaCreateInput>
+    export type AddCaricoPraticaRigaMutationError = ErrorType<unknown>
+
+    export const useAddCaricoPraticaRiga = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addCaricoPraticaRiga>>, TError,{id: number;data: BodyType<CaricoPraticaRigaCreateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addCaricoPraticaRiga>>,
+        TError,
+        {id: number;data: BodyType<CaricoPraticaRigaCreateInput>},
+        TContext
+      > => {
+      return useMutation(getAddCaricoPraticaRigaMutationOptions(options));
+    }
+
+export const getUpdateCaricoPraticaRigaUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/carico-pratiche/${id}/righe/${rigaId}`
+}
+
+export const updateCaricoPraticaRiga = async (id: number,
+    rigaId: number,
+    caricoPraticaRigaUpdateInput: CaricoPraticaRigaUpdateInput, options?: RequestInit): Promise<CaricoPraticaDettaglio> => {
+
+  return customFetch<CaricoPraticaDettaglio>(getUpdateCaricoPraticaRigaUrl(id,rigaId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoPraticaRigaUpdateInput,)
+  }
+);}
+
+
+
+
+export const getUpdateCaricoPraticaRigaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCaricoPraticaRiga>>, TError,{id: number;rigaId: number;data: BodyType<CaricoPraticaRigaUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCaricoPraticaRiga>>, TError,{id: number;rigaId: number;data: BodyType<CaricoPraticaRigaUpdateInput>}, TContext> => {
+
+const mutationKey = ['updateCaricoPraticaRiga'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCaricoPraticaRiga>>, {id: number;rigaId: number;data: BodyType<CaricoPraticaRigaUpdateInput>}> = (props) => {
+          const {id,rigaId,data} = props ?? {};
+
+          return  updateCaricoPraticaRiga(id,rigaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCaricoPraticaRigaMutationResult = NonNullable<Awaited<ReturnType<typeof updateCaricoPraticaRiga>>>
+    export type UpdateCaricoPraticaRigaMutationBody = BodyType<CaricoPraticaRigaUpdateInput>
+    export type UpdateCaricoPraticaRigaMutationError = ErrorType<unknown>
+
+    export const useUpdateCaricoPraticaRiga = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCaricoPraticaRiga>>, TError,{id: number;rigaId: number;data: BodyType<CaricoPraticaRigaUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCaricoPraticaRiga>>,
+        TError,
+        {id: number;rigaId: number;data: BodyType<CaricoPraticaRigaUpdateInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateCaricoPraticaRigaMutationOptions(options));
+    }
+
+export const getDeleteCaricoPraticaRigaUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/carico-pratiche/${id}/righe/${rigaId}`
+}
+
+export const deleteCaricoPraticaRiga = async (id: number,
+    rigaId: number,
+    caricoPraticaVersioneInput: CaricoPraticaVersioneInput, options?: RequestInit): Promise<CaricoPraticaDettaglio> => {
+
+  return customFetch<CaricoPraticaDettaglio>(getDeleteCaricoPraticaRigaUrl(id,rigaId),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoPraticaVersioneInput,)
+  }
+);}
+
+
+
+
+export const getDeleteCaricoPraticaRigaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCaricoPraticaRiga>>, TError,{id: number;rigaId: number;data: BodyType<CaricoPraticaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCaricoPraticaRiga>>, TError,{id: number;rigaId: number;data: BodyType<CaricoPraticaVersioneInput>}, TContext> => {
+
+const mutationKey = ['deleteCaricoPraticaRiga'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCaricoPraticaRiga>>, {id: number;rigaId: number;data: BodyType<CaricoPraticaVersioneInput>}> = (props) => {
+          const {id,rigaId,data} = props ?? {};
+
+          return  deleteCaricoPraticaRiga(id,rigaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCaricoPraticaRigaMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCaricoPraticaRiga>>>
+    export type DeleteCaricoPraticaRigaMutationBody = BodyType<CaricoPraticaVersioneInput>
+    export type DeleteCaricoPraticaRigaMutationError = ErrorType<unknown>
+
+    export const useDeleteCaricoPraticaRiga = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCaricoPraticaRiga>>, TError,{id: number;rigaId: number;data: BodyType<CaricoPraticaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCaricoPraticaRiga>>,
+        TError,
+        {id: number;rigaId: number;data: BodyType<CaricoPraticaVersioneInput>},
+        TContext
+      > => {
+      return useMutation(getDeleteCaricoPraticaRigaMutationOptions(options));
+    }
+
+export const getRegisterCaricoPraticaUrl = (id: number,) => {
+
+
+
+
+  return `/api/carico-pratiche/${id}/registra`
+}
+
+export const registerCaricoPratica = async (id: number,
+    caricoPraticaRegistrazioneInput: CaricoPraticaRegistrazioneInput, options?: RequestInit): Promise<CaricoPraticaRegistrazioneResult> => {
+
+  return customFetch<CaricoPraticaRegistrazioneResult>(getRegisterCaricoPraticaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoPraticaRegistrazioneInput,)
+  }
+);}
+
+
+
+
+export const getRegisterCaricoPraticaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaRegistrazioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaRegistrazioneInput>}, TContext> => {
+
+const mutationKey = ['registerCaricoPratica'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerCaricoPratica>>, {id: number;data: BodyType<CaricoPraticaRegistrazioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  registerCaricoPratica(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterCaricoPraticaMutationResult = NonNullable<Awaited<ReturnType<typeof registerCaricoPratica>>>
+    export type RegisterCaricoPraticaMutationBody = BodyType<CaricoPraticaRegistrazioneInput>
+    export type RegisterCaricoPraticaMutationError = ErrorType<unknown>
+
+    export const useRegisterCaricoPratica = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaRegistrazioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerCaricoPratica>>,
+        TError,
+        {id: number;data: BodyType<CaricoPraticaRegistrazioneInput>},
+        TContext
+      > => {
+      return useMutation(getRegisterCaricoPraticaMutationOptions(options));
+    }
+
+export const getRectifyCaricoPraticaRigaUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/carico-pratiche/${id}/righe/${rigaId}/rettifica`
+}
+
+/**
+ * @summary Registra una rettifica negativa motivata sulla riga contabilizzata
+ */
+export const rectifyCaricoPraticaRiga = async (id: number,
+    rigaId: number,
+    caricoPraticaRettificaInput: CaricoPraticaRettificaInput, options?: RequestInit): Promise<CaricoPraticaRettificaResult> => {
+
+  return customFetch<CaricoPraticaRettificaResult>(getRectifyCaricoPraticaRigaUrl(id,rigaId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoPraticaRettificaInput,)
+  }
+);}
+
+
+
+
+export const getRectifyCaricoPraticaRigaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rectifyCaricoPraticaRiga>>, TError,{id: number;rigaId: number;data: BodyType<CaricoPraticaRettificaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rectifyCaricoPraticaRiga>>, TError,{id: number;rigaId: number;data: BodyType<CaricoPraticaRettificaInput>}, TContext> => {
+
+const mutationKey = ['rectifyCaricoPraticaRiga'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rectifyCaricoPraticaRiga>>, {id: number;rigaId: number;data: BodyType<CaricoPraticaRettificaInput>}> = (props) => {
+          const {id,rigaId,data} = props ?? {};
+
+          return  rectifyCaricoPraticaRiga(id,rigaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RectifyCaricoPraticaRigaMutationResult = NonNullable<Awaited<ReturnType<typeof rectifyCaricoPraticaRiga>>>
+    export type RectifyCaricoPraticaRigaMutationBody = BodyType<CaricoPraticaRettificaInput>
+    export type RectifyCaricoPraticaRigaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Registra una rettifica negativa motivata sulla riga contabilizzata
+ */
+export const useRectifyCaricoPraticaRiga = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rectifyCaricoPraticaRiga>>, TError,{id: number;rigaId: number;data: BodyType<CaricoPraticaRettificaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rectifyCaricoPraticaRiga>>,
+        TError,
+        {id: number;rigaId: number;data: BodyType<CaricoPraticaRettificaInput>},
+        TContext
+      > => {
+      return useMutation(getRectifyCaricoPraticaRigaMutationOptions(options));
+    }
+
+export const getCloseCaricoPraticaUrl = (id: number,) => {
+
+
+
+
+  return `/api/carico-pratiche/${id}/chiudi`
+}
+
+export const closeCaricoPratica = async (id: number,
+    caricoPraticaVersioneInput: CaricoPraticaVersioneInput, options?: RequestInit): Promise<CaricoPraticaDettaglio> => {
+
+  return customFetch<CaricoPraticaDettaglio>(getCloseCaricoPraticaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoPraticaVersioneInput,)
+  }
+);}
+
+
+
+
+export const getCloseCaricoPraticaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof closeCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaVersioneInput>}, TContext> => {
+
+const mutationKey = ['closeCaricoPratica'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof closeCaricoPratica>>, {id: number;data: BodyType<CaricoPraticaVersioneInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  closeCaricoPratica(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CloseCaricoPraticaMutationResult = NonNullable<Awaited<ReturnType<typeof closeCaricoPratica>>>
+    export type CloseCaricoPraticaMutationBody = BodyType<CaricoPraticaVersioneInput>
+    export type CloseCaricoPraticaMutationError = ErrorType<unknown>
+
+    export const useCloseCaricoPratica = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaVersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof closeCaricoPratica>>,
+        TError,
+        {id: number;data: BodyType<CaricoPraticaVersioneInput>},
+        TContext
+      > => {
+      return useMutation(getCloseCaricoPraticaMutationOptions(options));
+    }
+
+export const getReopenCaricoPraticaUrl = (id: number,) => {
+
+
+
+
+  return `/api/carico-pratiche/${id}/riapri`
+}
+
+export const reopenCaricoPratica = async (id: number,
+    caricoPraticaMotivoInput: CaricoPraticaMotivoInput, options?: RequestInit): Promise<CaricoPraticaDettaglio> => {
+
+  return customFetch<CaricoPraticaDettaglio>(getReopenCaricoPraticaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoPraticaMotivoInput,)
+  }
+);}
+
+
+
+
+export const getReopenCaricoPraticaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reopenCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaMotivoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reopenCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaMotivoInput>}, TContext> => {
+
+const mutationKey = ['reopenCaricoPratica'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reopenCaricoPratica>>, {id: number;data: BodyType<CaricoPraticaMotivoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reopenCaricoPratica(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReopenCaricoPraticaMutationResult = NonNullable<Awaited<ReturnType<typeof reopenCaricoPratica>>>
+    export type ReopenCaricoPraticaMutationBody = BodyType<CaricoPraticaMotivoInput>
+    export type ReopenCaricoPraticaMutationError = ErrorType<unknown>
+
+    export const useReopenCaricoPratica = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reopenCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaMotivoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reopenCaricoPratica>>,
+        TError,
+        {id: number;data: BodyType<CaricoPraticaMotivoInput>},
+        TContext
+      > => {
+      return useMutation(getReopenCaricoPraticaMutationOptions(options));
+    }
+
+export const getCancelCaricoPraticaUrl = (id: number,) => {
+
+
+
+
+  return `/api/carico-pratiche/${id}/annulla`
+}
+
+export const cancelCaricoPratica = async (id: number,
+    caricoPraticaMotivoInput: CaricoPraticaMotivoInput, options?: RequestInit): Promise<CaricoPraticaDettaglio> => {
+
+  return customFetch<CaricoPraticaDettaglio>(getCancelCaricoPraticaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caricoPraticaMotivoInput,)
+  }
+);}
+
+
+
+
+export const getCancelCaricoPraticaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaMotivoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaMotivoInput>}, TContext> => {
+
+const mutationKey = ['cancelCaricoPratica'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelCaricoPratica>>, {id: number;data: BodyType<CaricoPraticaMotivoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  cancelCaricoPratica(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelCaricoPraticaMutationResult = NonNullable<Awaited<ReturnType<typeof cancelCaricoPratica>>>
+    export type CancelCaricoPraticaMutationBody = BodyType<CaricoPraticaMotivoInput>
+    export type CancelCaricoPraticaMutationError = ErrorType<unknown>
+
+    export const useCancelCaricoPratica = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelCaricoPratica>>, TError,{id: number;data: BodyType<CaricoPraticaMotivoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelCaricoPratica>>,
+        TError,
+        {id: number;data: BodyType<CaricoPraticaMotivoInput>},
+        TContext
+      > => {
+      return useMutation(getCancelCaricoPraticaMutationOptions(options));
+    }
 
 export const getListAgeaImportazioniUrl = () => {
 

@@ -125,7 +125,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     key: "lotti",
-    url: "/lotti",
+    url: "/carico-merce",
     icon: Boxes,
     groupKey: "magazzino",
     area: "magazzino",
