@@ -1,5 +1,14 @@
 import type { Magazzino, Prodotto } from "@workspace/api-client-react";
 
+export type CaricoRowDraft = {
+  quantita: string;
+  fondoOrigine: "NESSUN_FONDO" | "FSE_PLUS";
+  codiceLottoProduttore: string;
+  dataScadenza: string;
+  fattoreKgLtPezzo: string;
+  note: string;
+};
+
 export function operationalWarehousesForArea(
   warehouses: Magazzino[] | undefined,
   areaOperativaId: number | null,
@@ -14,6 +23,39 @@ export function operationalWarehousesForArea(
 
 export function normalizeUiQuantity(value: string): string {
   return value.trim().replace(",", ".");
+}
+
+function normalizeComparableQuantity(value: string): string {
+  const normalized = normalizeUiQuantity(value);
+  const match = /^([+-]?)(\d+)(?:\.(\d*))?$/.exec(normalized);
+  if (!match) return normalized;
+
+  const integer = match[2].replace(/^0+(?=\d)/, "");
+  const fraction = (match[3] ?? "").replace(/0+$/, "");
+  const sign = integer === "0" && !fraction ? "" : match[1];
+  return `${sign}${integer}${fraction ? `.${fraction}` : ""}`;
+}
+
+function comparableRowDraft(draft: CaricoRowDraft): CaricoRowDraft {
+  return {
+    quantita: normalizeComparableQuantity(draft.quantita),
+    fondoOrigine: draft.fondoOrigine,
+    codiceLottoProduttore: draft.codiceLottoProduttore.trim(),
+    dataScadenza: draft.dataScadenza.trim(),
+    fattoreKgLtPezzo: normalizeComparableQuantity(draft.fattoreKgLtPezzo),
+    note: draft.note.trim(),
+  };
+}
+
+export function isCaricoRowDraftDirty(
+  draft: CaricoRowDraft,
+  persisted: CaricoRowDraft,
+): boolean {
+  const current = comparableRowDraft(draft);
+  const saved = comparableRowDraft(persisted);
+  return (Object.keys(current) as Array<keyof CaricoRowDraft>).some(
+    (key) => current[key] !== saved[key],
+  );
 }
 
 export function productForBarcode(

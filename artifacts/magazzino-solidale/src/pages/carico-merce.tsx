@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetCaricoPraticaQueryKey,
@@ -53,14 +53,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import {
+  UnsavedChangesDialog,
+  useUnsavedChangesGuard,
+} from "@/hooks/use-unsaved-changes-guard";
 import { useAuth } from "@/lib/auth";
 import { errorMessage } from "@/lib/api-error";
 import {
+  isCaricoRowDraftDirty,
   newCommandKey,
   normalizeUiQuantity,
   operationalWarehousesForArea,
   productForBarcode,
   shouldAcceptBarcodeScan,
+  type CaricoRowDraft,
   visibleProducts,
 } from "@/lib/carico-merce";
 import { ArrowLeft, History, Loader2, PackagePlus, Save } from "lucide-react";
@@ -80,15 +86,6 @@ type HeaderForm = {
   dataCarico: string;
   descrizione: string;
   numeroDocumento: string;
-  note: string;
-};
-
-type RowDraft = {
-  quantita: string;
-  fondoOrigine: "NESSUN_FONDO" | "FSE_PLUS";
-  codiceLottoProduttore: string;
-  dataScadenza: string;
-  fattoreKgLtPezzo: string;
   note: string;
 };
 
@@ -122,7 +119,7 @@ function headerFromPractice(practice: CaricoPraticaDettaglio): HeaderForm {
   };
 }
 
-function rowDraft(row: CaricoPraticaRiga): RowDraft {
+function rowDraft(row: CaricoPraticaRiga): CaricoRowDraft {
   return {
     quantita: row.quantita?.toString() ?? "",
     fondoOrigine: row.fondoOrigine === "FSE_PLUS" ? "FSE_PLUS" : "NESSUN_FONDO",
@@ -143,6 +140,7 @@ export default function CaricoMerce() {
   const { hasPermission } = useAuth();
   const canReceive = hasPermission("magazzino.stock.receive");
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const [header, setHeader] = useState<HeaderForm>(emptyHeader);
@@ -154,7 +152,9 @@ export default function CaricoMerce() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [productSearch, setProductSearch] = useState("");
-  const [rowDrafts, setRowDrafts] = useState<Record<number, RowDraft>>({});
+  const [rowDrafts, setRowDrafts] = useState<Record<number, CaricoRowDraft>>(
+    {},
+  );
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [confirmRegister, setConfirmRegister] = useState(false);
   const registrationKey = useRef<string | null>(null);
@@ -227,6 +227,18 @@ export default function CaricoMerce() {
     },
   });
   const practice = detailQuery.data;
+  const pendingRows = practice?.righe.filter((row) => !row.registrata) ?? [];
+  const registeredRows = practice?.righe.filter((row) => row.registrata) ?? [];
+  const canEdit =
+    canReceive && (practice?.stato === "bozza" || practice?.stato === "aperta");
+  const isRowDirty = (row: CaricoPraticaRiga) =>
+    isCaricoRowDraftDirty(rowDrafts[row.id] ?? rowDraft(row), rowDraft(row));
+  const rowsHaveUnsavedChanges = pendingRows.some(isRowDirty);
+  const selectedRowsHaveUnsavedChanges = pendingRows.some(
+    (row) => selectedRows.has(row.id) && isRowDirty(row),
+  );
+  const hasUnsavedChanges = dirty || rowsHaveUnsavedChanges;
+  const unsavedGuard = useUnsavedChangesGuard(hasUnsavedChanges);
 
   useEffect(() => {
     if (!practice) return;
@@ -245,14 +257,38 @@ export default function CaricoMerce() {
   }, [practice]);
 
   useEffect(() => {
-    const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (!dirty) return;
+    if (!hasUnsavedChanges) return;
+    const guardInternalLink = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target && anchor.target !== "_self") return;
+      if (anchor.hasAttribute("download")) return;
+
+      const destination = new URL(anchor.href, window.location.href);
+      if (destination.origin !== window.location.origin) return;
+      const nextLocation = `${destination.pathname}${destination.search}${destination.hash}`;
+      const currentLocation = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (nextLocation === currentLocation) return;
+
       event.preventDefault();
-      event.returnValue = "";
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      unsavedGuard.requestClose(() => navigate(nextLocation));
     };
-    window.addEventListener("beforeunload", beforeUnload);
-    return () => window.removeEventListener("beforeunload", beforeUnload);
-  }, [dirty]);
+    document.addEventListener("click", guardInternalLink, true);
+    return () => document.removeEventListener("click", guardInternalLink, true);
+  }, [hasUnsavedChanges, navigate, unsavedGuard.requestClose]);
 
   const createMutation = useCreateCaricoPratica();
   const createLogicalLotMutation = useCreateLottoLogico();
@@ -443,7 +479,8 @@ export default function CaricoMerce() {
   };
 
   const registerRows = async () => {
-    if (!practice || selectedRows.size === 0) return;
+    if (!practice || selectedRows.size === 0 || selectedRowsHaveUnsavedChanges)
+      return;
     registrationKey.current ??= newCommandKey();
     try {
       await registerMutation.mutateAsync({
@@ -498,16 +535,12 @@ export default function CaricoMerce() {
     () => visibleProducts(products, productSearch),
     [productSearch, products],
   );
-  const pendingRows = practice?.righe.filter((row) => !row.registrata) ?? [];
-  const registeredRows = practice?.righe.filter((row) => row.registrata) ?? [];
-  const canEdit =
-    canReceive && (practice?.stato === "bozza" || practice?.stato === "aperta");
-
   const leaveDetail = () => {
-    if (dirty && !window.confirm(t("caricoPratiche.unsaved"))) return;
-    setSelectedId(null);
-    setCreating(false);
-    setDirty(false);
+    unsavedGuard.requestClose(() => {
+      setSelectedId(null);
+      setCreating(false);
+      setDirty(false);
+    });
   };
 
   if (!selectedId && !creating) {
@@ -933,7 +966,7 @@ export default function CaricoMerce() {
                   <div className="flex items-start gap-2">
                     <Checkbox
                       checked={selectedRows.has(row.id)}
-                      disabled={!draft.quantita || pending}
+                      disabled={row.quantita == null || pending}
                       onCheckedChange={(checked) =>
                         setSelectedRows((current) => {
                           const next = new Set(current);
@@ -962,7 +995,6 @@ export default function CaricoMerce() {
                       step={row.quantitaFrazionabile ? "0.000001" : "1"}
                       value={draft.quantita}
                       onChange={(event) => {
-                        setDirty(true);
                         setRowDrafts((current) => ({
                           ...current,
                           [row.id]: { ...draft, quantita: event.target.value },
@@ -975,12 +1007,12 @@ export default function CaricoMerce() {
                     <Select
                       value={draft.fondoOrigine}
                       onValueChange={(value) => {
-                        setDirty(true);
                         setRowDrafts((current) => ({
                           ...current,
                           [row.id]: {
                             ...draft,
-                            fondoOrigine: value as RowDraft["fondoOrigine"],
+                            fondoOrigine:
+                              value as CaricoRowDraft["fondoOrigine"],
                           },
                         }));
                       }}
@@ -1002,9 +1034,9 @@ export default function CaricoMerce() {
                       {row.lottoFisicoObbligatorio ? " *" : ""}
                     </Label>
                     <Input
+                      aria-label={t("caricoPratiche.physicalLot")}
                       value={draft.codiceLottoProduttore}
                       onChange={(event) => {
-                        setDirty(true);
                         setRowDrafts((current) => ({
                           ...current,
                           [row.id]: {
@@ -1021,10 +1053,10 @@ export default function CaricoMerce() {
                       {row.gestioneScadenza ? " *" : ""}
                     </Label>
                     <Input
+                      aria-label={t("caricoPratiche.expiry")}
                       type="date"
                       value={draft.dataScadenza}
                       onChange={(event) => {
-                        setDirty(true);
                         setRowDrafts((current) => ({
                           ...current,
                           [row.id]: {
@@ -1040,7 +1072,6 @@ export default function CaricoMerce() {
                     <Input
                       value={draft.note}
                       onChange={(event) => {
-                        setDirty(true);
                         setRowDrafts((current) => ({
                           ...current,
                           [row.id]: { ...draft, note: event.target.value },
@@ -1057,7 +1088,6 @@ export default function CaricoMerce() {
                         inputMode="decimal"
                         value={draft.fattoreKgLtPezzo}
                         onChange={(event) => {
-                          setDirty(true);
                           setRowDrafts((current) => ({
                             ...current,
                             [row.id]: {
@@ -1097,7 +1127,17 @@ export default function CaricoMerce() {
               <p className="text-sm text-muted-foreground">—</p>
             )}
             <Button
-              disabled={pending || selectedRows.size === 0 || !canEdit}
+              aria-describedby={
+                selectedRowsHaveUnsavedChanges
+                  ? "carico-register-unsaved"
+                  : undefined
+              }
+              disabled={
+                pending ||
+                selectedRows.size === 0 ||
+                !canEdit ||
+                selectedRowsHaveUnsavedChanges
+              }
               onClick={() => setConfirmRegister(true)}
             >
               {registerMutation.isPending && (
@@ -1105,6 +1145,15 @@ export default function CaricoMerce() {
               )}
               {t("caricoPratiche.register")}
             </Button>
+            {selectedRowsHaveUnsavedChanges && (
+              <p
+                id="carico-register-unsaved"
+                role="status"
+                className="text-sm text-amber-700 dark:text-amber-300"
+              >
+                {t("caricoPratiche.saveSelectedRowsBeforeRegister")}
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -1204,7 +1253,9 @@ export default function CaricoMerce() {
               {t("barcodeScanner.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              disabled={registerMutation.isPending}
+              disabled={
+                registerMutation.isPending || selectedRowsHaveUnsavedChanges
+              }
               onClick={(event) => {
                 event.preventDefault();
                 void registerRows();
@@ -1218,6 +1269,7 @@ export default function CaricoMerce() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <UnsavedChangesDialog guard={unsavedGuard} />
     </div>
   );
 }

@@ -35,6 +35,8 @@ const it = {
   fund: "Fondo",
   factor: "Fattore kg/litri per pezzo (se noto)",
   register: "Registra nuove righe",
+  saveSelectedRowsBeforeRegister:
+    "Salva le modifiche alle righe selezionate prima di registrare la merce.",
   confirmRegister: "Conferma registrazione",
   confirmBody:
     "Entreranno nello stock soltanto {{count}} righe complete selezionate.",
@@ -87,6 +89,8 @@ export const caricoPratiche = {
     registeredRows: "Ya registradas en existencias",
     addProduct: "Añadir producto",
     register: "Registrar nuevas líneas",
+    saveSelectedRowsBeforeRegister:
+      "Guarda los cambios de las líneas seleccionadas antes de registrar la mercancía.",
     scan: "Escanear código de barras",
     unknownBarcode:
       "Código no asociado a un producto. El borrador se ha conservado.",
@@ -162,6 +166,8 @@ export const caricoPratiche = {
     registeredRows: "Already posted to stock",
     addProduct: "Add product",
     register: "Post new lines",
+    saveSelectedRowsBeforeRegister:
+      "Save changes to the selected lines before posting the goods.",
     scan: "Scan barcode",
     unknownBarcode:
       "Barcode is not linked to a product. The draft has been preserved.",
@@ -237,6 +243,8 @@ export const caricoPratiche = {
     registeredRows: "Déjà comptabilisées en stock",
     addProduct: "Ajouter un produit",
     register: "Comptabiliser les nouvelles lignes",
+    saveSelectedRowsBeforeRegister:
+      "Enregistrez les modifications des lignes sélectionnées avant de comptabiliser les marchandises.",
     scan: "Scanner le code-barres",
     unknownBarcode: "Code-barres inconnu. Le brouillon a été conservé.",
     unsaved: "Des modifications ne sont pas enregistrées. Quitter ?",
@@ -312,6 +320,8 @@ export const caricoPratiche = {
     registeredRows: "Bereits im Bestand gebucht",
     addProduct: "Produkt hinzufügen",
     register: "Neue Zeilen buchen",
+    saveSelectedRowsBeforeRegister:
+      "Speichern Sie die Änderungen an den ausgewählten Zeilen, bevor Sie die Ware buchen.",
     scan: "Barcode scannen",
     unknownBarcode:
       "Barcode ist keinem Produkt zugeordnet. Der Entwurf bleibt erhalten.",
@@ -389,6 +399,8 @@ export const caricoPratiche = {
     registeredRows: "مسجلة في المخزون",
     addProduct: "إضافة منتج",
     register: "تسجيل الصفوف الجديدة",
+    saveSelectedRowsBeforeRegister:
+      "احفظ التغييرات على الصفوف المحددة قبل تسجيل البضائع.",
     scan: "مسح الرمز الشريطي",
     unknownBarcode: "الرمز غير مرتبط بمنتج. تم الاحتفاظ بالمسودة.",
     unsaved: "توجد تغييرات غير محفوظة. هل تريد المغادرة؟",

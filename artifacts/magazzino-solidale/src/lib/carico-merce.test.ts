@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Magazzino, Prodotto } from "@workspace/api-client-react";
 import {
+  isCaricoRowDraftDirty,
   normalizeUiQuantity,
   operationalWarehousesForArea,
   productForBarcode,
   shouldAcceptBarcodeScan,
+  type CaricoRowDraft,
   visibleProducts,
 } from "./carico-merce";
 import { barcodeCameraErrorKey } from "@/components/barcode-scanner-button";
@@ -44,6 +46,16 @@ const warehouse = (overrides: Partial<Magazzino>): Magazzino =>
     dataCreazione: "2026-09-17T00:00:00Z",
     ...overrides,
   }) as Magazzino;
+
+const rowDraft = (overrides: Partial<CaricoRowDraft> = {}): CaricoRowDraft => ({
+  quantita: "5.000000",
+  fondoOrigine: "NESSUN_FONDO",
+  codiceLottoProduttore: "LOT-A",
+  dataScadenza: "2027-12-31",
+  fattoreKgLtPezzo: "",
+  note: "",
+  ...overrides,
+});
 
 describe("Carico Merce M3A", () => {
   it("mostra l'elenco prodotti anche senza ricerca e filtra per nome/codice", () => {
@@ -86,6 +98,33 @@ describe("Carico Merce M3A", () => {
 
   it("normalizza la virgola decimale senza arrotondare", () => {
     expect(normalizeUiQuantity(" 1,250001 ")).toBe("1.250001");
+  });
+
+  it("confronta deterministicamente il draft con quantità e null normalizzati", () => {
+    expect(
+      isCaricoRowDraftDirty(
+        rowDraft({ quantita: " 5,0 ", codiceLottoProduttore: " LOT-A " }),
+        rowDraft(),
+      ),
+    ).toBe(false);
+    expect(isCaricoRowDraftDirty(rowDraft({ quantita: "8" }), rowDraft())).toBe(
+      true,
+    );
+  });
+
+  it("rileva lotto produttore e scadenza modificati ma non salvati", () => {
+    expect(
+      isCaricoRowDraftDirty(
+        rowDraft({ codiceLottoProduttore: "LOT-B" }),
+        rowDraft(),
+      ),
+    ).toBe(true);
+    expect(
+      isCaricoRowDraftDirty(
+        rowDraft({ dataScadenza: "2028-01-31" }),
+        rowDraft(),
+      ),
+    ).toBe(true);
   });
 
   it("traduce rifiuto e assenza della fotocamera senza bloccare la selezione manuale", () => {

@@ -878,3 +878,41 @@ Stato: **test automatici M3A superati** (`OK-M3A/NE-MAN`). Docker candidato, pro
 - M3B non è iniziato; import XLSX/XLS/CSV e flussi logistici successivi restano fuori perimetro.
 
 Condizione di arresto: **M3A test automatici superati — pronto per code review**.
+
+## M3A — hardening post-code-review
+
+Data: 17 settembre 2026
+
+Base del correttivo: `c49cc0a99f88df90d074659a1b0a186285770873`.
+
+### Coerenza fra draft e registrazione
+
+- Ogni riga confronta deterministicamente il draft locale con lo snapshot persistito, normalizzando quantità, valori vuoti/null e testo secondo la stessa semantica del salvataggio.
+- Una riga con quantità soltanto locale resta non selezionabile. Se una riga già selezionata contiene quantità, fondo, lotto produttore, scadenza, fattore o note non salvati, `Registra` è disabilitato e mostra un messaggio localizzato; il comando applica anche lo stesso controllo difensivo prima della chiamata API.
+- Non è stato introdotto autosave: dopo `Salva bozza` il dettaglio aggiornato riallinea draft e persistenza, quindi la riga torna registrabile.
+- Il guard delle modifiche non salvate riusa il dialogo comune e ora intercetta anche i link interni e la sidebar, oltre a refresh/chiusura browser e pulsante di ritorno.
+
+Lo scenario E2E verifica una riga persistita con quantità 5, lotto `LOT-A` e scadenza `2027-12-31`, modificata localmente in quantità 8, lotto `LOT-B` e scadenza `2028-01-31`. Prima del salvataggio il comando resta bloccato, la navigazione verso Giacenze chiede conferma e, scegliendo di restare, conserva il draft; stock, integrazioni e movimenti restano a zero. Dopo il salvataggio, la registrazione produce una sola integrazione, un solo movimento da 8 e una sola partita `LOT-B` con la nuova scadenza.
+
+### Gate suite API candidato/base
+
+Entrambi i database sono partiti vuoti e hanno seguito lo stesso ordine: `pnpm --filter @workspace/db run push`, migration runner ufficiale `pnpm --filter @workspace/db run update`, nessun seed, quindi Vitest con `fileParallelism=false`, `--maxWorkers=1` e report JSON. La suite candidata ha eseguito per primo `accessi-emporio.test.ts`, il test M3A in posizione 24 e per ultimo `volontari-save-validation.test.ts`; la base ha lo stesso primo e ultimo file, senza il test M3A.
+
+| Revisione                               | File | Passati | Skip | Falliti |
+| --------------------------------------- | ---- | ------- | ---- | ------- |
+| candidato `c49cc0a` + correttivo locale | 112  | 1.229   | 2    | 0       |
+| base `fdb8561`                          | 111  | 1.218   | 2    | 0       |
+
+Un tentativo preliminare basato sul solo `drizzle push` non è stato considerato un gate: mancavano i trigger e gli oggetti SQL del migration runner, a partire dalla protezione append-only dell'audit, e la conseguente cascata di errori era dovuta a un database inizializzato in modo incompleto. Con il flusso repository corretto, le failure intermittenti osservate nella precedente fase `##test M3A` non si riproducono né sul candidato né sulla base. Non sono quindi una regressione M3A riproducibile, né vengono dichiarate baseline provata. Fixture, cleanup scoped, stato dei moduli e concorrenza M3A non lasciano residui rilevati dalla suite completa.
+
+### Regressione
+
+- Backend M3A mirato: 1 file, 11/11 test passati.
+- Frontend completo: 68 file, 376/376 test passati.
+- Playwright M3A desktop: 2/2 test passati, inclusi stale draft e navigazione interna.
+- Typecheck, Prettier pertinente e `git diff --check` superati.
+- Nessun file backend, schema, OpenAPI, generated o migrazione è stato modificato dal correttivo.
+
+Docker candidato e prova manuale non sono stati eseguiti; M3B non è iniziato.
+
+Condizione di arresto: **M3A code review hardening completato — pronto per Docker**.

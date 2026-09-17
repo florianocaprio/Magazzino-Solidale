@@ -17,6 +17,13 @@ type Product = {
   gestioneScadenza: boolean;
 };
 type Stock = { prodottoId: number; giacenzaFisica: number };
+type LogicalLot = { id: number; isGenerale: boolean };
+type Movement = { id: number; quantita: number };
+type PhysicalLot = {
+  codiceLotto: string | null;
+  dataScadenza: string | null;
+  quantitaResidua: number;
+};
 
 async function openPracticeFromList(
   page: Page,
@@ -62,10 +69,24 @@ test.describe("M3A — pratica di carico persistente", () => {
     const warehouse = ((await warehousesResponse.json()) as Warehouse[]).find(
       (item) => item.areaOperativaId === area.id && item.stato === "attivo",
     )!;
-    const product = ((await productsResponse.json()) as Product[]).find(
+    let product = ((await productsResponse.json()) as Product[]).find(
       (item) =>
         item.attivo && !item.lottoFisicoObbligatorio && !item.gestioneScadenza,
-    )!;
+    );
+    if (!product) {
+      const productResponse = await page.request.post("/api/prodotti", {
+        data: {
+          nome: `Prodotto M3A E2E ${suffix}`,
+          tipoProdotto: "alimentare",
+          unitaMisura: "pz",
+          quantitaFrazionabile: false,
+          lottoFisicoObbligatorio: false,
+          gestioneScadenza: false,
+        },
+      });
+      expect(productResponse.status()).toBe(201);
+      product = (await productResponse.json()) as Product;
+    }
     expect(area).toBeTruthy();
     expect(warehouse).toBeTruthy();
     expect(product).toBeTruthy();
@@ -126,10 +147,16 @@ test.describe("M3A — pratica di carico persistente", () => {
       .getByRole("button", { name: new RegExp(product.codice, "i") })
       .click();
     await resumedPage.getByLabel(/quantità/i).fill("80");
+    await expect(resumedPage.getByRole("checkbox")).toBeDisabled();
+    await expect(
+      resumedPage.getByRole("button", { name: /registra nuove righe/i }),
+    ).toBeDisabled();
     await resumedPage
       .getByRole("button", { name: /salva bozza/i })
       .last()
       .click();
+    await expect(resumedPage.getByRole("checkbox")).toBeEnabled();
+    await expect(resumedPage.getByRole("checkbox")).toBeChecked();
     await resumedPage
       .getByRole("button", { name: /registra nuove righe/i })
       .click();
@@ -223,5 +250,205 @@ test.describe("M3A — pratica di carico persistente", () => {
     expect(staleFromB.status()).toBe(409);
     await concurrentContext.close();
     await resumedContext.close();
+  });
+
+  test("blocca quantità, lotto e scadenza locali finché la riga non è salvata e protegge la sidebar", async ({
+    page,
+  }) => {
+    const suffix = Date.now();
+    const description = `Pratica M3A stale draft ${suffix}`;
+    const [areasResponse, warehousesResponse] = await Promise.all([
+      page.request.get("/api/aree-operative"),
+      page.request.get("/api/magazzini"),
+    ]);
+    const area = ((await areasResponse.json()) as Area[]).find(
+      (item) => item.attivo,
+    )!;
+    const warehouse = ((await warehousesResponse.json()) as Warehouse[]).find(
+      (item) => item.areaOperativaId === area.id && item.stato === "attivo",
+    )!;
+    const logicalLotsResponse = await page.request.get(
+      `/api/lotti-logici?areaOperativaId=${area.id}`,
+    );
+    const generalLot = (
+      (await logicalLotsResponse.json()) as LogicalLot[]
+    ).find((item) => item.isGenerale)!;
+    expect(area).toBeTruthy();
+    expect(warehouse).toBeTruthy();
+    expect(generalLot).toBeTruthy();
+
+    const productResponse = await page.request.post("/api/prodotti", {
+      data: {
+        nome: `Prodotto stale draft ${suffix}`,
+        tipoProdotto: "alimentare",
+        unitaMisura: "pz",
+        quantitaFrazionabile: false,
+        lottoFisicoObbligatorio: true,
+        gestioneScadenza: true,
+      },
+    });
+    expect(productResponse.status()).toBe(201);
+    const product = (await productResponse.json()) as Product;
+
+    const practiceResponse = await page.request.post("/api/carico-pratiche", {
+      data: {
+        areaOperativaId: area.id,
+        magazzinoId: warehouse.id,
+        lottoLogicoId: generalLot.id,
+        origineCarico: "DONAZIONE",
+        dataCarico: "2026-09-17",
+        descrizione: description,
+        righe: [
+          {
+            prodottoId: product.id,
+            fondoOrigine: "NESSUN_FONDO",
+            quantita: "5",
+            codiceLottoProduttore: "LOT-A",
+            dataScadenza: "2027-12-31",
+          },
+        ],
+      },
+    });
+    expect(practiceResponse.status()).toBe(201);
+    const practice = (await practiceResponse.json()) as {
+      id: number;
+      righe: Array<{ id: number }>;
+    };
+
+    const readStock = async () => {
+      const response = await page.request.get(
+        `/api/giacenze?areaOperativaId=${area.id}&magazzinoId=${warehouse.id}`,
+      );
+      expect(response.ok()).toBe(true);
+      return (
+        ((await response.json()) as Stock[]).find(
+          (item) => item.prodottoId === product.id,
+        )?.giacenzaFisica ?? 0
+      );
+    };
+    const readMovements = async () => {
+      const response = await page.request.get(
+        `/api/movimenti?magazzinoId=${warehouse.id}&prodottoId=${product.id}`,
+      );
+      expect(response.ok()).toBe(true);
+      return (await response.json()) as Movement[];
+    };
+
+    expect(await readStock()).toBe(0);
+    expect(await readMovements()).toHaveLength(0);
+    await page.goto("/carico-merce");
+    await openPracticeFromList(page, area, description);
+
+    const quantity = page.getByLabel(/quantità/i);
+    await expect(quantity).toHaveValue("5.00");
+    await quantity.fill("8");
+    await page.getByLabel("Codice lotto produttore").fill("LOT-B");
+    await page.getByLabel("Scadenza effettiva").fill("2028-01-31");
+
+    const register = page.getByRole("button", {
+      name: /registra nuove righe/i,
+    });
+    await expect(register).toBeDisabled();
+    await expect(
+      page.getByText(
+        "Salva le modifiche alle righe selezionate prima di registrare la merce.",
+      ),
+    ).toBeVisible();
+
+    await page
+      .getByRole("link", { name: /giacenze/i })
+      .first()
+      .click();
+    const unsavedDialog = page.getByRole("alertdialog", {
+      name: /modifiche non salvate/i,
+    });
+    await expect(unsavedDialog).toBeVisible();
+    await unsavedDialog
+      .getByRole("button", { name: /resta e continua/i })
+      .click();
+    await expect(page).toHaveURL(/\/carico-merce$/);
+    await expect(quantity).toHaveValue("8");
+
+    const staleDetailResponse = await page.request.get(
+      `/api/carico-pratiche/${practice.id}`,
+    );
+    const staleDetail = (await staleDetailResponse.json()) as {
+      righe: Array<{
+        quantita: string;
+        codiceLottoProduttore: string | null;
+        dataScadenza: string | null;
+      }>;
+      integrazioni: unknown[];
+    };
+    expect(staleDetail.righe[0]).toMatchObject({
+      quantita: "5.00",
+      codiceLottoProduttore: "LOT-A",
+      dataScadenza: "2027-12-31",
+    });
+    expect(staleDetail.integrazioni).toHaveLength(0);
+    expect(await readStock()).toBe(0);
+    expect(await readMovements()).toHaveLength(0);
+
+    const saveResponse = page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .endsWith(
+            `/api/carico-pratiche/${practice.id}/righe/${practice.righe[0].id}`,
+          ) && response.request().method() === "PATCH",
+    );
+    await page
+      .getByRole("button", { name: /salva bozza/i })
+      .last()
+      .click();
+    expect((await saveResponse).status()).toBe(200);
+    await expect(register).toBeEnabled();
+
+    await register.click();
+    const registrationResponse = page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .endsWith(`/api/carico-pratiche/${practice.id}/registra`) &&
+        response.request().method() === "POST",
+    );
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: /registra nuove righe/i })
+      .click();
+    expect((await registrationResponse).status()).toBe(201);
+
+    const persistedResponse = await page.request.get(
+      `/api/carico-pratiche/${practice.id}`,
+    );
+    const persisted = (await persistedResponse.json()) as {
+      righe: Array<{
+        quantita: string;
+        codiceLottoProduttore: string | null;
+        dataScadenza: string | null;
+      }>;
+      integrazioni: unknown[];
+    };
+    expect(persisted.righe[0]).toMatchObject({
+      quantita: "8.00",
+      codiceLottoProduttore: "LOT-B",
+      dataScadenza: "2028-01-31",
+    });
+    expect(persisted.integrazioni).toHaveLength(1);
+    expect(await readStock()).toBe(8);
+    expect(await readMovements()).toHaveLength(1);
+    expect((await readMovements())[0].quantita).toBe(8);
+
+    const lotsResponse = await page.request.get(
+      `/api/lotti?magazzinoId=${warehouse.id}&prodottoId=${product.id}`,
+    );
+    expect(lotsResponse.ok()).toBe(true);
+    expect((await lotsResponse.json()) as PhysicalLot[]).toEqual([
+      expect.objectContaining({
+        codiceLotto: "LOT-B",
+        dataScadenza: "2028-01-31",
+        quantitaResidua: 8,
+      }),
+    ]);
   });
 });
