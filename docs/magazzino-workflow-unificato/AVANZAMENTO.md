@@ -916,3 +916,22 @@ Un tentativo preliminare basato sul solo `drizzle push` non è stato considerato
 Docker candidato e prova manuale non sono stati eseguiti; M3B non è iniziato.
 
 Condizione di arresto: **M3A code review hardening completato — pronto per Docker**.
+
+## M3A — validazione manuale e chiusura
+
+Data: 17 settembre 2026
+
+Base validata: `6eaf91c53e1990b8f157f938a668c9aea1e35264`.
+
+Stato: **M3A validato manualmente e chiuso** (`OK-M3A/OK-MAN-M3A`).
+
+Floriano ha completato con esito positivo il dry run reale della pratica Carico Merce sul candidato Docker costruito dalla stessa SHA. La prova ha confermato `LOAD-01` e `LOAD-02`: creazione e persistenza della bozza senza effetti inventariali, ripresa dopo l'interruzione, distinzione fra righe pendenti e registrate, contabilizzazioni incrementali 80+20 senza duplicazioni, blocco dei draft locali non salvati, aggiornamento del lotto fisico prima della registrazione, quantità frazionabili e indivisibili, ricerca prodotto, protezione della navigazione, conflitto fra sessioni, lifecycle della pratica, riconciliazione di Giacenze e Movimenti, audit e rettifica prudente.
+
+Restano esplicitamente non eseguite:
+
+- `NE-MAN-CAMERA`: scansione con fotocamera reale;
+- `NE-MAN-TABLET`: prova su dispositivo tablet fisico.
+
+Queste due verifiche fisiche non bloccano la chiusura M3A e non sono dichiarate superate. Il percorso AGEA/FSE+ legacy resta separato dalla pratica; M3B non è stato avviato.
+
+La chiusura modifica esclusivamente la documentazione M3A. Non modifica codice applicativo, schema, API, migrazioni o file generati e non coinvolge `main`.
