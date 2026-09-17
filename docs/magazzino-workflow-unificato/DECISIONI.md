@@ -65,7 +65,7 @@ Il lotto logico contiene codice, descrizione, Area operativa, date indicative, n
 
 **Impatto.** Nuova relazione e migrazione conservativa in M2; adeguamento OpenAPI/client, carichi, viste giacenza e documenti successivi.
 
-**Stato.** Implementazione candidata verificata automaticamente in M2 (`OK-M2/NE-MAN`): schema, migrazione conservativa, servizio di carico, lifecycle API, audit e regressioni sono coperti. La UI operativa M3, i completamenti M4 e la prova manuale M2 non sono ancora eseguiti.
+**Stato.** Implementazione verificata automaticamente e validata manualmente in M2 (`OK-M2/OK-MAN-M2`): schema, migrazione conservativa, servizio di carico, lifecycle API, audit e regressioni sono coperti. La UI operativa M3 e i completamenti M4 restano fuori dal perimetro validato.
 
 ### Lotto logico “Generale”
 
@@ -80,7 +80,7 @@ Il lotto logico contiene codice, descrizione, Area operativa, date indicative, n
 
 **Perché.** Un default globale attraverserebbe il confine territoriale e renderebbe ambigua la chiusura; un default per prodotto moltiplicherebbe contenitori privi di significato per il volontario.
 
-**Stato.** Implementazione candidata verificata automaticamente in M2 (`OK-M2/NE-MAN`): migrazione, nuove Aree e seed/demo creano un solo `Generale`; i 21 dettagli legacy restano null e le API ne proteggono struttura e lifecycle. La prova manuale M2 resta pendente.
+**Stato.** Implementazione verificata automaticamente e validata manualmente in M2 (`OK-M2/OK-MAN-M2`): migrazione, nuove Aree e seed/demo creano un solo `Generale`; i 21 dettagli legacy restano null e le API ne proteggono struttura e lifecycle.
 
 ### Ciclo di vita
 
@@ -114,7 +114,7 @@ M2 introduce la proprietà esplicita di catalogo `quantitaFrazionabile`, con def
 
 **Legacy.** Una query di preflight elenca prodotti indivisibili con frazioni. Queste righe non sono arrotondate: vengono marcate come anomalia, continuano a essere leggibili e richiedono una scelta esplicita di riclassificazione, rettifica o mantenimento legacy.
 
-**Stato.** Implementazione candidata verificata automaticamente in M2 (`OK-M2/NE-MAN`): default, override, helper fixed-point, flussi ordinari, diagnostica legacy e rettifica amministrativa sono coperti dalle suite complete. Nessun dato storico viene arrotondato o corretto. La prova manuale M2 resta pendente.
+**Stato.** Implementazione verificata automaticamente e validata manualmente in M2 (`OK-M2/OK-MAN-M2`): default, override, helper fixed-point, flussi ordinari, diagnostica legacy e rettifica amministrativa sono coperti. Nessun dato storico viene arrotondato o corretto.
 
 ## D3 — Pratica di carico e integrazioni
 

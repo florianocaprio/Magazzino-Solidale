@@ -768,3 +768,11 @@ La regressione su PostgreSQL isolato copre:
 I test mirati Lotto Logico M2, Trasferimenti e Giacenze M1B hanno chiuso 3 file e 48 test senza fallimenti. Il typecheck dell'intero workspace, Prettier pertinente e `git diff --check` sono verdi. Non sono stati modificati schema, migrazioni, OpenAPI, generated o modello Trasferimenti.
 
 LOT-03 riconosce quindi correttamente il transito già materializzato nel ledger; resta parziale soltanto per rientro e altri comportamenti M4B non ancora implementati. Non sono stati costruiti container applicativi candidati, avviati M3 o effettuati merge/modifiche a `main`.
+
+## M2 — validazione manuale
+
+Floriano ha dichiarato esplicitamente M2 validato sul candidato `ca1b3aa5c0444aef8be61d1caf349c41dc436abc` dopo il rebuild Docker e il dry run Catalogo/Lotti/Quantità.
+
+CAT-02, QTY-01 e LOT-01 passano a `OK-M2/OK-MAN-M2`. LOT-02 e LOT-03 restano fondazioni parziali M2: la validazione manuale non certifica prenotazioni, rientro, visualizzazione completa o gli altri completamenti demandati a M4B. Gli esiti automatici, i dati legacy e le milestone precedenti restano invariati.
+
+Questa chiusura documentale non modifica codice, schema, API, migrazioni o output generati e costituisce la base autorizzata per M3A.
