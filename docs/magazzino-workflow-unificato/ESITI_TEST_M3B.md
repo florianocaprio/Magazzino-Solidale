@@ -263,3 +263,21 @@ desktop finale è partito da database release vergine.
 Decisione automatica: **GO a un nuovo commit correttivo e al push del solo
 branch `codex/magazzino-workflow-unificato`, pronto per una nuova code review
 ChatGPT**.
+
+## Validazione manuale finale
+
+Data: 18 settembre 2026
+
+Candidato validato: `c4da09c1c16d62bd25cddf36a04e8e7871e417d4`.
+
+Floriano ha completato con esito positivo il dry run manuale e ha approvato il
+workflow M3B. M3B è quindi validato manualmente e chiuso; le evidenze
+automatiche di questo documento restano distinte e non vengono reinterpretate
+come prove manuali.
+
+Restano `NE-MAN-CAMERA` e `NE-MAN-TABLET`: fotocamera reale e tablet fisico
+non sono stati provati e non sono dichiarati superati. Questi due punti non
+bloccano la chiusura M3B.
+
+Con M3A già chiuso e validato, **M3 complessivamente è CHIUSO**. Non è stata
+avviata alcuna attività M4/M5.

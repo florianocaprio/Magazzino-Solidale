@@ -1099,3 +1099,36 @@ umana è implicata.
 
 Condizione di arresto: **M3B hardening post-review completato — candidato
 automatico pronto per nuova code review ChatGPT**.
+
+## M3B — validazione manuale e chiusura M3
+
+Data: 18 settembre 2026
+
+Candidato validato: `c4da09c1c16d62bd25cddf36a04e8e7871e417d4`.
+
+Stato: **M3B validato manualmente da Floriano e chiuso**
+(`OK-M3B/OK-MAN-M3B/NE-MAN-CAMERA/NE-MAN-TABLET`).
+
+Floriano ha completato con esito positivo il dry run manuale e ha approvato il
+workflow M3B. Le prove automatiche e le evidenze dettagliate già registrate
+restano valide e distinte dalla validazione umana; questa chiusura non le
+duplica né attribuisce al dry run verifiche di dettaglio non fornite.
+
+Restano esplicitamente non eseguite e non dichiarate superate:
+
+- `NE-MAN-CAMERA`: prova con fotocamera reale;
+- `NE-MAN-TABLET`: prova su dispositivo tablet fisico.
+
+Le due prove hardware non bloccano la chiusura. M3A è chiuso e validato,
+M3B è chiuso e validato e **M3 complessivamente è CHIUSO**.
+
+Il workflow Carico Merce consolidato comprende pratica persistente e
+riprendibile, contabilizzazioni incrementali, barcode, quantità coerenti con
+M2, import FSE+/AGEA XLS/XLSX/CSV, associazione o creazione prodotti, gestione
+anomalie, import parziale, anti-sovrapposizione, identità esterna preservata,
+retry idempotente, saldo iniziale, copertura storica, protezioni di
+concorrenza e integrazione con ledger e audit comuni.
+
+Questa chiusura modifica esclusivamente la documentazione M3B. Non modifica
+codice applicativo, schema, API, migrazioni, OpenAPI o file generati, non
+coinvolge `main` e non avvia né descrive come implementato M4/M5.
