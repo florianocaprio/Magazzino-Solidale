@@ -48,6 +48,32 @@ export class FsePracticeImportError extends Error {
   }
 }
 
+async function lockFseSource(
+  tx: InventoryTransaction,
+  sourceRegistryId: number,
+) {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-source:${sourceRegistryId}`}, 0))`,
+  );
+}
+
+async function lockFseSourceForSession(
+  tx: InventoryTransaction,
+  sessionId: number,
+) {
+  const [session] = await tx
+    .select({ sourceRegistryId: fseImportSessionsTable.sourceRegistryId })
+    .from(fseImportSessionsTable)
+    .where(eq(fseImportSessionsTable.id, sessionId));
+  if (!session)
+    throw new FsePracticeImportError(
+      404,
+      "SESSIONE_NON_TROVATA",
+      "Procedura non trovata",
+    );
+  await lockFseSource(tx, session.sourceRegistryId);
+}
+
 function hash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
@@ -705,9 +731,7 @@ async function refreshSessionState(
       "SESSIONE_NON_TROVATA",
       "Procedura non trovata",
     );
-  await tx.execute(
-    sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-source:${session.sourceRegistryId}`}, 0))`,
-  );
+  await lockFseSource(tx, session.sourceRegistryId);
   const files = await tx
     .select()
     .from(fseImportFilesTable)
@@ -778,6 +802,27 @@ export async function acquireFseFile(
     sheetName: input.sheetName,
     referenceDate: input.referenceDate,
   });
+  await lockFseSource(tx, input.sourceRegistryId);
+  if (input.modalita === "NUOVI_CARICHI") {
+    const [proposedCoverage] = await tx
+      .select({ id: fseInitialBalanceCoverageTable.id })
+      .from(fseInitialBalanceCoverageTable)
+      .where(
+        and(
+          eq(
+            fseInitialBalanceCoverageTable.sourceRegistryId,
+            input.sourceRegistryId,
+          ),
+          eq(fseInitialBalanceCoverageTable.stato, "PROPOSTA"),
+        ),
+      );
+    if (proposedCoverage)
+      throw new FsePracticeImportError(
+        409,
+        "SALDO_INIZIALE_IN_CORSO",
+        "È in corso la preparazione della giacenza iniziale. Completa o annulla il saldo prima di importare nuovi carichi.",
+      );
+  }
   if (input.sessionId == null) {
     const [sameFile] = await tx
       .select({
@@ -928,6 +973,7 @@ export async function mapFseProduct(
     audit: AuditCommandContext;
   },
 ) {
+  await lockFseSourceForSession(tx, input.sessionId);
   await tx.execute(
     sql`SELECT id FROM ${fseImportSessionsTable} WHERE ${fseImportSessionsTable.id}=${input.sessionId} FOR UPDATE`,
   );
@@ -1190,6 +1236,7 @@ export async function reviseFseImportRow(
     audit: AuditCommandContext;
   },
 ) {
+  await lockFseSourceForSession(tx, input.sessionId);
   await tx.execute(
     sql`SELECT id FROM ${fseImportSessionsTable} WHERE ${fseImportSessionsTable.id}=${input.sessionId} FOR UPDATE`,
   );
@@ -1624,6 +1671,7 @@ export async function addFseRowsToPractice(
   await tx.execute(
     sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-attach:${input.idempotencyKey}`}, 0))`,
   );
+  await lockFseSourceForSession(tx, input.sessionId);
   await tx.execute(
     sql`SELECT id FROM ${fseImportSessionsTable} WHERE ${fseImportSessionsTable.id}=${input.sessionId} FOR UPDATE`,
   );
@@ -1637,9 +1685,6 @@ export async function addFseRowsToPractice(
       "SESSIONE_NON_TROVATA",
       "Procedura non trovata",
     );
-  await tx.execute(
-    sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-source:${session.sourceRegistryId}`}, 0))`,
-  );
   const requestHash = hash({
     sessionId: input.sessionId,
     version: input.version,
@@ -1771,6 +1816,28 @@ export async function addFseRowsToPractice(
         409,
         "DATA_TAGLIO_MANCANTE",
         "Conferma la data di riferimento del saldo",
+      );
+    const [openOrdinaryImport] = await tx
+      .select({ id: fseImportSessionsTable.id })
+      .from(fseImportSessionsTable)
+      .where(
+        and(
+          eq(fseImportSessionsTable.sourceRegistryId, session.sourceRegistryId),
+          eq(fseImportSessionsTable.modalita, "NUOVI_CARICHI"),
+          inArray(fseImportSessionsTable.stato, [
+            "IN_ANALISI",
+            "DA_COMPLETARE",
+            "PRONTA",
+            "IN_PRATICA",
+          ]),
+        ),
+      )
+      .limit(1);
+    if (openOrdinaryImport)
+      throw new FsePracticeImportError(
+        409,
+        "IMPORT_ORDINARIO_IN_CORSO",
+        "Esiste un'importazione ordinaria FSE+ ancora aperta per questa sorgente. Completala o annullala prima di impostare la giacenza iniziale.",
       );
     const [existingCoverage] = await tx
       .select()

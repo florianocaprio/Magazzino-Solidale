@@ -14,6 +14,7 @@ import {
   carichiMagazzinoTable,
   db,
   fornitoriTable,
+  fseImportRowRevisionsTable,
   fseImportRowsTable,
   fseImportSessionsTable,
   fseInitialBalanceCoverageTable,
@@ -197,6 +198,39 @@ function errorResponse(error: unknown, res: Response) {
     return true;
   }
   return false;
+}
+
+async function initialBalanceClaimedRows(
+  tx: InventoryTransaction,
+  coverage: {
+    sourceRegistryId: number;
+    sessioneId: number;
+  },
+) {
+  return tx
+    .select({
+      claimId: fseMovementClaimsTable.id,
+      rowId: fseImportRowRevisionsTable.rigaId,
+    })
+    .from(fseMovementClaimsTable)
+    .innerJoin(
+      fseImportRowRevisionsTable,
+      eq(
+        fseMovementClaimsTable.acceptedRevisionId,
+        fseImportRowRevisionsTable.id,
+      ),
+    )
+    .innerJoin(
+      fseImportRowsTable,
+      eq(fseImportRowRevisionsTable.rigaId, fseImportRowsTable.id),
+    )
+    .where(
+      and(
+        eq(fseMovementClaimsTable.sourceRegistryId, coverage.sourceRegistryId),
+        eq(fseMovementClaimsTable.stato, "RISERVATA"),
+        eq(fseImportRowsTable.sessioneId, coverage.sessioneId),
+      ),
+    );
 }
 
 async function validateHeader(
@@ -1235,6 +1269,14 @@ router.post(
             );
         }
         if (initialCoverage) {
+          const coveredRows = await initialBalanceClaimedRows(
+            tx,
+            initialCoverage,
+          );
+          const coveredClaimIds = coveredRows.map((row) => row.claimId);
+          const coveredImportRowIds = [
+            ...new Set(coveredRows.map((row) => row.rowId)),
+          ];
           await tx
             .update(fseInitialBalanceCoverageTable)
             .set({
@@ -1243,42 +1285,21 @@ router.post(
               dataAttivazione: now,
             })
             .where(eq(fseInitialBalanceCoverageTable.id, initialCoverage.id));
-          await tx
-            .update(fseMovementClaimsTable)
-            .set({ stato: "COPERTA_SALDO", dataAggiornamento: now })
-            .where(
-              and(
-                eq(
-                  fseMovementClaimsTable.sourceRegistryId,
-                  initialCoverage.sourceRegistryId,
+          if (coveredClaimIds.length > 0)
+            await tx
+              .update(fseMovementClaimsTable)
+              .set({ stato: "COPERTA_SALDO", dataAggiornamento: now })
+              .where(
+                and(
+                  inArray(fseMovementClaimsTable.id, coveredClaimIds),
+                  eq(fseMovementClaimsTable.stato, "RISERVATA"),
                 ),
-                eq(fseMovementClaimsTable.stato, "RISERVATA"),
-              ),
-            );
-          await tx
-            .update(fseImportRowsTable)
-            .set({ stato: "COPERTO_SALDO", dataAggiornamento: now })
-            .where(
-              inArray(
-                fseImportRowsTable.id,
-                tx
-                  .select({ id: fseImportRowsTable.id })
-                  .from(fseImportRowsTable)
-                  .innerJoin(
-                    fseImportSessionsTable,
-                    eq(
-                      fseImportRowsTable.sessioneId,
-                      fseImportSessionsTable.id,
-                    ),
-                  )
-                  .where(
-                    eq(
-                      fseImportSessionsTable.sourceRegistryId,
-                      initialCoverage.sourceRegistryId,
-                    ),
-                  ),
-              ),
-            );
+              );
+          if (coveredImportRowIds.length > 0)
+            await tx
+              .update(fseImportRowsTable)
+              .set({ stato: "COPERTO_SALDO", dataAggiornamento: now })
+              .where(inArray(fseImportRowsTable.id, coveredImportRowIds));
           await tx
             .update(fseImportSessionsTable)
             .set({
@@ -1664,22 +1685,22 @@ for (const action of ["chiudi", "riapri", "annulla"] as const) {
                 ),
               );
             if (coverage) {
+              const coveredRows = await initialBalanceClaimedRows(tx, coverage);
+              const coveredClaimIds = coveredRows.map((row) => row.claimId);
               await tx
                 .update(fseInitialBalanceCoverageTable)
                 .set({ stato: "ANNULLATA" })
                 .where(eq(fseInitialBalanceCoverageTable.id, coverage.id));
-              await tx
-                .update(fseMovementClaimsTable)
-                .set({ stato: "RILASCIATA", dataAggiornamento: new Date() })
-                .where(
-                  and(
-                    eq(
-                      fseMovementClaimsTable.sourceRegistryId,
-                      coverage.sourceRegistryId,
+              if (coveredClaimIds.length > 0)
+                await tx
+                  .update(fseMovementClaimsTable)
+                  .set({ stato: "RILASCIATA", dataAggiornamento: new Date() })
+                  .where(
+                    and(
+                      inArray(fseMovementClaimsTable.id, coveredClaimIds),
+                      eq(fseMovementClaimsTable.stato, "RISERVATA"),
                     ),
-                    eq(fseMovementClaimsTable.stato, "RISERVATA"),
-                  ),
-                );
+                  );
               await tx
                 .update(fseImportSessionsTable)
                 .set({

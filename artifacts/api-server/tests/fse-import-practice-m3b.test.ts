@@ -12,6 +12,7 @@ import {
   caricoPraticheTable,
   db,
   fseImportAttachCommandsTable,
+  fseImportFilesTable,
   fseImportRowsTable,
   fseImportSessionsTable,
   fseInitialBalanceCoverageTable,
@@ -350,6 +351,76 @@ async function prepareOrdinaryImport(
   expect(detail.status).toBe(200);
   expect(detail.body.summary.ready).toBe(1);
   return { practice, acquired, detail };
+}
+
+async function createIsolatedContext(label: string) {
+  const [{ id: warehouseId }] = await db
+    .insert(magazziniTable)
+    .values({
+      codice: `M3B${label}-${suffix}`.slice(0, 20),
+      nome: `M3B ${label}`,
+      areaOperativaId: areaId,
+    })
+    .returning({ id: magazziniTable.id });
+  const [{ id: sourceId }] = await db
+    .insert(fseSourceRegistriesTable)
+    .values({
+      codice: `M3B-${label}-${suffix}`,
+      descrizione: `Sorgente M3B ${label}`,
+      areaOperativaId: areaId,
+      creatoDa: actorId,
+    })
+    .returning({ id: fseSourceRegistriesTable.id });
+  return { warehouseId, sourceId };
+}
+
+async function prepareInitialBalance(
+  app: Express,
+  input: {
+    warehouseId: number;
+    sourceId: number;
+    document: string;
+    quantity?: number;
+  },
+) {
+  const quantity = input.quantity ?? 10;
+  const practice = await createEmptyPractice(app, input.warehouseId);
+  expect(practice.status).toBe(201);
+  const registry = await upload(app, {
+    bytes: workbook(registryHeaders, [
+      registryRow(input.document, quantity, quantity),
+    ]),
+    sourceId: input.sourceId,
+    warehouseId: input.warehouseId,
+    practiceId: practice.body.id,
+    mode: "SALDO_INIZIALE",
+    profile: "REGISTRO",
+    fileName: `${input.document}-registro.xlsx`,
+  });
+  expect(registry.status).toBe(201);
+  const stock = await upload(app, {
+    bytes: workbook(stockHeaders, [stockRow(quantity)]),
+    sourceId: input.sourceId,
+    warehouseId: input.warehouseId,
+    practiceId: practice.body.id,
+    mode: "SALDO_INIZIALE",
+    profile: "GIACENZE",
+    sessionId: registry.body.sessionId,
+    fileName: `${input.document}-giacenze.xlsx`,
+  });
+  expect(stock.status).toBe(201);
+  const mapped = await mapProduct(
+    app,
+    registry.body.sessionId,
+    stock.body.versione,
+  );
+  expect(mapped.status).toBe(200);
+  const detail = await request(app).get(
+    `/fse-importazioni/sessioni/${registry.body.sessionId}`,
+  );
+  expect(detail.status).toBe(200);
+  expect(detail.body.stato).toBe("PRONTA");
+  return { practice, registry, detail };
 }
 
 beforeAll(async () => {
@@ -1485,6 +1556,424 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
         .where(eq(movimentiTable.magazzinoId, warehouseId)),
     ).toHaveLength(1);
   });
+
+  it("rifiuta senza residui un upload ordinario mentre il saldo è PROPOSTA", async () => {
+    const app = appFor();
+    const context = await createIsolatedContext("PROPOSTA");
+    const balance = await prepareInitialBalance(app, {
+      ...context,
+      document: `DOC-BAL-PROPOSTA-${suffix}`,
+    });
+    const attached = await request(app)
+      .post(
+        `/fse-importazioni/sessioni/${balance.registry.body.sessionId}/aggiungi-pratica`,
+      )
+      .send({
+        versione: balance.detail.body.versione,
+        versionePratica: balance.practice.body.versione,
+        confermaCoperturaStorica: true,
+        idempotencyKey: `m3b-proposta-attach-${suffix}`,
+      });
+    expect(attached.status).toBe(201);
+
+    const sessionsBefore = await db
+      .select({ id: fseImportSessionsTable.id })
+      .from(fseImportSessionsTable)
+      .where(eq(fseImportSessionsTable.sourceRegistryId, context.sourceId));
+    const sessionIdsBefore = sessionsBefore.map((row) => row.id);
+    const filesBefore = await db
+      .select({ id: fseImportFilesTable.id })
+      .from(fseImportFilesTable)
+      .where(inArray(fseImportFilesTable.sessioneId, sessionIdsBefore));
+    const rowsBefore = await db
+      .select({ id: fseImportRowsTable.id })
+      .from(fseImportRowsTable)
+      .where(inArray(fseImportRowsTable.sessioneId, sessionIdsBefore));
+    const auditsBefore = await db
+      .select({ id: auditEventiTable.id })
+      .from(auditEventiTable)
+      .where(eq(auditEventiTable.azione, "FSE_IMPORT_FILE_ACQUISITO"));
+    const [coverageBefore] = await db
+      .select()
+      .from(fseInitialBalanceCoverageTable)
+      .where(
+        eq(fseInitialBalanceCoverageTable.sourceRegistryId, context.sourceId),
+      );
+    expect(coverageBefore.stato).toBe("PROPOSTA");
+
+    const ordinaryPractice = await createEmptyPractice(
+      app,
+      context.warehouseId,
+    );
+    const rejected = await upload(app, {
+      bytes: workbook(registryHeaders, [
+        registryRow(`DOC-DURANTE-PROPOSTA-${suffix}`, 100, 100),
+      ]),
+      sourceId: context.sourceId,
+      warehouseId: context.warehouseId,
+      practiceId: ordinaryPractice.body.id,
+      mode: "NUOVI_CARICHI",
+      profile: "REGISTRO",
+      fileName: "nuovi-carichi-durante-proposta.xlsx",
+    });
+    expect(rejected.status).toBe(409);
+    expect(rejected.body).toEqual({
+      code: "SALDO_INIZIALE_IN_CORSO",
+      error:
+        "È in corso la preparazione della giacenza iniziale. Completa o annulla il saldo prima di importare nuovi carichi.",
+    });
+
+    const sessionsAfter = await db
+      .select({ id: fseImportSessionsTable.id })
+      .from(fseImportSessionsTable)
+      .where(eq(fseImportSessionsTable.sourceRegistryId, context.sourceId));
+    const filesAfter = await db
+      .select({ id: fseImportFilesTable.id })
+      .from(fseImportFilesTable)
+      .where(inArray(fseImportFilesTable.sessioneId, sessionIdsBefore));
+    const rowsAfter = await db
+      .select({ id: fseImportRowsTable.id })
+      .from(fseImportRowsTable)
+      .where(inArray(fseImportRowsTable.sessioneId, sessionIdsBefore));
+    const auditsAfter = await db
+      .select({ id: auditEventiTable.id })
+      .from(auditEventiTable)
+      .where(eq(auditEventiTable.azione, "FSE_IMPORT_FILE_ACQUISITO"));
+    const [coverageAfter] = await db
+      .select()
+      .from(fseInitialBalanceCoverageTable)
+      .where(
+        eq(fseInitialBalanceCoverageTable.sourceRegistryId, context.sourceId),
+      );
+    expect(sessionsAfter).toEqual(sessionsBefore);
+    expect(filesAfter).toEqual(filesBefore);
+    expect(rowsAfter).toEqual(rowsBefore);
+    expect(auditsAfter).toEqual(auditsBefore);
+    expect(coverageAfter).toEqual(coverageBefore);
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.magazzinoId, context.warehouseId)),
+    ).toHaveLength(0);
+
+    const cancelledBalance = await request(app)
+      .post(`/carico-pratiche/${balance.practice.body.id}/annulla`)
+      .send({
+        versione: attached.body.practiceVersion,
+        motivo: "Annullamento proposta saldo per riaprire gli import ordinari",
+      });
+    expect(cancelledBalance.status).toBe(200);
+    const retried = await upload(app, {
+      bytes: workbook(registryHeaders, [
+        registryRow(`DOC-DURANTE-PROPOSTA-${suffix}`, 100, 100),
+      ]),
+      sourceId: context.sourceId,
+      warehouseId: context.warehouseId,
+      practiceId: ordinaryPractice.body.id,
+      mode: "NUOVI_CARICHI",
+      profile: "REGISTRO",
+      fileName: "nuovi-carichi-dopo-annullamento-proposta.xlsx",
+    });
+    expect(retried.status).toBe(201);
+  });
+
+  it("isola le righe coperte e conserva i nuovi eventi post-taglio e retrodatati", async () => {
+    const app = appFor();
+    const context = await createIsolatedContext("ISOLAMENTO");
+    const ordinary = await prepareOrdinaryImport(app, {
+      ...context,
+      document: `DOC-ORD-APERTA-${suffix}`,
+      fileName: "ordinaria-aperta-prima-del-saldo.xlsx",
+    });
+    expect(ordinary.detail.body.stato).toBe("PRONTA");
+    const externalRowId = ordinary.detail.body.rows[0].id as number;
+
+    const balance = await prepareInitialBalance(app, {
+      ...context,
+      document: `DOC-BAL-ISOLATO-${suffix}`,
+    });
+    const blocked = await request(app)
+      .post(
+        `/fse-importazioni/sessioni/${balance.registry.body.sessionId}/aggiungi-pratica`,
+      )
+      .send({
+        versione: balance.detail.body.versione,
+        versionePratica: balance.practice.body.versione,
+        confermaCoperturaStorica: true,
+        idempotencyKey: `m3b-isolamento-attach-${suffix}`,
+      });
+    expect(blocked.status).toBe(409);
+    expect(blocked.body).toMatchObject({
+      code: "IMPORT_ORDINARIO_IN_CORSO",
+      error:
+        "Esiste un'importazione ordinaria FSE+ ancora aperta per questa sorgente. Completala o annullala prima di impostare la giacenza iniziale.",
+    });
+    expect(
+      await db
+        .select()
+        .from(fseInitialBalanceCoverageTable)
+        .where(
+          eq(fseInitialBalanceCoverageTable.sourceRegistryId, context.sourceId),
+        ),
+    ).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(fseMovementClaimsTable)
+        .where(eq(fseMovementClaimsTable.sourceRegistryId, context.sourceId)),
+    ).toHaveLength(0);
+    const [openSession] = await db
+      .select()
+      .from(fseImportSessionsTable)
+      .where(eq(fseImportSessionsTable.id, ordinary.acquired.body.sessionId));
+    expect(openSession.stato).toBe("PRONTA");
+
+    const cancelledOrdinary = await request(app)
+      .post(`/carico-pratiche/${ordinary.practice.body.id}/annulla`)
+      .send({
+        versione: ordinary.practice.body.versione,
+        motivo: "Annullamento sessione ordinaria prima del saldo",
+      });
+    expect(cancelledOrdinary.status).toBe(200);
+    const [cancelledSession] = await db
+      .select()
+      .from(fseImportSessionsTable)
+      .where(eq(fseImportSessionsTable.id, openSession.id));
+    expect(cancelledSession.stato).toBe("ANNULLATA");
+    const attached = await request(app)
+      .post(
+        `/fse-importazioni/sessioni/${balance.registry.body.sessionId}/aggiungi-pratica`,
+      )
+      .send({
+        versione: balance.detail.body.versione,
+        versionePratica: balance.practice.body.versione,
+        confermaCoperturaStorica: true,
+        idempotencyKey: `m3b-isolamento-attach-${suffix}`,
+      });
+    expect(attached.status).toBe(201);
+    const balancePractice = await request(app).get(
+      `/carico-pratiche/${balance.practice.body.id}`,
+    );
+    const registeredBalance = await request(app)
+      .post(`/carico-pratiche/${balance.practice.body.id}/registra`)
+      .send({
+        versione: balancePractice.body.versione,
+        rigaIds: balancePractice.body.righe.map(
+          (row: { id: number }) => row.id,
+        ),
+        idempotencyKey: `m3b-isolamento-register-${suffix}`,
+      });
+    expect(registeredBalance.status).toBe(201);
+
+    const importRows = await db
+      .select({
+        id: fseImportRowsTable.id,
+        sessionId: fseImportRowsTable.sessioneId,
+        state: fseImportRowsTable.stato,
+      })
+      .from(fseImportRowsTable)
+      .where(
+        inArray(fseImportRowsTable.sessioneId, [
+          openSession.id,
+          balance.registry.body.sessionId,
+        ]),
+      );
+    expect(importRows.find((row) => row.id === externalRowId)?.state).toBe(
+      "PRONTO",
+    );
+    expect(
+      importRows.find(
+        (row) => row.sessionId === balance.registry.body.sessionId,
+      )?.state,
+    ).toBe("COPERTO_SALDO");
+    const balanceClaims = await db
+      .select()
+      .from(fseMovementClaimsTable)
+      .where(eq(fseMovementClaimsTable.sourceRegistryId, context.sourceId));
+    expect(balanceClaims).toHaveLength(1);
+    expect(balanceClaims[0].stato).toBe("COPERTA_SALDO");
+
+    const postCutoffRow = registryRow(`DOC-POST-${suffix}`, 4, 4);
+    postCutoffRow[5] = "18/09/2026";
+    const postPractice = await createEmptyPractice(app, context.warehouseId);
+    const postBytes = workbook(registryHeaders, [postCutoffRow]);
+    const postUpload = await upload(app, {
+      bytes: postBytes,
+      sourceId: context.sourceId,
+      warehouseId: context.warehouseId,
+      practiceId: postPractice.body.id,
+      mode: "NUOVI_CARICHI",
+      profile: "REGISTRO",
+      fileName: "evento-post-taglio.xlsx",
+    });
+    expect(postUpload.status).toBe(201);
+    const postMapped = await mapProduct(
+      app,
+      postUpload.body.sessionId,
+      postUpload.body.versione,
+    );
+    expect(postMapped.status).toBe(200);
+    const postDetail = await request(app).get(
+      `/fse-importazioni/sessioni/${postUpload.body.sessionId}`,
+    );
+    expect(postDetail.body.rows[0].stato).toBe("PRONTO");
+    const postAttached = await request(app)
+      .post(
+        `/fse-importazioni/sessioni/${postUpload.body.sessionId}/aggiungi-pratica`,
+      )
+      .send({
+        versione: postDetail.body.versione,
+        versionePratica: postPractice.body.versione,
+        rigaIds: [postDetail.body.rows[0].id],
+        idempotencyKey: `m3b-post-attach-${suffix}`,
+      });
+    expect(postAttached.status).toBe(201);
+    const postPracticeDetail = await request(app).get(
+      `/carico-pratiche/${postPractice.body.id}`,
+    );
+    const postRegistered = await request(app)
+      .post(`/carico-pratiche/${postPractice.body.id}/registra`)
+      .send({
+        versione: postPracticeDetail.body.versione,
+        rigaIds: postPracticeDetail.body.righe.map(
+          (row: { id: number }) => row.id,
+        ),
+        idempotencyKey: `m3b-post-register-${suffix}`,
+      });
+    expect(postRegistered.status).toBe(201);
+    const movementsAfterPost = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.magazzinoId, context.warehouseId));
+    expect(movementsAfterPost).toHaveLength(2);
+    expect(
+      movementsAfterPost.filter(
+        (movement) => movement.naturaContabile !== "SALDO_INIZIALE",
+      ),
+    ).toHaveLength(1);
+
+    const replayPractice = await createEmptyPractice(app, context.warehouseId);
+    const postReplay = await upload(app, {
+      bytes: postBytes,
+      sourceId: context.sourceId,
+      warehouseId: context.warehouseId,
+      practiceId: replayPractice.body.id,
+      mode: "NUOVI_CARICHI",
+      profile: "REGISTRO",
+      fileName: "evento-post-taglio-rinominato.xlsx",
+    });
+    expect(postReplay.status).toBe(200);
+    expect(postReplay.body.replay).toBe(true);
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.magazzinoId, context.warehouseId)),
+    ).toHaveLength(2);
+
+    const pastRow = registryRow(`DOC-RETRO-${suffix}`, 3, 3);
+    pastRow[5] = "16/09/2026";
+    const retroPractice = await createEmptyPractice(app, context.warehouseId);
+    const retroUpload = await upload(app, {
+      bytes: workbook(registryHeaders, [pastRow]),
+      sourceId: context.sourceId,
+      warehouseId: context.warehouseId,
+      practiceId: retroPractice.body.id,
+      mode: "NUOVI_CARICHI",
+      profile: "REGISTRO",
+      fileName: "evento-retrodatato.xlsx",
+    });
+    expect(retroUpload.status).toBe(201);
+    const retroMapped = await mapProduct(
+      app,
+      retroUpload.body.sessionId,
+      retroUpload.body.versione,
+    );
+    expect(retroMapped.status).toBe(200);
+    const retroDetail = await request(app).get(
+      `/fse-importazioni/sessioni/${retroUpload.body.sessionId}`,
+    );
+    expect(retroDetail.body.rows[0].stato).toBe("DA_VERIFICARE");
+    expect(retroDetail.body.rows[0].warningCodes).toContain(
+      "EVENTO_RETRODATATO_DOPO_SALDO",
+    );
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.magazzinoId, context.warehouseId)),
+    ).toHaveLength(2);
+  });
+
+  it("serializza davvero proposta saldo e acquisizione ordinaria sulla stessa sorgente", async () => {
+    const app = appFor();
+    const context = await createIsolatedContext("RACE-SOURCE");
+    const balance = await prepareInitialBalance(app, {
+      ...context,
+      document: `DOC-BAL-RACE-SOURCE-${suffix}`,
+    });
+    const ordinaryPractice = await createEmptyPractice(
+      app,
+      context.warehouseId,
+    );
+    const [proposal, ordinaryUpload] = await Promise.all([
+      request(app)
+        .post(
+          `/fse-importazioni/sessioni/${balance.registry.body.sessionId}/aggiungi-pratica`,
+        )
+        .send({
+          versione: balance.detail.body.versione,
+          versionePratica: balance.practice.body.versione,
+          confermaCoperturaStorica: true,
+          idempotencyKey: `m3b-race-source-attach-${suffix}`,
+        }),
+      upload(app, {
+        bytes: workbook(registryHeaders, [
+          registryRow(`DOC-NEW-RACE-${suffix}`, 5, 5),
+        ]),
+        sourceId: context.sourceId,
+        warehouseId: context.warehouseId,
+        practiceId: ordinaryPractice.body.id,
+        mode: "NUOVI_CARICHI",
+        profile: "REGISTRO",
+        fileName: "nuovo-carico-concorrente.xlsx",
+      }),
+    ]);
+    expect([proposal.status, ordinaryUpload.status].sort()).toEqual([201, 409]);
+    const rejected = proposal.status === 409 ? proposal : ordinaryUpload;
+    expect(["IMPORT_ORDINARIO_IN_CORSO", "SALDO_INIZIALE_IN_CORSO"]).toContain(
+      rejected.body.code,
+    );
+
+    const [coverage] = await db
+      .select()
+      .from(fseInitialBalanceCoverageTable)
+      .where(
+        eq(fseInitialBalanceCoverageTable.sourceRegistryId, context.sourceId),
+      );
+    const ordinarySessions = await db
+      .select({ id: fseImportSessionsTable.id })
+      .from(fseImportSessionsTable)
+      .where(
+        and(
+          eq(fseImportSessionsTable.sourceRegistryId, context.sourceId),
+          eq(fseImportSessionsTable.modalita, "NUOVI_CARICHI"),
+        ),
+      );
+    if (proposal.status === 201) {
+      expect(coverage?.stato).toBe("PROPOSTA");
+      expect(ordinarySessions).toHaveLength(0);
+    } else {
+      expect(coverage).toBeUndefined();
+      expect(ordinarySessions).toHaveLength(1);
+      const [ordinaryRow] = await db
+        .select({ state: fseImportRowsTable.stato })
+        .from(fseImportRowsTable)
+        .where(eq(fseImportRowsTable.sessioneId, ordinarySessions[0].id));
+      expect(ordinaryRow.state).not.toBe("COPERTO_SALDO");
+    }
+  }, 15_000);
 
   it("prepara e registra il saldo iniziale in modo atomico", async () => {
     const app = appFor();
