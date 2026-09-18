@@ -2,7 +2,11 @@ import type { Magazzino, Prodotto } from "@workspace/api-client-react";
 
 export type CaricoRowDraft = {
   quantita: string;
-  fondoOrigine: "NESSUN_FONDO" | "FSE_PLUS";
+  fondoOrigine:
+    | "NESSUN_FONDO"
+    | "FSE_PLUS"
+    | "FONDO_NAZIONALE"
+    | "FONDO_NAZIONALE_COFINANZIATO";
   codiceLottoProduttore: string;
   dataScadenza: string;
   fattoreKgLtPezzo: string;

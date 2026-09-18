@@ -57,18 +57,34 @@ test.describe("M3A — pratica di carico persistente", () => {
   }) => {
     const suffix = Date.now();
     const description = `Pratica M3A E2E ${suffix}`;
-    const [areasResponse, warehousesResponse, productsResponse] =
-      await Promise.all([
-        page.request.get("/api/aree-operative"),
-        page.request.get("/api/magazzini"),
-        page.request.get("/api/prodotti"),
-      ]);
-    const area = ((await areasResponse.json()) as Area[]).find(
+    const [areasResponse, productsResponse] = await Promise.all([
+      page.request.get("/api/aree-operative"),
+      page.request.get("/api/prodotti"),
+    ]);
+    let area = ((await areasResponse.json()) as Area[]).find(
       (item) => item.attivo,
-    )!;
-    const warehouse = ((await warehousesResponse.json()) as Warehouse[]).find(
+    );
+    if (!area) {
+      const areaResponse = await page.request.post("/api/aree-operative", {
+        data: { nome: `M3A Area E2E ${suffix}` },
+      });
+      expect(areaResponse.status()).toBe(201);
+      area = (await areaResponse.json()) as Area;
+    }
+    const warehousesResponse = await page.request.get("/api/magazzini");
+    let warehouse = ((await warehousesResponse.json()) as Warehouse[]).find(
       (item) => item.areaOperativaId === area.id && item.stato === "attivo",
-    )!;
+    );
+    if (!warehouse) {
+      const warehouseResponse = await page.request.post("/api/magazzini", {
+        data: {
+          nome: `M3A Magazzino E2E ${suffix}`,
+          areaOperativaId: area.id,
+        },
+      });
+      expect(warehouseResponse.status()).toBe(201);
+      warehouse = (await warehouseResponse.json()) as Warehouse;
+    }
     let product = ((await productsResponse.json()) as Product[]).find(
       (item) =>
         item.attivo && !item.lottoFisicoObbligatorio && !item.gestioneScadenza,
@@ -87,8 +103,6 @@ test.describe("M3A — pratica di carico persistente", () => {
       expect(productResponse.status()).toBe(201);
       product = (await productResponse.json()) as Product;
     }
-    expect(area).toBeTruthy();
-    expect(warehouse).toBeTruthy();
     expect(product).toBeTruthy();
 
     const readStock = async (targetPage: Page) => {

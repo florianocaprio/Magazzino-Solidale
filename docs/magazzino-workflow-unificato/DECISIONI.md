@@ -135,7 +135,7 @@ Esempio vincolante: riga A da 80 contabilizzata nell'integrazione 1 + nuova riga
 
 **Riutilizzo.** Estendere `createWarehouseLoad`, advisory lock, hash, `InventoryDecimal`, lineage riga/lotto/movimento e transazioni esistenti.
 
-**Stato.** Requisito approvato in M0 e implementato nel candidato M3A: `carico_pratiche` conserva testata, stato e versione; `carico_pratica_righe` conserva il lavoro; `carico_integrazioni` e `carico_integrazione_righe` collegano in modo immutabile le righe al solo motore contabile `carichi_magazzino`. La fase automatica `##test M3A` è superata (`OK-M3A/NE-MAN`); Docker candidato, prova fisica e validazione umana non sono ancora eseguiti.
+**Stato.** Requisito approvato in M0, implementato e validato in M3A: `carico_pratiche` conserva testata, stato e versione; `carico_pratica_righe` conserva il lavoro; `carico_integrazioni` e `carico_integrazione_righe` collegano in modo immutabile le righe al solo motore contabile `carichi_magazzino`. Test automatici e dry run reale Floriano sono superati (`OK-M3A/OK-MAN-M3A`); le sole prove fisiche fotocamera e tablet restano `NE-MAN-CAMERA` e `NE-MAN-TABLET`, non bloccanti per M3A.
 
 ### Import AGEA/FSE+
 
@@ -144,16 +144,18 @@ L'import confluisce nella stessa pratica ma conserva un sottodominio di staging:
 1. acquisizione file e fingerprint crittografico;
 2. parsing XLSX/XLS/CSV con formato realmente verificato;
 3. staging immutabile delle righe originali;
-4. classificazione `nuovo_ingresso`, `snapshot_registro`, `aggiornamento`, `solo_analisi`;
+4. classificazione di carichi nuovi, riferimenti, eventi già noti/coperti e contenuti modificati;
 5. mapping autorizzato verso prodotti esistenti;
 6. correzioni e ricalcolo versionati;
-7. conferma che crea una o più integrazioni del carico.
+7. aggiunta selettiva alla pratica senza stock e successiva contabilizzazione attraverso il comando M3A `Registra`.
 
-La chiave antiduplicazione combina sorgente, fingerprint, identità del registro/periodo e chiavi esterne di riga. Ricaricare lo stesso file non incrementa lo stock. Un registro cumulativo aggiorna lo staging e contabilizza solo delta esplicitamente classificati come nuovi ingressi.
+La sorgente esterna è distinta dal magazzino. L'identità semantica versionata usa sorgente, Fondo, prodotto esterno, documento/data, lotto, natura e mittente/destinatario; quantità, saldo finale, ordine del file, mapping interno e magazzino non trasformano lo stesso evento in un evento nuovo. Il fingerprint SHA-256 governa il replay dello stesso file, mentre claim attive univoche e idempotency key proteggono la presa in carico fra sessioni, pratiche e magazzini. Un contenuto diverso sulla stessa identità resta da riconciliare e non genera un delta automatico.
 
-Stato attuale verificato: solo XLSX; staging, mapping, ricalcolo, versioni, transazione e replay sono riutilizzabili. XLS e CSV sono requisito non implementato.
+Il saldo iniziale è una modalità amministrativa della stessa procedura: richiede Registro e Giacenze coerenti per Fondo/Prodotto/Lotto e data di taglio, crea una pratica riservata `SALDO_INIZIALE`, non modifica lo stock prima di `Registra` e attiva la copertura storica nella stessa transazione della contabilizzazione integrale. Un secondo saldo o un saldo su magazzino con storia inventariale è bloccato. Le giacenze successive sono confronto, non incremento o overwrite automatico.
 
-**Stato/blocco.** Da validare; blocca M3B.
+Il writer AGEA legacy resta consultabile ma viene bloccato sul magazzino già adottato da una sessione M3B, così non costituisce un secondo percorso di contabilizzazione. Le righe legacy applicate riconoscibili partecipano alla classificazione prudente; i casi non ricostruibili restano da verificare senza backfill.
+
+**Stato.** Implementazione e test automatici M3B superati (`OK-M3B`): parser XLSX/XLS binario/CSV, staging e revisioni persistenti, mapping per sorgente, claim, import parziale riprendibile, documenti esterni per riga e saldo iniziale atomico sono verificati. T01 e T25 sono stati eseguiti sui due Excel originali, con saldo esatto di 1.177 pezzi dalle sette righe Giacenze e nessuna contabilizzazione delle 24.216 entrate storiche. La prova Playwright copre desktop e viewport tablet; fotocamera e tablet fisici restano rispettivamente `NE-MAN-CAMERA` e `NE-MAN-TABLET`. Lo stato automatico non equivale a validazione umana.
 
 ## D4 — Richiesta, documento e consegna
 

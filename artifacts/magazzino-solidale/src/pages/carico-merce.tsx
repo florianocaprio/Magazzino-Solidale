@@ -27,6 +27,7 @@ import {
 } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
+import { FseImportPracticeWizard } from "@/components/fse-import-practice-wizard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,7 +70,14 @@ import {
   type CaricoRowDraft,
   visibleProducts,
 } from "@/lib/carico-merce";
-import { ArrowLeft, History, Loader2, PackagePlus, Save } from "lucide-react";
+import {
+  ArrowLeft,
+  FileSpreadsheet,
+  History,
+  Loader2,
+  PackagePlus,
+  Save,
+} from "lucide-react";
 
 const ORIGINS: OrigineCaricoManuale[] = [
   "DONAZIONE",
@@ -111,7 +119,7 @@ function headerFromPractice(practice: CaricoPraticaDettaglio): HeaderForm {
     areaOperativaId: String(practice.areaOperativaId),
     magazzinoId: String(practice.magazzinoId),
     lottoLogicoId: String(practice.lottoLogicoId),
-    origineCarico: practice.origineCarico,
+    origineCarico: practice.origineCarico as OrigineCaricoManuale,
     dataCarico: practice.dataCarico,
     descrizione: practice.descrizione,
     numeroDocumento: practice.numeroDocumento ?? "",
@@ -122,7 +130,7 @@ function headerFromPractice(practice: CaricoPraticaDettaglio): HeaderForm {
 function rowDraft(row: CaricoPraticaRiga): CaricoRowDraft {
   return {
     quantita: row.quantita?.toString() ?? "",
-    fondoOrigine: row.fondoOrigine === "FSE_PLUS" ? "FSE_PLUS" : "NESSUN_FONDO",
+    fondoOrigine: row.fondoOrigine,
     codiceLottoProduttore: row.codiceLottoProduttore ?? "",
     dataScadenza: row.dataScadenza ?? "",
     fattoreKgLtPezzo: row.fattoreKgLtPezzo?.toString() ?? "",
@@ -139,6 +147,7 @@ export default function CaricoMerce() {
   const { toast } = useToast();
   const { hasPermission } = useAuth();
   const canReceive = hasPermission("magazzino.stock.receive");
+  const canImportFse = hasPermission("magazzino.agea.import");
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -157,6 +166,8 @@ export default function CaricoMerce() {
   );
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [confirmRegister, setConfirmRegister] = useState(false);
+  const [fseImportOpen, setFseImportOpen] = useState(false);
+  const [openImportAfterSave, setOpenImportAfterSave] = useState(false);
   const registrationKey = useRef<string | null>(null);
   const lastScan = useRef<{ value: string; at: number } | null>(null);
 
@@ -231,6 +242,18 @@ export default function CaricoMerce() {
   const registeredRows = practice?.righe.filter((row) => row.registrata) ?? [];
   const canEdit =
     canReceive && (practice?.stato === "bozza" || practice?.stato === "aperta");
+  const isSystemPractice =
+    practice?.origineCarico === "AGEA_SIFEAD" ||
+    practice?.origineCarico === "SALDO_INIZIALE";
+  const canEditManual = canEdit && !isSystemPractice;
+  const canRemoveRow = canEdit && practice?.tipoPratica !== "SALDO_INIZIALE";
+  const canOpenFseImport =
+    canImportFse &&
+    canEdit &&
+    ((canEditManual &&
+      practice?.righe.length === 0 &&
+      practice.integrazioni.length === 0) ||
+      practice?.origineCarico === "AGEA_SIFEAD");
   const isRowDirty = (row: CaricoPraticaRiga) =>
     isCaricoRowDraftDirty(rowDrafts[row.id] ?? rowDraft(row), rowDraft(row));
   const rowsHaveUnsavedChanges = pendingRows.some(isRowDirty);
@@ -362,6 +385,10 @@ export default function CaricoMerce() {
         setCreating(false);
         setSelectedId(created.id);
         updateDetailCache(created);
+        if (openImportAfterSave) {
+          setOpenImportAfterSave(false);
+          setFseImportOpen(true);
+        }
       } else if (practice) {
         const updated = await updateMutation.mutateAsync({
           id: practice.id,
@@ -564,11 +591,31 @@ export default function CaricoMerce() {
               <Button
                 onClick={() => {
                   setHeader(emptyHeader());
+                  setOpenImportAfterSave(false);
                   setCreating(true);
                 }}
               >
                 <PackagePlus className="mr-2 h-4 w-4" />
                 {t("caricoPratiche.newPractice")}
+              </Button>
+            )}
+            {canReceive && canImportFse && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setHeader({
+                    ...emptyHeader(),
+                    areaOperativaId: filterArea,
+                    magazzinoId:
+                      filterWarehouse === "all" ? "" : filterWarehouse,
+                    descrizione: t("caricoPratiche.fseDraftDescription"),
+                  });
+                  setOpenImportAfterSave(true);
+                  setCreating(true);
+                }}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                {t("caricoPratiche.fseImport")}
               </Button>
             )}
           </div>
@@ -696,9 +743,20 @@ export default function CaricoMerce() {
           {t("caricoPratiche.backToList")}
         </Button>
         {practice && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <strong>{practice.codice}</strong>
             <Badge>{statusLabel(t, practice.stato)}</Badge>
+            {canOpenFseImport && (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  unsavedGuard.requestClose(() => setFseImportOpen(true))
+                }
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                {t("caricoPratiche.fseImport")}
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -711,7 +769,11 @@ export default function CaricoMerce() {
           <div className="space-y-2">
             <Label>{t("caricoPratiche.area")}</Label>
             <Select
-              disabled={Boolean(practice?.integrazioni.length) || pending}
+              disabled={
+                Boolean(practice?.integrazioni.length) ||
+                pending ||
+                Boolean(practice && !canEditManual)
+              }
               value={header.areaOperativaId}
               onValueChange={(value) => {
                 setHeader((current) => ({
@@ -740,7 +802,11 @@ export default function CaricoMerce() {
           <div className="space-y-2">
             <Label>{t("caricoPratiche.warehouse")}</Label>
             <Select
-              disabled={Boolean(practice?.integrazioni.length) || pending}
+              disabled={
+                Boolean(practice?.integrazioni.length) ||
+                pending ||
+                Boolean(practice && !canEditManual)
+              }
               value={header.magazzinoId}
               onValueChange={(value) => {
                 setHeader((current) => ({ ...current, magazzinoId: value }));
@@ -764,7 +830,11 @@ export default function CaricoMerce() {
           <div className="space-y-2">
             <Label>{t("caricoPratiche.activity")}</Label>
             <Select
-              disabled={Boolean(practice?.integrazioni.length) || pending}
+              disabled={
+                Boolean(practice?.integrazioni.length) ||
+                pending ||
+                Boolean(practice && !canEditManual)
+              }
               value={header.lottoLogicoId}
               onValueChange={(value) => {
                 setHeader((current) => ({ ...current, lottoLogicoId: value }));
@@ -786,6 +856,7 @@ export default function CaricoMerce() {
             </Select>
             {canReceive &&
               selectedAreaId != null &&
+              (!practice || canEditManual) &&
               !practice?.integrazioni.length && (
                 <Button
                   type="button"
@@ -801,7 +872,11 @@ export default function CaricoMerce() {
           <div className="space-y-2">
             <Label>{t("caricoPratiche.origin")}</Label>
             <Select
-              disabled={Boolean(practice?.integrazioni.length) || pending}
+              disabled={
+                Boolean(practice?.integrazioni.length) ||
+                pending ||
+                Boolean(practice && !canEditManual)
+              }
               value={header.origineCarico}
               onValueChange={(value) => {
                 setHeader((current) => ({
@@ -827,7 +902,11 @@ export default function CaricoMerce() {
             <Label>{t("caricoPratiche.date")}</Label>
             <Input
               aria-label={t("caricoPratiche.date")}
-              disabled={Boolean(practice?.integrazioni.length) || pending}
+              disabled={
+                Boolean(practice?.integrazioni.length) ||
+                pending ||
+                Boolean(practice && !canEditManual)
+              }
               type="date"
               value={header.dataCarico}
               onChange={(event) => {
@@ -843,7 +922,7 @@ export default function CaricoMerce() {
             <Label>{t("caricoPratiche.description")}</Label>
             <Input
               aria-label={t("caricoPratiche.description")}
-              disabled={pending}
+              disabled={pending || Boolean(practice && !canEditManual)}
               value={header.descrizione}
               onChange={(event) => {
                 setHeader((current) => ({
@@ -858,7 +937,11 @@ export default function CaricoMerce() {
             <Label>{t("caricoPratiche.document")}</Label>
             <Input
               aria-label={t("caricoPratiche.document")}
-              disabled={Boolean(practice?.integrazioni.length) || pending}
+              disabled={
+                Boolean(practice?.integrazioni.length) ||
+                pending ||
+                Boolean(practice && !canEditManual)
+              }
               value={header.numeroDocumento}
               onChange={(event) => {
                 setHeader((current) => ({
@@ -873,7 +956,7 @@ export default function CaricoMerce() {
             <Label>{t("caricoPratiche.notes")}</Label>
             <Textarea
               aria-label={t("caricoPratiche.notes")}
-              disabled={pending}
+              disabled={pending || Boolean(practice && !canEditManual)}
               value={header.note}
               onChange={(event) => {
                 setHeader((current) => ({
@@ -887,7 +970,7 @@ export default function CaricoMerce() {
           <div className="flex items-end">
             <Button
               disabled={
-                pending || !validHeader || Boolean(practice && !canEdit)
+                pending || !validHeader || Boolean(practice && !canEditManual)
               }
               onClick={() => void saveHeader()}
             >
@@ -898,7 +981,7 @@ export default function CaricoMerce() {
         </CardContent>
       </Card>
 
-      {practice && canEdit && (
+      {practice && canEditManual && (
         <Card>
           <CardHeader>
             <CardTitle>{t("caricoPratiche.addProduct")}</CardTitle>
@@ -981,6 +1064,16 @@ export default function CaricoMerce() {
                       <p className="text-xs text-muted-foreground">
                         {row.prodottoCodice}
                       </p>
+                      {row.numeroDocumentoEsterno && (
+                        <p className="text-xs text-muted-foreground">
+                          {t("caricoPratiche.fseExternalDocument", {
+                            number: row.numeroDocumentoEsterno,
+                            date: row.dataDocumentoEsterna
+                              ? ` · ${row.dataDocumentoEsterna}`
+                              : "",
+                          })}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -994,6 +1087,7 @@ export default function CaricoMerce() {
                       inputMode="decimal"
                       step={row.quantitaFrazionabile ? "0.000001" : "1"}
                       value={draft.quantita}
+                      disabled={pending || !canEditManual}
                       onChange={(event) => {
                         setRowDrafts((current) => ({
                           ...current,
@@ -1005,6 +1099,7 @@ export default function CaricoMerce() {
                   <div className="space-y-1">
                     <Label>{t("caricoPratiche.fund")}</Label>
                     <Select
+                      disabled={pending || !canEditManual}
                       value={draft.fondoOrigine}
                       onValueChange={(value) => {
                         setRowDrafts((current) => ({
@@ -1025,6 +1120,12 @@ export default function CaricoMerce() {
                           {t("caricoPratiche.noFund")}
                         </SelectItem>
                         <SelectItem value="FSE_PLUS">FSE+</SelectItem>
+                        <SelectItem value="FONDO_NAZIONALE">
+                          {t("caricoPratiche.nationalFund")}
+                        </SelectItem>
+                        <SelectItem value="FONDO_NAZIONALE_COFINANZIATO">
+                          {t("caricoPratiche.cofinancedNationalFund")}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1036,6 +1137,7 @@ export default function CaricoMerce() {
                     <Input
                       aria-label={t("caricoPratiche.physicalLot")}
                       value={draft.codiceLottoProduttore}
+                      disabled={pending || !canEditManual}
                       onChange={(event) => {
                         setRowDrafts((current) => ({
                           ...current,
@@ -1056,6 +1158,7 @@ export default function CaricoMerce() {
                       aria-label={t("caricoPratiche.expiry")}
                       type="date"
                       value={draft.dataScadenza}
+                      disabled={pending || !canEditManual}
                       onChange={(event) => {
                         setRowDrafts((current) => ({
                           ...current,
@@ -1071,6 +1174,7 @@ export default function CaricoMerce() {
                     <Label>{t("caricoPratiche.notes")}</Label>
                     <Input
                       value={draft.note}
+                      disabled={pending || !canEditManual}
                       onChange={(event) => {
                         setRowDrafts((current) => ({
                           ...current,
@@ -1087,6 +1191,7 @@ export default function CaricoMerce() {
                       <Input
                         inputMode="decimal"
                         value={draft.fattoreKgLtPezzo}
+                        disabled={pending || !canEditManual}
                         onChange={(event) => {
                           setRowDrafts((current) => ({
                             ...current,
@@ -1102,14 +1207,14 @@ export default function CaricoMerce() {
                   <div className="flex items-end gap-2">
                     <Button
                       variant="outline"
-                      disabled={pending || !canEdit}
+                      disabled={pending || !canEditManual}
                       onClick={() => void saveRow(row)}
                     >
                       {t("caricoPratiche.saveDraft")}
                     </Button>
                     <Button
                       variant="ghost"
-                      disabled={pending || !canEdit}
+                      disabled={pending || !canRemoveRow}
                       onClick={() => void removeRow(row)}
                     >
                       {t("caricoPratiche.removeRow")}
@@ -1270,6 +1375,22 @@ export default function CaricoMerce() {
         </AlertDialogContent>
       </AlertDialog>
       <UnsavedChangesDialog guard={unsavedGuard} />
+
+      {practice && (
+        <FseImportPracticeWizard
+          open={fseImportOpen}
+          onOpenChange={setFseImportOpen}
+          practice={practice}
+          products={products}
+          onPracticeReady={(practiceId) => {
+            setSelectedId(practiceId);
+            void queryClient.invalidateQueries({
+              queryKey: ["/api/carico-pratiche"],
+            });
+            if (practiceId === practice.id) void detailQuery.refetch();
+          }}
+        />
+      )}
     </div>
   );
 }

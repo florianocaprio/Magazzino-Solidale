@@ -12,6 +12,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 import { utentiTable } from "./auth";
@@ -127,6 +128,7 @@ export const mappatureProdottiEsterniTable = pgTable(
   {
     id: serial("id").primaryKey(),
     fonte: varchar("fonte", { length: 40 }).notNull(),
+    sourceRegistryId: integer("source_registry_id"),
     codiceEsterno: varchar("codice_esterno", { length: 100 }),
     descrizioneEsterna: text("descrizione_esterna").notNull(),
     chiaveDescrizioneNormalizzata: text(
@@ -160,10 +162,12 @@ export const mappatureProdottiEsterniTable = pgTable(
       .defaultNow(),
   },
   (table) => [
-    unique("mappature_prodotti_esterni_fonte_descrizione_unique").on(
-      table.fonte,
-      table.chiaveDescrizioneNormalizzata,
-    ),
+    uniqueIndex("mappature_prodotti_esterni_legacy_descrizione_unique")
+      .on(table.fonte, table.chiaveDescrizioneNormalizzata)
+      .where(sql`${table.sourceRegistryId} is null`),
+    uniqueIndex("mappature_prodotti_esterni_sorgente_descrizione_unique")
+      .on(table.sourceRegistryId, table.chiaveDescrizioneNormalizzata)
+      .where(sql`${table.sourceRegistryId} is not null`),
     index("mappature_prodotti_esterni_prodotto_idx").on(table.prodottoId),
   ],
 );

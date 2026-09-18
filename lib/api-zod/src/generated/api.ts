@@ -504,7 +504,7 @@ export const createCaricoBodyRigheItemFattoreKgLtPezzoOneRegExp = new RegExp('^[
 export const CreateCaricoBody = zod.object({
   "magazzinoId": zod.number().min(1),
   "lottoLogicoId": zod.number().min(1).nullish(),
-  "origineCarico": zod.enum(['RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'ALTRO']).describe('Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.'),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
   "numeroDocumento": zod.string().nullish(),
   "dataDocumento": zod.coerce.date().nullish(),
   "dataCarico": zod.coerce.date(),
@@ -702,7 +702,8 @@ export const ListCaricoPraticheResponseItem = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "lottoLogicoId": zod.number(),
   "lottoLogicoDescrizione": zod.string().nullish(),
-  "origineCarico": zod.enum(['RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'ALTRO']).describe('Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.'),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
+  "tipoPratica": zod.enum(['ORDINARIA', 'SALDO_INIZIALE']),
   "dataCarico": zod.coerce.date(),
   "descrizione": zod.string(),
   "fornitoreId": zod.number().nullish(),
@@ -780,7 +781,8 @@ export const GetCaricoPraticaResponse = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "lottoLogicoId": zod.number(),
   "lottoLogicoDescrizione": zod.string().nullish(),
-  "origineCarico": zod.enum(['RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'ALTRO']).describe('Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.'),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
+  "tipoPratica": zod.enum(['ORDINARIA', 'SALDO_INIZIALE']),
   "dataCarico": zod.coerce.date(),
   "descrizione": zod.string(),
   "fornitoreId": zod.number().nullish(),
@@ -814,6 +816,9 @@ export const GetCaricoPraticaResponse = zod.object({
   "dataScadenza": zod.coerce.date().nullish(),
   "fattoreKgLtPezzo": zod.union([zod.string().regex(getCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
   "note": zod.string().nullish(),
+  "numeroDocumentoEsterno": zod.string().nullish(),
+  "dataDocumentoEsterna": zod.coerce.date().nullish(),
+  "dataOperativaFonte": zod.string().nullish(),
   "registrata": zod.boolean(),
   "registrataAt": zod.coerce.date().nullish(),
   "integrazioneId": zod.number().nullish(),
@@ -876,7 +881,8 @@ export const UpdateCaricoPraticaResponse = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "lottoLogicoId": zod.number(),
   "lottoLogicoDescrizione": zod.string().nullish(),
-  "origineCarico": zod.enum(['RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'ALTRO']).describe('Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.'),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
+  "tipoPratica": zod.enum(['ORDINARIA', 'SALDO_INIZIALE']),
   "dataCarico": zod.coerce.date(),
   "descrizione": zod.string(),
   "fornitoreId": zod.number().nullish(),
@@ -910,6 +916,9 @@ export const UpdateCaricoPraticaResponse = zod.object({
   "dataScadenza": zod.coerce.date().nullish(),
   "fattoreKgLtPezzo": zod.union([zod.string().regex(updateCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
   "note": zod.string().nullish(),
+  "numeroDocumentoEsterno": zod.string().nullish(),
+  "dataDocumentoEsterna": zod.coerce.date().nullish(),
+  "dataOperativaFonte": zod.string().nullish(),
   "registrata": zod.boolean(),
   "registrataAt": zod.coerce.date().nullish(),
   "integrazioneId": zod.number().nullish(),
@@ -1004,7 +1013,8 @@ export const UpdateCaricoPraticaRigaResponse = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "lottoLogicoId": zod.number(),
   "lottoLogicoDescrizione": zod.string().nullish(),
-  "origineCarico": zod.enum(['RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'ALTRO']).describe('Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.'),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
+  "tipoPratica": zod.enum(['ORDINARIA', 'SALDO_INIZIALE']),
   "dataCarico": zod.coerce.date(),
   "descrizione": zod.string(),
   "fornitoreId": zod.number().nullish(),
@@ -1038,6 +1048,9 @@ export const UpdateCaricoPraticaRigaResponse = zod.object({
   "dataScadenza": zod.coerce.date().nullish(),
   "fattoreKgLtPezzo": zod.union([zod.string().regex(updateCaricoPraticaRigaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
   "note": zod.string().nullish(),
+  "numeroDocumentoEsterno": zod.string().nullish(),
+  "dataDocumentoEsterna": zod.coerce.date().nullish(),
+  "dataOperativaFonte": zod.string().nullish(),
   "registrata": zod.boolean(),
   "registrataAt": zod.coerce.date().nullish(),
   "integrazioneId": zod.number().nullish(),
@@ -1085,7 +1098,8 @@ export const DeleteCaricoPraticaRigaResponse = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "lottoLogicoId": zod.number(),
   "lottoLogicoDescrizione": zod.string().nullish(),
-  "origineCarico": zod.enum(['RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'ALTRO']).describe('Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.'),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
+  "tipoPratica": zod.enum(['ORDINARIA', 'SALDO_INIZIALE']),
   "dataCarico": zod.coerce.date(),
   "descrizione": zod.string(),
   "fornitoreId": zod.number().nullish(),
@@ -1119,6 +1133,9 @@ export const DeleteCaricoPraticaRigaResponse = zod.object({
   "dataScadenza": zod.coerce.date().nullish(),
   "fattoreKgLtPezzo": zod.union([zod.string().regex(deleteCaricoPraticaRigaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
   "note": zod.string().nullish(),
+  "numeroDocumentoEsterno": zod.string().nullish(),
+  "dataDocumentoEsterna": zod.coerce.date().nullish(),
+  "dataOperativaFonte": zod.string().nullish(),
   "registrata": zod.boolean(),
   "registrataAt": zod.coerce.date().nullish(),
   "integrazioneId": zod.number().nullish(),
@@ -1236,7 +1253,8 @@ export const CloseCaricoPraticaResponse = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "lottoLogicoId": zod.number(),
   "lottoLogicoDescrizione": zod.string().nullish(),
-  "origineCarico": zod.enum(['RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'ALTRO']).describe('Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.'),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
+  "tipoPratica": zod.enum(['ORDINARIA', 'SALDO_INIZIALE']),
   "dataCarico": zod.coerce.date(),
   "descrizione": zod.string(),
   "fornitoreId": zod.number().nullish(),
@@ -1270,6 +1288,9 @@ export const CloseCaricoPraticaResponse = zod.object({
   "dataScadenza": zod.coerce.date().nullish(),
   "fattoreKgLtPezzo": zod.union([zod.string().regex(closeCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
   "note": zod.string().nullish(),
+  "numeroDocumentoEsterno": zod.string().nullish(),
+  "dataDocumentoEsterna": zod.coerce.date().nullish(),
+  "dataOperativaFonte": zod.string().nullish(),
   "registrata": zod.boolean(),
   "registrataAt": zod.coerce.date().nullish(),
   "integrazioneId": zod.number().nullish(),
@@ -1318,7 +1339,8 @@ export const ReopenCaricoPraticaResponse = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "lottoLogicoId": zod.number(),
   "lottoLogicoDescrizione": zod.string().nullish(),
-  "origineCarico": zod.enum(['RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'ALTRO']).describe('Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.'),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
+  "tipoPratica": zod.enum(['ORDINARIA', 'SALDO_INIZIALE']),
   "dataCarico": zod.coerce.date(),
   "descrizione": zod.string(),
   "fornitoreId": zod.number().nullish(),
@@ -1352,6 +1374,9 @@ export const ReopenCaricoPraticaResponse = zod.object({
   "dataScadenza": zod.coerce.date().nullish(),
   "fattoreKgLtPezzo": zod.union([zod.string().regex(reopenCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
   "note": zod.string().nullish(),
+  "numeroDocumentoEsterno": zod.string().nullish(),
+  "dataDocumentoEsterna": zod.coerce.date().nullish(),
+  "dataOperativaFonte": zod.string().nullish(),
   "registrata": zod.boolean(),
   "registrataAt": zod.coerce.date().nullish(),
   "integrazioneId": zod.number().nullish(),
@@ -1400,7 +1425,8 @@ export const CancelCaricoPraticaResponse = zod.object({
   "magazzinoNome": zod.string().nullish(),
   "lottoLogicoId": zod.number(),
   "lottoLogicoDescrizione": zod.string().nullish(),
-  "origineCarico": zod.enum(['RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'ALTRO']).describe('Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.'),
+  "origineCarico": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']),
+  "tipoPratica": zod.enum(['ORDINARIA', 'SALDO_INIZIALE']),
   "dataCarico": zod.coerce.date(),
   "descrizione": zod.string(),
   "fornitoreId": zod.number().nullish(),
@@ -1434,6 +1460,9 @@ export const CancelCaricoPraticaResponse = zod.object({
   "dataScadenza": zod.coerce.date().nullish(),
   "fattoreKgLtPezzo": zod.union([zod.string().regex(cancelCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
   "note": zod.string().nullish(),
+  "numeroDocumentoEsterno": zod.string().nullish(),
+  "dataDocumentoEsterna": zod.coerce.date().nullish(),
+  "dataOperativaFonte": zod.string().nullish(),
   "registrata": zod.boolean(),
   "registrataAt": zod.coerce.date().nullish(),
   "integrazioneId": zod.number().nullish(),
@@ -1449,6 +1478,344 @@ export const CancelCaricoPraticaResponse = zod.object({
   "dataRegistrazione": zod.coerce.date()
 }))
 }))
+
+
+export const ListFseImportSourcesResponseItem = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "descrizione": zod.string(),
+  "areaOperativaId": zod.number(),
+  "attiva": zod.union([zod.literal(0),zod.literal(1)]),
+  "creatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date()
+})
+export const ListFseImportSourcesResponse = zod.array(ListFseImportSourcesResponseItem)
+
+
+export const createFseImportSourceBodyCodiceMax = 80;
+
+export const createFseImportSourceBodyDescrizioneMax = 500;
+
+
+
+
+export const CreateFseImportSourceBody = zod.object({
+  "codice": zod.string().min(1).max(createFseImportSourceBodyCodiceMax),
+  "descrizione": zod.string().min(1).max(createFseImportSourceBodyDescrizioneMax),
+  "areaOperativaId": zod.number().min(1)
+})
+
+
+
+
+
+
+
+
+export const analyzeFsePracticeImportQueryNomeFileMax = 255;
+
+export const analyzeFsePracticeImportQuerySheetNameMax = 100;
+
+
+
+export const AnalyzeFsePracticeImportQueryParams = zod.object({
+  "sourceRegistryId": zod.coerce.number().min(1),
+  "areaOperativaId": zod.coerce.number().min(1),
+  "magazzinoId": zod.coerce.number().min(1),
+  "lottoLogicoId": zod.coerce.number().min(1),
+  "caricoPraticaId": zod.coerce.number().min(1).optional(),
+  "sessionId": zod.coerce.number().min(1).optional(),
+  "modalita": zod.enum(['NUOVI_CARICHI', 'SALDO_INIZIALE']),
+  "profilo": zod.enum(['REGISTRO', 'GIACENZE']),
+  "nomeFile": zod.coerce.string().max(analyzeFsePracticeImportQueryNomeFileMax),
+  "sheetName": zod.coerce.string().max(analyzeFsePracticeImportQuerySheetNameMax).optional(),
+  "dataRiferimento": zod.date().optional()
+})
+
+export const analyzeFsePracticeImportResponseSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const AnalyzeFsePracticeImportResponse = zod.object({
+  "sessionId": zod.number(),
+  "fileId": zod.number(),
+  "replay": zod.boolean(),
+  "versione": zod.number().optional(),
+  "stato": zod.enum(['IN_ANALISI', 'DA_COMPLETARE', 'PRONTA', 'IN_PRATICA', 'REGISTRATA', 'ANNULLATA']).optional(),
+  "formato": zod.enum(['XLSX', 'XLS', 'CSV']).optional(),
+  "sha256File": zod.string().regex(analyzeFsePracticeImportResponseSha256FileRegExp).optional()
+})
+
+
+
+
+
+export const ListFseImportSessionsQueryParams = zod.object({
+  "magazzinoId": zod.coerce.number().min(1)
+})
+
+export const ListFseImportSessionsResponseItem = zod.object({
+  "id": zod.number(),
+  "sourceRegistryId": zod.number(),
+  "areaOperativaId": zod.number(),
+  "magazzinoId": zod.number(),
+  "lottoLogicoId": zod.number(),
+  "caricoPraticaId": zod.number().nullish(),
+  "modalita": zod.enum(['NUOVI_CARICHI', 'SALDO_INIZIALE']),
+  "stato": zod.enum(['IN_ANALISI', 'DA_COMPLETARE', 'PRONTA', 'IN_PRATICA', 'REGISTRATA', 'ANNULLATA']),
+  "versione": zod.number(),
+  "dataRiferimentoSaldo": zod.coerce.date().nullish(),
+  "coperturaConfermata": zod.union([zod.literal(0),zod.literal(1)]),
+  "creatoDa": zod.number(),
+  "aggiornatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})
+export const ListFseImportSessionsResponse = zod.array(ListFseImportSessionsResponseItem)
+
+
+
+
+
+export const GetFseImportSessionParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const getFseImportSessionResponseTwoFilesItemSha256FileRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getFseImportSessionResponseTwoRowsItemQuantitaPezziOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getFseImportSessionResponseTwoRowsItemQuantitaKgLtOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getFseImportSessionResponseTwoRowsItemQuantitaOperativaOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getFseImportSessionResponseTwoRowsItemFattoreKgLtPezzoOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+export const getFseImportSessionResponseTwoStockRowsItemGiacenzaPezziOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getFseImportSessionResponseTwoStockRowsItemGiacenzaPesoVolumeOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getFseImportSessionResponseTwoStockRowsItemPesoUnitaOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+export const getFseImportSessionResponseTwoStockRowsItemQuantitaOperativaOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getFseImportSessionResponseTwoSummaryStockPiecesRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const GetFseImportSessionResponse = zod.object({
+  "id": zod.number(),
+  "sourceRegistryId": zod.number(),
+  "areaOperativaId": zod.number(),
+  "magazzinoId": zod.number(),
+  "lottoLogicoId": zod.number(),
+  "caricoPraticaId": zod.number().nullish(),
+  "modalita": zod.enum(['NUOVI_CARICHI', 'SALDO_INIZIALE']),
+  "stato": zod.enum(['IN_ANALISI', 'DA_COMPLETARE', 'PRONTA', 'IN_PRATICA', 'REGISTRATA', 'ANNULLATA']),
+  "versione": zod.number(),
+  "dataRiferimentoSaldo": zod.coerce.date().nullish(),
+  "coperturaConfermata": zod.union([zod.literal(0),zod.literal(1)]),
+  "creatoDa": zod.number(),
+  "aggiornatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+}).and(zod.object({
+  "files": zod.array(zod.object({
+  "id": zod.number(),
+  "sessioneId": zod.number(),
+  "profilo": zod.enum(['REGISTRO', 'GIACENZE']),
+  "nomeFile": zod.string(),
+  "formato": zod.enum(['XLSX', 'XLS', 'CSV']),
+  "mimeTypeDichiarato": zod.string().nullish(),
+  "dimensioneBytes": zod.number(),
+  "sha256File": zod.string().regex(getFseImportSessionResponseTwoFilesItemSha256FileRegExp),
+  "tracciatoCodice": zod.string(),
+  "parserVersion": zod.string(),
+  "sheetName": zod.string(),
+  "dataRiferimento": zod.coerce.date().nullish(),
+  "warningsJson": zod.array(zod.string()),
+  "acquisitoDa": zod.number(),
+  "dataAcquisizione": zod.coerce.date()
+})),
+  "rows": zod.array(zod.object({
+  "id": zod.number(),
+  "numeroRiga": zod.number(),
+  "tipoMovimento": zod.string(),
+  "fondoOrigine": zod.string().nullish(),
+  "prodottoEsterno": zod.string(),
+  "lottoFisico": zod.string().nullish(),
+  "numeroDocumento": zod.string().nullish(),
+  "dataDocumento": zod.coerce.date().nullish(),
+  "dataOperativaProposta": zod.coerce.date().nullish(),
+  "dataOperativaFonte": zod.string().nullish(),
+  "quantitaPezzi": zod.union([zod.string().regex(getFseImportSessionResponseTwoRowsItemQuantitaPezziOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "quantitaKgLt": zod.union([zod.string().regex(getFseImportSessionResponseTwoRowsItemQuantitaKgLtOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "prodottoId": zod.number().nullish(),
+  "prodotto": zod.union([zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "unitaMisura": zod.string()
+}),zod.null()]).optional(),
+  "quantitaOperativa": zod.union([zod.string().regex(getFseImportSessionResponseTwoRowsItemQuantitaOperativaOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "fattoreKgLtPezzo": zod.union([zod.string().regex(getFseImportSessionResponseTwoRowsItemFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
+  "disambiguatore": zod.string().optional(),
+  "stato": zod.string(),
+  "errorCodes": zod.array(zod.string()),
+  "warningCodes": zod.array(zod.string())
+})),
+  "stockRows": zod.array(zod.object({
+  "id": zod.number(),
+  "numeroRiga": zod.number(),
+  "fondoOrigine": zod.string().nullish(),
+  "prodottoEsterno": zod.string(),
+  "lottoFisico": zod.string().nullish(),
+  "giacenzaPezzi": zod.union([zod.string().regex(getFseImportSessionResponseTwoStockRowsItemGiacenzaPezziOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "giacenzaPesoVolume": zod.union([zod.string().regex(getFseImportSessionResponseTwoStockRowsItemGiacenzaPesoVolumeOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "pesoUnita": zod.union([zod.string().regex(getFseImportSessionResponseTwoStockRowsItemPesoUnitaOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "prodottoId": zod.number().nullish(),
+  "prodotto": zod.union([zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "nome": zod.string(),
+  "unitaMisura": zod.string()
+}),zod.null()]).optional(),
+  "quantitaOperativa": zod.union([zod.string().regex(getFseImportSessionResponseTwoStockRowsItemQuantitaOperativaOneRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),zod.null()]).optional(),
+  "stato": zod.string(),
+  "errorCodes": zod.array(zod.string()),
+  "warningCodes": zod.array(zod.string())
+})),
+  "summary": zod.object({
+  "total": zod.number(),
+  "ready": zod.number(),
+  "needsMapping": zod.number(),
+  "needsReview": zod.number(),
+  "errors": zod.number(),
+  "known": zod.number(),
+  "referenceOnly": zod.number(),
+  "stockRows": zod.number(),
+  "stockPieces": zod.string().regex(getFseImportSessionResponseTwoSummaryStockPiecesRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
+})
+}))
+
+
+
+
+
+export const MapFseImportProductParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+export const mapFseImportProductBodyDescrizioneEsternaMax = 4000;
+
+
+export const mapFseImportProductBodyMotivoMax = 1000;
+
+export const mapFseImportProductBodyAccettaFallbackDataDefault = false;
+
+export const MapFseImportProductBody = zod.object({
+  "versione": zod.number().min(1),
+  "descrizioneEsterna": zod.string().min(1).max(mapFseImportProductBodyDescrizioneEsternaMax),
+  "prodottoId": zod.number().min(1),
+  "motivo": zod.string().min(1).max(mapFseImportProductBodyMotivoMax),
+  "accettaFallbackData": zod.boolean().default(mapFseImportProductBodyAccettaFallbackDataDefault)
+})
+
+export const MapFseImportProductResponse = zod.object({
+  "id": zod.number(),
+  "sourceRegistryId": zod.number(),
+  "areaOperativaId": zod.number(),
+  "magazzinoId": zod.number(),
+  "lottoLogicoId": zod.number(),
+  "caricoPraticaId": zod.number().nullish(),
+  "modalita": zod.enum(['NUOVI_CARICHI', 'SALDO_INIZIALE']),
+  "stato": zod.enum(['IN_ANALISI', 'DA_COMPLETARE', 'PRONTA', 'IN_PRATICA', 'REGISTRATA', 'ANNULLATA']),
+  "versione": zod.number(),
+  "dataRiferimentoSaldo": zod.coerce.date().nullish(),
+  "coperturaConfermata": zod.union([zod.literal(0),zod.literal(1)]),
+  "creatoDa": zod.number(),
+  "aggiornatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})
+
+
+
+
+
+
+export const ReviseFseImportRowParams = zod.object({
+  "id": zod.coerce.number().min(1),
+  "rigaId": zod.coerce.number().min(1)
+})
+
+
+export const reviseFseImportRowBodyQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const reviseFseImportRowBodyNumeroDocumentoMax = 100;
+
+export const reviseFseImportRowBodyLottoFisicoMax = 80;
+
+export const reviseFseImportRowBodyFattoreKgLtPezzoOneRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,9})?$');
+export const reviseFseImportRowBodyDisambiguatoreMax = 80;
+
+export const reviseFseImportRowBodyAccettaFallbackDataDefault = false;
+export const reviseFseImportRowBodyMotivoMax = 1000;
+
+
+
+export const ReviseFseImportRowBody = zod.object({
+  "versione": zod.number().min(1),
+  "quantita": zod.string().regex(reviseFseImportRowBodyQuantitaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "numeroDocumento": zod.string().max(reviseFseImportRowBodyNumeroDocumentoMax).nullish(),
+  "dataDocumento": zod.coerce.date().nullish(),
+  "dataOperativa": zod.coerce.date().nullish(),
+  "lottoFisico": zod.string().max(reviseFseImportRowBodyLottoFisicoMax).nullish(),
+  "dataScadenza": zod.coerce.date().nullish(),
+  "fattoreKgLtPezzo": zod.union([zod.string().regex(reviseFseImportRowBodyFattoreKgLtPezzoOneRegExp).describe('Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.'),zod.null()]).optional(),
+  "disambiguatore": zod.string().max(reviseFseImportRowBodyDisambiguatoreMax).nullish(),
+  "accettaFallbackData": zod.boolean().default(reviseFseImportRowBodyAccettaFallbackDataDefault),
+  "motivo": zod.string().min(1).max(reviseFseImportRowBodyMotivoMax)
+})
+
+export const ReviseFseImportRowResponse = zod.object({
+  "id": zod.number(),
+  "sourceRegistryId": zod.number(),
+  "areaOperativaId": zod.number(),
+  "magazzinoId": zod.number(),
+  "lottoLogicoId": zod.number(),
+  "caricoPraticaId": zod.number().nullish(),
+  "modalita": zod.enum(['NUOVI_CARICHI', 'SALDO_INIZIALE']),
+  "stato": zod.enum(['IN_ANALISI', 'DA_COMPLETARE', 'PRONTA', 'IN_PRATICA', 'REGISTRATA', 'ANNULLATA']),
+  "versione": zod.number(),
+  "dataRiferimentoSaldo": zod.coerce.date().nullish(),
+  "coperturaConfermata": zod.union([zod.literal(0),zod.literal(1)]),
+  "creatoDa": zod.number(),
+  "aggiornatoDa": zod.number(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})
+
+
+
+
+
+export const AddFseImportToPracticeParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+
+
+export const addFseImportToPracticeBodyIdempotencyKeyMax = 100;
+
+export const addFseImportToPracticeBodyConfermaCoperturaStoricaDefault = false;
+
+export const AddFseImportToPracticeBody = zod.object({
+  "versione": zod.number().min(1),
+  "versionePratica": zod.number().min(1).optional(),
+  "rigaIds": zod.array(zod.number().min(1)).optional(),
+  "idempotencyKey": zod.string().min(1).max(addFseImportToPracticeBodyIdempotencyKeyMax),
+  "confermaCoperturaStorica": zod.boolean().default(addFseImportToPracticeBodyConfermaCoperturaStoricaDefault).describe('Conferma amministrativa richiesta esclusivamente per predisporre un saldo iniziale.')
+})
+
+export const AddFseImportToPracticeResponse = zod.object({
+  "practiceId": zod.number(),
+  "practiceVersion": zod.number().optional(),
+  "addedRows": zod.number().optional(),
+  "replay": zod.boolean()
+})
 
 
 /**

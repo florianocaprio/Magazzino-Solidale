@@ -14,6 +14,10 @@ import {
   carichiMagazzinoTable,
   db,
   fornitoriTable,
+  fseImportRowsTable,
+  fseImportSessionsTable,
+  fseInitialBalanceCoverageTable,
+  fseMovementClaimsTable,
   lottiLogiciTable,
   lottiTable,
   magazziniTable,
@@ -63,6 +67,7 @@ import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 import type { InventoryTransaction } from "../lib/scaricoInventory";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
+import { releaseFseClaimForPracticeRow } from "../lib/fsePracticeImportService";
 
 const router: IRouter = Router();
 router.use("/carico-pratiche", requireModulo("LOTTI"));
@@ -157,7 +162,31 @@ function errorResponse(error: unknown, res: Response) {
     res.status(error.status).json({ error: error.message });
     return true;
   }
-  const pg = error as { code?: string; constraint?: string };
+  let current: unknown = error;
+  let pg: { code?: string; constraint?: string } | undefined;
+  for (let depth = 0; current != null && depth < 5; depth += 1) {
+    if (typeof current !== "object") break;
+    const candidate = current as {
+      code?: string;
+      constraint?: string;
+      cause?: unknown;
+    };
+    if (candidate.code) {
+      pg = candidate;
+      break;
+    }
+    current = candidate.cause;
+  }
+  if (
+    pg?.code === "23514" &&
+    pg.constraint === "movimenti_fse_initial_balance_proposal_guard"
+  ) {
+    res.status(409).json({
+      error: "Il Magazzino ha una proposta di saldo iniziale in corso",
+      code: "SALDO_INIZIALE_IN_CORSO",
+    });
+    return true;
+  }
   if (pg?.code === "23505") {
     res.status(409).json({
       error:
@@ -342,6 +371,18 @@ function requireWorkingState(practice: CaricoPratica) {
       `La pratica in stato ${practice.stato} non è modificabile`,
     );
   }
+}
+
+function requireManualPracticeEdit(practice: CaricoPratica) {
+  if (
+    practice.tipoPratica === "SALDO_INIZIALE" ||
+    practice.origineCarico === "AGEA_SIFEAD" ||
+    practice.origineCarico === "SALDO_INIZIALE"
+  )
+    throw new CaricoPraticaError(
+      409,
+      "Le righe e la testata di una pratica FSE+ si correggono dalla procedura di import",
+    );
 }
 
 async function detail(id: number) {
@@ -676,6 +717,7 @@ router.patch(
         const practice = await lockedPractice(tx, id);
         requireVersion(practice, version(body.versione));
         requireWorkingState(practice);
+        requireManualPracticeEdit(practice);
         let values: Partial<typeof caricoPraticheTable.$inferInsert>;
         if (practice.stato === "aperta") {
           const forbidden = [
@@ -753,6 +795,7 @@ router.post(
         const practice = await lockedPractice(tx, id);
         requireVersion(practice, version(req.body?.versione));
         requireWorkingState(practice);
+        requireManualPracticeEdit(practice);
         const row = await normalizeDraftLine(tx, req.body ?? {});
         const [created] = await tx
           .insert(caricoPraticaRigheTable)
@@ -813,6 +856,7 @@ router.patch(
         const practice = await lockedPractice(tx, id);
         requireVersion(practice, version(req.body?.versione));
         requireWorkingState(practice);
+        requireManualPracticeEdit(practice);
         const [existing] = await tx
           .select()
           .from(caricoPraticaRigheTable)
@@ -885,6 +929,11 @@ router.delete(
         const practice = await lockedPractice(tx, id);
         requireVersion(practice, version(req.body?.versione));
         requireWorkingState(practice);
+        if (practice.tipoPratica === "SALDO_INIZIALE")
+          throw new CaricoPraticaError(
+            409,
+            "Le righe del saldo iniziale sono atomiche e non possono essere rimosse singolarmente",
+          );
         const [existing] = await tx
           .select()
           .from(caricoPraticaRigheTable)
@@ -901,6 +950,10 @@ router.delete(
           );
         if (existing.registrataAt)
           throw new CaricoPraticaError(409, "Una riga registrata è immutabile");
+        await releaseFseClaimForPracticeRow(tx, existing.id, {
+          actorId: req.user!.id,
+          audit: command,
+        });
         await tx
           .delete(caricoPraticaRigheTable)
           .where(eq(caricoPraticaRigheTable.id, rowId));
@@ -939,6 +992,16 @@ router.post(
       const current = await detail(id);
       if (!current) throw new CaricoPraticaError(404, "Pratica non trovata");
       await assertAccess(req, current);
+      if (
+        current.tipoPratica === "SALDO_INIZIALE" &&
+        !req.user!.isAdmin &&
+        !req.user!.isSuperAdmin &&
+        !req.user!.permessi.includes("magazzino.agea.bootstrap")
+      )
+        throw new CaricoPraticaError(
+          403,
+          "Permesso amministrativo richiesto per registrare il saldo iniziale",
+        );
       const key = requiredText(req.body?.idempotencyKey, "idempotencyKey", 100);
       if (!Array.isArray(req.body?.rigaIds) || req.body.rigaIds.length === 0)
         throw new CaricoPraticaError(400, "Seleziona almeno una riga completa");
@@ -976,6 +1039,16 @@ router.post(
             );
           return { ...replay.resultSnapshot, replay: true };
         }
+        const [coverageForLock] = await tx
+          .select({
+            sourceRegistryId: fseInitialBalanceCoverageTable.sourceRegistryId,
+          })
+          .from(fseInitialBalanceCoverageTable)
+          .where(eq(fseInitialBalanceCoverageTable.caricoPraticaId, id));
+        if (coverageForLock)
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-source:${coverageForLock.sourceRegistryId}`}, 0))`,
+          );
         const practice = await lockedPractice(tx, id);
         requireVersion(practice, requestedVersion);
         requireWorkingState(practice);
@@ -1003,6 +1076,62 @@ router.post(
             409,
             "Una o più righe sono già registrate",
           );
+        if (practice.origineCarico === "AGEA_SIFEAD") {
+          const reservedClaims = await tx
+            .select({ rowId: fseMovementClaimsTable.caricoPraticaRigaId })
+            .from(fseMovementClaimsTable)
+            .where(
+              and(
+                inArray(fseMovementClaimsTable.caricoPraticaRigaId, ids),
+                eq(fseMovementClaimsTable.stato, "RISERVATA"),
+              ),
+            );
+          if (
+            reservedClaims.length !== ids.length ||
+            reservedClaims.some((claim) => claim.rowId == null)
+          )
+            throw new CaricoPraticaError(
+              409,
+              "Ogni riga FSE+ deve avere una presa in carico esterna valida",
+            );
+        }
+        const pendingPracticeRows = await tx
+          .select({ id: caricoPraticaRigheTable.id })
+          .from(caricoPraticaRigheTable)
+          .where(
+            and(
+              eq(caricoPraticaRigheTable.caricoPraticaId, id),
+              sql`${caricoPraticaRigheTable.registrataAt} is null`,
+            ),
+          );
+        const [initialCoverage] = await tx
+          .select()
+          .from(fseInitialBalanceCoverageTable)
+          .where(eq(fseInitialBalanceCoverageTable.caricoPraticaId, id));
+        if (practice.tipoPratica === "SALDO_INIZIALE") {
+          if (!initialCoverage || initialCoverage.stato !== "PROPOSTA")
+            throw new CaricoPraticaError(
+              409,
+              "Copertura del saldo iniziale non disponibile",
+            );
+          if (
+            pendingPracticeRows.length !== ids.length ||
+            pendingPracticeRows.some((row) => !ids.includes(row.id))
+          )
+            throw new CaricoPraticaError(
+              409,
+              "Il saldo iniziale deve essere registrato integralmente",
+            );
+          const [inventoryHistory] = await tx
+            .select({ count: sql<number>`count(*)::int` })
+            .from(movimentiTable)
+            .where(eq(movimentiTable.magazzinoId, practice.magazzinoId));
+          if ((inventoryHistory?.count ?? 0) > 0)
+            throw new CaricoPraticaError(
+              409,
+              "Il Magazzino ha acquisito storia inventariale dopo la preparazione del saldo",
+            );
+        }
         const loadLines: WarehouseLoadLineInput[] = selected.map(({ riga }) => {
           if (riga.quantita == null)
             throw new CaricoPraticaError(
@@ -1016,6 +1145,14 @@ router.post(
             codiceLotto: riga.codiceLottoProduttore,
             dataScadenza: riga.dataScadenza,
             fattoreKgLtPezzo: riga.fattoreKgLtPezzo,
+            descrizioneEsterna: riga.note,
+            riferimentoEsterno:
+              riga.numeroDocumentoEsterno == null
+                ? null
+                : `FSE:${riga.numeroDocumentoEsterno}:${riga.dataDocumentoEsterna ?? ""}`.slice(
+                    0,
+                    160,
+                  ),
             note: riga.note,
           };
         });
@@ -1030,7 +1167,11 @@ router.post(
           fornitoreId: practice.fornitoreId,
           note: practice.note,
           idempotencyKey: `m3a:${key}`,
-          executionContext: "manual",
+          executionContext:
+            practice.origineCarico === "AGEA_SIFEAD" ||
+            practice.origineCarico === "SALDO_INIZIALE"
+              ? "system"
+              : "manual",
           creatoDa: req.user!.id,
           audit: command,
           righe: loadLines,
@@ -1079,6 +1220,74 @@ router.post(
                 sql`${caricoPraticaRigheTable.registrataAt} is null`,
               ),
             );
+          await tx
+            .update(fseMovementClaimsTable)
+            .set({
+              stato: "REGISTRATA",
+              caricoMagazzinoRigaId: registered.riga.id,
+              dataAggiornamento: now,
+            })
+            .where(
+              and(
+                eq(fseMovementClaimsTable.caricoPraticaRigaId, work.riga.id),
+                eq(fseMovementClaimsTable.stato, "RISERVATA"),
+              ),
+            );
+        }
+        if (initialCoverage) {
+          await tx
+            .update(fseInitialBalanceCoverageTable)
+            .set({
+              stato: "ATTIVA",
+              attivataDa: req.user!.id,
+              dataAttivazione: now,
+            })
+            .where(eq(fseInitialBalanceCoverageTable.id, initialCoverage.id));
+          await tx
+            .update(fseMovementClaimsTable)
+            .set({ stato: "COPERTA_SALDO", dataAggiornamento: now })
+            .where(
+              and(
+                eq(
+                  fseMovementClaimsTable.sourceRegistryId,
+                  initialCoverage.sourceRegistryId,
+                ),
+                eq(fseMovementClaimsTable.stato, "RISERVATA"),
+              ),
+            );
+          await tx
+            .update(fseImportRowsTable)
+            .set({ stato: "COPERTO_SALDO", dataAggiornamento: now })
+            .where(
+              inArray(
+                fseImportRowsTable.id,
+                tx
+                  .select({ id: fseImportRowsTable.id })
+                  .from(fseImportRowsTable)
+                  .innerJoin(
+                    fseImportSessionsTable,
+                    eq(
+                      fseImportRowsTable.sessioneId,
+                      fseImportSessionsTable.id,
+                    ),
+                  )
+                  .where(
+                    eq(
+                      fseImportSessionsTable.sourceRegistryId,
+                      initialCoverage.sourceRegistryId,
+                    ),
+                  ),
+              ),
+            );
+          await tx
+            .update(fseImportSessionsTable)
+            .set({
+              stato: "REGISTRATA",
+              coperturaConfermata: 1,
+              aggiornatoDa: req.user!.id,
+              dataAggiornamento: now,
+            })
+            .where(eq(fseImportSessionsTable.id, initialCoverage.sessioneId));
         }
         const [changed] = await tx
           .update(caricoPraticheTable)
@@ -1429,6 +1638,81 @@ for (const action of ["chiudi", "riapri", "annulla"] as const) {
               409,
               "Solo una bozza senza effetti inventariali può essere annullata",
             );
+          }
+          if (action === "annulla") {
+            const pendingRows = await tx
+              .select({ id: caricoPraticaRigheTable.id })
+              .from(caricoPraticaRigheTable)
+              .where(
+                and(
+                  eq(caricoPraticaRigheTable.caricoPraticaId, id),
+                  sql`${caricoPraticaRigheTable.registrataAt} is null`,
+                ),
+              );
+            for (const row of pendingRows)
+              await releaseFseClaimForPracticeRow(tx, row.id, {
+                actorId: req.user!.id,
+                audit: command,
+              });
+            const [coverage] = await tx
+              .select()
+              .from(fseInitialBalanceCoverageTable)
+              .where(
+                and(
+                  eq(fseInitialBalanceCoverageTable.caricoPraticaId, id),
+                  eq(fseInitialBalanceCoverageTable.stato, "PROPOSTA"),
+                ),
+              );
+            if (coverage) {
+              await tx
+                .update(fseInitialBalanceCoverageTable)
+                .set({ stato: "ANNULLATA" })
+                .where(eq(fseInitialBalanceCoverageTable.id, coverage.id));
+              await tx
+                .update(fseMovementClaimsTable)
+                .set({ stato: "RILASCIATA", dataAggiornamento: new Date() })
+                .where(
+                  and(
+                    eq(
+                      fseMovementClaimsTable.sourceRegistryId,
+                      coverage.sourceRegistryId,
+                    ),
+                    eq(fseMovementClaimsTable.stato, "RISERVATA"),
+                  ),
+                );
+              await tx
+                .update(fseImportSessionsTable)
+                .set({
+                  stato: "ANNULLATA",
+                  aggiornatoDa: req.user!.id,
+                  dataAggiornamento: new Date(),
+                })
+                .where(eq(fseImportSessionsTable.id, coverage.sessioneId));
+              await recordAuditEvent(tx, {
+                command,
+                azione: "FSE_SALDO_PROPOSTA_ANNULLATA",
+                entitaTipo: "fse_initial_balance_coverage",
+                entitaId: coverage.id,
+                documentoTipo: "carico_pratica",
+                documentoId: id,
+                areaOperativaIdSnapshot: practice.areaOperativaId,
+                magazzinoIdSnapshot: practice.magazzinoId,
+                motivo: motivo!,
+              });
+            }
+            await tx
+              .update(fseImportSessionsTable)
+              .set({
+                stato: "ANNULLATA",
+                aggiornatoDa: req.user!.id,
+                dataAggiornamento: new Date(),
+              })
+              .where(
+                and(
+                  eq(fseImportSessionsTable.caricoPraticaId, id),
+                  sql`${fseImportSessionsTable.stato} <> 'REGISTRATA'`,
+                ),
+              );
           }
           const [changed] = await tx
             .update(caricoPraticheTable)

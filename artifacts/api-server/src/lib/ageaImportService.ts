@@ -33,6 +33,10 @@ import {
   parseAgeaWorkbook,
   type ParsedAgeaRow,
 } from "./ageaSifeadParser";
+import {
+  blockLegacyAgeaWriter,
+  FsePracticeImportError,
+} from "./fsePracticeImportService";
 
 export class AgeaImportError extends Error {
   constructor(
@@ -1286,6 +1290,13 @@ export async function confirmAgeaImport(
       "Mapping, date, lotti o saldi richiedono ancora intervento",
     );
   const fresh = importRow;
+  try {
+    await blockLegacyAgeaWriter(tx, fresh.magazzinoId);
+  } catch (error) {
+    if (error instanceof FsePracticeImportError)
+      throw new AgeaImportError(error.status, error.code, error.message);
+    throw error;
+  }
   await tx.execute(
     sql`SELECT pg_advisory_xact_lock(hashtextextended(${`agea-warehouse:${fresh.magazzinoId}`}, 0))`,
   );

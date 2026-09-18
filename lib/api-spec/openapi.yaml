@@ -722,6 +722,219 @@ paths:
                 $ref: "#/components/schemas/CaricoPraticaDettaglio"
 
   # ─── IMPORT AGEA/SIFEAD 2.0B ────────────────────────────────────────────────
+  /fse-importazioni/sorgenti:
+    get:
+      operationId: listFseImportSources
+      tags: [fse-importazioni]
+      responses:
+        "200":
+          description: Sorgenti esterne accessibili
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FseImportSource"
+    post:
+      operationId: createFseImportSource
+      tags: [fse-importazioni]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FseImportSourceInput"
+      responses:
+        "201":
+          description: Sorgente creata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportSource"
+
+  /fse-importazioni/analizza:
+    post:
+      operationId: analyzeFsePracticeImport
+      tags: [fse-importazioni]
+      parameters:
+        - in: query
+          name: sourceRegistryId
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: areaOperativaId
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: magazzinoId
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: lottoLogicoId
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: caricoPraticaId
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: sessionId
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: modalita
+          required: true
+          schema:
+            $ref: "#/components/schemas/FseImportMode"
+        - in: query
+          name: profilo
+          required: true
+          schema:
+            $ref: "#/components/schemas/FseImportFileProfile"
+        - in: query
+          name: nomeFile
+          required: true
+          schema: { type: string, maxLength: 255 }
+        - in: query
+          name: sheetName
+          schema: { type: string, maxLength: 100 }
+        - in: query
+          name: dataRiferimento
+          schema: { type: string, format: date }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Replay dello stesso file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportAcquireResult"
+        "201":
+          description: File acquisito e analizzato senza effetti inventariali
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportAcquireResult"
+
+  /fse-importazioni/sessioni:
+    get:
+      operationId: listFseImportSessions
+      tags: [fse-importazioni]
+      parameters:
+        - in: query
+          name: magazzinoId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Procedure persistenti e riprendibili
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FseImportSession"
+
+  /fse-importazioni/sessioni/{id}:
+    get:
+      operationId: getFseImportSession
+      tags: [fse-importazioni]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Dettaglio della procedura senza campi riservati del file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportSessionDetail"
+
+  /fse-importazioni/sessioni/{id}/associa-prodotto:
+    post:
+      operationId: mapFseImportProduct
+      tags: [fse-importazioni]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FseImportProductMappingInput"
+      responses:
+        "200":
+          description: Mappatura confermata e preview ricalcolata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportSession"
+
+  /fse-importazioni/sessioni/{id}/righe/{rigaId}:
+    patch:
+      operationId: reviseFseImportRow
+      tags: [fse-importazioni]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - in: path
+          name: rigaId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FseImportRowRevisionInput"
+      responses:
+        "200":
+          description: Revisione persistita senza variazione di stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportSession"
+
+  /fse-importazioni/sessioni/{id}/aggiungi-pratica:
+    post:
+      operationId: addFseImportToPractice
+      tags: [fse-importazioni]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FseImportAddToPracticeInput"
+      responses:
+        "200":
+          description: Replay idempotente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportAddToPracticeResult"
+        "201":
+          description: Righe aggiunte alla pratica senza variazione di stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FseImportAddToPracticeResult"
+
   /agea/importazioni:
     get:
       operationId: listAgeaImportazioni
@@ -10758,6 +10971,345 @@ components:
       example: "53.593120"
       description: Decimale esatto; non convertire in number JavaScript per i calcoli.
 
+    FseImportMode:
+      type: string
+      enum: [NUOVI_CARICHI, SALDO_INIZIALE]
+
+    FseImportFileProfile:
+      type: string
+      enum: [REGISTRO, GIACENZE]
+
+    FseImportSessionState:
+      type: string
+      enum:
+        [IN_ANALISI, DA_COMPLETARE, PRONTA, IN_PRATICA, REGISTRATA, ANNULLATA]
+
+    FseImportSource:
+      type: object
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        descrizione: { type: string }
+        areaOperativaId: { type: integer }
+        attiva: { type: integer, enum: [0, 1] }
+        creatoDa: { type: integer }
+        dataCreazione: { type: string, format: date-time }
+      required:
+        [
+          id,
+          codice,
+          descrizione,
+          areaOperativaId,
+          attiva,
+          creatoDa,
+          dataCreazione,
+        ]
+
+    FseImportSourceInput:
+      type: object
+      additionalProperties: false
+      properties:
+        codice: { type: string, minLength: 1, maxLength: 80 }
+        descrizione: { type: string, minLength: 1, maxLength: 500 }
+        areaOperativaId: { type: integer, minimum: 1 }
+      required: [codice, descrizione, areaOperativaId]
+
+    FseImportSession:
+      type: object
+      properties:
+        id: { type: integer }
+        sourceRegistryId: { type: integer }
+        areaOperativaId: { type: integer }
+        magazzinoId: { type: integer }
+        lottoLogicoId: { type: integer }
+        caricoPraticaId: { type: [integer, "null"] }
+        modalita:
+          $ref: "#/components/schemas/FseImportMode"
+        stato:
+          $ref: "#/components/schemas/FseImportSessionState"
+        versione: { type: integer }
+        dataRiferimentoSaldo: { type: [string, "null"], format: date }
+        coperturaConfermata: { type: integer, enum: [0, 1] }
+        creatoDa: { type: integer }
+        aggiornatoDa: { type: integer }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+      required:
+        [
+          id,
+          sourceRegistryId,
+          areaOperativaId,
+          magazzinoId,
+          lottoLogicoId,
+          modalita,
+          stato,
+          versione,
+          coperturaConfermata,
+          creatoDa,
+          aggiornatoDa,
+          dataCreazione,
+          dataAggiornamento,
+        ]
+
+    FseImportFile:
+      type: object
+      properties:
+        id: { type: integer }
+        sessioneId: { type: integer }
+        profilo:
+          $ref: "#/components/schemas/FseImportFileProfile"
+        nomeFile: { type: string }
+        formato: { type: string, enum: [XLSX, XLS, CSV] }
+        mimeTypeDichiarato: { type: [string, "null"] }
+        dimensioneBytes: { type: integer }
+        sha256File: { type: string, pattern: "^[0-9a-f]{64}$" }
+        tracciatoCodice: { type: string }
+        parserVersion: { type: string }
+        sheetName: { type: string }
+        dataRiferimento: { type: [string, "null"], format: date }
+        warningsJson:
+          type: array
+          items: { type: string }
+        acquisitoDa: { type: integer }
+        dataAcquisizione: { type: string, format: date-time }
+      required:
+        [
+          id,
+          sessioneId,
+          profilo,
+          nomeFile,
+          formato,
+          dimensioneBytes,
+          sha256File,
+          tracciatoCodice,
+          parserVersion,
+          sheetName,
+          warningsJson,
+          acquisitoDa,
+          dataAcquisizione,
+        ]
+
+    FseImportProductSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        nome: { type: string }
+        unitaMisura: { type: string }
+      required: [id, codice, nome, unitaMisura]
+
+    FseImportRow:
+      type: object
+      properties:
+        id: { type: integer }
+        numeroRiga: { type: integer }
+        tipoMovimento: { type: string }
+        fondoOrigine: { type: [string, "null"] }
+        prodottoEsterno: { type: string }
+        lottoFisico: { type: [string, "null"] }
+        numeroDocumento: { type: [string, "null"] }
+        dataDocumento: { type: [string, "null"], format: date }
+        dataOperativaProposta: { type: [string, "null"], format: date }
+        dataOperativaFonte: { type: [string, "null"] }
+        quantitaPezzi:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        quantitaKgLt:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        prodottoId: { type: [integer, "null"] }
+        prodotto:
+          oneOf:
+            - $ref: "#/components/schemas/FseImportProductSummary"
+            - type: "null"
+        quantitaOperativa:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        dataScadenza: { type: [string, "null"], format: date }
+        fattoreKgLtPezzo:
+          oneOf:
+            - $ref: "#/components/schemas/FattoreContabile"
+            - type: "null"
+        disambiguatore: { type: string }
+        stato: { type: string }
+        errorCodes:
+          type: array
+          items: { type: string }
+        warningCodes:
+          type: array
+          items: { type: string }
+      required:
+        [
+          id,
+          numeroRiga,
+          tipoMovimento,
+          prodottoEsterno,
+          stato,
+          errorCodes,
+          warningCodes,
+        ]
+
+    FseImportStockRow:
+      type: object
+      properties:
+        id: { type: integer }
+        numeroRiga: { type: integer }
+        fondoOrigine: { type: [string, "null"] }
+        prodottoEsterno: { type: string }
+        lottoFisico: { type: [string, "null"] }
+        giacenzaPezzi:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        giacenzaPesoVolume:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        pesoUnita:
+          oneOf:
+            - $ref: "#/components/schemas/FattoreContabile"
+            - type: "null"
+        dataScadenza: { type: [string, "null"], format: date }
+        prodottoId: { type: [integer, "null"] }
+        prodotto:
+          oneOf:
+            - $ref: "#/components/schemas/FseImportProductSummary"
+            - type: "null"
+        quantitaOperativa:
+          oneOf:
+            - $ref: "#/components/schemas/QuantitaContabile"
+            - type: "null"
+        stato: { type: string }
+        errorCodes:
+          type: array
+          items: { type: string }
+        warningCodes:
+          type: array
+          items: { type: string }
+      required:
+        [id, numeroRiga, prodottoEsterno, stato, errorCodes, warningCodes]
+
+    FseImportSummary:
+      type: object
+      properties:
+        total: { type: integer }
+        ready: { type: integer }
+        needsMapping: { type: integer }
+        needsReview: { type: integer }
+        errors: { type: integer }
+        known: { type: integer }
+        referenceOnly: { type: integer }
+        stockRows: { type: integer }
+        stockPieces:
+          $ref: "#/components/schemas/QuantitaContabile"
+      required:
+        [
+          total,
+          ready,
+          needsMapping,
+          needsReview,
+          errors,
+          known,
+          referenceOnly,
+          stockRows,
+          stockPieces,
+        ]
+
+    FseImportSessionDetail:
+      allOf:
+        - $ref: "#/components/schemas/FseImportSession"
+        - type: object
+          properties:
+            files:
+              type: array
+              items:
+                $ref: "#/components/schemas/FseImportFile"
+            rows:
+              type: array
+              items:
+                $ref: "#/components/schemas/FseImportRow"
+            stockRows:
+              type: array
+              items:
+                $ref: "#/components/schemas/FseImportStockRow"
+            summary:
+              $ref: "#/components/schemas/FseImportSummary"
+          required: [files, rows, stockRows, summary]
+
+    FseImportAcquireResult:
+      type: object
+      properties:
+        sessionId: { type: integer }
+        fileId: { type: integer }
+        replay: { type: boolean }
+        versione: { type: integer }
+        stato:
+          $ref: "#/components/schemas/FseImportSessionState"
+        formato: { type: string, enum: [XLSX, XLS, CSV] }
+        sha256File: { type: string, pattern: "^[0-9a-f]{64}$" }
+      required: [sessionId, fileId, replay]
+
+    FseImportProductMappingInput:
+      type: object
+      additionalProperties: false
+      properties:
+        versione: { type: integer, minimum: 1 }
+        descrizioneEsterna: { type: string, minLength: 1, maxLength: 4000 }
+        prodottoId: { type: integer, minimum: 1 }
+        motivo: { type: string, minLength: 1, maxLength: 1000 }
+        accettaFallbackData: { type: boolean, default: false }
+      required: [versione, descrizioneEsterna, prodottoId, motivo]
+
+    FseImportRowRevisionInput:
+      type: object
+      additionalProperties: false
+      properties:
+        versione: { type: integer, minimum: 1 }
+        quantita:
+          $ref: "#/components/schemas/QuantitaContabile"
+        numeroDocumento: { type: [string, "null"], maxLength: 100 }
+        dataDocumento: { type: [string, "null"], format: date }
+        dataOperativa: { type: [string, "null"], format: date }
+        lottoFisico: { type: [string, "null"], maxLength: 80 }
+        dataScadenza: { type: [string, "null"], format: date }
+        fattoreKgLtPezzo:
+          oneOf:
+            - $ref: "#/components/schemas/FattoreContabile"
+            - type: "null"
+        disambiguatore: { type: [string, "null"], maxLength: 80 }
+        accettaFallbackData: { type: boolean, default: false }
+        motivo: { type: string, minLength: 1, maxLength: 1000 }
+      required: [versione, motivo]
+
+    FseImportAddToPracticeInput:
+      type: object
+      additionalProperties: false
+      properties:
+        versione: { type: integer, minimum: 1 }
+        versionePratica: { type: integer, minimum: 1 }
+        rigaIds:
+          type: array
+          uniqueItems: true
+          items: { type: integer, minimum: 1 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 100 }
+        confermaCoperturaStorica:
+          type: boolean
+          default: false
+          description: Conferma amministrativa richiesta esclusivamente per predisporre un saldo iniziale.
+      required: [versione, idempotencyKey]
+
+    FseImportAddToPracticeResult:
+      type: object
+      properties:
+        practiceId: { type: integer }
+        practiceVersion: { type: integer }
+        addedRows: { type: integer }
+        replay: { type: boolean }
+      required: [practiceId, replay]
+
     AgeaImportModalita:
       type: string
       enum: [PRIMA_ACQUISIZIONE, AGGIORNAMENTO, SOLO_ANALISI]
@@ -11258,7 +11810,7 @@ components:
         magazzinoId: { type: integer, minimum: 1 }
         lottoLogicoId: { type: [integer, "null"], minimum: 1 }
         origineCarico:
-          $ref: "#/components/schemas/OrigineCaricoManuale"
+          $ref: "#/components/schemas/OrigineCarico"
         numeroDocumento: { type: [string, "null"] }
         dataDocumento: { type: [string, "null"], format: date }
         dataCarico: { type: string, format: date }
@@ -11291,7 +11843,10 @@ components:
         lottoLogicoId: { type: integer }
         lottoLogicoDescrizione: { type: [string, "null"] }
         origineCarico:
-          $ref: "#/components/schemas/OrigineCaricoManuale"
+          $ref: "#/components/schemas/OrigineCarico"
+        tipoPratica:
+          type: string
+          enum: [ORDINARIA, SALDO_INIZIALE]
         dataCarico: { type: string, format: date }
         descrizione: { type: string }
         fornitoreId: { type: [integer, "null"] }
@@ -11314,6 +11869,7 @@ components:
           magazzinoId,
           lottoLogicoId,
           origineCarico,
+          tipoPratica,
           dataCarico,
           descrizione,
           creatoDa,
@@ -11348,6 +11904,9 @@ components:
             - $ref: "#/components/schemas/FattoreContabile"
             - type: "null"
         note: { type: [string, "null"] }
+        numeroDocumentoEsterno: { type: [string, "null"] }
+        dataDocumentoEsterna: { type: [string, "null"], format: date }
+        dataOperativaFonte: { type: [string, "null"] }
         registrata: { type: boolean }
         registrataAt: { type: [string, "null"], format: date-time }
         integrazioneId: { type: [integer, "null"] }

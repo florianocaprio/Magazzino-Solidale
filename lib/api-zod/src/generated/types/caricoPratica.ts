@@ -6,7 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CaricoPraticaStato } from './caricoPraticaStato';
-import type { OrigineCaricoManuale } from './origineCaricoManuale';
+import type { CaricoPraticaTipoPratica } from './caricoPraticaTipoPratica';
+import type { OrigineCarico } from './origineCarico';
 
 export interface CaricoPratica {
   id: number;
@@ -20,7 +21,8 @@ export interface CaricoPratica {
   lottoLogicoId: number;
   /** @nullable */
   lottoLogicoDescrizione?: string | null;
-  origineCarico: OrigineCaricoManuale;
+  origineCarico: OrigineCarico;
+  tipoPratica: CaricoPraticaTipoPratica;
   dataCarico: Date;
   descrizione: string;
   /** @nullable */

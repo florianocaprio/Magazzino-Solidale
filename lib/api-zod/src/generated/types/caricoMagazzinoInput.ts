@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CaricoMagazzinoRigaInput } from './caricoMagazzinoRigaInput';
-import type { OrigineCaricoManuale } from './origineCaricoManuale';
+import type { OrigineCarico } from './origineCarico';
 
 export interface CaricoMagazzinoInput {
   /** @minimum 1 */
@@ -16,7 +16,7 @@ export interface CaricoMagazzinoInput {
      * @nullable
      */
   lottoLogicoId?: number | null;
-  origineCarico: OrigineCaricoManuale;
+  origineCarico: OrigineCarico;
   /** @nullable */
   numeroDocumento?: string | null;
   /** @nullable */

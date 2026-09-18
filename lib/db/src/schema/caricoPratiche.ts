@@ -54,6 +54,9 @@ export const caricoPraticheTable = pgTable(
       .notNull()
       .references(() => lottiLogiciTable.id, { onDelete: "restrict" }),
     origineCarico: varchar("origine_carico", { length: 40 }).notNull(),
+    tipoPratica: varchar("tipo_pratica", { length: 30 })
+      .notNull()
+      .default("ORDINARIA"),
     dataCarico: date("data_carico").notNull(),
     descrizione: text("descrizione").notNull(),
     fornitoreId: integer("fornitore_id").references(() => fornitoriTable.id, {
@@ -87,6 +90,10 @@ export const caricoPraticheTable = pgTable(
       "carico_pratiche_stato_check",
       sql`${table.stato} in ('bozza', 'aperta', 'chiusa', 'annullata')`,
     ),
+    check(
+      "carico_pratiche_tipo_check",
+      sql`${table.tipoPratica} in ('ORDINARIA', 'SALDO_INIZIALE')`,
+    ),
     check("carico_pratiche_versione_check", sql`${table.versione} > 0`),
     check(
       "carico_pratiche_descrizione_check",
@@ -117,6 +124,11 @@ export const caricoPraticaRigheTable = pgTable(
       scale: 9,
     }),
     note: text("note"),
+    numeroDocumentoEsterno: varchar("numero_documento_esterno", {
+      length: 100,
+    }),
+    dataDocumentoEsterna: date("data_documento_esterna"),
+    dataOperativaFonte: varchar("data_operativa_fonte", { length: 40 }),
     unitaMisuraSnapshot: varchar("unita_misura_snapshot", { length: 20 }),
     quantitaFrazionabileSnapshot: boolean("quantita_frazionabile_snapshot"),
     registrataAt: timestamp("registrata_at", { withTimezone: true }),

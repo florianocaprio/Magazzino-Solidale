@@ -24,9 +24,10 @@ app.use(
     genReqId(req, res) {
       const incoming = req.headers["x-correlation-id"];
       const requested = Array.isArray(incoming) ? incoming[0] : incoming;
-      const id = requested && /^[A-Za-z0-9._-]{1,128}$/.test(requested)
-        ? requested
-        : randomUUID();
+      const id =
+        requested && /^[A-Za-z0-9._-]{1,128}$/.test(requested)
+          ? requested
+          : randomUUID();
       res.setHeader("X-Correlation-Id", id);
       return id;
     },
@@ -67,25 +68,38 @@ app.use("/api", (req, res, next) => {
   const json = res.json.bind(res);
   res.json = ((body: unknown) => {
     if (
-      res.statusCode >= 400
-      && body != null
-      && typeof body === "object"
-      && typeof (body as { error?: unknown }).error === "string"
+      res.statusCode >= 400 &&
+      body != null &&
+      typeof body === "object" &&
+      typeof (body as { error?: unknown }).error === "string"
     ) {
       const current = body as Record<string, unknown> & { error: string };
-      const domain = req.path.split("/").filter(Boolean)[0]
-        ?.replace(/[^A-Za-z0-9]+/g, "_")
-        .toUpperCase() || "API";
-      const suffix = res.statusCode === 400 ? "INVALID_REQUEST"
-        : res.statusCode === 401 ? "UNAUTHENTICATED"
-        : res.statusCode === 403 ? "FORBIDDEN"
-        : res.statusCode === 404 ? "NOT_FOUND"
-        : res.statusCode === 409 ? "CONFLICT"
-        : "ERROR";
+      const domain =
+        req.path
+          .split("/")
+          .filter(Boolean)[0]
+          ?.replace(/[^A-Za-z0-9]+/g, "_")
+          .toUpperCase() || "API";
+      const suffix =
+        res.statusCode === 400
+          ? "INVALID_REQUEST"
+          : res.statusCode === 401
+            ? "UNAUTHENTICATED"
+            : res.statusCode === 403
+              ? "FORBIDDEN"
+              : res.statusCode === 404
+                ? "NOT_FOUND"
+                : res.statusCode === 409
+                  ? "CONFLICT"
+                  : "ERROR";
       return json({
         ...current,
-        code: typeof current.code === "string" ? current.code : `${domain}_${suffix}`,
-        message: typeof current.message === "string" ? current.message : current.error,
+        code:
+          typeof current.code === "string"
+            ? current.code
+            : `${domain}_${suffix}`,
+        message:
+          typeof current.message === "string" ? current.message : current.error,
         correlationId: String(req.id),
         details: current.details ?? null,
       });
@@ -94,11 +108,14 @@ app.use("/api", (req, res, next) => {
   }) as typeof res.json;
   next();
 });
-app.use("/uploads", express.static(process.env.UPLOAD_DIR ?? "/app/uploads", {
-  fallthrough: false,
-  index: false,
-  maxAge: "1d",
-}));
+app.use(
+  "/uploads",
+  express.static(process.env.UPLOAD_DIR ?? "/app/uploads", {
+    fallthrough: false,
+    index: false,
+    maxAge: "1d",
+  }),
+);
 
 // Session cookie / proxy configuration adapts to the runtime environment:
 // - On Replit the app is served over HTTPS behind a reverse proxy and rendered
@@ -190,6 +207,31 @@ app.use("/api", (req, res, next) => {
 app.use("/api", router);
 
 const unhandledError: ErrorRequestHandler = (error, req, res, _next) => {
+  let current: unknown = error;
+  let databaseError: { code?: string; constraint?: string } = {};
+  for (let depth = 0; current != null && depth < 5; depth += 1) {
+    if (typeof current !== "object") break;
+    const candidate = current as {
+      code?: string;
+      constraint?: string;
+      cause?: unknown;
+    };
+    if (candidate.code) {
+      databaseError = candidate;
+      break;
+    }
+    current = candidate.cause;
+  }
+  if (
+    databaseError.code === "23514" &&
+    databaseError.constraint === "movimenti_fse_initial_balance_proposal_guard"
+  ) {
+    res.status(409).json({
+      error: "Il Magazzino ha una proposta di saldo iniziale in corso",
+      code: "SALDO_INIZIALE_IN_CORSO",
+    });
+    return;
+  }
   req.log.error({ err: error }, "Unhandled API error");
   if (res.headersSent) return;
   res.status(500).json({

@@ -235,3 +235,66 @@ Sulla destinazione fresh isolata, con email e geocoding pubblico disabilitati, s
 Il riepilogo API sopra si riferisce al terzo run completo, eseguito dopo aver rimosso la collisione di porte. I due tentativi precedenti sono falliti con 1 test su 1.144, in file diversi; entrambi i casi sono poi passati isolatamente o nel run finale. Non vengono conteggiati come test superati, ma come diagnosi ambientale risolta.
 
 Le suite hanno segnalato una deprecazione `pg` relativa a `client.query()` concorrenti, mentre Vite ha prodotto warning non bloccanti su sourcemap e dimensione chunk. Sono evidenze di baseline da sorvegliare, non errori introdotti da M0.
+
+## M3B — ambiente disposable di sviluppo
+
+Data: 18 settembre 2026
+Base codice: `ad76175a360794ceeb36a7024b1933ba5e6b2bba`
+
+Per i soli gate di sviluppo M3B è stato creato un ambiente PostgreSQL isolato, privo di container web/API candidati:
+
+| Risorsa              | Nome                                | Uso                                        | Stato finale |
+| -------------------- | ----------------------------------- | ------------------------------------------ | ------------ |
+| container PostgreSQL | `magazzino-m3b-dev-db-20260918`     | fresh gate, copia populated e scenario E2E | eliminato    |
+| rete                 | `magazzino-m3b-dev-net-20260918`    | isolamento del database M3B                | eliminata    |
+| volume PostgreSQL    | `magazzino_m3b_dev_pgdata_20260918` | dati temporanei dei gate M3B               | eliminato    |
+
+Container, rete e volume avevano etichetta `magazzino.milestone=M3B`. Nel container sono esistiti esclusivamente i database temporanei `magazzino_m3b_dev`, `magazzino_m3b_populated_check` e `magazzino_m3b_e2e`.
+
+Il fresh gate ha applicato e verificato 38/38 migrazioni. La copia populated è stata portata dallo stato 37 alla sola migrazione 38, conservando conteggi e hash di lotti e movimenti; il replay ha applicato zero migrazioni. Lo scenario Playwright M3B ha usato il terzo database con fixture sintetiche, senza file FSE+ reali.
+
+Al termine dello sviluppo il container è stato rimosso per nome, quindi sono state rimosse nominativamente la rete e il volume. Il report Playwright temporaneo è stato eliminato dal working tree. Non sono stati usati comandi prune.
+
+La verifica successiva con `docker ps -a`, `docker network ls` e `docker volume ls` non mostra risorse M3B residue. I container originali `magazzino-postgres`, `magazzino-api` e `magazzino-web` sono rimasti attivi e invariati; il volume persistente originale e tutte le risorse degli altri progetti non sono stati toccati.
+
+Non è stato costruito né avviato un ambiente Docker candidato M3B: questa attività appartiene alla successiva fase autorizzata `##test M3B`.
+
+## M3B — ambiente disposable di test e review
+
+Data: 18 settembre 2026
+
+Base codice: `ad76175a360794ceeb36a7024b1933ba5e6b2bba`
+
+La fase `##test M3B` ha usato un solo PostgreSQL temporaneo, senza costruire
+container web/API candidati:
+
+| Risorsa              | Nome                                 | Uso                                | Stato finale |
+| -------------------- | ------------------------------------ | ---------------------------------- | ------------ |
+| container PostgreSQL | `magazzino-m3b-test-db-20260918`     | fresh, populated, suite API ed E2E | eliminato    |
+| rete                 | `magazzino-m3b-test-net-20260918`    | isolamento del database            | eliminata    |
+| volume               | `magazzino_m3b_test_pgdata_20260918` | dati temporanei                    | eliminato    |
+
+Nel container sono esistiti `magazzino_m3b_test`,
+`magazzino_m3b_e2e_test` e `magazzino_m3b_populated_test`. La porta host era
+limitata a loopback (`127.0.0.1:55438`). Le risorse riportavano etichette di
+milestone/scopo M3B.
+
+Il fresh gate ha usato lo schema push esclusivamente come bootstrap del DB
+vuoto, seguito dal runner ufficiale e dalla verifica dei trigger/vincoli; non è
+stato considerato un sostituto del runner. La copia populated è stata costruita
+con lo schema esatto della base 37 e aggiornata dal runner 37→38 senza schema
+push. Conteggi e hash semantici ordinati sono rimasti identici.
+
+I due Excel originali sono rimasti fuori dal repository e sono stati aperti in
+sola lettura. Nessuna credenziale, cookie, screenshot, report browser o fixture
+temporanea è stata committata.
+
+A fine fase sono stati eliminati nominativamente container, rete e volume,
+oltre ai soli script/fixture/report temporanei M3B. Non è stato eseguito alcun
+comando prune. Le verifiche finali `docker ps -a`, `docker network ls` e
+`docker volume ls` non mostrano risorse disposable M3B residue.
+
+I container protetti `magazzino-postgres`, `magazzino-api` e `magazzino-web`
+sono rimasti attivi e invariati; il relativo volume persistente e tutte le
+risorse Docker di altri progetti non sono stati arrestati, modificati o
+rimossi.

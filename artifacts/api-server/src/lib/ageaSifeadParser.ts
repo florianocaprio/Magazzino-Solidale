@@ -175,6 +175,9 @@ export function parseAgeaDate(value: CellValue): string | null {
     return parsed ? datePartsToIso(parsed.d, parsed.m, parsed.y) : null;
   }
   if (typeof value !== "string") return null;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (iso)
+    return datePartsToIso(Number(iso[3]), Number(iso[2]), Number(iso[1]));
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
   return match
     ? datePartsToIso(Number(match[1]), Number(match[2]), Number(match[3]))
@@ -310,7 +313,7 @@ function selectSheet(workbook: XLSX.WorkBook) {
   return valid[0];
 }
 
-function validateZipContainer(buffer: Buffer): void {
+export function validateZipContainer(buffer: Buffer): void {
   const eocdSignature = 0x06054b50;
   const centralSignature = 0x02014b50;
   const searchStart = Math.max(0, buffer.length - 65_557);

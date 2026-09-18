@@ -1450,6 +1450,305 @@ export const OrigineCaricoManuale = {
  */
 export type QuantitaContabile = string;
 
+export type FseImportMode = typeof FseImportMode[keyof typeof FseImportMode];
+
+
+export const FseImportMode = {
+  NUOVI_CARICHI: 'NUOVI_CARICHI',
+  SALDO_INIZIALE: 'SALDO_INIZIALE',
+} as const;
+
+export type FseImportFileProfile = typeof FseImportFileProfile[keyof typeof FseImportFileProfile];
+
+
+export const FseImportFileProfile = {
+  REGISTRO: 'REGISTRO',
+  GIACENZE: 'GIACENZE',
+} as const;
+
+export type FseImportSessionState = typeof FseImportSessionState[keyof typeof FseImportSessionState];
+
+
+export const FseImportSessionState = {
+  IN_ANALISI: 'IN_ANALISI',
+  DA_COMPLETARE: 'DA_COMPLETARE',
+  PRONTA: 'PRONTA',
+  IN_PRATICA: 'IN_PRATICA',
+  REGISTRATA: 'REGISTRATA',
+  ANNULLATA: 'ANNULLATA',
+} as const;
+
+export type FseImportSourceAttiva = typeof FseImportSourceAttiva[keyof typeof FseImportSourceAttiva];
+
+
+export const FseImportSourceAttiva = {
+  NUMBER_0: 0,
+  NUMBER_1: 1,
+} as const;
+
+export interface FseImportSource {
+  id: number;
+  codice: string;
+  descrizione: string;
+  areaOperativaId: number;
+  attiva: FseImportSourceAttiva;
+  creatoDa: number;
+  dataCreazione: string;
+}
+
+export interface FseImportSourceInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  codice: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  descrizione: string;
+  /** @minimum 1 */
+  areaOperativaId: number;
+}
+
+export type FseImportSessionCoperturaConfermata = typeof FseImportSessionCoperturaConfermata[keyof typeof FseImportSessionCoperturaConfermata];
+
+
+export const FseImportSessionCoperturaConfermata = {
+  NUMBER_0: 0,
+  NUMBER_1: 1,
+} as const;
+
+export interface FseImportSession {
+  id: number;
+  sourceRegistryId: number;
+  areaOperativaId: number;
+  magazzinoId: number;
+  lottoLogicoId: number;
+  /** @nullable */
+  caricoPraticaId?: number | null;
+  modalita: FseImportMode;
+  stato: FseImportSessionState;
+  versione: number;
+  /** @nullable */
+  dataRiferimentoSaldo?: string | null;
+  coperturaConfermata: FseImportSessionCoperturaConfermata;
+  creatoDa: number;
+  aggiornatoDa: number;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export type FseImportFileFormato = typeof FseImportFileFormato[keyof typeof FseImportFileFormato];
+
+
+export const FseImportFileFormato = {
+  XLSX: 'XLSX',
+  XLS: 'XLS',
+  CSV: 'CSV',
+} as const;
+
+export interface FseImportFile {
+  id: number;
+  sessioneId: number;
+  profilo: FseImportFileProfile;
+  nomeFile: string;
+  formato: FseImportFileFormato;
+  /** @nullable */
+  mimeTypeDichiarato?: string | null;
+  dimensioneBytes: number;
+  /** @pattern ^[0-9a-f]{64}$ */
+  sha256File: string;
+  tracciatoCodice: string;
+  parserVersion: string;
+  sheetName: string;
+  /** @nullable */
+  dataRiferimento?: string | null;
+  warningsJson: string[];
+  acquisitoDa: number;
+  dataAcquisizione: string;
+}
+
+export interface FseImportProductSummary {
+  id: number;
+  codice: string;
+  nome: string;
+  unitaMisura: string;
+}
+
+/**
+ * Fattore Kg/Lt per pezzo esatto, positivo, scala massima 9.
+ * @pattern ^[0-9]+(?:\.[0-9]{1,9})?$
+ */
+export type FattoreContabile = string;
+
+export interface FseImportRow {
+  id: number;
+  numeroRiga: number;
+  tipoMovimento: string;
+  /** @nullable */
+  fondoOrigine?: string | null;
+  prodottoEsterno: string;
+  /** @nullable */
+  lottoFisico?: string | null;
+  /** @nullable */
+  numeroDocumento?: string | null;
+  /** @nullable */
+  dataDocumento?: string | null;
+  /** @nullable */
+  dataOperativaProposta?: string | null;
+  /** @nullable */
+  dataOperativaFonte?: string | null;
+  quantitaPezzi?: QuantitaContabile | null;
+  quantitaKgLt?: QuantitaContabile | null;
+  /** @nullable */
+  prodottoId?: number | null;
+  prodotto?: FseImportProductSummary | null;
+  quantitaOperativa?: QuantitaContabile | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
+  disambiguatore?: string;
+  stato: string;
+  errorCodes: string[];
+  warningCodes: string[];
+}
+
+export interface FseImportStockRow {
+  id: number;
+  numeroRiga: number;
+  /** @nullable */
+  fondoOrigine?: string | null;
+  prodottoEsterno: string;
+  /** @nullable */
+  lottoFisico?: string | null;
+  giacenzaPezzi?: QuantitaContabile | null;
+  giacenzaPesoVolume?: QuantitaContabile | null;
+  pesoUnita?: FattoreContabile | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  prodottoId?: number | null;
+  prodotto?: FseImportProductSummary | null;
+  quantitaOperativa?: QuantitaContabile | null;
+  stato: string;
+  errorCodes: string[];
+  warningCodes: string[];
+}
+
+export interface FseImportSummary {
+  total: number;
+  ready: number;
+  needsMapping: number;
+  needsReview: number;
+  errors: number;
+  known: number;
+  referenceOnly: number;
+  stockRows: number;
+  stockPieces: QuantitaContabile;
+}
+
+export type FseImportSessionDetail = FseImportSession & {
+  files: FseImportFile[];
+  rows: FseImportRow[];
+  stockRows: FseImportStockRow[];
+  summary: FseImportSummary;
+};
+
+export type FseImportAcquireResultFormato = typeof FseImportAcquireResultFormato[keyof typeof FseImportAcquireResultFormato];
+
+
+export const FseImportAcquireResultFormato = {
+  XLSX: 'XLSX',
+  XLS: 'XLS',
+  CSV: 'CSV',
+} as const;
+
+export interface FseImportAcquireResult {
+  sessionId: number;
+  fileId: number;
+  replay: boolean;
+  versione?: number;
+  stato?: FseImportSessionState;
+  formato?: FseImportAcquireResultFormato;
+  /** @pattern ^[0-9a-f]{64}$ */
+  sha256File?: string;
+}
+
+export interface FseImportProductMappingInput {
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  descrizioneEsterna: string;
+  /** @minimum 1 */
+  prodottoId: number;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  motivo: string;
+  accettaFallbackData?: boolean;
+}
+
+export interface FseImportRowRevisionInput {
+  /** @minimum 1 */
+  versione: number;
+  quantita?: QuantitaContabile;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  numeroDocumento?: string | null;
+  /** @nullable */
+  dataDocumento?: string | null;
+  /** @nullable */
+  dataOperativa?: string | null;
+  /**
+     * @maxLength 80
+     * @nullable
+     */
+  lottoFisico?: string | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  fattoreKgLtPezzo?: FattoreContabile | null;
+  /**
+     * @maxLength 80
+     * @nullable
+     */
+  disambiguatore?: string | null;
+  accettaFallbackData?: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  motivo: string;
+}
+
+export interface FseImportAddToPracticeInput {
+  /** @minimum 1 */
+  versione: number;
+  /** @minimum 1 */
+  versionePratica?: number;
+  rigaIds?: number[];
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  idempotencyKey: string;
+  /** Conferma amministrativa richiesta esclusivamente per predisporre un saldo iniziale. */
+  confermaCoperturaStorica?: boolean;
+}
+
+export interface FseImportAddToPracticeResult {
+  practiceId: number;
+  practiceVersion?: number;
+  addedRows?: number;
+  replay: boolean;
+}
+
 export type AgeaImportModalita = typeof AgeaImportModalita[keyof typeof AgeaImportModalita];
 
 
@@ -1610,12 +1909,6 @@ export interface AgeaImportRighePage {
   page: number;
   pageSize: number;
 }
-
-/**
- * Fattore Kg/Lt per pezzo esatto, positivo, scala massima 9.
- * @pattern ^[0-9]+(?:\.[0-9]{1,9})?$
- */
-export type FattoreContabile = string;
 
 export interface AgeaImportPartita {
   id: number;
@@ -1855,7 +2148,7 @@ export interface CaricoMagazzinoInput {
      * @nullable
      */
   lottoLogicoId?: number | null;
-  origineCarico: OrigineCaricoManuale;
+  origineCarico: OrigineCarico;
   /** @nullable */
   numeroDocumento?: string | null;
   /** @nullable */
@@ -1886,6 +2179,14 @@ export const CaricoPraticaStato = {
   annullata: 'annullata',
 } as const;
 
+export type CaricoPraticaTipoPratica = typeof CaricoPraticaTipoPratica[keyof typeof CaricoPraticaTipoPratica];
+
+
+export const CaricoPraticaTipoPratica = {
+  ORDINARIA: 'ORDINARIA',
+  SALDO_INIZIALE: 'SALDO_INIZIALE',
+} as const;
+
 export interface CaricoPratica {
   id: number;
   codice: string;
@@ -1898,7 +2199,8 @@ export interface CaricoPratica {
   lottoLogicoId: number;
   /** @nullable */
   lottoLogicoDescrizione?: string | null;
-  origineCarico: OrigineCaricoManuale;
+  origineCarico: OrigineCarico;
+  tipoPratica: CaricoPraticaTipoPratica;
   dataCarico: string;
   descrizione: string;
   /** @nullable */
@@ -1938,6 +2240,12 @@ export interface CaricoPraticaRiga {
   fattoreKgLtPezzo?: FattoreContabile | null;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  numeroDocumentoEsterno?: string | null;
+  /** @nullable */
+  dataDocumentoEsterna?: string | null;
+  /** @nullable */
+  dataOperativaFonte?: string | null;
   registrata: boolean;
   /** @nullable */
   registrataAt?: string | null;
@@ -8734,6 +9042,51 @@ stato?: CaricoPraticaStato;
 q?: string;
 da?: string;
 a?: string;
+};
+
+export type AnalyzeFsePracticeImportParams = {
+/**
+ * @minimum 1
+ */
+sourceRegistryId: number;
+/**
+ * @minimum 1
+ */
+areaOperativaId: number;
+/**
+ * @minimum 1
+ */
+magazzinoId: number;
+/**
+ * @minimum 1
+ */
+lottoLogicoId: number;
+/**
+ * @minimum 1
+ */
+caricoPraticaId?: number;
+/**
+ * @minimum 1
+ */
+sessionId?: number;
+modalita: FseImportMode;
+profilo: FseImportFileProfile;
+/**
+ * @maxLength 255
+ */
+nomeFile: string;
+/**
+ * @maxLength 100
+ */
+sheetName?: string;
+dataRiferimento?: string;
+};
+
+export type ListFseImportSessionsParams = {
+/**
+ * @minimum 1
+ */
+magazzinoId: number;
 };
 
 export type AnalyzeAgeaImportazioneParams = {

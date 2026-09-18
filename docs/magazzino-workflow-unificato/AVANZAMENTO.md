@@ -935,3 +935,117 @@ Restano esplicitamente non eseguite:
 Queste due verifiche fisiche non bloccano la chiusura M3A e non sono dichiarate superate. Il percorso AGEA/FSE+ legacy resta separato dalla pratica; M3B non è stato avviato.
 
 La chiusura modifica esclusivamente la documentazione M3A. Non modifica codice applicativo, schema, API, migrazioni o file generati e non coinvolge `main`.
+
+## M3B — sviluppo Importa file FSE+
+
+Data: 18 settembre 2026
+
+Base M3B: `ad76175a360794ceeb36a7024b1933ba5e6b2bba`.
+
+Stato: **M3B pronto per `##test`, da validare** (`DEV-M3B/NE-TEST-M3B`). Il candidato resta intenzionalmente non committato e non pubblicato; non sono stati avviati `##test M3B`, Docker candidato, M4/M5 o merge su `main`.
+
+### Flusso e contratti implementati
+
+- Carico Merce espone un solo ingresso contestuale `Importa file FSE+`, dalla lista o da una pratica vuota compatibile, con quattro passaggi: file e sorgente, associazioni/correzioni, riepilogo e aggiunta alla pratica.
+- Upload e aggiunta non cambiano le giacenze. Le righe entrano nello stock esclusivamente tramite il comando M3A `Registra`; testata e righe riservate AGEA/saldo non sono modificabili dai normali endpoint manuali.
+- Il parser rileva il formato dal contenuto e supporta XLSX, XLS binario e CSV con BOM, separatori, quote, multilinea e virgola decimale. Intestazioni normalizzate, data dinamica del Registro, foglio ambiguo, date italiane/ISO/seriali Excel, lotti testuali e quantità fixed-point sono gestiti senza euristiche americane o ricostruzione di zeri persi.
+- File e righe raw sono persistiti con SHA-256, versione parser e profilo. Identità semantica e hash contenuto sono separati; claim attive, versioni e idempotency key impediscono doppie prese in carico fra sessioni, pratiche o magazzini. Lo stesso comando è ripetibile; la stessa chiave con payload diverso restituisce conflitto.
+- Mapping prodotto è scoped alla sorgente. Correzioni e accettazione del fallback data sono revisionate e motivate. Creazione prodotto/barcode resta dietro `magazzino.products.manage`; l'attore deriva dalla sessione backend.
+- L'import ordinario consente selezione parziale e ripresa delle righe escluse. Numero/data documento esterni restano strutturati sulla singola riga della pratica, senza DDT fittizio di testata.
+- Il saldo iniziale richiede Registro e Giacenze coerenti, data di taglio, permesso amministrativo e magazzino senza storia. Genera una pratica `SALDO_INIZIALE`; la registrazione è integrale e attiva la copertura storica nella stessa transazione del movimento contabile.
+- Il writer AGEA legacy è conservato per la consultazione ma viene bloccato per un magazzino già gestito da M3B. Gli eventi legacy applicati e ricostruibili partecipano alla classificazione senza backfill o modifica degli audit storici.
+
+### Schema, API e migrazione
+
+- La migrazione 38 aggiunge registro sorgenti, sessioni/file/righe stock e Registro, revisioni, comandi idempotenti, claim e copertura del saldo; estende in modo limitato mapping prodotti e metadati riga M3A. Non carica campioni, non crea stock e non attribuisce dati legacy.
+- OpenAPI descrive sorgenti, upload binario, sessioni, mapping, revisione e aggiunta alla pratica; client React e Zod sono rigenerati dal comando ufficiale. Due esecuzioni consecutive hanno prodotto lo stesso diff generato.
+- Il fresh gate disposable ha applicato e verificato 38/38 migrazioni, seed, login, cambio password, CRUD Area e replay con zero pending/mismatch/out-of-order.
+- La migrazione 38 è stata provata separatamente su una copia popolata allo stato 37. Prima/dopo sono rimasti invariati 8 pratiche, 12 righe pratica, 8 integrazioni, 15 carichi, 16 lotti, 21 movimenti e 13 prodotti; hash lotti `13b4787be73ef782766cffc2372acb41` e movimenti `cdfdfe67bcf444c7ff318869a4ea2ca6` sono identici. Replay: 38 skip, zero pending.
+
+### Prove di sviluppo eseguite
+
+- Parser M3B: 9/9 test passati su XLSX, vero XLS Biff8, CSV, lotto `006544`, date/fallback, identità stabile, molteplicità ambigua, fogli multipli, oversize, file corrotto e contenuto attivo.
+- API M3B + regressione M3A: 2 file, 14/14 test passati. Fixture sintetiche verificano upload/replay, pratica parziale 80+20, retry idempotente, metadati documento, blocco modifica manuale, zero movimenti prima di `Registra`, claim registrate, saldo iniziale atomico e blocco di una copertura positiva assente dalle Giacenze.
+- Regressioni AGEA/M1B/M1C/M2: 4 file, 52 test passati e 1 skip opzionale preesistente.
+- Frontend mirato: 2 file, 11/11 test passati su ingresso unico, separazione dallo stock, permessi e sei lingue.
+- Playwright desktop 1440×900: 1/1 scenario sintetico passato con upload reale via UI, mapping prodotto, aggiunta senza stock, logout/nuovo contesto, registrazione da 10 pezzi, metadato documento visibile e re-upload rinominato senza raddoppio.
+- Migration runner unitario: 10/10 test passati; typecheck dell'intero workspace verde. Prettier pertinente e `git diff --check` superati.
+
+Un ultimo run combinato di 6 file ha chiuso 65 test e 1 skip, ma il test M2 sull'ordine di quattro eventi audit con timestamp equivalenti ha osservato `PRODOTTO_ATTIVATO` prima di `PRODOTTO_CREATO`. Lo stesso file è passato subito isolato 14/14 senza modifiche, mentre il gate finale M3B+M3A è passato 14/14. Il run combinato non viene dichiarato verde né promosso a suite completa; l'instabilità d'ordinamento preesistente resta evidenza da sorvegliare nel successivo `##test M3B`.
+
+### Campioni e limiti
+
+Gli Excel originali indicati dalla specifica non erano presenti nei percorsi autorizzati. Non sono quindi stati verificati né i due SHA-256 attesi né i riscontri reali T01/T25 (7 righe e 1.177 pezzi). Tutte le prove file di sviluppo hanno usato fixture sintetiche generate in memoria; non costituiscono nuovi export ufficiali SIFEAD e non contengono un CodiceAccesso reale.
+
+Suite complete API/frontend, matrice E2E multi-viewport, build/budget, concorrenza estesa, originali Excel e validazione manuale appartengono alla futura autorizzazione separata `##test M3B`. Nessuna di queste prove è dichiarata superata in sviluppo.
+
+Condizione di arresto: **M3B pronto per `##test`, da validare**.
+
+## M3B — test, review e candidato pubblicabile
+
+Data: 18 settembre 2026
+
+Base verificata: `ad76175a360794ceeb36a7024b1933ba5e6b2bba`.
+
+Stato: **gate automatici M3B superati; candidato GO al commit/push**
+(`OK-M3B/NE-MAN-CAMERA/NE-MAN-TABLET`). Non sono stati avviati M4/M5,
+Docker candidato applicativo o merge su `main`.
+
+### Dati reali e comportamento
+
+- I due Excel originali richiesti sono stati letti in sola lettura e verificati
+  con gli SHA-256 attesi: Registro
+  `4e4b8ba724a35cb048d42070299c34b3ecfe673206390c8fde2d67c20488c901`
+  e Giacenze
+  `e1b4ab9c0b647adb0f3fb48bb4f0f76b493aee005933cb0a223a3218cba554de`.
+- T01 conferma 239 righe/19 colonne del Registro e 7 righe/15 colonne delle
+  Giacenze, con 80 carichi, 158 distribuzioni, 1 reso e saldo 1.177 pezzi.
+- T25 conferma zero stock prima di `Registra` e una sola inizializzazione da
+  1.177 pezzi dopo il comando. Le 24.216 entrate storiche non sono state
+  trasformate in un carico operativo.
+- La matrice T01–T35 è verde con evidenza automatica. Rimangono esplicitamente
+  non eseguite la fotocamera reale (`NE-MAN-CAMERA`) e il tablet fisico
+  (`NE-MAN-TABLET`); l'emulazione Playwright non viene presentata come prova
+  hardware.
+
+### Review e correzioni
+
+La review statica e la seconda review non lasciano finding bloccanti. Sono
+stati irrobustiti claim cross-magazzino, RBAC, immutabilità, versione delle
+sessioni parziali, copertura del saldo, concorrenza con writer ordinari,
+rilascio claim su annullamento, seriali Excel 1904, separazione Registro/saldo,
+error mapping, compatibilità AGEA, optimistic version UI e target touch.
+
+Durante la suite completa sono state corrette due assunzioni di test:
+
+- il test migrazione 2.0B verifica i due indici unici parziali M3B che
+  sostituiscono il precedente vincolo globale delle mappature;
+- l'assert AGEA sul cambio mapping è ora limitato alle righe create dal test e
+  non ingloba fixture M3B concorrenti del database condiviso.
+
+Non sono stati rimossi assert, aggiunti retry casuali o introdotti skip. La
+failure M2 sull'ordine audit osservata in sviluppo non si riproduce nel run
+combinato finale (6 file, 83 pass, 1 skip) né nella suite completa; resta
+registrata come “failure precedente non riprodotta”.
+
+### Gate finali
+
+- installazione frozen: superata, lockfile invariato;
+- parser/backend M3B: 11/11 e 17/17;
+- API completa: 114 file, 1.257 pass, 2 skip opzionali legacy, zero failure;
+- frontend completa: 69 file, 379 pass, zero failure;
+- Playwright: desktop 6 scenari passati; landscape e portrait 1 scenario
+  richiesto ciascuno, con soli skip condizionati al viewport;
+- runner migrazioni: 10/10 unit e 24/24 su PostgreSQL reale;
+- fresh 38/38 e populated 37→38: replay/verify senza pending, mismatch o
+  out-of-order e hash semantici pre/post identici;
+- typecheck, due codegen byte-identici, build workspace, budget bundle,
+  runtime config, Prettier e `git diff --check`: superati.
+
+Le evidenze dettagliate sono in `REVISIONE_STATICA_M3B.md` e
+`ESITI_TEST_M3B.md`. Le risorse PostgreSQL/Docker disposable e i report
+temporanei sono rimossi nominativamente a chiusura; i servizi originali e le
+risorse di altri progetti restano invariati.
+
+Condizione di arresto: **M3B test automatici e review superati — candidato
+pubblicabile sul solo branch `codex/magazzino-workflow-unificato`**.

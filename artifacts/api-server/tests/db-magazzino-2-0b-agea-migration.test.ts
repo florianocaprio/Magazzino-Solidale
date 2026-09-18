@@ -67,12 +67,25 @@ describe("migration Magazzino 2.0B AGEA", () => {
         WHERE conname = ANY(ARRAY[
           'importazioni_agea_righe_numero_unique',
           'importazioni_agea_partite_key_unique',
-          'movimenti_esterni_agea_magazzino_identity_unique',
-          'mappature_prodotti_esterni_fonte_descrizione_unique'
+          'movimenti_esterni_agea_magazzino_identity_unique'
         ])
         ORDER BY conname
       `);
-      expect(constraints.rows).toHaveLength(4);
+      expect(constraints.rows).toHaveLength(3);
+      const mappingIndexes = await client.query<{ indexname: string }>(`
+        SELECT indexname
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND indexname = ANY(ARRAY[
+            'mappature_prodotti_esterni_legacy_descrizione_unique',
+            'mappature_prodotti_esterni_sorgente_descrizione_unique'
+          ])
+        ORDER BY indexname
+      `);
+      expect(mappingIndexes.rows.map((row) => row.indexname)).toEqual([
+        "mappature_prodotti_esterni_legacy_descrizione_unique",
+        "mappature_prodotti_esterni_sorgente_descrizione_unique",
+      ]);
       await client.query("ROLLBACK");
     } catch (error) {
       await client.query("ROLLBACK");

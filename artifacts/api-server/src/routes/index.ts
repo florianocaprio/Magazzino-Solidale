@@ -48,6 +48,7 @@ import reportIntegratoRouter from "./report-integrato";
 import reportRouter from "./report";
 import mensaRouter from "./mensa";
 import ageaRouter from "./agea";
+import fseImportazioniRouter from "./fse-importazioni";
 import fseRouter from "./fse";
 import mapsRouter from "./maps";
 import authRouter from "./auth";
@@ -121,6 +122,7 @@ router.use(reportIntegratoRouter);
 router.use(reportRouter);
 router.use(mensaRouter);
 router.use(ageaRouter);
+router.use(fseImportazioniRouter);
 router.use(fseRouter);
 router.use(mapsRouter);
 

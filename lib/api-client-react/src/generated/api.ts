@@ -49,6 +49,7 @@ import type {
   Alert,
   AllocazioneMezziReport,
   AnalyzeAgeaImportazioneParams,
+  AnalyzeFsePracticeImportParams,
   AnalyzeVolontariImportParams,
   AnnullaTurnoInput,
   ApprovazioniLogistica,
@@ -176,6 +177,15 @@ import type {
   FseConflictResponse,
   FseExportInput,
   FseForbiddenResponse,
+  FseImportAcquireResult,
+  FseImportAddToPracticeInput,
+  FseImportAddToPracticeResult,
+  FseImportProductMappingInput,
+  FseImportRowRevisionInput,
+  FseImportSession,
+  FseImportSessionDetail,
+  FseImportSource,
+  FseImportSourceInput,
   FseMarkEnteredInput,
   FseMonitoringInput,
   FseMonitoringUpdate,
@@ -255,6 +265,7 @@ import type {
   ListFseExportEventsParams,
   ListFseExportLinesParams,
   ListFseExportsParams,
+  ListFseImportSessionsParams,
   ListFseMonitoringParams,
   ListFseReconciliationLinesParams,
   ListFseReconciliationsParams,
@@ -2728,6 +2739,563 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getCancelCaricoPraticaMutationOptions(options));
+    }
+
+export const getListFseImportSourcesUrl = () => {
+
+
+
+
+  return `/api/fse-importazioni/sorgenti`
+}
+
+export const listFseImportSources = async ( options?: RequestInit): Promise<FseImportSource[]> => {
+
+  return customFetch<FseImportSource[]>(getListFseImportSourcesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFseImportSourcesQueryKey = () => {
+    return [
+    `/api/fse-importazioni/sorgenti`
+    ] as const;
+    }
+
+
+export const getListFseImportSourcesQueryOptions = <TData = Awaited<ReturnType<typeof listFseImportSources>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseImportSources>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFseImportSourcesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFseImportSources>>> = ({ signal }) => listFseImportSources({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFseImportSources>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFseImportSourcesQueryResult = NonNullable<Awaited<ReturnType<typeof listFseImportSources>>>
+export type ListFseImportSourcesQueryError = ErrorType<unknown>
+
+
+
+export function useListFseImportSources<TData = Awaited<ReturnType<typeof listFseImportSources>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseImportSources>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFseImportSourcesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateFseImportSourceUrl = () => {
+
+
+
+
+  return `/api/fse-importazioni/sorgenti`
+}
+
+export const createFseImportSource = async (fseImportSourceInput: FseImportSourceInput, options?: RequestInit): Promise<FseImportSource> => {
+
+  return customFetch<FseImportSource>(getCreateFseImportSourceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseImportSourceInput,)
+  }
+);}
+
+
+
+
+export const getCreateFseImportSourceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFseImportSource>>, TError,{data: BodyType<FseImportSourceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFseImportSource>>, TError,{data: BodyType<FseImportSourceInput>}, TContext> => {
+
+const mutationKey = ['createFseImportSource'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFseImportSource>>, {data: BodyType<FseImportSourceInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createFseImportSource(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFseImportSourceMutationResult = NonNullable<Awaited<ReturnType<typeof createFseImportSource>>>
+    export type CreateFseImportSourceMutationBody = BodyType<FseImportSourceInput>
+    export type CreateFseImportSourceMutationError = ErrorType<unknown>
+
+    export const useCreateFseImportSource = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFseImportSource>>, TError,{data: BodyType<FseImportSourceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFseImportSource>>,
+        TError,
+        {data: BodyType<FseImportSourceInput>},
+        TContext
+      > => {
+      return useMutation(getCreateFseImportSourceMutationOptions(options));
+    }
+
+export const getAnalyzeFsePracticeImportUrl = (params: AnalyzeFsePracticeImportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse-importazioni/analizza?${stringifiedParams}` : `/api/fse-importazioni/analizza`
+}
+
+export const analyzeFsePracticeImport = async (analyzeFsePracticeImportBody: Blob,
+    params: AnalyzeFsePracticeImportParams, options?: RequestInit): Promise<FseImportAcquireResult> => {
+
+  return customFetch<FseImportAcquireResult>(getAnalyzeFsePracticeImportUrl(params),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...options?.headers },
+    body: analyzeFsePracticeImportBody
+  }
+);}
+
+
+
+
+export const getAnalyzeFsePracticeImportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeFsePracticeImport>>, TError,{data: BodyType<Blob>;params: AnalyzeFsePracticeImportParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeFsePracticeImport>>, TError,{data: BodyType<Blob>;params: AnalyzeFsePracticeImportParams}, TContext> => {
+
+const mutationKey = ['analyzeFsePracticeImport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeFsePracticeImport>>, {data: BodyType<Blob>;params: AnalyzeFsePracticeImportParams}> = (props) => {
+          const {data,params} = props ?? {};
+
+          return  analyzeFsePracticeImport(data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeFsePracticeImportMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeFsePracticeImport>>>
+    export type AnalyzeFsePracticeImportMutationBody = BodyType<Blob>
+    export type AnalyzeFsePracticeImportMutationError = ErrorType<unknown>
+
+    export const useAnalyzeFsePracticeImport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeFsePracticeImport>>, TError,{data: BodyType<Blob>;params: AnalyzeFsePracticeImportParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeFsePracticeImport>>,
+        TError,
+        {data: BodyType<Blob>;params: AnalyzeFsePracticeImportParams},
+        TContext
+      > => {
+      return useMutation(getAnalyzeFsePracticeImportMutationOptions(options));
+    }
+
+export const getListFseImportSessionsUrl = (params: ListFseImportSessionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/fse-importazioni/sessioni?${stringifiedParams}` : `/api/fse-importazioni/sessioni`
+}
+
+export const listFseImportSessions = async (params: ListFseImportSessionsParams, options?: RequestInit): Promise<FseImportSession[]> => {
+
+  return customFetch<FseImportSession[]>(getListFseImportSessionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFseImportSessionsQueryKey = (params?: ListFseImportSessionsParams,) => {
+    return [
+    `/api/fse-importazioni/sessioni`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFseImportSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listFseImportSessions>>, TError = ErrorType<unknown>>(params: ListFseImportSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseImportSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFseImportSessionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFseImportSessions>>> = ({ signal }) => listFseImportSessions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFseImportSessions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFseImportSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listFseImportSessions>>>
+export type ListFseImportSessionsQueryError = ErrorType<unknown>
+
+
+
+export function useListFseImportSessions<TData = Awaited<ReturnType<typeof listFseImportSessions>>, TError = ErrorType<unknown>>(
+ params: ListFseImportSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFseImportSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFseImportSessionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetFseImportSessionUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse-importazioni/sessioni/${id}`
+}
+
+export const getFseImportSession = async (id: number, options?: RequestInit): Promise<FseImportSessionDetail> => {
+
+  return customFetch<FseImportSessionDetail>(getGetFseImportSessionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFseImportSessionQueryKey = (id: number,) => {
+    return [
+    `/api/fse-importazioni/sessioni/${id}`
+    ] as const;
+    }
+
+
+export const getGetFseImportSessionQueryOptions = <TData = Awaited<ReturnType<typeof getFseImportSession>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFseImportSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFseImportSessionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFseImportSession>>> = ({ signal }) => getFseImportSession(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFseImportSession>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFseImportSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getFseImportSession>>>
+export type GetFseImportSessionQueryError = ErrorType<unknown>
+
+
+
+export function useGetFseImportSession<TData = Awaited<ReturnType<typeof getFseImportSession>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFseImportSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFseImportSessionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getMapFseImportProductUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse-importazioni/sessioni/${id}/associa-prodotto`
+}
+
+export const mapFseImportProduct = async (id: number,
+    fseImportProductMappingInput: FseImportProductMappingInput, options?: RequestInit): Promise<FseImportSession> => {
+
+  return customFetch<FseImportSession>(getMapFseImportProductUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseImportProductMappingInput,)
+  }
+);}
+
+
+
+
+export const getMapFseImportProductMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mapFseImportProduct>>, TError,{id: number;data: BodyType<FseImportProductMappingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof mapFseImportProduct>>, TError,{id: number;data: BodyType<FseImportProductMappingInput>}, TContext> => {
+
+const mutationKey = ['mapFseImportProduct'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mapFseImportProduct>>, {id: number;data: BodyType<FseImportProductMappingInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  mapFseImportProduct(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MapFseImportProductMutationResult = NonNullable<Awaited<ReturnType<typeof mapFseImportProduct>>>
+    export type MapFseImportProductMutationBody = BodyType<FseImportProductMappingInput>
+    export type MapFseImportProductMutationError = ErrorType<unknown>
+
+    export const useMapFseImportProduct = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mapFseImportProduct>>, TError,{id: number;data: BodyType<FseImportProductMappingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof mapFseImportProduct>>,
+        TError,
+        {id: number;data: BodyType<FseImportProductMappingInput>},
+        TContext
+      > => {
+      return useMutation(getMapFseImportProductMutationOptions(options));
+    }
+
+export const getReviseFseImportRowUrl = (id: number,
+    rigaId: number,) => {
+
+
+
+
+  return `/api/fse-importazioni/sessioni/${id}/righe/${rigaId}`
+}
+
+export const reviseFseImportRow = async (id: number,
+    rigaId: number,
+    fseImportRowRevisionInput: FseImportRowRevisionInput, options?: RequestInit): Promise<FseImportSession> => {
+
+  return customFetch<FseImportSession>(getReviseFseImportRowUrl(id,rigaId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseImportRowRevisionInput,)
+  }
+);}
+
+
+
+
+export const getReviseFseImportRowMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviseFseImportRow>>, TError,{id: number;rigaId: number;data: BodyType<FseImportRowRevisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviseFseImportRow>>, TError,{id: number;rigaId: number;data: BodyType<FseImportRowRevisionInput>}, TContext> => {
+
+const mutationKey = ['reviseFseImportRow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviseFseImportRow>>, {id: number;rigaId: number;data: BodyType<FseImportRowRevisionInput>}> = (props) => {
+          const {id,rigaId,data} = props ?? {};
+
+          return  reviseFseImportRow(id,rigaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviseFseImportRowMutationResult = NonNullable<Awaited<ReturnType<typeof reviseFseImportRow>>>
+    export type ReviseFseImportRowMutationBody = BodyType<FseImportRowRevisionInput>
+    export type ReviseFseImportRowMutationError = ErrorType<unknown>
+
+    export const useReviseFseImportRow = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviseFseImportRow>>, TError,{id: number;rigaId: number;data: BodyType<FseImportRowRevisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviseFseImportRow>>,
+        TError,
+        {id: number;rigaId: number;data: BodyType<FseImportRowRevisionInput>},
+        TContext
+      > => {
+      return useMutation(getReviseFseImportRowMutationOptions(options));
+    }
+
+export const getAddFseImportToPracticeUrl = (id: number,) => {
+
+
+
+
+  return `/api/fse-importazioni/sessioni/${id}/aggiungi-pratica`
+}
+
+export const addFseImportToPractice = async (id: number,
+    fseImportAddToPracticeInput: FseImportAddToPracticeInput, options?: RequestInit): Promise<FseImportAddToPracticeResult> => {
+
+  return customFetch<FseImportAddToPracticeResult>(getAddFseImportToPracticeUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      fseImportAddToPracticeInput,)
+  }
+);}
+
+
+
+
+export const getAddFseImportToPracticeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addFseImportToPractice>>, TError,{id: number;data: BodyType<FseImportAddToPracticeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addFseImportToPractice>>, TError,{id: number;data: BodyType<FseImportAddToPracticeInput>}, TContext> => {
+
+const mutationKey = ['addFseImportToPractice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addFseImportToPractice>>, {id: number;data: BodyType<FseImportAddToPracticeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addFseImportToPractice(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddFseImportToPracticeMutationResult = NonNullable<Awaited<ReturnType<typeof addFseImportToPractice>>>
+    export type AddFseImportToPracticeMutationBody = BodyType<FseImportAddToPracticeInput>
+    export type AddFseImportToPracticeMutationError = ErrorType<unknown>
+
+    export const useAddFseImportToPractice = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addFseImportToPractice>>, TError,{id: number;data: BodyType<FseImportAddToPracticeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addFseImportToPractice>>,
+        TError,
+        {id: number;data: BodyType<FseImportAddToPracticeInput>},
+        TContext
+      > => {
+      return useMutation(getAddFseImportToPracticeMutationOptions(options));
     }
 
 export const getListAgeaImportazioniUrl = () => {

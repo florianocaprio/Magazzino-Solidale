@@ -952,7 +952,15 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
         importazioniAgeaTable,
         eq(importazioniAgeaTable.id, importazioniAgeaRigheTable.importazioneId),
       )
-      .where(eq(importazioniAgeaTable.stato, "CONFERMATA"));
+      .where(
+        and(
+          eq(importazioniAgeaTable.stato, "CONFERMATA"),
+          eq(
+            importazioniAgeaRigheTable.prodottoNormalizzato,
+            "PASTA TEST AGEA",
+          ),
+        ),
+      );
     expect(
       confirmedRows.every(
         ({ importazioni_agea_righe: row }) =>

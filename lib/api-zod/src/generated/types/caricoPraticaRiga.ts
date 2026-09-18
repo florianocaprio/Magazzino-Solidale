@@ -30,6 +30,12 @@ export interface CaricoPraticaRiga {
   fattoreKgLtPezzo?: FattoreContabile | null;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  numeroDocumentoEsterno?: string | null;
+  /** @nullable */
+  dataDocumentoEsterna?: Date | null;
+  /** @nullable */
+  dataOperativaFonte?: string | null;
   registrata: boolean;
   /** @nullable */
   registrataAt?: Date | null;
