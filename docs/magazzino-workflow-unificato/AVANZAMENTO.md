@@ -1049,3 +1049,53 @@ risorse di altri progetti restano invariati.
 
 Condizione di arresto: **M3B test automatici e review superati — candidato
 pubblicabile sul solo branch `codex/magazzino-workflow-unificato`**.
+
+## M3B — hardening post-review indipendente
+
+Data: 18 settembre 2026
+
+Base revisionata: `32a6953d4b2d07a4db2f747f4febdeb1e5230f0f`.
+HEAD iniziale reale preservata:
+`fcd445576bae9c10e9c155b29659009de5fdf5a1`.
+
+Stato: **H1/H2/H3/H4 corretti e gate automatici verdi; candidato pronto per
+nuova code review** (`OK-M3B/NE-MAN-CAMERA/NE-MAN-TABLET`). Non sono stati
+avviati Docker candidato, M4/M5 o merge su `main`.
+
+### Correzioni
+
+- H1 separa identità esterna originale, identità operativa accettata e alias
+  verificati. La nuova migrazione 39 conserva alias per sorgente/evento
+  canonico senza riscrivere le prime 38 migrazioni o i dati storici.
+- H2 valida pratica, versione, stato e contesto esclusivamente dopo lock e
+  rilettura autorevole; un update stale non aggiunge righe o claim.
+- H3 consente per `NUOVI_CARICHI` l'aggiunta atomica delle sole righe valide
+  selezionate anche con eccezioni pendenti. Le righe escluse restano
+  riprendibili e non vengono riselezionate dopo refetch; il saldo resta
+  integrale.
+- H4 conserva idempotency key e payload canonico dopo una risposta incerta. Un
+  retry ripete esattamente la stessa intenzione; una nuova intenzione usa una
+  nuova key e un `409` resta definitivo e visibile.
+
+### Evidenza finale
+
+- backend M3B 25/25 e frontend dedicato 5/5;
+- API completa finale su database fresco e dipendenze da lockfile: 114 file,
+  1.263 pass, 4 skip, zero failure;
+- frontend completa: 69 file, 381 pass;
+- Playwright desktop: 22 pass e 4 skip di viewport; tablet emulato portrait e
+  landscape: 2 pass e 8 skip desktop intenzionali;
+- T01/T25 sui due originali: sette partite, 1.177 pezzi, nessun effetto prima
+  di `Registra` e nessun carico storico al reimport;
+- runner 24/24, fresh/replay 39/39 e upgrade populated 38→39 con ledger,
+  movimenti, legacy e audit invariati;
+- typecheck, build, budget, runtime config, Prettier e `git diff --check`
+  verdi;
+- OpenAPI e generated invariati; codegen non pertinente al delta.
+
+Restano non eseguite e non dichiarate superate la fotocamera reale
+(`NE-MAN-CAMERA`) e il tablet fisico (`NE-MAN-TABLET`). Nessuna validazione
+umana è implicata.
+
+Condizione di arresto: **M3B hardening post-review completato — candidato
+automatico pronto per nuova code review ChatGPT**.

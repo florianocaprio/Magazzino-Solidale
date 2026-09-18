@@ -466,7 +466,7 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     const concurrentRow = (overrides: Record<string, unknown> = {}) =>
       row(firstCode, {
         "Nome Referente fascicolo": `Xylophora-${suffix}`,
-        "Cognome Referente fascicolo": `Quasarion-${suffix}`,
+        "Cognome Referente fascicolo": `Zymurgy-${suffix}`,
         ...overrides,
       });
     const firstRows = [concurrentRow()];
@@ -879,13 +879,11 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     });
     expect(
       (
-        await request(app())
-          .post("/beneficiari/fse/export")
-          .send({
-            centroAscoltoId: centerExport,
-            dataRiferimento: "2026-08-24",
-            soloAttivi: false,
-          })
+        await request(app()).post("/beneficiari/fse/export").send({
+          centroAscoltoId: centerExport,
+          dataRiferimento: "2026-08-24",
+          soloAttivi: false,
+        })
       ).status,
     ).toBe(400);
 

@@ -199,3 +199,67 @@ altri progetti restano invariati.
 Decisione: **GO al commit e al push del solo branch
 `codex/magazzino-workflow-unificato`**. Nessun merge su `main`; nessun avvio di
 M4/M5.
+
+## Review indipendente post-pubblicazione — H1/H2/H3/H4
+
+Base della review indipendente:
+`32a6953d4b2d07a4db2f747f4febdeb1e5230f0f`. HEAD reale preservata al
+preflight: `fcd445576bae9c10e9c155b29659009de5fdf5a1`.
+
+### Evidenza per finding
+
+| Finding | Evidenza finale                                                                                                                                                                                                                                                                                |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1      | Correzione lotto `LOT-A→LOT-B`, documento e data; export successivo sia originale sia corretto; evento realmente distinto; concorrenza forma originale/corretta; una sola claim, riga pratica, audit e contabilizzazione; raw e revisioni immutabili.                                          |
+| H2      | Interleaving PostgreSQL reale con connessioni e barriere: incremento versione durante l'attesa → `409`; chiusura durante l'attesa → nessuna aggiunta; due attach stessa versione → uno solo riesce; retry con versione aggiornata → successo. Nessun `sleep` casuale o mock della transazione. |
+| H3      | Sessione con A `PRONTO`, B `DA_ASSOCIARE`, C `ERRORE`: A aggiunta mentre la sessione resta `DA_COMPLETARE`, logout/ripresa, B risolta e aggiunta senza duplicare A, B+C invalida in rollback, stock ancora zero fino a `Registra`, saldo invalido sempre atomico.                              |
+| H4      | E2E con primo POST realmente committato e sola risposta browser interrotta; retry con key e payload byte-equivalenti, un solo effetto su riga/claim/audit e stock singolo dopo `Registra`; una selezione intenzionalmente diversa usa una nuova key.                                           |
+
+Il test backend M3B chiude 25/25; il componente frontend dedicato chiude 5/5.
+I due originali sono stati rieseguiti in T01/T25: sette partite, 1.177 pezzi,
+quantità secondarie e scadenze corrette, zero stock prima di `Registra` e
+nessun nuovo carico storico al reimport.
+
+### Gate finali del correttivo
+
+| Gate                      | Esito                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| install frozen            | `CI=true pnpm install --frozen-lockfile --offline`: pass, lockfile invariato                          |
+| migrazione                | runner PostgreSQL 24/24; fresh/replay 39/39; populated 38→39 con hash pre/post invariati              |
+| API completa              | 114 file, 1.263 pass, 4 skip preesistenti/opzionali, zero failure                                     |
+| frontend completa         | 69 file, 381 pass, zero failure                                                                       |
+| Playwright desktop        | 22 pass, 4 skip condizionati ad altri viewport; include originali e H4                                |
+| Playwright tablet emulato | portrait 768×1024 e landscape 1024×768: 2 pass, 8 skip desktop intenzionali                           |
+| typecheck/build           | workspace verde; build verde con `PORT=4174 BASE_PATH=/`                                              |
+| bundle/runtime            | entry 1.300,0 KiB / 359,6 KiB gzip; runtime config 14/14                                              |
+| contratti                 | OpenAPI/generated invariati; codegen non necessario                                                   |
+| hygiene                   | Prettier pertinente e `git diff --check` verdi; nessun Excel, dump, log, credenziale o report incluso |
+
+Durante i run completi sono state diagnosticate senza mascherarle:
+
+1. una failure UDS storica non si è riprodotta su database freschi successivi
+   né nel run finale;
+2. la fixture di concorrenza Beneficiari FSE usava `Quasarion` dopo il caso
+   fuzzy `Quasar`, rendendo il punteggio trigramma dipendente dal suffisso
+   casuale. La fixture è stata resa semanticamente dissimile (`Zymurgy`),
+   lasciando intatte le asserzioni di concorrenza; il run combinato finale è
+   verde;
+3. i locator E2E ora selezionano esplicitamente le righe diventate `PRONTO`,
+   coerentemente con H3, e attendono stati osservabili invece di timeout
+   arbitrari.
+
+Non sono stati aggiunti skip o rimossi assert per ottenere il verde. I report
+preliminari con ambiente E2E riusato non sono conteggiati come gate; il gate
+desktop finale è partito da database release vergine.
+
+### Limiti
+
+- `NE-MAN-CAMERA`: fotocamera reale non provata;
+- `NE-MAN-TABLET`: tablet fisico non provato; i due viewport sono emulati;
+- nessuna validazione umana è dichiarata;
+- nessun Docker candidato applicativo è stato costruito;
+- M4/M5 non sono iniziati.
+
+Decisione automatica: **GO a un nuovo commit correttivo e al push del solo
+branch `codex/magazzino-workflow-unificato`, pronto per una nuova code review
+ChatGPT**.

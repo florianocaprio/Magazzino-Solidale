@@ -13,6 +13,7 @@ type Product = {
   codice: string;
   nome: string;
   attivo: boolean;
+  unitaMisura: string;
   lottoFisicoObbligatorio: boolean;
   gestioneScadenza: boolean;
 };
@@ -185,7 +186,7 @@ test.describe("M3A — pratica di carico persistente", () => {
       .click();
     expect((await firstRegistrationResponse).status()).toBe(201);
     await expect(
-      resumedPage.getByText(/80.*già registrate|80.*pz/i),
+      resumedPage.getByText(`80.00 ${product.unitaMisura}`, { exact: true }),
     ).toBeVisible();
     expect(await readStock(resumedPage)).toBe(before + 80);
 

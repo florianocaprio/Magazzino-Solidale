@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   analyzeFsePracticeImport,
@@ -45,6 +45,12 @@ import { useToast } from "@/hooks/use-toast";
 import { errorMessage } from "@/lib/api-error";
 import { useAuth } from "@/lib/auth";
 import { newCommandKey } from "@/lib/carico-merce";
+import {
+  reconcileFseReadySelection,
+  resolveFseAttachIntent,
+  retainFseAttachIntentAfterError,
+  type FseAttachIntent,
+} from "@/lib/fse-import-attach-intent";
 import {
   AlertTriangle,
   FileSpreadsheet,
@@ -142,6 +148,8 @@ export function FseImportPracticeWizard({
   const [newProductFor, setNewProductFor] = useState<string | null>(null);
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
   const [correction, setCorrection] = useState<CorrectionDraft | null>(null);
+  const selectedSession = useRef<number | null>(null);
+  const attachIntent = useRef<FseAttachIntent | null>(null);
 
   const sourcesQuery = useListFseImportSources({
     query: { enabled: open, queryKey: getListFseImportSourcesQueryKey() },
@@ -180,13 +188,17 @@ export function FseImportPracticeWizard({
     if (!detail) return;
     setMode(detail.modalita);
     setSourceId(String(detail.sourceRegistryId));
-    setSelectedRows(
-      new Set(
+    const initialize = selectedSession.current !== detail.id;
+    setSelectedRows((current) =>
+      reconcileFseReadySelection(
+        current,
         detail.rows
           .filter((row) => row.stato === "PRONTO")
           .map((row) => row.id),
+        initialize,
       ),
     );
+    selectedSession.current = detail.id;
   }, [detail]);
 
   useEffect(() => {
@@ -293,6 +305,7 @@ export function FseImportPracticeWizard({
         },
       });
       await detailQuery.refetch();
+      attachIntent.current = null;
     } catch (error) {
       showError(error);
     }
@@ -345,6 +358,7 @@ export function FseImportPracticeWizard({
       setEditingRowId(null);
       setCorrection(null);
       await detailQuery.refetch();
+      attachIntent.current = null;
     } catch (error) {
       showError(error);
     }
@@ -352,21 +366,30 @@ export function FseImportPracticeWizard({
 
   const attach = async () => {
     if (!detail) return;
+    const intent = resolveFseAttachIntent(
+      attachIntent.current,
+      {
+        sessionId: detail.id,
+        practiceId: practice.id,
+        mode: detail.modalita,
+        sessionVersion: detail.versione,
+        practiceVersion: practice.versione,
+        rowIds:
+          detail.modalita === "NUOVI_CARICHI" ? [...selectedRows] : undefined,
+        historicalCoverageConfirmed:
+          detail.modalita === "SALDO_INIZIALE"
+            ? historicalCoverageConfirmed
+            : false,
+      },
+      () => newCommandKey(),
+    );
+    attachIntent.current = intent;
     try {
       const result = await addToPractice.mutateAsync({
-        id: detail.id,
-        data: {
-          versione: detail.versione,
-          versionePratica: practice.versione,
-          rigaIds:
-            detail.modalita === "NUOVI_CARICHI" ? [...selectedRows] : undefined,
-          idempotencyKey: newCommandKey(),
-          confermaCoperturaStorica:
-            detail.modalita === "SALDO_INIZIALE"
-              ? historicalCoverageConfirmed
-              : false,
-        },
+        id: intent.sessionId,
+        data: intent.payload,
       });
+      attachIntent.current = null;
       toast({
         title: t("caricoPratiche.fseAdded", {
           count: result.addedRows ?? 0,
@@ -376,6 +399,7 @@ export function FseImportPracticeWizard({
       onOpenChange(false);
       onPracticeReady(result.practiceId);
     } catch (error) {
+      if (!retainFseAttachIntentAfterError(error)) attachIntent.current = null;
       showError(error);
     }
   };
@@ -388,6 +412,8 @@ export function FseImportPracticeWizard({
     setReferenceDate("");
     setHistoricalCoverageConfirmed(false);
     setSelectedRows(new Set());
+    selectedSession.current = null;
+    attachIntent.current = null;
     setNewProductFor(null);
     setEditingRowId(null);
     setCorrection(null);
@@ -753,6 +779,7 @@ export function FseImportPracticeWizard({
                         disabled={row.stato !== "PRONTO"}
                         onCheckedChange={(checked) =>
                           setSelectedRows((current) => {
+                            attachIntent.current = null;
                             const next = new Set(current);
                             if (checked) next.add(row.id);
                             else next.delete(row.id);
@@ -995,7 +1022,7 @@ export function FseImportPracticeWizard({
                 !(
                   detail?.stato === "PRONTA" ||
                   (detail?.modalita === "NUOVI_CARICHI" &&
-                    detail?.stato === "IN_PRATICA")
+                    ["DA_COMPLETARE", "IN_PRATICA"].includes(detail?.stato))
                 ) ||
                 (detail.modalita === "NUOVI_CARICHI" &&
                   selectedRows.size === 0) ||

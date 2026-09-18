@@ -10,6 +10,7 @@ import {
   fseImportSessionsTable,
   fseImportStockRowsTable,
   fseInitialBalanceCoverageTable,
+  fseMovementIdentityAliasesTable,
   fseMovementClaimsTable,
   fseSourceRegistriesTable,
   importazioniAgeaRigheTable,
@@ -76,6 +77,241 @@ async function lockFseSourceForSession(
 
 function hash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+type FseImportRowRecord = typeof fseImportRowsTable.$inferSelect;
+
+function rawTextValue(value: unknown): string | null {
+  if (value == null) return null;
+  const normalized = String(value).normalize("NFC").trim();
+  return normalized || null;
+}
+
+function rowIdentity(
+  row: Pick<
+    FseImportRowRecord,
+    | "fondoOrigine"
+    | "prodottoNormalizzato"
+    | "numeroDocumento"
+    | "dataDocumento"
+    | "lottoFisico"
+    | "tipoMovimento"
+    | "rawJson"
+  >,
+) {
+  return fseSemanticIdentityHash({
+    fondo: row.fondoOrigine,
+    prodotto: row.prodottoNormalizzato,
+    numeroDocumento: normalizeAgeaKey(row.numeroDocumento),
+    dataDocumento: row.dataDocumento,
+    lotto: normalizeAgeaKey(row.lottoFisico),
+    natura: row.tipoMovimento,
+    mittenteDestinatario: normalizeAgeaKey(
+      rawTextValue(row.rawJson["Mittente / destinatario"]),
+    ),
+  });
+}
+
+function rowContent(
+  row: Pick<
+    FseImportRowRecord,
+    | "quantitaKgLt"
+    | "quantitaPezzi"
+    | "dataOperativaProposta"
+    | "lottoFisico"
+    | "fondoOrigine"
+  >,
+) {
+  return normalizedMovementContentHash({
+    movimentoKgLt: row.quantitaKgLt,
+    movimentoPezzi: row.quantitaPezzi,
+    dataOperativaProposta: row.dataOperativaProposta,
+    lotto: normalizeAgeaKey(row.lottoFisico),
+    fondo: row.fondoOrigine,
+  });
+}
+
+function normalizedMovementContentHash(input: {
+  movimentoKgLt: string | null;
+  movimentoPezzi: string | null;
+  dataOperativaProposta: string | null;
+  lotto: string | null;
+  fondo: string | null;
+}) {
+  const normalizeQuantity = (value: string | null) =>
+    value == null
+      ? null
+      : InventoryDecimal.parse(value, { allowNegative: true }).toDb();
+  return fseMovementContentHash({
+    ...input,
+    movimentoKgLt: normalizeQuantity(input.movimentoKgLt),
+    movimentoPezzi: normalizeQuantity(input.movimentoPezzi),
+  });
+}
+
+function originalIdentityFromRaw(row: FseImportRowRecord) {
+  return fseSemanticIdentityHash({
+    fondo: row.fondoOrigine,
+    prodotto: row.prodottoNormalizzato,
+    numeroDocumento: normalizeAgeaKey(
+      rawTextValue(row.rawJson["Numero documento"]),
+    ),
+    dataDocumento: parseFseDate(rawTextValue(row.rawJson["Data documento"])),
+    lotto: normalizeAgeaKey(rawTextValue(row.rawJson.Lotto)),
+    natura: row.tipoMovimento,
+    mittenteDestinatario: normalizeAgeaKey(
+      rawTextValue(row.rawJson["Mittente / destinatario"]),
+    ),
+  });
+}
+
+function identityFromRevision(
+  row: FseImportRowRecord,
+  acceptedValues: Record<string, unknown>,
+) {
+  const explicit = acceptedValues.semanticIdentityHash;
+  if (typeof explicit === "string" && /^[0-9a-f]{64}$/.test(explicit))
+    return explicit;
+  if (
+    !Object.hasOwn(acceptedValues, "numeroDocumento") ||
+    !Object.hasOwn(acceptedValues, "dataDocumento") ||
+    !Object.hasOwn(acceptedValues, "lottoFisico")
+  )
+    return null;
+  return fseSemanticIdentityHash({
+    fondo: row.fondoOrigine,
+    prodotto: row.prodottoNormalizzato,
+    numeroDocumento: normalizeAgeaKey(
+      rawTextValue(acceptedValues.numeroDocumento),
+    ),
+    dataDocumento: parseFseDate(rawTextValue(acceptedValues.dataDocumento)),
+    lotto: normalizeAgeaKey(rawTextValue(acceptedValues.lottoFisico)),
+    natura: row.tipoMovimento,
+    mittenteDestinatario: normalizeAgeaKey(
+      rawTextValue(row.rawJson["Mittente / destinatario"]),
+    ),
+  });
+}
+
+async function registerIdentityAliases(
+  tx: InventoryTransaction,
+  input: {
+    sourceRegistryId: number;
+    canonicalIdentityHash: string;
+    identities: string[];
+    disambiguator: string;
+    revisionId: number;
+  },
+) {
+  for (const identity of [...new Set(input.identities)]) {
+    const [existing] = await tx
+      .select({
+        canonicalIdentityHash:
+          fseMovementIdentityAliasesTable.canonicalIdentityHash,
+      })
+      .from(fseMovementIdentityAliasesTable)
+      .where(
+        and(
+          eq(
+            fseMovementIdentityAliasesTable.sourceRegistryId,
+            input.sourceRegistryId,
+          ),
+          eq(fseMovementIdentityAliasesTable.semanticIdentityHash, identity),
+          eq(
+            fseMovementIdentityAliasesTable.disambiguatore,
+            input.disambiguator,
+          ),
+        ),
+      );
+    if (existing) {
+      if (existing.canonicalIdentityHash !== input.canonicalIdentityHash)
+        throw new FsePracticeImportError(
+          409,
+          "IDENTITA_ALIAS_AMBIGUA",
+          "La correzione coincide con un'altra identità esterna già verificata",
+        );
+      continue;
+    }
+    await tx.insert(fseMovementIdentityAliasesTable).values({
+      sourceRegistryId: input.sourceRegistryId,
+      semanticIdentityHash: identity,
+      disambiguatore: input.disambiguator,
+      canonicalIdentityHash: input.canonicalIdentityHash,
+      createdFromRevisionId: input.revisionId,
+    });
+  }
+}
+
+async function hydrateIdentityAliasesForClaims(
+  tx: InventoryTransaction,
+  sourceRegistryId: number,
+) {
+  const claims = await tx
+    .select({
+      canonicalIdentityHash: fseMovementClaimsTable.semanticIdentityHash,
+      disambiguator: fseMovementClaimsTable.disambiguatore,
+      revisionId: fseMovementClaimsTable.acceptedRevisionId,
+      acceptedValues: fseImportRowRevisionsTable.acceptedValuesJson,
+      row: fseImportRowsTable,
+    })
+    .from(fseMovementClaimsTable)
+    .innerJoin(
+      fseImportRowRevisionsTable,
+      eq(
+        fseMovementClaimsTable.acceptedRevisionId,
+        fseImportRowRevisionsTable.id,
+      ),
+    )
+    .innerJoin(
+      fseImportRowsTable,
+      eq(fseImportRowRevisionsTable.rigaId, fseImportRowsTable.id),
+    )
+    .where(
+      and(
+        eq(fseMovementClaimsTable.sourceRegistryId, sourceRegistryId),
+        ne(fseMovementClaimsTable.stato, "RILASCIATA"),
+      ),
+    );
+  for (const claim of claims) {
+    const acceptedIdentity = identityFromRevision(
+      claim.row,
+      claim.acceptedValues,
+    );
+    await registerIdentityAliases(tx, {
+      sourceRegistryId,
+      canonicalIdentityHash: claim.canonicalIdentityHash,
+      identities: [
+        claim.canonicalIdentityHash,
+        claim.row.semanticIdentityHash,
+        originalIdentityFromRaw(claim.row),
+        ...(acceptedIdentity ? [acceptedIdentity] : []),
+      ],
+      disambiguator: claim.disambiguator,
+      revisionId: claim.revisionId,
+    });
+  }
+}
+
+async function canonicalIdentityFor(
+  tx: InventoryTransaction,
+  sourceRegistryId: number,
+  identity: string,
+  disambiguator: string,
+) {
+  const [alias] = await tx
+    .select({
+      canonicalIdentityHash:
+        fseMovementIdentityAliasesTable.canonicalIdentityHash,
+    })
+    .from(fseMovementIdentityAliasesTable)
+    .where(
+      and(
+        eq(fseMovementIdentityAliasesTable.sourceRegistryId, sourceRegistryId),
+        eq(fseMovementIdentityAliasesTable.semanticIdentityHash, identity),
+        eq(fseMovementIdentityAliasesTable.disambiguatore, disambiguator),
+      ),
+    );
+  return alias?.canonicalIdentityHash ?? identity;
 }
 
 function code(): string {
@@ -303,23 +539,64 @@ async function classifyRegistryRows(
   const identities = [
     ...new Set(parsed.registryRows.map((row) => row.identityKey)),
   ];
-  const claims =
+  await hydrateIdentityAliasesForClaims(tx, sourceRegistryId);
+  const [aliases, claims] = await Promise.all([
     identities.length === 0
       ? []
-      : await tx
+      : tx
           .select()
-          .from(fseMovementClaimsTable)
+          .from(fseMovementIdentityAliasesTable)
           .where(
             and(
-              eq(fseMovementClaimsTable.sourceRegistryId, sourceRegistryId),
-              inArray(fseMovementClaimsTable.semanticIdentityHash, identities),
+              eq(
+                fseMovementIdentityAliasesTable.sourceRegistryId,
+                sourceRegistryId,
+              ),
+              inArray(
+                fseMovementIdentityAliasesTable.semanticIdentityHash,
+                identities,
+              ),
             ),
-          );
-  const claimsByIdentity = new Map(
-    claims
-      .filter((claim) => claim.stato !== "RILASCIATA")
-      .map((claim) => [claim.semanticIdentityHash, claim]),
-  );
+          ),
+    tx
+      .select({
+        claim: fseMovementClaimsTable,
+        acceptedValues: fseImportRowRevisionsTable.acceptedValuesJson,
+        row: fseImportRowsTable,
+      })
+      .from(fseMovementClaimsTable)
+      .innerJoin(
+        fseImportRowRevisionsTable,
+        eq(
+          fseMovementClaimsTable.acceptedRevisionId,
+          fseImportRowRevisionsTable.id,
+        ),
+      )
+      .innerJoin(
+        fseImportRowsTable,
+        eq(fseImportRowRevisionsTable.rigaId, fseImportRowsTable.id),
+      )
+      .where(
+        and(
+          eq(fseMovementClaimsTable.sourceRegistryId, sourceRegistryId),
+          ne(fseMovementClaimsTable.stato, "RILASCIATA"),
+        ),
+      ),
+  ]);
+  const claimsByCanonical = new Map<string, typeof claims>();
+  for (const claim of claims) {
+    const key = `${claim.claim.semanticIdentityHash}:${claim.claim.disambiguatore}`;
+    claimsByCanonical.set(key, [...(claimsByCanonical.get(key) ?? []), claim]);
+  }
+  const claimsByIdentity = new Map<string, typeof claims>();
+  for (const alias of aliases) {
+    const key = `${alias.canonicalIdentityHash}:${alias.disambiguatore}`;
+    const matches = claimsByCanonical.get(key) ?? [];
+    claimsByIdentity.set(alias.semanticIdentityHash, [
+      ...(claimsByIdentity.get(alias.semanticIdentityHash) ?? []),
+      ...matches,
+    ]);
+  }
   const legacyRows = await tx
     .select({
       stato: movimentiEsterniAgeaTable.statoApplicazione,
@@ -365,7 +642,7 @@ async function classifyRegistryRows(
     });
     const match = {
       ...legacy,
-      contentHash: fseMovementContentHash({
+      contentHash: normalizedMovementContentHash({
         movimentoKgLt: legacy.movimentoKgLt,
         movimentoPezzi: legacy.movimentoPezzi,
         dataOperativaProposta: legacy.dataOperativa,
@@ -390,7 +667,15 @@ async function classifyRegistryRows(
   return parsed.registryRows.map((row) => {
     const productId = mappings.get(row.prodottoNormalizzato) ?? null;
     const product = productId == null ? null : productMap.get(productId);
-    const claim = claimsByIdentity.get(row.identityKey);
+    const claimMatches = [
+      ...new Map(
+        (claimsByIdentity.get(row.identityKey) ?? []).map((item) => [
+          item.claim.id,
+          item,
+        ]),
+      ).values(),
+    ];
+    const claim = claimMatches.length === 1 ? claimMatches[0] : null;
     const legacyMatches = legacyByIdentity.get(row.identityKey) ?? [];
     const legacy =
       legacyMatches.find((match) => match.magazzinoId === warehouseId) ??
@@ -402,15 +687,23 @@ async function classifyRegistryRows(
     let operational: ReturnType<typeof quantityForProduct> | null = null;
     if (row.blocking) state = "ERRORE";
     else if (mode === "SALDO_INIZIALE") state = "RIFERIMENTO";
-    else if (claim) {
+    else if (claimMatches.length > 1) {
+      warnings.push("IDENTITA_ALIAS_AMBIGUA");
+      state = "DA_VERIFICARE";
+    } else if (claim) {
+      const acceptedIdentity = identityFromRevision(
+        claim.row,
+        claim.acceptedValues,
+      );
       state =
-        claim.acceptedContentHash !== row.contentHash
+        row.identityKey === acceptedIdentity &&
+        claim.claim.acceptedContentHash !== row.contentHash
           ? "DATO_MODIFICATO"
-          : claim.stato === "REGISTRATA"
+          : claim.claim.stato === "REGISTRATA"
             ? "GIA_REGISTRATO"
-            : claim.stato === "COPERTA_SALDO"
+            : claim.claim.stato === "COPERTA_SALDO"
               ? "COPERTO_SALDO"
-              : claim.stato === "RISERVATA"
+              : claim.claim.stato === "RISERVATA"
                 ? "GIA_NELLA_PRATICA"
                 : "DA_VERIFICARE";
     } else if (legacy) {
@@ -1292,25 +1585,6 @@ export async function reviseFseImportRow(
       "RIGA_NON_CORREGGIBILE",
       "Associa prima un prodotto a una riga di carico",
     );
-  const [activeClaim] = await tx
-    .select({ id: fseMovementClaimsTable.id })
-    .from(fseMovementClaimsTable)
-    .where(
-      and(
-        eq(fseMovementClaimsTable.sourceRegistryId, session.sourceRegistryId),
-        eq(
-          fseMovementClaimsTable.semanticIdentityHash,
-          row.semanticIdentityHash,
-        ),
-        ne(fseMovementClaimsTable.stato, "RILASCIATA"),
-      ),
-    );
-  if (activeClaim)
-    throw new FsePracticeImportError(
-      409,
-      "RIGA_GIA_PRESA_IN_CARICO",
-      "La riga è già collegata a una pratica o contabilizzazione",
-    );
   const [product] = await tx
     .select()
     .from(prodottiTable)
@@ -1428,20 +1702,55 @@ export async function reviseFseImportRow(
       String(row.rawJson["Mittente / destinatario"] ?? ""),
     ),
   });
-  const content = fseMovementContentHash({
+  const content = normalizedMovementContentHash({
     movimentoKgLt: kgLt,
     movimentoPezzi: pieces,
     dataOperativaProposta: operationalDate,
     lotto: normalizeAgeaKey(physicalLot),
     fondo: row.fondoOrigine,
   });
+  await hydrateIdentityAliasesForClaims(tx, session.sourceRegistryId);
+  const originalCanonicalIdentity = await canonicalIdentityFor(
+    tx,
+    session.sourceRegistryId,
+    originalIdentityFromRaw(row),
+    row.disambiguatore,
+  );
+  const [targetAlias] = await tx
+    .select({
+      canonicalIdentityHash:
+        fseMovementIdentityAliasesTable.canonicalIdentityHash,
+    })
+    .from(fseMovementIdentityAliasesTable)
+    .where(
+      and(
+        eq(
+          fseMovementIdentityAliasesTable.sourceRegistryId,
+          session.sourceRegistryId,
+        ),
+        eq(fseMovementIdentityAliasesTable.semanticIdentityHash, identity),
+        eq(fseMovementIdentityAliasesTable.disambiguatore, disambiguator ?? ""),
+      ),
+    );
+  if (
+    targetAlias &&
+    targetAlias.canonicalIdentityHash !== originalCanonicalIdentity
+  )
+    throw new FsePracticeImportError(
+      409,
+      "IDENTITA_ALIAS_AMBIGUA",
+      "La correzione coincide con un'altra identità esterna già verificata",
+    );
   const [conflict] = await tx
     .select({ id: fseMovementClaimsTable.id })
     .from(fseMovementClaimsTable)
     .where(
       and(
         eq(fseMovementClaimsTable.sourceRegistryId, session.sourceRegistryId),
-        eq(fseMovementClaimsTable.semanticIdentityHash, identity),
+        eq(
+          fseMovementClaimsTable.semanticIdentityHash,
+          originalCanonicalIdentity,
+        ),
         eq(fseMovementClaimsTable.disambiguatore, disambiguator ?? ""),
         ne(fseMovementClaimsTable.stato, "RILASCIATA"),
       ),
@@ -1469,21 +1778,35 @@ export async function reviseFseImportRow(
     dataOperativa: operationalDate,
     fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
     disambiguatore: disambiguator,
+    semanticIdentityHash: identity,
+    movementContentHash: content,
   };
-  await tx.insert(fseImportRowRevisionsTable).values({
-    rigaId: row.id,
-    versione: (lastRevision?.maxVersion ?? 0) + 1,
-    acceptedValuesJson: acceptedValues,
-    revisionHash: hash(acceptedValues),
-    motivo: input.reason,
-    creatoDa: input.actorId,
+  const [revision] = await tx
+    .insert(fseImportRowRevisionsTable)
+    .values({
+      rigaId: row.id,
+      versione: (lastRevision?.maxVersion ?? 0) + 1,
+      acceptedValuesJson: acceptedValues,
+      revisionHash: hash(acceptedValues),
+      motivo: input.reason,
+      creatoDa: input.actorId,
+    })
+    .returning();
+  await registerIdentityAliases(tx, {
+    sourceRegistryId: session.sourceRegistryId,
+    canonicalIdentityHash: originalCanonicalIdentity,
+    identities: [
+      originalIdentityFromRaw(row),
+      row.semanticIdentityHash,
+      identity,
+    ],
+    disambiguator: disambiguator ?? "",
+    revisionId: revision.id,
   });
   await tx
     .update(fseImportRowsTable)
     .set({
-      semanticIdentityHash: identity,
       disambiguatore: disambiguator ?? "",
-      movementContentHash: content,
       numeroDocumento: documentNumber,
       dataDocumento: documentDate,
       dataOperativaProposta: operationalDate,
@@ -1719,7 +2042,8 @@ export async function addFseRowsToPractice(
   if (
     !(
       session.stato === "PRONTA" ||
-      (session.modalita === "NUOVI_CARICHI" && session.stato === "IN_PRATICA")
+      (session.modalita === "NUOVI_CARICHI" &&
+        ["DA_COMPLETARE", "IN_PRATICA"].includes(session.stato))
     )
   )
     throw new FsePracticeImportError(
@@ -1729,18 +2053,21 @@ export async function addFseRowsToPractice(
     );
 
   let convertPractice = false;
-  let practice = session.caricoPraticaId
-    ? (
-        await tx
-          .select()
-          .from(caricoPraticheTable)
-          .where(eq(caricoPraticheTable.id, session.caricoPraticaId))
-      )[0]
-    : null;
-  if (practice) {
+  let practice: typeof caricoPraticheTable.$inferSelect | null = null;
+  if (session.caricoPraticaId != null) {
     await tx.execute(
-      sql`SELECT id FROM ${caricoPraticheTable} WHERE ${caricoPraticheTable.id}=${practice.id} FOR UPDATE`,
+      sql`SELECT id FROM ${caricoPraticheTable} WHERE ${caricoPraticheTable.id}=${session.caricoPraticaId} FOR UPDATE`,
     );
+    [practice] = await tx
+      .select()
+      .from(caricoPraticheTable)
+      .where(eq(caricoPraticheTable.id, session.caricoPraticaId));
+    if (!practice)
+      throw new FsePracticeImportError(
+        409,
+        "PRATICA_NON_DISPONIBILE",
+        "La pratica collegata non è più disponibile",
+      );
     if (practice.versione !== input.practiceVersion)
       throw new FsePracticeImportError(
         409,
@@ -1801,6 +2128,8 @@ export async function addFseRowsToPractice(
     identity: string | null;
     disambiguator: string;
     content: string | null;
+    acceptedIdentity: string | null;
+    canonicalIdentity: string | null;
     rawDescription: string;
   }>;
   let registryForCoverage: (typeof fseImportRowsTable.$inferSelect)[] = [];
@@ -1918,6 +2247,8 @@ export async function addFseRowsToPractice(
       identity: null,
       disambiguator: "",
       content: null,
+      acceptedIdentity: null,
+      canonicalIdentity: null,
       rawDescription: row.prodottoEsterno,
     }));
   } else {
@@ -1981,11 +2312,73 @@ export async function addFseRowsToPractice(
       documentDate: row.dataDocumento,
       operationalDate: row.dataOperativaProposta,
       operationalSource: row.dataOperativaFonte,
-      identity: row.semanticIdentityHash,
+      identity: originalIdentityFromRaw(row),
       disambiguator: row.disambiguatore,
-      content: row.movementContentHash,
+      content: rowContent(row),
+      acceptedIdentity: rowIdentity(row),
+      canonicalIdentity: null,
       rawDescription: row.prodottoEsterno,
     }));
+  }
+  if (session.modalita === "NUOVI_CARICHI") {
+    await hydrateIdentityAliasesForClaims(tx, session.sourceRegistryId);
+    for (const work of workRows) {
+      const canonical = await canonicalIdentityFor(
+        tx,
+        session.sourceRegistryId,
+        work.identity!,
+        work.disambiguator,
+      );
+      const [acceptedAlias] = await tx
+        .select({
+          canonicalIdentityHash:
+            fseMovementIdentityAliasesTable.canonicalIdentityHash,
+        })
+        .from(fseMovementIdentityAliasesTable)
+        .where(
+          and(
+            eq(
+              fseMovementIdentityAliasesTable.sourceRegistryId,
+              session.sourceRegistryId,
+            ),
+            eq(
+              fseMovementIdentityAliasesTable.semanticIdentityHash,
+              work.acceptedIdentity!,
+            ),
+            eq(
+              fseMovementIdentityAliasesTable.disambiguatore,
+              work.disambiguator,
+            ),
+          ),
+        );
+      if (acceptedAlias && acceptedAlias.canonicalIdentityHash !== canonical)
+        throw new FsePracticeImportError(
+          409,
+          "IDENTITA_ALIAS_AMBIGUA",
+          "La riga corretta coincide con un'altra identità esterna già verificata",
+        );
+      const [activeClaim] = await tx
+        .select({ id: fseMovementClaimsTable.id })
+        .from(fseMovementClaimsTable)
+        .where(
+          and(
+            eq(
+              fseMovementClaimsTable.sourceRegistryId,
+              session.sourceRegistryId,
+            ),
+            eq(fseMovementClaimsTable.semanticIdentityHash, canonical),
+            eq(fseMovementClaimsTable.disambiguatore, work.disambiguator),
+            ne(fseMovementClaimsTable.stato, "RILASCIATA"),
+          ),
+        );
+      if (activeClaim)
+        throw new FsePracticeImportError(
+          409,
+          "IDENTITA_GIA_PRESA_IN_CARICO",
+          "La riga esterna è già stata presa in carico",
+        );
+      work.canonicalIdentity = canonical;
+    }
   }
   if (workRows.some((row) => !FONDI_ORIGINE.includes(row.fund)))
     throw new FsePracticeImportError(
@@ -2086,6 +2479,8 @@ export async function addFseRowsToPractice(
         numeroDocumento: work.document,
         dataDocumento: work.documentDate,
         dataOperativa: work.operationalDate,
+        semanticIdentityHash: work.acceptedIdentity,
+        movementContentHash: work.content,
       };
       const [revision] = await tx
         .insert(fseImportRowRevisionsTable)
@@ -2106,9 +2501,16 @@ export async function addFseRowsToPractice(
           creatoDa: input.actorId,
         })
         .returning();
+      await registerIdentityAliases(tx, {
+        sourceRegistryId: session.sourceRegistryId,
+        canonicalIdentityHash: work.canonicalIdentity!,
+        identities: [work.identity!, work.acceptedIdentity!],
+        disambiguator: work.disambiguator,
+        revisionId: revision.id,
+      });
       await tx.insert(fseMovementClaimsTable).values({
         sourceRegistryId: session.sourceRegistryId,
-        semanticIdentityHash: work.identity!,
+        semanticIdentityHash: work.canonicalIdentity!,
         disambiguatore: work.disambiguator,
         acceptedContentHash: work.content!,
         acceptedRevisionId: revision.id,
@@ -2167,14 +2569,26 @@ export async function addFseRowsToPractice(
     });
   }
   const nextVersion = practice.versione + 1;
-  await tx
+  const [updatedPractice] = await tx
     .update(caricoPraticheTable)
     .set({
       versione: nextVersion,
       aggiornatoDa: input.actorId,
       dataAggiornamento: new Date(),
     })
-    .where(eq(caricoPraticheTable.id, practice.id));
+    .where(
+      and(
+        eq(caricoPraticheTable.id, practice.id),
+        eq(caricoPraticheTable.versione, practice.versione),
+      ),
+    )
+    .returning({ id: caricoPraticheTable.id });
+  if (!updatedPractice)
+    throw new FsePracticeImportError(
+      409,
+      "VERSIONE_PRATICA",
+      "La pratica è stata modificata da un altro operatore",
+    );
   const attachResult = {
     practiceId: practice.id,
     practiceVersion: nextVersion,

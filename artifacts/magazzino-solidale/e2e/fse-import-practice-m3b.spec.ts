@@ -349,6 +349,11 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       .getByRole("button", { name: "Salva revisione", exact: true })
       .click();
     await expect(page.getByText("Pronto", { exact: true })).toBeVisible();
+    const readySelection = page
+      .getByRole("dialog")
+      .locator('[role="checkbox"]:not([disabled])');
+    await expect(readySelection).toHaveCount(1);
+    await readySelection.check();
     expect(await readStock(page)).toBe(before);
 
     await page.getByRole("button", { name: "Vai al riepilogo" }).click();
@@ -601,14 +606,51 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await expect(rowChecks).toHaveCount(2);
     await rowChecks.nth(1).click();
     await page.getByRole("button", { name: "Vai al riepilogo" }).click();
-    const firstAttach = page.waitForResponse(
+    const attachPayloads: Array<Record<string, unknown>> = [];
+    let interruptFirstResponse = true;
+    await page.route(
+      /\/api\/fse-importazioni\/sessioni\/\d+\/aggiungi-pratica$/,
+      async (route) => {
+        attachPayloads.push(
+          route.request().postDataJSON() as Record<string, unknown>,
+        );
+        const backendResponse = await route.fetch();
+        if (interruptFirstResponse) {
+          interruptFirstResponse = false;
+          await route.abort("failed");
+          return;
+        }
+        await route.fulfill({ response: backendResponse });
+      },
+    );
+    await page.getByRole("button", { name: "Aggiungi alla pratica" }).click();
+    await expect.poll(() => attachPayloads.length).toBe(1);
+    await expect(
+      page.getByRole("button", { name: "Aggiungi alla pratica" }),
+    ).toBeEnabled();
+    const committedAfterInterruptedResponse = await page.request.get(
+      `/api/carico-pratiche/${practice.id}`,
+    );
+    expect(committedAfterInterruptedResponse.status()).toBe(200);
+    expect(
+      (
+        (await committedAfterInterruptedResponse.json()) as {
+          righe: Array<{ id: number }>;
+        }
+      ).righe,
+    ).toHaveLength(1);
+
+    const retryAttach = page.waitForResponse(
       (response) =>
         /\/api\/fse-importazioni\/sessioni\/\d+\/aggiungi-pratica$/.test(
           response.url(),
         ) && response.request().method() === "POST",
     );
     await page.getByRole("button", { name: "Aggiungi alla pratica" }).click();
-    expect((await firstAttach).status()).toBe(201);
+    expect((await retryAttach).status()).toBe(200);
+    expect(attachPayloads).toHaveLength(2);
+    expect(attachPayloads[1]).toEqual(attachPayloads[0]);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await page.reload();
     await openPractice(page, context.area, description);
@@ -627,6 +669,11 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     );
     await page.getByRole("button", { name: "Aggiungi alla pratica" }).click();
     expect((await secondAttach).status()).toBe(201);
+    expect(attachPayloads).toHaveLength(3);
+    expect(attachPayloads[2].idempotencyKey).not.toBe(
+      attachPayloads[0].idempotencyKey,
+    );
+    expect(attachPayloads[2].rigaIds).not.toEqual(attachPayloads[0].rigaIds);
 
     const detailResponse = await page.request.get(
       `/api/carico-pratiche/${practice.id}`,
@@ -931,6 +978,12 @@ test.describe("M3B — viewport tablet", () => {
     await saveRevision.scrollIntoViewIfNeeded();
     await expect(saveRevision).toBeVisible();
     await saveRevision.click();
+    await expect(page.getByText("Pronto", { exact: true })).toBeVisible();
+    const readySelection = page
+      .getByRole("dialog")
+      .locator('[role="checkbox"]:not([disabled])');
+    await expect(readySelection).toHaveCount(1);
+    await readySelection.check();
     await page.getByRole("button", { name: "Vai al riepilogo" }).click();
     await assertViewportSafe(page);
     await page.getByRole("button", { name: "Indietro" }).click();

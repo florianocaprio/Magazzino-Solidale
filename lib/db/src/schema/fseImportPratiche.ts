@@ -382,6 +382,49 @@ export const fseImportRowRevisionsTable = pgTable(
   ],
 );
 
+export const fseMovementIdentityAliasesTable = pgTable(
+  "fse_movement_identity_aliases",
+  {
+    id: serial("id").primaryKey(),
+    sourceRegistryId: integer("source_registry_id")
+      .notNull()
+      .references(() => fseSourceRegistriesTable.id, { onDelete: "restrict" }),
+    semanticIdentityHash: varchar("semantic_identity_hash", {
+      length: 64,
+    }).notNull(),
+    disambiguatore: varchar("disambiguatore", { length: 80 })
+      .notNull()
+      .default(""),
+    canonicalIdentityHash: varchar("canonical_identity_hash", {
+      length: 64,
+    }).notNull(),
+    createdFromRevisionId: integer("created_from_revision_id")
+      .notNull()
+      .references(() => fseImportRowRevisionsTable.id, {
+        onDelete: "restrict",
+      }),
+    dataCreazione: timestamp("data_creazione", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("fse_movement_identity_aliases_source_identity_unique").on(
+      table.sourceRegistryId,
+      table.semanticIdentityHash,
+      table.disambiguatore,
+    ),
+    index("fse_movement_identity_aliases_canonical_idx").on(
+      table.sourceRegistryId,
+      table.canonicalIdentityHash,
+      table.disambiguatore,
+    ),
+    check(
+      "fse_movement_identity_aliases_hashes_check",
+      sql`${table.semanticIdentityHash} ~ '^[0-9a-f]{64}$' and ${table.canonicalIdentityHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+  ],
+);
+
 export const fseMovementClaimsTable = pgTable(
   "fse_movement_claims",
   {

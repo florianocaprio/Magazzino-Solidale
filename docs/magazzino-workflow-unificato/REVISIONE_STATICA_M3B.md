@@ -83,3 +83,63 @@ degli assert o skip aggiunti per ottenere il verde.
 Il candidato è **GO** per commit e pubblicazione condizionata al completamento
 dei gate documentali, di pulizia Docker e di verifica Git/remota descritti in
 `ESITI_TEST_M3B.md`.
+
+## Review indipendente post-pubblicazione — H1/H2/H3/H4
+
+Questa sezione registra una review successiva e indipendente rispetto
+all'esito storico sopra riportato. La frase «Nessun finding bloccante resta
+aperto» descriveva la revisione del candidato originario; la review
+post-pubblicazione ha poi individuato quattro controesempi ulteriori. La base
+revisionata resta `32a6953d4b2d07a4db2f747f4febdeb1e5230f0f`; il preflight
+del correttivo è partito dalla successiva HEAD pubblicata
+`fcd445576bae9c10e9c155b29659009de5fdf5a1`, senza riscriverla.
+
+| Finding               | Controesempio e causa                                                                                                                                                                                                            | Correzione verificata                                                                                                                                                                                                                                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1 — identità esterna | Dopo una correzione `LOT-A→LOT-B`, documento o data, la riga sostituiva l'identità originale con quella operativa. Un export successivo della stessa sorgente poteva quindi ripresentare la forma originale come nuovo ingresso. | L'identità raw resta immutabile; le identità accettate sono revisionate e collegate all'evento canonico tramite alias verificati. Claim, forma originale e forma corretta convergono solo con provenienza dimostrabile; alias ambigui diventano `DA_VERIFICARE`.                                    |
+| H2 — pratica stale    | `addFseRowsToPractice` leggeva la pratica prima del `FOR UPDATE` e continuava a validare versione/stato sulla snapshot precedente anche dopo aver atteso un'altra transazione.                                                   | Lock e rilettura autorevole precedono ogni controllo di versione, stato, tipo e contesto. L'update finale è condizionale sulla versione e deve restituire la riga aggiornata; in caso contrario produce `409`.                                                                                      |
+| H3 — import parziale  | Una singola riga `DA_ASSOCIARE`, `ERRORE` o `DA_VERIFICARE` impediva l'aggiunta delle altre righe `PRONTO`, perché API e UI dipendevano dallo stato globale della sessione.                                                      | In `NUOVI_CARICHI` il backend valida atomicamente soltanto il sottoinsieme esplicitamente selezionato; le escluse restano nello staging riprendibile senza claim. La UI conserva la selezione dopo refetch e non seleziona automaticamente righe appena corrette. `SALDO_INIZIALE` resta integrale. |
+| H4 — retry browser    | Dopo un commit backend con risposta persa, il retry creava una nuova idempotency key e aggiornava implicitamente le versioni del payload, impedendo il replay deterministico.                                                    | Un'intenzione canonica conserva key e payload esatto fino a esito determinato. Errori di rete/parsing mantengono l'intenzione; successo o errore HTTP definitivo la chiudono. Nuova selezione, pratica, modalità o copertura generano una nuova key.                                                |
+
+### Persistenza e migrazione 39
+
+La soluzione H1 aggiunge esclusivamente
+`20260918_za_m3b_fse_identity_aliases.sql`, successiva alle 38 migrazioni già
+pubblicate e lasciate byte-identiche. `fse_movement_identity_aliases` conserva
+sorgente, identità candidata, disambiguatore, evento canonico e revisione di
+origine, con unicità DB e vincoli sugli hash. Il servizio idrata in modo
+conservativo gli alias delle claim preesistenti solo quando la provenienza è
+dimostrabile; non esegue merge o backfill ciechi e non modifica stock,
+movimenti, carichi, audit o revisioni storiche.
+
+L'upgrade populated 38→39 ha applicato soltanto la nuova migrazione. Prima e
+dopo sono rimasti identici i campioni semantici di ledger, movimenti, dato
+legacy e audit:
+
+- ledger: `1 | 7,000000 | 9ea20d09bed1e581303b2ceb665976c4`;
+- movimenti: `1 | 7,000000 | 7ab80ee325f77dd51dfee8f08c71f370`;
+- legacy: `1 | 2a0fb4e236674cad3d8425875d0db1a7`;
+- audit: `1 | a2278b9450f49da28b4cbfea493271f1`.
+
+Fresh, replay, ordine e checksum hanno chiuso a 39/39. Nessun contratto
+OpenAPI o file generato è cambiato, quindi il codegen non era pertinente al
+delta.
+
+### Seconda review del correttivo
+
+La rilettura finale conferma:
+
+- nessuna identity accettata sovrascrive più l'identità esterna originale;
+- alias e claim sono serializzati per sorgente e protetti da unicità DB;
+- nessuna validazione usa la pratica letta prima del lock;
+- l'import ordinario parziale non estende la semantica al saldo iniziale;
+- upload, analisi e associazione restano senza effetti inventariali;
+- il retry frontend non riusa una key con payload differente e non nasconde i
+  `409` definitivi;
+- scope, RBAC, attore backend, audit transazionale, fixed-point e writer AGEA
+  restano invariati;
+- non sono stati modificati OpenAPI, client generati o le prime 38 migrazioni.
+
+Il candidato corretto resta **automaticamente GO per una nuova code review**,
+non per validazione umana o Docker candidato. Restano
+`NE-MAN-CAMERA` e `NE-MAN-TABLET`.

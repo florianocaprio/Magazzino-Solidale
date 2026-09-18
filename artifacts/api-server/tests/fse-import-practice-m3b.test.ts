@@ -13,9 +13,11 @@ import {
   db,
   fseImportAttachCommandsTable,
   fseImportFilesTable,
+  fseImportRowRevisionsTable,
   fseImportRowsTable,
   fseImportSessionsTable,
   fseInitialBalanceCoverageTable,
+  fseMovementIdentityAliasesTable,
   fseMovementClaimsTable,
   fseSourceRegistriesTable,
   importazioniAgeaRigheTable,
@@ -30,7 +32,7 @@ import {
   prodottiTable,
   utentiTable,
 } from "@workspace/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   ensureAmbienteModuli,
   listModuliFunzionali,
@@ -53,6 +55,7 @@ let ordinarySourceId: number;
 let initialSourceId: number;
 let incompleteBalanceSourceId: number;
 let originalLottiEnabled = true;
+let isolatedContextSequence = 0;
 const originalRegistryPath = process.env.FSE_REGISTRY_ORIGINAL_PATH;
 const originalStockPath = process.env.FSE_STOCK_ORIGINAL_PATH;
 const originalsAvailable = Boolean(originalRegistryPath && originalStockPath);
@@ -310,6 +313,36 @@ async function waitForPendingMovementShareLock() {
   throw new Error("Il lock ShareLock M3B non è entrato in attesa");
 }
 
+async function waitForBlockedBy(blockingPid: number, expected = 1) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const pending = await pool.query<{ count: number }>(
+      `SELECT count(*)::int AS count
+       FROM pg_stat_activity
+       WHERE $1 = ANY(pg_blocking_pids(pid))`,
+      [blockingPid],
+    );
+    if ((pending.rows[0]?.count ?? 0) >= expected) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(
+    `Attese ${expected} connessioni bloccate dal backend ${blockingPid}`,
+  );
+}
+
+async function waitForLockWaiters(expected: number) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const pending = await pool.query<{ count: number }>(`
+      SELECT count(*)::int AS count
+      FROM pg_stat_activity
+      WHERE wait_event_type = 'Lock'
+        AND query LIKE '%carico_pratiche%'
+    `);
+    if ((pending.rows[0]?.count ?? 0) >= expected) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Attese ${expected} connessioni in coda sul lock pratica`);
+}
+
 async function prepareOrdinaryImport(
   app: Express,
   input: {
@@ -354,10 +387,11 @@ async function prepareOrdinaryImport(
 }
 
 async function createIsolatedContext(label: string) {
+  isolatedContextSequence += 1;
   const [{ id: warehouseId }] = await db
     .insert(magazziniTable)
     .values({
-      codice: `M3B${label}-${suffix}`.slice(0, 20),
+      codice: `M3B-${suffix.slice(-8)}-${isolatedContextSequence}`.slice(0, 20),
       nome: `M3B ${label}`,
       areaOperativaId: areaId,
     })
@@ -432,10 +466,11 @@ beforeAll(async () => {
         'fse_import_sessions',
         'fse_import_attach_commands',
         'fse_movement_claims',
-        'fse_initial_balance_coverage'
+        'fse_initial_balance_coverage',
+        'fse_movement_identity_aliases'
       )
   `);
-  if (required.rows[0].count !== 4)
+  if (required.rows[0].count !== 5)
     throw new Error("Applicare la migrazione M3B al database disposable");
 
   await ensureAmbienteModuli();
@@ -648,6 +683,33 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
       .send(firstCommand);
     expect(retry.status).toBe(200);
     expect(retry.body).toMatchObject({ addedRows: 1, replay: true });
+    const retryClaims = await db
+      .select({ id: fseMovementClaimsTable.id })
+      .from(fseMovementClaimsTable)
+      .innerJoin(
+        fseImportRowRevisionsTable,
+        eq(
+          fseMovementClaimsTable.acceptedRevisionId,
+          fseImportRowRevisionsTable.id,
+        ),
+      )
+      .innerJoin(
+        fseImportRowsTable,
+        eq(fseImportRowRevisionsTable.rigaId, fseImportRowsTable.id),
+      )
+      .where(eq(fseImportRowsTable.sessioneId, acquired.body.sessionId));
+    expect(retryClaims).toHaveLength(1);
+    expect(
+      await db
+        .select({ id: auditEventiTable.id })
+        .from(auditEventiTable)
+        .where(
+          and(
+            eq(auditEventiTable.azione, "FSE_IMPORT_AGGIUNTO_PRATICA"),
+            eq(auditEventiTable.entitaId, acquired.body.sessionId),
+          ),
+        ),
+    ).toHaveLength(1);
 
     const resumed = await request(app).get(
       `/fse-importazioni/sessioni/${acquired.body.sessionId}`,
@@ -718,6 +780,770 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
       "REGISTRATA",
       "REGISTRATA",
     ]);
+  });
+
+  it("conserva l'identità esterna originale e riconcilia gli alias verificati di lotto, documento e data", async () => {
+    const app = appFor();
+    const context = await createIsolatedContext("identity");
+    const originalDocument = `DOC-H1-A-${suffix}`;
+    const first = await prepareOrdinaryImport(app, {
+      ...context,
+      document: originalDocument,
+      quantity: 10,
+      finalBalance: 10,
+      fileName: "h1-originale-a.xlsx",
+    });
+    const rowId = first.detail.body.rows[0].id;
+    const [immutableBefore] = await db
+      .select({
+        identity: fseImportRowsTable.semanticIdentityHash,
+        content: fseImportRowsTable.movementContentHash,
+      })
+      .from(fseImportRowsTable)
+      .where(eq(fseImportRowsTable.id, rowId));
+
+    const revised = await request(app)
+      .patch(
+        `/fse-importazioni/sessioni/${first.acquired.body.sessionId}/righe/${rowId}`,
+      )
+      .send({
+        versione: first.detail.body.versione,
+        lottoFisico: "LOT-B",
+        motivo: "Correzione verificata lotto H1",
+        accettaFallbackData: true,
+      });
+    expect(revised.status).toBe(200);
+    const [immutableAfter] = await db
+      .select({
+        identity: fseImportRowsTable.semanticIdentityHash,
+        content: fseImportRowsTable.movementContentHash,
+        lot: fseImportRowsTable.lottoFisico,
+      })
+      .from(fseImportRowsTable)
+      .where(eq(fseImportRowsTable.id, rowId));
+    expect(immutableAfter).toMatchObject({
+      identity: immutableBefore.identity,
+      content: immutableBefore.content,
+      lot: "LOT-B",
+    });
+    const revisions = await db
+      .select()
+      .from(fseImportRowRevisionsTable)
+      .where(eq(fseImportRowRevisionsTable.rigaId, rowId));
+    expect(revisions.length).toBeGreaterThanOrEqual(2);
+    const correctionRevision = revisions.find(
+      (revision) => revision.motivo === "Correzione verificata lotto H1",
+    );
+    expect(correctionRevision?.acceptedValuesJson).toMatchObject({
+      lottoFisico: "LOT-B",
+    });
+    expect(
+      correctionRevision?.acceptedValuesJson.semanticIdentityHash,
+    ).not.toBe(immutableBefore.identity);
+
+    const revisedDetail = await request(app).get(
+      `/fse-importazioni/sessioni/${first.acquired.body.sessionId}`,
+    );
+    const attached = await request(app)
+      .post(
+        `/fse-importazioni/sessioni/${first.acquired.body.sessionId}/aggiungi-pratica`,
+      )
+      .send({
+        versione: revisedDetail.body.versione,
+        versionePratica: first.practice.body.versione,
+        rigaIds: [rowId],
+        idempotencyKey: `h1-lot-attach-${suffix}`,
+      });
+    expect(attached.status).toBe(201);
+
+    const classify = async (row: unknown[], name: string) => {
+      const practice = await createEmptyPractice(app, context.warehouseId);
+      const imported = await upload(app, {
+        bytes: workbook(registryHeaders, [row]),
+        sourceId: context.sourceId,
+        warehouseId: context.warehouseId,
+        practiceId: practice.body.id,
+        mode: "NUOVI_CARICHI",
+        profile: "REGISTRO",
+        fileName: name,
+      });
+      expect(imported.status).toBe(201);
+      const detail = await request(app).get(
+        `/fse-importazioni/sessioni/${imported.body.sessionId}`,
+      );
+      return detail.body.rows[0];
+    };
+    expect(
+      await classify(
+        registryRow(originalDocument, 10, 999, "006544"),
+        "h1-export-originale-diverso.xlsx",
+      ),
+    ).toMatchObject({ stato: "GIA_NELLA_PRATICA" });
+    expect(
+      await classify(
+        registryRow(originalDocument, 10, 998, "LOT-B"),
+        "h1-export-corretto-diverso.xlsx",
+      ),
+    ).toMatchObject({ stato: "GIA_NELLA_PRATICA" });
+    const firstPractice = await request(app).get(
+      `/carico-pratiche/${first.practice.body.id}`,
+    );
+    const registered = await request(app)
+      .post(`/carico-pratiche/${first.practice.body.id}/registra`)
+      .send({
+        versione: firstPractice.body.versione,
+        rigaIds: firstPractice.body.righe.map((row: { id: number }) => row.id),
+        idempotencyKey: `h1-lot-register-${suffix}`,
+      });
+    expect(registered.status).toBe(201);
+    expect(
+      await classify(
+        registryRow(originalDocument, 10, 997, "006544"),
+        "h1-export-originale-post-registra.xlsx",
+      ),
+    ).toMatchObject({ stato: "GIA_REGISTRATO" });
+    expect(
+      await classify(
+        (() => {
+          const distinct = registryRow(
+            `DOC-H1-DISTINTO-${suffix}`,
+            3,
+            3,
+            "LOT-B",
+          );
+          distinct[6] = "17/09/2026";
+          return distinct;
+        })(),
+        "h1-evento-distinto.xlsx",
+      ),
+    ).toMatchObject({ stato: "PRONTO" });
+
+    const secondDocument = `DOC-H1-C-${suffix}`;
+    const second = await prepareOrdinaryImport(app, {
+      ...context,
+      document: secondDocument,
+      quantity: 4,
+      finalBalance: 4,
+      fileName: "h1-originale-documento.xlsx",
+    });
+    const secondRowId = second.detail.body.rows[0].id;
+    const revisedDocument = `${secondDocument}-CORRETTO`;
+    const revisedDate = "2026-09-18";
+    const documentRevision = await request(app)
+      .patch(
+        `/fse-importazioni/sessioni/${second.acquired.body.sessionId}/righe/${secondRowId}`,
+      )
+      .send({
+        versione: second.detail.body.versione,
+        numeroDocumento: revisedDocument,
+        dataDocumento: revisedDate,
+        motivo: "Correzione verificata documento e data H1",
+        accettaFallbackData: true,
+      });
+    expect(documentRevision.status).toBe(200);
+    const secondDetail = await request(app).get(
+      `/fse-importazioni/sessioni/${second.acquired.body.sessionId}`,
+    );
+    expect(
+      await request(app)
+        .post(
+          `/fse-importazioni/sessioni/${second.acquired.body.sessionId}/aggiungi-pratica`,
+        )
+        .send({
+          versione: secondDetail.body.versione,
+          versionePratica: second.practice.body.versione,
+          rigaIds: [secondRowId],
+          idempotencyKey: `h1-document-attach-${suffix}`,
+        }),
+    ).toMatchObject({ status: 201 });
+    const correctedDocumentRow = registryRow(revisedDocument, 4, 5);
+    correctedDocumentRow[5] = revisedDate;
+    correctedDocumentRow[6] = "17/09/2026";
+    expect(
+      await classify(
+        registryRow(secondDocument, 4, 6),
+        "h1-documento-originale-export.xlsx",
+      ),
+    ).toMatchObject({ stato: "GIA_NELLA_PRATICA" });
+    expect(
+      await classify(correctedDocumentRow, "h1-documento-corretto-export.xlsx"),
+    ).toMatchObject({ stato: "GIA_NELLA_PRATICA" });
+
+    const aliases = await db
+      .select()
+      .from(fseMovementIdentityAliasesTable)
+      .where(
+        eq(fseMovementIdentityAliasesTable.sourceRegistryId, context.sourceId),
+      );
+    expect(
+      new Set(aliases.map((alias) => alias.canonicalIdentityHash)).size,
+    ).toBe(2);
+    expect(aliases.length).toBeGreaterThanOrEqual(4);
+    expect(
+      await db
+        .select()
+        .from(fseMovementClaimsTable)
+        .where(eq(fseMovementClaimsTable.sourceRegistryId, context.sourceId)),
+    ).toHaveLength(2);
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.magazzinoId, context.warehouseId)),
+    ).toHaveLength(1);
+  });
+
+  it("serializza forma originale e corretta concorrenti sulla stessa claim canonica", async () => {
+    const app = appFor();
+    const context = await createIsolatedContext("identity-race");
+    const document = `DOC-H1-RACE-${suffix}`;
+    const original = await prepareOrdinaryImport(app, {
+      ...context,
+      document,
+      quantity: 6,
+      finalBalance: 6,
+      fileName: "h1-race-originale.xlsx",
+    });
+    const originalRowId = original.detail.body.rows[0].id;
+    const revised = await request(app)
+      .patch(
+        `/fse-importazioni/sessioni/${original.acquired.body.sessionId}/righe/${originalRowId}`,
+      )
+      .send({
+        versione: original.detail.body.versione,
+        lottoFisico: "LOT-RACE-CORRETTO",
+        motivo: "Alias concorrente H1",
+        accettaFallbackData: true,
+      });
+    expect(revised.status).toBe(200);
+    const originalReady = await request(app).get(
+      `/fse-importazioni/sessioni/${original.acquired.body.sessionId}`,
+    );
+
+    const correctedPractice = await createEmptyPractice(
+      app,
+      context.warehouseId,
+    );
+    const correctedExport = registryRow(document, 6, 7, "LOT-RACE-CORRETTO");
+    correctedExport[6] = "17/09/2026";
+    const correctedUpload = await upload(app, {
+      bytes: workbook(registryHeaders, [correctedExport]),
+      sourceId: context.sourceId,
+      warehouseId: context.warehouseId,
+      practiceId: correctedPractice.body.id,
+      mode: "NUOVI_CARICHI",
+      profile: "REGISTRO",
+      fileName: "h1-race-corretto.xlsx",
+    });
+    expect(correctedUpload.status).toBe(201);
+    const correctedReady = await request(app).get(
+      `/fse-importazioni/sessioni/${correctedUpload.body.sessionId}`,
+    );
+    expect(correctedReady.body.rows[0].stato).toBe("PRONTO");
+
+    const blocker = await pool.connect();
+    try {
+      await blocker.query("BEGIN");
+      const pid = (
+        await blocker.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")
+      ).rows[0].pid;
+      await blocker.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`fse-source:${context.sourceId}`],
+      );
+      const attempts = [
+        request(app)
+          .post(
+            `/fse-importazioni/sessioni/${original.acquired.body.sessionId}/aggiungi-pratica`,
+          )
+          .send({
+            versione: originalReady.body.versione,
+            versionePratica: original.practice.body.versione,
+            rigaIds: [originalRowId],
+            idempotencyKey: `h1-race-original-${suffix}`,
+          })
+          .then((response) => response),
+        request(app)
+          .post(
+            `/fse-importazioni/sessioni/${correctedUpload.body.sessionId}/aggiungi-pratica`,
+          )
+          .send({
+            versione: correctedReady.body.versione,
+            versionePratica: correctedPractice.body.versione,
+            rigaIds: [correctedReady.body.rows[0].id],
+            idempotencyKey: `h1-race-corrected-${suffix}`,
+          })
+          .then((response) => response),
+      ];
+      await waitForBlockedBy(pid, 2);
+      await blocker.query("COMMIT");
+      const responses = await Promise.all(attempts);
+      expect(responses.map((response) => response.status).sort()).toEqual([
+        201, 409,
+      ]);
+    } finally {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      blocker.release();
+    }
+    expect(
+      await db
+        .select()
+        .from(fseMovementClaimsTable)
+        .where(eq(fseMovementClaimsTable.sourceRegistryId, context.sourceId)),
+    ).toHaveLength(1);
+  });
+
+  it("rilegge la pratica dopo il lock e rifiuta versione o stato divenuti obsoleti", async () => {
+    const app = appFor();
+    const versionContext = await createIsolatedContext("practice-version");
+    const versionCase = await prepareOrdinaryImport(app, {
+      ...versionContext,
+      document: `DOC-H2-VERSION-${suffix}`,
+    });
+    const versionBlocker = await pool.connect();
+    try {
+      await versionBlocker.query("BEGIN");
+      await versionBlocker.query(
+        "SELECT id FROM carico_pratiche WHERE id = $1 FOR UPDATE",
+        [versionCase.practice.body.id],
+      );
+      const pid = (
+        await versionBlocker.query<{ pid: number }>(
+          "SELECT pg_backend_pid() AS pid",
+        )
+      ).rows[0].pid;
+      const pending = request(app)
+        .post(
+          `/fse-importazioni/sessioni/${versionCase.acquired.body.sessionId}/aggiungi-pratica`,
+        )
+        .send({
+          versione: versionCase.detail.body.versione,
+          versionePratica: versionCase.practice.body.versione,
+          rigaIds: [versionCase.detail.body.rows[0].id],
+          idempotencyKey: `h2-stale-version-${suffix}`,
+        })
+        .then((response) => response);
+      await waitForBlockedBy(pid);
+      await versionBlocker.query(
+        "UPDATE carico_pratiche SET versione = versione + 1 WHERE id = $1",
+        [versionCase.practice.body.id],
+      );
+      await versionBlocker.query("COMMIT");
+      const rejected = await pending;
+      expect(rejected.status).toBe(409);
+      expect(rejected.body.code).toBe("VERSIONE_PRATICA");
+    } finally {
+      await versionBlocker.query("ROLLBACK").catch(() => undefined);
+      versionBlocker.release();
+    }
+    expect(
+      await db
+        .select()
+        .from(caricoPraticaRigheTable)
+        .where(
+          eq(
+            caricoPraticaRigheTable.caricoPraticaId,
+            versionCase.practice.body.id,
+          ),
+        ),
+    ).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(fseMovementClaimsTable)
+        .where(
+          eq(fseMovementClaimsTable.sourceRegistryId, versionContext.sourceId),
+        ),
+    ).toHaveLength(0);
+
+    const stateContext = await createIsolatedContext("practice-state");
+    const stateCase = await prepareOrdinaryImport(app, {
+      ...stateContext,
+      document: `DOC-H2-STATE-${suffix}`,
+    });
+    const stateBlocker = await pool.connect();
+    try {
+      await stateBlocker.query("BEGIN");
+      await stateBlocker.query(
+        "SELECT id FROM carico_pratiche WHERE id = $1 FOR UPDATE",
+        [stateCase.practice.body.id],
+      );
+      const pid = (
+        await stateBlocker.query<{ pid: number }>(
+          "SELECT pg_backend_pid() AS pid",
+        )
+      ).rows[0].pid;
+      const pending = request(app)
+        .post(
+          `/fse-importazioni/sessioni/${stateCase.acquired.body.sessionId}/aggiungi-pratica`,
+        )
+        .send({
+          versione: stateCase.detail.body.versione,
+          versionePratica: stateCase.practice.body.versione + 1,
+          rigaIds: [stateCase.detail.body.rows[0].id],
+          idempotencyKey: `h2-stale-state-${suffix}`,
+        })
+        .then((response) => response);
+      await waitForBlockedBy(pid);
+      await stateBlocker.query(
+        "UPDATE carico_pratiche SET stato = 'chiusa', versione = versione + 1 WHERE id = $1",
+        [stateCase.practice.body.id],
+      );
+      await stateBlocker.query("COMMIT");
+      const rejected = await pending;
+      expect(rejected.status).toBe(409);
+      expect(rejected.body.code).toBe("PRATICA_NON_MODIFICABILE");
+    } finally {
+      await stateBlocker.query("ROLLBACK").catch(() => undefined);
+      stateBlocker.release();
+    }
+    expect(
+      await db
+        .select()
+        .from(caricoPraticaRigheTable)
+        .where(
+          eq(
+            caricoPraticaRigheTable.caricoPraticaId,
+            stateCase.practice.body.id,
+          ),
+        ),
+    ).toHaveLength(0);
+  });
+
+  it("serializza due attach sulla stessa pratica e consente il retry con versione aggiornata", async () => {
+    const app = appFor();
+    const firstContext = await createIsolatedContext("practice-race-a");
+    const [{ id: secondSourceId }] = await db
+      .insert(fseSourceRegistriesTable)
+      .values({
+        codice: `M3B-practice-race-b-${suffix}`,
+        descrizione: "Sorgente H2 concorrente B",
+        areaOperativaId: areaId,
+        creatoDa: actorId,
+      })
+      .returning({ id: fseSourceRegistriesTable.id });
+    const practice = await createEmptyPractice(app, firstContext.warehouseId);
+    const prepareForPractice = async (sourceId: number, document: string) => {
+      const acquired = await upload(app, {
+        bytes: workbook(registryHeaders, [registryRow(document, 5, 5)]),
+        sourceId,
+        warehouseId: firstContext.warehouseId,
+        practiceId: practice.body.id,
+        mode: "NUOVI_CARICHI",
+        profile: "REGISTRO",
+        fileName: `${document}.xlsx`,
+      });
+      expect(acquired.status).toBe(201);
+      const mapped = await mapProduct(
+        app,
+        acquired.body.sessionId,
+        acquired.body.versione,
+      );
+      expect(mapped.status).toBe(200);
+      const detail = await request(app).get(
+        `/fse-importazioni/sessioni/${acquired.body.sessionId}`,
+      );
+      return { acquired, detail };
+    };
+    const first = await prepareForPractice(
+      firstContext.sourceId,
+      `DOC-H2-RACE-A-${suffix}`,
+    );
+    const second = await prepareForPractice(
+      secondSourceId,
+      `DOC-H2-RACE-B-${suffix}`,
+    );
+    const attempts = [first, second].map((prepared, index) => ({
+      prepared,
+      key: `h2-practice-race-${index}-${suffix}`,
+    }));
+
+    const blocker = await pool.connect();
+    let responses: Array<Awaited<ReturnType<typeof request>>> = [];
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query(
+        "SELECT id FROM carico_pratiche WHERE id = $1 FOR UPDATE",
+        [practice.body.id],
+      );
+      const pid = (
+        await blocker.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")
+      ).rows[0].pid;
+      const pending = attempts.map(({ prepared, key }) =>
+        request(app)
+          .post(
+            `/fse-importazioni/sessioni/${prepared.acquired.body.sessionId}/aggiungi-pratica`,
+          )
+          .send({
+            versione: prepared.detail.body.versione,
+            versionePratica: practice.body.versione,
+            rigaIds: [prepared.detail.body.rows[0].id],
+            idempotencyKey: key,
+          })
+          .then((response) => response),
+      );
+      await waitForLockWaiters(2);
+      await blocker.query("COMMIT");
+      responses = await Promise.all(pending);
+    } finally {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      blocker.release();
+    }
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 409,
+    ]);
+    const failedIndex = responses.findIndex(
+      (response) => response.status === 409,
+    );
+    expect(responses[failedIndex].body.code).toBe("VERSIONE_PRATICA");
+    const failed = attempts[failedIndex].prepared;
+    const currentSession = await request(app).get(
+      `/fse-importazioni/sessioni/${failed.acquired.body.sessionId}`,
+    );
+    const currentPractice = await request(app).get(
+      `/carico-pratiche/${practice.body.id}`,
+    );
+    expect(currentPractice.body.versione).toBe(practice.body.versione + 1);
+    const retry = await request(app)
+      .post(
+        `/fse-importazioni/sessioni/${failed.acquired.body.sessionId}/aggiungi-pratica`,
+      )
+      .send({
+        versione: currentSession.body.versione,
+        versionePratica: currentPractice.body.versione,
+        rigaIds: [
+          currentSession.body.rows.find(
+            (row: { stato: string }) => row.stato === "PRONTO",
+          ).id,
+        ],
+        idempotencyKey: `h2-practice-retry-${suffix}`,
+      });
+    expect(retry.status).toBe(201);
+    const completed = await request(app).get(
+      `/carico-pratiche/${practice.body.id}`,
+    );
+    expect(completed.body.versione).toBe(practice.body.versione + 2);
+    expect(completed.body.righe).toHaveLength(2);
+  });
+
+  it("aggiunge solo il sottoinsieme ordinario valido e mantiene atomico il saldo iniziale", async () => {
+    const app = appFor();
+    const context = await createIsolatedContext("partial-subset");
+    const practice = await createEmptyPractice(app, context.warehouseId);
+    const ready = registryRow(`DOC-H3-A-${suffix}`, 10, 10);
+    const unmapped = registryRow(`DOC-H3-B-${suffix}`, 5, 15);
+    unmapped[1] = "Prodotto da associare H3";
+    const invalid = registryRow(`DOC-H3-C-${suffix}`, 1.5, 16.5);
+    const acquired = await upload(app, {
+      bytes: workbook(registryHeaders, [ready, unmapped, invalid]),
+      sourceId: context.sourceId,
+      warehouseId: context.warehouseId,
+      practiceId: practice.body.id,
+      mode: "NUOVI_CARICHI",
+      profile: "REGISTRO",
+      fileName: "h3-sottoinsieme.xlsx",
+    });
+    expect(acquired.status).toBe(201);
+    const mapped = await mapProduct(
+      app,
+      acquired.body.sessionId,
+      acquired.body.versione,
+    );
+    expect(mapped.status).toBe(200);
+    let detail = await request(app).get(
+      `/fse-importazioni/sessioni/${acquired.body.sessionId}`,
+    );
+    expect(detail.body.stato).toBe("DA_COMPLETARE");
+    const rowsByDocument = new Map(
+      detail.body.rows.map((row: { numeroDocumento: string }) => [
+        row.numeroDocumento,
+        row,
+      ]),
+    );
+    expect(rowsByDocument.get(`DOC-H3-A-${suffix}`)).toMatchObject({
+      stato: "PRONTO",
+    });
+    expect(rowsByDocument.get(`DOC-H3-B-${suffix}`)).toMatchObject({
+      stato: "DA_ASSOCIARE",
+    });
+    expect(rowsByDocument.get(`DOC-H3-C-${suffix}`)).toMatchObject({
+      stato: "ERRORE",
+    });
+
+    const firstAttach = await request(app)
+      .post(
+        `/fse-importazioni/sessioni/${acquired.body.sessionId}/aggiungi-pratica`,
+      )
+      .send({
+        versione: detail.body.versione,
+        versionePratica: practice.body.versione,
+        rigaIds: [
+          (rowsByDocument.get(`DOC-H3-A-${suffix}`) as { id: number }).id,
+        ],
+        idempotencyKey: `h3-ready-a-${suffix}`,
+      });
+    expect(firstAttach.status).toBe(201);
+    expect(firstAttach.body.addedRows).toBe(1);
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.magazzinoId, context.warehouseId)),
+    ).toHaveLength(0);
+
+    const resumedApp = appFor();
+    detail = await request(resumedApp).get(
+      `/fse-importazioni/sessioni/${acquired.body.sessionId}`,
+    );
+    expect(detail.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          numeroDocumento: `DOC-H3-A-${suffix}`,
+          stato: "GIA_NELLA_PRATICA",
+        }),
+        expect.objectContaining({
+          numeroDocumento: `DOC-H3-B-${suffix}`,
+          stato: "DA_ASSOCIARE",
+        }),
+        expect.objectContaining({
+          numeroDocumento: `DOC-H3-C-${suffix}`,
+          stato: "ERRORE",
+        }),
+      ]),
+    );
+    const mappedB = await request(resumedApp)
+      .post(
+        `/fse-importazioni/sessioni/${acquired.body.sessionId}/associa-prodotto`,
+      )
+      .send({
+        versione: detail.body.versione,
+        descrizioneEsterna: "Prodotto da associare H3",
+        prodottoId: productId,
+        motivo: "Associazione differita H3",
+        accettaFallbackData: true,
+      });
+    expect(mappedB.status).toBe(200);
+    detail = await request(resumedApp).get(
+      `/fse-importazioni/sessioni/${acquired.body.sessionId}`,
+    );
+    const readyB = detail.body.rows.find(
+      (row: { numeroDocumento: string }) =>
+        row.numeroDocumento === `DOC-H3-B-${suffix}`,
+    );
+    const invalidC = detail.body.rows.find(
+      (row: { numeroDocumento: string }) =>
+        row.numeroDocumento === `DOC-H3-C-${suffix}`,
+    );
+    expect(readyB.stato).toBe("PRONTO");
+    expect(invalidC.stato).toBe("ERRORE");
+
+    const invalidAttach = await request(resumedApp)
+      .post(
+        `/fse-importazioni/sessioni/${acquired.body.sessionId}/aggiungi-pratica`,
+      )
+      .send({
+        versione: detail.body.versione,
+        versionePratica: firstAttach.body.practiceVersion,
+        rigaIds: [readyB.id, invalidC.id],
+        idempotencyKey: `h3-invalid-subset-${suffix}`,
+      });
+    expect(invalidAttach.status).toBe(409);
+    expect(invalidAttach.body.code).toBe("RIGHE_NON_PRONTE");
+    expect(
+      await db
+        .select()
+        .from(caricoPraticaRigheTable)
+        .where(eq(caricoPraticaRigheTable.caricoPraticaId, practice.body.id)),
+    ).toHaveLength(1);
+
+    const secondAttach = await request(resumedApp)
+      .post(
+        `/fse-importazioni/sessioni/${acquired.body.sessionId}/aggiungi-pratica`,
+      )
+      .send({
+        versione: detail.body.versione,
+        versionePratica: firstAttach.body.practiceVersion,
+        rigaIds: [readyB.id],
+        idempotencyKey: `h3-ready-b-${suffix}`,
+      });
+    expect(secondAttach.status).toBe(201);
+    const completedPractice = await request(resumedApp).get(
+      `/carico-pratiche/${practice.body.id}`,
+    );
+    expect(completedPractice.body.righe).toHaveLength(2);
+    const registered = await request(resumedApp)
+      .post(`/carico-pratiche/${practice.body.id}/registra`)
+      .send({
+        versione: completedPractice.body.versione,
+        rigaIds: completedPractice.body.righe.map(
+          (row: { id: number }) => row.id,
+        ),
+        idempotencyKey: `h3-register-valid-${suffix}`,
+      });
+    expect(registered.status).toBe(201);
+    expect(
+      (
+        await db
+          .select()
+          .from(movimentiTable)
+          .where(eq(movimentiTable.magazzinoId, context.warehouseId))
+      ).reduce((total, movement) => total + Number(movement.quantita), 0),
+    ).toBe(15);
+
+    const balanceContext = await createIsolatedContext("partial-balance");
+    const balancePractice = await createEmptyPractice(
+      app,
+      balanceContext.warehouseId,
+    );
+    const balanceRegistry = await upload(app, {
+      bytes: workbook(registryHeaders, [
+        registryRow(`DOC-H3-SALDO-${suffix}`, 10, 10),
+      ]),
+      sourceId: balanceContext.sourceId,
+      warehouseId: balanceContext.warehouseId,
+      practiceId: balancePractice.body.id,
+      mode: "SALDO_INIZIALE",
+      profile: "REGISTRO",
+    });
+    const balanceStock = await upload(app, {
+      bytes: workbook(stockHeaders, [stockRow(1.5)]),
+      sourceId: balanceContext.sourceId,
+      warehouseId: balanceContext.warehouseId,
+      practiceId: balancePractice.body.id,
+      mode: "SALDO_INIZIALE",
+      profile: "GIACENZE",
+      sessionId: balanceRegistry.body.sessionId,
+    });
+    const balanceMapped = await mapProduct(
+      app,
+      balanceRegistry.body.sessionId,
+      balanceStock.body.versione,
+    );
+    expect(balanceMapped.status).toBe(200);
+    const balanceDetail = await request(app).get(
+      `/fse-importazioni/sessioni/${balanceRegistry.body.sessionId}`,
+    );
+    expect(balanceDetail.body.stato).toBe("DA_COMPLETARE");
+    const balanceAttach = await request(app)
+      .post(
+        `/fse-importazioni/sessioni/${balanceRegistry.body.sessionId}/aggiungi-pratica`,
+      )
+      .send({
+        versione: balanceDetail.body.versione,
+        versionePratica: balancePractice.body.versione,
+        confermaCoperturaStorica: true,
+        idempotencyKey: `h3-balance-invalid-${suffix}`,
+      });
+    expect(balanceAttach.status).toBe(409);
+    expect(balanceAttach.body.code).toBe("SESSIONE_NON_PRONTA");
+    expect(
+      await db
+        .select()
+        .from(caricoPraticaRigheTable)
+        .where(
+          eq(caricoPraticaRigheTable.caricoPraticaId, balancePractice.body.id),
+        ),
+    ).toHaveLength(0);
   });
 
   it("non rimappa righe già riservate durante la ripresa parziale", async () => {
