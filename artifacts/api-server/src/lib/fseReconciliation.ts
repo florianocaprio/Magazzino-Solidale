@@ -91,6 +91,15 @@ export type ReconciliationRow = {
   contentHash: string;
 };
 
+export function reconciliationMovementType(nature: string): string {
+  if (nature === "CARICO") return "CARICO";
+  if (nature === "DISTRIBUZIONE_FINALE") return "DISTRIBUZIONE";
+  if (nature === "CONSEGNA_ENTE") return "CONSEGNA_ENTE";
+  if (nature === "STORNO") return "STORNO";
+  if (nature === "RESO") return "RESO";
+  return "MODIFICA_GIACENZA";
+}
+
 function exact(value: string | null): string | null {
   return value == null
     ? null
@@ -200,9 +209,11 @@ function localOnly(local: ReconciliationLocalLine): ReconciliationRow {
       ? "STORNO_NON_RISCONTRATO"
       : local.type === "RESO"
         ? "RESO_NON_RISCONTRATO"
-        : local.type === "MODIFICA_GIACENZA"
-          ? "MODIFICA_GIACENZA_NON_RISCONTRATA"
-          : "SOLO_LOCALE_DA_RENDICONTARE";
+        : local.type === "CONSEGNA_ENTE"
+          ? "CONSEGNA_ENTE_NON_RISCONTRATA"
+          : local.type === "MODIFICA_GIACENZA"
+            ? "MODIFICA_GIACENZA_NON_RISCONTRATA"
+            : "SOLO_LOCALE_DA_RENDICONTARE";
   const base = {
     tipoRiga: local.type,
     businessKey: `LOCAL:${local.movementId}`,
@@ -415,16 +426,7 @@ async function loadLocal(
         naturaOriginale:
           row.original_nature == null ? null : String(row.original_nature),
       });
-    const type =
-      nature === "CARICO"
-        ? "CARICO"
-        : nature === "DISTRIBUZIONE_FINALE"
-          ? "DISTRIBUZIONE"
-          : nature === "STORNO"
-            ? "STORNO"
-            : nature === "RESO"
-              ? "RESO"
-              : "MODIFICA_GIACENZA";
+    const type = reconciliationMovementType(nature);
     const operationId =
       row.operazione_distribuzione_id == null
         ? null

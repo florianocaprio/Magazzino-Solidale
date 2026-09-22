@@ -1,13 +1,20 @@
 import { sql, type SQL } from "drizzle-orm";
 import { InventoryDecimal } from "./inventoryDecimal";
 
-const NEGATIVE_NATURES = new Set([
+const NEGATIVE_NATURES = [
   "DISTRIBUZIONE_FINALE",
+  "CONSEGNA_ENTE",
   "TRASFERIMENTO_INTERNO_USCITA",
   "RETTIFICA_NEGATIVA",
   "SCARTO",
   "RESO",
-]);
+] as const;
+
+const NEGATIVE_NATURES_SET = new Set<string>(NEGATIVE_NATURES);
+const NEGATIVE_NATURES_SQL = sql.join(
+  NEGATIVE_NATURES.map((nature) => sql`${nature}`),
+  sql`, `,
+);
 
 export type AccountingNatureInput = {
   naturaContabile: string;
@@ -16,9 +23,9 @@ export type AccountingNatureInput = {
 
 export function accountingSign(input: AccountingNatureInput): -1 | 1 {
   if (input.naturaContabile === "STORNO") {
-    return NEGATIVE_NATURES.has(input.naturaOriginale ?? "") ? 1 : -1;
+    return NEGATIVE_NATURES_SET.has(input.naturaOriginale ?? "") ? 1 : -1;
   }
-  return NEGATIVE_NATURES.has(input.naturaContabile) ? -1 : 1;
+  return NEGATIVE_NATURES_SET.has(input.naturaContabile) ? -1 : 1;
 }
 
 export function signedInventoryValue(
@@ -41,11 +48,11 @@ export function signedMovementSql(
 ): SQL {
   return sql`CASE
     WHEN ${nature} = 'STORNO'
-      AND ${originalNature} IN ('DISTRIBUZIONE_FINALE', 'TRASFERIMENTO_INTERNO_USCITA', 'RETTIFICA_NEGATIVA', 'SCARTO', 'RESO')
+      AND ${originalNature} IN (${NEGATIVE_NATURES_SQL})
       THEN abs(COALESCE(${quantity}::numeric, 0))
     WHEN ${nature} = 'STORNO'
       THEN -abs(COALESCE(${quantity}::numeric, 0))
-    WHEN ${nature} IN ('DISTRIBUZIONE_FINALE', 'TRASFERIMENTO_INTERNO_USCITA', 'RETTIFICA_NEGATIVA', 'SCARTO', 'RESO')
+    WHEN ${nature} IN (${NEGATIVE_NATURES_SQL})
       THEN -abs(COALESCE(${quantity}::numeric, 0))
     ELSE abs(COALESCE(${quantity}::numeric, 0))
   END`;
@@ -60,6 +67,7 @@ export function accountingDisposition(input: {
   if (naturaContabile === "STORNO") {
     if (naturaOriginale === "DISTRIBUZIONE_FINALE")
       return "CORREZIONE_DISTRIBUZIONE";
+    if (naturaOriginale === "CONSEGNA_ENTE") return "TRACCIABILITA_INTERNA";
     if (naturaOriginale === "RESO") return "CORREZIONE_RESO";
     if (["SCARTO", "RETTIFICA_NEGATIVA"].includes(naturaOriginale ?? ""))
       return "CORREZIONE_MODIFICA_GIACENZA";
@@ -83,6 +91,7 @@ export function accountingDisposition(input: {
   )
     return "MODIFICA_GIACENZA";
   if (naturaContabile === "DISTRIBUZIONE_FINALE") return "DA_RENDICONTARE_DDC";
+  if (naturaContabile === "CONSEGNA_ENTE") return "TRACCIABILITA_INTERNA";
   return "TRACCIABILITA_INTERNA";
 }
 

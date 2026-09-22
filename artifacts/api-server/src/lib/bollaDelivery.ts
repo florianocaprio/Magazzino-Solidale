@@ -7,13 +7,15 @@ import {
   interventiStoricoStatiTable,
   interventiTable,
   lottiTable,
+  magazziniTable,
   movimentiTable,
   prenotazioniMagazzinoTable,
   prodottiTable,
 } from "@workspace/db";
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
 import { requireOperationalMagazzino } from "./inventoryLedger";
+import { lockInventoryLotsInGlobalOrder } from "./inventoryLocks";
 import { isLottoDistribuibile } from "./lottoPolicy";
 import { InventoryDecimal } from "./inventoryDecimal";
 import {
@@ -24,15 +26,27 @@ import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimension
 import {
   BeneficiaryReportingScopeError,
   isReportingSnapshotConcurrencyError,
-  lockAndAuthorizeBeneficiaryReportingContextTx,
+  lockBeneficiaryReportingContextTx,
 } from "./reporting/eventSnapshots";
-import type { BeneficiarioAccessScope } from "./beneficiarioPolicy";
+import {
+  canAccessBeneficiarioScope,
+  type BeneficiarioAccessScope,
+} from "./beneficiarioPolicy";
+import { canAccessAreaOperativa, canAccessCentro } from "./centroScope";
 import {
   auditFields,
   auditUserId,
   recordAuditEvent,
   type AuditCommandContext,
 } from "./auditEvent";
+import {
+  DocumentCommandError,
+  loadDocumentCommand,
+  lockConsegnaBollaRelation,
+  lockDocumentCommand,
+  storeDocumentCommand,
+  validateDocumentCommand,
+} from "./documentCommand";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 const PRENOTAZIONE_CONVERTITA = "convertita_in_scarico";
@@ -60,6 +74,10 @@ export function handleBollaActionError(err: unknown, res: Response): boolean {
     return true;
   }
   if (err instanceof BollaActionError) {
+    res.status(err.status).json({ error: err.message });
+    return true;
+  }
+  if (err instanceof DocumentCommandError) {
     res.status(err.status).json({ error: err.message });
     return true;
   }
@@ -118,6 +136,8 @@ async function syncInterventoBollaTx(tx: Tx, bollaId: number) {
     .from(bolleTable)
     .where(eq(bolleTable.id, bollaId));
   if (!bolla) return;
+  if (bolla.tipoDestinatario !== "beneficiario" || bolla.beneficiarioId == null)
+    return;
 
   const righe = await tx
     .select({ tipoProdotto: prodottiTable.tipoProdotto })
@@ -217,16 +237,44 @@ export async function stornoRigaTx(
   operatoreId: number,
   auditEventoId: number | null = null,
 ) {
+  return stornoRigheTx(tx, [riga], bollaId, operatoreId, auditEventoId);
+}
+
+export async function stornoRigheTx(
+  tx: Tx,
+  righe: Array<{ id: number }>,
+  bollaId: number,
+  operatoreId: number,
+  auditEventoId: number | null = null,
+) {
+  const rigaIds = [...new Set(righe.map((riga) => riga.id))].sort(
+    (a, b) => a - b,
+  );
+  if (rigaIds.length === 0) return;
+
   const movimenti = await tx
     .select()
     .from(movimentiTable)
     .where(
       and(
         eq(movimentiTable.bollaId, bollaId),
-        eq(movimentiTable.bollaRigaId, riga.id),
+        inArray(movimentiTable.bollaRigaId, rigaIds),
         eq(movimentiTable.tipoMovimento, "scarico"),
       ),
-    );
+    )
+    .orderBy(
+      asc(movimentiTable.prodottoId),
+      asc(movimentiTable.lottoId),
+      asc(movimentiTable.id),
+    )
+    .for("update");
+
+  await lockInventoryLotsInGlobalOrder(tx, {
+    kind: "lot-ids",
+    lottoIds: movimenti.flatMap((movimento) =>
+      movimento.lottoId == null ? [] : [movimento.lottoId],
+    ),
+  });
 
   for (const mov of movimenti) {
     if (!mov.lottoId) continue;
@@ -320,25 +368,43 @@ async function convertiPrenotazioniAttiveInScarico(
         eq(prenotazioniMagazzinoTable.bollaId, bolla.id),
         eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
       ),
+    )
+    .orderBy(
+      asc(prenotazioniMagazzinoTable.prodottoId),
+      asc(prenotazioniMagazzinoTable.lottoId),
+      asc(prenotazioniMagazzinoTable.id),
     );
 
-  const canaleOperativo =
-    bolla.consegnaId != null ? "DOMICILIARE" : "RITIRO_SEDE";
-  const operation = await ensureDistributionOperation(tx, {
-    magazzinoId: bolla.magazzinoId,
-    dataDistribuzione: opts.dataMovimento,
-    canaleOperativo,
-    dominioOrigine: "BOLLA",
-    entitaOrigineTipo: "bolla",
-    entitaOrigineId: bolla.id,
-    areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
-    centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
-    territorioClassificazione:
-      bolla.areaOperativaIdSnapshot == null ? "legacy_sconosciuto" : "attribuito",
-    numeroDocumento: bolla.numeroBolla,
-    numeroPacchi: 1,
-    creatoDa: opts.operatoreId,
+  await lockInventoryLotsInGlobalOrder(tx, {
+    kind: "lot-ids",
+    lottoIds: prenotazioni.map((row) => row.p.lottoId),
   });
+
+  const isBeneficiario = bolla.tipoDestinatario === "beneficiario";
+  const canaleOperativo = isBeneficiario
+    ? bolla.consegnaId != null
+      ? "DOMICILIARE"
+      : "RITIRO_SEDE"
+    : "ALTRO";
+  const operation = isBeneficiario
+    ? await ensureDistributionOperation(tx, {
+        magazzinoId: bolla.magazzinoId,
+        dataDistribuzione: opts.dataMovimento,
+        canaleOperativo,
+        dominioOrigine: "BOLLA",
+        entitaOrigineTipo: "bolla",
+        entitaOrigineId: bolla.id,
+        areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
+        territorioClassificazione:
+          bolla.areaOperativaIdSnapshot == null
+            ? "legacy_sconosciuto"
+            : "attribuito",
+        numeroDocumento: bolla.numeroBolla,
+        numeroPacchi: 1,
+        creatoDa: opts.operatoreId,
+      })
+    : null;
 
   for (const row of prenotazioni) {
     const prenotazione = row.p;
@@ -372,7 +438,7 @@ async function convertiPrenotazioniAttiveInScarico(
 
     await tx.insert(movimentiTable).values({
       tipoMovimento: "scarico",
-      tipoDettaglio: "consegna_beneficiario",
+      tipoDettaglio: isBeneficiario ? "consegna_beneficiario" : "consegna_ente",
       dataMovimento: opts.dataMovimento,
       magazzinoId: prenotazione.magazzinoId,
       prodottoId: prenotazione.prodottoId,
@@ -382,18 +448,20 @@ async function convertiPrenotazioniAttiveInScarico(
       quantitaKgLt: dimensions.quantitaKgLt,
       fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
       unitaMisura,
-      beneficiarioId: bolla.beneficiarioId,
+      beneficiarioId: isBeneficiario ? bolla.beneficiarioId : null,
       operatoreId: opts.operatoreId,
       auditEventoId: opts.auditEventoId,
       bollaId: bolla.id,
       bollaRigaId: prenotazione.rigaBollaId,
       fondoOrigine: lotto.fondoOrigine,
-      naturaContabile: "DISTRIBUZIONE_FINALE",
+      naturaContabile: isBeneficiario
+        ? "DISTRIBUZIONE_FINALE"
+        : "CONSEGNA_ENTE",
       dominioOrigine: "BOLLA",
       entitaOrigineTipo: "bolla",
       entitaOrigineId: bolla.id,
       rigaOrigineId: prenotazione.rigaBollaId,
-      operazioneDistribuzioneId: operation.id,
+      operazioneDistribuzioneId: operation?.id ?? null,
       canaleOperativo,
       documentoRiferimento: bolla.numeroBolla,
       note: row.r?.note ?? undefined,
@@ -411,28 +479,31 @@ async function convertiPrenotazioniAttiveInScarico(
 async function syncConsegnaDaBollaTx(
   tx: Tx,
   bolla: typeof bolleTable.$inferSelect,
+  lockedConsegna: typeof consegneTable.$inferSelect | null,
 ) {
+  if (bolla.tipoDestinatario !== "beneficiario" || bolla.beneficiarioId == null)
+    return;
   const now = new Date();
 
   if (bolla.consegnaId != null) {
-    const [consegna] = await tx
-      .select()
-      .from(consegneTable)
-      .where(eq(consegneTable.id, bolla.consegnaId));
-    if (consegna) {
-      if (consegna.stato !== "effettuata") {
-        await tx
-          .update(consegneTable)
-          .set({
-            stato: "effettuata",
-            dataEffettuata: now,
-            areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
-            centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
-          })
-          .where(eq(consegneTable.id, bolla.consegnaId));
-      }
-      return;
+    if (!lockedConsegna || lockedConsegna.id !== bolla.consegnaId) {
+      throw new BollaActionError(
+        409,
+        "La Consegna collegata non è stata bloccata in modo coerente",
+      );
     }
+    if (lockedConsegna.stato !== "effettuata") {
+      await tx
+        .update(consegneTable)
+        .set({
+          stato: "effettuata",
+          dataEffettuata: now,
+          areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+          centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
+        })
+        .where(eq(consegneTable.id, bolla.consegnaId));
+    }
+    return;
   }
 
   const today = dataCivileEuropeRome(now);
@@ -458,6 +529,45 @@ async function syncConsegnaDaBollaTx(
     .where(eq(bolleTable.id, bolla.id));
 }
 
+async function lockAndAuthorizeBollaDeliveryScope(
+  tx: Tx,
+  bolla: typeof bolleTable.$inferSelect,
+  accessScope: BeneficiarioAccessScope,
+) {
+  const reportingContext =
+    bolla.tipoDestinatario === "beneficiario"
+      ? await lockBeneficiaryReportingContextTx(tx, bolla.beneficiarioId!)
+      : null;
+  if (
+    reportingContext &&
+    !canAccessBeneficiarioScope(reportingContext, accessScope)
+  ) {
+    throw new BeneficiaryReportingScopeError();
+  }
+  const [lockedMagazzino] = await tx
+    .select()
+    .from(magazziniTable)
+    .where(eq(magazziniTable.id, bolla.magazzinoId))
+    .for("share");
+  if (
+    !lockedMagazzino ||
+    !canAccessCentro(
+      lockedMagazzino.centroAscoltoId,
+      accessScope.centroAscoltoId,
+    ) ||
+    !canAccessAreaOperativa(
+      lockedMagazzino.areaOperativaId,
+      accessScope.areaOperativaId,
+    )
+  ) {
+    throw new BollaActionError(
+      403,
+      "Magazzino non accessibile per il tuo profilo",
+    );
+  }
+  return reportingContext;
+}
+
 export async function completeBollaDelivery(opts: {
   bollaId: number;
   audit: AuditCommandContext;
@@ -465,27 +575,143 @@ export async function completeBollaDelivery(opts: {
   confermaRicezione?: boolean;
   allowAlreadyConsegnata?: boolean;
   beneficiaryAccessScope: BeneficiarioAccessScope;
-}): Promise<{ alreadyConsegnata: boolean }> {
+  expectedConsegna: { id: number; beneficiarioId: number } | null;
+  documentCommand?: {
+    tipoComando: string;
+    idempotencyKey: string;
+    requestHash: string;
+    expectedVersion: number;
+    actorUserId: number;
+  };
+}): Promise<{ alreadyConsegnata: boolean; replay: boolean }> {
   const dataMovimento = dataCivileEuropeRome(new Date());
   let alreadyConsegnata = false;
+  let replay = false;
 
   await db.transaction(async (tx) => {
-    const current = await lockBolla(tx, opts.bollaId);
-    const reportingContext =
-      await lockAndAuthorizeBeneficiaryReportingContextTx(
+    if (opts.documentCommand) {
+      await lockDocumentCommand(
         tx,
-        current.beneficiarioId,
+        opts.documentCommand.tipoComando,
+        opts.documentCommand.idempotencyKey,
+      );
+    }
+    if (opts.expectedConsegna) {
+      await lockConsegnaBollaRelation(tx, opts.expectedConsegna.id);
+    }
+    const current = await lockBolla(tx, opts.bollaId);
+    const isBeneficiario = current.tipoDestinatario === "beneficiario";
+    const existingReceipt = opts.documentCommand
+      ? await loadDocumentCommand(tx, {
+          tipoComando: opts.documentCommand.tipoComando,
+          idempotencyKey: opts.documentCommand.idempotencyKey,
+        })
+      : null;
+    if (existingReceipt && opts.documentCommand) {
+      await lockAndAuthorizeBollaDeliveryScope(
+        tx,
+        current,
         opts.beneficiaryAccessScope,
       );
+      validateDocumentCommand(existingReceipt, {
+        tipoComando: opts.documentCommand.tipoComando,
+        idempotencyKey: opts.documentCommand.idempotencyKey,
+        requestHash: opts.documentCommand.requestHash,
+        actorUserId: opts.documentCommand.actorUserId,
+        aggregatoTipo: "bolla",
+        aggregatoId: opts.bollaId,
+      });
+      replay = true;
+      return;
+    }
+    let lockedConsegna: typeof consegneTable.$inferSelect | null = null;
+    if (opts.expectedConsegna) {
+      const [candidateConsegna] = await tx
+        .select()
+        .from(consegneTable)
+        .where(eq(consegneTable.id, opts.expectedConsegna.id))
+        .for("update");
+      lockedConsegna = candidateConsegna ?? null;
+      if (
+        !lockedConsegna ||
+        lockedConsegna.tipoPianificazione !== "consegna_pacco" ||
+        lockedConsegna.beneficiarioId !==
+          opts.expectedConsegna.beneficiarioId ||
+        current.tipoDestinatario !== "beneficiario" ||
+        current.beneficiarioId !== opts.expectedConsegna.beneficiarioId ||
+        current.consegnaId !== opts.expectedConsegna.id
+      ) {
+        throw new BollaActionError(
+          409,
+          "La Consegna e la Bolla non risultano più associate allo stesso Beneficiario",
+        );
+      }
+    } else if (current.consegnaId != null) {
+      throw new BollaActionError(
+        409,
+        "L'associazione della Bolla a una Consegna è cambiata; ricaricare i dati",
+      );
+    }
+    const reportingContext = await lockAndAuthorizeBollaDeliveryScope(
+      tx,
+      current,
+      opts.beneficiaryAccessScope,
+    );
+    if (
+      opts.documentCommand &&
+      current.versione !== opts.documentCommand.expectedVersion
+    ) {
+      throw new DocumentCommandError(
+        409,
+        "Versione non aggiornata; ricaricare i dati",
+      );
+    }
+    if (reportingContext && !reportingContext.attivo) {
+      throw new BeneficiaryReportingScopeError();
+    }
 
     if (current.stato === "consegnato") {
-      await requireOperationalMagazzino(tx, current.magazzinoId);
       if (!opts.allowAlreadyConsegnata) {
         throw new BollaActionError(400, "La bolla risulta già consegnata");
       }
       alreadyConsegnata = true;
-      await syncConsegnaDaBollaTx(tx, current);
-      await syncInterventoBollaTx(tx, opts.bollaId);
+      await recordAuditEvent(tx, {
+        command: opts.audit,
+        azione: "CONSEGNA_LEGACY_RICONCILIATA",
+        entitaTipo: "bolla",
+        entitaId: current.id,
+        documentoTipo: "bolla",
+        documentoId: current.id,
+        areaOperativaIdSnapshot: current.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot: current.centroAscoltoIdSnapshot,
+        magazzinoIdSnapshot: current.magazzinoId,
+        dataOperativa: dataMovimento,
+        metadata: auditFields(
+          { consegnaId: current.consegnaId, stato: current.stato },
+          ["consegnaId", "stato"],
+        ),
+      });
+      if (isBeneficiario) {
+        await syncConsegnaDaBollaTx(tx, current, lockedConsegna);
+        await syncInterventoBollaTx(tx, opts.bollaId);
+      }
+      if (opts.documentCommand) {
+        await storeDocumentCommand(tx, {
+          tipoComando: opts.documentCommand.tipoComando,
+          idempotencyKey: opts.documentCommand.idempotencyKey,
+          requestHash: opts.documentCommand.requestHash,
+          aggregatoTipo: "bolla",
+          aggregatoId: opts.bollaId,
+          versioneRichiesta: opts.documentCommand.expectedVersion,
+          versioneRisultante: current.versione,
+          resultSnapshot: {
+            id: opts.bollaId,
+            stato: current.stato,
+            versione: current.versione,
+          },
+          actorUserId: opts.documentCommand.actorUserId,
+        });
+      }
       return;
     }
 
@@ -496,7 +722,11 @@ export async function completeBollaDelivery(opts: {
       );
     }
 
-    const reportingSnapshot = reportingContext.snapshot;
+    const reportingSnapshot = reportingContext?.snapshot ?? {
+      areaOperativaIdSnapshot: current.areaOperativaIdSnapshot,
+      centroAscoltoIdSnapshot: null,
+      numeroComponentiNucleoSnapshot: null,
+    };
     let areaOperativaIdSnapshot = current.areaOperativaIdSnapshot;
     let centroAscoltoIdSnapshot = current.centroAscoltoIdSnapshot;
     if (areaOperativaIdSnapshot == null && centroAscoltoIdSnapshot == null) {
@@ -580,21 +810,43 @@ export async function completeBollaDelivery(opts: {
         confermaRicezione: opts.confermaRicezione ?? true,
         noteRicezione: opts.noteRicezione ?? null,
         operatoreId,
+        versione: sql`${bolleTable.versione} + 1`,
         ...effectiveReportingSnapshot,
       })
       .where(eq(bolleTable.id, opts.bollaId))
       .returning();
 
-    await syncConsegnaDaBollaTx(
-      tx,
-      updated ?? {
-        ...effectiveBolla,
-        stato: "consegnato",
-        operatoreId,
-      },
-    );
-    await syncInterventoBollaTx(tx, opts.bollaId);
+    if (isBeneficiario) {
+      await syncConsegnaDaBollaTx(
+        tx,
+        updated ?? {
+          ...effectiveBolla,
+          stato: "consegnato",
+          operatoreId,
+        },
+        lockedConsegna,
+      );
+      await syncInterventoBollaTx(tx, opts.bollaId);
+    }
+    if (opts.documentCommand) {
+      const resultingVersion = updated?.versione ?? current.versione + 1;
+      await storeDocumentCommand(tx, {
+        tipoComando: opts.documentCommand.tipoComando,
+        idempotencyKey: opts.documentCommand.idempotencyKey,
+        requestHash: opts.documentCommand.requestHash,
+        aggregatoTipo: "bolla",
+        aggregatoId: opts.bollaId,
+        versioneRichiesta: opts.documentCommand.expectedVersion,
+        versioneRisultante: resultingVersion,
+        resultSnapshot: {
+          id: opts.bollaId,
+          stato: "consegnato",
+          versione: resultingVersion,
+        },
+        actorUserId: opts.documentCommand.actorUserId,
+      });
+    }
   });
 
-  return { alreadyConsegnata };
+  return { alreadyConsegnata, replay };
 }

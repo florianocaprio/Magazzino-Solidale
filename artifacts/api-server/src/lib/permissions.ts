@@ -227,7 +227,19 @@ export const BOLLE_PERMISSIONS = [
   { key: "bolle.view", label: "Bolle: consultazione" },
   { key: "bolle.manage", label: "Bolle: creazione e modifica bozze" },
   { key: "bolle.deliver", label: "Bolle: conferma e consegna" },
-  { key: "bolle.cancel", label: "Bolle: annullamento e storno" },
+  { key: "bolle.cancel", label: "Bolle: annullamento prima dell'uscita" },
+  {
+    key: "bolle.reverse.admin",
+    label: "Bolle: storno amministrativo post-uscita",
+  },
+  {
+    key: "enti-destinatari.view",
+    label: "Bolle: consultazione enti destinatari",
+  },
+  {
+    key: "enti-destinatari.manage",
+    label: "Bolle: gestione enti destinatari",
+  },
 ] as const;
 
 export const APPROVVIGIONAMENTI_PERMISSIONS = [

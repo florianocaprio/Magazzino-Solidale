@@ -1132,3 +1132,175 @@ concorrenza e integrazione con ledger e audit comuni.
 Questa chiusura modifica esclusivamente la documentazione M3B. Non modifica
 codice applicativo, schema, API, migrazioni, OpenAPI o file generati, non
 coinvolge `main` e non avvia né descrive come implementato M4/M5.
+
+## M4A — sviluppo documento operativo comune
+
+Data: 19 settembre 2026
+
+Base locale/remota: `8df6b823bb14604af0123ea62ce7b237b32561c8` sul branch
+`codex/magazzino-workflow-unificato`. M3 complessivamente chiuso; fotocamera
+reale e tablet fisico restano `NE-MAN-CAMERA`/`NE-MAN-TABLET`.
+
+Stato: **sviluppo M4A predisposto, fase formale `##test` non eseguita**
+(`DEV-M4A/NE-TEST-M4A/NE-MAN`).
+
+Il delta introduce destinatari Beneficiario/Ente con vincolo esclusivo,
+classificazione inventariale `CONSEGNA_ENTE`, facciata comune server-side per
+lista/dettaglio Bolle e Trasferimenti, UI operativa unica con creazione e
+azioni sull'aggregato autorevole, PDF tipizzato e compatibilità del vecchio
+URL. Scarichi Manuali resta distinto; il trasferimento continua a usare il
+workflow e il ledger esistenti.
+
+È aggiunta la migrazione 40
+`20260919_m4a_documenti_destinatari.sql`; le prime 39 non sono modificate.
+OpenAPI è stato aggiornato prima del codegen e due generazioni consecutive non
+hanno prodotto errori o churn. Il fresh gate isolato applica 40/40 migrazioni,
+esegue seed/smoke/replay/verify senza pending o mismatch. I test backend mirati
+Documento comune/Bolle/Trasferimenti passano 65/65; il test frontend PDF
+mirato passa 1/1. Typecheck e `git diff --check` di sviluppo sono verdi. Un
+primo run mirato ha evidenziato e permesso di correggere snapshot legacy,
+motivo annullamento, query scope con array SQL e teardown della nuova FK; non
+viene conteggiato come verde. Non è stata eseguita la fase formale `##test`, né
+una suite completa, né Docker candidato/persistente, né validazione manuale.
+
+Il ciclo affidamento/mancata consegna/rientro, le prenotazioni Trasferimento e
+la chiusura complessiva di CAN-02/LOT-02/LOT-03 restano M4B.
+
+## M4A — test formale bloccato in revisione
+
+Data: 19 settembre 2026
+
+Base verificata: `8df6b823bb14604af0123ea62ce7b237b32561c8`.
+
+Stato: **NO-GO; candidato locale preservato, nessun commit/push**
+(`BLOCKED-M4A/NE-TEST-M4A/NE-MAN`).
+
+La revisione statica ha rilevato finding bloccanti prima dei gate PostgreSQL:
+`CONSEGNA_ENTE` non è propagata come uscita nei consumer contabili comuni; la
+facciata Trasferimenti richiede modulo e permesso Bolle; i nuovi comandi non
+dispongono del contratto completo versione/idempotency/hash; i dati Ente live
+prevalgono sugli snapshot congelati; lista/export/URL comuni sono incompleti;
+lo storno amministrativo Bolla precedente non è più raggiungibile da una route
+runtime distinta.
+
+Il controllo `pnpm run typecheck` è verde. Il primo run frontend pertinente ha
+chiuso 47 test passati e 1 fallito: la regressione di navigazione attende ancora
+la voce Trasferimenti protetta da `magazzino.view`. Fresh, upgrade populated
+39→40, suite complete, E2E, build, budget, runtime e codegen finali non sono
+stati eseguiti e non vengono dichiarati superati.
+
+Le evidenze dettagliate e la matrice T01–T32 sono registrate in
+`REVISIONE_STATICA_M4A.md` ed `ESITI_TEST_M4A.md`. Non sono state create
+risorse Docker/PostgreSQL M4A; l'ambiente persistente è stato soltanto censito
+in lettura e non aggiornato. M4B e `main` non sono stati toccati.
+
+## M4A — correzione e completamento post-NO-GO
+
+Data: 19 settembre 2026
+
+Base pubblicata:
+`8df6b823bb14604af0123ea62ce7b237b32561c8`, branch
+`codex/magazzino-workflow-unificato`.
+
+Stato corrente: **correzioni M4A completate nel working tree, nuova fase
+formale non eseguita e validazione manuale non eseguita**
+(`DEV-M4A-CORRETTO/NE-TEST-M4A/NE-MAN`).
+
+Il **NO-GO** registrato nella sezione precedente resta l'esito storico
+dell'ultima fase formale. Questa sezione non lo riscrive come GO, non chiude
+M4A e non attribuisce alle prove di sviluppo lo stato di validazione formale o
+umana.
+
+### Correzioni consolidate
+
+- `CONSEGNA_ENTE` è trattata come uscita fisica nei consumer contabili e di
+  riconciliazione, senza quantità negative persistite o conteggi sociali
+  fittizi.
+- La facciata comune separa autorizzazioni Bolle e Trasferimenti prima di
+  lista, totale, paginazione ed export. Il profilo con `magazzino.view`
+  conserva la consultazione Trasferimenti senza ricevere mutazioni Bolle;
+  Mensa mantiene il proprio contratto.
+- I comandi adattati condividono chiave idempotente, hash semantico, versione,
+  ricevuta transazionale, replay dopo rivalidazione dello scope e audit
+  atomico. Lock e rilettura autorevole precedono gli effetti; l'ordine dei lock
+  Bolla/Consegna/Beneficiario/Magazzino/planning/lotti è deterministico.
+- Snapshot Ente congelati, campi null intenzionali e fallback legacy hanno una
+  fonte esplicita e coerente fra dettaglio e PDF.
+- Lista, ricerca, filtri, ordinamento, conteggio ed export comuni operano sullo
+  stesso insieme autorizzato. URL e query key identificano l'aggregato con
+  `bolla:<id>` o `trasferimento:<id>` e preservano deep link e draft.
+- Lo storno amministrativo è nuovamente raggiungibile come comando distinto
+  dall'annullamento ordinario, con permesso, motivo, idempotenza, audit e
+  rollback atomico; non introduce i rientri previsti per M4B.
+- La seconda rilettura indipendente del delta corretto non ha rilevato blocker
+  M4A residui.
+
+### Schema e contratti
+
+La migrazione candidata 40 resta
+`20260919_m4a_documenti_destinatari.sql`; le prime 39 migrazioni pubblicate
+restano invariate. Il fresh finale applica 40/40 migrazioni e completa
+seed/smoke/replay/verify. Anche l'upgrade autentico populated 39→40 è verde
+nella fase correttiva. OpenAPI resta la fonte del contratto; due codegen
+consecutivi producono 842 file byte-identici.
+
+### Prove mirate conclusive
+
+| Prova               | Esito                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| backend coordinato  | PASS, 11 file / 273 test                                                           |
+| Mensa isolata       | PASS, 72/72 test                                                                   |
+| Bolle isolata       | PASS, 2 file / 57 test                                                             |
+| frontend completo   | PASS, 74 file / 408 test                                                           |
+| Playwright desktop  | primo run FAIL per locator ambiguo; correzione puntuale; rerun 3/3 PASS            |
+| PDF reale snapshot  | PASS, A4 una pagina, 3,2 MiB; A presente, B assente; render leggibile/non tagliato |
+| migration runner    | PASS, 10/10 test                                                                   |
+| workspace typecheck | PASS                                                                               |
+| build API/frontend  | PASS; warning sourcemap/chunk frontend non bloccanti registrati                    |
+| budget frontend     | PASS, 1306,8 KiB / 361,4 KiB gzip                                                  |
+| Prettier pertinente | PASS sul delta non generato; generated lasciati all'output ufficiale del codegen   |
+| `git diff --check`  | PASS                                                                               |
+
+I tre E2E coprono Beneficiario con risposta persa, Ente con
+snapshot/fallback legacy e Trasferimento con conservazione del draft. Le porte
+temporanee API/frontend 18181 e 4173 risultano chiuse. Dettaglio dei comandi,
+della lettura T01–T32 e dei limiti è in `ESITI_TEST_M4A.md`; la rilettura dei
+finding resta in `REVISIONE_STATICA_M4A.md`.
+
+### Ambiente e arresto
+
+Le prove hanno usato esclusivamente il laboratorio effimero censito in
+`AMBIENTE_TEST.md`; `magazzino-web`, `magazzino-api`, `magazzino-postgres` e i
+relativi volumi persistenti sono rimasti invariati. Il cleanup nominativo
+finale del container e degli output PDF/render/Playwright è completato e
+verificato, senza prune o rimozioni globali.
+
+Il working tree resta non pubblicato: nessun commit, staging per pubblicazione,
+push, merge o modifica di `main`; nessun rebuild o migrazione del Docker locale
+persistente. Il passo successivo resta un nuovo `##test M4A` completo. M4B non
+è iniziata.
+
+## M4A — rerun formale finale post-correzione
+
+Data: 22 settembre 2026. Stato del candidato:
+**`OK-M4A/NE-MAN`**. Il precedente NO-GO e la successiva fase
+`DEV-M4A-CORRETTO/NE-TEST-M4A/NE-MAN` restano registrati sopra come storia,
+non vengono retroattivamente trasformati in PASS.
+
+Sul working tree corretto sono stati rivalutati F1–F8, T01–T32 e G1–G8:
+tutti i gate automatici risultano GO. La suite API completa ha 1308 pass e
+due skip opzionali AGEA; la frontend 408/408 pass; Playwright completo
+`--retries=0` ha 66 pass e 99 skip di progetto/viewport previsti. La prova
+E2E comprende tre destinatari, ripresa della bozza Ente, replay dopo risposta
+persa anche della conferma versionata, PDF FEFO/multipagina e regressioni
+M1–M3 con i due Excel originali. Il fresh 40/40, l'upgrade autentico
+populated 39→40, il runner 24/24, il codegen ripetuto byte-identico,
+typecheck, build, budget, runtime, Prettier e diff check sono verdi.
+
+I tentativi intermedi e le correzioni minime dei test E2E sono documentati in
+`ESITI_TEST_M4A.md`; la chiusura motivata F1–F8 è in
+`REVISIONE_STATICA_M4A.md`. Gli output PDF/render e i tre container
+PostgreSQL disposable M4A sono stati rimossi nominativamente; l'ambiente
+Docker persistente non è stato ricostruito, migrato o modificato. Restano
+`NE-MAN-CAMERA`, `NE-MAN-TABLET` e la validazione manuale M4A: non sono
+dichiarati superati. M4B non è iniziata; `main` non è stato modificato.

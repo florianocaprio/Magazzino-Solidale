@@ -50,6 +50,7 @@ import {
   callerCentroId,
   callerZonaUdsId,
   canAccessAreaOperativa,
+  canAccessCentro,
   canAccessMagazzino,
   centroScopeFilter,
   areaOperativaScopeFilter,
@@ -99,6 +100,10 @@ import {
   positiveInventoryDecimal,
 } from "../lib/inventoryDecimal";
 import { auditContextFromRequest } from "../lib/auditEvent";
+import {
+  commandRequestHash,
+  isDocumentCommandError,
+} from "../lib/documentCommand";
 import {
   ProductOperationalQuantityError,
   validateProductOperationalQuantity,
@@ -442,7 +447,11 @@ async function requireMensa(id: number, req: Request, active = false) {
   return row;
 }
 
-async function requireMensaLogisticsWarehouse(id: number, req: Request) {
+async function requireMensaLogisticsWarehouse(
+  id: number,
+  req: Request,
+  active = true,
+) {
   const [warehouse] = await db
     .select({
       id: magazziniTable.id,
@@ -461,7 +470,7 @@ async function requireMensaLogisticsWarehouse(id: number, req: Request) {
   ) {
     throw new MensaError(403, "Magazzino non accessibile per la tua area");
   }
-  if (warehouse.stato !== "attivo") {
+  if (active && warehouse.stato !== "attivo") {
     throw new MensaError(409, "Il magazzino non è attivo");
   }
   return warehouse;
@@ -803,6 +812,72 @@ async function requireReplayMensaScope(
     throw new MensaError(403, "Replay idempotente non accessibile");
   }
   await requireMensa(resourceMensaId, req);
+}
+
+async function assertMensaTransferScopeTx(
+  tx: MensaTransaction,
+  req: Request,
+  transfer: Pick<
+    typeof trasferimentiTable.$inferSelect,
+    "mensaId" | "magazzinoOrigineId" | "magazzinoDestinoId"
+  >,
+  requestedMensaId: number,
+  requireActive: boolean,
+): Promise<void> {
+  if (transfer.mensaId == null || transfer.mensaId !== requestedMensaId) {
+    throw new MensaError(403, "Replay idempotente non accessibile");
+  }
+  const [mensa] = await tx
+    .select()
+    .from(menseTable)
+    .where(eq(menseTable.id, transfer.mensaId))
+    .for("share");
+  if (
+    !mensa ||
+    !canAccessAreaOperativa(mensa.areaOperativaId, callerAreaOperativaId(req))
+  ) {
+    throw new MensaError(403, "Mensa non accessibile per la tua area");
+  }
+  if (transfer.magazzinoDestinoId !== mensa.magazzinoId) {
+    throw new MensaError(
+      409,
+      "Il Trasferimento non è più coerente con il magazzino della Mensa",
+    );
+  }
+  const warehouses = await tx
+    .select()
+    .from(magazziniTable)
+    .where(
+      inArray(magazziniTable.id, [
+        transfer.magazzinoOrigineId,
+        transfer.magazzinoDestinoId,
+      ]),
+    )
+    .orderBy(asc(magazziniTable.id))
+    .for("share");
+  const origin = warehouses.find(
+    (warehouse) => warehouse.id === transfer.magazzinoOrigineId,
+  );
+  const destination = warehouses.find(
+    (warehouse) => warehouse.id === transfer.magazzinoDestinoId,
+  );
+  if (
+    !origin ||
+    !destination ||
+    !canAccessCentro(origin.centroAscoltoId, callerCentroId(req)) ||
+    !canAccessAreaOperativa(origin.areaOperativaId, callerAreaOperativaId(req))
+  ) {
+    throw new MensaError(403, "Magazzino non accessibile per la tua area");
+  }
+  if (
+    requireActive &&
+    (!mensa.attiva ||
+      origin.stato !== "attivo" ||
+      destination.stato !== "attivo" ||
+      destination.tipoMagazzino !== "mensa")
+  ) {
+    throw new MensaError(409, "La Mensa o il magazzino non è attivo");
+  }
 }
 
 async function sendReplayMensaScope(
@@ -1279,6 +1354,9 @@ router.post(
         res.json({ ...dto, idempotentReplay: true });
         return;
       }
+      // La verifica di accesso deve restare disponibile anche quando il
+      // servizio o il magazzino Mensa non sono operativi: in quel caso
+      // registriamo un accesso negato con motivo MENSA_NON_ATTIVA.
       const mensa = await requireMensa(mensaId, req);
       const now = new Date();
       const today = dataServizioMensa(now);
@@ -1466,7 +1544,7 @@ router.post(
         });
         return;
       }
-      const mensa = await requireMensa(mensaId, req, true);
+      const mensa = await requireMensa(mensaId, req);
       const nuovaPersona = req.body?.nuovaPersona as
         | Record<string, unknown>
         | undefined;
@@ -2398,13 +2476,13 @@ router.post(
         "La chiave di idempotenza",
         80,
       );
-      const mensa = await requireMensa(mensaId, req, true);
+      const mensa = await requireMensa(mensaId, req);
       if (origineId === mensa.mensa.magazzinoId)
         throw new MensaError(
           400,
           "Origine e destinazione devono essere diverse",
         );
-      await requireMensaLogisticsWarehouse(origineId, req);
+      await requireMensaLogisticsWarehouse(origineId, req, false);
       const dataRichiesta = dateOnly(
         req.body?.dataRichiesta,
         "La data richiesta",
@@ -2441,35 +2519,50 @@ router.post(
           note: optionalText(row.note, "Le note", 1000),
         };
       });
-      const [replay] = await db
-        .select({
-          id: trasferimentiTable.id,
-          mensaId: trasferimentiTable.mensaId,
-        })
-        .from(trasferimentiTable)
-        .where(eq(trasferimentiTable.idempotencyKey, idempotencyKey));
-      if (replay) {
-        if (replay.mensaId == null) {
-          throw new MensaError(403, "Replay idempotente non accessibile");
-        }
-        await requireReplayMensaScope(req, replay.mensaId, mensaId);
-        res.json({ id: replay.id, idempotentReplay: true });
-        return;
-      }
+      const trasportatoreNome = optionalText(
+        req.body?.trasportatoreNome,
+        "Il trasportatore",
+        120,
+      );
+      const note = optionalText(req.body?.note, "Le note", 2000);
+      const requestHash = commandRequestHash({
+        mensaId,
+        magazzinoOrigineId: origineId,
+        magazzinoDestinoId: mensa.mensa.magazzinoId,
+        dataRichiesta,
+        trasportatoreNome,
+        note,
+        righe: normalized,
+      });
       const created = await createTransferRequest({
         magazzinoOrigineId: origineId,
         magazzinoDestinoId: mensa.mensa.magazzinoId,
         mensaId,
         idempotencyKey,
         dataRichiesta,
-        trasportatoreNome: optionalText(
-          req.body?.trasportatoreNome,
-          "Il trasportatore",
-          120,
-        ),
-        note: optionalText(req.body?.note, "Le note", 2000),
+        trasportatoreNome,
+        note,
         operatoreId: req.user!.id,
         audit: auditContextFromRequest(req, { operationKey: idempotencyKey }),
+        command: {
+          idempotencyKey,
+          requestHash,
+          actorUserId: req.user!.id,
+        },
+        authorizeCurrent: (tx, transfer) =>
+          assertMensaTransferScopeTx(tx, req, transfer, mensaId, false),
+        beforeCreate: (tx) =>
+          assertMensaTransferScopeTx(
+            tx,
+            req,
+            {
+              mensaId,
+              magazzinoOrigineId: origineId,
+              magazzinoDestinoId: mensa.mensa.magazzinoId,
+            },
+            mensaId,
+            true,
+          ),
         righe: normalized,
         afterCreate: async (tx, transfer) => {
           await tx.insert(auditConfigurazioniTable).values(
@@ -2488,11 +2581,18 @@ router.post(
           );
         },
       });
-      res
-        .status(201)
-        .json({ id: created.id, codice: created.codice, stato: created.stato });
+      res.status(created.idempotentReplay ? 200 : 201).json({
+        id: created.id,
+        codice: created.codice,
+        stato: created.stato,
+        idempotentReplay: created.idempotentReplay,
+      });
     } catch (error) {
       if (error instanceof TransferRequestError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      if (isDocumentCommandError(error)) {
         res.status(error.status).json({ error: error.message });
         return;
       }
@@ -2524,7 +2624,10 @@ router.post(
             ))
           )
             return;
-          res.json({ id: existing.id, idempotentReplay: true });
+          res.status(409).json({
+            error:
+              "La chiave appartiene a un Trasferimento legacy senza ricevuta verificabile; usare una nuova chiave",
+          });
           return;
         }
         res.status(409).json({ error: "Trasferimento duplicato" });

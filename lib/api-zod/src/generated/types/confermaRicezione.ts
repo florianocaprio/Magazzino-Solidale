@@ -7,6 +7,11 @@
  */
 
 export interface ConfermaRicezione {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   note?: string;

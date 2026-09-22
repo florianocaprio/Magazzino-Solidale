@@ -48,6 +48,7 @@ import {
   qualificheDeiVolontariTable,
   registroVolontariEventiTable,
   statiVolontariTable,
+  entiDestinatariTable,
 } from "@workspace/db";
 import { inArray, sql } from "drizzle-orm";
 
@@ -139,6 +140,8 @@ export function makeScopedApp(
         "bolle.manage",
         "bolle.deliver",
         "bolle.cancel",
+        "enti-destinatari.view",
+        "enti-destinatari.manage",
         "approvvigionamenti.view",
         "approvvigionamenti.manage",
         "approvvigionamenti.receive",
@@ -204,6 +207,7 @@ export interface SeedScope {
   turnoIds: number[];
   zonaIds: number[];
   areaOperativaIds: number[];
+  enteDestinatarioIds: number[];
   emissioneRegistroIds: number[];
   importazioneVolontariIds: number[];
 }
@@ -232,6 +236,7 @@ export function newScope(): SeedScope {
     turnoIds: [],
     zonaIds: [],
     areaOperativaIds: [],
+    enteDestinatarioIds: [],
     emissioneRegistroIds: [],
     importazioneVolontariIds: [],
   };
@@ -366,7 +371,8 @@ export async function createZona(
   return { id: z.id, nome };
 }
 
-export async function createProdotto(scope: SeedScope,
+export async function createProdotto(
+  scope: SeedScope,
   opts: {
     unitaMisura?: string;
     quantitaFrazionabile?: boolean;
@@ -784,9 +790,7 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db
       .delete(emissioniRegistroVolontariTable)
       .where(
-        inArray(
-          emissioniRegistroVolontariTable.id,
-          scope.emissioneRegistroIds),
+        inArray(emissioniRegistroVolontariTable.id, scope.emissioneRegistroIds),
       );
   }
   if (scope.importazioneVolontariIds.length > 0) {
@@ -879,6 +883,11 @@ export async function cleanup(scope: SeedScope): Promise<void> {
       .delete(bollaRigheTable)
       .where(inArray(bollaRigheTable.bollaId, scope.bollaIds));
     await db.delete(bolleTable).where(inArray(bolleTable.id, scope.bollaIds));
+  }
+  if (scope.enteDestinatarioIds.length > 0) {
+    await db
+      .delete(entiDestinatariTable)
+      .where(inArray(entiDestinatariTable.id, scope.enteDestinatarioIds));
   }
   if (cleanupConsegnaIds.length > 0) {
     await db

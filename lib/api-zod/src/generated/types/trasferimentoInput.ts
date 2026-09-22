@@ -8,6 +8,11 @@
 import type { TrasferimentoRigaInput } from './trasferimentoRigaInput';
 
 export interface TrasferimentoInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
   magazzinoOrigineId: number;
   magazzinoDestinoId: number;
   /** @nullable */

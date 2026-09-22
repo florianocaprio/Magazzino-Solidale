@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useListTrasferimenti,
   useCreateTrasferimento,
@@ -17,26 +17,66 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, ArrowRight, Play, CheckCircle2, Trash2, Download, CheckCircle, Pencil, Truck } from "lucide-react";
+import {
+  Plus,
+  ArrowRight,
+  Play,
+  CheckCircle2,
+  Trash2,
+  Download,
+  CheckCircle,
+  Pencil,
+  Truck,
+} from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
 import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
+import { useCommandIntentRegistry } from "@/lib/command-intent";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { loadAllPages } from "@/lib/paged-export";
 import { todayEuropeRome } from "@/lib/europe-rome";
-import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { trasferimentoDraftIsDirty } from "@/lib/trasferimento-draft";
+import {
+  UnsavedChangesDialog,
+  useUnsavedChangesGuard,
+} from "@/hooks/use-unsaved-changes-guard";
 
 interface RigaDraft {
   key: string;
@@ -46,7 +86,12 @@ interface RigaDraft {
 }
 
 function newRiga(): RigaDraft {
-  return { key: Math.random().toString(36).slice(2), prodottoId: "", quantita: "", unitaMisura: "pz" };
+  return {
+    key: Math.random().toString(36).slice(2),
+    prodottoId: "",
+    quantita: "",
+    unitaMisura: "pz",
+  };
 }
 
 // ─── Editor righe (dipende dal magazzino origine) ────────────────────────────
@@ -65,7 +110,12 @@ function RigheEditor({
   const { t } = useTranslation();
   const { data: giacenze } = useListGiacenze(
     { areaOperativaId, magazzinoId },
-    { query: { enabled: areaOperativaId > 0 && magazzinoId > 0, queryKey: getListGiacenzeQueryKey({ areaOperativaId, magazzinoId }) } },
+    {
+      query: {
+        enabled: areaOperativaId > 0 && magazzinoId > 0,
+        queryKey: getListGiacenzeQueryKey({ areaOperativaId, magazzinoId }),
+      },
+    },
   );
 
   const update = (key: string, patch: Partial<RigaDraft>) =>
@@ -83,7 +133,9 @@ function RigheEditor({
       )}
 
       {righe.map((r, index) => {
-        const giac = giacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
+        const giac = giacenze?.find(
+          (g) => g.prodottoId === parseInt(r.prodottoId),
+        );
         const max = Math.max(0, giac?.disponibileReale ?? 0);
         const qNum = parseFloat(r.quantita || "0");
         const eccede = !!r.prodottoId && qNum > max;
@@ -95,17 +147,37 @@ function RigheEditor({
                 <Select
                   value={r.prodottoId}
                   onValueChange={(v) => {
-                    const g = giacenze?.find((x) => x.prodottoId === parseInt(v));
-                    update(r.key, { prodottoId: v, unitaMisura: g?.unitaMisura ?? "pz", quantita: "" });
+                    const g = giacenze?.find(
+                      (x) => x.prodottoId === parseInt(v),
+                    );
+                    update(r.key, {
+                      prodottoId: v,
+                      unitaMisura: g?.unitaMisura ?? "pz",
+                      quantita: "",
+                    });
                   }}
                 >
-                  <SelectTrigger aria-label={`${t("trasferimenti.prodotto")} ${index + 1}`}><SelectValue placeholder={t("trasferimenti.selezionaProdotto")} /></SelectTrigger>
+                  <SelectTrigger
+                    aria-label={`${t("trasferimenti.prodotto")} ${index + 1}`}
+                  >
+                    <SelectValue
+                      placeholder={t("trasferimenti.selezionaProdotto")}
+                    />
+                  </SelectTrigger>
                   <SelectContent>
                     {giacenze
-                      ?.filter((g) => g.prodottoId === parseInt(r.prodottoId) || !usedIds.includes(String(g.prodottoId)))
+                      ?.filter(
+                        (g) =>
+                          g.prodottoId === parseInt(r.prodottoId) ||
+                          !usedIds.includes(String(g.prodottoId)),
+                      )
                       .map((g) => (
-                        <SelectItem key={g.prodottoId} value={String(g.prodottoId)}>
-                          {g.prodottoNome} — {Math.max(0, g.disponibileReale)} {g.unitaMisura} {t("trasferimenti.disponibileSuffix")}
+                        <SelectItem
+                          key={g.prodottoId}
+                          value={String(g.prodottoId)}
+                        >
+                          {g.prodottoNome} — {Math.max(0, g.disponibileReale)}{" "}
+                          {g.unitaMisura} {t("trasferimenti.disponibileSuffix")}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -133,23 +205,52 @@ function RigheEditor({
                   value={r.quantita}
                   onChange={(e) => update(r.key, { quantita: e.target.value })}
                   placeholder="0"
-                  className={eccede ? "border-destructive focus-visible:ring-destructive" : ""}
+                  className={
+                    eccede
+                      ? "border-destructive focus-visible:ring-destructive"
+                      : ""
+                  }
                 />
                 {r.prodottoId && (
-                  <p className={`text-xs ${eccede ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                  <p
+                    className={`text-xs ${eccede ? "text-destructive font-medium" : "text-muted-foreground"}`}
+                  >
                     {eccede
                       ? t("trasferimenti.massimoDisponibile", { max })
-                      : t("trasferimenti.disponibile", { max, um: giac?.unitaMisura ?? "" })}
+                      : t("trasferimenti.disponibile", {
+                          max,
+                          um: giac?.unitaMisura ?? "",
+                        })}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">{t("trasferimenti.unitaMisura")}</Label>
-                <Select value={r.unitaMisura} onValueChange={(v) => update(r.key, { unitaMisura: v })}>
-                  <SelectTrigger aria-label={`${t("trasferimenti.unitaMisura")} ${index + 1}`}><SelectValue /></SelectTrigger>
+                <Label className="text-xs">
+                  {t("trasferimenti.unitaMisura")}
+                </Label>
+                <Select
+                  value={r.unitaMisura}
+                  onValueChange={(v) => update(r.key, { unitaMisura: v })}
+                >
+                  <SelectTrigger
+                    aria-label={`${t("trasferimenti.unitaMisura")} ${index + 1}`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {["pz", "kg", "g", "lt", "ml", "conf", "scatola", "busta"].map((u) => (
-                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                    {[
+                      "pz",
+                      "kg",
+                      "g",
+                      "lt",
+                      "ml",
+                      "conf",
+                      "scatola",
+                      "busta",
+                    ].map((u) => (
+                      <SelectItem key={u} value={u}>
+                        {u}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -174,7 +275,7 @@ function RigheEditor({
 
 // ─── Form nuovo trasferimento ────────────────────────────────────────────────
 
-function NuovoTrasferimentoForm({
+export function NuovoTrasferimentoForm({
   open,
   onClose,
   onCreated,
@@ -195,16 +296,24 @@ function NuovoTrasferimentoForm({
   const { data: volontari } = useListVolontari();
   const createTrasferimento = useCreateTrasferimento();
   const { toast } = useToast();
+  const commandIntents = useCommandIntentRegistry();
 
   const origineIdNum = origineId ? parseInt(origineId) : 0;
-  const origineAreaId = magazzini?.find((m) => m.id === origineIdNum)?.areaOperativaId ?? 0;
-  const giacenzeParams = { areaOperativaId: origineAreaId, magazzinoId: origineIdNum };
-  const { data: origineGiacenze } = useListGiacenze(
-    giacenzeParams,
-    { query: { enabled: !!origineId && origineAreaId > 0, queryKey: getListGiacenzeQueryKey(giacenzeParams) } },
-  );
+  const origineAreaId =
+    magazzini?.find((m) => m.id === origineIdNum)?.areaOperativaId ?? 0;
+  const giacenzeParams = {
+    areaOperativaId: origineAreaId,
+    magazzinoId: origineIdNum,
+  };
+  const { data: origineGiacenze } = useListGiacenze(giacenzeParams, {
+    query: {
+      enabled: !!origineId && origineAreaId > 0,
+      queryKey: getListGiacenzeQueryKey(giacenzeParams),
+    },
+  });
 
   const reset = () => {
+    commandIntents.discard("trasferimento:create");
     setOrigineId("");
     setDestinoId("");
     setTrasportatore("");
@@ -212,16 +321,30 @@ function NuovoTrasferimentoForm({
     setNote("");
     setRighe([newRiga()]);
   };
-  const isDirty = !!origineId || !!destinoId || !!trasportatore || !!trasportatoreAltro || !!note || righe.length !== 1 || righe.some((riga) => !!riga.prodottoId || !!riga.quantita);
+  const isDirty =
+    !!origineId ||
+    !!destinoId ||
+    !!trasportatore ||
+    !!trasportatoreAltro ||
+    !!note ||
+    righe.length !== 1 ||
+    righe.some((riga) => !!riga.prodottoId || !!riga.quantita);
   const unsavedGuard = useUnsavedChangesGuard(open && isDirty);
-  const requestClose = () => unsavedGuard.requestClose(() => {
-    reset();
-    onClose();
-  });
+  const requestClose = () => {
+    if (createTrasferimento.isPending) return;
+    unsavedGuard.requestClose(() => {
+      reset();
+      onClose();
+    });
+  };
 
-  const righeValide = righe.filter((r) => r.prodottoId && parseFloat(r.quantita || "0") > 0);
+  const righeValide = righe.filter(
+    (r) => r.prodottoId && parseFloat(r.quantita || "0") > 0,
+  );
   const hasEccesso = righeValide.some((r) => {
-    const giac = origineGiacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
+    const giac = origineGiacenze?.find(
+      (g) => g.prodottoId === parseInt(r.prodottoId),
+    );
     return parseFloat(r.quantita) > Math.max(0, giac?.disponibileReale ?? 0);
   });
   const trasportatoreValido =
@@ -239,38 +362,58 @@ function NuovoTrasferimentoForm({
 
   const onSubmit = () => {
     if (!canSubmit) return;
+    const slot = "trasferimento:create";
+    const semanticInput = {
+      magazzinoOrigineId: parseInt(origineId),
+      magazzinoDestinoId: parseInt(destinoId),
+      trasportatoreVolontarioId:
+        trasportatore && trasportatore !== "altro"
+          ? parseInt(trasportatore)
+          : undefined,
+      trasportatoreNome:
+        trasportatore === "altro"
+          ? trasportatoreAltro.trim() || undefined
+          : undefined,
+      note: note || undefined,
+      righe: righeValide.map((r) => ({
+        prodottoId: parseInt(r.prodottoId),
+        quantita: r.quantita,
+        unitaMisura: r.unitaMisura,
+      })),
+    };
     createTrasferimento.mutate(
       {
-        data: {
-          magazzinoOrigineId: parseInt(origineId),
-          magazzinoDestinoId: parseInt(destinoId),
+        data: commandIntents.prepare(slot, semanticInput, {
+          ...semanticInput,
           dataRichiesta: todayEuropeRome(),
-          trasportatoreVolontarioId:
-            trasportatore && trasportatore !== "altro" ? parseInt(trasportatore) : undefined,
-          trasportatoreNome:
-            trasportatore === "altro" ? (trasportatoreAltro.trim() || undefined) : undefined,
-          note: note || undefined,
-          righe: righeValide.map((r) => ({
-            prodottoId: parseInt(r.prodottoId),
-            quantita: r.quantita,
-            unitaMisura: r.unitaMisura,
-          })),
-        },
+        }),
       },
       {
         onSuccess: (t) => {
+          commandIntents.complete(slot);
           reset();
           onClose();
           onCreated(t);
         },
-        onError: () =>
-          toast({ title: t("trasferimenti.errorTitle"), description: t("trasferimenti.errorCreate"), variant: "destructive" }),
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
+            description: t("trasferimenti.errorCreate"),
+            variant: "destructive",
+          });
+        },
       },
     );
   };
 
   return (
-    <Sheet open={open} onOpenChange={(o) => { if (!o) requestClose(); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) requestClose();
+      }}
+    >
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{t("trasferimenti.formTitle")}</SheetTitle>
@@ -283,40 +426,89 @@ function NuovoTrasferimentoForm({
           <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label>{t("trasferimenti.magazzinoPartenza")}</Label>
-              <Select value={origineId} onValueChange={(v) => { setOrigineId(v); setRighe([newRiga()]); }}>
-                <SelectTrigger aria-label={t("trasferimenti.magazzinoPartenza")}><SelectValue placeholder={t("trasferimenti.selectOrigine")} /></SelectTrigger>
+              <Select
+                value={origineId}
+                onValueChange={(v) => {
+                  setOrigineId(v);
+                  setRighe([newRiga()]);
+                }}
+              >
+                <SelectTrigger
+                  aria-label={t("trasferimenti.magazzinoPartenza")}
+                >
+                  <SelectValue placeholder={t("trasferimenti.selectOrigine")} />
+                </SelectTrigger>
                 <SelectContent>
-                  {magazzini?.filter((m) => m.stato === "attivo" && m.areaOperativaId != null).map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
-                  ))}
+                  {magazzini
+                    ?.filter(
+                      (m) => m.stato === "attivo" && m.areaOperativaId != null,
+                    )
+                    .map((m) => (
+                      <SelectItem key={m.id} value={String(m.id)}>
+                        {m.nome}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>{t("trasferimenti.magazzinoDestinazione")}</Label>
               <Select value={destinoId} onValueChange={setDestinoId}>
-                <SelectTrigger aria-label={t("trasferimenti.magazzinoDestinazione")}><SelectValue placeholder={t("trasferimenti.selectDestinazione")} /></SelectTrigger>
+                <SelectTrigger
+                  aria-label={t("trasferimenti.magazzinoDestinazione")}
+                >
+                  <SelectValue
+                    placeholder={t("trasferimenti.selectDestinazione")}
+                  />
+                </SelectTrigger>
                 <SelectContent>
-                  {magazzini?.filter((m) => m.stato === "attivo" && String(m.id) !== origineId).map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
-                  ))}
+                  {magazzini
+                    ?.filter(
+                      (m) => m.stato === "attivo" && String(m.id) !== origineId,
+                    )
+                    .map((m) => (
+                      <SelectItem key={m.id} value={String(m.id)}>
+                        {m.nome}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               {origineId && destinoId && origineId === destinoId && (
-                <p className="text-xs text-destructive">{t("trasferimenti.origineDestinazioneDiverse")}</p>
+                <p className="text-xs text-destructive">
+                  {t("trasferimenti.origineDestinazioneDiverse")}
+                </p>
               )}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>{t("trasferimenti.trasportatore")} <span className="text-destructive">*</span></Label>
-            <Select value={trasportatore} onValueChange={(v) => { setTrasportatore(v); if (v !== "altro") setTrasportatoreAltro(""); }}>
-              <SelectTrigger aria-label={t("trasferimenti.trasportatore")}><SelectValue placeholder={t("trasferimenti.selectTrasportatore")} /></SelectTrigger>
+            <Label>
+              {t("trasferimenti.trasportatore")}{" "}
+              <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={trasportatore}
+              onValueChange={(v) => {
+                setTrasportatore(v);
+                if (v !== "altro") setTrasportatoreAltro("");
+              }}
+            >
+              <SelectTrigger aria-label={t("trasferimenti.trasportatore")}>
+                <SelectValue
+                  placeholder={t("trasferimenti.selectTrasportatore")}
+                />
+              </SelectTrigger>
               <SelectContent>
-                {volontari?.filter((v) => v.operativo).map((v) => (
-                  <SelectItem key={v.id} value={String(v.id)}>{v.nome} {v.cognome}</SelectItem>
-                ))}
-                <SelectItem value="altro">{t("trasferimenti.altro")}</SelectItem>
+                {volontari
+                  ?.filter((v) => v.operativo)
+                  .map((v) => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {v.nome} {v.cognome}
+                    </SelectItem>
+                  ))}
+                <SelectItem value="altro">
+                  {t("trasferimenti.altro")}
+                </SelectItem>
               </SelectContent>
             </Select>
             {trasportatore === "altro" && (
@@ -331,7 +523,12 @@ function NuovoTrasferimentoForm({
           <div className="space-y-2">
             <Label>{t("trasferimenti.prodottiDaTrasferire")}</Label>
             {origineId ? (
-              <RigheEditor magazzinoId={parseInt(origineId)} areaOperativaId={origineAreaId} righe={righe} setRighe={setRighe} />
+              <RigheEditor
+                magazzinoId={parseInt(origineId)}
+                areaOperativaId={origineAreaId}
+                righe={righe}
+                setRighe={setRighe}
+              />
             ) : (
               <p className="text-sm text-muted-foreground rounded-md border border-dashed p-3 text-center">
                 {t("trasferimenti.selezionaPrimaMagazzino")}
@@ -341,12 +538,18 @@ function NuovoTrasferimentoForm({
 
           <div className="space-y-2">
             <Label>{t("trasferimenti.noteOpzionale")}</Label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("trasferimenti.notePlaceholder")} />
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={t("trasferimenti.notePlaceholder")}
+            />
           </div>
         </div>
 
         <div className="flex justify-end gap-2 pb-4">
-          <Button variant="outline" onClick={requestClose}>{t("common.cancel")}</Button>
+          <Button variant="outline" onClick={requestClose}>
+            {t("common.cancel")}
+          </Button>
           <Button onClick={onSubmit} disabled={!canSubmit} className="gap-2">
             <Plus className="h-4 w-4" /> {t("trasferimenti.crea")}
           </Button>
@@ -359,14 +562,16 @@ function NuovoTrasferimentoForm({
 
 // ─── Form modifica trasferimento (note + righe, solo stati editabili) ────────
 
-function ModificaTrasferimentoForm({
+export function ModificaTrasferimentoForm({
   trasferimento,
   open,
   onClose,
+  onDirtyChange,
 }: {
   trasferimento: Trasferimento;
   open: boolean;
   onClose: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const { t } = useTranslation();
   const [note, setNote] = useState(trasferimento.note ?? "");
@@ -382,86 +587,165 @@ function ModificaTrasferimentoForm({
   const updateTrasferimento = useUpdateTrasferimento();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const commandIntents = useCommandIntentRegistry();
   const { data: magazzini } = useListMagazzini();
+  const updateSlot = `trasferimento:${trasferimento.id}:update`;
+  const initialDraft = {
+    note: trasferimento.note ?? "",
+    righe: (trasferimento.righe ?? []).map((riga) => ({
+      prodottoId: String(riga.prodottoId),
+      quantita: String(riga.quantita),
+      unitaMisura: riga.unitaMisura,
+    })),
+  };
+  const isDirty = trasferimentoDraftIsDirty(initialDraft, {
+    note,
+    righe,
+  });
+  const unsavedGuard = useUnsavedChangesGuard(open && isDirty);
+
+  useEffect(() => {
+    onDirtyChange?.(open && isDirty);
+    return () => onDirtyChange?.(false);
+  }, [isDirty, onDirtyChange, open]);
+
+  const requestClose = () => {
+    if (updateTrasferimento.isPending) return;
+    unsavedGuard.requestClose(() => {
+      commandIntents.discard(updateSlot);
+      onDirtyChange?.(false);
+      onClose();
+    });
+  };
 
   const origineIdNum = trasferimento.magazzinoOrigineId;
-  const origineAreaId = magazzini?.find((m) => m.id === origineIdNum)?.areaOperativaId ?? 0;
-  const giacenzeParams = { areaOperativaId: origineAreaId, magazzinoId: origineIdNum };
-  const { data: origineGiacenze } = useListGiacenze(
-    giacenzeParams,
-    { query: { enabled: open && origineAreaId > 0, queryKey: getListGiacenzeQueryKey(giacenzeParams) } },
-  );
+  const origineAreaId =
+    magazzini?.find((m) => m.id === origineIdNum)?.areaOperativaId ?? 0;
+  const giacenzeParams = {
+    areaOperativaId: origineAreaId,
+    magazzinoId: origineIdNum,
+  };
+  const { data: origineGiacenze } = useListGiacenze(giacenzeParams, {
+    query: {
+      enabled: open && origineAreaId > 0,
+      queryKey: getListGiacenzeQueryKey(giacenzeParams),
+    },
+  });
 
-  const righeValide = righe.filter((r) => r.prodottoId && parseFloat(r.quantita || "0") > 0);
+  const righeValide = righe.filter(
+    (r) => r.prodottoId && parseFloat(r.quantita || "0") > 0,
+  );
   const hasEccesso = righeValide.some((r) => {
-    const giac = origineGiacenze?.find((g) => g.prodottoId === parseInt(r.prodottoId));
+    const giac = origineGiacenze?.find(
+      (g) => g.prodottoId === parseInt(r.prodottoId),
+    );
     return parseFloat(r.quantita) > Math.max(0, giac?.disponibileReale ?? 0);
   });
-  const canSubmit = origineAreaId > 0 && righeValide.length > 0 && !hasEccesso && !updateTrasferimento.isPending;
+  const canSubmit =
+    origineAreaId > 0 &&
+    righeValide.length > 0 &&
+    !hasEccesso &&
+    !updateTrasferimento.isPending;
 
   const onSubmit = () => {
     if (!canSubmit) return;
+    const semanticInput = {
+      note,
+      righe: righeValide.map((r) => ({
+        prodottoId: parseInt(r.prodottoId),
+        quantita: r.quantita,
+        unitaMisura: r.unitaMisura,
+      })),
+    };
     updateTrasferimento.mutate(
       {
         id: trasferimento.id,
-        data: {
+        data: commandIntents.prepare(updateSlot, semanticInput, {
+          ...semanticInput,
           versione: trasferimento.versione,
-          note,
-          righe: righeValide.map((r) => ({
-            prodottoId: parseInt(r.prodottoId),
-            quantita: r.quantita,
-            unitaMisura: r.unitaMisura,
-          })),
-        },
+        }),
       },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListTrasferimentiQueryKey() });
+          commandIntents.complete(updateSlot);
+          queryClient.invalidateQueries({
+            queryKey: getListTrasferimentiQueryKey(),
+          });
           toast({ title: t("trasferimenti.toastAggiornato") });
+          onDirtyChange?.(false);
           onClose();
         },
-        onError: () =>
-          toast({ title: t("trasferimenti.errorTitle"), description: t("trasferimenti.errorUpdate"), variant: "destructive" }),
+        onError: (error) => {
+          commandIntents.fail(updateSlot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
+            description: t("trasferimenti.errorUpdate"),
+            variant: "destructive",
+          });
+        },
       },
     );
   };
 
   return (
-    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) requestClose();
+      }}
+    >
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{t("trasferimenti.modificaTitle")}</SheetTitle>
           <SheetDescription>
             {t("trasferimenti.modificaDescPrefix")}{" "}
-            <span className="font-mono font-medium text-foreground">{trasferimento.codice}</span>.{" "}
-            {t("trasferimenti.modificaDescSuffix")}
+            <span className="font-mono font-medium text-foreground">
+              {trasferimento.codice}
+            </span>
+            . {t("trasferimenti.modificaDescSuffix")}
           </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-5 py-5">
           <div className="rounded-lg border p-3 text-sm flex items-center gap-2 bg-muted/40">
-            <span className="font-medium">{trasferimento.magazzinoOrigineNome}</span>
+            <span className="font-medium">
+              {trasferimento.magazzinoOrigineNome}
+            </span>
             <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium">{trasferimento.magazzinoDestinoNome}</span>
+            <span className="font-medium">
+              {trasferimento.magazzinoDestinoNome}
+            </span>
           </div>
 
           <div className="space-y-2">
             <Label>{t("trasferimenti.prodottiDaTrasferire")}</Label>
-            <RigheEditor magazzinoId={origineIdNum} areaOperativaId={origineAreaId} righe={righe} setRighe={setRighe} />
+            <RigheEditor
+              magazzinoId={origineIdNum}
+              areaOperativaId={origineAreaId}
+              righe={righe}
+              setRighe={setRighe}
+            />
           </div>
 
           <div className="space-y-2">
             <Label>{t("trasferimenti.noteOpzionale")}</Label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("trasferimenti.notePlaceholder")} />
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={t("trasferimenti.notePlaceholder")}
+            />
           </div>
         </div>
 
         <div className="flex justify-end gap-2 pb-4">
-          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button variant="outline" onClick={requestClose}>
+            {t("common.cancel")}
+          </Button>
           <Button onClick={onSubmit} disabled={!canSubmit} className="gap-2">
             <Pencil className="h-4 w-4" /> {t("trasferimenti.salvaModifiche")}
           </Button>
         </div>
+        <UnsavedChangesDialog guard={unsavedGuard} />
       </SheetContent>
     </Sheet>
   );
@@ -469,13 +753,23 @@ function ModificaTrasferimentoForm({
 
 // ─── Trasportatore: display + riassegnazione ─────────────────────────────────
 
-function trasportatoreLabel(t: Trasferimento, volontarioFallback = "Volontario"): string | null {
-  if (t.trasportatoreVolontarioId) return t.trasportatoreVolontarioNome ?? volontarioFallback;
+function trasportatoreLabel(
+  t: Trasferimento,
+  volontarioFallback = "Volontario",
+): string | null {
+  if (t.trasportatoreVolontarioId)
+    return t.trasportatoreVolontarioNome ?? volontarioFallback;
   if (t.trasportatoreNome) return t.trasportatoreNome;
   return null;
 }
 
-function TrasportatoreCell({ t: tras, canEdit }: { t: Trasferimento; canEdit: boolean }) {
+function TrasportatoreCell({
+  t: tras,
+  canEdit,
+}: {
+  t: Trasferimento;
+  canEdit: boolean;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [trasportatore, setTrasportatore] = useState("");
@@ -485,6 +779,8 @@ function TrasportatoreCell({ t: tras, canEdit }: { t: Trasferimento; canEdit: bo
   const updateTrasferimento = useUpdateTrasferimento();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const commandIntents = useCommandIntentRegistry();
+  const updateTransporterSlot = `trasferimento:${tras.id}:update-transporter`;
 
   const label = trasportatoreLabel(tras, t("trasferimenti.volontario"));
 
@@ -508,31 +804,50 @@ function TrasportatoreCell({ t: tras, canEdit }: { t: Trasferimento; canEdit: bo
 
   const onSave = () => {
     if (!valido) return;
+    const semanticInput = {
+      trasportatoreVolontarioId:
+        trasportatore && trasportatore !== "altro"
+          ? parseInt(trasportatore)
+          : null,
+      trasportatoreNome:
+        trasportatore === "altro" ? trasportatoreAltro.trim() : null,
+    };
     updateTrasferimento.mutate(
       {
         id: tras.id,
-        data: {
+        data: commandIntents.prepare(updateTransporterSlot, semanticInput, {
+          ...semanticInput,
           versione: tras.versione,
-          trasportatoreVolontarioId:
-            trasportatore && trasportatore !== "altro" ? parseInt(trasportatore) : null,
-          trasportatoreNome:
-            trasportatore === "altro" ? trasportatoreAltro.trim() : null,
-        },
+        }),
       },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListTrasferimentiQueryKey() });
+          commandIntents.complete(updateTransporterSlot);
+          queryClient.invalidateQueries({
+            queryKey: getListTrasferimentiQueryKey(),
+          });
           toast({ title: t("trasferimenti.toastTrasportatoreAggiornato") });
           setOpen(false);
         },
-        onError: () =>
-          toast({ title: t("trasferimenti.errorTitle"), description: t("trasferimenti.errorTrasportatore"), variant: "destructive" }),
+        onError: (error) => {
+          commandIntents.fail(updateTransporterSlot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
+            description: t("trasferimenti.errorTrasportatore"),
+            variant: "destructive",
+          });
+        },
       },
     );
   };
 
   if (!canEdit) {
-    return <div className="flex items-center gap-1.5 text-sm"><Truck className="h-3.5 w-3.5 text-muted-foreground" /><span>{label ?? "—"}</span></div>;
+    return (
+      <div className="flex items-center gap-1.5 text-sm">
+        <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+        <span>{label ?? "—"}</span>
+      </div>
+    );
   }
   return (
     <>
@@ -542,28 +857,57 @@ function TrasportatoreCell({ t: tras, canEdit }: { t: Trasferimento; canEdit: bo
         className="group flex min-h-11 items-center gap-1.5 text-left text-sm hover:text-foreground"
       >
         <Truck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <span className={label ? "font-medium" : "text-muted-foreground"}>{label ?? "—"}</span>
+        <span className={label ? "font-medium" : "text-muted-foreground"}>
+          {label ?? "—"}
+        </span>
         <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
       </button>
 
-      <Dialog open={open} onOpenChange={(o) => { if (!o) setOpen(false); }}>
+      <Dialog
+        open={open}
+        onOpenChange={(o) => {
+          if (!o && !updateTrasferimento.isPending) {
+            commandIntents.discard(updateTransporterSlot);
+            setOpen(false);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("trasferimenti.riassegnaTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-sm text-muted-foreground">
-              {t("trasferimenti.codiceLabel")} <span className="font-mono font-medium text-foreground">{tras.codice}</span>
+              {t("trasferimenti.codiceLabel")}{" "}
+              <span className="font-mono font-medium text-foreground">
+                {tras.codice}
+              </span>
             </p>
             <div className="space-y-2">
               <Label>{t("trasferimenti.trasportatore")}</Label>
-              <Select value={trasportatore} onValueChange={(v) => { setTrasportatore(v); if (v !== "altro") setTrasportatoreAltro(""); }}>
-                <SelectTrigger><SelectValue placeholder={t("trasferimenti.selectTrasportatore")} /></SelectTrigger>
+              <Select
+                value={trasportatore}
+                onValueChange={(v) => {
+                  setTrasportatore(v);
+                  if (v !== "altro") setTrasportatoreAltro("");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={t("trasferimenti.selectTrasportatore")}
+                  />
+                </SelectTrigger>
                 <SelectContent>
-                  {volontari?.filter((v) => v.operativo).map((v) => (
-                    <SelectItem key={v.id} value={String(v.id)}>{v.nome} {v.cognome}</SelectItem>
-                  ))}
-                  <SelectItem value="altro">{t("trasferimenti.altro")}</SelectItem>
+                  {volontari
+                    ?.filter((v) => v.operativo)
+                    .map((v) => (
+                      <SelectItem key={v.id} value={String(v.id)}>
+                        {v.nome} {v.cognome}
+                      </SelectItem>
+                    ))}
+                  <SelectItem value="altro">
+                    {t("trasferimenti.altro")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
               {trasportatore === "altro" && (
@@ -576,8 +920,22 @@ function TrasportatoreCell({ t: tras, canEdit }: { t: Trasferimento; canEdit: bo
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
-            <Button onClick={onSave} disabled={!valido || updateTrasferimento.isPending}>{t("common.save")}</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                commandIntents.discard(updateTransporterSlot);
+                setOpen(false);
+              }}
+              disabled={updateTrasferimento.isPending}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={onSave}
+              disabled={!valido || updateTrasferimento.isPending}
+            >
+              {t("common.save")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -595,7 +953,10 @@ export default function Trasferimenti() {
   const canReceive = hasPermission("magazzino.transfers.receive");
   const [page, setPage] = useState(1);
   const pageSize = 50;
-  const { data: trasferimenti, isLoading } = useListTrasferimenti({ page, limit: pageSize });
+  const { data: trasferimenti, isLoading } = useListTrasferimenti({
+    page,
+    limit: pageSize,
+  });
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: impostazioni } = useGetImpostazioniStampa();
@@ -606,22 +967,66 @@ export default function Trasferimenti() {
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const avviaTrasferimento = useAvviaTrasferimento();
   const confermaTrasferimento = useConfermaTrasferimento();
+  const commandIntents = useCommandIntentRegistry();
 
   const handleAction = (tr: Trasferimento) => {
     if (tr.stato === "richiesto" || tr.stato === "preparato") {
-      avviaTrasferimento.mutate({ id: tr.id, data: { versione: tr.versione } }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListTrasferimentiQueryKey() });
-          toast({ title: t("trasferimenti.toastAvviato") });
+      const slot = `trasferimento:${tr.id}:start`;
+      avviaTrasferimento.mutate(
+        {
+          id: tr.id,
+          data: commandIntents.prepare(slot, {}, { versione: tr.versione }),
         },
-      });
+        {
+          onSuccess: () => {
+            commandIntents.complete(slot);
+            queryClient.invalidateQueries({
+              queryKey: getListTrasferimentiQueryKey(),
+            });
+            toast({ title: t("trasferimenti.toastAvviato") });
+          },
+          onError: (error) => {
+            commandIntents.fail(slot, error);
+            toast({
+              title: t("trasferimenti.errorTitle"),
+              description: t("trasferimenti.errorUpdate"),
+              variant: "destructive",
+            });
+          },
+        },
+      );
     } else if (tr.stato === "in_transito") {
-      confermaTrasferimento.mutate({ id: tr.id, data: { versione: tr.versione, dataConferma: new Date().toISOString() } }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListTrasferimentiQueryKey() });
-          toast({ title: t("trasferimenti.toastRicezioneConfermata") });
+      const slot = `trasferimento:${tr.id}:receive`;
+      confermaTrasferimento.mutate(
+        {
+          id: tr.id,
+          data: commandIntents.prepare(
+            slot,
+            {},
+            {
+              versione: tr.versione,
+              dataConferma: new Date().toISOString(),
+            },
+          ),
         },
-      });
+        {
+          onSuccess: () => {
+            commandIntents.complete(slot);
+            queryClient.invalidateQueries({
+              queryKey: getListTrasferimentiQueryKey(),
+            });
+            toast({ title: t("trasferimenti.toastRicezioneConfermata") });
+          },
+          onError: (error) => {
+            commandIntents.fail(slot, error);
+            toast({
+              title: t("trasferimenti.errorTitle"),
+              description: t("trasferimenti.errorUpdate"),
+              variant: "destructive",
+            });
+          },
+        },
+      );
     }
   };
 
@@ -636,7 +1041,11 @@ export default function Trasferimenti() {
         branding,
       });
     } catch {
-      toast({ title: t("trasferimenti.errorTitle"), description: t("trasferimenti.errorBolla"), variant: "destructive" });
+      toast({
+        title: t("trasferimenti.errorTitle"),
+        description: t("trasferimenti.errorBolla"),
+        variant: "destructive",
+      });
     } finally {
       setDownloadingId(null);
     }
@@ -649,12 +1058,50 @@ export default function Trasferimenti() {
 
   const getStatusBadge = (stato: string) => {
     switch (stato) {
-      case "richiesto": return <Badge variant="secondary" className="bg-gray-100 text-gray-800">{t("trasferimenti.statusRichiesto")}</Badge>;
-      case "preparato": return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{t("trasferimenti.statusPreparato")}</Badge>;
-      case "in_transito": return <Badge variant="outline" className="bg-amber-500 text-white border-amber-600 shadow-sm animate-pulse">{t("trasferimenti.statusInTransito")}</Badge>;
-      case "completato": return <Badge variant="outline" className="bg-green-500/10 text-green-700 border-none">{t("trasferimenti.statusCompletato")}</Badge>;
-      case "annullato": return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">{t("trasferimenti.statusAnnullato")}</Badge>;
-      default: return <Badge>{stato}</Badge>;
+      case "richiesto":
+        return (
+          <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            {t("trasferimenti.statusRichiesto")}
+          </Badge>
+        );
+      case "preparato":
+        return (
+          <Badge
+            variant="outline"
+            className="bg-blue-50 text-blue-700 border-blue-200"
+          >
+            {t("trasferimenti.statusPreparato")}
+          </Badge>
+        );
+      case "in_transito":
+        return (
+          <Badge
+            variant="outline"
+            className="bg-amber-500 text-white border-amber-600 shadow-sm animate-pulse"
+          >
+            {t("trasferimenti.statusInTransito")}
+          </Badge>
+        );
+      case "completato":
+        return (
+          <Badge
+            variant="outline"
+            className="bg-green-500/10 text-green-700 border-none"
+          >
+            {t("trasferimenti.statusCompletato")}
+          </Badge>
+        );
+      case "annullato":
+        return (
+          <Badge
+            variant="outline"
+            className="bg-red-50 text-red-700 border-red-200"
+          >
+            {t("trasferimenti.statusAnnullato")}
+          </Badge>
+        );
+      default:
+        return <Badge>{stato}</Badge>;
     }
   };
 
@@ -662,27 +1109,59 @@ export default function Trasferimenti() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("trasferimenti.title")}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("trasferimenti.title")}
+          </h1>
           <p className="text-muted-foreground">{t("trasferimenti.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={trasferimenti ?? []}
-            loadRows={() => loadAllPages((exportPage, limit) => listTrasferimenti({ page: exportPage, limit }))}
+            loadRows={() =>
+              loadAllPages((exportPage, limit) =>
+                listTrasferimenti({ page: exportPage, limit }),
+              )
+            }
             columns={[
               { header: t("common.code"), accessor: (tr) => tr.codice },
-              { header: t("trasferimenti.colDataRichiesta"), accessor: (tr) => tr.dataRichiesta ? new Date(tr.dataRichiesta).toLocaleDateString("it-IT") : "" },
-              { header: t("trasferimenti.colOrigine"), accessor: (tr) => tr.magazzinoOrigineNome },
-              { header: t("trasferimenti.colDestinazione"), accessor: (tr) => tr.magazzinoDestinoNome },
-              { header: t("trasferimenti.colTrasportatore"), accessor: (tr) => trasportatoreLabel(tr, t("trasferimenti.volontario")) ?? "—" },
-              { header: t("trasferimenti.colArticoli"), accessor: (tr) => tr.righe?.length ?? 0 },
-              { header: t("common.status"), accessor: (tr) => tr.stato?.replace("_", " ") },
+              {
+                header: t("trasferimenti.colDataRichiesta"),
+                accessor: (tr) =>
+                  tr.dataRichiesta
+                    ? new Date(tr.dataRichiesta).toLocaleDateString("it-IT")
+                    : "",
+              },
+              {
+                header: t("trasferimenti.colOrigine"),
+                accessor: (tr) => tr.magazzinoOrigineNome,
+              },
+              {
+                header: t("trasferimenti.colDestinazione"),
+                accessor: (tr) => tr.magazzinoDestinoNome,
+              },
+              {
+                header: t("trasferimenti.colTrasportatore"),
+                accessor: (tr) =>
+                  trasportatoreLabel(tr, t("trasferimenti.volontario")) ?? "—",
+              },
+              {
+                header: t("trasferimenti.colArticoli"),
+                accessor: (tr) => tr.righe?.length ?? 0,
+              },
+              {
+                header: t("common.status"),
+                accessor: (tr) => tr.stato?.replace("_", " "),
+              },
             ]}
             filename="trasferimenti"
             title={t("trasferimenti.exportTitle")}
             orientation="landscape"
           />
-          {canCreate && <Button onClick={() => setIsFormOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> {t("common.new")}</Button>}
+          {canCreate && (
+            <Button onClick={() => setIsFormOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" /> {t("common.new")}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -696,91 +1175,168 @@ export default function Trasferimenti() {
                 <TableHead>{t("trasferimenti.colPercorso")}</TableHead>
                 <TableHead>{t("trasferimenti.colTrasportatore")}</TableHead>
                 <TableHead>{t("common.details")}</TableHead>
-                <TableHead className="text-center">{t("common.status")}</TableHead>
-                <TableHead className="text-right w-[320px]">{t("trasferimenti.colAzione")}</TableHead>
+                <TableHead className="text-center">
+                  {t("common.status")}
+                </TableHead>
+                <TableHead className="text-right w-[320px]">
+                  {t("trasferimenti.colAzione")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                Array(3).fill(0).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-28" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
-                  </TableRow>
-                ))
+                Array(3)
+                  .fill(0)
+                  .map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <Skeleton className="h-5 w-20" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-48" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-28" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-32" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-6 w-24 mx-auto rounded-full" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-8 w-24 ml-auto" />
+                      </TableCell>
+                    </TableRow>
+                  ))
               ) : trasferimenti?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">{t("trasferimenti.emptyState")}</TableCell>
+                  <TableCell
+                    colSpan={7}
+                    className="h-32 text-center text-muted-foreground"
+                  >
+                    {t("trasferimenti.emptyState")}
+                  </TableCell>
                 </TableRow>
-              ) : trasferimenti?.map((tr) => (
-                <TableRow key={tr.id}>
-                  <TableCell className="font-mono text-sm font-medium">{tr.codice}</TableCell>
-                  <TableCell className="text-sm">
-                    {format(new Date(tr.dataRichiesta), "dd MMM yyyy", { locale: it })}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <span>{tr.magazzinoOrigineNome}</span>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span>{tr.magazzinoDestinoNome}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <TrasportatoreCell t={tr} canEdit={canCreate} />
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {t("trasferimenti.articoliCount", { count: tr.righe?.length || 0 })}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {getStatusBadge(tr.stato)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5"
-                        onClick={() => downloadBolla(tr)}
-                        disabled={downloadingId === tr.id}
-                      >
-                        <Download className="h-3.5 w-3.5" /> {t("trasferimenti.bolla")}
-                      </Button>
-                      {(tr.stato === "richiesto" || tr.stato === "preparato") && (canCreate || canDispatch) && (
-                        <>
-                          {canCreate && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(tr)}>
-                            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-                          </Button>}
-                          {canDispatch && <Button size="sm" variant="outline" className="gap-1 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => handleAction(tr)} disabled={avviaTrasferimento.isPending}>
-                            <Play className="h-3.5 w-3.5" /> {t("trasferimenti.avvia")}
-                          </Button>}
-                        </>
-                      )}
-                      {tr.stato === "in_transito" && canReceive && (
-                        <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => handleAction(tr)} disabled={confermaTrasferimento.isPending}>
-                          <CheckCircle2 className="h-3.5 w-3.5" /> {t("trasferimenti.confermaRic")}
+              ) : (
+                trasferimenti?.map((tr) => (
+                  <TableRow key={tr.id}>
+                    <TableCell className="font-mono text-sm font-medium">
+                      {tr.codice}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {format(new Date(tr.dataRichiesta), "dd MMM yyyy", {
+                        locale: it,
+                      })}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <span>{tr.magazzinoOrigineNome}</span>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span>{tr.magazzinoDestinoNome}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <TrasportatoreCell t={tr} canEdit={canCreate} />
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {t("trasferimenti.articoliCount", {
+                        count: tr.righe?.length || 0,
+                      })}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {getStatusBadge(tr.stato)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5"
+                          onClick={() => downloadBolla(tr)}
+                          disabled={downloadingId === tr.id}
+                        >
+                          <Download className="h-3.5 w-3.5" />{" "}
+                          {t("trasferimenti.bolla")}
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        {(tr.stato === "richiesto" ||
+                          tr.stato === "preparato") &&
+                          (canCreate || canDispatch) && (
+                            <>
+                              {canCreate && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1.5"
+                                  onClick={() => setEditing(tr)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />{" "}
+                                  {t("common.edit")}
+                                </Button>
+                              )}
+                              {canDispatch && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1 border-blue-200 text-blue-700 hover:bg-blue-50"
+                                  onClick={() => handleAction(tr)}
+                                  disabled={avviaTrasferimento.isPending}
+                                >
+                                  <Play className="h-3.5 w-3.5" />{" "}
+                                  {t("trasferimenti.avvia")}
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        {tr.stato === "in_transito" && canReceive && (
+                          <Button
+                            size="sm"
+                            className="gap-1 bg-green-600 hover:bg-green-700"
+                            onClick={() => handleAction(tr)}
+                            disabled={confermaTrasferimento.isPending}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />{" "}
+                            {t("trasferimenti.confermaRic")}
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
       <div className="flex items-center justify-end gap-2">
-        <Button variant="outline" size="sm" disabled={page === 1 || isLoading} onClick={() => setPage((value) => Math.max(1, value - 1))}>Precedente</Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page === 1 || isLoading}
+          onClick={() => setPage((value) => Math.max(1, value - 1))}
+        >
+          Precedente
+        </Button>
         <span className="text-sm text-muted-foreground">Pagina {page}</span>
-        <Button variant="outline" size="sm" disabled={isLoading || (trasferimenti?.length ?? 0) < pageSize} onClick={() => setPage((value) => value + 1)}>Successiva</Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isLoading || (trasferimenti?.length ?? 0) < pageSize}
+          onClick={() => setPage((value) => value + 1)}
+        >
+          Successiva
+        </Button>
       </div>
 
-      <NuovoTrasferimentoForm open={isFormOpen} onClose={() => setIsFormOpen(false)} onCreated={handleCreated} />
+      <NuovoTrasferimentoForm
+        open={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onCreated={handleCreated}
+      />
 
       {editing && (
         <ModificaTrasferimentoForm
@@ -792,28 +1348,48 @@ export default function Trasferimenti() {
       )}
 
       {/* Conferma creazione + download bolla */}
-      <Dialog open={!!created} onOpenChange={(o) => { if (!o) setCreated(null); }}>
+      <Dialog
+        open={!!created}
+        onOpenChange={(o) => {
+          if (!o) setCreated(null);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" /> {t("trasferimenti.bollaCreata")}
+              <CheckCircle className="h-5 w-5 text-green-600" />{" "}
+              {t("trasferimenti.bollaCreata")}
             </DialogTitle>
           </DialogHeader>
           {created && (
             <div className="space-y-3 py-2">
               <p className="text-sm text-muted-foreground">
-                {t("trasferimenti.codiceLabel")} <span className="font-mono font-medium text-foreground">{created.codice}</span> {t("trasferimenti.createdSuffix")}
+                {t("trasferimenti.codiceLabel")}{" "}
+                <span className="font-mono font-medium text-foreground">
+                  {created.codice}
+                </span>{" "}
+                {t("trasferimenti.createdSuffix")}
               </p>
               <div className="rounded-lg border p-3 text-sm flex items-center gap-2">
-                <span className="font-medium">{created.magazzinoOrigineNome}</span>
+                <span className="font-medium">
+                  {created.magazzinoOrigineNome}
+                </span>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">{created.magazzinoDestinoNome}</span>
-                <span className="ml-auto text-muted-foreground">{t("trasferimenti.articoliCount", { count: created.righe?.length || 0 })}</span>
+                <span className="font-medium">
+                  {created.magazzinoDestinoNome}
+                </span>
+                <span className="ml-auto text-muted-foreground">
+                  {t("trasferimenti.articoliCount", {
+                    count: created.righe?.length || 0,
+                  })}
+                </span>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreated(null)}>{t("common.close")}</Button>
+            <Button variant="outline" onClick={() => setCreated(null)}>
+              {t("common.close")}
+            </Button>
             <Button
               className="gap-2"
               disabled={!created || downloadingId === created.id}

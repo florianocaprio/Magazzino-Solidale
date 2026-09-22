@@ -48,6 +48,8 @@ const SOCIAL_OPERATOR_PERMISSIONS = [
   "bolle.manage",
   "bolle.deliver",
   "bolle.cancel",
+  "enti-destinatari.view",
+  "enti-destinatari.manage",
   "logistica.turni.view",
   "logistica.turni.manage",
 ] as const;
@@ -90,6 +92,8 @@ const MAGAZZINO_OPERATOR_PERMISSIONS = [
   "bolle.manage",
   "bolle.deliver",
   "bolle.cancel",
+  "enti-destinatari.view",
+  "enti-destinatari.manage",
 ] as const;
 
 function mergePermissions(

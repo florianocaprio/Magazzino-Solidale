@@ -2731,6 +2731,15 @@ export interface PreparazioneConsegne {
   consegne: PreparazioneConsegnaRef[];
 }
 
+export interface RipartizioneLottoDocumento {
+  /** @nullable */
+  lottoId: number | null;
+  /** @nullable */
+  codiceLotto: string | null;
+  fondoOrigine: string;
+  quantita: number;
+}
+
 export interface TrasferimentoRiga {
   id: number;
   prodottoId: number;
@@ -2738,6 +2747,11 @@ export interface TrasferimentoRiga {
   prodottoNome?: string | null;
   /** @nullable */
   lottoId?: number | null;
+  /** @nullable */
+  codiceLotto?: string | null;
+  /** @nullable */
+  fondoOrigine?: string | null;
+  ripartizioniLotto: RipartizioneLottoDocumento[];
   fsePlus: boolean;
   fsePlusQuantita?: number;
   nonFsePlusQuantita?: number;
@@ -2805,6 +2819,11 @@ export interface TrasferimentoRigaInput {
 }
 
 export interface TrasferimentoInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
   magazzinoOrigineId: number;
   magazzinoDestinoId: number;
   /** @nullable */
@@ -2817,6 +2836,11 @@ export interface TrasferimentoInput {
 }
 
 export interface TrasferimentoUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   /** @nullable */
@@ -2914,10 +2938,25 @@ export interface ScaricoInput {
 }
 
 export interface ConfermaRicezione {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   note?: string;
   dataConferma?: string;
+}
+
+export interface ComandoVersionatoInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
 }
 
 export interface VersioneInput {
@@ -3708,6 +3747,11 @@ export interface Consegna {
   bollaNumero?: string | null;
   /** @nullable */
   bollaStato?: string | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  bollaVersione?: number | null;
   /** @nullable */
   noteOperative?: string | null;
   /** @nullable */
@@ -6418,8 +6462,18 @@ export interface BollaEmporioStampa {
 }
 
 export interface AssociaBollaInput {
-  /** @nullable */
-  bollaId?: number | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  bollaId: number | null;
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
 }
 
 export interface ConsegnaInput {
@@ -6454,50 +6508,167 @@ export interface ConsegnaUpdate {
   noteOperative?: string;
 }
 
-export interface Bolla {
+export interface EnteDestinatario {
   id: number;
-  numeroBolla: string;
-  dataBolla: string;
-  beneficiarioId: number;
-  /** @nullable */
-  beneficiarioNome?: string | null;
-  /** @nullable */
-  consegnaId?: number | null;
-  daPianificazione?: boolean;
-  magazzinoId: number;
-  /** @nullable */
-  magazzinoNome?: string | null;
-  /** @nullable */
-  centroAscoltoId?: number | null;
-  /** @nullable */
-  centroAscoltoNome?: string | null;
-  /** @nullable */
-  indirizzoConsegna?: string | null;
-  /** @nullable */
-  volontarioConsegnaId?: number | null;
-  /** @nullable */
-  trasportatoreNome?: string | null;
-  /** @nullable */
-  mezzoId?: number | null;
-  mezzoAltro?: boolean;
-  stato: string;
-  /** @nullable */
-  noteConsegna?: string | null;
-  confermaRicezione: boolean;
-  /** @nullable */
-  noteRicezione?: string | null;
-  /** @nullable */
-  ritiroNonEffettuatoAt?: string | null;
-  /** @nullable */
-  ritiroNonEffettuatoOperatoreId?: number | null;
-  /** @nullable */
-  ritiroNonEffettuatoMotivo?: string | null;
-  /** @nullable */
-  operatoreId?: number | null;
-  /** @nullable */
-  operatoreCodice?: string | null;
+  /** @maxLength 200 */
+  denominazione: string;
+  /** @maxLength 250 */
+  indirizzo: string;
+  /**
+     * @maxLength 50
+     * @nullable
+     */
+  telefono?: string | null;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  email?: string | null;
+  areaOperativaId: number;
+  attivo: boolean;
+  /** @minimum 1 */
+  versione: number;
   dataCreazione: string;
+  dataAggiornamento: string;
 }
+
+export interface EnteDestinatarioInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  denominazione: string;
+  /**
+     * @minLength 1
+     * @maxLength 250
+     */
+  indirizzo: string;
+  /**
+     * @maxLength 50
+     * @nullable
+     */
+  telefono?: string | null;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  email?: string | null;
+  /** @minimum 1 */
+  areaOperativaId: number;
+}
+
+export interface EnteDestinatarioUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  denominazione?: string;
+  /**
+     * @minLength 1
+     * @maxLength 250
+     */
+  indirizzo?: string;
+  /**
+     * @maxLength 50
+     * @nullable
+     */
+  telefono?: string | null;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  email?: string | null;
+  attivo?: boolean;
+}
+
+export type DocumentoOperativoTipoAggregato = typeof DocumentoOperativoTipoAggregato[keyof typeof DocumentoOperativoTipoAggregato];
+
+
+export const DocumentoOperativoTipoAggregato = {
+  bolla: 'bolla',
+  trasferimento: 'trasferimento',
+} as const;
+
+export type DocumentoOperativoTipoDestinatario = typeof DocumentoOperativoTipoDestinatario[keyof typeof DocumentoOperativoTipoDestinatario];
+
+
+export const DocumentoOperativoTipoDestinatario = {
+  beneficiario: 'beneficiario',
+  ente: 'ente',
+  magazzino: 'magazzino',
+} as const;
+
+export interface DocumentoOperativo {
+  /** @pattern ^(bolla|trasferimento):[1-9][0-9]*$ */
+  documentoId: string;
+  tipoAggregato: DocumentoOperativoTipoAggregato;
+  id: number;
+  tipoDestinatario: DocumentoOperativoTipoDestinatario;
+  numero: string;
+  dataDocumento: string;
+  dataCreazione: string;
+  stato: string;
+  origineId: number;
+  /** @nullable */
+  origineNome?: string | null;
+  /** @nullable */
+  destinazioneMagazzinoId?: number | null;
+  /** @nullable */
+  destinazioneMagazzinoNome?: string | null;
+  /** @nullable */
+  destinatarioNome?: string | null;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface DocumentoOperativoPage {
+  items: DocumentoOperativo[];
+  /** @minimum 1 */
+  page: number;
+  /** @minimum 1 */
+  limit: number;
+  /** @minimum 0 */
+  total: number;
+}
+
+export type DocumentoOperativoDettaglioTipoAggregato = typeof DocumentoOperativoDettaglioTipoAggregato[keyof typeof DocumentoOperativoDettaglioTipoAggregato];
+
+
+export const DocumentoOperativoDettaglioTipoAggregato = {
+  bolla: 'bolla',
+  trasferimento: 'trasferimento',
+} as const;
+
+export type BollaDettaglioTipoDestinatario = typeof BollaDettaglioTipoDestinatario[keyof typeof BollaDettaglioTipoDestinatario];
+
+
+export const BollaDettaglioTipoDestinatario = {
+  beneficiario: 'beneficiario',
+  ente: 'ente',
+} as const;
+
+/**
+ * @nullable
+ */
+export type BollaDettaglioDestinatarioSnapshotFonte = typeof BollaDettaglioDestinatarioSnapshotFonte[keyof typeof BollaDettaglioDestinatarioSnapshotFonte] | null;
+
+
+export const BollaDettaglioDestinatarioSnapshotFonte = {
+  confermato: 'confermato',
+  legacy_live: 'legacy_live',
+} as const;
 
 export interface BollaRiga {
   id: number;
@@ -6509,6 +6680,9 @@ export interface BollaRiga {
   lottoId?: number | null;
   /** @nullable */
   codiceLotto?: string | null;
+  /** @nullable */
+  fondoOrigine?: string | null;
+  ripartizioniLotto: RipartizioneLottoDocumento[];
   fsePlus: boolean;
   fsePlusQuantita?: number;
   nonFsePlusQuantita?: number;
@@ -6523,15 +6697,32 @@ export interface BollaRiga {
   unitaMisura: string | null;
   /** @nullable */
   note?: string | null;
+  /** @minimum 1 */
+  versioneBolla?: number;
 }
 
 export interface BollaDettaglio {
   id: number;
   numeroBolla: string;
   dataBolla: string;
-  beneficiarioId: number;
+  tipoDestinatario: BollaDettaglioTipoDestinatario;
+  /** @nullable */
+  beneficiarioId?: number | null;
   /** @nullable */
   beneficiarioNome?: string | null;
+  /** @nullable */
+  enteDestinatarioId?: number | null;
+  /** @nullable */
+  enteDestinatarioNome?: string | null;
+  /** @nullable */
+  enteDestinatarioIndirizzo?: string | null;
+  /** @nullable */
+  enteDestinatarioTelefono?: string | null;
+  /** @nullable */
+  enteDestinatarioEmail?: string | null;
+  destinatarioSnapshotCongelato: boolean;
+  /** @nullable */
+  destinatarioSnapshotFonte?: BollaDettaglioDestinatarioSnapshotFonte;
   /** @nullable */
   consegnaId?: number | null;
   daPianificazione?: boolean;
@@ -6573,11 +6764,105 @@ export interface BollaDettaglio {
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
+  /** @nullable */
+  motivoAnnullamento?: string | null;
+  /** @minimum 1 */
+  versione: number;
   dataCreazione: string;
   righe: BollaRiga[];
 }
 
+export interface DocumentoOperativoDettaglio {
+  documentoId: string;
+  tipoAggregato: DocumentoOperativoDettaglioTipoAggregato;
+  dettaglio: BollaDettaglio | Trasferimento;
+}
+
+export type BollaTipoDestinatario = typeof BollaTipoDestinatario[keyof typeof BollaTipoDestinatario];
+
+
+export const BollaTipoDestinatario = {
+  beneficiario: 'beneficiario',
+  ente: 'ente',
+} as const;
+
+/**
+ * @nullable
+ */
+export type BollaDestinatarioSnapshotFonte = typeof BollaDestinatarioSnapshotFonte[keyof typeof BollaDestinatarioSnapshotFonte] | null;
+
+
+export const BollaDestinatarioSnapshotFonte = {
+  confermato: 'confermato',
+  legacy_live: 'legacy_live',
+} as const;
+
+export interface Bolla {
+  id: number;
+  numeroBolla: string;
+  dataBolla: string;
+  tipoDestinatario: BollaTipoDestinatario;
+  /** @nullable */
+  beneficiarioId?: number | null;
+  /** @nullable */
+  beneficiarioNome?: string | null;
+  /** @nullable */
+  enteDestinatarioId?: number | null;
+  /** @nullable */
+  enteDestinatarioNome?: string | null;
+  destinatarioSnapshotCongelato: boolean;
+  /** @nullable */
+  destinatarioSnapshotFonte?: BollaDestinatarioSnapshotFonte;
+  /** @nullable */
+  consegnaId?: number | null;
+  daPianificazione?: boolean;
+  magazzinoId: number;
+  /** @nullable */
+  magazzinoNome?: string | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroAscoltoNome?: string | null;
+  /** @nullable */
+  indirizzoConsegna?: string | null;
+  /** @nullable */
+  volontarioConsegnaId?: number | null;
+  /** @nullable */
+  trasportatoreNome?: string | null;
+  /** @nullable */
+  mezzoId?: number | null;
+  mezzoAltro?: boolean;
+  stato: string;
+  /** @nullable */
+  noteConsegna?: string | null;
+  confermaRicezione: boolean;
+  /** @nullable */
+  noteRicezione?: string | null;
+  /** @nullable */
+  ritiroNonEffettuatoAt?: string | null;
+  /** @nullable */
+  ritiroNonEffettuatoOperatoreId?: number | null;
+  /** @nullable */
+  ritiroNonEffettuatoMotivo?: string | null;
+  /** @nullable */
+  operatoreId?: number | null;
+  /** @nullable */
+  operatoreCodice?: string | null;
+  /** @nullable */
+  motivoAnnullamento?: string | null;
+  /** @minimum 1 */
+  versione: number;
+  dataCreazione: string;
+}
+
 export interface BollaRigaInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
   prodottoId: number;
   lottoId?: number;
   quantita: QuantitaContabile;
@@ -6586,8 +6871,47 @@ export interface BollaRigaInput {
 }
 
 export interface ConsegnaRicezioneInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
   noteRicezione?: string;
   confermaRicezione?: boolean;
+}
+
+export interface BollaAnnullamentoInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  motivo: string;
+}
+
+export interface BollaStornoAmministrativoInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  motivo: string;
+  /** @minItems 1 */
+  rigaIds: number[];
 }
 
 export interface RitiroNonEffettuatoInput {
@@ -6642,8 +6966,25 @@ export interface ConversioneConsegnaResult {
   codice: string;
 }
 
+export type BollaInputTipoDestinatario = typeof BollaInputTipoDestinatario[keyof typeof BollaInputTipoDestinatario];
+
+
+export const BollaInputTipoDestinatario = {
+  beneficiario: 'beneficiario',
+  ente: 'ente',
+} as const;
+
 export interface BollaInput {
-  beneficiarioId: number;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  tipoDestinatario: BollaInputTipoDestinatario;
+  /** @nullable */
+  beneficiarioId?: number | null;
+  /** @nullable */
+  enteDestinatarioId?: number | null;
   consegnaId?: number;
   magazzinoId: number;
   indirizzoConsegna?: string;
@@ -6655,6 +6996,13 @@ export interface BollaInput {
 }
 
 export interface BollaUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
   beneficiarioId?: number;
   magazzinoId?: number;
   /** @nullable */
@@ -9796,6 +10144,141 @@ page?: PageParamParameter;
  */
 limit?: LimitParamParameter;
 };
+
+export type ListEntiDestinatariParams = {
+attivo?: boolean;
+};
+
+export type ListDocumentiOperativiParams = {
+tipoAggregato?: ListDocumentiOperativiTipoAggregato;
+destinatario?: ListDocumentiOperativiDestinatario;
+stato?: string;
+/**
+ * @minimum 1
+ */
+areaOperativaId?: number;
+/**
+ * @minimum 1
+ */
+magazzinoId?: number;
+/**
+ * @minimum 1
+ */
+centroAscoltoId?: number;
+dataDa?: string;
+dataA?: string;
+/**
+ * @minLength 1
+ * @maxLength 120
+ */
+ricerca?: string;
+sortBy?: ListDocumentiOperativiSortBy;
+sortDirection?: ListDocumentiOperativiSortDirection;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type ListDocumentiOperativiTipoAggregato = typeof ListDocumentiOperativiTipoAggregato[keyof typeof ListDocumentiOperativiTipoAggregato];
+
+
+export const ListDocumentiOperativiTipoAggregato = {
+  bolla: 'bolla',
+  trasferimento: 'trasferimento',
+} as const;
+
+export type ListDocumentiOperativiDestinatario = typeof ListDocumentiOperativiDestinatario[keyof typeof ListDocumentiOperativiDestinatario];
+
+
+export const ListDocumentiOperativiDestinatario = {
+  beneficiario: 'beneficiario',
+  ente: 'ente',
+  magazzino: 'magazzino',
+} as const;
+
+export type ListDocumentiOperativiSortBy = typeof ListDocumentiOperativiSortBy[keyof typeof ListDocumentiOperativiSortBy];
+
+
+export const ListDocumentiOperativiSortBy = {
+  dataDocumento: 'dataDocumento',
+  dataCreazione: 'dataCreazione',
+  numero: 'numero',
+} as const;
+
+export type ListDocumentiOperativiSortDirection = typeof ListDocumentiOperativiSortDirection[keyof typeof ListDocumentiOperativiSortDirection];
+
+
+export const ListDocumentiOperativiSortDirection = {
+  asc: 'asc',
+  desc: 'desc',
+} as const;
+
+export type ExportDocumentiOperativiParams = {
+tipoAggregato?: ExportDocumentiOperativiTipoAggregato;
+destinatario?: ExportDocumentiOperativiDestinatario;
+stato?: string;
+/**
+ * @minimum 1
+ */
+areaOperativaId?: number;
+/**
+ * @minimum 1
+ */
+magazzinoId?: number;
+/**
+ * @minimum 1
+ */
+centroAscoltoId?: number;
+dataDa?: string;
+dataA?: string;
+/**
+ * @minLength 1
+ * @maxLength 120
+ */
+ricerca?: string;
+sortBy?: ExportDocumentiOperativiSortBy;
+sortDirection?: ExportDocumentiOperativiSortDirection;
+};
+
+export type ExportDocumentiOperativiTipoAggregato = typeof ExportDocumentiOperativiTipoAggregato[keyof typeof ExportDocumentiOperativiTipoAggregato];
+
+
+export const ExportDocumentiOperativiTipoAggregato = {
+  bolla: 'bolla',
+  trasferimento: 'trasferimento',
+} as const;
+
+export type ExportDocumentiOperativiDestinatario = typeof ExportDocumentiOperativiDestinatario[keyof typeof ExportDocumentiOperativiDestinatario];
+
+
+export const ExportDocumentiOperativiDestinatario = {
+  beneficiario: 'beneficiario',
+  ente: 'ente',
+  magazzino: 'magazzino',
+} as const;
+
+export type ExportDocumentiOperativiSortBy = typeof ExportDocumentiOperativiSortBy[keyof typeof ExportDocumentiOperativiSortBy];
+
+
+export const ExportDocumentiOperativiSortBy = {
+  dataDocumento: 'dataDocumento',
+  dataCreazione: 'dataCreazione',
+  numero: 'numero',
+} as const;
+
+export type ExportDocumentiOperativiSortDirection = typeof ExportDocumentiOperativiSortDirection[keyof typeof ExportDocumentiOperativiSortDirection];
+
+
+export const ExportDocumentiOperativiSortDirection = {
+  asc: 'asc',
+  desc: 'desc',
+} as const;
 
 export type ListBolleParams = {
 stato?: string;

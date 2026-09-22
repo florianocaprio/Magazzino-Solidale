@@ -15,10 +15,12 @@ import {
   gte,
   lte,
   desc,
+  asc,
   inArray,
   isNull,
   isNotNull,
   ilike,
+  ne,
   sql,
   type SQL,
 } from "drizzle-orm";
@@ -38,10 +40,15 @@ import {
 import { sendEmail } from "../lib/emailService";
 import { buildIcs } from "../lib/ics";
 import {
+  BollaActionError,
   completeBollaDelivery,
   handleBollaActionError,
 } from "../lib/bollaDelivery";
-import { auditContextFromRequest } from "../lib/auditEvent";
+import {
+  auditContextFromRequest,
+  auditFields,
+  recordAuditEvent,
+} from "../lib/auditEvent";
 import { requireAllModuli } from "../lib/featureFlags";
 import {
   ConsegnaPlanningError,
@@ -61,10 +68,23 @@ import {
 } from "../lib/beneficiarioPolicy";
 import { requirePermission } from "../middlewares/auth";
 import { operationalStatesForRows } from "../lib/volontariOperational";
+import {
+  DocumentCommandError,
+  commandRequestHash,
+  loadDocumentCommand,
+  lockConsegnaBollaRelation,
+  lockDocumentCommand,
+  requireExpectedVersion,
+  requireIdempotencyKey,
+  storeDocumentCommand,
+  validateDocumentCommand,
+} from "../lib/documentCommand";
 
 const TIPO_CONSEGNA_PACCO = "consegna_pacco";
 
 const router: IRouter = Router();
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 router.use("/consegne", requireAllModuli(["CENTRO_ASCOLTO", "CONSEGNE"]));
 
@@ -83,11 +103,9 @@ function handlePlanningError(error: unknown, res: Response): boolean {
       typeof current === "object" &&
       (current as { code?: string }).code === "23505"
     ) {
-      res
-        .status(409)
-        .json({
-          error: "La pianificazione è in conflitto con un'altra operazione",
-        });
+      res.status(409).json({
+        error: "La pianificazione è in conflitto con un'altra operazione",
+      });
       return true;
     }
     current =
@@ -182,11 +200,75 @@ async function canAccessConsegna(
   );
 }
 
+async function canAccessConsegnaTx(
+  tx: Tx,
+  req: Request,
+  consegna: typeof consegneTable.$inferSelect,
+): Promise<boolean> {
+  const [beneficiario] = await tx
+    .select({
+      centroAscoltoId: beneficiariTable.centroAscoltoId,
+      areaOperativaId: beneficiariTable.areaOperativaId,
+      zonaUdsId: beneficiariTable.zonaUdsId,
+    })
+    .from(beneficiariTable)
+    .where(eq(beneficiariTable.id, consegna.beneficiarioId))
+    .for("share");
+  if (!beneficiario) return false;
+
+  const terminale = consegna.stato === "effettuata";
+  return (
+    canAccessCentro(
+      terminale
+        ? (consegna.centroAscoltoIdSnapshot ?? beneficiario.centroAscoltoId)
+        : beneficiario.centroAscoltoId,
+      callerCentroId(req),
+    ) &&
+    canAccessAreaOperativa(
+      terminale
+        ? (consegna.areaOperativaIdSnapshot ?? beneficiario.areaOperativaId)
+        : beneficiario.areaOperativaId,
+      callerAreaOperativaId(req),
+    ) &&
+    canAccessZonaUds(beneficiario.zonaUdsId, callerZonaUdsId(req))
+  );
+}
+
+async function canAccessAssociatedBollaTx(
+  tx: Tx,
+  req: Request,
+  bolla: typeof bolleTable.$inferSelect,
+  beneficiarioId: number,
+): Promise<boolean> {
+  if (
+    bolla.tipoDestinatario !== "beneficiario" ||
+    bolla.beneficiarioId !== beneficiarioId
+  ) {
+    return false;
+  }
+  const [magazzino] = await tx
+    .select({
+      centroAscoltoId: magazziniTable.centroAscoltoId,
+      areaOperativaId: magazziniTable.areaOperativaId,
+    })
+    .from(magazziniTable)
+    .where(eq(magazziniTable.id, bolla.magazzinoId))
+    .for("share");
+  return Boolean(
+    magazzino &&
+    canAccessCentro(magazzino.centroAscoltoId, callerCentroId(req)) &&
+    canAccessAreaOperativa(
+      magazzino.areaOperativaId,
+      callerAreaOperativaId(req),
+    ),
+  );
+}
+
 /** Ritorna, per ogni consegnaId, la bolla collegata più rilevante (non annullata). */
 async function bollePerConsegne(consegnaIds: number[]) {
   const map = new Map<
     number,
-    { id: number; numeroBolla: string; stato: string }
+    { id: number; numeroBolla: string; stato: string; versione: number }
   >();
   if (consegnaIds.length === 0) return map;
   const rows = await db
@@ -194,6 +276,7 @@ async function bollePerConsegne(consegnaIds: number[]) {
       id: bolleTable.id,
       numeroBolla: bolleTable.numeroBolla,
       stato: bolleTable.stato,
+      versione: bolleTable.versione,
       consegnaId: bolleTable.consegnaId,
     })
     .from(bolleTable)
@@ -209,6 +292,7 @@ async function bollePerConsegne(consegnaIds: number[]) {
         id: r.id,
         numeroBolla: r.numeroBolla,
         stato: r.stato,
+        versione: r.versione,
       });
     }
   }
@@ -489,6 +573,7 @@ async function loadConsegne(req: Request, options: ConsegneListOptions) {
       bollaId: bolla?.id ?? null,
       bollaNumero: bolla?.numeroBolla ?? null,
       bollaStato: bolla?.stato ?? null,
+      bollaVersione: bolla?.versione ?? null,
       noteOperative: r.c.noteOperative ?? null,
       dataEffettuata: r.c.dataEffettuata?.toISOString() ?? null,
       dataCreazione: r.c.dataCreazione.toISOString(),
@@ -511,11 +596,9 @@ router.get(
       pageSize < 1 ||
       pageSize > 100
     ) {
-      res
-        .status(400)
-        .json({
-          error: "Paginazione non valida: page >= 1 e pageSize tra 1 e 100",
-        });
+      res.status(400).json({
+        error: "Paginazione non valida: page >= 1 e pageSize tra 1 e 100",
+      });
       return;
     }
     const result = await loadConsegne(req, { page, pageSize });
@@ -555,11 +638,9 @@ router.post(
     const cid = callerAreaOperativaId(req);
     const zid = callerZonaUdsId(req);
     if (body.volontarioId != null && body.volontarioAltro) {
-      res
-        .status(400)
-        .json({
-          error: "Indicare un volontario censito oppure Altro, non entrambi",
-        });
+      res.status(400).json({
+        error: "Indicare un volontario censito oppure Altro, non entrambi",
+      });
       return;
     }
     if (
@@ -572,12 +653,10 @@ router.post(
       return;
     }
     if (!(await isBeneficiarioActive(body.beneficiarioId))) {
-      res
-        .status(400)
-        .json({
-          error:
-            "Il Beneficiario deve essere attivo per creare una nuova Consegna.",
-        });
+      res.status(400).json({
+        error:
+          "Il Beneficiario deve essere attivo per creare una nuova Consegna.",
+      });
       return;
     }
     if (
@@ -721,11 +800,9 @@ router.patch(
         ? body.volontarioAltro
         : existing.volontarioAltro;
     if (nextVol != null && nextAltro) {
-      res
-        .status(400)
-        .json({
-          error: "Indicare un volontario censito oppure Altro, non entrambi",
-        });
+      res.status(400).json({
+        error: "Indicare un volontario censito oppure Altro, non entrambi",
+      });
       return;
     }
     try {
@@ -799,12 +876,45 @@ router.delete(
     }
     try {
       await db.transaction(async (tx) => {
+        await lockConsegnaBollaRelation(tx, id);
+        const linkedIds = await tx
+          .select({ id: bolleTable.id })
+          .from(bolleTable)
+          .where(eq(bolleTable.consegnaId, id))
+          .orderBy(asc(bolleTable.id));
+        if (linkedIds.length > 0) {
+          await tx
+            .select({ id: bolleTable.id })
+            .from(bolleTable)
+            .where(
+              inArray(
+                bolleTable.id,
+                linkedIds.map((row) => row.id),
+              ),
+            )
+            .orderBy(asc(bolleTable.id))
+            .for("update");
+        }
         const [locked] = await tx
           .select()
           .from(consegneTable)
           .where(eq(consegneTable.id, id))
           .for("update");
-        if (!locked) throw new ConsegnaPlanningError(404, "Not found");
+        if (!locked || locked.tipoPianificazione !== TIPO_CONSEGNA_PACCO) {
+          throw new ConsegnaPlanningError(404, "Not found");
+        }
+        if (!(await canAccessConsegnaTx(tx, req, locked))) {
+          throw new ConsegnaPlanningError(
+            403,
+            "Risorsa non accessibile per il tuo centro",
+          );
+        }
+        if (locked.stato !== "pianificata") {
+          throw new ConsegnaPlanningError(
+            409,
+            "Una consegna conclusa non può essere eliminata",
+          );
+        }
         await lockConsegnaPlanningContextTx(tx, locked, null);
         await reconcileConsegnaPlanningTx(tx, locked, null, req);
         await tx
@@ -830,7 +940,8 @@ router.post(
   requirePermission("consegne.manage"),
   async (req, res) => {
     const consegnaId = Number(req.params.id);
-    const { bollaId } = req.body ?? {};
+    const requestedBollaId =
+      req.body?.bollaId == null ? null : Number(req.body.bollaId);
 
     const [consegna] = await db
       .select()
@@ -850,66 +961,284 @@ router.post(
         .json({ error: "Risorsa non accessibile per il tuo centro" });
       return;
     }
+    if (
+      requestedBollaId != null &&
+      (!Number.isSafeInteger(requestedBollaId) || requestedBollaId <= 0)
+    ) {
+      res.status(400).json({ error: "Bolla non valida" });
+      return;
+    }
+    let idempotencyKey: string;
+    let expectedVersion: number;
+    try {
+      idempotencyKey = requireIdempotencyKey(req.body?.idempotencyKey);
+      expectedVersion = requireExpectedVersion(req.body?.versione);
+    } catch (error) {
+      if (handleBollaActionError(error, res)) return;
+      throw error;
+    }
+    const tipoComando = "CONSEGNA_ASSOCIA_BOLLA";
+    const requestHash = commandRequestHash({
+      consegnaId,
+      bollaId: requestedBollaId,
+      versione: expectedVersion,
+    });
+    try {
+      await db.transaction(async (tx) => {
+        await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        await lockConsegnaBollaRelation(tx, consegnaId);
+        const linkedIds = await tx
+          .select({ id: bolleTable.id })
+          .from(bolleTable)
+          .where(
+            and(
+              eq(bolleTable.consegnaId, consegnaId),
+              ne(bolleTable.stato, "annullato"),
+            ),
+          )
+          .orderBy(asc(bolleTable.id));
+        const idsToLock = [
+          ...new Set([
+            ...linkedIds.map((row) => row.id),
+            ...(requestedBollaId == null ? [] : [requestedBollaId]),
+          ]),
+        ].sort((left, right) => left - right);
+        const lockedBolle =
+          idsToLock.length === 0
+            ? []
+            : await tx
+                .select()
+                .from(bolleTable)
+                .where(inArray(bolleTable.id, idsToLock))
+                .orderBy(asc(bolleTable.id))
+                .for("update");
+        const lockedById = new Map(lockedBolle.map((row) => [row.id, row]));
+        const [lockedConsegna] = await tx
+          .select()
+          .from(consegneTable)
+          .where(eq(consegneTable.id, consegnaId))
+          .for("update");
+        if (
+          !lockedConsegna ||
+          lockedConsegna.tipoPianificazione !== TIPO_CONSEGNA_PACCO
+        ) {
+          throw new BollaActionError(404, "Consegna non trovata");
+        }
+        if (!(await canAccessConsegnaTx(tx, req, lockedConsegna))) {
+          throw new BollaActionError(
+            403,
+            "Risorsa non accessibile per il tuo centro",
+          );
+        }
 
-    // scollega: rimuovi il legame da tutte le bolle puntate a questa consegna
-    if (bollaId == null) {
-      await db
-        .update(bolleTable)
-        .set({ consegnaId: null })
-        .where(eq(bolleTable.consegnaId, consegnaId));
-      res.json(await dettaglioConsegna(consegnaId));
-      return;
-    }
+        const linkedBolle = lockedBolle.filter(
+          (row) => row.consegnaId === consegnaId && row.stato !== "annullato",
+        );
+        for (const linked of linkedBolle) {
+          if (
+            !(await canAccessAssociatedBollaTx(
+              tx,
+              req,
+              linked,
+              lockedConsegna.beneficiarioId,
+            ))
+          ) {
+            throw new BollaActionError(
+              403,
+              "Bolla non accessibile per il tuo profilo",
+            );
+          }
+        }
 
-    const [bolla] = await db
-      .select()
-      .from(bolleTable)
-      .where(eq(bolleTable.id, bollaId));
-    if (!bolla) {
-      res.status(404).json({ error: "Bolla non trovata" });
-      return;
-    }
-    if (bolla.beneficiarioId !== consegna.beneficiarioId) {
-      res
-        .status(400)
-        .json({ error: "La bolla appartiene a un altro beneficiario" });
-      return;
-    }
-    if (bolla.stato === "annullato") {
-      res
-        .status(400)
-        .json({ error: "Non è possibile associare una bolla annullata" });
-      return;
-    }
-    if (bolla.consegnaId != null && bolla.consegnaId !== consegnaId) {
-      res
-        .status(400)
-        .json({ error: "La bolla è già associata a un'altra consegna" });
-      return;
-    }
-    if (bolla.ritiroNonEffettuatoAt != null && bolla.consegnaId == null) {
-      res.status(409).json({
-        error:
-          "Per un ritiro non effettuato usa la conversione in consegna domiciliare dalla bolla",
+        const requestedBolla =
+          requestedBollaId == null
+            ? null
+            : (lockedById.get(requestedBollaId) ?? null);
+        if (requestedBollaId != null && !requestedBolla) {
+          throw new BollaActionError(404, "Bolla non trovata");
+        }
+        if (
+          requestedBolla &&
+          (requestedBolla.tipoDestinatario !== "beneficiario" ||
+            requestedBolla.beneficiarioId !== lockedConsegna.beneficiarioId)
+        ) {
+          throw new BollaActionError(
+            400,
+            "La bolla appartiene a un altro beneficiario",
+          );
+        }
+        if (
+          requestedBolla &&
+          !(await canAccessAssociatedBollaTx(
+            tx,
+            req,
+            requestedBolla,
+            lockedConsegna.beneficiarioId,
+          ))
+        ) {
+          throw new BollaActionError(
+            403,
+            "Bolla non accessibile per il tuo profilo",
+          );
+        }
+
+        const receipt = await loadDocumentCommand(tx, {
+          tipoComando,
+          idempotencyKey,
+        });
+        if (receipt) {
+          validateDocumentCommand(receipt, {
+            tipoComando,
+            idempotencyKey,
+            requestHash,
+            actorUserId: req.user!.id,
+            aggregatoTipo: "consegna",
+            aggregatoId: consegnaId,
+          });
+          return;
+        }
+
+        if (lockedConsegna.stato !== "pianificata") {
+          throw new BollaActionError(
+            409,
+            "Una Consegna conclusa non può cambiare la Bolla associata",
+          );
+        }
+        const statoAssociabile = (stato: string) =>
+          stato === "bozza" || stato === "confermato";
+        if (linkedBolle.some((row) => !statoAssociabile(row.stato))) {
+          throw new BollaActionError(
+            409,
+            "Una Bolla consegnata o annullata non può essere dissociata dalla Consegna",
+          );
+        }
+        if (requestedBolla && !statoAssociabile(requestedBolla.stato)) {
+          throw new BollaActionError(
+            409,
+            "Solo una Bolla in bozza o confermata può essere associata alla Consegna",
+          );
+        }
+
+        let resultingVersion: number;
+        if (requestedBolla == null) {
+          const [linked] = linkedBolle;
+          if (!linked) {
+            throw new DocumentCommandError(
+              409,
+              "La Consegna non ha una Bolla operativa associata",
+            );
+          }
+          if (linked.versione !== expectedVersion) {
+            throw new DocumentCommandError(
+              409,
+              "Versione non aggiornata; ricaricare i dati",
+            );
+          }
+          const [unlinked] = await tx
+            .update(bolleTable)
+            .set({
+              consegnaId: null,
+              versione: sql`${bolleTable.versione} + 1`,
+            })
+            .where(eq(bolleTable.id, linked.id))
+            .returning();
+          resultingVersion = unlinked.versione;
+        } else {
+          if (
+            requestedBolla.consegnaId != null &&
+            requestedBolla.consegnaId !== consegnaId
+          ) {
+            throw new BollaActionError(
+              409,
+              "La bolla è già associata a un'altra consegna",
+            );
+          }
+          if (
+            requestedBolla.ritiroNonEffettuatoAt != null &&
+            requestedBolla.consegnaId == null
+          ) {
+            throw new BollaActionError(
+              409,
+              "Per un ritiro non effettuato usa la conversione in consegna domiciliare dalla bolla",
+            );
+          }
+          if (requestedBolla.versione !== expectedVersion) {
+            throw new DocumentCommandError(
+              409,
+              "Versione non aggiornata; ricaricare i dati",
+            );
+          }
+          for (const linked of linkedBolle) {
+            if (linked.id === requestedBolla.id) continue;
+            await tx
+              .update(bolleTable)
+              .set({
+                consegnaId: null,
+                versione: sql`${bolleTable.versione} + 1`,
+              })
+              .where(eq(bolleTable.id, linked.id));
+          }
+          if (requestedBolla.consegnaId === consegnaId) {
+            resultingVersion = requestedBolla.versione;
+          } else {
+            const [linked] = await tx
+              .update(bolleTable)
+              .set({
+                consegnaId,
+                versione: sql`${bolleTable.versione} + 1`,
+              })
+              .where(eq(bolleTable.id, requestedBolla.id))
+              .returning();
+            resultingVersion = linked.versione;
+          }
+        }
+
+        await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req, {
+            operationKey: `m4a:${tipoComando}:${idempotencyKey}`,
+          }),
+          azione:
+            requestedBollaId == null
+              ? "CONSEGNA_BOLLA_DISSOCIATA"
+              : "CONSEGNA_BOLLA_ASSOCIATA",
+          entitaTipo: "consegna",
+          entitaId: consegnaId,
+          documentoTipo: "bolla",
+          documentoId: requestedBollaId ?? linkedBolle.at(0)?.id ?? consegnaId,
+          areaOperativaIdSnapshot: lockedConsegna.areaOperativaIdSnapshot,
+          centroAscoltoIdSnapshot: lockedConsegna.centroAscoltoIdSnapshot,
+          magazzinoIdSnapshot: lockedConsegna.magazzinoId,
+          dataOperativa: lockedConsegna.dataPrevista,
+          metadata: auditFields(
+            {
+              bollaPrecedenteId: linkedBolle.at(0)?.id ?? null,
+              bollaNuovaId: requestedBollaId,
+            },
+            ["bollaPrecedenteId", "bollaNuovaId"],
+          ),
+        });
+        await storeDocumentCommand(tx, {
+          tipoComando,
+          idempotencyKey,
+          requestHash,
+          aggregatoTipo: "consegna",
+          aggregatoId: consegnaId,
+          versioneRichiesta: expectedVersion,
+          versioneRisultante: resultingVersion,
+          resultSnapshot: {
+            id: consegnaId,
+            bollaId: requestedBollaId,
+            versioneBolla: resultingVersion,
+          },
+          actorUserId: req.user!.id,
+        });
       });
-      return;
+    } catch (error) {
+      if (handleBollaActionError(error, res)) return;
+      throw error;
     }
 
-    // una sola bolla per consegna: scollega le altre, poi collega quella scelta
-    await db
-      .update(bolleTable)
-      .set({ consegnaId: null })
-      .where(eq(bolleTable.consegnaId, consegnaId));
-    await db
-      .update(bolleTable)
-      .set({ consegnaId })
-      .where(eq(bolleTable.id, bollaId));
-
-    const [row] = await db
-      .select()
-      .from(consegneTable)
-      .where(eq(consegneTable.id, consegnaId));
-    res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
+    res.json(await dettaglioConsegna(consegnaId));
   },
 );
 
@@ -950,12 +1279,10 @@ router.post(
         b.beneficiarioId === consegna.beneficiarioId,
     );
     if (!bollaPronta) {
-      res
-        .status(400)
-        .json({
-          error:
-            "Associa prima una bolla pronta: la merce non risulta ancora preparata.",
-        });
+      res.status(400).json({
+        error:
+          "Associa prima una bolla pronta: la merce non risulta ancora preparata.",
+      });
       return;
     }
     if (!(await canAccessMagazzino(bollaPronta.magazzinoId, caller, cid))) {
@@ -965,13 +1292,43 @@ router.post(
       return;
     }
 
+    let idempotencyKey: string;
+    let expectedVersion: number;
+    try {
+      idempotencyKey = requireIdempotencyKey(req.body?.idempotencyKey);
+      expectedVersion = requireExpectedVersion(req.body?.versione);
+    } catch (err) {
+      if (handleBollaActionError(err, res)) return;
+      throw err;
+    }
+    const tipoComando = "CONSEGNA_COMPLETA";
+    const requestHash = commandRequestHash({
+      consegnaId,
+      bollaId: bollaPronta.id,
+      versione: expectedVersion,
+      confermaRicezione: true,
+    });
+
     try {
       await completeBollaDelivery({
         bollaId: bollaPronta.id,
-        audit: auditContextFromRequest(req),
+        audit: auditContextFromRequest(req, {
+          operationKey: `m4a:${tipoComando}:${idempotencyKey}`,
+        }),
         confermaRicezione: true,
         allowAlreadyConsegnata: true,
         beneficiaryAccessScope: beneficiarioAccessScopeFromRequest(req),
+        expectedConsegna: {
+          id: consegnaId,
+          beneficiarioId: consegna.beneficiarioId,
+        },
+        documentCommand: {
+          tipoComando,
+          idempotencyKey,
+          requestHash,
+          expectedVersion,
+          actorUserId: req.user!.id,
+        },
       });
     } catch (err) {
       if (handleBollaActionError(err, res)) return;
@@ -1041,6 +1398,7 @@ async function dettaglioConsegna(id: number) {
     bollaId: bolla?.id ?? null,
     bollaNumero: bolla?.numeroBolla ?? null,
     bollaStato: bolla?.stato ?? null,
+    bollaVersione: bolla?.versione ?? null,
     noteOperative: r.c.noteOperative ?? null,
     dataEffettuata: r.c.dataEffettuata?.toISOString() ?? null,
     dataCreazione: r.c.dataCreazione.toISOString(),

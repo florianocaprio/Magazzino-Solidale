@@ -284,6 +284,10 @@ test.describe("workflow Magazzino reali", () => {
 
     await page.goto("/trasferimenti");
     await page.getByRole("button", { name: /^nuovo$/i }).click();
+    await page
+      .getByRole("dialog", { name: /nuovo documento operativo/i })
+      .getByRole("button", { name: /trasferimenti/i })
+      .click();
     const sheet = page.getByRole("dialog", { name: /nuovo trasferimento/i });
     await selectOption(
       page,
@@ -330,29 +334,32 @@ test.describe("workflow Magazzino reali", () => {
     };
     await page.getByRole("button", { name: /chiudi/i }).click();
 
-    let row = page.getByRole("row").filter({ hasText: created.codice });
+    const row = page.getByRole("row").filter({ hasText: created.codice });
+    await row.click();
+    const detail = page.getByRole("dialog", {
+      name: /dettaglio trasferimento/i,
+    });
     const dispatchResponse = page.waitForResponse(
       (response) =>
         response.url().includes(`/api/trasferimenti/${created.id}/avvia`) &&
         response.request().method() === "POST",
     );
-    await row.getByRole("button", { name: /avvia/i }).click();
+    await detail.getByRole("button", { name: /avvia/i }).click();
     expect((await dispatchResponse).status()).toBe(200);
-    await expect(row).toContainText(/in transito/i);
+    await expect(detail).toContainText(/in transito/i);
     expect(await readStock(origin)).toBe(originBefore - 1);
 
-    row = page.getByRole("row").filter({ hasText: created.codice });
     const receiveResponse = page.waitForResponse(
       (response) =>
         response.url().includes(`/api/trasferimenti/${created.id}/conferma`) &&
         response.request().method() === "POST",
     );
-    await row.getByRole("button", { name: /conferma ric/i }).click();
+    await detail.getByRole("button", { name: /conferma ric/i }).click();
     expect((await receiveResponse).status()).toBe(200);
-    await expect(row).toContainText(/completato/i);
+    await expect(detail).toContainText(/completato/i);
     expect(await readStock(destination)).toBe(destinationBefore + 1);
     await expect(
-      row.getByRole("button", { name: /conferma ric/i }),
+      detail.getByRole("button", { name: /conferma ric/i }),
     ).toHaveCount(0);
   });
 });

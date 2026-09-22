@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
+  uniqueIndex,
   pgTable,
   serial,
   varchar,
@@ -17,6 +18,7 @@ import { z } from "zod/v4";
 import { utentiTable } from "./auth";
 import { areeOperativeTable } from "./areeOperative";
 import { centriAscoltoTable } from "./centri";
+import { entiDestinatariTable } from "./entiDestinatari";
 
 export const bolleTable = pgTable(
   "bolle",
@@ -24,7 +26,14 @@ export const bolleTable = pgTable(
     id: serial("id").primaryKey(),
     numeroBolla: varchar("numero_bolla", { length: 30 }).notNull().unique(),
     dataBolla: date("data_bolla").notNull(),
-    beneficiarioId: integer("beneficiario_id").notNull(),
+    tipoDestinatario: varchar("tipo_destinatario", { length: 20 })
+      .notNull()
+      .default("beneficiario"),
+    beneficiarioId: integer("beneficiario_id"),
+    enteDestinatarioId: integer("ente_destinatario_id").references(
+      () => entiDestinatariTable.id,
+      { onDelete: "restrict" },
+    ),
     consegnaId: integer("consegna_id"),
     magazzinoId: integer("magazzino_id").notNull(),
     areaOperativaIdSnapshot: integer("area_operativa_id_snapshot").references(
@@ -38,6 +47,21 @@ export const bolleTable = pgTable(
     numeroComponentiNucleoSnapshot: integer(
       "numero_componenti_nucleo_snapshot",
     ),
+    destinatarioNomeSnapshot: varchar("destinatario_nome_snapshot", {
+      length: 250,
+    }),
+    destinatarioIndirizzoSnapshot: varchar("destinatario_indirizzo_snapshot", {
+      length: 250,
+    }),
+    destinatarioTelefonoSnapshot: varchar("destinatario_telefono_snapshot", {
+      length: 50,
+    }),
+    destinatarioEmailSnapshot: varchar("destinatario_email_snapshot", {
+      length: 200,
+    }),
+    destinatarioSnapshotCongelato: boolean("destinatario_snapshot_congelato")
+      .notNull()
+      .default(false),
     indirizzoConsegna: varchar("indirizzo_consegna", { length: 200 }),
     operatoreId: integer("operatore_id").references(() => utentiTable.id),
     volontarioConsegnaId: integer("volontario_consegna_id"),
@@ -58,6 +82,8 @@ export const bolleTable = pgTable(
     ritiroNonEffettuatoMotivo: varchar("ritiro_non_effettuato_motivo", {
       length: 500,
     }),
+    motivoAnnullamento: varchar("motivo_annullamento", { length: 500 }),
+    versione: integer("versione").notNull().default(1),
     dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
   },
   (table) => [
@@ -67,9 +93,18 @@ export const bolleTable = pgTable(
       table.areaOperativaIdSnapshot,
       table.centroAscoltoIdSnapshot,
     ),
+    uniqueIndex("bolle_consegna_attiva_unique")
+      .on(table.consegnaId)
+      .where(
+        sql`${table.consegnaId} is not null and ${table.stato} <> 'annullato'`,
+      ),
     check(
       "bolle_numero_componenti_nucleo_snapshot_check",
       sql`${table.numeroComponentiNucleoSnapshot} is null or ${table.numeroComponentiNucleoSnapshot} > 0`,
+    ),
+    check(
+      "bolle_destinatario_esclusivo_check",
+      sql`(${table.tipoDestinatario} = 'beneficiario' and ${table.beneficiarioId} is not null and ${table.enteDestinatarioId} is null) or (${table.tipoDestinatario} = 'ente' and ${table.beneficiarioId} is null and ${table.enteDestinatarioId} is not null)`,
     ),
   ],
 );
@@ -95,6 +130,9 @@ export const insertBollaSchema = createInsertSchema(bolleTable).omit({
 export type InsertBolla = z.infer<typeof insertBollaSchema>;
 export type Bolla = typeof bolleTable.$inferSelect;
 
-export const insertBollaRigaSchema = createInsertSchema(bollaRigheTable).omit({ id: true, dataCreazione: true });
+export const insertBollaRigaSchema = createInsertSchema(bollaRigheTable).omit({
+  id: true,
+  dataCreazione: true,
+});
 export type InsertBollaRiga = z.infer<typeof insertBollaRigaSchema>;
 export type BollaRiga = typeof bollaRigheTable.$inferSelect;

@@ -70,6 +70,7 @@ import {
   ProductOperationalQuantityError,
   validateProductOperationalQuantity,
 } from "./productQuantity";
+import { lockInventoryLotsInGlobalOrder } from "./inventoryLocks";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 
@@ -730,6 +731,11 @@ export async function chiudiSessioneCassaEmporio(opts: {
       creatoDa: operationActorId,
     });
 
+    await lockInventoryLotsInGlobalOrder(tx, {
+      kind: "warehouse-products",
+      magazzinoId: sessione.magazzinoEmporioId,
+      prodottoIds: righe.map((riga) => riga.prodottoId),
+    });
     for (const riga of righe) {
       const prodotto = productMap.get(riga.prodottoId);
       if (!prodotto) throw new SpesaEmporioError(400, MSG_PRODOTTO_NON_TROVATO);
@@ -1296,6 +1302,13 @@ export async function stornaSpesaEmporio(
     }
     const saldoPrima = parseDbNumber(beneficiario.creditoSolidaleSaldo);
     const saldoDopo = round2(saldoPrima + creditoRestituito);
+    await lockInventoryLotsInGlobalOrder(tx, {
+      kind: "lot-ids",
+      lottoIds: [...requested.keys()].flatMap((rowId) => {
+        const lottoId = rowById.get(rowId)?.lottoId;
+        return lottoId == null ? [] : [lottoId];
+      }),
+    });
     const [storno] = await tx
       .insert(speseEmporioStorniTable)
       .values({

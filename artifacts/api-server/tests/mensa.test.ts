@@ -1128,17 +1128,35 @@ describe("Modulo Mensa", () => {
         .from(movimentiTable)
         .where(eq(movimentiTable.prodottoId, product.id)),
     ).toEqual([]);
+    const requestKey = `transfer-request-${rnd()}`;
+    const requestBody = {
+      mensaId: fixture.mensaA,
+      magazzinoOrigineId: fixture.warehouseIds[1],
+      dataRichiesta: dataServizioMensa(),
+      idempotencyKey: requestKey,
+      righe: [{ prodottoId: product.id, quantita: 1 }],
+    };
     const requested = await request(makeApp(fixture, permissions))
       .post("/mensa/trasferimenti")
-      .send({
-        mensaId: fixture.mensaA,
-        magazzinoOrigineId: fixture.warehouseIds[1],
-        dataRichiesta: dataServizioMensa(),
-        idempotencyKey: `transfer-request-${rnd()}`,
-        righe: [{ prodottoId: product.id, quantita: 1 }],
-      });
+      .send(requestBody);
     expect(requested.status).toBe(201);
     ids.transfers.push(requested.body.id);
+    const requestReplay = await request(makeApp(fixture, permissions))
+      .post("/mensa/trasferimenti")
+      .send(requestBody);
+    expect(requestReplay.status, requestReplay.text).toBe(200);
+    expect(requestReplay.body).toMatchObject({
+      id: requested.body.id,
+      idempotentReplay: true,
+    });
+    const requestMismatch = await request(makeApp(fixture, permissions))
+      .post("/mensa/trasferimenti")
+      .send({
+        ...requestBody,
+        righe: [{ prodottoId: product.id, quantita: 2 }],
+      });
+    expect(requestMismatch.status).toBe(409);
+    expect(requestMismatch.body.error).toMatch(/chiave di idempotenza/i);
     const [savedRow] = await db
       .select({ unitaMisura: trasferimentoRigheTable.unitaMisura })
       .from(trasferimentoRigheTable)
@@ -1164,7 +1182,10 @@ describe("Modulo Mensa", () => {
     expect(savedNullUnitRow.unitaMisura).toBe("pz");
     const deniedDispatch = await request(makeApp(fixture, permissions))
       .post(`/trasferimenti/${requested.body.id}/avvia`)
-      .send({ versione: 1 });
+      .send({
+        versione: 1,
+        idempotencyKey: `transfer-denied-dispatch-${rnd()}`,
+      });
     expect(deniedDispatch.status).toBe(403);
 
     const [inTransit] = await db
@@ -1186,7 +1207,10 @@ describe("Modulo Mensa", () => {
     ids.transfers.push(inTransit.id);
     const received = await request(makeApp(fixture, permissions))
       .post(`/trasferimenti/${inTransit.id}/conferma`)
-      .send({ versione: inTransit.versione });
+      .send({
+        versione: inTransit.versione,
+        idempotencyKey: `transfer-receive-${rnd()}`,
+      });
     expect(received.status).toBe(200);
     expect(received.body.stato).toBe("completato");
   });

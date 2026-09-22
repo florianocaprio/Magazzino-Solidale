@@ -37,6 +37,7 @@ import {
   ProductOperationalQuantityError,
   validateProductOperationalQuantity,
 } from "./productQuantity";
+import { lockInventoryLotsInGlobalOrder } from "./inventoryLocks";
 
 export type InventoryTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
@@ -434,6 +435,11 @@ export async function creaScaricoInventariale(
       note: riga.note ?? null,
     })),
   );
+  await lockInventoryLotsInGlobalOrder(tx, {
+    kind: "warehouse-products",
+    magazzinoId: input.magazzinoId,
+    prodottoIds: productIds,
+  });
   for (const riga of input.righe) {
     if (riga.lottoId != null) {
       await scaricaRigaLottoEsatto(
@@ -477,12 +483,23 @@ export async function stornaScaricoInventariale(
         eq(movimentiTable.tipoMovimento, "scarico"),
       ),
     )
+    .orderBy(
+      asc(movimentiTable.prodottoId),
+      asc(movimentiTable.lottoId),
+      asc(movimentiTable.id),
+    )
     .for("update");
   if (!movements.length) {
     throw new InventoryError(
       "Movimenti inventariali dello scarico non trovati",
     );
   }
+  await lockInventoryLotsInGlobalOrder(tx, {
+    kind: "lot-ids",
+    lottoIds: movements.flatMap((movement) =>
+      movement.lottoId == null ? [] : [movement.lottoId],
+    ),
+  });
   const auditEventoId = input.audit
     ? await recordAuditEvent(tx, {
         command: input.audit,

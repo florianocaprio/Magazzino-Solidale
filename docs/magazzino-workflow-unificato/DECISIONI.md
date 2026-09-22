@@ -338,3 +338,123 @@ Componenti candidati da riutilizzare/estendere: `Button`, `Tabs`, `Switch`, `Exp
 Le decisioni umane richieste da M0 sono state registrate come approvate. La precedente proposta di usare `max(prodotti.scortaMinima)` per l'Area è respinta e sostituita dalla regola D5; il codice lotto fisico/produttore è separato semanticamente dal lotto logico e dalla generica partecipazione del prodotto alla gestione lotti.
 
 M0 è chiuso sul piano decisionale. Tutte le righe marcate “non implementato” o “non testato” restano lavoro delle rispettive milestone e non possono essere considerate soddisfatte dalla sola approvazione documentale.
+
+## D8 — Facciata documentale M4A e destinatario Ente
+
+**Decisione M4A definitiva.** L'unificazione è applicativa e di interfaccia, non una
+fusione distruttiva delle tabelle. `bolle` resta autorevole per Beneficiario ed
+Ente; `trasferimenti` resta autorevole per Altro Magazzino. L'identità comune
+include sempre tipo aggregato e ID.
+
+L'Ente usa un'anagrafica minima propria, non un fornitore reinterpretato. I
+riferimenti Beneficiario/Ente sono esclusivi; il tipo non cambia dopo la
+creazione.
+
+### D8.1 — Segno e semantica di `CONSEGNA_ENTE`
+
+L'uscita Ente usa `CONSEGNA_ENTE` e non produce fatti sociali, persone/pacchi
+assistiti o pianificazioni personali. È un'uscita fisica distinta da
+`DISTRIBUZIONE_FINALE`:
+
+- le quantità del ledger restano positive e il segno contabile derivato è
+  `-1` in ogni proiezione TypeScript/SQL, report ed export pertinente;
+- bozza e conferma non riducono il fisico; la consegna lo riduce una sola
+  volta;
+- fondo, provenienza, lotto, riga e lineage restano quelli reali;
+- non vengono attribuite persone assistite, nuclei o pacchi e non viene
+  ampliata l'ammissibilità FSE+/AGEA.
+
+Uno storno ammesso usa un evento compensativo collegato; non cambia il segno
+storico del movimento originario e non salva quantità negative per compensare
+una proiezione errata.
+
+### D8.2 — Permessi e moduli per tipo documentale
+
+La facciata comune applica un'unione di rami autorizzati:
+
+- Bolle e relativi destinatari richiedono i moduli, permessi e scope propri;
+- Trasferimenti richiedono i moduli, permessi e scope propri;
+- Mensa mantiene permessi e regole verticali distinti;
+- lettura, creazione/modifica, partenza, ricezione, annullamento e storno
+  restano capacità separate.
+
+Lista, conteggio, ricerca ed export rimuovono i rami non autorizzati prima
+della paginazione. Dettaglio, PDF, replay e comandi rivalidano tipo e scope. Il
+permesso di un ramo non concede dati o azioni dell'altro e un gate Bolle non
+può bloccare il percorso legittimo di un utente Trasferimenti.
+
+### D8.3 — Protocollo dei comandi e replay
+
+Ogni comando mutante M4A segue lo stesso protocollo:
+
+1. `idempotencyKey` identifica l'intenzione e l'hash copre il payload
+   semantico normalizzato;
+2. una mutazione di aggregato esistente include la versione attesa; una
+   creazione non inventa una versione antecedente;
+3. il backend acquisisce i lock nell'ordine definito, rilegge stato e versione
+   autorevoli e verifica la transizione;
+4. effetto di dominio, nuova versione, audit obbligatorio e ricevuta del
+   comando sono committati nella stessa transazione;
+5. prima di restituire anche un replay già registrato vengono rivalidati
+   sessione, permessi, moduli e scope correnti.
+
+Stessa chiave e stesso payload restituiscono lo stesso esito senza duplicare
+l'effetto; stessa chiave e hash diverso producono conflitto; una nuova
+intenzione con versione superata produce conflitto. Dopo una risposta incerta
+il frontend riusa esattamente chiave, payload e versione originari. Una nuova
+chiave viene generata soltanto per una nuova intenzione esplicita.
+
+Route comune, adapter legacy e consumer verticali convergono sul medesimo
+servizio; non sono ammesse transazioni o ricevute parallele che rendano
+separabili documento, inventario, audit e replay.
+
+### D8.4 — Snapshot Ente autorevole e fallback legacy
+
+Alla conferma il backend congela dall'anagrafica autorevole denominazione,
+indirizzo e contatti previsti. Quando lo snapshot è marcato come congelato,
+dettaglio e PDF usano quei valori anche se l'Ente viene modificato o
+disattivato; un campo congelato nullo resta nullo e non viene riempito con un
+nuovo dato live.
+
+Il legacy senza snapshot usa soltanto un fallback live esplicito e
+riconoscibile. Il fallback non viene descritto come fotografia storica, non
+modifica il record durante la lettura e non giustifica un backfill
+indiscriminato. La disattivazione preserva storico e ristampe autorizzate, ma
+impedisce nuove operazioni vietate.
+
+### D8.5 — Annullamento ordinario e storno amministrativo
+
+La normale azione Annulla è motivata e precedente all'uscita fisica. Nessun
+annullamento ordinario post-uscita reintegra merce: prima dell'uscita libera
+gli impegni senza creare un falso movimento fisico.
+
+Lo storno amministrativo è un comando separato e nominato esplicitamente,
+riservato al permesso `bolle.reverse.admin`. Richiede motivo, righe esatte,
+versione, idempotenza, conferma forte e audit; produce movimenti compensativi
+collegati senza cancellare o riscrivere la storia. Non è la scorciatoia per una
+mancata consegna e non simula il rientro. Affidamento, mancata consegna,
+`rientro_atteso` e ricezione fisica del rientro restano decisione esecutiva
+M4B.
+
+### D8.6 — Identità URL, lista ed export comuni
+
+L'identità canonica è composta: `bolla:<id>` e `trasferimento:<id>` sono
+documenti diversi anche quando condividono lo stesso numero interno. L'URL usa
+il parametro `documento=tipo:id`; tipo e ID partecipano anche a stato UI,
+query key, invalidazioni, mutazioni e PDF. Gli URL legacy realmente supportati
+vengono adattati alla forma canonica preservando i filtri, senza concedere
+accesso aggiuntivo. L'interfaccia mantiene un solo dettaglio aperto.
+
+Lista, totale ed export usano lo stesso insieme misto server-side, già
+filtrato per autorizzazioni, e gli stessi criteri: tipo aggregato e
+destinatario, stato, date, Area, Magazzino, Centro quando pertinente, ricerca
+e ordinamento. L'ordine usa discriminatore e ID come spareggio stabile;
+l'export copre l'intero insieme filtrato, non soltanto la pagina visibile. Un
+cambio di scope non può renderizzare una risposta tardiva e conserva il draft
+oppure richiede conferma prima di scartarlo.
+
+**Stato.** Le precisazioni D8 sono requisiti definitivi M4A. Il working tree
+contiene un'implementazione candidata e prove mirate, ma la revisione statica
+resta NO-GO finché i correttivi post-review e un nuovo `##test M4A` separato
+non sono completati. Non risultano quindi ancora acquisiti GO formale,
+validazione umana o chiusura M4A.

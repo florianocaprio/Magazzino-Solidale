@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import {
   trasferimentiTable,
@@ -12,6 +12,7 @@ import {
   prenotazioniMagazzinoTable,
   auditConfigurazioniTable,
   menseTable,
+  type FondoOrigine,
 } from "@workspace/db";
 import {
   eq,
@@ -28,22 +29,23 @@ import {
   type SQL,
 } from "drizzle-orm";
 import {
+  canAccessAreaOperativa,
+  canAccessCentro,
   callerCentroId,
   callerAreaOperativaId,
   visibleMagazzinoIds,
   trasferimentoScopeFilter,
 } from "../lib/centroScope";
-import {
-  PRENOTAZIONE_MAGAZZINO_ATTIVA,
-  calcolaDisponibilitaMagazzino,
-  parseDbNumber,
-} from "../lib/disponibilitaMagazzino";
+import { PRENOTAZIONE_MAGAZZINO_ATTIVA } from "../lib/disponibilitaMagazzino";
 import { requireModulo } from "../lib/featureFlags";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 import {
+  inventoryPartyBusinessKey,
+  lockInventoryPartyBusinessKeys,
   requireOperationalMagazzino,
   InventoryLedgerError,
 } from "../lib/inventoryLedger";
+import { lockInventoryLotsInGlobalOrder } from "../lib/inventoryLocks";
 import {
   createTransferRequest,
   normalizeTransferRows,
@@ -61,6 +63,15 @@ import {
   LogicalLotError,
   resolveOpenLogicalLotForWarehouse,
 } from "../lib/logicalLots";
+import {
+  commandRequestHash,
+  findDocumentCommand,
+  isDocumentCommandError,
+  lockDocumentCommand,
+  requireExpectedVersion,
+  requireIdempotencyKey,
+  storeDocumentCommand,
+} from "../lib/documentCommand";
 
 const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
@@ -90,11 +101,117 @@ function hasPermission(req: Request, permission: string): boolean {
   return !!req.user?.isAdmin || (req.user?.permessi ?? []).includes(permission);
 }
 
-function requestedVersion(body: unknown): number | null {
-  const value = (body as { versione?: unknown } | null)?.versione;
-  return Number.isSafeInteger(value) && Number(value) > 0
-    ? Number(value)
-    : null;
+function sendDocumentCommandError(error: unknown, res: Response): boolean {
+  if (databaseErrorCode(error) === "40P01") {
+    res.status(409).json({
+      error: "Operazione concorrente sul magazzino: ricarica i dati e riprova",
+    });
+    return true;
+  }
+  if (!isDocumentCommandError(error)) return false;
+  res.status(error.status).json({ error: error.message });
+  return true;
+}
+
+async function lockTransfer(tx: Tx, id: number) {
+  const [current] = await tx
+    .select()
+    .from(trasferimentiTable)
+    .where(eq(trasferimentiTable.id, id))
+    .for("update");
+  if (!current) throw new TransferRequestError(404, "Not found");
+  return current;
+}
+
+async function assertCurrentTransferScope(
+  tx: Tx,
+  req: Request,
+  transfer: Pick<
+    typeof trasferimentiTable.$inferSelect,
+    "magazzinoOrigineId" | "magazzinoDestinoId"
+  >,
+  requiredWarehouse: "both" | "either" | "origin" | "destination",
+): Promise<void> {
+  const centroId = callerCentroId(req);
+  const areaOperativaId = callerAreaOperativaId(req);
+  if (centroId == null && areaOperativaId == null) return;
+  const warehouseIds = [
+    ...new Set([transfer.magazzinoOrigineId, transfer.magazzinoDestinoId]),
+  ];
+  const warehouses = await tx
+    .select({
+      id: magazziniTable.id,
+      centroAscoltoId: magazziniTable.centroAscoltoId,
+      areaOperativaId: magazziniTable.areaOperativaId,
+    })
+    .from(magazziniTable)
+    .where(inArray(magazziniTable.id, warehouseIds))
+    .for("share");
+  const visibleIds = new Set(
+    warehouses
+      .filter(
+        (warehouse) =>
+          canAccessCentro(warehouse.centroAscoltoId, centroId) &&
+          canAccessAreaOperativa(warehouse.areaOperativaId, areaOperativaId),
+      )
+      .map((warehouse) => warehouse.id),
+  );
+  const allowed =
+    requiredWarehouse === "both"
+      ? visibleIds.has(transfer.magazzinoOrigineId) &&
+        visibleIds.has(transfer.magazzinoDestinoId)
+      : requiredWarehouse === "origin"
+        ? visibleIds.has(transfer.magazzinoOrigineId)
+        : requiredWarehouse === "destination"
+          ? visibleIds.has(transfer.magazzinoDestinoId)
+          : visibleIds.has(transfer.magazzinoOrigineId) ||
+            visibleIds.has(transfer.magazzinoDestinoId);
+  if (!allowed) {
+    throw new TransferRequestError(
+      403,
+      "Risorsa non accessibile per il tuo centro",
+    );
+  }
+}
+
+function assertExpectedVersion(
+  current: { versione: number },
+  expected: number,
+) {
+  if (current.versione !== expected) {
+    throw new TransferRequestError(
+      409,
+      "Il Trasferimento è stato modificato da un altro operatore",
+    );
+  }
+}
+
+/**
+ * L'unità operativa è derivata dal catalogo: non identifica una nuova
+ * intenzione. Anche rappresentazioni decimali equivalenti devono quindi
+ * produrre la stessa impronta idempotente.
+ */
+function transferRowsForCommandHash(rows: unknown): unknown {
+  if (!Array.isArray(rows)) return rows;
+  return rows.map((value) => {
+    if (value === null || typeof value !== "object") return value;
+    const row = value as Record<string, unknown>;
+    let quantita = row.quantita;
+    if (typeof quantita === "string" || typeof quantita === "number") {
+      try {
+        quantita = InventoryDecimal.parse(quantita).toCanonical();
+      } catch {
+        // Il validatore di dominio produrrà l'errore descrittivo. Per una
+        // richiesta invalida conserviamo il valore grezzo nell'impronta.
+      }
+    }
+    return {
+      prodottoId: row.prodottoId,
+      lottoId: row.lottoId ?? null,
+      quantita,
+      note: row.note ?? null,
+    };
+  });
 }
 
 function databaseErrorCode(error: unknown): unknown {
@@ -145,20 +262,6 @@ function requireGenericTransferPermission(
   return false;
 }
 
-async function operationalMagazzino(id: number) {
-  const [row] = await db
-    .select()
-    .from(magazziniTable)
-    .where(eq(magazziniTable.id, id));
-  if (!row) return { error: "Magazzino non trovato", status: 404 } as const;
-  if (row.stato !== "attivo")
-    return {
-      error: "Il Magazzino selezionato non è attivo",
-      status: 400,
-    } as const;
-  return { row } as const;
-}
-
 async function enforceMensaTransfer(
   req: Request,
   mensaId: number | null,
@@ -177,17 +280,6 @@ async function enforceMensaTransfer(
     }
   }
   return null;
-}
-
-async function disponibileRealeProdotto(
-  prodottoId: number,
-  magazzinoId: number,
-): Promise<number> {
-  const disponibilita = await calcolaDisponibilitaMagazzino(
-    prodottoId,
-    magazzinoId,
-  );
-  return Math.max(0, disponibilita.disponibileReale);
 }
 
 async function fseBreakdownTrasferimenti(ids: number[]) {
@@ -278,7 +370,11 @@ async function trasferimentoUscitaFEFO(
         ),
       ),
     )
-    .orderBy(asc(lottiTable.dataScadenza), asc(lottiTable.dataCarico))
+    .orderBy(
+      asc(lottiTable.dataScadenza),
+      asc(lottiTable.dataCarico),
+      asc(lottiTable.id),
+    )
     .for("update");
 
   for (const lotto of lotti) {
@@ -373,7 +469,7 @@ function normalizeTrasportatore(body: {
   };
 }
 
-async function getTrasferimentoWithRighe(id: number) {
+export async function getTrasferimentoWithRighe(id: number) {
   const [t] = await db
     .select({
       t: trasferimentiTable,
@@ -416,6 +512,8 @@ async function getTrasferimentoWithRighe(id: number) {
     .select({
       r: trasferimentoRigheTable,
       prodottoNome: prodottiTable.nome,
+      codiceLotto: lottiTable.codiceLotto,
+      fondoOrigine: lottiTable.fondoOrigine,
       lottoFsePlus: lottiTable.fsePlus,
     })
     .from(trasferimentoRigheTable)
@@ -425,6 +523,52 @@ async function getTrasferimentoWithRighe(id: number) {
     )
     .leftJoin(lottiTable, eq(trasferimentoRigheTable.lottoId, lottiTable.id))
     .where(eq(trasferimentoRigheTable.trasferimentoId, id));
+  const ripartizioniUscita = await db
+    .select({
+      rigaOrigineId: movimentiTable.rigaOrigineId,
+      lottoId: movimentiTable.lottoId,
+      codiceLotto: lottiTable.codiceLotto,
+      fondoOrigine: movimentiTable.fondoOrigine,
+      unitaMisura: movimentiTable.unitaMisura,
+      quantita: sum(movimentiTable.quantita),
+    })
+    .from(movimentiTable)
+    .leftJoin(lottiTable, eq(movimentiTable.lottoId, lottiTable.id))
+    .where(
+      and(
+        eq(movimentiTable.trasferimentoId, id),
+        eq(movimentiTable.tipoMovimento, "trasferimento"),
+        eq(movimentiTable.tipoDettaglio, "uscita"),
+      ),
+    )
+    .groupBy(
+      movimentiTable.rigaOrigineId,
+      movimentiTable.lottoId,
+      lottiTable.codiceLotto,
+      movimentiTable.fondoOrigine,
+      movimentiTable.unitaMisura,
+    )
+    .orderBy(asc(movimentiTable.rigaOrigineId), asc(movimentiTable.lottoId));
+  const ripartizioniPerRiga = new Map<
+    number,
+    Array<{
+      lottoId: number | null;
+      codiceLotto: string | null;
+      fondoOrigine: string;
+      quantita: number;
+    }>
+  >();
+  for (const ripartizione of ripartizioniUscita) {
+    if (ripartizione.rigaOrigineId == null) continue;
+    const current = ripartizioniPerRiga.get(ripartizione.rigaOrigineId) ?? [];
+    current.push({
+      lottoId: ripartizione.lottoId ?? null,
+      codiceLotto: ripartizione.codiceLotto ?? null,
+      fondoOrigine: ripartizione.fondoOrigine,
+      quantita: parseFloat(ripartizione.quantita ?? "0"),
+    });
+    ripartizioniPerRiga.set(ripartizione.rigaOrigineId, current);
+  }
   const provenance = await fseBreakdownTrasferimenti([id]);
 
   return {
@@ -463,6 +607,20 @@ async function getTrasferimentoWithRighe(id: number) {
         prodottoId: r.r.prodottoId,
         prodottoNome: r.prodottoNome ?? null,
         lottoId: r.r.lottoId ?? null,
+        codiceLotto: r.codiceLotto ?? null,
+        fondoOrigine: r.fondoOrigine ?? null,
+        ripartizioniLotto:
+          ripartizioniPerRiga.get(r.r.id) ??
+          (r.r.lottoId != null
+            ? [
+                {
+                  lottoId: r.r.lottoId,
+                  codiceLotto: r.codiceLotto ?? null,
+                  fondoOrigine: r.fondoOrigine ?? "NESSUN_FONDO",
+                  quantita: parseFloat(r.r.quantita),
+                },
+              ]
+            : []),
         fsePlus:
           split.fse > 0
             ? split.nonFse === 0
@@ -688,6 +846,13 @@ router.post("/trasferimenti", async (req, res) => {
   }
   if (!requireGenericTransferPermission(req, res, "magazzino.transfers.create"))
     return;
+  let idempotencyKey: string;
+  try {
+    idempotencyKey = requireIdempotencyKey(body.idempotencyKey);
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    throw error;
+  }
   if (
     !Number.isSafeInteger(body.magazzinoOrigineId) ||
     body.magazzinoOrigineId <= 0 ||
@@ -719,16 +884,6 @@ router.post("/trasferimenti", async (req, res) => {
       .json({ error: "Magazzino non accessibile per il tuo centro" });
     return;
   }
-  for (const magazzinoId of [
-    body.magazzinoOrigineId,
-    body.magazzinoDestinoId,
-  ]) {
-    const operational = await operationalMagazzino(Number(magazzinoId));
-    if ("error" in operational) {
-      res.status(operational.status ?? 400).json({ error: operational.error });
-      return;
-    }
-  }
   const righeInput: Array<{
     prodottoId: number;
     quantita: string | number;
@@ -750,21 +905,17 @@ router.post("/trasferimenti", async (req, res) => {
     res.status(400).json({ error: trasportatore.error });
     return;
   }
-  if (trasportatore.volontarioId != null) {
-    const state = await operationalStateForVolunteer(
-      db,
-      trasportatore.volontarioId,
-      body.dataRichiesta,
-    );
-    if (!state?.operativo) {
-      res.status(403).json({
-        error: `Il volontario selezionato non è operativo alla data richiesta (${state?.motivoNonOperativo ?? "requisiti non soddisfatti"})`,
-      });
-      return;
-    }
-  }
-  let t: typeof trasferimentiTable.$inferSelect;
+  let t: Awaited<ReturnType<typeof createTransferRequest>>;
   try {
+    const requestHash = commandRequestHash({
+      magazzinoOrigineId: body.magazzinoOrigineId,
+      magazzinoDestinoId: body.magazzinoDestinoId,
+      dataRichiesta: body.dataRichiesta,
+      trasportatoreVolontarioId: trasportatore.volontarioId,
+      trasportatoreNome: trasportatore.nome,
+      note: body.note ?? null,
+      righe: transferRowsForCommandHash(body.righe),
+    });
     t = await createTransferRequest({
       magazzinoOrigineId: body.magazzinoOrigineId,
       magazzinoDestinoId: body.magazzinoDestinoId,
@@ -773,11 +924,46 @@ router.post("/trasferimenti", async (req, res) => {
       trasportatoreNome: trasportatore.nome,
       note: body.note,
       operatoreId: req.user!.id,
-      audit: auditContextFromRequest(req),
+      audit: auditContextFromRequest(req, { operationKey: idempotencyKey }),
+      command: {
+        idempotencyKey,
+        requestHash,
+        actorUserId: req.user!.id,
+      },
+      authorizeCurrent: (tx, current) =>
+        assertCurrentTransferScope(tx, req, current, "both"),
+      beforeCreate: async (tx) => {
+        await assertCurrentTransferScope(
+          tx,
+          req,
+          {
+            magazzinoOrigineId: body.magazzinoOrigineId,
+            magazzinoDestinoId: body.magazzinoDestinoId,
+          },
+          "both",
+        );
+        if (trasportatore.volontarioId == null) return;
+        const state = await operationalStateForVolunteer(
+          tx,
+          trasportatore.volontarioId,
+          body.dataRichiesta,
+        );
+        if (!state?.operativo) {
+          throw new TransferRequestError(
+            403,
+            `Il volontario selezionato non è operativo alla data richiesta (${state?.motivoNonOperativo ?? "requisiti non soddisfatti"})`,
+          );
+        }
+      },
       righe: body.righe,
     });
   } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
     if (error instanceof TransferRequestError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    if (error instanceof InventoryLedgerError) {
       res.status(error.status).json({ error: error.message });
       return;
     }
@@ -791,7 +977,7 @@ router.post("/trasferimenti", async (req, res) => {
   }
 
   const result = await getTrasferimentoWithRighe(t.id);
-  res.status(201).json(result);
+  res.status(t.idempotentReplay ? 200 : 201).json(result);
 });
 
 router.get("/trasferimenti/:id", async (req, res) => {
@@ -870,12 +1056,14 @@ router.patch("/trasferimenti/:id", async (req, res) => {
     return;
   const id = Number(req.params.id);
   const body = req.body ?? {};
-  const versione = requestedVersion(body);
-  if (versione == null) {
-    res
-      .status(400)
-      .json({ error: "La versione corrente del Trasferimento è obbligatoria" });
-    return;
+  let versione: number;
+  let idempotencyKey: string;
+  try {
+    versione = requireExpectedVersion(body.versione);
+    idempotencyKey = requireIdempotencyKey(body.idempotencyKey);
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    throw error;
   }
 
   const [current] = await db
@@ -891,14 +1079,14 @@ router.patch("/trasferimenti/:id", async (req, res) => {
     res.status(403).json({ error: mensaError });
     return;
   }
-  const visIds = await visibleMagazzinoIds(
+  const preflightVisibleIds = await visibleMagazzinoIds(
     callerCentroId(req),
     callerAreaOperativaId(req),
   );
   if (
-    visIds != null &&
-    !visIds.includes(current.magazzinoOrigineId) &&
-    !visIds.includes(current.magazzinoDestinoId)
+    preflightVisibleIds != null &&
+    !preflightVisibleIds.includes(current.magazzinoOrigineId) &&
+    !preflightVisibleIds.includes(current.magazzinoDestinoId)
   ) {
     res
       .status(403)
@@ -922,25 +1110,14 @@ router.patch("/trasferimenti/:id", async (req, res) => {
 
   // Normalize transporter only when the request touches either field, so that
   // a transporter switch (volontario <-> "Altro") always clears the opposite column.
+  let normalizedTransporter: TrasportatoreResult | null = null;
   if ("trasportatoreVolontarioId" in body || "trasportatoreNome" in body) {
     const trasportatore = normalizeTrasportatore(body);
     if (!trasportatore.ok) {
       res.status(400).json({ error: trasportatore.error });
       return;
     }
-    if (trasportatore.volontarioId != null) {
-      const state = await operationalStateForVolunteer(
-        db,
-        trasportatore.volontarioId,
-        current.dataRichiesta,
-      );
-      if (!state?.operativo) {
-        res.status(403).json({
-          error: `Il volontario selezionato non è operativo alla data richiesta (${state?.motivoNonOperativo ?? "requisiti non soddisfatti"})`,
-        });
-        return;
-      }
-    }
+    normalizedTransporter = trasportatore;
     updates.trasportatoreVolontarioId = trasportatore.volontarioId;
     updates.trasportatoreNome = trasportatore.nome;
   }
@@ -957,13 +1134,6 @@ router.patch("/trasferimenti/:id", async (req, res) => {
     note?: string;
   }> = [];
   if (editRighe) {
-    if (current.stato !== "richiesto" && current.stato !== "preparato") {
-      res.status(400).json({
-        error:
-          "Le righe possono essere modificate solo prima dell'avvio del trasferimento",
-      });
-      return;
-    }
     righeInput = body.righe ?? [];
     if (righeInput.length === 0) {
       res
@@ -986,22 +1156,72 @@ router.patch("/trasferimenti/:id", async (req, res) => {
 
   // Stamp the operator who performed this mutation alongside the allow-listed updates.
   updates.operatoreId = req.user!.id;
-  const mutationApplied = await db
-    .transaction(async (tx) => {
+  const requestHash = commandRequestHash({
+    id,
+    versione,
+    note: "note" in body ? body.note : undefined,
+    trasportatoreVolontarioId:
+      normalizedTransporter && normalizedTransporter.ok
+        ? normalizedTransporter.volontarioId
+        : undefined,
+    trasportatoreNome:
+      normalizedTransporter && normalizedTransporter.ok
+        ? normalizedTransporter.nome
+        : undefined,
+    righe: editRighe ? transferRowsForCommandHash(righeInput) : undefined,
+  });
+  const audit = auditContextFromRequest(req, {
+    operationKey: idempotencyKey,
+  });
+  try {
+    await db.transaction(async (tx) => {
+      await lockDocumentCommand(tx, "trasferimento.update", idempotencyKey);
+      const locked = await lockTransfer(tx, id);
+      await assertCurrentTransferScope(tx, req, locked, "either");
+      const receipt = await findDocumentCommand(tx, {
+        tipoComando: "trasferimento.update",
+        idempotencyKey,
+        requestHash,
+        actorUserId: req.user!.id,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+      });
+      if (receipt) return;
+      assertExpectedVersion(locked, versione);
+      if (
+        editRighe &&
+        locked.stato !== "richiesto" &&
+        locked.stato !== "preparato"
+      ) {
+        throw new TransferRequestError(
+          400,
+          "Le righe possono essere modificate solo prima dell'avvio del trasferimento",
+        );
+      }
+      if (
+        normalizedTransporter?.ok &&
+        normalizedTransporter.volontarioId != null
+      ) {
+        const state = await operationalStateForVolunteer(
+          tx,
+          normalizedTransporter.volontarioId,
+          locked.dataRichiesta,
+        );
+        if (!state?.operativo) {
+          throw new TransferRequestError(
+            403,
+            `Il volontario selezionato non è operativo alla data richiesta (${state?.motivoNonOperativo ?? "requisiti non soddisfatti"})`,
+          );
+        }
+      }
       const normalizedRows = editRighe
         ? await normalizeTransferRows(tx, righeInput)
         : [];
       const [updated] = await tx
         .update(trasferimentiTable)
-        .set({ ...updates, versione: sql`${trasferimentiTable.versione} + 1` })
-        .where(
-          and(
-            eq(trasferimentiTable.id, id),
-            eq(trasferimentiTable.versione, versione),
-          ),
-        )
-        .returning({ id: trasferimentiTable.id });
-      if (!updated) throw new Error("VERSIONE_TRASFERIMENTO_SUPERATA");
+        .set({ ...updates, versione: locked.versione + 1 })
+        .where(eq(trasferimentiTable.id, id))
+        .returning();
       if (editRighe) {
         await tx
           .delete(trasferimentoRigheTable)
@@ -1011,44 +1231,77 @@ router.patch("/trasferimenti/:id", async (req, res) => {
             trasferimentoId: id,
             prodottoId: r.prodottoId,
             lottoId: r.lottoId,
-            quantita: r.quantita.toString(),
+            quantita: r.quantita,
             unitaMisura: r.unitaMisura,
             note: r.note,
           })),
         );
       }
-      return true;
-    })
-    .catch((error) => {
-      if (
-        error instanceof Error &&
-        error.message === "VERSIONE_TRASFERIMENTO_SUPERATA"
-      )
-        return false;
-      if (databaseErrorCode(error) === "23503")
-        return "riga_non_valida" as const;
-      if (error instanceof TransferRequestError) return error;
-      throw error;
+      await recordAuditEvent(tx, {
+        command: audit,
+        azione: "TRASFERIMENTO_MODIFICATO",
+        entitaTipo: "trasferimento",
+        entitaId: id,
+        documentoTipo: "trasferimento",
+        documentoId: id,
+        magazzinoIdSnapshot: locked.magazzinoOrigineId,
+        dataOperativa: locked.dataRichiesta,
+        changes: auditFields(
+          {
+            versionePrecedente: locked.versione,
+            versioneNuova: updated.versione,
+          },
+          ["versionePrecedente", "versioneNuova"],
+        ),
+        metadata: auditFields(
+          {
+            righeModificate: editRighe,
+            numeroRighe: editRighe ? normalizedRows.length : undefined,
+          },
+          ["righeModificate", "numeroRighe"],
+        ),
+      });
+      await storeDocumentCommand(tx, {
+        tipoComando: "trasferimento.update",
+        idempotencyKey,
+        requestHash,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+        versioneRichiesta: versione,
+        versioneRisultante: updated.versione,
+        resultSnapshot: {
+          id,
+          stato: updated.stato,
+          versione: updated.versione,
+        },
+        actorUserId: req.user!.id,
+      });
     });
-  if (mutationApplied instanceof TransferRequestError) {
-    res.status(mutationApplied.status).json({ error: mutationApplied.message });
-    return;
-  }
-  if (mutationApplied === "riga_non_valida") {
-    res.status(400).json({
-      error:
-        "Una riga indica un Prodotto, Lotto o risorsa collegata inesistente",
-    });
-    return;
-  }
-  if (!mutationApplied) {
-    res.status(409).json({
-      error: "Il Trasferimento è stato modificato da un altro operatore",
-    });
-    return;
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    if (error instanceof TransferRequestError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    if (error instanceof InventoryLedgerError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    if (databaseErrorCode(error) === "23503") {
+      res.status(400).json({
+        error:
+          "Una riga indica un Prodotto, Lotto o risorsa collegata inesistente",
+      });
+      return;
+    }
+    throw error;
   }
 
   const result = await getTrasferimentoWithRighe(id);
+  if (!result) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
   res.json(result);
 });
 
@@ -1056,12 +1309,15 @@ router.patch("/trasferimenti/:id", async (req, res) => {
 // trasferimento "in_transito". Da qui in poi le righe non sono più modificabili.
 router.post("/trasferimenti/:id/avvia", async (req, res) => {
   const id = Number(req.params.id);
-  const versione = requestedVersion(req.body);
-  if (versione == null) {
-    res
-      .status(400)
-      .json({ error: "La versione corrente del Trasferimento è obbligatoria" });
-    return;
+  const body = req.body ?? {};
+  let versione: number;
+  let idempotencyKey: string;
+  try {
+    versione = requireExpectedVersion(body.versione);
+    idempotencyKey = requireIdempotencyKey(body.idempotencyKey);
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    throw error;
   }
   const [current] = await db
     .select()
@@ -1080,145 +1336,110 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
     !requireGenericTransferPermission(req, res, "magazzino.transfers.dispatch")
   )
     return;
-  const visIds = await visibleMagazzinoIds(
+  const preflightVisibleIds = await visibleMagazzinoIds(
     callerCentroId(req),
     callerAreaOperativaId(req),
   );
-  if (visIds != null && !visIds.includes(current.magazzinoOrigineId)) {
+  if (
+    preflightVisibleIds != null &&
+    !preflightVisibleIds.includes(current.magazzinoOrigineId)
+  ) {
     res
       .status(403)
       .json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  const origine = await operationalMagazzino(
-    Number(current.magazzinoOrigineId),
-  );
-  if ("error" in origine) {
-    res.status(origine.status ?? 400).json({ error: origine.error });
-    return;
-  }
-  if (current.stato !== "richiesto" && current.stato !== "preparato") {
-    res.status(400).json({ error: "Il trasferimento è già stato avviato" });
-    return;
-  }
-
-  const righe = await db
-    .select()
-    .from(trasferimentoRigheTable)
-    .where(eq(trasferimentoRigheTable.trasferimentoId, id));
-  if (righe.length === 0) {
-    res
-      .status(400)
-      .json({ error: "Il trasferimento non ha prodotti da trasferire" });
-    return;
-  }
-
-  // Nomi prodotto per messaggi di errore leggibili.
-  const prodottoIds = [...new Set(righe.map((r) => r.prodottoId))];
-  const prodotti = await db
-    .select({ id: prodottiTable.id, nome: prodottiTable.nome })
-    .from(prodottiTable)
-    .where(inArray(prodottiTable.id, prodottoIds));
-  const prodottoMap = new Map(prodotti.map((p) => [p.id, p.nome]));
-
-  // Valida la disponibilità all'origine sommando per prodotto.
-  const richiestaPerProdotto = new Map<number, InventoryDecimal>();
-  for (const r of righe) {
-    richiestaPerProdotto.set(
-      r.prodottoId,
-      (richiestaPerProdotto.get(r.prodottoId) ?? InventoryDecimal.zero()).add(
-        InventoryDecimal.parse(r.quantita),
-      ),
-    );
-  }
-  for (const [prodottoId, richiesta] of richiestaPerProdotto) {
-    const disponibilita = await calcolaDisponibilitaMagazzino(
-      prodottoId,
-      current.magazzinoOrigineId,
-    );
-    const available = InventoryDecimal.parse(
-      disponibilita.disponibileRealePrecisa,
-      { allowNegative: true },
-    );
-    const disp = available.isNegative() ? InventoryDecimal.zero() : available;
-    if (richiesta.compare(disp) > 0) {
-      if (
-        richiesta.compare(
-          InventoryDecimal.parse(disponibilita.giacenzaFisicaPrecisa),
-        ) <= 0 &&
-        InventoryDecimal.parse(
-          disponibilita.giacenzaScadutaPrecisa,
-        ).isPositive()
-      ) {
-        res.status(409).json({
-          error:
-            "Disponibilità FEFO insufficiente o composta solo da lotti scaduti",
-        });
-        return;
-      }
-      res.status(400).json({
-        error: `Disponibilità insufficiente all'origine per ${prodottoMap.get(prodottoId) ?? `prodotto #${prodottoId}`}: ${disp.toCanonical()} disponibili, richiesti ${richiesta.toCanonical()}`,
-      });
-      return;
-    }
-  }
-
   const dataEsecuzione = dataCivileEuropeRome(new Date());
+  const requestHash = commandRequestHash({ id, versione });
 
   try {
-    const audit = auditContextFromRequest(req);
+    const audit = auditContextFromRequest(req, {
+      operationKey: idempotencyKey,
+    });
     await db.transaction(async (tx) => {
-      await requireOperationalMagazzino(tx, current.magazzinoOrigineId);
+      await lockDocumentCommand(tx, "trasferimento.dispatch", idempotencyKey);
+      const locked = await lockTransfer(tx, id);
+      await assertCurrentTransferScope(tx, req, locked, "origin");
+      const receipt = await findDocumentCommand(tx, {
+        tipoComando: "trasferimento.dispatch",
+        idempotencyKey,
+        requestHash,
+        actorUserId: req.user!.id,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+      });
+      if (receipt) return;
+      assertExpectedVersion(locked, versione);
+      if (locked.stato !== "richiesto" && locked.stato !== "preparato") {
+        throw new TransferRequestError(
+          400,
+          "Il trasferimento è già stato avviato",
+        );
+      }
+      await requireOperationalMagazzino(tx, locked.magazzinoOrigineId);
+      const righe = await tx
+        .select()
+        .from(trasferimentoRigheTable)
+        .where(eq(trasferimentoRigheTable.trasferimentoId, id))
+        .orderBy(
+          asc(trasferimentoRigheTable.prodottoId),
+          asc(trasferimentoRigheTable.lottoId),
+          asc(trasferimentoRigheTable.id),
+        );
+      if (righe.length === 0) {
+        throw new TransferRequestError(
+          400,
+          "Il trasferimento non ha prodotti da trasferire",
+        );
+      }
+      await lockInventoryLotsInGlobalOrder(tx, {
+        kind: "warehouse-products",
+        magazzinoId: locked.magazzinoOrigineId,
+        prodottoIds: righe.map((riga) => riga.prodottoId),
+      });
       const [claimed] = await tx
         .update(trasferimentiTable)
         .set({
           stato: "in_transito",
           dataEsecuzione,
           operatoreId: req.user!.id,
-          versione: sql`${trasferimentiTable.versione} + 1`,
+          versione: locked.versione + 1,
         })
-        .where(
-          and(
-            eq(trasferimentiTable.id, id),
-            eq(trasferimentiTable.versione, versione),
-            inArray(trasferimentiTable.stato, ["richiesto", "preparato"]),
-          ),
-        )
-        .returning({ id: trasferimentiTable.id });
-      if (!claimed) throw new Error("VERSIONE_TRASFERIMENTO_SUPERATA");
+        .where(eq(trasferimentiTable.id, id))
+        .returning();
       const auditEventoId = await recordAuditEvent(tx, {
         command: audit,
         azione: "TRASFERIMENTO_AVVIATO",
         entitaTipo: "trasferimento",
-        entitaId: current.id,
+        entitaId: locked.id,
         documentoTipo: "trasferimento",
-        documentoId: current.id,
-        magazzinoIdSnapshot: current.magazzinoOrigineId,
+        documentoId: locked.id,
+        magazzinoIdSnapshot: locked.magazzinoOrigineId,
         dataOperativa: dataEsecuzione,
         changes: auditFields(
-          { statoPrecedente: current.stato, statoNuovo: "in_transito" },
+          { statoPrecedente: locked.stato, statoNuovo: "in_transito" },
           ["statoPrecedente", "statoNuovo"],
         ),
         metadata: auditFields(
-          { magazzinoDestinoId: current.magazzinoDestinoId },
+          { magazzinoDestinoId: locked.magazzinoDestinoId },
           ["magazzinoDestinoId"],
         ),
       });
       for (const r of righe) {
         await trasferimentoUscitaFEFO(tx, {
           prodottoId: r.prodottoId,
-          magazzinoId: current.magazzinoOrigineId,
+          magazzinoId: locked.magazzinoOrigineId,
           quantita: r.quantita,
           unitaMisura: r.unitaMisura,
           dataMovimento: dataEsecuzione,
           trasferimentoId: id,
           rigaOrigineId: r.id,
-          trasferimentoCodice: current.codice,
+          trasferimentoCodice: locked.codice,
           operatoreId: req.user!.id,
           auditEventoId,
         });
       }
-      if (current.mensaId != null) {
+      if (locked.mensaId != null) {
         await tx.insert(auditConfigurazioniTable).values({
           area: "mensa",
           chiave: `mensa-trasferimento:${id}`,
@@ -1228,16 +1449,29 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
           ip: req.ip ?? null,
         });
       }
+      await storeDocumentCommand(tx, {
+        tipoComando: "trasferimento.dispatch",
+        idempotencyKey,
+        requestHash,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+        versioneRichiesta: versione,
+        versioneRisultante: claimed.versione,
+        resultSnapshot: {
+          id,
+          stato: claimed.stato,
+          versione: claimed.versione,
+        },
+        actorUserId: req.user!.id,
+      });
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (message.includes("VERSIONE_TRASFERIMENTO_SUPERATA")) {
-      res.status(409).json({
-        error:
-          "Il Trasferimento è stato modificato o avviato da un altro operatore",
-      });
+    if (sendDocumentCommandError(error, res)) return;
+    if (error instanceof TransferRequestError) {
+      res.status(error.status).json({ error: error.message });
       return;
     }
+    const message = error instanceof Error ? error.message : "";
     if (message.includes("Disponibilità FEFO insufficiente")) {
       res.status(409).json({ error: message });
       return;
@@ -1258,12 +1492,14 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
 router.post("/trasferimenti/:id/conferma", async (req, res) => {
   const id = Number(req.params.id);
   const body = req.body ?? {};
-  const versione = requestedVersion(body);
-  if (versione == null) {
-    res
-      .status(400)
-      .json({ error: "La versione corrente del Trasferimento è obbligatoria" });
-    return;
+  let versione: number;
+  let idempotencyKey: string;
+  try {
+    versione = requireExpectedVersion(body.versione);
+    idempotencyKey = requireIdempotencyKey(body.idempotencyKey);
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    throw error;
   }
   const [current] = await db
     .select()
@@ -1282,43 +1518,59 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
     !requireGenericTransferPermission(req, res, "magazzino.transfers.receive")
   )
     return;
-  const visIds = await visibleMagazzinoIds(
+  const preflightVisibleIds = await visibleMagazzinoIds(
     callerCentroId(req),
     callerAreaOperativaId(req),
   );
-  if (visIds != null && !visIds.includes(current.magazzinoDestinoId)) {
+  if (
+    preflightVisibleIds != null &&
+    !preflightVisibleIds.includes(current.magazzinoDestinoId)
+  ) {
     res
       .status(403)
       .json({ error: "Risorsa non accessibile per il tuo centro" });
     return;
   }
-  const destinazione = await operationalMagazzino(
-    Number(current.magazzinoDestinoId),
-  );
-  if ("error" in destinazione) {
-    res.status(destinazione.status ?? 400).json({ error: destinazione.error });
-    return;
-  }
-  if (current.stato !== "in_transito") {
-    res.status(400).json({
-      error: "Solo un trasferimento in transito può essere confermato",
-    });
-    return;
-  }
-
   const dataConferma = body.dataConferma ?? dataCivileEuropeRome(new Date());
+  const requestHash = commandRequestHash({
+    id,
+    versione,
+    dataConferma: body.dataConferma ?? null,
+    note: body.note ?? null,
+  });
 
   try {
-    const audit = auditContextFromRequest(req);
+    const audit = auditContextFromRequest(req, {
+      operationKey: idempotencyKey,
+    });
     await db.transaction(async (tx) => {
+      await lockDocumentCommand(tx, "trasferimento.receive", idempotencyKey);
+      const locked = await lockTransfer(tx, id);
+      await assertCurrentTransferScope(tx, req, locked, "destination");
+      const receipt = await findDocumentCommand(tx, {
+        tipoComando: "trasferimento.receive",
+        idempotencyKey,
+        requestHash,
+        actorUserId: req.user!.id,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+      });
+      if (receipt) return;
+      assertExpectedVersion(locked, versione);
+      if (locked.stato !== "in_transito") {
+        throw new TransferRequestError(
+          400,
+          "Solo un trasferimento in transito può essere confermato",
+        );
+      }
       const destinationWarehouse = await requireOperationalMagazzino(
         tx,
-        current.magazzinoDestinoId,
+        locked.magazzinoDestinoId,
       );
       const [sourceWarehouse] = await tx
         .select()
         .from(magazziniTable)
-        .where(eq(magazziniTable.id, current.magazzinoOrigineId));
+        .where(eq(magazziniTable.id, locked.magazzinoOrigineId));
       if (
         destinationWarehouse.areaOperativaId == null ||
         !sourceWarehouse ||
@@ -1336,32 +1588,25 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
           dataConfermaRicezione: dataConferma,
           note: body.note,
           operatoreId: req.user!.id,
-          versione: sql`${trasferimentiTable.versione} + 1`,
+          versione: locked.versione + 1,
         })
-        .where(
-          and(
-            eq(trasferimentiTable.id, id),
-            eq(trasferimentiTable.versione, versione),
-            eq(trasferimentiTable.stato, "in_transito"),
-          ),
-        )
-        .returning({ id: trasferimentiTable.id });
-      if (!claimed) throw new Error("VERSIONE_TRASFERIMENTO_SUPERATA");
+        .where(eq(trasferimentiTable.id, id))
+        .returning();
       const auditEventoId = await recordAuditEvent(tx, {
         command: audit,
         azione: "TRASFERIMENTO_RICEVUTO",
         entitaTipo: "trasferimento",
-        entitaId: current.id,
+        entitaId: locked.id,
         documentoTipo: "trasferimento",
-        documentoId: current.id,
-        magazzinoIdSnapshot: current.magazzinoDestinoId,
+        documentoId: locked.id,
+        magazzinoIdSnapshot: locked.magazzinoDestinoId,
         dataOperativa: dataConferma,
         changes: auditFields(
-          { statoPrecedente: current.stato, statoNuovo: "completato" },
+          { statoPrecedente: locked.stato, statoNuovo: "completato" },
           ["statoPrecedente", "statoNuovo"],
         ),
         metadata: auditFields(
-          { magazzinoOrigineId: current.magazzinoOrigineId },
+          { magazzinoOrigineId: locked.magazzinoOrigineId },
           ["magazzinoOrigineId"],
         ),
       });
@@ -1377,11 +1622,15 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
             eq(movimentiTable.tipoMovimento, "trasferimento"),
             eq(movimentiTable.tipoDettaglio, "uscita"),
           ),
+        )
+        .orderBy(
+          asc(movimentiTable.prodottoId),
+          asc(movimentiTable.lottoId),
+          asc(movimentiTable.id),
         );
 
+      const incoming = [];
       for (const u of uscite) {
-        const qty = u.m.quantita;
-        let destLotto: typeof lottiTable.$inferSelect | undefined;
         const normalized = u.lotto?.codiceLottoNormalizzato ?? null;
         let lottoLogicoId = u.lotto?.lottoLogicoId ?? null;
         if (
@@ -1392,7 +1641,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
           try {
             lottoLogicoId = (
               await resolveOpenLogicalLotForWarehouse(tx, {
-                magazzinoId: current.magazzinoDestinoId,
+                magazzinoId: locked.magazzinoDestinoId,
               })
             ).lotto.id;
           } catch (error) {
@@ -1402,19 +1651,46 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
             throw error;
           }
         }
+        const fattoreKgLtPezzo =
+          u.m.fattoreKgLtPezzo ?? u.lotto?.fattoreKgLtPezzo ?? null;
+        incoming.push({
+          u,
+          normalized,
+          lottoLogicoId,
+          fattoreKgLtPezzo,
+          businessKey:
+            normalized == null
+              ? null
+              : inventoryPartyBusinessKey({
+                  magazzinoId: locked.magazzinoDestinoId,
+                  prodottoId: u.m.prodottoId,
+                  lottoLogicoId,
+                  fondoOrigine: u.m.fondoOrigine as FondoOrigine,
+                  fornitoreId: u.lotto?.fornitoreId ?? null,
+                  lottoNormalizzato: normalized,
+                  dataScadenza: u.lotto?.dataScadenza ?? null,
+                  fattoreKgLtPezzo,
+                }),
+        });
+      }
+      await lockInventoryPartyBusinessKeys(
+        tx,
+        incoming.flatMap((item) =>
+          item.businessKey == null ? [] : [item.businessKey],
+        ),
+      );
+
+      for (const item of incoming) {
+        const { u, normalized, lottoLogicoId, fattoreKgLtPezzo } = item;
+        const qty = u.m.quantita;
+        let destLotto: typeof lottiTable.$inferSelect | undefined;
         if (normalized != null) {
-          const fattoreKgLtPezzo =
-            u.m.fattoreKgLtPezzo ?? u.lotto?.fattoreKgLtPezzo ?? null;
-          const lockKey = `${current.magazzinoDestinoId}:${u.m.prodottoId}:${lottoLogicoId}:${u.m.fondoOrigine}:${u.lotto?.fornitoreId ?? "-"}:${normalized}:${u.lotto?.dataScadenza ?? "-"}:${fattoreKgLtPezzo ?? "-"}`;
-          await tx.execute(
-            sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
-          );
           [destLotto] = await tx
             .select()
             .from(lottiTable)
             .where(
               and(
-                eq(lottiTable.magazzinoId, current.magazzinoDestinoId),
+                eq(lottiTable.magazzinoId, locked.magazzinoDestinoId),
                 eq(lottiTable.prodottoId, u.m.prodottoId),
                 eq(lottiTable.lottoLogicoId, lottoLogicoId),
                 eq(lottiTable.fondoOrigine, u.m.fondoOrigine),
@@ -1476,13 +1752,13 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
               dataUltimoCarico: dataConferma,
               quantitaCaricata: qty,
               quantitaResidua: qty,
-              magazzinoId: current.magazzinoDestinoId,
+              magazzinoId: locked.magazzinoDestinoId,
               fornitoreId: u.lotto?.fornitoreId ?? null,
               fsePlus: u.m.fondoOrigine === "FSE_PLUS",
               fondoOrigine: u.m.fondoOrigine,
               fattoreKgLtPezzo:
                 u.m.fattoreKgLtPezzo ?? u.lotto?.fattoreKgLtPezzo ?? null,
-              note: `Da trasferimento ${current.codice}`,
+              note: `Da trasferimento ${locked.codice}`,
             })
             .returning();
         }
@@ -1491,7 +1767,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
           tipoMovimento: "trasferimento",
           tipoDettaglio: "entrata",
           dataMovimento: dataConferma,
-          magazzinoId: current.magazzinoDestinoId,
+          magazzinoId: locked.magazzinoDestinoId,
           prodottoId: u.m.prodottoId,
           lottoId: destLotto.id,
           quantita: qty,
@@ -1510,12 +1786,12 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
           entitaOrigineTipo: "trasferimento",
           entitaOrigineId: id,
           rigaOrigineId: u.m.rigaOrigineId,
-          documentoRiferimento: current.codice,
-          note: `Trasferimento ${current.codice} — entrata`,
+          documentoRiferimento: locked.codice,
+          note: `Trasferimento ${locked.codice} — entrata`,
         });
       }
 
-      if (current.mensaId != null) {
+      if (locked.mensaId != null) {
         await tx.insert(auditConfigurazioniTable).values({
           area: "mensa",
           chiave: `mensa-trasferimento:${id}`,
@@ -1525,16 +1801,26 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
           ip: req.ip ?? null,
         });
       }
+      await storeDocumentCommand(tx, {
+        tipoComando: "trasferimento.receive",
+        idempotencyKey,
+        requestHash,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+        versioneRichiesta: versione,
+        versioneRisultante: claimed.versione,
+        resultSnapshot: {
+          id,
+          stato: claimed.stato,
+          versione: claimed.versione,
+        },
+        actorUserId: req.user!.id,
+      });
     });
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.includes("VERSIONE_TRASFERIMENTO_SUPERATA")
-    ) {
-      res.status(409).json({
-        error:
-          "Il Trasferimento è stato modificato o confermato da un altro operatore",
-      });
+    if (sendDocumentCommandError(error, res)) return;
+    if (error instanceof TransferRequestError) {
+      res.status(error.status).json({ error: error.message });
       return;
     }
     if (error instanceof InventoryLedgerError) {

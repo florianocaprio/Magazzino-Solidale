@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { RipartizioneLottoDocumento } from './ripartizioneLottoDocumento';
 
 export interface BollaRiga {
   id: number;
@@ -16,6 +17,9 @@ export interface BollaRiga {
   lottoId?: number | null;
   /** @nullable */
   codiceLotto?: string | null;
+  /** @nullable */
+  fondoOrigine?: string | null;
+  ripartizioniLotto: RipartizioneLottoDocumento[];
   fsePlus: boolean;
   fsePlusQuantita?: number;
   nonFsePlusQuantita?: number;
@@ -30,4 +34,6 @@ export interface BollaRiga {
   unitaMisura: string | null;
   /** @nullable */
   note?: string | null;
+  /** @minimum 1 */
+  versioneBolla?: number;
 }

@@ -5,15 +5,32 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { BollaDettaglioDestinatarioSnapshotFonte } from './bollaDettaglioDestinatarioSnapshotFonte';
+import type { BollaDettaglioTipoDestinatario } from './bollaDettaglioTipoDestinatario';
 import type { BollaRiga } from './bollaRiga';
 
 export interface BollaDettaglio {
   id: number;
   numeroBolla: string;
   dataBolla: string;
-  beneficiarioId: number;
+  tipoDestinatario: BollaDettaglioTipoDestinatario;
+  /** @nullable */
+  beneficiarioId?: number | null;
   /** @nullable */
   beneficiarioNome?: string | null;
+  /** @nullable */
+  enteDestinatarioId?: number | null;
+  /** @nullable */
+  enteDestinatarioNome?: string | null;
+  /** @nullable */
+  enteDestinatarioIndirizzo?: string | null;
+  /** @nullable */
+  enteDestinatarioTelefono?: string | null;
+  /** @nullable */
+  enteDestinatarioEmail?: string | null;
+  destinatarioSnapshotCongelato: boolean;
+  /** @nullable */
+  destinatarioSnapshotFonte?: BollaDettaglioDestinatarioSnapshotFonte;
   /** @nullable */
   consegnaId?: number | null;
   daPianificazione?: boolean;
@@ -55,6 +72,10 @@ export interface BollaDettaglio {
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
+  /** @nullable */
+  motivoAnnullamento?: string | null;
+  /** @minimum 1 */
+  versione: number;
   dataCreazione: string;
   righe: BollaRiga[];
 }

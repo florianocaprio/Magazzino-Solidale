@@ -2415,7 +2415,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/VersioneInput"
+              $ref: "#/components/schemas/ComandoVersionatoInput"
       responses:
         "200":
           description: Transfer started
@@ -4469,6 +4469,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComandoVersionatoInput"
       responses:
         "200":
           description: Delivery completed
@@ -4476,6 +4482,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Consegna"
+        "400": { description: Comando non valido o Bolla non pronta }
+        "403": { description: Consegna o Magazzino non accessibile }
+        "409":
+          {
+            description: Chiave già usata con payload diverso o versione non aggiornata,
+          }
 
   /consegne/{id}/invia-email-beneficiario:
     post:
@@ -5241,6 +5253,209 @@ paths:
         "409":
           description: Quantità già stornata, over-storno o double-submit concorrente
 
+  # ─── DOCUMENTI OPERATIVI M4A ──────────────────────────────────────────────────
+  /enti-destinatari:
+    get:
+      operationId: listEntiDestinatari
+      tags: [bolle]
+      parameters:
+        - { name: attivo, in: query, schema: { type: boolean, default: true } }
+      responses:
+        "200":
+          description: Enti esterni accessibili
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EnteDestinatario" }
+    post:
+      operationId: createEnteDestinatario
+      tags: [bolle]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EnteDestinatarioInput" }
+      responses:
+        "201":
+          description: Ente creato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnteDestinatario" }
+
+  /enti-destinatari/{id}:
+    patch:
+      operationId: updateEnteDestinatario
+      tags: [bolle]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EnteDestinatarioUpdate" }
+      responses:
+        "200":
+          description: Ente aggiornato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnteDestinatario" }
+
+  /documenti-operativi:
+    get:
+      operationId: listDocumentiOperativi
+      tags: [bolle]
+      parameters:
+        - {
+            name: tipoAggregato,
+            in: query,
+            schema: { type: string, enum: [bolla, trasferimento] },
+          }
+        - {
+            name: destinatario,
+            in: query,
+            schema: { type: string, enum: [beneficiario, ente, magazzino] },
+          }
+        - { name: stato, in: query, schema: { type: string } }
+        - {
+            name: areaOperativaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: magazzinoId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: centroAscoltoId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - { name: dataDa, in: query, schema: { type: string, format: date } }
+        - { name: dataA, in: query, schema: { type: string, format: date } }
+        - {
+            name: ricerca,
+            in: query,
+            schema: { type: string, minLength: 1, maxLength: 120 },
+          }
+        - {
+            name: sortBy,
+            in: query,
+            schema:
+              {
+                type: string,
+                enum: [dataDocumento, dataCreazione, numero],
+                default: dataDocumento,
+              },
+          }
+        - {
+            name: sortDirection,
+            in: query,
+            schema: { type: string, enum: [asc, desc], default: desc },
+          }
+        - {
+            name: page,
+            in: query,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 50 },
+          }
+      responses:
+        "200":
+          description: Lista comune realmente paginata di Bolle e Trasferimenti
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DocumentoOperativoPage" }
+
+  /documenti-operativi/export.xlsx:
+    get:
+      operationId: exportDocumentiOperativi
+      tags: [bolle]
+      parameters:
+        - {
+            name: tipoAggregato,
+            in: query,
+            schema: { type: string, enum: [bolla, trasferimento] },
+          }
+        - {
+            name: destinatario,
+            in: query,
+            schema: { type: string, enum: [beneficiario, ente, magazzino] },
+          }
+        - { name: stato, in: query, schema: { type: string } }
+        - {
+            name: areaOperativaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: magazzinoId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: centroAscoltoId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - { name: dataDa, in: query, schema: { type: string, format: date } }
+        - { name: dataA, in: query, schema: { type: string, format: date } }
+        - {
+            name: ricerca,
+            in: query,
+            schema: { type: string, minLength: 1, maxLength: 120 },
+          }
+        - {
+            name: sortBy,
+            in: query,
+            schema:
+              {
+                type: string,
+                enum: [dataDocumento, dataCreazione, numero],
+                default: dataDocumento,
+              },
+          }
+        - {
+            name: sortDirection,
+            in: query,
+            schema: { type: string, enum: [asc, desc], default: desc },
+          }
+      responses:
+        "200":
+          description: Export completo dell'insieme filtrato e autorizzato
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+
+  /documenti-operativi/{tipo}/{id}:
+    get:
+      operationId: getDocumentoOperativo
+      tags: [bolle]
+      parameters:
+        - {
+            name: tipo,
+            in: path,
+            required: true,
+            schema: { type: string, enum: [bolla, trasferimento] },
+          }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: integer, minimum: 1 },
+          }
+      responses:
+        "200":
+          description: Dettaglio dall'aggregato autorevole
+          content:
+            application/json:
+              schema:
+                { $ref: "#/components/schemas/DocumentoOperativoDettaglio" }
+
   # ─── BOLLE ───────────────────────────────────────────────────────────────────
   /bolle:
     get:
@@ -5391,6 +5606,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComandoVersionatoInput"
       responses:
         "204":
           description: Deleted
@@ -5406,6 +5627,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComandoVersionatoInput"
       responses:
         "200":
           description: Confirmed
@@ -5418,13 +5645,18 @@ paths:
     post:
       operationId: annullaBolla
       tags: [bolle]
-      summary: Cancel bolla - revert stock if confermato, mark annullato
+      summary: Cancel a pre-delivery bolla and release active reservations
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BollaAnnullamentoInput" }
       responses:
         "200":
           description: Cancelled
@@ -5432,6 +5664,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BollaDettaglio"
+
+  /bolle/{id}/storno-amministrativo:
+    post:
+      operationId: stornaAmministrativamenteBolla
+      tags: [bolle]
+      summary: Rettifica amministrativa append-only di righe già contabilizzate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BollaStornoAmministrativoInput"
+      responses:
+        "200":
+          description: Movimenti compensativi registrati; la consegna storica resta tale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BollaDettaglio"
+        "409":
+          description: Versione obsoleta, movimento già stornato o stato incompatibile
 
   /bolle/{id}/consegna:
     post:
@@ -5445,7 +5703,7 @@ paths:
           schema:
             type: integer
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
@@ -12673,6 +12931,10 @@ components:
     TrasferimentoInput:
       type: object
       properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 120
         magazzinoOrigineId:
           type: integer
         magazzinoDestinoId:
@@ -12689,11 +12951,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TrasferimentoRigaInput"
-      required: [magazzinoOrigineId, magazzinoDestinoId, dataRichiesta, righe]
+      required:
+        [
+          idempotencyKey,
+          magazzinoOrigineId,
+          magazzinoDestinoId,
+          dataRichiesta,
+          righe,
+        ]
 
     TrasferimentoUpdate:
       type: object
       properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 120
         versione:
           type: integer
           minimum: 1
@@ -12707,7 +12980,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TrasferimentoRigaInput"
-      required: [versione]
+      required: [idempotencyKey, versione]
 
     TrasferimentoRiga:
       type: object
@@ -12720,6 +12993,14 @@ components:
           type: ["string", "null"]
         lottoId:
           type: ["integer", "null"]
+        codiceLotto:
+          type: ["string", "null"]
+        fondoOrigine:
+          type: ["string", "null"]
+        ripartizioniLotto:
+          type: array
+          items:
+            $ref: "#/components/schemas/RipartizioneLottoDocumento"
         fsePlus:
           type: boolean
         fsePlusQuantita:
@@ -12732,7 +13013,8 @@ components:
           type: string
         note:
           type: ["string", "null"]
-      required: [id, prodottoId, quantita, unitaMisura, fsePlus]
+      required:
+        [id, prodottoId, quantita, unitaMisura, fsePlus, ripartizioniLotto]
 
     TrasferimentoRigaInput:
       type: object
@@ -12857,6 +13139,10 @@ components:
     ConfermaRicezione:
       type: object
       properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 120
         versione:
           type: integer
           minimum: 1
@@ -12864,7 +13150,20 @@ components:
           type: string
         dataConferma:
           type: string
-      required: [versione]
+      required: [idempotencyKey, versione]
+
+    ComandoVersionatoInput:
+      type: object
+      additionalProperties: false
+      properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 120
+        versione:
+          type: integer
+          minimum: 1
+      required: [idempotencyKey, versione]
 
     VersioneInput:
       type: object
@@ -16420,6 +16719,9 @@ components:
           type: ["string", "null"]
         bollaStato:
           type: ["string", "null"]
+        bollaVersione:
+          type: ["integer", "null"]
+          minimum: 1
         noteOperative:
           type: ["string", "null"]
         dataEffettuata:
@@ -17285,9 +17587,18 @@ components:
 
     AssociaBollaInput:
       type: object
+      required: [bollaId, versione, idempotencyKey]
       properties:
         bollaId:
           type: ["integer", "null"]
+          minimum: 1
+        versione:
+          type: integer
+          minimum: 1
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 120
 
     ConsegnaInput:
       type: object
@@ -17346,6 +17657,110 @@ components:
         noteOperative:
           type: string
 
+    # ── Documenti operativi M4A ──────────────────────────────────────────
+    EnteDestinatario:
+      type: object
+      required:
+        [
+          id,
+          denominazione,
+          indirizzo,
+          areaOperativaId,
+          attivo,
+          versione,
+          dataCreazione,
+          dataAggiornamento,
+        ]
+      properties:
+        id: { type: integer }
+        denominazione: { type: string, maxLength: 200 }
+        indirizzo: { type: string, maxLength: 250 }
+        telefono: { type: ["string", "null"], maxLength: 50 }
+        email: { type: ["string", "null"], maxLength: 200 }
+        areaOperativaId: { type: integer }
+        attivo: { type: boolean }
+        versione: { type: integer, minimum: 1 }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+
+    EnteDestinatarioInput:
+      type: object
+      required: [idempotencyKey, denominazione, indirizzo, areaOperativaId]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        denominazione: { type: string, minLength: 1, maxLength: 200 }
+        indirizzo: { type: string, minLength: 1, maxLength: 250 }
+        telefono: { type: ["string", "null"], maxLength: 50 }
+        email: { type: ["string", "null"], maxLength: 200 }
+        areaOperativaId: { type: integer, minimum: 1 }
+
+    EnteDestinatarioUpdate:
+      type: object
+      required: [idempotencyKey, versione]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        versione: { type: integer, minimum: 1 }
+        denominazione: { type: string, minLength: 1, maxLength: 200 }
+        indirizzo: { type: string, minLength: 1, maxLength: 250 }
+        telefono: { type: ["string", "null"], maxLength: 50 }
+        email: { type: ["string", "null"], maxLength: 200 }
+        attivo: { type: boolean }
+
+    DocumentoOperativo:
+      type: object
+      required:
+        [
+          documentoId,
+          tipoAggregato,
+          id,
+          tipoDestinatario,
+          numero,
+          dataDocumento,
+          dataCreazione,
+          stato,
+          origineId,
+          versione,
+        ]
+      properties:
+        documentoId:
+          { type: string, pattern: "^(bolla|trasferimento):[1-9][0-9]*$" }
+        tipoAggregato: { type: string, enum: [bolla, trasferimento] }
+        id: { type: integer }
+        tipoDestinatario:
+          { type: string, enum: [beneficiario, ente, magazzino] }
+        numero: { type: string }
+        dataDocumento: { type: string, format: date }
+        dataCreazione: { type: string, format: date-time }
+        stato: { type: string }
+        origineId: { type: integer }
+        origineNome: { type: ["string", "null"] }
+        destinazioneMagazzinoId: { type: ["integer", "null"] }
+        destinazioneMagazzinoNome: { type: ["string", "null"] }
+        destinatarioNome: { type: ["string", "null"] }
+        versione: { type: integer, minimum: 1 }
+
+    DocumentoOperativoPage:
+      type: object
+      required: [items, page, limit, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/DocumentoOperativo" }
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1 }
+        total: { type: integer, minimum: 0 }
+
+    DocumentoOperativoDettaglio:
+      type: object
+      required: [documentoId, tipoAggregato, dettaglio]
+      properties:
+        documentoId: { type: string }
+        tipoAggregato: { type: string, enum: [bolla, trasferimento] }
+        dettaglio:
+          oneOf:
+            - { $ref: "#/components/schemas/BollaDettaglio" }
+            - { $ref: "#/components/schemas/Trasferimento" }
+
     # ── Bolle ─────────────────────────────────────────────────────────────
     Bolla:
       type: object
@@ -17356,10 +17771,22 @@ components:
           type: string
         dataBolla:
           type: string
+        tipoDestinatario:
+          type: string
+          enum: [beneficiario, ente]
         beneficiarioId:
-          type: integer
+          type: ["integer", "null"]
         beneficiarioNome:
           type: ["string", "null"]
+        enteDestinatarioId:
+          type: ["integer", "null"]
+        enteDestinatarioNome:
+          type: ["string", "null"]
+        destinatarioSnapshotCongelato:
+          type: boolean
+        destinatarioSnapshotFonte:
+          type: ["string", "null"]
+          enum: [confermato, legacy_live, null]
         consegnaId:
           type: ["integer", "null"]
         daPianificazione:
@@ -17401,6 +17828,11 @@ components:
           type: ["integer", "null"]
         operatoreCodice:
           type: ["string", "null"]
+        motivoAnnullamento:
+          type: ["string", "null"]
+        versione:
+          type: integer
+          minimum: 1
         dataCreazione:
           type: string
       required:
@@ -17408,10 +17840,12 @@ components:
           id,
           numeroBolla,
           dataBolla,
-          beneficiarioId,
+          tipoDestinatario,
+          destinatarioSnapshotCongelato,
           magazzinoId,
           stato,
           confermaRicezione,
+          versione,
           dataCreazione,
         ]
 
@@ -17424,10 +17858,28 @@ components:
           type: string
         dataBolla:
           type: string
+        tipoDestinatario:
+          type: string
+          enum: [beneficiario, ente]
         beneficiarioId:
-          type: integer
+          type: ["integer", "null"]
         beneficiarioNome:
           type: ["string", "null"]
+        enteDestinatarioId:
+          type: ["integer", "null"]
+        enteDestinatarioNome:
+          type: ["string", "null"]
+        enteDestinatarioIndirizzo:
+          type: ["string", "null"]
+        enteDestinatarioTelefono:
+          type: ["string", "null"]
+        enteDestinatarioEmail:
+          type: ["string", "null"]
+        destinatarioSnapshotCongelato:
+          type: boolean
+        destinatarioSnapshotFonte:
+          type: ["string", "null"]
+          enum: [confermato, legacy_live, null]
         consegnaId:
           type: ["integer", "null"]
         daPianificazione:
@@ -17475,6 +17927,11 @@ components:
           type: ["integer", "null"]
         operatoreCodice:
           type: ["string", "null"]
+        motivoAnnullamento:
+          type: ["string", "null"]
+        versione:
+          type: integer
+          minimum: 1
         dataCreazione:
           type: string
         righe:
@@ -17486,10 +17943,12 @@ components:
           id,
           numeroBolla,
           dataBolla,
-          beneficiarioId,
+          tipoDestinatario,
+          destinatarioSnapshotCongelato,
           magazzinoId,
           stato,
           confermaRicezione,
+          versione,
           dataCreazione,
           righe,
         ]
@@ -17509,6 +17968,12 @@ components:
           type: ["integer", "null"]
         codiceLotto:
           type: ["string", "null"]
+        fondoOrigine:
+          type: ["string", "null"]
+        ripartizioniLotto:
+          type: array
+          items:
+            $ref: "#/components/schemas/RipartizioneLottoDocumento"
         fsePlus:
           type: boolean
         fsePlusQuantita:
@@ -17530,11 +17995,44 @@ components:
           type: ["string", "null"]
         note:
           type: ["string", "null"]
-      required: [id, bollaId, prodottoId, quantita, unitaMisura, fsePlus]
+        versioneBolla:
+          type: integer
+          minimum: 1
+      required:
+        [
+          id,
+          bollaId,
+          prodottoId,
+          quantita,
+          unitaMisura,
+          fsePlus,
+          ripartizioniLotto,
+        ]
+
+    RipartizioneLottoDocumento:
+      type: object
+      additionalProperties: false
+      properties:
+        lottoId:
+          type: ["integer", "null"]
+        codiceLotto:
+          type: ["string", "null"]
+        fondoOrigine:
+          type: string
+        quantita:
+          type: number
+      required: [lottoId, codiceLotto, fondoOrigine, quantita]
 
     BollaRigaInput:
       type: object
       properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 120
+        versione:
+          type: integer
+          minimum: 1
         prodottoId:
           type: integer
         lottoId:
@@ -17545,15 +18043,45 @@ components:
           type: string
         note:
           type: string
-      required: [prodottoId, quantita, unitaMisura]
+      required: [idempotencyKey, versione, prodottoId, quantita, unitaMisura]
 
     ConsegnaRicezioneInput:
       type: object
       properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 120
+        versione:
+          type: integer
+          minimum: 1
         noteRicezione:
           type: string
         confermaRicezione:
           type: boolean
+      required: [idempotencyKey, versione]
+
+    BollaAnnullamentoInput:
+      type: object
+      required: [idempotencyKey, versione, motivo]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        versione: { type: integer, minimum: 1 }
+        motivo: { type: string, minLength: 1, maxLength: 500 }
+
+    BollaStornoAmministrativoInput:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, versione, motivo, rigaIds]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        versione: { type: integer, minimum: 1 }
+        motivo: { type: string, minLength: 1, maxLength: 500 }
+        rigaIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: integer, minimum: 1 }
 
     RitiroNonEffettuatoInput:
       type: object
@@ -17585,8 +18113,17 @@ components:
     BollaInput:
       type: object
       properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 120
+        tipoDestinatario:
+          type: string
+          enum: [beneficiario, ente]
         beneficiarioId:
-          type: integer
+          type: ["integer", "null"]
+        enteDestinatarioId:
+          type: ["integer", "null"]
         consegnaId:
           type: integer
         magazzinoId:
@@ -17603,11 +18140,18 @@ components:
           type: boolean
         noteConsegna:
           type: string
-      required: [beneficiarioId, magazzinoId]
+      required: [idempotencyKey, tipoDestinatario, magazzinoId]
 
     BollaUpdate:
       type: object
       properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 120
+        versione:
+          type: integer
+          minimum: 1
         beneficiarioId:
           type: integer
         magazzinoId:
@@ -17624,6 +18168,7 @@ components:
           type: string
         noteConsegna:
           type: ["string", "null"]
+      required: [idempotencyKey, versione]
 
     ConfigurazioneMatricoleVolontari:
       type: object

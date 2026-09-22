@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { RipartizioneLottoDocumento } from './ripartizioneLottoDocumento';
 
 export interface TrasferimentoRiga {
   id: number;
@@ -13,6 +14,11 @@ export interface TrasferimentoRiga {
   prodottoNome?: string | null;
   /** @nullable */
   lottoId?: number | null;
+  /** @nullable */
+  codiceLotto?: string | null;
+  /** @nullable */
+  fondoOrigine?: string | null;
+  ripartizioniLotto: RipartizioneLottoDocumento[];
   fsePlus: boolean;
   fsePlusQuantita?: number;
   nonFsePlusQuantita?: number;

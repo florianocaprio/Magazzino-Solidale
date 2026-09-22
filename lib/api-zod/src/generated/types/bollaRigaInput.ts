@@ -8,6 +8,13 @@
 import type { QuantitaContabile } from './quantitaContabile';
 
 export interface BollaRigaInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
   prodottoId: number;
   lottoId?: number;
   quantita: QuantitaContabile;

@@ -13,12 +13,14 @@ import {
   areeOperativeTable,
   auditEventiTable,
   db,
+  lottiTable,
   lottiLogiciTable,
   magazziniTable,
+  movimentiTable,
   pool,
   trasferimentiTable,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   makeApp,
   newScope,
@@ -34,6 +36,7 @@ import {
   type SeedScope,
 } from "./helpers";
 import logicalLotsRouter from "../src/routes/lotti-logici";
+import { inventoryPartyBusinessKey } from "../src/lib/inventoryLedger";
 
 let app: Express;
 let scope: SeedScope;
@@ -41,6 +44,41 @@ let bootScope: SeedScope;
 let operatoreId: number;
 let origineId: number;
 let destinoId: number;
+let commandSequence = 0;
+
+function commandBody<T extends Record<string, unknown>>(
+  body: T,
+  idempotencyKey = `trasferimenti-test-${Date.now()}-${++commandSequence}`,
+) {
+  return { ...body, idempotencyKey };
+}
+
+async function waitForBlockedBackend(
+  blockerPid: number,
+  expected = 1,
+): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const result = await pool.query<{ blocked: string }>(
+      `WITH RECURSIVE blocked(pid) AS (
+         SELECT pid
+           FROM pg_stat_activity
+          WHERE $1 = ANY(pg_blocking_pids(pid))
+         UNION
+         SELECT activity.pid
+           FROM pg_stat_activity activity
+           JOIN blocked parent
+             ON parent.pid = ANY(pg_blocking_pids(activity.pid))
+       )
+       SELECT count(*)::text AS blocked FROM blocked`,
+      [blockerPid],
+    );
+    if (Number(result.rows[0]?.blocked ?? 0) >= expected) return;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  throw new Error(
+    `Attese ${expected} richieste sul lock PostgreSQL di laboratorio`,
+  );
+}
 
 /** Creates a transfer with one riga via the API and records its id for cleanup. */
 async function creaTrasferimento(opts: {
@@ -51,20 +89,22 @@ async function creaTrasferimento(opts: {
 }) {
   const res = await request(app)
     .post("/trasferimenti")
-    .send({
-      magazzinoOrigineId: origineId,
-      magazzinoDestinoId: destinoId,
-      dataRichiesta: "2026-06-24",
-      trasportatoreNome: "Ritiro presso il magazzino",
-      righe: [
-        {
-          prodottoId: opts.prodottoId,
-          lottoId: opts.lottoId,
-          quantita: opts.quantita,
-          unitaMisura: opts.unitaMisura ?? "kg",
-        },
-      ],
-    });
+    .send(
+      commandBody({
+        magazzinoOrigineId: origineId,
+        magazzinoDestinoId: destinoId,
+        dataRichiesta: "2026-06-24",
+        trasportatoreNome: "Ritiro presso il magazzino",
+        righe: [
+          {
+            prodottoId: opts.prodottoId,
+            lottoId: opts.lottoId,
+            quantita: opts.quantita,
+            unitaMisura: opts.unitaMisura ?? "kg",
+          },
+        ],
+      }),
+    );
   expect(res.status).toBe(201);
   scope.trasferimentoIds.push(res.body.id);
   return res.body;
@@ -110,13 +150,15 @@ describe("POST /trasferimenti — unità di misura canonica", () => {
     const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
     const response = await request(app)
       .post("/trasferimenti")
-      .send({
-        magazzinoOrigineId: origineId,
-        magazzinoDestinoId: destinoId,
-        dataRichiesta: "2026-06-24",
-        trasportatoreNome: "Trasporto test",
-        righe: [{ prodottoId, quantita: "1.5", unitaMisura: "pz" }],
-      });
+      .send(
+        commandBody({
+          magazzinoOrigineId: origineId,
+          magazzinoDestinoId: destinoId,
+          dataRichiesta: "2026-06-24",
+          trasportatoreNome: "Trasporto test",
+          righe: [{ prodottoId, quantita: "1.5", unitaMisura: "pz" }],
+        }),
+      );
     expect(response.status).toBe(400);
     expect(response.body.error).toMatch(/numero intero/i);
   });
@@ -125,13 +167,15 @@ describe("POST /trasferimenti — unità di misura canonica", () => {
     const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
     const response = await request(app)
       .post("/trasferimenti")
-      .send({
-        magazzinoOrigineId: origineId,
-        magazzinoDestinoId: destinoId,
-        dataRichiesta: "2026-06-24",
-        trasportatoreNome: "Trasporto test",
-        righe: [{ prodottoId, quantita: 1, unitaMisura: "kg" }],
-      });
+      .send(
+        commandBody({
+          magazzinoOrigineId: origineId,
+          magazzinoDestinoId: destinoId,
+          dataRichiesta: "2026-06-24",
+          trasportatoreNome: "Trasporto test",
+          righe: [{ prodottoId, quantita: 1, unitaMisura: "kg" }],
+        }),
+      );
     expect(response.status).toBe(400);
     expect(response.body.error).toMatch(/deve essere pz/i);
   });
@@ -151,27 +195,29 @@ describe("POST /trasferimenti — unità di misura canonica", () => {
     await createLotto({ prodottoId, magazzinoId: origineId, quantita: 3 });
     const created = await request(app)
       .post("/trasferimenti")
-      .send({
-        magazzinoOrigineId: origineId,
-        magazzinoDestinoId: destinoId,
-        dataRichiesta: "2026-06-24",
-        trasportatoreNome: "Trasporto test",
-        righe: [{ prodottoId, quantita: 3 }],
-      });
+      .send(
+        commandBody({
+          magazzinoOrigineId: origineId,
+          magazzinoDestinoId: destinoId,
+          dataRichiesta: "2026-06-24",
+          trasportatoreNome: "Trasporto test",
+          righe: [{ prodottoId, quantita: 3 }],
+        }),
+      );
     expect(created.status).toBe(201);
     scope.trasferimentoIds.push(created.body.id);
     expect(
       (
         await request(dispatcherApp)
           .post(`/trasferimenti/${created.body.id}/avvia`)
-          .send({ versione: created.body.versione })
+          .send(commandBody({ versione: created.body.versione }))
       ).status,
     ).toBe(200);
     expect(
       (
         await request(receiverApp)
           .post(`/trasferimenti/${created.body.id}/conferma`)
-          .send({ versione: created.body.versione + 1 })
+          .send(commandBody({ versione: created.body.versione + 1 }))
       ).status,
     ).toBe(200);
     const movements = await getMovimentiForTrasferimento(created.body.id);
@@ -221,7 +267,439 @@ describe("POST /trasferimenti — unità di misura canonica", () => {
   });
 });
 
+describe("comandi Trasferimento — idempotenza e versione", () => {
+  it("rende la creazione ritentabile e rifiuta il riuso incompatibile della chiave", async () => {
+    const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
+    const key = `transfer-create-${Date.now()}`;
+    const payload = {
+      magazzinoOrigineId: origineId,
+      magazzinoDestinoId: destinoId,
+      dataRichiesta: "2026-06-24",
+      trasportatoreNome: "Trasporto idempotente",
+      righe: [{ prodottoId, quantita: 2, unitaMisura: "pz" }],
+    };
+
+    const created = await request(app)
+      .post("/trasferimenti")
+      .send(commandBody(payload, key));
+    expect(created.status).toBe(201);
+    scope.trasferimentoIds.push(created.body.id);
+
+    const replay = await request(app)
+      .post("/trasferimenti")
+      .send(
+        commandBody(
+          {
+            ...payload,
+            // Quantità equivalente e UDM omessa: il catalogo resta la fonte
+            // autorevole, quindi l'intenzione applicativa non cambia.
+            righe: [{ prodottoId, quantita: "2.0" }],
+          },
+          key,
+        ),
+      );
+    expect(replay.status).toBe(200);
+    expect(replay.body).toMatchObject({
+      id: created.body.id,
+      codice: created.body.codice,
+      versione: created.body.versione,
+    });
+
+    const conflict = await request(app)
+      .post("/trasferimenti")
+      .send(commandBody({ ...payload, note: "intenzione differente" }, key));
+    expect(conflict.status).toBe(409);
+
+    const rows = await db
+      .select({ id: trasferimentiTable.id })
+      .from(trasferimentiTable)
+      .where(eq(trasferimentiTable.id, created.body.id));
+    expect(rows).toHaveLength(1);
+
+    const revoked = makeApp(operatoreId, {
+      isAdmin: false,
+      aree: ["magazzino"],
+      permessi: [],
+    });
+    expect(
+      (
+        await request(revoked)
+          .post("/trasferimenti")
+          .send(commandBody(payload, key))
+      ).status,
+    ).toBe(403);
+  });
+
+  it("serializza due creazioni concorrenti con la stessa intenzione", async () => {
+    const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
+    const marker = `concurrent-${Date.now()}`;
+    const key = `transfer-create-concurrent-${Date.now()}`;
+    const payload = {
+      magazzinoOrigineId: origineId,
+      magazzinoDestinoId: destinoId,
+      dataRichiesta: "2026-06-24",
+      trasportatoreNome: "Trasporto concorrente",
+      note: marker,
+      righe: [{ prodottoId, quantita: 2, unitaMisura: "pz" }],
+    };
+
+    const responses = await Promise.all([
+      request(app).post("/trasferimenti").send(commandBody(payload, key)),
+      request(app).post("/trasferimenti").send(commandBody(payload, key)),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      200, 201,
+    ]);
+    expect(responses[0].body.id).toBe(responses[1].body.id);
+    scope.trasferimentoIds.push(responses[0].body.id);
+
+    const rows = await db
+      .select({ id: trasferimentiTable.id })
+      .from(trasferimentiTable)
+      .where(
+        and(
+          eq(trasferimentiTable.magazzinoOrigineId, origineId),
+          eq(trasferimentiTable.magazzinoDestinoId, destinoId),
+          eq(trasferimentiTable.note, marker),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("rivalida lo scope corrente prima di restituire un replay in attesa del lock", async () => {
+    const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
+    const transfer = await creaTrasferimento({
+      prodottoId,
+      quantita: 2,
+      unitaMisura: "pz",
+    });
+    const areaOrigineId = scope.areaOperativaIds[0];
+    const scopedApp = makeApp(operatoreId, {
+      isAdmin: false,
+      aree: ["magazzino"],
+      permessi: ["magazzino.transfers.create"],
+      areaOperativaId: areaOrigineId,
+    });
+    const key = `transfer-update-scope-${Date.now()}`;
+    const payload = {
+      versione: transfer.versione,
+      note: "replay con scope corrente",
+    };
+    const updated = await request(scopedApp)
+      .patch(`/trasferimenti/${transfer.id}`)
+      .send(commandBody(payload, key));
+    expect(updated.status, updated.text).toBe(200);
+
+    const [revokedArea] = await db
+      .insert(areeOperativeTable)
+      .values({ nome: `Area revoca replay ${Date.now()}` })
+      .returning({ id: areeOperativeTable.id });
+    scope.areaOperativaIds.push(revokedArea.id);
+    const [revokedGeneral] = await db
+      .insert(lottiLogiciTable)
+      .values({
+        areaOperativaId: revokedArea.id,
+        codice: "GENERALE",
+        descrizione: "Generale",
+        isGenerale: true,
+      })
+      .returning({ id: lottiLogiciTable.id });
+    scope.lottoLogicoIds.push(revokedGeneral.id);
+
+    const blocker = await pool.connect();
+    let replayPromise: Promise<request.Response> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      const blockerPid = await blocker.query<{ pid: number }>(
+        "SELECT pg_backend_pid() AS pid",
+      );
+      await blocker.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`document-command:trasferimento.update:${key}`],
+      );
+
+      replayPromise = request(scopedApp)
+        .patch(`/trasferimenti/${transfer.id}`)
+        .send(commandBody(payload, key))
+        .then((response) => response);
+      await waitForBlockedBackend(blockerPid.rows[0].pid);
+
+      await db
+        .update(magazziniTable)
+        .set({ areaOperativaId: revokedArea.id })
+        .where(inArray(magazziniTable.id, [origineId, destinoId]));
+      await blocker.query("COMMIT");
+
+      const replay = await replayPromise;
+      expect(replay.status, replay.text).toBe(403);
+      expect(replay.body.error).toMatch(/non accessibile/i);
+    } finally {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      blocker.release();
+      await replayPromise?.catch(() => undefined);
+    }
+  });
+
+  it("richiede una chiave client sui quattro comandi mutanti", async () => {
+    const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
+    await createLotto({ prodottoId, magazzinoId: origineId, quantita: 5 });
+    const createPayload = {
+      magazzinoOrigineId: origineId,
+      magazzinoDestinoId: destinoId,
+      dataRichiesta: "2026-06-24",
+      trasportatoreNome: "Trasporto con chiave",
+      righe: [{ prodottoId, quantita: 2, unitaMisura: "pz" }],
+    };
+    expect(
+      (await request(app).post("/trasferimenti").send(createPayload)).status,
+    ).toBe(400);
+
+    const transfer = await creaTrasferimento({
+      prodottoId,
+      quantita: 2,
+      unitaMisura: "pz",
+    });
+    expect(
+      (
+        await request(app)
+          .patch(`/trasferimenti/${transfer.id}`)
+          .send({ versione: transfer.versione, note: "senza chiave" })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post(`/trasferimenti/${transfer.id}/avvia`)
+          .send({ versione: transfer.versione })
+      ).status,
+    ).toBe(400);
+
+    const dispatched = await request(app)
+      .post(`/trasferimenti/${transfer.id}/avvia`)
+      .send(commandBody({ versione: transfer.versione }));
+    expect(dispatched.status).toBe(200);
+    expect(
+      (
+        await request(app)
+          .post(`/trasferimenti/${transfer.id}/conferma`)
+          .send({ versione: dispatched.body.versione })
+      ).status,
+    ).toBe(400);
+  });
+
+  it("protegge modifica, partenza e ricezione con receipt e versione autorevole", async () => {
+    const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
+    await createLotto({ prodottoId, magazzinoId: origineId, quantita: 5 });
+    const transfer = await creaTrasferimento({
+      prodottoId,
+      quantita: 2,
+      unitaMisura: "pz",
+    });
+
+    const updateKey = `transfer-update-${Date.now()}`;
+    const updatePayload = {
+      versione: transfer.versione,
+      note: "nota idempotente",
+    };
+    const updated = await request(app)
+      .patch(`/trasferimenti/${transfer.id}`)
+      .send(commandBody(updatePayload, updateKey));
+    expect(updated.status).toBe(200);
+    const updateReplay = await request(app)
+      .patch(`/trasferimenti/${transfer.id}`)
+      .send(commandBody(updatePayload, updateKey));
+    expect(updateReplay.status).toBe(200);
+    expect(updateReplay.body.versione).toBe(updated.body.versione);
+    expect(
+      (
+        await request(app)
+          .patch(`/trasferimenti/${transfer.id}`)
+          .send(
+            commandBody(
+              { ...updatePayload, note: "payload incompatibile" },
+              updateKey,
+            ),
+          )
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await request(app)
+          .patch(`/trasferimenti/${transfer.id}`)
+          .send(commandBody(updatePayload))
+      ).status,
+    ).toBe(409);
+
+    const dispatchKey = `transfer-dispatch-${Date.now()}`;
+    const dispatchPayload = { versione: updated.body.versione };
+    const dispatched = await request(app)
+      .post(`/trasferimenti/${transfer.id}/avvia`)
+      .send(commandBody(dispatchPayload, dispatchKey));
+    expect(dispatched.status).toBe(200);
+    const dispatchReplay = await request(app)
+      .post(`/trasferimenti/${transfer.id}/avvia`)
+      .send(commandBody(dispatchPayload, dispatchKey));
+    expect(dispatchReplay.status).toBe(200);
+    expect(dispatchReplay.body.versione).toBe(dispatched.body.versione);
+    expect(
+      (await getMovimentiForTrasferimento(transfer.id)).filter(
+        (row) => row.tipoDettaglio === "uscita",
+      ),
+    ).toHaveLength(1);
+
+    const receiveKey = `transfer-receive-${Date.now()}`;
+    const receivePayload = { versione: dispatched.body.versione };
+    const received = await request(app)
+      .post(`/trasferimenti/${transfer.id}/conferma`)
+      .send(commandBody(receivePayload, receiveKey));
+    expect(received.status).toBe(200);
+    const receiveReplay = await request(app)
+      .post(`/trasferimenti/${transfer.id}/conferma`)
+      .send(commandBody(receivePayload, receiveKey));
+    expect(receiveReplay.status).toBe(200);
+    expect(receiveReplay.body.versione).toBe(received.body.versione);
+    expect(
+      (await getMovimentiForTrasferimento(transfer.id)).filter(
+        (row) => row.tipoDettaglio === "entrata",
+      ),
+    ).toHaveLength(1);
+  });
+});
+
 describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
+  it("pre-locka prodotti e lotti in ordine globale con righe Trasferimento inverse", async () => {
+    const prodottoA = await createProdotto(scope);
+    const prodottoB = await createProdotto(scope);
+    const lottoA = await createLotto({
+      prodottoId: prodottoA,
+      magazzinoId: origineId,
+      quantita: 10,
+    });
+    await createLotto({
+      prodottoId: prodottoB,
+      magazzinoId: origineId,
+      quantita: 10,
+    });
+    const transferPayload = (righe: Array<Record<string, unknown>>) => ({
+      magazzinoOrigineId: origineId,
+      magazzinoDestinoId: destinoId,
+      dataRichiesta: "2026-06-24",
+      trasportatoreNome: "Trasporto lock ordering",
+      righe,
+    });
+    const rigaA = {
+      prodottoId: prodottoA,
+      quantita: 1,
+      unitaMisura: "kg",
+    };
+    const rigaB = {
+      prodottoId: prodottoB,
+      quantita: 1,
+      unitaMisura: "kg",
+    };
+    const [createdAB, createdBA] = await Promise.all([
+      request(app)
+        .post("/trasferimenti")
+        .send(commandBody(transferPayload([rigaA, rigaB]))),
+      request(app)
+        .post("/trasferimenti")
+        .send(commandBody(transferPayload([rigaB, rigaA]))),
+    ]);
+    expect(createdAB.status, createdAB.text).toBe(201);
+    expect(createdBA.status, createdBA.text).toBe(201);
+    scope.trasferimentoIds.push(createdAB.body.id, createdBA.body.id);
+
+    const blocker = await pool.connect();
+    let committed = false;
+    let pendingAB: Promise<request.Response> | undefined;
+    let pendingBA: Promise<request.Response> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      const blockerPid = await blocker.query<{ pid: number }>(
+        "SELECT pg_backend_pid() AS pid",
+      );
+      await blocker.query("SELECT id FROM lotti WHERE id = $1 FOR UPDATE", [
+        lottoA,
+      ]);
+
+      pendingAB = request(app)
+        .post(`/trasferimenti/${createdAB.body.id}/avvia`)
+        .send(commandBody({ versione: createdAB.body.versione }))
+        .then((response) => response);
+      await waitForBlockedBackend(blockerPid.rows[0].pid);
+      pendingBA = request(app)
+        .post(`/trasferimenti/${createdBA.body.id}/avvia`)
+        .send(commandBody({ versione: createdBA.body.versione }))
+        .then((response) => response);
+      await waitForBlockedBackend(blockerPid.rows[0].pid, 2);
+
+      await blocker.query("COMMIT");
+      committed = true;
+      const responses = await Promise.all([pendingAB, pendingBA]);
+      expect(
+        responses.map((response) => response.status),
+        responses.map((response) => response.text).join("\n"),
+      ).toEqual([200, 200]);
+    } finally {
+      if (!committed) await blocker.query("ROLLBACK").catch(() => undefined);
+      blocker.release();
+      await Promise.allSettled(
+        [pendingAB, pendingBA].filter(
+          (pending): pending is Promise<request.Response> => pending != null,
+        ),
+      );
+    }
+  });
+
+  it("traduce il deadlock PostgreSQL in 409 e consente il retry senza receipt fantasma", async () => {
+    const prodottoId = await createProdotto(scope);
+    const lottoId = await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 10,
+    });
+    const transfer = await creaTrasferimento({
+      prodottoId,
+      quantita: 1,
+    });
+    const suffix = `${process.pid}_${Date.now()}_${++commandSequence}`;
+    const functionName = `test_transfer_deadlock_${suffix}`;
+    const triggerName = `test_transfer_deadlock_trg_${suffix}`;
+    const idempotencyKey = `transfer-deadlock-${suffix}`;
+    const body = commandBody({ versione: transfer.versione }, idempotencyKey);
+
+    await pool.query(`
+      CREATE FUNCTION "${functionName}"() RETURNS trigger
+      LANGUAGE plpgsql AS $$
+      BEGIN
+        RAISE EXCEPTION 'synthetic transfer deadlock' USING ERRCODE = '40P01';
+      END;
+      $$
+    `);
+    await pool.query(`
+      CREATE TRIGGER "${triggerName}"
+      BEFORE UPDATE OF quantita_residua ON lotti
+      FOR EACH ROW WHEN (OLD.id = ${lottoId})
+      EXECUTE FUNCTION "${functionName}"()
+    `);
+    try {
+      const failed = await request(app)
+        .post(`/trasferimenti/${transfer.id}/avvia`)
+        .send(body);
+      expect(failed.status, failed.text).toBe(409);
+      expect(failed.body.error).toMatch(/operazione concorrente/i);
+    } finally {
+      await pool.query(`DROP TRIGGER IF EXISTS "${triggerName}" ON lotti`);
+      await pool.query(`DROP FUNCTION IF EXISTS "${functionName}"()`);
+    }
+
+    const retried = await request(app)
+      .post(`/trasferimenti/${transfer.id}/avvia`)
+      .send(body);
+    expect(retried.status, retried.text).toBe(200);
+    expect(retried.body.stato).toBe("in_transito");
+  });
+
   it("scala le quantità dai lotti origine in ordine FEFO (scadenza crescente)", async () => {
     const prodottoId = await createProdotto(scope);
     // Lotto A scade prima → deve essere svuotato per primo.
@@ -242,7 +720,7 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
 
     const res = await request(app)
       .post(`/trasferimenti/${t.id}/avvia`)
-      .send({ versione: t.versione });
+      .send(commandBody({ versione: t.versione }));
     expect(res.status).toBe(200);
     expect(res.body.stato).toBe("in_transito");
 
@@ -263,9 +741,15 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
       expect(u.tipoMovimento).toBe("trasferimento");
       expect(u.magazzinoId).toBe(origineId);
     }
+    const dettaglio = await request(app).get(`/trasferimenti/${t.id}`);
+    expect(dettaglio.status, dettaglio.text).toBe(200);
+    expect(dettaglio.body.righe[0].ripartizioniLotto).toEqual([
+      expect.objectContaining({ lottoId: lottoA, quantita: 10 }),
+      expect.objectContaining({ lottoId: lottoB, quantita: 5 }),
+    ]);
   });
 
-  it("rifiuta (400) quando la giacenza all'origine è insufficiente", async () => {
+  it("rifiuta atomicamente quando la giacenza all'origine è insufficiente", async () => {
     const prodottoId = await createProdotto(scope);
     await createLotto({ prodottoId, magazzinoId: origineId, quantita: 5 });
 
@@ -273,8 +757,8 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
 
     const res = await request(app)
       .post(`/trasferimenti/${t.id}/avvia`)
-      .send({ versione: t.versione });
-    expect(res.status).toBe(400);
+      .send(commandBody({ versione: t.versione }));
+    expect(res.status).toBe(409);
     expect(res.body.error).toMatch(/insufficiente/i);
 
     // Stato invariato e nessun movimento registrato.
@@ -290,14 +774,14 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
 
     const first = await request(app)
       .post(`/trasferimenti/${t.id}/avvia`)
-      .send({ versione: t.versione });
+      .send(commandBody({ versione: t.versione }));
     expect(first.status).toBe(200);
 
-    // Secondo avvio: ora è "in_transito" → 400.
+    // Secondo avvio con una nuova intenzione e versione superata → 409.
     const second = await request(app)
       .post(`/trasferimenti/${t.id}/avvia`)
-      .send({ versione: t.versione });
-    expect(second.status).toBe(400);
+      .send(commandBody({ versione: t.versione }));
+    expect(second.status).toBe(409);
   });
 
   it("non distribuisce lotti scaduti e mantiene il rollback completo", async () => {
@@ -312,7 +796,7 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
 
     const response = await request(app)
       .post(`/trasferimenti/${t.id}/avvia`)
-      .send({ versione: t.versione });
+      .send(commandBody({ versione: t.versione }));
     expect(response.status).toBe(409);
     expect(response.body.error).toMatch(/scaduti|FEFO/i);
     expect(parseFloat((await getLotto(expired)).quantitaResidua)).toBe(10);
@@ -331,14 +815,17 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
     const responses = await Promise.all([
       request(app)
         .post(`/trasferimenti/${t.id}/avvia`)
-        .send({ versione: t.versione }),
+        .send(commandBody({ versione: t.versione })),
       request(app)
         .post(`/trasferimenti/${t.id}/avvia`)
-        .send({ versione: t.versione }),
+        .send(commandBody({ versione: t.versione })),
     ]);
     expect(
       responses.filter((response) => response.status === 200),
     ).toHaveLength(1);
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      200, 409,
+    ]);
     expect(parseFloat((await getLotto(lottoId)).quantitaResidua)).toBe(4);
     const outputs = (await getMovimentiForTrasferimento(t.id)).filter(
       (row) => row.tipoDettaglio === "uscita",
@@ -371,7 +858,7 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
       (
         await request(app)
           .post(`/trasferimenti/${trasferimento.id}/avvia`)
-          .send({ versione: trasferimento.versione })
+          .send(commandBody({ versione: trasferimento.versione }))
       ).status,
     ).toBe(200);
     const detail = await request(app).get(`/trasferimenti/${trasferimento.id}`);
@@ -385,6 +872,149 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
 });
 
 describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
+  it("acquisisce tutte le business key di ricezione prima di applicare ordini inversi", async () => {
+    const prodottoA = await createProdotto(scope);
+    const prodottoB = await createProdotto(scope);
+    const lottoA = await createLotto({
+      prodottoId: prodottoA,
+      magazzinoId: origineId,
+      quantita: 2,
+      codiceLotto: "RECEIVE-A",
+    });
+    const lottoB = await createLotto({
+      prodottoId: prodottoB,
+      magazzinoId: origineId,
+      quantita: 2,
+      codiceLotto: "RECEIVE-B",
+    });
+    await db
+      .update(lottiTable)
+      .set({ codiceLottoNormalizzato: "RECEIVE-A" })
+      .where(eq(lottiTable.id, lottoA));
+    await db
+      .update(lottiTable)
+      .set({ codiceLottoNormalizzato: "RECEIVE-B" })
+      .where(eq(lottiTable.id, lottoB));
+    const sourceLots = await db
+      .select()
+      .from(lottiTable)
+      .where(inArray(lottiTable.id, [lottoA, lottoB]));
+    const byId = new Map(sourceLots.map((lotto) => [lotto.id, lotto]));
+    const keyByLot = new Map(
+      sourceLots.map((lotto) => [
+        lotto.id,
+        inventoryPartyBusinessKey({
+          magazzinoId: destinoId,
+          prodottoId: lotto.prodottoId,
+          lottoLogicoId: lotto.lottoLogicoId!,
+          fondoOrigine: lotto.fondoOrigine,
+          fornitoreId: lotto.fornitoreId,
+          lottoNormalizzato: lotto.codiceLottoNormalizzato!,
+          dataScadenza: lotto.dataScadenza,
+          fattoreKgLtPezzo: lotto.fattoreKgLtPezzo,
+        }),
+      ]),
+    );
+    const orderedLots = [lottoA, lottoB].sort((left, right) =>
+      keyByLot.get(left)!.localeCompare(keyByLot.get(right)!),
+    );
+
+    const createInTransit = async (lotIds: number[]) => {
+      const [transfer] = await db
+        .insert(trasferimentiTable)
+        .values({
+          codice: `TRF-RECEIVE-${Date.now()}-${++commandSequence}`,
+          magazzinoOrigineId: origineId,
+          magazzinoDestinoId: destinoId,
+          dataRichiesta: "2026-06-24",
+          stato: "in_transito",
+          operatoreId,
+        })
+        .returning();
+      scope.trasferimentoIds.push(transfer.id);
+      for (const lottoId of lotIds) {
+        const lotto = byId.get(lottoId)!;
+        await db.insert(movimentiTable).values({
+          tipoMovimento: "trasferimento",
+          tipoDettaglio: "uscita",
+          dataMovimento: "2026-06-24",
+          magazzinoId: origineId,
+          prodottoId: lotto.prodottoId,
+          lottoId,
+          quantita: "1.00",
+          unitaMisura: "kg",
+          trasferimentoId: transfer.id,
+          fondoOrigine: lotto.fondoOrigine,
+          naturaContabile: "TRASFERIMENTO_INTERNO_USCITA",
+          dominioOrigine: "TRASFERIMENTO",
+          entitaOrigineTipo: "trasferimento",
+          entitaOrigineId: transfer.id,
+          operatoreId,
+        });
+      }
+      return transfer;
+    };
+    const transferAB = await createInTransit(orderedLots);
+    const transferBA = await createInTransit([...orderedLots].reverse());
+    const firstKey = keyByLot.get(orderedLots[0])!;
+    const blocker = await pool.connect();
+    let committed = false;
+    let pendingAB: Promise<request.Response> | undefined;
+    let pendingBA: Promise<request.Response> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      const blockerPid = await blocker.query<{ pid: number }>(
+        "SELECT pg_backend_pid() AS pid",
+      );
+      await blocker.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [firstKey],
+      );
+      pendingAB = request(app)
+        .post(`/trasferimenti/${transferAB.id}/conferma`)
+        .send(commandBody({ versione: transferAB.versione }))
+        .then((response) => response);
+      await waitForBlockedBackend(blockerPid.rows[0].pid);
+      pendingBA = request(app)
+        .post(`/trasferimenti/${transferBA.id}/conferma`)
+        .send(commandBody({ versione: transferBA.versione }))
+        .then((response) => response);
+      await waitForBlockedBackend(blockerPid.rows[0].pid, 2);
+      await blocker.query("COMMIT");
+      committed = true;
+      const responses = await Promise.all([pendingAB, pendingBA]);
+      expect(
+        responses.map((response) => response.status),
+        responses.map((response) => response.text).join("\n"),
+      ).toEqual([200, 200]);
+    } finally {
+      if (!committed) await blocker.query("ROLLBACK").catch(() => undefined);
+      blocker.release();
+      await Promise.allSettled(
+        [pendingAB, pendingBA].filter(
+          (pending): pending is Promise<request.Response> => pending != null,
+        ),
+      );
+    }
+
+    const destinationLots = await getLottiInMagazzino(destinoId);
+    expect(destinationLots).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ codiceLottoNormalizzato: "RECEIVE-A" }),
+        expect.objectContaining({ codiceLottoNormalizzato: "RECEIVE-B" }),
+      ]),
+    );
+    expect(
+      destinationLots
+        .filter((lotto) =>
+          ["RECEIVE-A", "RECEIVE-B"].includes(
+            lotto.codiceLottoNormalizzato ?? "",
+          ),
+        )
+        .map((lotto) => Number(lotto.quantitaResidua)),
+    ).toEqual([2, 2]);
+  });
+
   it("preserva il lotto logico nella stessa Area anche se viene chiuso durante il transito", async () => {
     const [logicalLot] = await db
       .insert(lottiLogiciTable)
@@ -410,7 +1040,7 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
       (
         await request(app)
           .post(`/trasferimenti/${transfer.id}/avvia`)
-          .send({ versione: transfer.versione })
+          .send(commandBody({ versione: transfer.versione }))
       ).status,
     ).toBe(200);
     expect(Number((await getLotto(sourceLotId)).quantitaResidua)).toBe(0);
@@ -426,7 +1056,7 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
 
     const received = await request(app)
       .post(`/trasferimenti/${transfer.id}/conferma`)
-      .send({ versione: transfer.versione + 1 });
+      .send(commandBody({ versione: transfer.versione + 1 }));
     expect(received.status).toBe(200);
     const [destinationLot] = await getLottiInMagazzino(destinoId);
     expect(destinationLot).toMatchObject({
@@ -474,7 +1104,7 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
     expect(transfer.righe[0].lottoId).toBeNull();
     const started = await request(app)
       .post(`/trasferimenti/${transfer.id}/avvia`)
-      .send({ versione: transfer.versione });
+      .send(commandBody({ versione: transfer.versione }));
     expect(started.status).toBe(200);
     expect(started.body.stato).toBe("in_transito");
 
@@ -517,7 +1147,7 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
     expect(transfer.righe[0].lottoId).toBeNull();
     const started = await request(app)
       .post(`/trasferimenti/${transfer.id}/avvia`)
-      .send({ versione: transfer.versione });
+      .send(commandBody({ versione: transfer.versione }));
     expect(started.status).toBe(200);
 
     const state = await getLogicalLotState(logicalLot.id);
@@ -579,7 +1209,7 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
       (
         await request(app)
           .post(`/trasferimenti/${transfer.id}/avvia`)
-          .send({ versione: transfer.versione })
+          .send(commandBody({ versione: transfer.versione }))
       ).status,
     ).toBe(200);
     expect(await getLogicalLotState(sourceLogicalLot.id)).toMatchObject({
@@ -591,7 +1221,7 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
       (
         await request(app)
           .post(`/trasferimenti/${transfer.id}/conferma`)
-          .send({ versione: transfer.versione + 1 })
+          .send(commandBody({ versione: transfer.versione + 1 }))
       ).status,
     ).toBe(200);
 
@@ -646,13 +1276,13 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/avvia`)
-          .send({ versione: t.versione })
+          .send(commandBody({ versione: t.versione }))
       ).status,
     ).toBe(200);
 
     const res = await request(app)
       .post(`/trasferimenti/${t.id}/conferma`)
-      .send({ versione: t.versione + 1 });
+      .send(commandBody({ versione: t.versione + 1 }));
     expect(res.status).toBe(200);
     expect(res.body.stato).toBe("completato");
 
@@ -682,14 +1312,14 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/avvia`)
-          .send({ versione: t.versione })
+          .send(commandBody({ versione: t.versione }))
       ).status,
     ).toBe(200);
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/conferma`)
-          .send({ versione: t.versione + 1 })
+          .send(commandBody({ versione: t.versione + 1 }))
       ).status,
     ).toBe(200);
 
@@ -707,14 +1337,14 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/avvia`)
-          .send({ versione: t.versione })
+          .send(commandBody({ versione: t.versione }))
       ).status,
     ).toBe(200);
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/conferma`)
-          .send({ versione: t.versione + 1 })
+          .send(commandBody({ versione: t.versione + 1 }))
       ).status,
     ).toBe(200);
 
@@ -738,7 +1368,7 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
     // Ancora in "richiesto" → conferma non consentita.
     const res = await request(app)
       .post(`/trasferimenti/${t.id}/conferma`)
-      .send({ versione: t.versione });
+      .send(commandBody({ versione: t.versione }));
     expect(res.status).toBe(400);
   });
 
@@ -750,21 +1380,24 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/avvia`)
-          .send({ versione: t.versione })
+          .send(commandBody({ versione: t.versione }))
       ).status,
     ).toBe(200);
 
     const responses = await Promise.all([
       request(app)
         .post(`/trasferimenti/${t.id}/conferma`)
-        .send({ versione: t.versione + 1 }),
+        .send(commandBody({ versione: t.versione + 1 })),
       request(app)
         .post(`/trasferimenti/${t.id}/conferma`)
-        .send({ versione: t.versione + 1 }),
+        .send(commandBody({ versione: t.versione + 1 })),
     ]);
     expect(
       responses.filter((response) => response.status === 200),
     ).toHaveLength(1);
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      200, 409,
+    ]);
     const destinationLots = await getLottiInMagazzino(destinoId);
     expect(destinationLots).toHaveLength(1);
     expect(parseFloat(destinationLots[0].quantitaResidua)).toBe(6);
@@ -782,14 +1415,16 @@ describe("PATCH /trasferimenti/:id — modifica righe", () => {
 
     const response = await request(app)
       .patch(`/trasferimenti/${transfer.id}`)
-      .send({
-        versione: transfer.versione,
-        note: "non deve restare",
-        righe: [
-          { prodottoId, quantita: 4, unitaMisura: "pz" },
-          { prodottoId, quantita: 1, unitaMisura: "kg" },
-        ],
-      });
+      .send(
+        commandBody({
+          versione: transfer.versione,
+          note: "non deve restare",
+          righe: [
+            { prodottoId, quantita: 4, unitaMisura: "pz" },
+            { prodottoId, quantita: 1, unitaMisura: "kg" },
+          ],
+        }),
+      );
     expect(response.status).toBe(400);
     expect(response.body.error).toMatch(/deve essere pz/i);
 
@@ -815,10 +1450,12 @@ describe("PATCH /trasferimenti/:id — modifica righe", () => {
 
     const withCanonicalUnit = await request(app)
       .patch(`/trasferimenti/${transfer.id}`)
-      .send({
-        versione: transfer.versione,
-        righe: [{ prodottoId, quantita: 3, unitaMisura: "pz" }],
-      });
+      .send(
+        commandBody({
+          versione: transfer.versione,
+          righe: [{ prodottoId, quantita: 3, unitaMisura: "pz" }],
+        }),
+      );
     expect(withCanonicalUnit.status).toBe(200);
     expect(withCanonicalUnit.body.righe).toMatchObject([
       { prodottoId, quantita: 3, unitaMisura: "pz" },
@@ -826,10 +1463,12 @@ describe("PATCH /trasferimenti/:id — modifica righe", () => {
 
     const withoutUnit = await request(app)
       .patch(`/trasferimenti/${transfer.id}`)
-      .send({
-        versione: withCanonicalUnit.body.versione,
-        righe: [{ prodottoId, quantita: 4 }],
-      });
+      .send(
+        commandBody({
+          versione: withCanonicalUnit.body.versione,
+          righe: [{ prodottoId, quantita: 4 }],
+        }),
+      );
     expect(withoutUnit.status).toBe(200);
     expect(withoutUnit.body.righe).toMatchObject([
       { prodottoId, quantita: 4, unitaMisura: "pz" },
@@ -837,11 +1476,11 @@ describe("PATCH /trasferimenti/:id — modifica righe", () => {
 
     const started = await request(app)
       .post(`/trasferimenti/${transfer.id}/avvia`)
-      .send({ versione: withoutUnit.body.versione });
+      .send(commandBody({ versione: withoutUnit.body.versione }));
     expect(started.status).toBe(200);
     const received = await request(app)
       .post(`/trasferimenti/${transfer.id}/conferma`)
-      .send({ versione: started.body.versione });
+      .send(commandBody({ versione: started.body.versione }));
     expect(received.status).toBe(200);
     const movements = await getMovimentiForTrasferimento(transfer.id);
     expect(movements.length).toBeGreaterThanOrEqual(2);
@@ -862,20 +1501,22 @@ describe("PATCH /trasferimenti/:id — modifica righe", () => {
 
     const createFailed = await request(app)
       .post("/trasferimenti")
-      .send({
-        magazzinoOrigineId: origineId,
-        magazzinoDestinoId: destinoId,
-        dataRichiesta: "2026-06-24",
-        trasportatoreNome: "Test rollback",
-        righe: [
-          {
-            prodottoId,
-            lottoId: 2_000_000_000,
-            quantita: 1,
-            unitaMisura: "kg",
-          },
-        ],
-      });
+      .send(
+        commandBody({
+          magazzinoOrigineId: origineId,
+          magazzinoDestinoId: destinoId,
+          dataRichiesta: "2026-06-24",
+          trasportatoreNome: "Test rollback",
+          righe: [
+            {
+              prodottoId,
+              lottoId: 2_000_000_000,
+              quantita: 1,
+              unitaMisura: "kg",
+            },
+          ],
+        }),
+      );
     expect(createFailed.status).toBe(400);
     const after = await db
       .select({ id: trasferimentiTable.id })
@@ -891,18 +1532,20 @@ describe("PATCH /trasferimenti/:id — modifica righe", () => {
     const transfer = await creaTrasferimento({ prodottoId, quantita: 2 });
     const replaceFailed = await request(app)
       .patch(`/trasferimenti/${transfer.id}`)
-      .send({
-        versione: transfer.versione,
-        note: "non deve restare",
-        righe: [
-          {
-            prodottoId,
-            lottoId: 2_000_000_000,
-            quantita: 3,
-            unitaMisura: "kg",
-          },
-        ],
-      });
+      .send(
+        commandBody({
+          versione: transfer.versione,
+          note: "non deve restare",
+          righe: [
+            {
+              prodottoId,
+              lottoId: 2_000_000_000,
+              quantita: 3,
+              unitaMisura: "kg",
+            },
+          ],
+        }),
+      );
     expect(replaceFailed.status).toBe(400);
     const unchanged = await request(app).get(`/trasferimenti/${transfer.id}`);
     expect(unchanged.body.versione).toBe(transfer.versione);
@@ -919,16 +1562,18 @@ describe("PATCH /trasferimenti/:id — modifica righe", () => {
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/avvia`)
-          .send({ versione: t.versione })
+          .send(commandBody({ versione: t.versione }))
       ).status,
     ).toBe(200);
 
     const res = await request(app)
       .patch(`/trasferimenti/${t.id}`)
-      .send({
-        versione: t.versione + 1,
-        righe: [{ prodottoId, quantita: 3, unitaMisura: "kg" }],
-      });
+      .send(
+        commandBody({
+          versione: t.versione + 1,
+          righe: [{ prodottoId, quantita: 3, unitaMisura: "kg" }],
+        }),
+      );
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/prima dell'avvio/i);
   });
@@ -941,10 +1586,12 @@ describe("PATCH /trasferimenti/:id — modifica righe", () => {
 
     const res = await request(app)
       .patch(`/trasferimenti/${t.id}`)
-      .send({
-        versione: t.versione,
-        righe: [{ prodottoId, quantita: 7, unitaMisura: "kg" }],
-      });
+      .send(
+        commandBody({
+          versione: t.versione,
+          righe: [{ prodottoId, quantita: 7, unitaMisura: "kg" }],
+        }),
+      );
     expect(res.status).toBe(200);
     expect(res.body.righe).toHaveLength(1);
     expect(res.body.righe[0].quantita).toBe(7);

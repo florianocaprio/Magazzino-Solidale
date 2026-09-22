@@ -95,6 +95,7 @@ import type {
   BisognoPianificatoStorico,
   BisognoPianificatoUpdate,
   Bolla,
+  BollaAnnullamentoInput,
   BollaDettaglio,
   BollaEmporioEmailResult,
   BollaEmporioInvioManualeInput,
@@ -102,6 +103,7 @@ import type {
   BollaInput,
   BollaRiga,
   BollaRigaInput,
+  BollaStornoAmministrativoInput,
   BollaUpdate,
   BootstrapStatus,
   BulkImportResult,
@@ -127,6 +129,7 @@ import type {
   CercaBeneficiariSimili400,
   CercaBeneficiariSimiliParams,
   ChangePasswordInput,
+  ComandoVersionatoInput,
   ConfermaRicezione,
   ConfigurazioneAmbiente,
   ConfigurazioneAmbientePubblica,
@@ -164,9 +167,15 @@ import type {
   DashboardStats,
   DeleteMezzo200,
   DeleteVolontario200,
+  DocumentoOperativoDettaglio,
+  DocumentoOperativoPage,
   DownloadFseExportParams,
   EmailSendResult,
+  EnteDestinatario,
+  EnteDestinatarioInput,
+  EnteDestinatarioUpdate,
   ExportConsegneParams,
+  ExportDocumentiOperativiParams,
   ForgotPasswordInput,
   Fornitore,
   FornitoreInput,
@@ -260,7 +269,9 @@ import type {
   ListConsumiMensaParams,
   ListCreditoSolidaleBeneficiariParams,
   ListCreditoSolidaleMovimentiParams,
+  ListDocumentiOperativiParams,
   ListEccezioniMensaParams,
+  ListEntiDestinatariParams,
   ListFornitoriParams,
   ListFseExportEventsParams,
   ListFseExportLinesParams,
@@ -7561,7 +7572,7 @@ export const getAvviaTrasferimentoUrl = (id: number,) => {
  * @summary Phase 1 - start transfer (deduct from origin)
  */
 export const avviaTrasferimento = async (id: number,
-    versioneInput: VersioneInput, options?: RequestInit): Promise<Trasferimento> => {
+    comandoVersionatoInput: ComandoVersionatoInput, options?: RequestInit): Promise<Trasferimento> => {
 
   return customFetch<Trasferimento>(getAvviaTrasferimentoUrl(id),
   {
@@ -7569,7 +7580,7 @@ export const avviaTrasferimento = async (id: number,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      versioneInput,)
+      comandoVersionatoInput,)
   }
 );}
 
@@ -7577,8 +7588,8 @@ export const avviaTrasferimento = async (id: number,
 
 
 export const getAvviaTrasferimentoMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avviaTrasferimento>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof avviaTrasferimento>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avviaTrasferimento>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof avviaTrasferimento>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext> => {
 
 const mutationKey = ['avviaTrasferimento'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -7590,7 +7601,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof avviaTrasferimento>>, {id: number;data: BodyType<VersioneInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof avviaTrasferimento>>, {id: number;data: BodyType<ComandoVersionatoInput>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  avviaTrasferimento(id,data,requestOptions)
@@ -7604,18 +7615,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type AvviaTrasferimentoMutationResult = NonNullable<Awaited<ReturnType<typeof avviaTrasferimento>>>
-    export type AvviaTrasferimentoMutationBody = BodyType<VersioneInput>
+    export type AvviaTrasferimentoMutationBody = BodyType<ComandoVersionatoInput>
     export type AvviaTrasferimentoMutationError = ErrorType<unknown>
 
     /**
  * @summary Phase 1 - start transfer (deduct from origin)
  */
 export const useAvviaTrasferimento = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avviaTrasferimento>>, TError,{id: number;data: BodyType<VersioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avviaTrasferimento>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof avviaTrasferimento>>,
         TError,
-        {id: number;data: BodyType<VersioneInput>},
+        {id: number;data: BodyType<ComandoVersionatoInput>},
         TContext
       > => {
       return useMutation(getAvviaTrasferimentoMutationOptions(options));
@@ -13265,23 +13276,25 @@ export const getCompletaConsegnaUrl = (id: number,) => {
 /**
  * @summary Mark delivery as completed - atomic operation
  */
-export const completaConsegna = async (id: number, options?: RequestInit): Promise<Consegna> => {
+export const completaConsegna = async (id: number,
+    comandoVersionatoInput: ComandoVersionatoInput, options?: RequestInit): Promise<Consegna> => {
 
   return customFetch<Consegna>(getCompletaConsegnaUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      comandoVersionatoInput,)
   }
 );}
 
 
 
 
-export const getCompletaConsegnaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completaConsegna>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof completaConsegna>>, TError,{id: number}, TContext> => {
+export const getCompletaConsegnaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completaConsegna>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completaConsegna>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext> => {
 
 const mutationKey = ['completaConsegna'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -13293,10 +13306,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completaConsegna>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completaConsegna>>, {id: number;data: BodyType<ComandoVersionatoInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  completaConsegna(id,requestOptions)
+          return  completaConsegna(id,data,requestOptions)
         }
 
 
@@ -13307,18 +13320,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CompletaConsegnaMutationResult = NonNullable<Awaited<ReturnType<typeof completaConsegna>>>
-
-    export type CompletaConsegnaMutationError = ErrorType<unknown>
+    export type CompletaConsegnaMutationBody = BodyType<ComandoVersionatoInput>
+    export type CompletaConsegnaMutationError = ErrorType<void>
 
     /**
  * @summary Mark delivery as completed - atomic operation
  */
-export const useCompletaConsegna = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completaConsegna>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useCompletaConsegna = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completaConsegna>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof completaConsegna>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<ComandoVersionatoInput>},
         TContext
       > => {
       return useMutation(getCompletaConsegnaMutationOptions(options));
@@ -15417,6 +15430,447 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getStornaSpesaEmporioMutationOptions(options));
     }
 
+export const getListEntiDestinatariUrl = (params?: ListEntiDestinatariParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/enti-destinatari?${stringifiedParams}` : `/api/enti-destinatari`
+}
+
+export const listEntiDestinatari = async (params?: ListEntiDestinatariParams, options?: RequestInit): Promise<EnteDestinatario[]> => {
+
+  return customFetch<EnteDestinatario[]>(getListEntiDestinatariUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEntiDestinatariQueryKey = (params?: ListEntiDestinatariParams,) => {
+    return [
+    `/api/enti-destinatari`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListEntiDestinatariQueryOptions = <TData = Awaited<ReturnType<typeof listEntiDestinatari>>, TError = ErrorType<unknown>>(params?: ListEntiDestinatariParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEntiDestinatari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEntiDestinatariQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEntiDestinatari>>> = ({ signal }) => listEntiDestinatari(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEntiDestinatari>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEntiDestinatariQueryResult = NonNullable<Awaited<ReturnType<typeof listEntiDestinatari>>>
+export type ListEntiDestinatariQueryError = ErrorType<unknown>
+
+
+
+export function useListEntiDestinatari<TData = Awaited<ReturnType<typeof listEntiDestinatari>>, TError = ErrorType<unknown>>(
+ params?: ListEntiDestinatariParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEntiDestinatari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEntiDestinatariQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateEnteDestinatarioUrl = () => {
+
+
+
+
+  return `/api/enti-destinatari`
+}
+
+export const createEnteDestinatario = async (enteDestinatarioInput: EnteDestinatarioInput, options?: RequestInit): Promise<EnteDestinatario> => {
+
+  return customFetch<EnteDestinatario>(getCreateEnteDestinatarioUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      enteDestinatarioInput,)
+  }
+);}
+
+
+
+
+export const getCreateEnteDestinatarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEnteDestinatario>>, TError,{data: BodyType<EnteDestinatarioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createEnteDestinatario>>, TError,{data: BodyType<EnteDestinatarioInput>}, TContext> => {
+
+const mutationKey = ['createEnteDestinatario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createEnteDestinatario>>, {data: BodyType<EnteDestinatarioInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createEnteDestinatario(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateEnteDestinatarioMutationResult = NonNullable<Awaited<ReturnType<typeof createEnteDestinatario>>>
+    export type CreateEnteDestinatarioMutationBody = BodyType<EnteDestinatarioInput>
+    export type CreateEnteDestinatarioMutationError = ErrorType<unknown>
+
+    export const useCreateEnteDestinatario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEnteDestinatario>>, TError,{data: BodyType<EnteDestinatarioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createEnteDestinatario>>,
+        TError,
+        {data: BodyType<EnteDestinatarioInput>},
+        TContext
+      > => {
+      return useMutation(getCreateEnteDestinatarioMutationOptions(options));
+    }
+
+export const getUpdateEnteDestinatarioUrl = (id: number,) => {
+
+
+
+
+  return `/api/enti-destinatari/${id}`
+}
+
+export const updateEnteDestinatario = async (id: number,
+    enteDestinatarioUpdate: EnteDestinatarioUpdate, options?: RequestInit): Promise<EnteDestinatario> => {
+
+  return customFetch<EnteDestinatario>(getUpdateEnteDestinatarioUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      enteDestinatarioUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateEnteDestinatarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEnteDestinatario>>, TError,{id: number;data: BodyType<EnteDestinatarioUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEnteDestinatario>>, TError,{id: number;data: BodyType<EnteDestinatarioUpdate>}, TContext> => {
+
+const mutationKey = ['updateEnteDestinatario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEnteDestinatario>>, {id: number;data: BodyType<EnteDestinatarioUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateEnteDestinatario(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateEnteDestinatarioMutationResult = NonNullable<Awaited<ReturnType<typeof updateEnteDestinatario>>>
+    export type UpdateEnteDestinatarioMutationBody = BodyType<EnteDestinatarioUpdate>
+    export type UpdateEnteDestinatarioMutationError = ErrorType<unknown>
+
+    export const useUpdateEnteDestinatario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEnteDestinatario>>, TError,{id: number;data: BodyType<EnteDestinatarioUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateEnteDestinatario>>,
+        TError,
+        {id: number;data: BodyType<EnteDestinatarioUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateEnteDestinatarioMutationOptions(options));
+    }
+
+export const getListDocumentiOperativiUrl = (params?: ListDocumentiOperativiParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/documenti-operativi?${stringifiedParams}` : `/api/documenti-operativi`
+}
+
+export const listDocumentiOperativi = async (params?: ListDocumentiOperativiParams, options?: RequestInit): Promise<DocumentoOperativoPage> => {
+
+  return customFetch<DocumentoOperativoPage>(getListDocumentiOperativiUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDocumentiOperativiQueryKey = (params?: ListDocumentiOperativiParams,) => {
+    return [
+    `/api/documenti-operativi`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListDocumentiOperativiQueryOptions = <TData = Awaited<ReturnType<typeof listDocumentiOperativi>>, TError = ErrorType<unknown>>(params?: ListDocumentiOperativiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDocumentiOperativi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDocumentiOperativiQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDocumentiOperativi>>> = ({ signal }) => listDocumentiOperativi(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDocumentiOperativi>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDocumentiOperativiQueryResult = NonNullable<Awaited<ReturnType<typeof listDocumentiOperativi>>>
+export type ListDocumentiOperativiQueryError = ErrorType<unknown>
+
+
+
+export function useListDocumentiOperativi<TData = Awaited<ReturnType<typeof listDocumentiOperativi>>, TError = ErrorType<unknown>>(
+ params?: ListDocumentiOperativiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDocumentiOperativi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDocumentiOperativiQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportDocumentiOperativiUrl = (params?: ExportDocumentiOperativiParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/documenti-operativi/export.xlsx?${stringifiedParams}` : `/api/documenti-operativi/export.xlsx`
+}
+
+export const exportDocumentiOperativi = async (params?: ExportDocumentiOperativiParams, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportDocumentiOperativiUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportDocumentiOperativiQueryKey = (params?: ExportDocumentiOperativiParams,) => {
+    return [
+    `/api/documenti-operativi/export.xlsx`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportDocumentiOperativiQueryOptions = <TData = Awaited<ReturnType<typeof exportDocumentiOperativi>>, TError = ErrorType<unknown>>(params?: ExportDocumentiOperativiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportDocumentiOperativi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportDocumentiOperativiQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportDocumentiOperativi>>> = ({ signal }) => exportDocumentiOperativi(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportDocumentiOperativi>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportDocumentiOperativiQueryResult = NonNullable<Awaited<ReturnType<typeof exportDocumentiOperativi>>>
+export type ExportDocumentiOperativiQueryError = ErrorType<unknown>
+
+
+
+export function useExportDocumentiOperativi<TData = Awaited<ReturnType<typeof exportDocumentiOperativi>>, TError = ErrorType<unknown>>(
+ params?: ExportDocumentiOperativiParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportDocumentiOperativi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportDocumentiOperativiQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetDocumentoOperativoUrl = (tipo: 'bolla' | 'trasferimento',
+    id: number,) => {
+
+
+
+
+  return `/api/documenti-operativi/${tipo}/${id}`
+}
+
+export const getDocumentoOperativo = async (tipo: 'bolla' | 'trasferimento',
+    id: number, options?: RequestInit): Promise<DocumentoOperativoDettaglio> => {
+
+  return customFetch<DocumentoOperativoDettaglio>(getGetDocumentoOperativoUrl(tipo,id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDocumentoOperativoQueryKey = (tipo: 'bolla' | 'trasferimento',
+    id: number,) => {
+    return [
+    `/api/documenti-operativi/${tipo}/${id}`
+    ] as const;
+    }
+
+
+export const getGetDocumentoOperativoQueryOptions = <TData = Awaited<ReturnType<typeof getDocumentoOperativo>>, TError = ErrorType<unknown>>(tipo: 'bolla' | 'trasferimento',
+    id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDocumentoOperativo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDocumentoOperativoQueryKey(tipo,id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocumentoOperativo>>> = ({ signal }) => getDocumentoOperativo(tipo,id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(tipo && id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDocumentoOperativo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDocumentoOperativoQueryResult = NonNullable<Awaited<ReturnType<typeof getDocumentoOperativo>>>
+export type GetDocumentoOperativoQueryError = ErrorType<unknown>
+
+
+
+export function useGetDocumentoOperativo<TData = Awaited<ReturnType<typeof getDocumentoOperativo>>, TError = ErrorType<unknown>>(
+ tipo: 'bolla' | 'trasferimento',
+    id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDocumentoOperativo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDocumentoOperativoQueryOptions(tipo,id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListBolleUrl = (params?: ListBolleParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -15859,14 +16313,16 @@ export const getDeleteBollaRigaUrl = (id: number,
  * @summary Remove a product line from a bolla
  */
 export const deleteBollaRiga = async (id: number,
-    rigaId: number, options?: RequestInit): Promise<void> => {
+    rigaId: number,
+    comandoVersionatoInput: ComandoVersionatoInput, options?: RequestInit): Promise<void> => {
 
   return customFetch<void>(getDeleteBollaRigaUrl(id,rigaId),
   {
     ...options,
-    method: 'DELETE'
-
-
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      comandoVersionatoInput,)
   }
 );}
 
@@ -15874,8 +16330,8 @@ export const deleteBollaRiga = async (id: number,
 
 
 export const getDeleteBollaRigaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBollaRiga>>, TError,{id: number;rigaId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteBollaRiga>>, TError,{id: number;rigaId: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBollaRiga>>, TError,{id: number;rigaId: number;data: BodyType<ComandoVersionatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteBollaRiga>>, TError,{id: number;rigaId: number;data: BodyType<ComandoVersionatoInput>}, TContext> => {
 
 const mutationKey = ['deleteBollaRiga'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -15887,10 +16343,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteBollaRiga>>, {id: number;rigaId: number}> = (props) => {
-          const {id,rigaId} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteBollaRiga>>, {id: number;rigaId: number;data: BodyType<ComandoVersionatoInput>}> = (props) => {
+          const {id,rigaId,data} = props ?? {};
 
-          return  deleteBollaRiga(id,rigaId,requestOptions)
+          return  deleteBollaRiga(id,rigaId,data,requestOptions)
         }
 
 
@@ -15901,18 +16357,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type DeleteBollaRigaMutationResult = NonNullable<Awaited<ReturnType<typeof deleteBollaRiga>>>
-
+    export type DeleteBollaRigaMutationBody = BodyType<ComandoVersionatoInput>
     export type DeleteBollaRigaMutationError = ErrorType<unknown>
 
     /**
  * @summary Remove a product line from a bolla
  */
 export const useDeleteBollaRiga = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBollaRiga>>, TError,{id: number;rigaId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBollaRiga>>, TError,{id: number;rigaId: number;data: BodyType<ComandoVersionatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteBollaRiga>>,
         TError,
-        {id: number;rigaId: number},
+        {id: number;rigaId: number;data: BodyType<ComandoVersionatoInput>},
         TContext
       > => {
       return useMutation(getDeleteBollaRigaMutationOptions(options));
@@ -15929,14 +16385,16 @@ export const getConfermaBollaUrl = (id: number,) => {
 /**
  * @summary Confirm bolla - move from bozza to confermato
  */
-export const confermaBolla = async (id: number, options?: RequestInit): Promise<BollaDettaglio> => {
+export const confermaBolla = async (id: number,
+    comandoVersionatoInput: ComandoVersionatoInput, options?: RequestInit): Promise<BollaDettaglio> => {
 
   return customFetch<BollaDettaglio>(getConfermaBollaUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      comandoVersionatoInput,)
   }
 );}
 
@@ -15944,8 +16402,8 @@ export const confermaBolla = async (id: number, options?: RequestInit): Promise<
 
 
 export const getConfermaBollaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confermaBolla>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof confermaBolla>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confermaBolla>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confermaBolla>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext> => {
 
 const mutationKey = ['confermaBolla'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -15957,10 +16415,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confermaBolla>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confermaBolla>>, {id: number;data: BodyType<ComandoVersionatoInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  confermaBolla(id,requestOptions)
+          return  confermaBolla(id,data,requestOptions)
         }
 
 
@@ -15971,18 +16429,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ConfermaBollaMutationResult = NonNullable<Awaited<ReturnType<typeof confermaBolla>>>
-
+    export type ConfermaBollaMutationBody = BodyType<ComandoVersionatoInput>
     export type ConfermaBollaMutationError = ErrorType<unknown>
 
     /**
  * @summary Confirm bolla - move from bozza to confermato
  */
 export const useConfermaBolla = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confermaBolla>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confermaBolla>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof confermaBolla>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<ComandoVersionatoInput>},
         TContext
       > => {
       return useMutation(getConfermaBollaMutationOptions(options));
@@ -15997,16 +16455,18 @@ export const getAnnullaBollaUrl = (id: number,) => {
 }
 
 /**
- * @summary Cancel bolla - revert stock if confermato, mark annullato
+ * @summary Cancel a pre-delivery bolla and release active reservations
  */
-export const annullaBolla = async (id: number, options?: RequestInit): Promise<BollaDettaglio> => {
+export const annullaBolla = async (id: number,
+    bollaAnnullamentoInput: BollaAnnullamentoInput, options?: RequestInit): Promise<BollaDettaglio> => {
 
   return customFetch<BollaDettaglio>(getAnnullaBollaUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bollaAnnullamentoInput,)
   }
 );}
 
@@ -16014,8 +16474,8 @@ export const annullaBolla = async (id: number, options?: RequestInit): Promise<B
 
 
 export const getAnnullaBollaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaBolla>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof annullaBolla>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaBolla>>, TError,{id: number;data: BodyType<BollaAnnullamentoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof annullaBolla>>, TError,{id: number;data: BodyType<BollaAnnullamentoInput>}, TContext> => {
 
 const mutationKey = ['annullaBolla'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -16027,10 +16487,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof annullaBolla>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof annullaBolla>>, {id: number;data: BodyType<BollaAnnullamentoInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  annullaBolla(id,requestOptions)
+          return  annullaBolla(id,data,requestOptions)
         }
 
 
@@ -16041,21 +16501,93 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type AnnullaBollaMutationResult = NonNullable<Awaited<ReturnType<typeof annullaBolla>>>
-
+    export type AnnullaBollaMutationBody = BodyType<BollaAnnullamentoInput>
     export type AnnullaBollaMutationError = ErrorType<unknown>
 
     /**
- * @summary Cancel bolla - revert stock if confermato, mark annullato
+ * @summary Cancel a pre-delivery bolla and release active reservations
  */
 export const useAnnullaBolla = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaBolla>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaBolla>>, TError,{id: number;data: BodyType<BollaAnnullamentoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof annullaBolla>>,
         TError,
-        {id: number},
+        {id: number;data: BodyType<BollaAnnullamentoInput>},
         TContext
       > => {
       return useMutation(getAnnullaBollaMutationOptions(options));
+    }
+
+export const getStornaAmministrativamenteBollaUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/storno-amministrativo`
+}
+
+/**
+ * @summary Rettifica amministrativa append-only di righe già contabilizzate
+ */
+export const stornaAmministrativamenteBolla = async (id: number,
+    bollaStornoAmministrativoInput: BollaStornoAmministrativoInput, options?: RequestInit): Promise<BollaDettaglio> => {
+
+  return customFetch<BollaDettaglio>(getStornaAmministrativamenteBollaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bollaStornoAmministrativoInput,)
+  }
+);}
+
+
+
+
+export const getStornaAmministrativamenteBollaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof stornaAmministrativamenteBolla>>, TError,{id: number;data: BodyType<BollaStornoAmministrativoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof stornaAmministrativamenteBolla>>, TError,{id: number;data: BodyType<BollaStornoAmministrativoInput>}, TContext> => {
+
+const mutationKey = ['stornaAmministrativamenteBolla'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof stornaAmministrativamenteBolla>>, {id: number;data: BodyType<BollaStornoAmministrativoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  stornaAmministrativamenteBolla(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StornaAmministrativamenteBollaMutationResult = NonNullable<Awaited<ReturnType<typeof stornaAmministrativamenteBolla>>>
+    export type StornaAmministrativamenteBollaMutationBody = BodyType<BollaStornoAmministrativoInput>
+    export type StornaAmministrativamenteBollaMutationError = ErrorType<void>
+
+    /**
+ * @summary Rettifica amministrativa append-only di righe già contabilizzate
+ */
+export const useStornaAmministrativamenteBolla = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof stornaAmministrativamenteBolla>>, TError,{id: number;data: BodyType<BollaStornoAmministrativoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof stornaAmministrativamenteBolla>>,
+        TError,
+        {id: number;data: BodyType<BollaStornoAmministrativoInput>},
+        TContext
+      > => {
+      return useMutation(getStornaAmministrativamenteBollaMutationOptions(options));
     }
 
 export const getConsegnaBollaUrl = (id: number,) => {
@@ -16070,7 +16602,7 @@ export const getConsegnaBollaUrl = (id: number,) => {
  * @summary Mark bolla as delivered - move from confermato to consegnato
  */
 export const consegnaBolla = async (id: number,
-    consegnaRicezioneInput?: ConsegnaRicezioneInput, options?: RequestInit): Promise<BollaDettaglio> => {
+    consegnaRicezioneInput: ConsegnaRicezioneInput, options?: RequestInit): Promise<BollaDettaglio> => {
 
   return customFetch<BollaDettaglio>(getConsegnaBollaUrl(id),
   {
@@ -16086,8 +16618,8 @@ export const consegnaBolla = async (id: number,
 
 
 export const getConsegnaBollaMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof consegnaBolla>>, TError,{id: number;data?: BodyType<ConsegnaRicezioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof consegnaBolla>>, TError,{id: number;data?: BodyType<ConsegnaRicezioneInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof consegnaBolla>>, TError,{id: number;data: BodyType<ConsegnaRicezioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof consegnaBolla>>, TError,{id: number;data: BodyType<ConsegnaRicezioneInput>}, TContext> => {
 
 const mutationKey = ['consegnaBolla'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -16099,7 +16631,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof consegnaBolla>>, {id: number;data?: BodyType<ConsegnaRicezioneInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof consegnaBolla>>, {id: number;data: BodyType<ConsegnaRicezioneInput>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  consegnaBolla(id,data,requestOptions)
@@ -16113,18 +16645,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ConsegnaBollaMutationResult = NonNullable<Awaited<ReturnType<typeof consegnaBolla>>>
-    export type ConsegnaBollaMutationBody = BodyType<ConsegnaRicezioneInput> | undefined
+    export type ConsegnaBollaMutationBody = BodyType<ConsegnaRicezioneInput>
     export type ConsegnaBollaMutationError = ErrorType<unknown>
 
     /**
  * @summary Mark bolla as delivered - move from confermato to consegnato
  */
 export const useConsegnaBolla = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof consegnaBolla>>, TError,{id: number;data?: BodyType<ConsegnaRicezioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof consegnaBolla>>, TError,{id: number;data: BodyType<ConsegnaRicezioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof consegnaBolla>>,
         TError,
-        {id: number;data?: BodyType<ConsegnaRicezioneInput>},
+        {id: number;data: BodyType<ConsegnaRicezioneInput>},
         TContext
       > => {
       return useMutation(getConsegnaBollaMutationOptions(options));

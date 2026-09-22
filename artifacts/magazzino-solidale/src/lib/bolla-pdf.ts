@@ -3,14 +3,34 @@ import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import type { BollaDettaglio } from "@workspace/api-client-react";
-import { loadFallbackLogoDataUrl, resolveBrandingAmbiente, type BrandingAmbiente } from "@/lib/branding-ambiente";
+import {
+  loadFallbackLogoDataUrl,
+  resolveBrandingAmbiente,
+  type BrandingAmbiente,
+} from "@/lib/branding-ambiente";
 
 export type BollaTemplate = "standard" | "moderno" | "minimal";
 
-export const BOLLA_TEMPLATES: { value: BollaTemplate; label: string; description: string }[] = [
-  { value: "standard", label: "Standard", description: "Intestazione classica con bordo e logo documentale." },
-  { value: "moderno", label: "Moderno", description: "Fascia colorata in testata, stile compatto." },
-  { value: "minimal", label: "Minimal", description: "Solo testo, essenziale per stampa veloce." },
+export const BOLLA_TEMPLATES: {
+  value: BollaTemplate;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "standard",
+    label: "Standard",
+    description: "Intestazione classica con bordo e logo documentale.",
+  },
+  {
+    value: "moderno",
+    label: "Moderno",
+    description: "Fascia colorata in testata, stile compatto.",
+  },
+  {
+    value: "minimal",
+    label: "Minimal",
+    description: "Solo testo, essenziale per stampa veloce.",
+  },
 ];
 
 export interface CentroInfo {
@@ -43,7 +63,9 @@ function imageSize(dataUrl: string): Promise<{ w: number; h: number }> {
   });
 }
 
-async function loadImageDataUrl(url: string | null | undefined): Promise<string | null> {
+async function loadImageDataUrl(
+  url: string | null | undefined,
+): Promise<string | null> {
   if (!url) return null;
   if (url.startsWith("data:image/")) return url;
   try {
@@ -53,7 +75,8 @@ async function loadImageDataUrl(url: string | null | undefined): Promise<string 
     if (!blob.type.startsWith("image/")) return null;
     return await new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onload = () =>
+        resolve(typeof reader.result === "string" ? reader.result : null);
       reader.onerror = () => resolve(null);
       reader.readAsDataURL(blob);
     });
@@ -95,7 +118,11 @@ async function drawImageFit(
   return drawH;
 }
 
-function firstTextLine(doc: jsPDF, text: string | null | undefined, maxWidth: number): string | null {
+function firstTextLine(
+  doc: jsPDF,
+  text: string | null | undefined,
+  maxWidth: number,
+): string | null {
   if (!text) return null;
   const lines = doc.splitTextToSize(text, maxWidth) as string[];
   return lines[0] ?? null;
@@ -104,11 +131,14 @@ function firstTextLine(doc: jsPDF, text: string | null | undefined, maxWidth: nu
 export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
   const { bolla, centro, footer, associationLogoDataUrl } = opts;
   const branding = opts.branding ?? resolveBrandingAmbiente(null);
-  const documentLogoDataUrl = associationLogoDataUrl === undefined
-    ? await loadFallbackLogoDataUrl()
-    : associationLogoDataUrl;
-  const headerLogoDataUrl = (await loadImageDataUrl(centro?.logoUrl)) ?? documentLogoDataUrl;
-  const template: BollaTemplate = opts.template in ACCENT ? opts.template : "standard";
+  const documentLogoDataUrl =
+    associationLogoDataUrl === undefined
+      ? await loadFallbackLogoDataUrl()
+      : associationLogoDataUrl;
+  const headerLogoDataUrl =
+    (await loadImageDataUrl(centro?.logoUrl)) ?? documentLogoDataUrl;
+  const template: BollaTemplate =
+    opts.template in ACCENT ? opts.template : "standard";
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 14;
@@ -124,14 +154,26 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     doc.rect(0, 0, pageW, 32, "F");
     let textX = margin;
     if (headerLogoDataUrl) {
-      const drawn = await drawImageFit(doc, headerLogoDataUrl, margin, 6, 20, 20);
+      const drawn = await drawImageFit(
+        doc,
+        headerLogoDataUrl,
+        margin,
+        6,
+        20,
+        20,
+      );
       if (drawn) textX = margin + 24;
     }
     const leftWidth = pageW - textX - margin - 58;
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.text(firstTextLine(doc, branding.nomeDocumento, leftWidth) ?? branding.nomeDocumento, textX, 13);
+    doc.text(
+      firstTextLine(doc, branding.nomeDocumento, leftWidth) ??
+        branding.nomeDocumento,
+      textX,
+      13,
+    );
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     const headerLine = firstTextLine(
@@ -146,20 +188,37 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.text(bolla.numeroBolla, pageW - margin, 19, { align: "right" });
-    doc.text(format(new Date(bolla.dataBolla), "dd/MM/yyyy", { locale: it }), pageW - margin, 25, { align: "right" });
+    doc.text(
+      format(new Date(bolla.dataBolla), "dd/MM/yyyy", { locale: it }),
+      pageW - margin,
+      25,
+      { align: "right" },
+    );
     doc.setTextColor(0, 0, 0);
     y = 40;
   } else {
     let textX = margin;
     if (headerLogoDataUrl && template === "standard") {
-      const drawn = await drawImageFit(doc, headerLogoDataUrl, margin, y, 22, 22);
+      const drawn = await drawImageFit(
+        doc,
+        headerLogoDataUrl,
+        margin,
+        y,
+        22,
+        22,
+      );
       if (drawn) textX = margin + 26;
     }
     const leftWidth = pageW - textX - margin - 66;
     doc.setTextColor(accent[0], accent[1], accent[2]);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
-    doc.text(firstTextLine(doc, branding.nomeDocumento, leftWidth) ?? branding.nomeDocumento, textX, y + 5);
+    doc.text(
+      firstTextLine(doc, branding.nomeDocumento, leftWidth) ??
+        branding.nomeDocumento,
+      textX,
+      y + 5,
+    );
     doc.setTextColor(60, 60, 60);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
@@ -172,7 +231,8 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     const contactLine = branding.sottotitoloDocumento
       ? firstTextLine(doc, branding.contattiDocumento, leftWidth)
       : null;
-    if (contactLine && template === "standard") doc.text(contactLine, textX, y + 16);
+    if (contactLine && template === "standard")
+      doc.text(contactLine, textX, y + 16);
 
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "bold");
@@ -180,7 +240,9 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     doc.text("BOLLA DI CONSEGNA", pageW - margin, y + 5, { align: "right" });
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text(`N. ${bolla.numeroBolla}`, pageW - margin, y + 11, { align: "right" });
+    doc.text(`N. ${bolla.numeroBolla}`, pageW - margin, y + 11, {
+      align: "right",
+    });
     doc.text(
       `Data: ${format(new Date(bolla.dataBolla), "dd/MM/yyyy", { locale: it })}`,
       pageW - margin,
@@ -198,14 +260,23 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     }
   }
 
-  // ---- Banner ANNULLATA (storno): merce restituita a magazzino ----
+  if (bolla.stato === "bozza") {
+    doc.setTextColor(180, 40, 40);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("BOZZA — NON CONTABILIZZATA", pageW / 2, y, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    y += 8;
+  }
+
+  // ---- Banner ANNULLATA: non implica automaticamente un reintegro ----
   if (isAnnullato) {
     doc.setFillColor(RED[0], RED[1], RED[2]);
     doc.rect(margin, y, pageW - 2 * margin, 9, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("DOCUMENTO ANNULLATO — MERCE RESTITUITA A MAGAZZINO", pageW / 2, y + 6, { align: "center" });
+    doc.text("DOCUMENTO ANNULLATO", pageW / 2, y + 6, { align: "center" });
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");
     y += 13;
@@ -247,18 +318,27 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text(bolla.beneficiarioNome || `Beneficiario #${bolla.beneficiarioId}`, colLeftX, leftY);
+  const ente = bolla.tipoDestinatario === "ente";
+  const destinatarioNome = ente
+    ? bolla.enteDestinatarioNome || "Ente esterno"
+    : bolla.beneficiarioNome || `Beneficiario #${bolla.beneficiarioId}`;
+  doc.text(destinatarioNome, colLeftX, leftY);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   leftY += 5;
-  const indirizzoDest = bolla.indirizzoConsegna || bolla.beneficiarioIndirizzo;
+  const indirizzoDest =
+    bolla.indirizzoConsegna ||
+    (ente ? bolla.enteDestinatarioIndirizzo : bolla.beneficiarioIndirizzo);
   if (indirizzoDest) {
     const lines = doc.splitTextToSize(indirizzoDest, colWidth) as string[];
     doc.text(lines, colLeftX, leftY);
     leftY += lines.length * 4.5;
   }
-  if (bolla.beneficiarioTelefono) {
-    doc.text(`Cell: ${bolla.beneficiarioTelefono}`, colLeftX, leftY);
+  const telefonoDestinatario = ente
+    ? bolla.enteDestinatarioTelefono
+    : bolla.beneficiarioTelefono;
+  if (telefonoDestinatario) {
+    doc.text(`Tel: ${telefonoDestinatario}`, colLeftX, leftY);
     leftY += 5;
   }
 
@@ -271,7 +351,9 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   rightY += 5;
-  const magAddr = [bolla.magazzinoIndirizzo, bolla.magazzinoComune].filter(Boolean).join(" — ");
+  const magAddr = [bolla.magazzinoIndirizzo, bolla.magazzinoComune]
+    .filter(Boolean)
+    .join(" — ");
   if (magAddr) {
     const lines = doc.splitTextToSize(magAddr, colWidth) as string[];
     doc.text(lines, colRightX, rightY);
@@ -281,16 +363,24 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
   y = Math.max(leftY, rightY) + 4;
 
   // ---- Products table ----
+  const productRows = bolla.righe.flatMap((r, i) => {
+    const ripartizioni = r.ripartizioniLotto ?? [];
+    const rows = ripartizioni.length > 0 ? ripartizioni : [null];
+    return rows.map((ripartizione, allocationIndex) => [
+      allocationIndex === 0 ? String(i + 1) : "",
+      allocationIndex === 0
+        ? `${r.prodottoNome ?? `Prodotto #${r.prodottoId}`}${r.fsePlus ? " *" : ""}`
+        : "Ripartizione FEFO",
+      ripartizione?.codiceLotto ?? r.codiceLotto ?? "—",
+      ripartizione?.fondoOrigine ?? r.fondoOrigine ?? "NESSUN_FONDO",
+      String(ripartizione?.quantita ?? r.quantita),
+      r.unitaMisura ?? "—",
+    ]);
+  });
   autoTable(doc, {
     startY: y,
-    head: [["#", "Prodotto", "Lotto", "Quantità", "U.M."]],
-    body: bolla.righe.map((r, i) => [
-      String(i + 1),
-      `${r.prodottoNome ?? `Prodotto #${r.prodottoId}`}${r.fsePlus ? " *" : ""}`,
-      r.codiceLotto ?? "—",
-      String(r.quantita),
-      r.unitaMisura ?? "—",
-    ]),
+    head: [["#", "Prodotto", "Lotto", "Provenienza", "Quantità", "U.M."]],
+    body: productRows,
     theme: template === "minimal" ? "plain" : "striped",
     headStyles: {
       fillColor: template === "minimal" ? undefined : accent,
@@ -300,15 +390,19 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     styles: { fontSize: 9, cellPadding: 2.5 },
     columnStyles: {
       0: { cellWidth: 10, halign: "right" },
-      3: { halign: "right" },
-      4: { cellWidth: 18 },
+      4: { halign: "right" },
+      5: { cellWidth: 16 },
     },
-    margin: { left: margin, right: margin },
+    margin: { left: margin, right: margin, bottom: 24 },
   });
 
   // @ts-expect-error lastAutoTable is added by the autotable plugin
   let afterTableY: number = doc.lastAutoTable?.finalY ?? y + 20;
   afterTableY += 6;
+  if (afterTableY > doc.internal.pageSize.getHeight() - 65) {
+    doc.addPage();
+    afterTableY = margin;
+  }
   doc.setFontSize(9);
   doc.setTextColor(0, 0, 0);
   doc.text(
@@ -317,7 +411,7 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     afterTableY,
     { align: "right" },
   );
-  if (bolla.righe.some(r => r.fsePlus)) {
+  if (bolla.righe.some((r) => r.fsePlus)) {
     doc.setFontSize(8);
     doc.setTextColor(90, 90, 90);
     doc.text(
@@ -352,14 +446,24 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
   if (documentLogoDataUrl) {
     const logoW = 24;
     const logoH = 20;
-    const drawn = await drawImageFit(doc, documentLogoDataUrl, pageW - margin - logoW, footerY - 10, logoW, logoH);
+    const drawn = await drawImageFit(
+      doc,
+      documentLogoDataUrl,
+      pageW - margin - logoW,
+      footerY - 10,
+      logoW,
+      logoH,
+    );
     if (drawn) footerTextRightPad = margin + logoW + 4;
   }
   const footerText = footer ?? branding.footerDocumenti;
   if (footerText) {
     doc.setFontSize(8);
     doc.setTextColor(110, 110, 110);
-    const lines = doc.splitTextToSize(footerText, pageW - footerTextX - footerTextRightPad);
+    const lines = doc.splitTextToSize(
+      footerText,
+      pageW - footerTextX - footerTextRightPad,
+    );
     doc.text(lines, footerTextX, footerY + 1);
   }
 

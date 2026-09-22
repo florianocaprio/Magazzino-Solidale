@@ -1,11 +1,14 @@
 /* @vitest-environment node */
 
 import { describe, expect, it } from "vitest";
+import { sql } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { isCivilDate, isCivilYearMonth } from "../src/lib/civilDate";
 import {
   accountingDisposition,
   accountingSign,
   signedInventoryValue,
+  signedMovementSql,
 } from "../src/lib/fseAccounting";
 
 describe("Magazzino 2.0C-R1 — date civili e segno contabile", () => {
@@ -53,5 +56,87 @@ describe("Magazzino 2.0C-R1 — date civili e segno contabile", () => {
     expect(
       signedInventoryValue("0.000000", { naturaContabile: "CARICO" }),
     ).toBe("0.000000");
+  });
+
+  it("tratta CONSEGNA_ENTE come uscita fisica senza assimilarla alla distribuzione sociale", () => {
+    expect(accountingSign({ naturaContabile: "CONSEGNA_ENTE" })).toBe(-1);
+    expect(
+      signedInventoryValue("4.000000", {
+        naturaContabile: "CONSEGNA_ENTE",
+      }),
+    ).toBe("-4.000000");
+    expect(
+      signedInventoryValue("1.250000", {
+        naturaContabile: "CONSEGNA_ENTE",
+      }),
+    ).toBe("-1.250000");
+    expect(accountingDisposition({ naturaContabile: "CONSEGNA_ENTE" })).toBe(
+      "TRACCIABILITA_INTERNA",
+    );
+
+    expect(
+      accountingSign({
+        naturaContabile: "STORNO",
+        naturaOriginale: "CONSEGNA_ENTE",
+      }),
+    ).toBe(1);
+    expect(
+      signedInventoryValue("4.000000", {
+        naturaContabile: "STORNO",
+        naturaOriginale: "CONSEGNA_ENTE",
+      }),
+    ).toBe("4.000000");
+    expect(
+      accountingDisposition({
+        naturaContabile: "STORNO",
+        naturaOriginale: "CONSEGNA_ENTE",
+      }),
+    ).toBe("TRACCIABILITA_INTERNA");
+  });
+
+  it.each([
+    "DISTRIBUZIONE_FINALE",
+    "TRASFERIMENTO_INTERNO_USCITA",
+    "RETTIFICA_NEGATIVA",
+    "SCARTO",
+    "RESO",
+  ])("conserva il segno negativo della natura preesistente %s", (nature) => {
+    expect(accountingSign({ naturaContabile: nature })).toBe(-1);
+    expect(
+      accountingSign({
+        naturaContabile: "STORNO",
+        naturaOriginale: nature,
+      }),
+    ).toBe(1);
+  });
+
+  it.each([
+    "CARICO",
+    "TRASFERIMENTO_INTERNO_ENTRATA",
+    "RETTIFICA_POSITIVA",
+    "SALDO_INIZIALE",
+  ])("conserva il segno positivo della natura preesistente %s", (nature) => {
+    expect(accountingSign({ naturaContabile: nature })).toBe(1);
+    expect(
+      accountingSign({
+        naturaContabile: "STORNO",
+        naturaOriginale: nature,
+      }),
+    ).toBe(-1);
+  });
+
+  it("propaga CONSEGNA_ENTE anche nel CASE SQL condiviso da report ed export", () => {
+    const query = new PgDialect().sqlToQuery(
+      sql`SELECT ${signedMovementSql(
+        sql`quantity`,
+        sql`nature`,
+        sql`original_nature`,
+      )} AS signed_quantity`,
+    );
+
+    expect(
+      query.params.filter((value) => value === "CONSEGNA_ENTE"),
+    ).toHaveLength(2);
+    expect(query.sql).toContain("THEN -abs");
   });
 });

@@ -7,6 +7,13 @@
  */
 
 export interface BollaUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
   beneficiarioId?: number;
   magazzinoId?: number;
   /** @nullable */

@@ -70,6 +70,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
+import { useCommandIntentRegistry } from "@/lib/command-intent";
 
 export type MensaView =
   | "postazione"
@@ -1242,6 +1243,7 @@ function TrasferimentiView() {
   const create = useCreateTrasferimentoMensa();
   const start = useAvviaTrasferimento();
   const confirm = useConfermaTrasferimento();
+  const commandIntents = useCommandIntentRegistry();
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: ["/api/mensa/trasferimenti"] });
   const submit = () => {
@@ -1260,31 +1262,39 @@ function TrasferimentiView() {
       });
       return;
     }
+    const slot = "trasferimento-mensa:create";
+    const semanticInput = {
+      mensaId: Number(mensaId),
+      magazzinoOrigineId: Number(originId),
+      trasportatoreNome: "Operatore Mensa",
+      righe: [
+        {
+          prodottoId: product.prodottoId,
+          quantita: String(requestedQuantity),
+          unitaMisura: product.unitaMisura,
+        },
+      ],
+    };
     create.mutate(
       {
-        data: {
-          mensaId: Number(mensaId),
-          magazzinoOrigineId: Number(originId),
+        data: commandIntents.prepare(slot, semanticInput, {
+          ...semanticInput,
           dataRichiesta: todayEuropeRome(),
-          idempotencyKey: requestKey("transfer"),
-          trasportatoreNome: "Operatore Mensa",
-          righe: [
-            {
-              prodottoId: product.prodottoId,
-              quantita: String(requestedQuantity),
-              unitaMisura: product.unitaMisura,
-            },
-          ],
-        },
+        }),
       },
       {
-        onSuccess: refresh,
-        onError: (error) =>
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          refresh();
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
           toast({
             title: "Trasferimento non creato",
             description: errorMessage(error),
             variant: "destructive",
-          }),
+          });
+        },
       },
     );
   };
@@ -1297,6 +1307,52 @@ function TrasferimentiView() {
       | { items: TransferRow[]; total: number }
       | undefined,
   );
+  const startTransfer = (row: TransferRow) => {
+    const slot = `trasferimento:${row.id}:start`;
+    start.mutate(
+      {
+        id: row.id,
+        data: commandIntents.prepare(slot, {}, { versione: row.versione }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          refresh();
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: "Trasferimento non avviato",
+            description: errorMessage(error),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+  const confirmTransfer = (row: TransferRow) => {
+    const slot = `trasferimento:${row.id}:receive`;
+    confirm.mutate(
+      {
+        id: row.id,
+        data: commandIntents.prepare(slot, {}, { versione: row.versione }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          refresh();
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: "Ricezione non confermata",
+            description: errorMessage(error),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
   return (
     <div className="space-y-6 p-6">
       <PageTitle view="trasferimenti" />
@@ -1406,30 +1462,14 @@ function TrasferimentiView() {
                   <TableCell className="space-x-2">
                     {row.stato === "richiesto" &&
                       hasPermission("magazzino.transfers.dispatch") && (
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            start.mutate(
-                              { id: row.id, data: { versione: row.versione } },
-                              { onSuccess: refresh },
-                            )
-                          }
-                        >
+                        <Button size="sm" onClick={() => startTransfer(row)}>
                           Avvia
                         </Button>
                       )}
                     {row.stato === "in_transito" &&
                       (hasPermission("mensa.transfers.receive") ||
                         hasPermission("mensa.transfers.manage")) && (
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            confirm.mutate(
-                              { id: row.id, data: { versione: row.versione } },
-                              { onSuccess: refresh },
-                            )
-                          }
-                        >
+                        <Button size="sm" onClick={() => confirmTransfer(row)}>
                           Conferma
                         </Button>
                       )}

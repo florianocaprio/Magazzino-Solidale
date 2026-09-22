@@ -3775,6 +3775,14 @@ export const ListTrasferimentiResponseItem = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -3787,10 +3795,13 @@ export const ListTrasferimentiResponseItem = zod.object({
 export const ListTrasferimentiResponse = zod.array(ListTrasferimentiResponseItem)
 
 
+export const createTrasferimentoBodyIdempotencyKeyMax = 120;
+
 export const createTrasferimentoBodyRigheItemQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 export const CreateTrasferimentoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(createTrasferimentoBodyIdempotencyKeyMax),
   "magazzinoOrigineId": zod.number(),
   "magazzinoDestinoId": zod.number(),
   "trasportatoreVolontarioId": zod.number().nullish(),
@@ -3842,6 +3853,14 @@ export const GetTrasferimentoResponse = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -3857,11 +3876,14 @@ export const UpdateTrasferimentoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateTrasferimentoBodyIdempotencyKeyMax = 120;
+
 
 export const updateTrasferimentoBodyRigheItemQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 export const UpdateTrasferimentoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(updateTrasferimentoBodyIdempotencyKeyMax),
   "versione": zod.number().min(1),
   "trasportatoreVolontarioId": zod.number().nullish(),
   "trasportatoreNome": zod.string().nullish(),
@@ -3906,6 +3928,14 @@ export const UpdateTrasferimentoResponse = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -3924,10 +3954,13 @@ export const AvviaTrasferimentoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const avviaTrasferimentoBodyIdempotencyKeyMax = 120;
+
 
 
 
 export const AvviaTrasferimentoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(avviaTrasferimentoBodyIdempotencyKeyMax),
   "versione": zod.number().min(1)
 })
 
@@ -3962,6 +3995,14 @@ export const AvviaTrasferimentoResponse = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -4011,6 +4052,14 @@ export const GetDocumentoTrasferimentoResponse = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -4029,10 +4078,13 @@ export const ConfermaTrasferimentoParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const confermaTrasferimentoBodyIdempotencyKeyMax = 120;
+
 
 
 
 export const ConfermaTrasferimentoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(confermaTrasferimentoBodyIdempotencyKeyMax),
   "versione": zod.number().min(1),
   "note": zod.string().optional(),
   "dataConferma": zod.string().optional()
@@ -4069,6 +4121,14 @@ export const ConfermaTrasferimentoResponse = zod.object({
   "prodottoId": zod.number(),
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -5194,6 +5254,7 @@ export const GetBeneficiarioParams = zod.object({
 
 
 
+
 export const GetBeneficiarioResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
@@ -5337,6 +5398,7 @@ export const GetBeneficiarioResponse = zod.object({
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
+  "bollaVersione": zod.number().min(1).nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -7241,6 +7303,9 @@ export const ListConsegneQueryParams = zod.object({
   "centroAscoltoId": zod.coerce.number().optional()
 })
 
+
+
+
 export const ListConsegneResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
@@ -7268,6 +7333,7 @@ export const ListConsegneResponse = zod.object({
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
+  "bollaVersione": zod.number().min(1).nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -7312,6 +7378,9 @@ export const ExportConsegneQueryParams = zod.object({
   "centroAscoltoId": zod.coerce.number().optional()
 })
 
+
+
+
 export const ExportConsegneResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
@@ -7339,6 +7408,7 @@ export const ExportConsegneResponse = zod.object({
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
+  "bollaVersione": zod.number().min(1).nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -7350,6 +7420,9 @@ export const ExportConsegneResponse = zod.object({
 export const GetConsegnaParams = zod.object({
   "id": zod.coerce.number()
 })
+
+
+
 
 export const GetConsegnaResponse = zod.object({
   "id": zod.number(),
@@ -7377,6 +7450,7 @@ export const GetConsegnaResponse = zod.object({
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
+  "bollaVersione": zod.number().min(1).nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -7405,6 +7479,9 @@ export const UpdateConsegnaBody = zod.object({
   "noteOperative": zod.string().optional()
 })
 
+
+
+
 export const UpdateConsegnaResponse = zod.object({
   "id": zod.number(),
   "codice": zod.string(),
@@ -7431,6 +7508,7 @@ export const UpdateConsegnaResponse = zod.object({
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
+  "bollaVersione": zod.number().min(1).nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -7451,6 +7529,19 @@ export const DeleteConsegnaParams = zod.object({
 export const CompletaConsegnaParams = zod.object({
   "id": zod.coerce.number()
 })
+
+export const completaConsegnaBodyIdempotencyKeyMax = 120;
+
+
+
+
+export const CompletaConsegnaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(completaConsegnaBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1)
+})
+
+
+
 
 export const CompletaConsegnaResponse = zod.object({
   "id": zod.number(),
@@ -7478,6 +7569,7 @@ export const CompletaConsegnaResponse = zod.object({
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
+  "bollaVersione": zod.number().min(1).nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -7517,9 +7609,20 @@ export const AssociaBollaParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+export const associaBollaBodyIdempotencyKeyMax = 120;
+
+
+
 export const AssociaBollaBody = zod.object({
-  "bollaId": zod.number().nullish()
+  "bollaId": zod.number().min(1).nullable(),
+  "versione": zod.number().min(1),
+  "idempotencyKey": zod.string().min(1).max(associaBollaBodyIdempotencyKeyMax)
 })
+
+
+
 
 export const AssociaBollaResponse = zod.object({
   "id": zod.number(),
@@ -7547,6 +7650,7 @@ export const AssociaBollaResponse = zod.object({
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
+  "bollaVersione": zod.number().min(1).nullish(),
   "noteOperative": zod.string().nullish(),
   "dataEffettuata": zod.string().nullish(),
   "dataCreazione": zod.string()
@@ -9053,6 +9157,328 @@ export const StornaSpesaEmporioBody = zod.object({
 })
 
 
+export const listEntiDestinatariQueryAttivoDefault = true;
+
+export const ListEntiDestinatariQueryParams = zod.object({
+  "attivo": zod.coerce.boolean().default(listEntiDestinatariQueryAttivoDefault)
+})
+
+export const listEntiDestinatariResponseDenominazioneMax = 200;
+
+export const listEntiDestinatariResponseIndirizzoMax = 250;
+
+export const listEntiDestinatariResponseTelefonoMax = 50;
+
+export const listEntiDestinatariResponseEmailMax = 200;
+
+
+
+
+export const ListEntiDestinatariResponseItem = zod.object({
+  "id": zod.number(),
+  "denominazione": zod.string().max(listEntiDestinatariResponseDenominazioneMax),
+  "indirizzo": zod.string().max(listEntiDestinatariResponseIndirizzoMax),
+  "telefono": zod.string().max(listEntiDestinatariResponseTelefonoMax).nullish(),
+  "email": zod.string().max(listEntiDestinatariResponseEmailMax).nullish(),
+  "areaOperativaId": zod.number(),
+  "attivo": zod.boolean(),
+  "versione": zod.number().min(1),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})
+export const ListEntiDestinatariResponse = zod.array(ListEntiDestinatariResponseItem)
+
+
+export const createEnteDestinatarioBodyIdempotencyKeyMax = 120;
+
+export const createEnteDestinatarioBodyDenominazioneMax = 200;
+
+export const createEnteDestinatarioBodyIndirizzoMax = 250;
+
+export const createEnteDestinatarioBodyTelefonoMax = 50;
+
+export const createEnteDestinatarioBodyEmailMax = 200;
+
+
+
+
+export const CreateEnteDestinatarioBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(createEnteDestinatarioBodyIdempotencyKeyMax),
+  "denominazione": zod.string().min(1).max(createEnteDestinatarioBodyDenominazioneMax),
+  "indirizzo": zod.string().min(1).max(createEnteDestinatarioBodyIndirizzoMax),
+  "telefono": zod.string().max(createEnteDestinatarioBodyTelefonoMax).nullish(),
+  "email": zod.string().max(createEnteDestinatarioBodyEmailMax).nullish(),
+  "areaOperativaId": zod.number().min(1)
+})
+
+
+export const UpdateEnteDestinatarioParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateEnteDestinatarioBodyIdempotencyKeyMax = 120;
+
+
+export const updateEnteDestinatarioBodyDenominazioneMax = 200;
+
+export const updateEnteDestinatarioBodyIndirizzoMax = 250;
+
+export const updateEnteDestinatarioBodyTelefonoMax = 50;
+
+export const updateEnteDestinatarioBodyEmailMax = 200;
+
+
+
+export const UpdateEnteDestinatarioBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(updateEnteDestinatarioBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "denominazione": zod.string().min(1).max(updateEnteDestinatarioBodyDenominazioneMax).optional(),
+  "indirizzo": zod.string().min(1).max(updateEnteDestinatarioBodyIndirizzoMax).optional(),
+  "telefono": zod.string().max(updateEnteDestinatarioBodyTelefonoMax).nullish(),
+  "email": zod.string().max(updateEnteDestinatarioBodyEmailMax).nullish(),
+  "attivo": zod.boolean().optional()
+})
+
+export const updateEnteDestinatarioResponseDenominazioneMax = 200;
+
+export const updateEnteDestinatarioResponseIndirizzoMax = 250;
+
+export const updateEnteDestinatarioResponseTelefonoMax = 50;
+
+export const updateEnteDestinatarioResponseEmailMax = 200;
+
+
+
+
+export const UpdateEnteDestinatarioResponse = zod.object({
+  "id": zod.number(),
+  "denominazione": zod.string().max(updateEnteDestinatarioResponseDenominazioneMax),
+  "indirizzo": zod.string().max(updateEnteDestinatarioResponseIndirizzoMax),
+  "telefono": zod.string().max(updateEnteDestinatarioResponseTelefonoMax).nullish(),
+  "email": zod.string().max(updateEnteDestinatarioResponseEmailMax).nullish(),
+  "areaOperativaId": zod.number(),
+  "attivo": zod.boolean(),
+  "versione": zod.number().min(1),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+})
+
+
+
+
+
+export const listDocumentiOperativiQueryRicercaMax = 120;
+
+export const listDocumentiOperativiQuerySortByDefault = `dataDocumento`;
+export const listDocumentiOperativiQuerySortDirectionDefault = `desc`;
+export const listDocumentiOperativiQueryPageDefault = 1;
+
+export const listDocumentiOperativiQueryLimitDefault = 50;
+export const listDocumentiOperativiQueryLimitMax = 100;
+
+
+
+export const ListDocumentiOperativiQueryParams = zod.object({
+  "tipoAggregato": zod.enum(['bolla', 'trasferimento']).optional(),
+  "destinatario": zod.enum(['beneficiario', 'ente', 'magazzino']).optional(),
+  "stato": zod.coerce.string().optional(),
+  "areaOperativaId": zod.coerce.number().min(1).optional(),
+  "magazzinoId": zod.coerce.number().min(1).optional(),
+  "centroAscoltoId": zod.coerce.number().min(1).optional(),
+  "dataDa": zod.date().optional(),
+  "dataA": zod.date().optional(),
+  "ricerca": zod.coerce.string().min(1).max(listDocumentiOperativiQueryRicercaMax).optional(),
+  "sortBy": zod.enum(['dataDocumento', 'dataCreazione', 'numero']).default(listDocumentiOperativiQuerySortByDefault),
+  "sortDirection": zod.enum(['asc', 'desc']).default(listDocumentiOperativiQuerySortDirectionDefault),
+  "page": zod.coerce.number().min(1).default(listDocumentiOperativiQueryPageDefault),
+  "limit": zod.coerce.number().min(1).max(listDocumentiOperativiQueryLimitMax).default(listDocumentiOperativiQueryLimitDefault)
+})
+
+export const listDocumentiOperativiResponseItemsItemDocumentoIdRegExp = new RegExp('^(bolla|trasferimento):[1-9][0-9]\*$');
+
+
+
+export const listDocumentiOperativiResponseTotalMin = 0;
+
+
+
+export const ListDocumentiOperativiResponse = zod.object({
+  "items": zod.array(zod.object({
+  "documentoId": zod.string().regex(listDocumentiOperativiResponseItemsItemDocumentoIdRegExp),
+  "tipoAggregato": zod.enum(['bolla', 'trasferimento']),
+  "id": zod.number(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente', 'magazzino']),
+  "numero": zod.string(),
+  "dataDocumento": zod.coerce.date(),
+  "dataCreazione": zod.coerce.date(),
+  "stato": zod.string(),
+  "origineId": zod.number(),
+  "origineNome": zod.string().nullish(),
+  "destinazioneMagazzinoId": zod.number().nullish(),
+  "destinazioneMagazzinoNome": zod.string().nullish(),
+  "destinatarioNome": zod.string().nullish(),
+  "versione": zod.number().min(1)
+})),
+  "page": zod.number().min(1),
+  "limit": zod.number().min(1),
+  "total": zod.number().min(listDocumentiOperativiResponseTotalMin)
+})
+
+
+
+
+
+export const exportDocumentiOperativiQueryRicercaMax = 120;
+
+export const exportDocumentiOperativiQuerySortByDefault = `dataDocumento`;
+export const exportDocumentiOperativiQuerySortDirectionDefault = `desc`;
+
+export const ExportDocumentiOperativiQueryParams = zod.object({
+  "tipoAggregato": zod.enum(['bolla', 'trasferimento']).optional(),
+  "destinatario": zod.enum(['beneficiario', 'ente', 'magazzino']).optional(),
+  "stato": zod.coerce.string().optional(),
+  "areaOperativaId": zod.coerce.number().min(1).optional(),
+  "magazzinoId": zod.coerce.number().min(1).optional(),
+  "centroAscoltoId": zod.coerce.number().min(1).optional(),
+  "dataDa": zod.date().optional(),
+  "dataA": zod.date().optional(),
+  "ricerca": zod.coerce.string().min(1).max(exportDocumentiOperativiQueryRicercaMax).optional(),
+  "sortBy": zod.enum(['dataDocumento', 'dataCreazione', 'numero']).default(exportDocumentiOperativiQuerySortByDefault),
+  "sortDirection": zod.enum(['asc', 'desc']).default(exportDocumentiOperativiQuerySortDirectionDefault)
+})
+
+
+
+
+
+export const GetDocumentoOperativoParams = zod.object({
+  "tipo": zod.enum(['bolla', 'trasferimento']),
+  "id": zod.coerce.number().min(1)
+})
+
+
+
+
+
+export const GetDocumentoOperativoResponse = zod.object({
+  "documentoId": zod.string(),
+  "tipoAggregato": zod.enum(['bolla', 'trasferimento']),
+  "dettaglio": zod.union([zod.object({
+  "id": zod.number(),
+  "numeroBolla": zod.string(),
+  "dataBolla": zod.string(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
+  "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "enteDestinatarioIndirizzo": zod.string().nullish(),
+  "enteDestinatarioTelefono": zod.string().nullish(),
+  "enteDestinatarioEmail": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
+  "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "volontarioConsegnaId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
+  "magazzinoIndirizzo": zod.string().nullish(),
+  "magazzinoComune": zod.string().nullish(),
+  "beneficiarioIndirizzo": zod.string().nullish(),
+  "beneficiarioTelefono": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "mezzoAltro": zod.boolean().optional(),
+  "stato": zod.string(),
+  "noteConsegna": zod.string().nullish(),
+  "confermaRicezione": zod.boolean(),
+  "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "versione": zod.number().min(1),
+  "dataCreazione": zod.string(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
+  "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string().nullable(),
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
+}))
+}),zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "versione": zod.number(),
+  "magazzinoOrigineId": zod.number(),
+  "magazzinoOrigineNome": zod.string().nullish(),
+  "magazzinoOrigineIndirizzo": zod.string().nullish(),
+  "magazzinoOrigineComune": zod.string().nullish(),
+  "magazzinoOrigineZona": zod.string().nullish(),
+  "magazzinoDestinoId": zod.number(),
+  "magazzinoDestinoNome": zod.string().nullish(),
+  "magazzinoDestinoIndirizzo": zod.string().nullish(),
+  "magazzinoDestinoComune": zod.string().nullish(),
+  "magazzinoDestinoZona": zod.string().nullish(),
+  "trasportatoreVolontarioId": zod.number().nullish(),
+  "trasportatoreVolontarioNome": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "dataRichiesta": zod.string(),
+  "dataEsecuzione": zod.string().nullish(),
+  "dataConfermaRicezione": zod.string().nullish(),
+  "stato": zod.string(),
+  "note": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "mensaId": zod.number().nullish(),
+  "idempotencyKey": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
+  "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+})).optional(),
+  "dataCreazione": zod.string()
+})])
+})
+
+
 export const listBolleQueryPageDefault = 1;
 
 export const listBolleQueryLimitDefault = 50;
@@ -9068,12 +9494,20 @@ export const ListBolleQueryParams = zod.object({
   "limit": zod.coerce.number().min(1).max(listBolleQueryLimitMax).default(listBolleQueryLimitDefault)
 })
 
+
+
+
 export const ListBolleResponseItem = zod.object({
   "id": zod.number(),
   "numeroBolla": zod.string(),
   "dataBolla": zod.string(),
-  "beneficiarioId": zod.number(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
   "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
@@ -9094,13 +9528,22 @@ export const ListBolleResponseItem = zod.object({
   "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "versione": zod.number().min(1),
   "dataCreazione": zod.string()
 })
 export const ListBolleResponse = zod.array(ListBolleResponseItem)
 
 
+export const createBollaBodyIdempotencyKeyMax = 120;
+
+
+
 export const CreateBollaBody = zod.object({
-  "beneficiarioId": zod.number(),
+  "idempotencyKey": zod.string().min(1).max(createBollaBodyIdempotencyKeyMax),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
   "consegnaId": zod.number().optional(),
   "magazzinoId": zod.number(),
   "indirizzoConsegna": zod.string().optional(),
@@ -9116,12 +9559,24 @@ export const GetBollaParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
+
 export const GetBollaResponse = zod.object({
   "id": zod.number(),
   "numeroBolla": zod.string(),
   "dataBolla": zod.string(),
-  "beneficiarioId": zod.number(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
   "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "enteDestinatarioIndirizzo": zod.string().nullish(),
+  "enteDestinatarioTelefono": zod.string().nullish(),
+  "enteDestinatarioEmail": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
@@ -9145,6 +9600,8 @@ export const GetBollaResponse = zod.object({
   "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
@@ -9153,6 +9610,13 @@ export const GetBollaResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -9161,7 +9625,8 @@ export const GetBollaResponse = zod.object({
   "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
-  "note": zod.string().nullish()
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
 }))
 })
 
@@ -9170,7 +9635,14 @@ export const UpdateBollaParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateBollaBodyIdempotencyKeyMax = 120;
+
+
+
+
 export const UpdateBollaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(updateBollaBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
   "beneficiarioId": zod.number().optional(),
   "magazzinoId": zod.number().optional(),
   "volontarioConsegnaId": zod.number().nullish(),
@@ -9181,12 +9653,24 @@ export const UpdateBollaBody = zod.object({
   "noteConsegna": zod.string().nullish()
 })
 
+
+
+
+
 export const UpdateBollaResponse = zod.object({
   "id": zod.number(),
   "numeroBolla": zod.string(),
   "dataBolla": zod.string(),
-  "beneficiarioId": zod.number(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
   "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "enteDestinatarioIndirizzo": zod.string().nullish(),
+  "enteDestinatarioTelefono": zod.string().nullish(),
+  "enteDestinatarioEmail": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
@@ -9210,6 +9694,8 @@ export const UpdateBollaResponse = zod.object({
   "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
@@ -9218,6 +9704,13 @@ export const UpdateBollaResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -9226,7 +9719,8 @@ export const UpdateBollaResponse = zod.object({
   "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
-  "note": zod.string().nullish()
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
 }))
 })
 
@@ -9238,6 +9732,9 @@ export const ListBollaRigheParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
 export const ListBollaRigheResponseItem = zod.object({
   "id": zod.number(),
   "bollaId": zod.number(),
@@ -9245,6 +9742,13 @@ export const ListBollaRigheResponseItem = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -9253,7 +9757,8 @@ export const ListBollaRigheResponseItem = zod.object({
   "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
-  "note": zod.string().nullish()
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
 })
 export const ListBollaRigheResponse = zod.array(ListBollaRigheResponseItem)
 
@@ -9265,10 +9770,15 @@ export const AddBollaRigaParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const addBollaRigaBodyIdempotencyKeyMax = 120;
+
+
 export const addBollaRigaBodyQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 export const AddBollaRigaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(addBollaRigaBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
   "prodottoId": zod.number(),
   "lottoId": zod.number().optional(),
   "quantita": zod.string().regex(addBollaRigaBodyQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
@@ -9285,6 +9795,16 @@ export const DeleteBollaRigaParams = zod.object({
   "rigaId": zod.coerce.number()
 })
 
+export const deleteBollaRigaBodyIdempotencyKeyMax = 120;
+
+
+
+
+export const DeleteBollaRigaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(deleteBollaRigaBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1)
+})
+
 
 /**
  * @summary Confirm bolla - move from bozza to confermato
@@ -9293,12 +9813,34 @@ export const ConfermaBollaParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const confermaBollaBodyIdempotencyKeyMax = 120;
+
+
+
+
+export const ConfermaBollaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(confermaBollaBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1)
+})
+
+
+
+
+
 export const ConfermaBollaResponse = zod.object({
   "id": zod.number(),
   "numeroBolla": zod.string(),
   "dataBolla": zod.string(),
-  "beneficiarioId": zod.number(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
   "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "enteDestinatarioIndirizzo": zod.string().nullish(),
+  "enteDestinatarioTelefono": zod.string().nullish(),
+  "enteDestinatarioEmail": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
@@ -9322,6 +9864,8 @@ export const ConfermaBollaResponse = zod.object({
   "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
@@ -9330,6 +9874,13 @@ export const ConfermaBollaResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -9338,24 +9889,50 @@ export const ConfermaBollaResponse = zod.object({
   "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
-  "note": zod.string().nullish()
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
 }))
 })
 
 
 /**
- * @summary Cancel bolla - revert stock if confermato, mark annullato
+ * @summary Cancel a pre-delivery bolla and release active reservations
  */
 export const AnnullaBollaParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const annullaBollaBodyIdempotencyKeyMax = 120;
+
+
+export const annullaBollaBodyMotivoMax = 500;
+
+
+
+export const AnnullaBollaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(annullaBollaBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "motivo": zod.string().min(1).max(annullaBollaBodyMotivoMax)
+})
+
+
+
+
+
 export const AnnullaBollaResponse = zod.object({
   "id": zod.number(),
   "numeroBolla": zod.string(),
   "dataBolla": zod.string(),
-  "beneficiarioId": zod.number(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
   "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "enteDestinatarioIndirizzo": zod.string().nullish(),
+  "enteDestinatarioTelefono": zod.string().nullish(),
+  "enteDestinatarioEmail": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
@@ -9379,6 +9956,8 @@ export const AnnullaBollaResponse = zod.object({
   "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
@@ -9387,6 +9966,13 @@ export const AnnullaBollaResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -9395,7 +9981,106 @@ export const AnnullaBollaResponse = zod.object({
   "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
-  "note": zod.string().nullish()
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
+}))
+})
+
+
+/**
+ * @summary Rettifica amministrativa append-only di righe già contabilizzate
+ */
+
+
+
+export const StornaAmministrativamenteBollaParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const stornaAmministrativamenteBollaBodyIdempotencyKeyMax = 120;
+
+
+export const stornaAmministrativamenteBollaBodyMotivoMax = 500;
+
+
+
+
+
+export const StornaAmministrativamenteBollaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(stornaAmministrativamenteBollaBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "motivo": zod.string().min(1).max(stornaAmministrativamenteBollaBodyMotivoMax),
+  "rigaIds": zod.array(zod.number().min(1)).min(1)
+})
+
+
+
+
+
+export const StornaAmministrativamenteBollaResponse = zod.object({
+  "id": zod.number(),
+  "numeroBolla": zod.string(),
+  "dataBolla": zod.string(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
+  "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "enteDestinatarioIndirizzo": zod.string().nullish(),
+  "enteDestinatarioTelefono": zod.string().nullish(),
+  "enteDestinatarioEmail": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
+  "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "volontarioConsegnaId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
+  "magazzinoIndirizzo": zod.string().nullish(),
+  "magazzinoComune": zod.string().nullish(),
+  "beneficiarioIndirizzo": zod.string().nullish(),
+  "beneficiarioTelefono": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "mezzoAltro": zod.boolean().optional(),
+  "stato": zod.string(),
+  "noteConsegna": zod.string().nullish(),
+  "confermaRicezione": zod.boolean(),
+  "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "versione": zod.number().min(1),
+  "dataCreazione": zod.string(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
+  "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string().nullable(),
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
 }))
 })
 
@@ -9407,17 +10092,36 @@ export const ConsegnaBollaParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const consegnaBollaBodyIdempotencyKeyMax = 120;
+
+
+
+
 export const ConsegnaBollaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(consegnaBollaBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
   "noteRicezione": zod.string().optional(),
   "confermaRicezione": zod.boolean().optional()
 })
+
+
+
+
 
 export const ConsegnaBollaResponse = zod.object({
   "id": zod.number(),
   "numeroBolla": zod.string(),
   "dataBolla": zod.string(),
-  "beneficiarioId": zod.number(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
   "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "enteDestinatarioIndirizzo": zod.string().nullish(),
+  "enteDestinatarioTelefono": zod.string().nullish(),
+  "enteDestinatarioEmail": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
@@ -9441,6 +10145,8 @@ export const ConsegnaBollaResponse = zod.object({
   "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
@@ -9449,6 +10155,13 @@ export const ConsegnaBollaResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -9457,7 +10170,8 @@ export const ConsegnaBollaResponse = zod.object({
   "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
-  "note": zod.string().nullish()
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
 }))
 })
 
@@ -9477,12 +10191,24 @@ export const SegnalaRitiroNonEffettuatoBody = zod.object({
   "motivo": zod.string().max(segnalaRitiroNonEffettuatoBodyMotivoMax).nullish()
 })
 
+
+
+
+
 export const SegnalaRitiroNonEffettuatoResponse = zod.object({
   "id": zod.number(),
   "numeroBolla": zod.string(),
   "dataBolla": zod.string(),
-  "beneficiarioId": zod.number(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
   "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "enteDestinatarioIndirizzo": zod.string().nullish(),
+  "enteDestinatarioTelefono": zod.string().nullish(),
+  "enteDestinatarioEmail": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
@@ -9506,6 +10232,8 @@ export const SegnalaRitiroNonEffettuatoResponse = zod.object({
   "ritiroNonEffettuatoMotivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
   "id": zod.number(),
@@ -9514,6 +10242,13 @@ export const SegnalaRitiroNonEffettuatoResponse = zod.object({
   "prodottoNome": zod.string().nullish(),
   "lottoId": zod.number().nullish(),
   "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
   "fsePlus": zod.boolean(),
   "fsePlusQuantita": zod.number().optional(),
   "nonFsePlusQuantita": zod.number().optional(),
@@ -9522,7 +10257,8 @@ export const SegnalaRitiroNonEffettuatoResponse = zod.object({
   "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
   "quantita": zod.number(),
   "unitaMisura": zod.string().nullable(),
-  "note": zod.string().nullish()
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
 }))
 })
 

@@ -37,6 +37,7 @@ import {
   formatDateOrDateTimeEuropeRome,
   todayEuropeRome,
 } from "@/lib/europe-rome";
+import { withDocumentoOperativoSelection } from "@/lib/documenti-operativi-location";
 
 const LAYER_LABELS: Record<MapsLayerCode, string> = {
   "sociale.interventi_pianificati": "maps.layerSocialInterventions",
@@ -50,7 +51,11 @@ export function mapsEntityDeepLink(marker: MapsMarker): string | null {
     return `/interventi?interventoId=${marker.entityId}`;
   if (marker.entityType === "consegna")
     return `/consegne?consegnaId=${marker.entityId}`;
-  if (marker.entityType === "bolla") return `/bolle?bollaId=${marker.entityId}`;
+  if (marker.entityType === "bolla")
+    return `/bolle${withDocumentoOperativoSelection("", {
+      tipo: "bolla",
+      id: marker.entityId,
+    })}`;
   if (marker.entityType === "magazzino")
     return `/magazzini?magazzinoId=${marker.entityId}`;
   if (marker.entityType === "centro_ascolto")
@@ -424,7 +429,12 @@ export default function MapsOperativa() {
                   />
                   {selectedMarker.actions.includes("convert_delivery") && (
                     <Button asChild className="min-h-11">
-                      <Link href={`/bolle?bollaId=${selectedMarker.entityId}`}>
+                      <Link
+                        href={`/bolle${withDocumentoOperativoSelection("", {
+                          tipo: "bolla",
+                          id: selectedMarker.entityId,
+                        })}`}
+                      >
                         {t("maps.convertDelivery")}
                       </Link>
                     </Button>

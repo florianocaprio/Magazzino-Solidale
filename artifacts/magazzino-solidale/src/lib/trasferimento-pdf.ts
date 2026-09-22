@@ -4,7 +4,11 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import type { Trasferimento } from "@workspace/api-client-react";
 import { loadAssociationLogo } from "./bolla-pdf";
-import { loadFallbackLogoDataUrl, resolveBrandingAmbiente, type BrandingAmbiente } from "@/lib/branding-ambiente";
+import {
+  loadFallbackLogoDataUrl,
+  resolveBrandingAmbiente,
+  type BrandingAmbiente,
+} from "@/lib/branding-ambiente";
 
 export { loadAssociationLogo };
 
@@ -51,12 +55,15 @@ async function drawImageFit(
   return drawH;
 }
 
-export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): Promise<void> {
+export async function generateTrasferimentoPdf(
+  opts: TrasferimentoPdfOptions,
+): Promise<void> {
   const { trasferimento: t, footer, associationLogoDataUrl } = opts;
   const branding = opts.branding ?? resolveBrandingAmbiente(null);
-  const documentLogoDataUrl = associationLogoDataUrl === undefined
-    ? await loadFallbackLogoDataUrl()
-    : associationLogoDataUrl;
+  const documentLogoDataUrl =
+    associationLogoDataUrl === undefined
+      ? await loadFallbackLogoDataUrl()
+      : associationLogoDataUrl;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
@@ -68,7 +75,14 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
   // ---- Header ----
   let textX = margin;
   if (documentLogoDataUrl) {
-    const drawn = await drawImageFit(doc, documentLogoDataUrl, margin, y, 22, 22);
+    const drawn = await drawImageFit(
+      doc,
+      documentLogoDataUrl,
+      margin,
+      y,
+      22,
+      22,
+    );
     if (drawn) textX = margin + 26;
   }
   doc.setTextColor(ACCENT[0], ACCENT[1], ACCENT[2]);
@@ -82,7 +96,13 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(110, 110, 110);
-  doc.text(branding.sottotitoloDocumento ?? branding.contattiDocumento ?? "Trasferimento interno tra magazzini", textX, y + 11);
+  doc.text(
+    branding.sottotitoloDocumento ??
+      branding.contattiDocumento ??
+      "Trasferimento interno tra magazzini",
+    textX,
+    y + 11,
+  );
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
   doc.text(`N. ${t.codice}`, pageW - margin, y + 11, { align: "right" });
@@ -98,6 +118,23 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
   doc.line(margin, y, pageW - margin, y);
   y += 6;
 
+  if (t.stato === "richiesto" || t.stato === "preparato") {
+    doc.setFillColor(254, 243, 199);
+    doc.rect(margin, y, pageW - margin * 2, 8, "F");
+    doc.setTextColor(146, 64, 14);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text(
+      "BOZZA OPERATIVA — NESSUN MOVIMENTO DI MAGAZZINO",
+      pageW / 2,
+      y + 5.2,
+      { align: "center" },
+    );
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    y += 12;
+  }
+
   // ---- Origine / Destinazione ----
   const colDestX = pageW / 2 + 4;
   const addrLines = (
@@ -111,8 +148,16 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
     if (zona) lines.push(`Zona: ${zona}`);
     return lines;
   };
-  const origineAddr = addrLines(t.magazzinoOrigineIndirizzo, t.magazzinoOrigineComune, t.magazzinoOrigineZona);
-  const destinoAddr = addrLines(t.magazzinoDestinoIndirizzo, t.magazzinoDestinoComune, t.magazzinoDestinoZona);
+  const origineAddr = addrLines(
+    t.magazzinoOrigineIndirizzo,
+    t.magazzinoOrigineComune,
+    t.magazzinoOrigineZona,
+  );
+  const destinoAddr = addrLines(
+    t.magazzinoDestinoIndirizzo,
+    t.magazzinoDestinoComune,
+    t.magazzinoDestinoZona,
+  );
 
   doc.setFontSize(9);
   doc.setTextColor(110, 110, 110);
@@ -122,8 +167,16 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
   doc.setTextColor(0, 0, 0);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text(t.magazzinoOrigineNome || `Magazzino #${t.magazzinoOrigineId}`, margin, y);
-  doc.text(t.magazzinoDestinoNome || `Magazzino #${t.magazzinoDestinoId}`, colDestX, y);
+  doc.text(
+    t.magazzinoOrigineNome || `Magazzino #${t.magazzinoOrigineId}`,
+    margin,
+    y,
+  );
+  doc.text(
+    t.magazzinoDestinoNome || `Magazzino #${t.magazzinoDestinoId}`,
+    colDestX,
+    y,
+  );
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
@@ -135,7 +188,8 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
   y = addrY + addrRows * 4.5 + 4;
 
   // ---- Trasportatore ----
-  const trasportatore = t.trasportatoreVolontarioNome || t.trasportatoreNome || "—";
+  const trasportatore =
+    t.trasportatoreVolontarioNome || t.trasportatoreNome || "—";
   doc.setFontSize(9);
   doc.setTextColor(110, 110, 110);
   doc.text("TRASPORTATORE", margin, y);
@@ -147,36 +201,55 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
   y += 9;
 
   // ---- Tabella prodotti ----
+  const productRows = righe.flatMap((r, i) => {
+    const ripartizioni = r.ripartizioniLotto ?? [];
+    const rows = ripartizioni.length > 0 ? ripartizioni : [null];
+    return rows.map((ripartizione, allocationIndex) => [
+      allocationIndex === 0 ? String(i + 1) : "",
+      allocationIndex === 0
+        ? `${r.prodottoNome ?? `Prodotto #${r.prodottoId}`}${r.fsePlus ? " *" : ""}`
+        : "Ripartizione FEFO",
+      ripartizione?.codiceLotto ?? r.codiceLotto ?? "—",
+      ripartizione?.fondoOrigine ?? r.fondoOrigine ?? "NESSUN_FONDO",
+      String(ripartizione?.quantita ?? r.quantita),
+      r.unitaMisura,
+    ]);
+  });
   autoTable(doc, {
     startY: y,
-    head: [["#", "Prodotto", "Quantità", "U.M."]],
-    body: righe.map((r, i) => [
-      String(i + 1),
-      `${r.prodottoNome ?? `Prodotto #${r.prodottoId}`}${r.fsePlus ? " *" : ""}`,
-      String(r.quantita),
-      r.unitaMisura,
-    ]),
+    head: [["#", "Prodotto", "Lotto", "Provenienza", "Quantità", "U.M."]],
+    body: productRows,
     theme: "striped",
     headStyles: { fillColor: ACCENT, textColor: 255, fontStyle: "bold" },
     styles: { fontSize: 9, cellPadding: 2.5 },
     columnStyles: {
       0: { cellWidth: 10, halign: "right" },
-      2: { halign: "right" },
-      3: { cellWidth: 18 },
+      4: { halign: "right" },
+      5: { cellWidth: 16 },
     },
-    margin: { left: margin, right: margin },
+    margin: { left: margin, right: margin, bottom: 24 },
   });
 
   // @ts-expect-error lastAutoTable is added by the autotable plugin
   let afterTableY: number = doc.lastAutoTable?.finalY ?? y + 20;
   afterTableY += 6;
+  if (afterTableY > pageH - 85) {
+    doc.addPage();
+    afterTableY = margin;
+  }
   doc.setFontSize(9);
   doc.setTextColor(0, 0, 0);
-  doc.text(`Totale articoli: ${righe.length}`, pageW - margin, afterTableY, { align: "right" });
-  if (righe.some(r => r.fsePlus)) {
+  doc.text(`Totale articoli: ${righe.length}`, pageW - margin, afterTableY, {
+    align: "right",
+  });
+  if (righe.some((r) => r.fsePlus)) {
     doc.setFontSize(8);
     doc.setTextColor(90, 90, 90);
-    doc.text("* Prodotto FSE+ (Fondo Sociale Europeo Plus)", margin, afterTableY);
+    doc.text(
+      "* Prodotto FSE+ (Fondo Sociale Europeo Plus)",
+      margin,
+      afterTableY,
+    );
     doc.setTextColor(0, 0, 0);
   }
 
@@ -215,7 +288,14 @@ export async function generateTrasferimentoPdf(opts: TrasferimentoPdfOptions): P
 
   let footerTextX = margin;
   if (documentLogoDataUrl) {
-    const drawn = await drawImageFit(doc, documentLogoDataUrl, margin, footerY - 2, 12, 10);
+    const drawn = await drawImageFit(
+      doc,
+      documentLogoDataUrl,
+      margin,
+      footerY - 2,
+      12,
+      10,
+    );
     if (drawn) footerTextX = margin + 16;
   }
   const footerText = footer ?? branding.footerDocumenti;

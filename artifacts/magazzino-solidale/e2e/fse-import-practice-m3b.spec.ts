@@ -628,17 +628,19 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await expect(
       page.getByRole("button", { name: "Aggiungi alla pratica" }),
     ).toBeEnabled();
-    const committedAfterInterruptedResponse = await page.request.get(
-      `/api/carico-pratiche/${practice.id}`,
-    );
-    expect(committedAfterInterruptedResponse.status()).toBe(200);
-    expect(
-      (
-        (await committedAfterInterruptedResponse.json()) as {
-          righe: Array<{ id: number }>;
-        }
-      ).righe,
-    ).toHaveLength(1);
+    await expect
+      .poll(async () => {
+        const committedAfterInterruptedResponse = await page.request.get(
+          `/api/carico-pratiche/${practice.id}`,
+        );
+        expect(committedAfterInterruptedResponse.status()).toBe(200);
+        return (
+          (await committedAfterInterruptedResponse.json()) as {
+            righe: Array<{ id: number }>;
+          }
+        ).righe.length;
+      })
+      .toBe(1);
 
     const retryAttach = page.waitForResponse(
       (response) =>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { isNavItemEnabledByAccess, NAV_ITEMS } from "@/components/layout";
+import { canAccessDocumentiOperativiRoute } from "@/App";
 
 const appSource = readFileSync(
   path.resolve(process.cwd(), "src/App.tsx"),
@@ -15,6 +16,52 @@ function routeSource(path: string, nextPath: string): string {
 }
 
 describe("permission gate della navigazione operativa", () => {
+  it("preserva il gate legacy Trasferimenti prima del redirect alla facciata comune", () => {
+    const source = routeSource("/trasferimenti", "/preparazione-consegne");
+    expect(source).toContain('<Guard area="magazzino">');
+    expect(source).toContain('<RequireModulo codice="TRASFERIMENTI">');
+    expect(source).toContain('permission="magazzino.view"');
+    expect(source).toContain("<LegacyTrasferimentiRedirect />");
+    expect(appSource).toContain(
+      "canonicalLegacyTrasferimentiSearch(window.location.search)",
+    );
+  });
+
+  it("apre la facciata comune per il solo ramo autorizzato", () => {
+    const access = (
+      areas: string[],
+      permissions: string[],
+      modules: string[],
+    ) =>
+      canAccessDocumentiOperativiRoute(
+        (area) => areas.includes(area),
+        (permission) => permissions.includes(permission),
+        (module) => modules.includes(module),
+      );
+
+    expect(access(["magazzino"], ["magazzino.view"], ["TRASFERIMENTI"])).toBe(
+      true,
+    );
+    expect(
+      access(["sociale"], ["bolle.view"], ["MAGAZZINO_SOLIDALE", "BOLLE"]),
+    ).toBe(true);
+    expect(
+      access(
+        ["magazzino"],
+        ["magazzino.view"],
+        ["MAGAZZINO_SOLIDALE", "BOLLE"],
+      ),
+    ).toBe(false);
+    expect(access(["sociale"], ["bolle.view"], ["TRASFERIMENTI"])).toBe(false);
+    expect(
+      access(
+        ["magazzino"],
+        ["magazzino.view", "bolle.view"],
+        ["MAGAZZINO_SOLIDALE", "BOLLE"],
+      ),
+    ).toBe(true);
+  });
+
   it("separa lista Sociale, directory UDS e dossier completo", () => {
     expect(routeSource("/beneficiari", "/beneficiari/:id")).toContain(
       'permission="beneficiari.view"',
@@ -103,8 +150,26 @@ describe("permission gate della navigazione operativa", () => {
   it("mostra Turni solo con Area Sociale e permesso dedicato", () => {
     const item = NAV_ITEMS.find((candidate) => candidate.key === "turni")!;
     expect(item.area).toBe("sociale");
-    expect(isNavItemEnabledByAccess(item, (area) => area === "sociale", () => true)).toBe(true);
-    expect(isNavItemEnabledByAccess(item, () => false, () => true)).toBe(false);
-    expect(isNavItemEnabledByAccess(item, () => true, () => false)).toBe(false);
+    expect(
+      isNavItemEnabledByAccess(
+        item,
+        (area) => area === "sociale",
+        () => true,
+      ),
+    ).toBe(true);
+    expect(
+      isNavItemEnabledByAccess(
+        item,
+        () => false,
+        () => true,
+      ),
+    ).toBe(false);
+    expect(
+      isNavItemEnabledByAccess(
+        item,
+        () => true,
+        () => false,
+      ),
+    ).toBe(false);
   });
 });

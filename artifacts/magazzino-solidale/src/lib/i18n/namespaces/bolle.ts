@@ -3,6 +3,19 @@ export const bolle = {
     title: "Bolle di Consegna",
     subtitle: "Documenti di accompagnamento per le uscite merce.",
     newBolla: "Nuova Bolla",
+    nuovoDocumento: "Nuovo documento operativo",
+    nuovaConsegnaDescrizione: "Consegna a beneficiario o ente esterno",
+    nuovoTrasferimentoDescrizione: "Movimento tra due magazzini",
+    tipoDestinatario: "Tipo destinatario",
+    destinatarioLabel: "Destinatario",
+    destinatarioBeneficiario: "Beneficiario",
+    destinatarioEnte: "Ente esterno",
+    entePlaceholder: "Seleziona ente...",
+    nuovoEnte: "Nuovo ente",
+    enteNome: "Denominazione ente",
+    creaEnte: "Crea e seleziona ente",
+    motivoAnnullamento: "Motivo dell'annullamento",
+    motivoAnnullamentoPlaceholder: "Indica il motivo obbligatorio...",
 
     statoBozza: "Bozza",
     statoConfermato: "Confermato",
@@ -40,8 +53,10 @@ export const bolle = {
     createError: "Impossibile creare la bolla",
 
     modificaTitle: "Modifica intestazione bolla",
-    cambioMagazzinoConfirm: "Cambiando magazzino i prodotti già aggiunti alla bolla verranno rimossi (appartengono al magazzino precedente). Continuare?",
-    cambioMagazzinoWarning: "Cambiando magazzino i prodotti già aggiunti verranno rimossi (appartengono al magazzino precedente).",
+    cambioMagazzinoConfirm:
+      "Cambiando magazzino i prodotti già aggiunti alla bolla verranno rimossi (appartengono al magazzino precedente). Continuare?",
+    cambioMagazzinoWarning:
+      "Cambiando magazzino i prodotti già aggiunti verranno rimossi (appartengono al magazzino precedente).",
     bollaAggiornata: "Bolla aggiornata",
     updateError: "Errore durante l'aggiornamento",
 
@@ -61,7 +76,8 @@ export const bolle = {
     lottoPrefix: "Lotto #",
     scadAbbr: "scad.",
     dispAbbr: "disp.",
-    lottoHint: "Lascia vuoto per scaricare automaticamente i lotti in scadenza per primi.",
+    lottoHint:
+      "Lascia vuoto per scaricare automaticamente i lotti in scadenza per primi.",
     quantitaPlaceholder: "0",
     massimoDisponibile: "Massimo disponibile: {{max}}",
     disponibileQta: "Disponibile: {{max}} {{um}}",
@@ -85,16 +101,19 @@ export const bolle = {
     fsePlusLegend: "* Prodotto FSE+ (Fondo Sociale Europeo Plus)",
     fsePlusTitle: "Prodotto FSE+",
     confermaInfoTitle: "Conferma bolla",
-    confermaInfoText: " — I prodotti verranno impegnati sui lotti in scadenza per primi. Lo scarico fisico avverrà alla consegna.",
+    confermaInfoText:
+      " — I prodotti verranno impegnati sui lotti in scadenza per primi. Lo scarico fisico avverrà alla consegna.",
     prontaTitle: "Pronta per la consegna.",
-    prontaText: " La merce è impegnata e le righe non sono più modificabili. Segna come consegnata quando il beneficiario ha ricevuto la merce.",
+    prontaText:
+      " La merce è impegnata e le righe non sono più modificabili. Segna come consegnata quando il beneficiario ha ricevuto la merce.",
     confermaInCorso: "Conferma in corso...",
     confermaBolla: "Conferma bolla e impegna merce",
     registrazione: "Registrazione...",
     segnaConsegnata: "Segna come consegnata",
     assegnaPianificazione: "Assegna a pianificazione consegne",
     assegnaPianificazioneTitle: "Assegna a pianificazione consegne",
-    assegnaPianificazioneDesc: "Seleziona una consegna pianificata del centro da collegare a questa bolla.",
+    assegnaPianificazioneDesc:
+      "Seleziona una consegna pianificata del centro da collegare a questa bolla.",
     tornaIndietro: "Torna indietro",
     nessunaPianificata: "Nessuna consegna pianificata per questo centro.",
     altroBeneficiario: "Altro beneficiario",
@@ -106,25 +125,33 @@ export const bolle = {
     annullaBolla: "Annulla bolla",
     storna: "Storna",
     consegnaCompletata: "✓ Consegna completata. Merce scaricata dal magazzino.",
-    bollaAnnullataInfo: "✕ Bolla annullata. Eventuali impegni sono stati rilasciati o gli scarichi fisici ripristinati.",
+    bollaAnnullataInfo:
+      "✕ Bolla annullata. Eventuali impegni sono stati rilasciati o gli scarichi fisici ripristinati.",
     annullareTitle: "Annullare la bolla {{numero}}?",
-    annullaDescConfermato: "Le prenotazioni attive verranno rilasciate senza scaricare i lotti. L'operazione non è reversibile.",
-    annullaDescConsegnato: "Questa bolla è già stata consegnata: i prodotti verranno ripristinati a magazzino, i movimenti annullati e l'eventuale consegna collegata riportata a 'pianificata'. L'operazione non è reversibile.",
-    trasportatoreObbligatorioDomicilio: "Per le consegne a domicilio è obbligatorio indicare un volontario trasportatore.",
-    ritiroMagazzinoInfo: "Nessun trasportatore: il beneficiario ritira presso il magazzino.",
-    annullaDescBozza: "La bolla verrà contrassegnata come annullata. L'operazione non è reversibile.",
+    annullaDescConfermato:
+      "Le prenotazioni attive verranno rilasciate senza scaricare i lotti. L'operazione non è reversibile.",
+    annullaDescConsegnato:
+      "Questa bolla è già stata consegnata: i prodotti verranno ripristinati a magazzino, i movimenti annullati e l'eventuale consegna collegata riportata a 'pianificata'. L'operazione non è reversibile.",
+    trasportatoreObbligatorioDomicilio:
+      "Per le consegne a domicilio è obbligatorio indicare un volontario trasportatore.",
+    ritiroMagazzinoInfo:
+      "Nessun trasportatore: il beneficiario ritira presso il magazzino.",
+    annullaDescBozza:
+      "La bolla verrà contrassegnata come annullata. L'operazione non è reversibile.",
     noMantieni: "No, mantieni",
     siAnnulla: "Sì, annulla bolla",
     prodottoRimosso: "Prodotto rimosso",
     rimuoviError: "Impossibile rimuovere",
     bollaConfermataTitle: "Bolla confermata",
-    bollaConfermataDesc: "Merce impegnata. Lo scarico fisico avverrà alla consegna.",
+    bollaConfermataDesc:
+      "Merce impegnata. Lo scarico fisico avverrà alla consegna.",
     confermaError: "Errore durante la conferma",
     bollaConsegnataTitle: "Bolla consegnata",
     bollaConsegnataDesc: "Consegna registrata.",
     consegnaError: "Errore durante la consegna",
     bollaAnnullataTitle: "Bolla annullata",
-    bollaAnnullataDesc: "Eventuali impegni sono stati rilasciati o gli scarichi fisici ripristinati.",
+    bollaAnnullataDesc:
+      "Eventuali impegni sono stati rilasciati o gli scarichi fisici ripristinati.",
     annullaError: "Impossibile annullare",
     consegnaAggiornata: "Consegna aggiornata",
     aggiornaError: "Impossibile aggiornare",
@@ -143,7 +170,8 @@ export const bolle = {
     allStati: "Tutti gli stati",
     azzeraFiltri: "Azzera filtri",
     noDocFiltri: "Nessun documento corrisponde ai filtri selezionati.",
-    noBolle: "Nessuna bolla emessa. Crea la prima bolla con il pulsante in alto a destra.",
+    noBolle:
+      "Nessuna bolla emessa. Crea la prima bolla con il pulsante in alto a destra.",
     scaricoMagazzino: "Scarico Magazzino",
     articoli: "{{count}} art.",
     bollaBtn: "Bolla",
@@ -156,6 +184,19 @@ export const bolle = {
     title: "Albaranes de Entrega",
     subtitle: "Documentos de acompañamiento para las salidas de mercancía.",
     newBolla: "Nuevo Albarán",
+    nuovoDocumento: "Nuevo documento operativo",
+    nuovaConsegnaDescrizione: "Entrega a beneficiario o entidad externa",
+    nuovoTrasferimentoDescrizione: "Movimiento entre dos almacenes",
+    tipoDestinatario: "Tipo de destinatario",
+    destinatarioLabel: "Destinatario",
+    destinatarioBeneficiario: "Beneficiario",
+    destinatarioEnte: "Entidad externa",
+    entePlaceholder: "Seleccionar entidad...",
+    nuovoEnte: "Nueva entidad",
+    enteNome: "Nombre de la entidad",
+    creaEnte: "Crear y seleccionar entidad",
+    motivoAnnullamento: "Motivo de la anulación",
+    motivoAnnullamentoPlaceholder: "Indique el motivo obligatorio...",
 
     statoBozza: "Borrador",
     statoConfermato: "Confirmado",
@@ -193,8 +234,10 @@ export const bolle = {
     createError: "No se pudo crear el albarán",
 
     modificaTitle: "Editar encabezado del albarán",
-    cambioMagazzinoConfirm: "Al cambiar de almacén los productos ya añadidos al albarán se eliminarán (pertenecen al almacén anterior). ¿Continuar?",
-    cambioMagazzinoWarning: "Al cambiar de almacén los productos ya añadidos se eliminarán (pertenecen al almacén anterior).",
+    cambioMagazzinoConfirm:
+      "Al cambiar de almacén los productos ya añadidos al albarán se eliminarán (pertenecen al almacén anterior). ¿Continuar?",
+    cambioMagazzinoWarning:
+      "Al cambiar de almacén los productos ya añadidos se eliminarán (pertenecen al almacén anterior).",
     bollaAggiornata: "Albarán actualizado",
     updateError: "Error durante la actualización",
 
@@ -214,7 +257,8 @@ export const bolle = {
     lottoPrefix: "Lote #",
     scadAbbr: "venc.",
     dispAbbr: "disp.",
-    lottoHint: "Deja vacío para descargar automáticamente los lotes próximos a vencer primero.",
+    lottoHint:
+      "Deja vacío para descargar automáticamente los lotes próximos a vencer primero.",
     quantitaPlaceholder: "0",
     massimoDisponibile: "Máximo disponible: {{max}}",
     disponibileQta: "Disponible: {{max}} {{um}}",
@@ -238,16 +282,19 @@ export const bolle = {
     fsePlusLegend: "* Producto FSE+ (Fondo Social Europeo Plus)",
     fsePlusTitle: "Producto FSE+",
     confermaInfoTitle: "Confirmar albarán",
-    confermaInfoText: " — Los productos se reservarán en los lotes próximos a vencer primero. La salida física se hará en la entrega.",
+    confermaInfoText:
+      " — Los productos se reservarán en los lotes próximos a vencer primero. La salida física se hará en la entrega.",
     prontaTitle: "Lista para la entrega.",
-    prontaText: " La mercancía está reservada y las líneas ya no se pueden modificar. Marca como entregada cuando el beneficiario la haya recibido.",
+    prontaText:
+      " La mercancía está reservada y las líneas ya no se pueden modificar. Marca como entregada cuando el beneficiario la haya recibido.",
     confermaInCorso: "Confirmando...",
     confermaBolla: "Confirmar albarán y reservar mercancía",
     registrazione: "Registrando...",
     segnaConsegnata: "Marcar como entregada",
     assegnaPianificazione: "Asignar a planificación de entregas",
     assegnaPianificazioneTitle: "Asignar a planificación de entregas",
-    assegnaPianificazioneDesc: "Selecciona una entrega planificada del centro para vincular a este albarán.",
+    assegnaPianificazioneDesc:
+      "Selecciona una entrega planificada del centro para vincular a este albarán.",
     tornaIndietro: "Volver",
     nessunaPianificata: "No hay entregas planificadas para este centro.",
     altroBeneficiario: "Otro beneficiario",
@@ -258,26 +305,35 @@ export const bolle = {
     giaAssegnata: "Asignado a una planificación de entregas.",
     annullaBolla: "Anular albarán",
     storna: "Anular",
-    consegnaCompletata: "✓ Entrega completada. Mercancía descargada del almacén.",
-    bollaAnnullataInfo: "✕ Albarán anulado. Las reservas se liberaron o las salidas físicas se restauraron.",
+    consegnaCompletata:
+      "✓ Entrega completada. Mercancía descargada del almacén.",
+    bollaAnnullataInfo:
+      "✕ Albarán anulado. Las reservas se liberaron o las salidas físicas se restauraron.",
     annullareTitle: "¿Anular el albarán {{numero}}?",
-    annullaDescConfermato: "Las reservas activas se liberarán sin descargar los lotes. La operación no es reversible.",
-    annullaDescConsegnato: "Este albarán ya fue entregado: los productos se restaurarán al almacén, los movimientos se anularán y la entrega vinculada volverá a 'planificada'. La operación no es reversible.",
-    trasportatoreObbligatorioDomicilio: "Para las entregas a domicilio es obligatorio indicar un voluntario transportista.",
-    ritiroMagazzinoInfo: "Sin transportista: el beneficiario recoge en el almacén.",
-    annullaDescBozza: "El albarán se marcará como anulado. La operación no es reversible.",
+    annullaDescConfermato:
+      "Las reservas activas se liberarán sin descargar los lotes. La operación no es reversible.",
+    annullaDescConsegnato:
+      "Este albarán ya fue entregado: los productos se restaurarán al almacén, los movimientos se anularán y la entrega vinculada volverá a 'planificada'. La operación no es reversible.",
+    trasportatoreObbligatorioDomicilio:
+      "Para las entregas a domicilio es obligatorio indicar un voluntario transportista.",
+    ritiroMagazzinoInfo:
+      "Sin transportista: el beneficiario recoge en el almacén.",
+    annullaDescBozza:
+      "El albarán se marcará como anulado. La operación no es reversible.",
     noMantieni: "No, mantener",
     siAnnulla: "Sí, anular albarán",
     prodottoRimosso: "Producto eliminado",
     rimuoviError: "No se pudo eliminar",
     bollaConfermataTitle: "Albarán confirmado",
-    bollaConfermataDesc: "Mercancía reservada. La salida física se hará en la entrega.",
+    bollaConfermataDesc:
+      "Mercancía reservada. La salida física se hará en la entrega.",
     confermaError: "Error durante la confirmación",
     bollaConsegnataTitle: "Albarán entregado",
     bollaConsegnataDesc: "Entrega registrada.",
     consegnaError: "Error durante la entrega",
     bollaAnnullataTitle: "Albarán anulado",
-    bollaAnnullataDesc: "Las reservas se liberaron o las salidas físicas se restauraron.",
+    bollaAnnullataDesc:
+      "Las reservas se liberaron o las salidas físicas se restauraron.",
     annullaError: "No se pudo anular",
     consegnaAggiornata: "Entrega actualizada",
     aggiornaError: "No se pudo actualizar",
@@ -296,7 +352,8 @@ export const bolle = {
     allStati: "Todos los estados",
     azzeraFiltri: "Restablecer filtros",
     noDocFiltri: "Ningún documento coincide con los filtros seleccionados.",
-    noBolle: "Ningún albarán emitido. Crea el primer albarán con el botón de arriba a la derecha.",
+    noBolle:
+      "Ningún albarán emitido. Crea el primer albarán con el botón de arriba a la derecha.",
     scaricoMagazzino: "Descarga de Almacén",
     articoli: "{{count}} art.",
     bollaBtn: "Albarán",
@@ -309,6 +366,19 @@ export const bolle = {
     title: "Delivery Notes",
     subtitle: "Accompanying documents for goods deliveries.",
     newBolla: "New Note",
+    nuovoDocumento: "New operational document",
+    nuovaConsegnaDescrizione: "Delivery to a beneficiary or external entity",
+    nuovoTrasferimentoDescrizione: "Movement between two warehouses",
+    tipoDestinatario: "Recipient type",
+    destinatarioLabel: "Recipient",
+    destinatarioBeneficiario: "Beneficiary",
+    destinatarioEnte: "External entity",
+    entePlaceholder: "Select entity...",
+    nuovoEnte: "New entity",
+    enteNome: "Entity name",
+    creaEnte: "Create and select entity",
+    motivoAnnullamento: "Cancellation reason",
+    motivoAnnullamentoPlaceholder: "Enter the required reason...",
 
     statoBozza: "Draft",
     statoConfermato: "Confirmed",
@@ -346,8 +416,10 @@ export const bolle = {
     createError: "Unable to create the delivery note",
 
     modificaTitle: "Edit delivery note header",
-    cambioMagazzinoConfirm: "By changing the warehouse, the products already added to the note will be removed (they belong to the previous warehouse). Continue?",
-    cambioMagazzinoWarning: "By changing the warehouse, the products already added will be removed (they belong to the previous warehouse).",
+    cambioMagazzinoConfirm:
+      "By changing the warehouse, the products already added to the note will be removed (they belong to the previous warehouse). Continue?",
+    cambioMagazzinoWarning:
+      "By changing the warehouse, the products already added will be removed (they belong to the previous warehouse).",
     bollaAggiornata: "Delivery note updated",
     updateError: "Error during update",
 
@@ -391,16 +463,19 @@ export const bolle = {
     fsePlusLegend: "* FSE+ product (European Social Fund Plus)",
     fsePlusTitle: "FSE+ product",
     confermaInfoTitle: "Confirm note",
-    confermaInfoText: " — Products will be committed on expiring lots first. Physical discharge happens on delivery.",
+    confermaInfoText:
+      " — Products will be committed on expiring lots first. Physical discharge happens on delivery.",
     prontaTitle: "Ready for delivery.",
-    prontaText: " Goods are committed and lines can no longer be changed. Mark as delivered when the beneficiary has received them.",
+    prontaText:
+      " Goods are committed and lines can no longer be changed. Mark as delivered when the beneficiary has received them.",
     confermaInCorso: "Confirming...",
     confermaBolla: "Confirm note and commit goods",
     registrazione: "Recording...",
     segnaConsegnata: "Mark as delivered",
     assegnaPianificazione: "Assign to delivery planning",
     assegnaPianificazioneTitle: "Assign to delivery planning",
-    assegnaPianificazioneDesc: "Select a planned delivery for the centre to link to this note.",
+    assegnaPianificazioneDesc:
+      "Select a planned delivery for the centre to link to this note.",
     tornaIndietro: "Go back",
     nessunaPianificata: "No planned deliveries for this centre.",
     altroBeneficiario: "Other beneficiary",
@@ -411,26 +486,35 @@ export const bolle = {
     giaAssegnata: "Assigned to a delivery planning.",
     annullaBolla: "Cancel note",
     storna: "Reverse",
-    consegnaCompletata: "✓ Delivery completed. Goods discharged from the warehouse.",
-    bollaAnnullataInfo: "✕ Note cancelled. Any commitments were released or physical discharges restored.",
+    consegnaCompletata:
+      "✓ Delivery completed. Goods discharged from the warehouse.",
+    bollaAnnullataInfo:
+      "✕ Note cancelled. Any commitments were released or physical discharges restored.",
     annullareTitle: "Cancel note {{numero}}?",
-    annullaDescConfermato: "Active commitments will be released without discharging lots. This operation is not reversible.",
-    annullaDescConsegnato: "This delivery note was already delivered: the products will be restored to the warehouse, the movements cancelled and any linked delivery reverted to 'planned'. This operation is not reversible.",
-    trasportatoreObbligatorioDomicilio: "For home deliveries a volunteer transporter is required.",
-    ritiroMagazzinoInfo: "No transporter: the recipient picks up at the warehouse.",
-    annullaDescBozza: "The note will be marked as cancelled. This operation is not reversible.",
+    annullaDescConfermato:
+      "Active commitments will be released without discharging lots. This operation is not reversible.",
+    annullaDescConsegnato:
+      "This delivery note was already delivered: the products will be restored to the warehouse, the movements cancelled and any linked delivery reverted to 'planned'. This operation is not reversible.",
+    trasportatoreObbligatorioDomicilio:
+      "For home deliveries a volunteer transporter is required.",
+    ritiroMagazzinoInfo:
+      "No transporter: the recipient picks up at the warehouse.",
+    annullaDescBozza:
+      "The note will be marked as cancelled. This operation is not reversible.",
     noMantieni: "No, keep it",
     siAnnulla: "Yes, cancel note",
     prodottoRimosso: "Product removed",
     rimuoviError: "Unable to remove",
     bollaConfermataTitle: "Note confirmed",
-    bollaConfermataDesc: "Goods committed. Physical discharge happens on delivery.",
+    bollaConfermataDesc:
+      "Goods committed. Physical discharge happens on delivery.",
     confermaError: "Error during confirmation",
     bollaConsegnataTitle: "Note delivered",
     bollaConsegnataDesc: "Delivery recorded.",
     consegnaError: "Error during delivery",
     bollaAnnullataTitle: "Note cancelled",
-    bollaAnnullataDesc: "Any commitments were released or physical discharges restored.",
+    bollaAnnullataDesc:
+      "Any commitments were released or physical discharges restored.",
     annullaError: "Unable to cancel",
     consegnaAggiornata: "Delivery updated",
     aggiornaError: "Unable to update",
@@ -449,7 +533,8 @@ export const bolle = {
     allStati: "All statuses",
     azzeraFiltri: "Reset filters",
     noDocFiltri: "No document matches the selected filters.",
-    noBolle: "No delivery note issued. Create the first note with the button at the top right.",
+    noBolle:
+      "No delivery note issued. Create the first note with the button at the top right.",
     scaricoMagazzino: "Warehouse Discharge",
     articoli: "{{count}} items",
     bollaBtn: "Note",
@@ -462,6 +547,20 @@ export const bolle = {
     title: "Bons de Livraison",
     subtitle: "Documents d'accompagnement pour les sorties de marchandises.",
     newBolla: "Nouveau Bon",
+    nuovoDocumento: "Nouveau document opérationnel",
+    nuovaConsegnaDescrizione:
+      "Livraison à un bénéficiaire ou une entité externe",
+    nuovoTrasferimentoDescrizione: "Mouvement entre deux entrepôts",
+    tipoDestinatario: "Type de destinataire",
+    destinatarioLabel: "Destinataire",
+    destinatarioBeneficiario: "Bénéficiaire",
+    destinatarioEnte: "Entité externe",
+    entePlaceholder: "Sélectionner une entité...",
+    nuovoEnte: "Nouvelle entité",
+    enteNome: "Nom de l'entité",
+    creaEnte: "Créer et sélectionner l'entité",
+    motivoAnnullamento: "Motif de l'annulation",
+    motivoAnnullamentoPlaceholder: "Indiquez le motif obligatoire...",
 
     statoBozza: "Brouillon",
     statoConfermato: "Confirmé",
@@ -499,8 +598,10 @@ export const bolle = {
     createError: "Impossible de créer le bon de livraison",
 
     modificaTitle: "Modifier l'en-tête du bon",
-    cambioMagazzinoConfirm: "En changeant d'entrepôt, les produits déjà ajoutés au bon seront supprimés (ils appartiennent à l'entrepôt précédent). Continuer ?",
-    cambioMagazzinoWarning: "En changeant d'entrepôt, les produits déjà ajoutés seront supprimés (ils appartiennent à l'entrepôt précédent).",
+    cambioMagazzinoConfirm:
+      "En changeant d'entrepôt, les produits déjà ajoutés au bon seront supprimés (ils appartiennent à l'entrepôt précédent). Continuer ?",
+    cambioMagazzinoWarning:
+      "En changeant d'entrepôt, les produits déjà ajoutés seront supprimés (ils appartiennent à l'entrepôt précédent).",
     bollaAggiornata: "Bon de livraison mis à jour",
     updateError: "Erreur lors de la mise à jour",
 
@@ -520,7 +621,8 @@ export const bolle = {
     lottoPrefix: "Lot #",
     scadAbbr: "exp.",
     dispAbbr: "disp.",
-    lottoHint: "Laisser vide pour décharger automatiquement les lots arrivant à expiration en premier.",
+    lottoHint:
+      "Laisser vide pour décharger automatiquement les lots arrivant à expiration en premier.",
     quantitaPlaceholder: "0",
     massimoDisponibile: "Maximum disponible : {{max}}",
     disponibileQta: "Disponible : {{max}} {{um}}",
@@ -544,16 +646,19 @@ export const bolle = {
     fsePlusLegend: "* Produit FSE+ (Fonds social européen plus)",
     fsePlusTitle: "Produit FSE+",
     confermaInfoTitle: "Confirmer le bon",
-    confermaInfoText: " — Les produits seront réservés sur les lots arrivant à expiration en premier. La sortie physique aura lieu à la livraison.",
+    confermaInfoText:
+      " — Les produits seront réservés sur les lots arrivant à expiration en premier. La sortie physique aura lieu à la livraison.",
     prontaTitle: "Prêt pour la livraison.",
-    prontaText: " La marchandise est réservée et les lignes ne sont plus modifiables. Marquez comme livré lorsque le bénéficiaire l'a reçue.",
+    prontaText:
+      " La marchandise est réservée et les lignes ne sont plus modifiables. Marquez comme livré lorsque le bénéficiaire l'a reçue.",
     confermaInCorso: "Confirmation en cours...",
     confermaBolla: "Confirmer le bon et réserver la marchandise",
     registrazione: "Enregistrement...",
     segnaConsegnata: "Marquer comme livré",
     assegnaPianificazione: "Affecter à la planification des livraisons",
     assegnaPianificazioneTitle: "Affecter à la planification des livraisons",
-    assegnaPianificazioneDesc: "Sélectionnez une livraison planifiée du centre à lier à ce bon.",
+    assegnaPianificazioneDesc:
+      "Sélectionnez une livraison planifiée du centre à lier à ce bon.",
     tornaIndietro: "Retour",
     nessunaPianificata: "Aucune livraison planifiée pour ce centre.",
     altroBeneficiario: "Autre bénéficiaire",
@@ -564,26 +669,35 @@ export const bolle = {
     giaAssegnata: "Affecté à une planification de livraisons.",
     annullaBolla: "Annuler le bon",
     storna: "Annuler",
-    consegnaCompletata: "✓ Livraison terminée. Marchandise déchargée de l'entrepôt.",
-    bollaAnnullataInfo: "✕ Bon annulé. Les réservations ont été libérées ou les sorties physiques restaurées.",
+    consegnaCompletata:
+      "✓ Livraison terminée. Marchandise déchargée de l'entrepôt.",
+    bollaAnnullataInfo:
+      "✕ Bon annulé. Les réservations ont été libérées ou les sorties physiques restaurées.",
     annullareTitle: "Annuler le bon {{numero}} ?",
-    annullaDescConfermato: "Les réservations actives seront libérées sans sortie des lots. L'opération n'est pas réversible.",
-    annullaDescConsegnato: "Ce bon a déjà été livré : les produits seront restaurés à l'entrepôt, les mouvements annulés et la livraison liée remise à « planifiée ». L'opération n'est pas réversible.",
-    trasportatoreObbligatorioDomicilio: "Pour les livraisons à domicile, un bénévole transporteur est obligatoire.",
-    ritiroMagazzinoInfo: "Aucun transporteur : le bénéficiaire retire à l'entrepôt.",
-    annullaDescBozza: "Le bon sera marqué comme annulé. L'opération n'est pas réversible.",
+    annullaDescConfermato:
+      "Les réservations actives seront libérées sans sortie des lots. L'opération n'est pas réversible.",
+    annullaDescConsegnato:
+      "Ce bon a déjà été livré : les produits seront restaurés à l'entrepôt, les mouvements annulés et la livraison liée remise à « planifiée ». L'opération n'est pas réversible.",
+    trasportatoreObbligatorioDomicilio:
+      "Pour les livraisons à domicile, un bénévole transporteur est obligatoire.",
+    ritiroMagazzinoInfo:
+      "Aucun transporteur : le bénéficiaire retire à l'entrepôt.",
+    annullaDescBozza:
+      "Le bon sera marqué comme annulé. L'opération n'est pas réversible.",
     noMantieni: "Non, conserver",
     siAnnulla: "Oui, annuler le bon",
     prodottoRimosso: "Produit supprimé",
     rimuoviError: "Impossible de supprimer",
     bollaConfermataTitle: "Bon confirmé",
-    bollaConfermataDesc: "Marchandise réservée. La sortie physique aura lieu à la livraison.",
+    bollaConfermataDesc:
+      "Marchandise réservée. La sortie physique aura lieu à la livraison.",
     confermaError: "Erreur lors de la confirmation",
     bollaConsegnataTitle: "Bon livré",
     bollaConsegnataDesc: "Livraison enregistrée.",
     consegnaError: "Erreur lors de la livraison",
     bollaAnnullataTitle: "Bon annulé",
-    bollaAnnullataDesc: "Les réservations ont été libérées ou les sorties physiques restaurées.",
+    bollaAnnullataDesc:
+      "Les réservations ont été libérées ou les sorties physiques restaurées.",
     annullaError: "Impossible d'annuler",
     consegnaAggiornata: "Livraison mise à jour",
     aggiornaError: "Impossible de mettre à jour",
@@ -602,7 +716,8 @@ export const bolle = {
     allStati: "Tous les statuts",
     azzeraFiltri: "Réinitialiser les filtres",
     noDocFiltri: "Aucun document ne correspond aux filtres sélectionnés.",
-    noBolle: "Aucun bon de livraison émis. Créez le premier bon avec le bouton en haut à droite.",
+    noBolle:
+      "Aucun bon de livraison émis. Créez le premier bon avec le bouton en haut à droite.",
     scaricoMagazzino: "Sortie d'entrepôt",
     articoli: "{{count}} art.",
     bollaBtn: "Bon",
@@ -615,6 +730,20 @@ export const bolle = {
     title: "Lieferscheine",
     subtitle: "Begleitdokumente für Warenausgänge.",
     newBolla: "Neuer Lieferschein",
+    nuovoDocumento: "Neues operatives Dokument",
+    nuovaConsegnaDescrizione:
+      "Lieferung an Begünstigte oder externe Einrichtung",
+    nuovoTrasferimentoDescrizione: "Bewegung zwischen zwei Lagern",
+    tipoDestinatario: "Empfängertyp",
+    destinatarioLabel: "Empfänger",
+    destinatarioBeneficiario: "Begünstigter",
+    destinatarioEnte: "Externe Einrichtung",
+    entePlaceholder: "Einrichtung auswählen...",
+    nuovoEnte: "Neue Einrichtung",
+    enteNome: "Name der Einrichtung",
+    creaEnte: "Einrichtung erstellen und auswählen",
+    motivoAnnullamento: "Stornierungsgrund",
+    motivoAnnullamentoPlaceholder: "Pflichtgrund angeben...",
 
     statoBozza: "Entwurf",
     statoConfermato: "Bestätigt",
@@ -652,8 +781,10 @@ export const bolle = {
     createError: "Lieferschein konnte nicht erstellt werden",
 
     modificaTitle: "Lieferschein-Kopf bearbeiten",
-    cambioMagazzinoConfirm: "Beim Wechsel des Lagers werden die bereits zum Lieferschein hinzugefügten Produkte entfernt (sie gehören zum vorherigen Lager). Fortfahren?",
-    cambioMagazzinoWarning: "Beim Wechsel des Lagers werden die bereits hinzugefügten Produkte entfernt (sie gehören zum vorherigen Lager).",
+    cambioMagazzinoConfirm:
+      "Beim Wechsel des Lagers werden die bereits zum Lieferschein hinzugefügten Produkte entfernt (sie gehören zum vorherigen Lager). Fortfahren?",
+    cambioMagazzinoWarning:
+      "Beim Wechsel des Lagers werden die bereits hinzugefügten Produkte entfernt (sie gehören zum vorherigen Lager).",
     bollaAggiornata: "Lieferschein aktualisiert",
     updateError: "Fehler bei der Aktualisierung",
 
@@ -673,7 +804,8 @@ export const bolle = {
     lottoPrefix: "Charge #",
     scadAbbr: "Ablauf",
     dispAbbr: "verf.",
-    lottoHint: "Leer lassen, um automatisch die zuerst ablaufenden Chargen zu entnehmen.",
+    lottoHint:
+      "Leer lassen, um automatisch die zuerst ablaufenden Chargen zu entnehmen.",
     quantitaPlaceholder: "0",
     massimoDisponibile: "Maximal verfügbar: {{max}}",
     disponibileQta: "Verfügbar: {{max}} {{um}}",
@@ -697,46 +829,58 @@ export const bolle = {
     fsePlusLegend: "* FSE+-Produkt (Europäischer Sozialfonds Plus)",
     fsePlusTitle: "FSE+-Produkt",
     confermaInfoTitle: "Lieferschein bestätigen",
-    confermaInfoText: " — Die Produkte werden zuerst auf ablaufende Chargen reserviert. Die physische Entnahme erfolgt bei Lieferung.",
+    confermaInfoText:
+      " — Die Produkte werden zuerst auf ablaufende Chargen reserviert. Die physische Entnahme erfolgt bei Lieferung.",
     prontaTitle: "Bereit zur Lieferung.",
-    prontaText: " Die Ware ist reserviert und die Zeilen können nicht mehr geändert werden. Als geliefert markieren, wenn der Begünstigte sie erhalten hat.",
+    prontaText:
+      " Die Ware ist reserviert und die Zeilen können nicht mehr geändert werden. Als geliefert markieren, wenn der Begünstigte sie erhalten hat.",
     confermaInCorso: "Wird bestätigt...",
     confermaBolla: "Lieferschein bestätigen und Ware reservieren",
     registrazione: "Wird erfasst...",
     segnaConsegnata: "Als geliefert markieren",
     assegnaPianificazione: "Der Lieferplanung zuweisen",
     assegnaPianificazioneTitle: "Der Lieferplanung zuweisen",
-    assegnaPianificazioneDesc: "Wählen Sie eine geplante Lieferung des Zentrums, die mit diesem Lieferschein verknüpft werden soll.",
+    assegnaPianificazioneDesc:
+      "Wählen Sie eine geplante Lieferung des Zentrums, die mit diesem Lieferschein verknüpft werden soll.",
     tornaIndietro: "Zurück",
     nessunaPianificata: "Keine geplanten Lieferungen für dieses Zentrum.",
     altroBeneficiario: "Anderer Begünstigter",
     assegna: "Zuweisen",
     bollaAssegnataTitle: "Lieferschein zugewiesen",
-    bollaAssegnataDesc: "Der Lieferschein wurde mit der geplanten Lieferung verknüpft.",
+    bollaAssegnataDesc:
+      "Der Lieferschein wurde mit der geplanten Lieferung verknüpft.",
     assegnaError: "Lieferschein konnte nicht zugewiesen werden",
     giaAssegnata: "Einer Lieferplanung zugewiesen.",
     annullaBolla: "Lieferschein stornieren",
     storna: "Stornieren",
-    consegnaCompletata: "✓ Lieferung abgeschlossen. Ware aus dem Lager entnommen.",
-    bollaAnnullataInfo: "✕ Lieferschein storniert. Reservierungen wurden freigegeben oder physische Entnahmen zurückgebucht.",
+    consegnaCompletata:
+      "✓ Lieferung abgeschlossen. Ware aus dem Lager entnommen.",
+    bollaAnnullataInfo:
+      "✕ Lieferschein storniert. Reservierungen wurden freigegeben oder physische Entnahmen zurückgebucht.",
     annullareTitle: "Lieferschein {{numero}} stornieren?",
-    annullaDescConfermato: "Aktive Reservierungen werden freigegeben, ohne Chargen zu entnehmen. Der Vorgang ist nicht umkehrbar.",
-    annullaDescConsegnato: "Dieser Lieferschein wurde bereits geliefert: Die Produkte werden ins Lager zurückgebucht, die Bewegungen storniert und die verknüpfte Lieferung auf „geplant“ zurückgesetzt. Der Vorgang ist nicht umkehrbar.",
-    trasportatoreObbligatorioDomicilio: "Für Hauslieferungen ist ein freiwilliger Transporteur erforderlich.",
+    annullaDescConfermato:
+      "Aktive Reservierungen werden freigegeben, ohne Chargen zu entnehmen. Der Vorgang ist nicht umkehrbar.",
+    annullaDescConsegnato:
+      "Dieser Lieferschein wurde bereits geliefert: Die Produkte werden ins Lager zurückgebucht, die Bewegungen storniert und die verknüpfte Lieferung auf „geplant“ zurückgesetzt. Der Vorgang ist nicht umkehrbar.",
+    trasportatoreObbligatorioDomicilio:
+      "Für Hauslieferungen ist ein freiwilliger Transporteur erforderlich.",
     ritiroMagazzinoInfo: "Kein Transporteur: Der Empfänger holt im Lager ab.",
-    annullaDescBozza: "Der Lieferschein wird als storniert markiert. Der Vorgang ist nicht umkehrbar.",
+    annullaDescBozza:
+      "Der Lieferschein wird als storniert markiert. Der Vorgang ist nicht umkehrbar.",
     noMantieni: "Nein, behalten",
     siAnnulla: "Ja, Lieferschein stornieren",
     prodottoRimosso: "Produkt entfernt",
     rimuoviError: "Entfernen nicht möglich",
     bollaConfermataTitle: "Lieferschein bestätigt",
-    bollaConfermataDesc: "Ware reserviert. Die physische Entnahme erfolgt bei Lieferung.",
+    bollaConfermataDesc:
+      "Ware reserviert. Die physische Entnahme erfolgt bei Lieferung.",
     confermaError: "Fehler bei der Bestätigung",
     bollaConsegnataTitle: "Lieferschein geliefert",
     bollaConsegnataDesc: "Lieferung erfasst.",
     consegnaError: "Fehler bei der Lieferung",
     bollaAnnullataTitle: "Lieferschein storniert",
-    bollaAnnullataDesc: "Reservierungen wurden freigegeben oder physische Entnahmen zurückgebucht.",
+    bollaAnnullataDesc:
+      "Reservierungen wurden freigegeben oder physische Entnahmen zurückgebucht.",
     annullaError: "Stornierung nicht möglich",
     consegnaAggiornata: "Lieferung aktualisiert",
     aggiornaError: "Aktualisierung nicht möglich",
@@ -755,7 +899,8 @@ export const bolle = {
     allStati: "Alle Status",
     azzeraFiltri: "Filter zurücksetzen",
     noDocFiltri: "Kein Dokument entspricht den ausgewählten Filtern.",
-    noBolle: "Kein Lieferschein ausgestellt. Erstellen Sie den ersten Lieferschein mit der Schaltfläche oben rechts.",
+    noBolle:
+      "Kein Lieferschein ausgestellt. Erstellen Sie den ersten Lieferschein mit der Schaltfläche oben rechts.",
     scaricoMagazzino: "Lagerabgang",
     articoli: "{{count}} Art.",
     bollaBtn: "Lieferschein",
@@ -768,6 +913,19 @@ export const bolle = {
     title: "إشعارات التسليم",
     subtitle: "مستندات مرافقة لعمليات إخراج البضائع.",
     newBolla: "إشعار جديد",
+    nuovoDocumento: "مستند تشغيلي جديد",
+    nuovaConsegnaDescrizione: "تسليم إلى مستفيد أو جهة خارجية",
+    nuovoTrasferimentoDescrizione: "نقل بين مستودعين",
+    tipoDestinatario: "نوع المستلم",
+    destinatarioLabel: "المستلم",
+    destinatarioBeneficiario: "المستفيد",
+    destinatarioEnte: "جهة خارجية",
+    entePlaceholder: "اختر الجهة...",
+    nuovoEnte: "جهة جديدة",
+    enteNome: "اسم الجهة",
+    creaEnte: "إنشاء الجهة واختيارها",
+    motivoAnnullamento: "سبب الإلغاء",
+    motivoAnnullamentoPlaceholder: "أدخل السبب الإلزامي...",
 
     statoBozza: "مسودة",
     statoConfermato: "مؤكد",
@@ -805,8 +963,10 @@ export const bolle = {
     createError: "تعذر إنشاء الإشعار",
 
     modificaTitle: "تعديل ترويسة الإشعار",
-    cambioMagazzinoConfirm: "عند تغيير المستودع ستتم إزالة المنتجات المضافة بالفعل إلى الإشعار (لأنها تنتمي إلى المستودع السابق). هل تريد المتابعة؟",
-    cambioMagazzinoWarning: "عند تغيير المستودع ستتم إزالة المنتجات المضافة بالفعل (لأنها تنتمي إلى المستودع السابق).",
+    cambioMagazzinoConfirm:
+      "عند تغيير المستودع ستتم إزالة المنتجات المضافة بالفعل إلى الإشعار (لأنها تنتمي إلى المستودع السابق). هل تريد المتابعة؟",
+    cambioMagazzinoWarning:
+      "عند تغيير المستودع ستتم إزالة المنتجات المضافة بالفعل (لأنها تنتمي إلى المستودع السابق).",
     bollaAggiornata: "تم تحديث الإشعار",
     updateError: "خطأ أثناء التحديث",
 
@@ -826,7 +986,8 @@ export const bolle = {
     lottoPrefix: "دفعة #",
     scadAbbr: "انتهاء",
     dispAbbr: "متاح",
-    lottoHint: "اتركه فارغًا لإخراج الدفعات القريبة من الانتهاء أولاً تلقائيًا.",
+    lottoHint:
+      "اتركه فارغًا لإخراج الدفعات القريبة من الانتهاء أولاً تلقائيًا.",
     quantitaPlaceholder: "0",
     massimoDisponibile: "الحد الأقصى المتاح: {{max}}",
     disponibileQta: "المتاح: {{max}} {{um}}",
@@ -850,9 +1011,11 @@ export const bolle = {
     fsePlusLegend: "* منتج FSE+ (الصندوق الاجتماعي الأوروبي بلس)",
     fsePlusTitle: "منتج FSE+",
     confermaInfoTitle: "تأكيد الإشعار",
-    confermaInfoText: " — سيتم حجز المنتجات على الدُفعات الأقرب انتهاءً أولاً. يتم الإخراج الفعلي عند التسليم.",
+    confermaInfoText:
+      " — سيتم حجز المنتجات على الدُفعات الأقرب انتهاءً أولاً. يتم الإخراج الفعلي عند التسليم.",
     prontaTitle: "جاهز للتسليم.",
-    prontaText: " تم حجز البضاعة ولم تعد الأسطر قابلة للتعديل. ضع علامة كـ مُسلَّم عندما يستلم المستفيد البضاعة.",
+    prontaText:
+      " تم حجز البضاعة ولم تعد الأسطر قابلة للتعديل. ضع علامة كـ مُسلَّم عندما يستلم المستفيد البضاعة.",
     confermaInCorso: "جارٍ التأكيد...",
     confermaBolla: "تأكيد الإشعار وحجز البضاعة",
     registrazione: "جارٍ التسجيل...",
@@ -871,13 +1034,18 @@ export const bolle = {
     annullaBolla: "إلغاء الإشعار",
     storna: "إلغاء",
     consegnaCompletata: "✓ اكتمل التسليم. تم إخراج البضاعة من المستودع.",
-    bollaAnnullataInfo: "✕ تم إلغاء الإشعار. تم تحرير أي حجوزات أو استعادة الإخراج الفعلي.",
+    bollaAnnullataInfo:
+      "✕ تم إلغاء الإشعار. تم تحرير أي حجوزات أو استعادة الإخراج الفعلي.",
     annullareTitle: "إلغاء الإشعار {{numero}}؟",
-    annullaDescConfermato: "سيتم تحرير الحجوزات النشطة دون إخراج الدُفعات. هذه العملية غير قابلة للتراجع.",
-    annullaDescConsegnato: "تم تسليم هذه المذكرة بالفعل: ستتم إعادة المنتجات إلى المستودع، وإلغاء الحركات، وإرجاع التسليم المرتبط إلى 'مخطط'. هذه العملية غير قابلة للتراجع.",
-    trasportatoreObbligatorioDomicilio: "بالنسبة للتوصيل إلى المنزل، يلزم تحديد متطوع ناقل.",
+    annullaDescConfermato:
+      "سيتم تحرير الحجوزات النشطة دون إخراج الدُفعات. هذه العملية غير قابلة للتراجع.",
+    annullaDescConsegnato:
+      "تم تسليم هذه المذكرة بالفعل: ستتم إعادة المنتجات إلى المستودع، وإلغاء الحركات، وإرجاع التسليم المرتبط إلى 'مخطط'. هذه العملية غير قابلة للتراجع.",
+    trasportatoreObbligatorioDomicilio:
+      "بالنسبة للتوصيل إلى المنزل، يلزم تحديد متطوع ناقل.",
     ritiroMagazzinoInfo: "لا يوجد ناقل: يستلم المستفيد من المخزن.",
-    annullaDescBozza: "سيتم وضع علامة على الإشعار كملغى. هذه العملية غير قابلة للتراجع.",
+    annullaDescBozza:
+      "سيتم وضع علامة على الإشعار كملغى. هذه العملية غير قابلة للتراجع.",
     noMantieni: "لا، احتفظ به",
     siAnnulla: "نعم، ألغِ الإشعار",
     prodottoRimosso: "تمت إزالة المنتج",
@@ -908,7 +1076,8 @@ export const bolle = {
     allStati: "جميع الحالات",
     azzeraFiltri: "إعادة تعيين عوامل التصفية",
     noDocFiltri: "لا يوجد مستند يطابق عوامل التصفية المحددة.",
-    noBolle: "لم يتم إصدار أي إشعار. أنشئ أول إشعار باستخدام الزر في أعلى اليمين.",
+    noBolle:
+      "لم يتم إصدار أي إشعار. أنشئ أول إشعار باستخدام الزر في أعلى اليمين.",
     scaricoMagazzino: "إخراج من المستودع",
     articoli: "{{count}} عنصر",
     bollaBtn: "إشعار",

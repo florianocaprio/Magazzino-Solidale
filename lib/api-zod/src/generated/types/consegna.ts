@@ -49,6 +49,11 @@ export interface Consegna {
   bollaNumero?: string | null;
   /** @nullable */
   bollaStato?: string | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  bollaVersione?: number | null;
   /** @nullable */
   noteOperative?: string | null;
   /** @nullable */

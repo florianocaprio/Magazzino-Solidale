@@ -298,3 +298,156 @@ I container protetti `magazzino-postgres`, `magazzino-api` e `magazzino-web`
 sono rimasti attivi e invariati; il relativo volume persistente e tutte le
 risorse Docker di altri progetti non sono stati arrestati, modificati o
 rimossi.
+
+## M4A — separazione sviluppo, test e aggiornamento persistente
+
+Durante `##sviluppo M4A` non viene ricostruito, riavviato o migrato l'ambiente
+locale persistente. Eventuali prove DB di sviluppo devono usare un PostgreSQL
+temporaneo con nomi/etichette M4A e cleanup nominativo; mai il `DATABASE_URL`
+operativo e mai comandi prune.
+
+La futura fase `##test M4A` dovrà registrare container, rete, volume, database,
+porta e cleanup, eseguendo fresh/replay e upgrade populated con il runner
+ufficiale. Soltanto dopo test, commit/push e code review positiva sarà
+autorizzato l'aggiornamento protetto dell'ambiente locale: identificazione del
+vero progetto Compose e dei mount, backup verificato di DB/upload, stessa SHA
+per web/API, stop delle scritture, rebuild dei soli servizi applicativi e
+verifica post-migrazione. Il volume persistente esistente non deve essere
+sostituito da un volume vuoto derivato dal nome del checkout.
+
+Per i controlli mirati di sviluppo è stato creato esclusivamente il container
+effimero `magazzino-m4a-dev-db-20260919`, immagine `postgres:16`, database
+`magazzino_m4a_dev`, porta loopback `55440` ed etichette
+`magazzino.milestone=M4A`/`magazzino.scope=development`. Non sono stati creati
+rete o volume nominativi, né container web/API. Il container è stato avviato
+con `--rm` e rimosso nominativamente al termine; i dati temporanei sono quindi
+eliminati con il container. L'ambiente locale persistente e gli altri progetti
+Docker non sono stati modificati.
+
+## M4A — fase formale arrestata prima del laboratorio
+
+Data: 19 settembre 2026
+
+Il preflight ha censito in sola lettura i container protetti attivi:
+
+| ID breve       | Nome                 | Immagine                 | Stato osservato                   |
+| -------------- | -------------------- | ------------------------ | --------------------------------- |
+| `64601804539f` | `magazzino-web`      | `magazzino-solidale-web` | attivo, porta host 8082           |
+| `fe52b85bc235` | `magazzino-api`      | `magazzino-solidale-api` | attivo e healthy                  |
+| `57e462be280a` | `magazzino-postgres` | `postgres:16-alpine`     | attivo e healthy, porta host 5434 |
+
+Sono stati inoltre osservati, senza modificarli, la rete
+`magazzino-solidale_default` e i volumi persistenti
+`magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads`, oltre alle risorse storiche e degli
+altri progetti presenti sulla macchina.
+
+La revisione statica e il primo test frontend pertinente hanno prodotto un
+NO-GO prima della creazione del laboratorio PostgreSQL. Questa esecuzione non
+ha quindi creato container, immagini, reti, volumi, database o processi M4A e
+non ha richiesto cleanup Docker. Non sono stati eseguiti Compose, build,
+restart, migrazioni o comandi contro il database persistente. Nessun prune o
+comando globale è stato usato.
+
+## M4A — laboratorio correttivo post-NO-GO
+
+Data: 19 settembre 2026
+
+Le verifiche mirate della correzione M4A hanno usato un solo PostgreSQL
+effimero, separato dall'ambiente persistente. API e frontend E2E sono stati
+avviati come processi temporanei contro il laboratorio, non come nuovo stack
+Docker candidato.
+
+### Risorse create
+
+| Tipo                 | Nome/identificativo                                     | Immagine/porta                              | Scopo                                           | Stato finale                 |
+| -------------------- | ------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------- | ---------------------------- |
+| container PostgreSQL | `magazzino-m4a-correction-db-20260919` (`eb741856d882`) | `postgres:16-alpine`, loopback `55441`      | fresh, upgrade, suite DB/API e verifiche finali | rimosso nominativamente      |
+| storage PostgreSQL   | `tmpfs` del container                                   | nessun volume nominativo o anonimo durevole | dati disposable della run                       | eliminato con il container   |
+| rete                 | rete predefinita Docker, senza rete di progetto M4A     | nessuna rete M4A creata                     | connessione locale al laboratorio               | nessuna risorsa da rimuovere |
+| API temporanea       | processo locale sulla porta `18181`                     | porta loopback                              | E2E UI/API/PostgreSQL reale                     | arrestato; porta chiusa      |
+| frontend temporaneo  | processo locale sulla porta `4173`                      | porta loopback                              | E2E Playwright desktop                          | arrestato; porta chiusa      |
+
+Nel container sono stati usati database distinti per fresh, upgrade populated,
+fresh finale, unit final e correzione finale, inclusi
+`magazzino_m4a_correction_final` e i database isolati Mensa/Bolle. I database
+Mensa/Bolle sono stati eliminati al termine delle rispettive run; tutti i dati
+residui del laboratorio sono stati eliminati con la rimozione del container.
+Le connessioni hanno usato esclusivamente la porta loopback 55441 e database
+di laboratorio; nessuna credenziale viene registrata in questo documento.
+
+Il fresh conclusivo su `magazzino_m4a_correction_final` ha applicato 40/40
+migrazioni e completato seed, smoke, replay e verify. L'upgrade autentico
+populated 39→40 era già risultato verde nella fase correttiva ed è mantenuto
+come evidenza distinta, senza promuovere G5 a GO formale.
+
+### Protezione dell'ambiente persistente
+
+Prima e dopo le prove sono rimasti attivi e invariati:
+
+| Risorsa protetta     | ID breve osservato | Stato finale                         |
+| -------------------- | ------------------ | ------------------------------------ |
+| `magazzino-web`      | `64601804539f`     | attivo, non ricostruito né riavviato |
+| `magazzino-api`      | `fe52b85bc235`     | attivo, non ricostruito né riavviato |
+| `magazzino-postgres` | `57e462be280a`     | attivo, non migrato né modificato    |
+
+I volumi persistenti dell'ambiente originale e le risorse degli altri progetti
+non sono stati arrestati, modificati o rimossi. Non sono stati usati
+`docker system prune`, `docker volume prune`, `docker network prune`, wildcard
+di rimozione, `down -v` o altri comandi globali.
+
+### Cleanup verificato
+
+- il container `magazzino-m4a-correction-db-20260919` è stato rimosso
+  nominativamente;
+- il filtro dei container M4A non restituisce residui;
+- non esistono reti o volumi con label M4A creati da questa run;
+- le porte temporanee 18181 e 4173 risultano chiuse;
+- PDF e render temporanei, i due file hash e
+  `artifacts/magazzino-solidale/test-results/playwright` sono stati rimossi e
+  la loro assenza è stata verificata;
+- le tre risorse persistenti protette risultano ancora attive con gli stessi
+  ID brevi.
+
+La pulizia riguarda esclusivamente risorse disposable della correzione M4A.
+Non è stato costruito o aggiornato alcun Docker candidato o persistente. Lo
+stato applicativo resta
+`DEV-M4A-CORRETTO/NE-TEST-M4A/NE-MAN`: questa pulizia non costituisce un gate
+formale, una validazione manuale o la chiusura della milestone.
+
+## M4A — laboratorio del rerun formale finale
+
+Data: 22 settembre 2026. Tutte le prove PostgreSQL finali hanno usato solo
+container disposable M4A, con storage `tmpfs`, porta bindata a
+`127.0.0.1`, rete Docker `bridge` preesistente e nessun volume nominativo o
+rete di progetto creata. API e frontend Playwright erano processi locali
+temporanei sulle porte 18181/4173; una breve API di setup usava 18182.
+
+| Risorsa creata durante M4A            | ID breve / porta                                                                                                                                  | Uso                                                         | Stato finale                  |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------- |
+| `magazzino-m4a-finaltest-db-20260919` | `1d5248f43d33`, 55442                                                                                                                             | fresh, suite API, upgrade populated 39→40 e prime prove E2E | rimosso nominativamente       |
+| `magazzino-m4a-rerun-db-20260922`     | `10ec42fae621`, 55443                                                                                                                             | riproduzioni E2E e tre run completi su database distinti    | rimosso nominativamente       |
+| `magazzino-m4a-final-api-20260922`    | `8d5e80a58240`, 55444                                                                                                                             | fresh e suite API completa post-formattazione               | rimosso nominativamente       |
+| Database del primo container          | `magazzino_m4a_final_fresh`, `magazzino_m4a_final_api`, `magazzino_m4a_final_e2e`, `magazzino_m4a_final_upgrade`, `magazzino_m4a_final_e2e_clean` | isolati per scopo                                           | eliminati con tmpfs/container |
+| Database del secondo container        | `magazzino_m4a_rerun`, `magazzino_m4a_final_e2e_clean`, `magazzino_m4a_final_e2e_round2`, `magazzino_m4a_final_e2e_round3`                        | regressioni e candidate finali puliti                       | eliminati con tmpfs/container |
+| Database del terzo container          | `magazzino_m4a_api_final`, `magazzino_m4a_api_final2`, `magazzino_m4a_api_final3`                                                                 | fresh e run API distinti                                    | eliminati con tmpfs/container |
+| Reti/volumi M4A dedicati              | nessuno                                                                                                                                           | non creati                                                  | nessun cleanup richiesto      |
+
+I tre nomi/ID erano gli unici container con label
+`magazzino.milestone=M4A` nei rispettivi controlli pre-cleanup. Sono stati rimossi con
+`docker rm -f` nominativo, non con `prune`; non sono stati toccati l'anonimo
+volume di altri ambienti, le reti storiche o risorse di altri progetti.
+Eliminati inoltre i soli output temporanei di questa prova: archive base 39,
+fixture/digest SQL, sette PDF e render, cache Fontconfig di test, output
+Playwright. Non sono stati eliminati file del repository, backup durevoli o i
+due XLSX originali dell'utente.
+
+La verifica finale `docker ps -a`, `docker network ls` e `docker volume ls`
+mostra nessun container/rete/volume disposable M4A residuo. Le porte 18083,
+18084, 18085, 18181, 18182, 4173, 55442, 55443 e 55444 non hanno listener.
+L'ambiente originale è rimasto
+attivo con gli stessi ID (`magazzino-web` `64601804539f`, `magazzino-api`
+`fe52b85bc235`, `magazzino-postgres` `57e462be280a`) e con i volumi
+persistenti `magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads` invariati. Nessun rebuild, restart,
+Compose, migrazione o push schema ha interessato l'ambiente persistente.

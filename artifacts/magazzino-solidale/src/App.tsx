@@ -1,5 +1,5 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { canAccessMapsApplication } from "@/lib/maps-access";
 import { createAppQueryClient } from "@/lib/query-client";
+import { canonicalLegacyTrasferimentiSearch } from "@/lib/documenti-operativi-location";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,17 +43,22 @@ const Prodotti = lazy(() => import("@/pages/prodotti"));
 const Lotti = lazy(() => import("@/pages/lotti"));
 const CaricoMerce = lazy(() => import("@/pages/carico-merce"));
 const Giacenze = lazy(() => import("@/pages/giacenze"));
-const PreparazioneConsegne = lazy(() => import("@/pages/preparazione-consegne"));
+const PreparazioneConsegne = lazy(
+  () => import("@/pages/preparazione-consegne"),
+);
 const Volontari = lazy(() => import("@/pages/volontari"));
 const Mezzi = lazy(() => import("@/pages/mezzi"));
-const ApprovazioniLogistica = lazy(() => import("@/pages/approvazioni-logistica"));
+const ApprovazioniLogistica = lazy(
+  () => import("@/pages/approvazioni-logistica"),
+);
 const Fornitori = lazy(() => import("@/pages/fornitori"));
-const Trasferimenti = lazy(() => import("@/pages/trasferimenti"));
 const Scarichi = lazy(() => import("@/pages/scarichi"));
 const Movimenti = lazy(() => import("@/pages/movimenti"));
 const CentriAscolto = lazy(() => import("@/pages/centri-ascolto"));
 const Beneficiari = lazy(() => import("@/pages/beneficiari"));
-const BeneficiarioDettaglio = lazy(() => import("@/pages/beneficiario-dettaglio"));
+const BeneficiarioDettaglio = lazy(
+  () => import("@/pages/beneficiario-dettaglio"),
+);
 const Interventi = lazy(() => import("@/pages/interventi"));
 const Consegne = lazy(() => import("@/pages/consegne"));
 const Bolle = lazy(() => import("@/pages/bolle"));
@@ -61,7 +67,9 @@ const ImpostazioniStampa = lazy(() => import("@/pages/impostazioni-stampa"));
 const ImpostazioniModuli = lazy(() => import("@/pages/impostazioni-moduli"));
 const Approvvigionamenti = lazy(() => import("@/pages/approvvigionamenti"));
 const ReportingLanding = lazy(() => import("@/pages/reporting-landing"));
-const ReportingDashboardPage = lazy(() => import("@/pages/reporting-dashboard"));
+const ReportingDashboardPage = lazy(
+  () => import("@/pages/reporting-dashboard"),
+);
 const Utenti = lazy(() => import("@/pages/utenti"));
 const Ruoli = lazy(() => import("@/pages/ruoli"));
 const AreeOperative = lazy(() => import("@/pages/aree-operative"));
@@ -69,21 +77,42 @@ const ZoneUds = lazy(() => import("@/pages/zone-uds"));
 const RuoliVolontari = lazy(() => import("@/pages/ruoli-volontari"));
 const TipiIntervento = lazy(() => import("@/pages/tipi-intervento"));
 const TipologieFornitore = lazy(() => import("@/pages/tipologie-fornitore"));
-const PoliticheCreditoSolidale = lazy(() => import("@/pages/politiche-credito-solidale"));
+const PoliticheCreditoSolidale = lazy(
+  () => import("@/pages/politiche-credito-solidale"),
+);
 const EmporioCassa = lazy(() => import("@/pages/emporio-cassa"));
 const EmporioCreditiSaldo = lazy(() => import("@/pages/emporio-crediti-saldo"));
 const EmporioAccessi = lazy(() => import("@/pages/emporio-accessi"));
 const EmporioSpese = lazy(() => import("@/pages/emporio-spese"));
 const UdsAnagrafica = lazy(() => import("@/pages/uds-anagrafica"));
 const UdsInterventi = lazy(() => import("@/pages/uds-interventi"));
-const UdsReportGiornaliero = lazy(() => import("@/pages/uds-report-giornaliero"));
-const SuperAdminConfigurazioneAmbiente = lazy(() => import("@/pages/super-admin-configurazione-ambiente"));
+const UdsReportGiornaliero = lazy(
+  () => import("@/pages/uds-report-giornaliero"),
+);
+const SuperAdminConfigurazioneAmbiente = lazy(
+  () => import("@/pages/super-admin-configurazione-ambiente"),
+);
 const SuperAdminModuli = lazy(() => import("@/pages/super-admin-moduli"));
-const SuperAdminAuditConfigurazioni = lazy(() => import("@/pages/super-admin-audit-configurazioni"));
-const SuperAdminLogSistema = lazy(() => import("@/pages/super-admin-log-sistema"));
+const SuperAdminAuditConfigurazioni = lazy(
+  () => import("@/pages/super-admin-audit-configurazioni"),
+);
+const SuperAdminLogSistema = lazy(
+  () => import("@/pages/super-admin-log-sistema"),
+);
 const SostieniProgetto = lazy(() => import("@/pages/sostieni-progetto"));
 const MensaPage = lazy(() => import("@/pages/mensa"));
 const MapsOperativa = lazy(() => import("@/pages/maps"));
+
+function LegacyTrasferimentiRedirect() {
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    navigate(
+      `/bolle${canonicalLegacyTrasferimentiSearch(window.location.search)}`,
+      { replace: true },
+    );
+  }, [navigate]);
+  return <Loader2 className="mx-auto mt-16 h-6 w-6 animate-spin" />;
+}
 
 const queryClient = createAppQueryClient();
 
@@ -97,6 +126,38 @@ function Guard({
   const { hasArea } = useAuth();
   const areas = Array.isArray(area) ? area : [area];
   if (!areas.some((a) => hasArea(a))) return <NotAuthorized />;
+  return <>{children}</>;
+}
+
+export function canAccessDocumentiOperativiRoute(
+  hasArea: (area: string) => boolean,
+  hasPermission: (permission: string) => boolean,
+  isModuloAttivo: (codice: string) => boolean,
+): boolean {
+  const canReadBolle =
+    (hasArea("sociale") || hasArea("magazzino")) &&
+    hasPermission("bolle.view") &&
+    isModuloAttivo("MAGAZZINO_SOLIDALE") &&
+    isModuloAttivo("BOLLE");
+  const canReadTransfers =
+    hasArea("magazzino") &&
+    hasPermission("magazzino.view") &&
+    isModuloAttivo("TRASFERIMENTI");
+  return canReadBolle || canReadTransfers;
+}
+
+function RequireDocumentiOperativiAccess({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { hasArea, hasPermission } = useAuth();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  if (
+    !canAccessDocumentiOperativiRoute(hasArea, hasPermission, isModuloAttivo)
+  ) {
+    return <NotAuthorized />;
+  }
   return <>{children}</>;
 }
 
@@ -249,623 +310,632 @@ function ReportingRoute({
 function AppRoutes() {
   return (
     <AppLayout>
-      <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-label="Caricamento pagina" /></div>}>
-      <Switch>
-        <Route path="/">
-          {() => (
-            <Guard area="generale">
-              <Dashboard />
-            </Guard>
-          )}
-        </Route>
-
-        <Route path="/magazzini">
-          {() => (
-            <Guard area="amministrazione">
-              <Magazzini />
-            </Guard>
-          )}
-        </Route>
-        <Route path="/maps">
-          {() => (
-            <RequireMapsAccess>
-              <MapsOperativa />
-            </RequireMapsAccess>
-          )}
-        </Route>
-        <Route path="/prodotti">
-          {() => (
-            <Guard area="magazzino">
-              <RequirePermission permission="magazzino.view">
-                <Prodotti />
-              </RequirePermission>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/lotti">
-          {() => (
-            <Guard area="magazzino">
-              <RequireModulo codice="LOTTI">
-                <RequirePermission permission="magazzino.view">
-                  <Lotti />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/carico-merce">
-          {() => (
-            <Guard area="magazzino">
-              <RequireModulo codice="LOTTI">
-                <RequirePermission permission="magazzino.view">
-                  <CaricoMerce />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/movimenti">
-          {() => (
-            <Guard area="magazzino">
-              <RequirePermission permission="magazzino.view">
-                <Movimenti />
-              </RequirePermission>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/giacenze">
-          {() => (
-            <Guard area="magazzino">
-              <RequirePermission permission="magazzino.view">
-                <Giacenze />
-              </RequirePermission>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/trasferimenti">
-          {() => (
-            <Guard area="magazzino">
-              <RequireModulo codice="TRASFERIMENTI">
-                <RequirePermission permission="magazzino.view">
-                  <Trasferimenti />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/preparazione-consegne">
-          {() => (
-            <Guard area="magazzino">
-              <RequireModulo codice="MAGAZZINO_SOLIDALE">
-                <RequirePermission permission="magazzino.view">
-                  <PreparazioneConsegne />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/scarichi">
-          {() => (
-            <Guard area="magazzino">
-              <RequireModulo codice="SCARICHI">
-                <RequirePermission permission="magazzino.view">
-                  <Scarichi />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-
-        <Route path="/emporio/cassa">
-          {() => (
-            <Guard area="emporio">
-              <RequireModulo codice="EMPORIO_SOLIDALE">
-                <RequirePermission permission="emporio.cassa.view">
-                  <EmporioCassa />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/emporio/crediti-saldo">
-          {() => (
-            <Guard area="emporio">
-              <RequireModulo codice="EMPORIO_SOLIDALE">
-                <RequireModulo codice="CREDITO_SOLIDALE">
-                  <RequirePermission permission="credito.view">
-                    <EmporioCreditiSaldo />
-                  </RequirePermission>
-                </RequireModulo>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/emporio/accessi">
-          {() => (
-            <Guard area="emporio">
-              <RequireModulo codice="EMPORIO_SOLIDALE">
-                <RequirePermission permission="emporio.access.view">
-                  <EmporioAccessi />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/emporio/spese">
-          {() => (
-            <Guard area="emporio">
-              <RequireModulo codice="EMPORIO_SOLIDALE">
-                <RequirePermission permission="emporio.sales.view">
-                  <EmporioSpese />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-
-        <Route path="/centri-ascolto">
-          {() => (
-            <Guard area="amministrazione">
-              <RequireAnyModulo
-                codici={[
-                  "CENTRO_ASCOLTO",
-                  "EMPORIO_SOLIDALE",
-                  "MENSA",
-                  "CREDITO_SOLIDALE",
-                ]}
-              >
-                <CentriAscolto />
-              </RequireAnyModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/beneficiari">
-          {() => (
-            <Guard area="sociale">
-              <RequireModulo codice="CENTRO_ASCOLTO">
-                <RequirePermission permission="beneficiari.view">
-                  <Beneficiari />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/beneficiari/:id">
-          {() => (
-            <Guard area={["sociale", "uds"]}>
-              <RequireAreaModulo
-                requisiti={[
-                  { area: "sociale", moduloCodice: "CENTRO_ASCOLTO" },
-                  { area: "uds", moduloCodice: "UDS" },
-                ]}
-              >
-                <RequirePermission permission="beneficiari.view">
-                  <BeneficiarioDettaglio />
-                </RequirePermission>
-              </RequireAreaModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/interventi">
-          {() => (
-            <Guard area="sociale">
-              <RequireModulo codice="CENTRO_ASCOLTO">
-                <RequirePermission permission="sociale.interventi.view">
-                  <Interventi />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/consegne">
-          {() => (
-            <Guard area="sociale">
-              <RequireModulo codice="CENTRO_ASCOLTO">
-                <RequireModulo codice="CONSEGNE">
-                  <RequirePermission permission="consegne.view">
-                    <Consegne />
-                  </RequirePermission>
-                </RequireModulo>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/bolle">
-          {() => (
-            <Guard area={["sociale", "magazzino"]}>
-              <RequireModulo codice="MAGAZZINO_SOLIDALE">
-                <RequireModulo codice="BOLLE">
-                  <RequirePermission permission="bolle.view">
-                    <Bolle />
-                  </RequirePermission>
-                </RequireModulo>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/turni">
-          {() => (
-            <Guard area="sociale">
-              <RequireModulo codice="CENTRO_ASCOLTO">
-                <RequirePermission permission="logistica.turni.view">
-                  <Turni />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-
-        <Route path="/uds/anagrafica">
-          {() => (
-            <Guard area="uds">
-              <RequireModulo codice="UDS">
-                <RequirePermission permission="uds.directory.view">
-                  <UdsAnagrafica />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-
-        <Route path="/mensa/postazione">
-          {() => (
-            <MensaRoute view="postazione" permission="mensa.access.scan" />
-          )}
-        </Route>
-        <Route path="/mensa/pasti">
-          {() => <MensaRoute view="pasti" permission="mensa.view" />}
-        </Route>
-        <Route path="/mensa/abilitazioni">
-          {() => (
-            <MensaRoute
-              view="abilitazioni"
-              permission="mensa.eligibility.manage"
+      <Suspense
+        fallback={
+          <div className="flex min-h-[50vh] items-center justify-center">
+            <Loader2
+              className="h-8 w-8 animate-spin text-muted-foreground"
+              aria-label="Caricamento pagina"
             />
-          )}
-        </Route>
-        <Route path="/mensa/trasferimenti">
-          {() => (
-            <MensaRoute
-              view="trasferimenti"
-              permission="mensa.transfers.request"
-            />
-          )}
-        </Route>
-        <Route path="/mensa/consumi">
-          {() => (
-            <MensaRoute view="consumi" permission="mensa.consumption.manage" />
-          )}
-        </Route>
-        <Route path="/mensa/eccezioni">
-          {() => <MensaRoute view="eccezioni" permission="mensa.view" />}
-        </Route>
-        <Route path="/mensa/report">
-          {() => <MensaRoute view="report" permission="mensa.reports.view" />}
-        </Route>
-        <Route path="/uds/interventi">
-          {() => (
-            <Guard area="uds">
-              <RequireModulo codice="UDS">
-                <RequirePermission permission="uds.interventi.view">
-                  <UdsInterventi />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/uds/report-giornaliero">
-          {() => (
-            <Guard area="uds">
-              <RequireModulo codice="UDS">
-                <RequirePermission permission="uds.reports.view">
-                  <UdsReportGiornaliero />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
+          </div>
+        }
+      >
+        <Switch>
+          <Route path="/">
+            {() => (
+              <Guard area="generale">
+                <Dashboard />
+              </Guard>
+            )}
+          </Route>
 
-        <Route path="/volontari">
-          {() => (
-            <Guard area="logistica">
-              <RequireModulo codice="VOLONTARI">
-                <RequirePermission permission="logistica.volontari.view">
-                  <Volontari />
+          <Route path="/magazzini">
+            {() => (
+              <Guard area="amministrazione">
+                <Magazzini />
+              </Guard>
+            )}
+          </Route>
+          <Route path="/maps">
+            {() => (
+              <RequireMapsAccess>
+                <MapsOperativa />
+              </RequireMapsAccess>
+            )}
+          </Route>
+          <Route path="/prodotti">
+            {() => (
+              <Guard area="magazzino">
+                <RequirePermission permission="magazzino.view">
+                  <Prodotti />
                 </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/mezzi">
-          {() => (
-            <Guard area="logistica">
-              <RequireModulo codice="MEZZI">
-                <RequirePermission permission="logistica.mezzi.view">
-                  <Mezzi />
+              </Guard>
+            )}
+          </Route>
+          <Route path="/lotti">
+            {() => (
+              <Guard area="magazzino">
+                <RequireModulo codice="LOTTI">
+                  <RequirePermission permission="magazzino.view">
+                    <Lotti />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/carico-merce">
+            {() => (
+              <Guard area="magazzino">
+                <RequireModulo codice="LOTTI">
+                  <RequirePermission permission="magazzino.view">
+                    <CaricoMerce />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/movimenti">
+            {() => (
+              <Guard area="magazzino">
+                <RequirePermission permission="magazzino.view">
+                  <Movimenti />
                 </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/approvazioni-logistica">
-          {() => (
-            <Guard area="logistica">
-              <RequireAnyModulo codici={["VOLONTARI", "MEZZI"]}>
-                <RequirePermission permission="logistica.approvazioni.view">
-                  <ApprovazioniLogistica />
+              </Guard>
+            )}
+          </Route>
+          <Route path="/giacenze">
+            {() => (
+              <Guard area="magazzino">
+                <RequirePermission permission="magazzino.view">
+                  <Giacenze />
                 </RequirePermission>
-              </RequireAnyModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/fornitori">
-          {() => (
-            <Guard area="logistica">
-              <RequireModulo codice="FORNITORI">
-                <Fornitori />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/approvvigionamenti">
-          {() => (
-            <Guard area="logistica">
-              <RequireModulo codice="APPROVVIGIONAMENTI">
-                <RequirePermission permission="approvvigionamenti.view">
-                  <Approvvigionamenti />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/trasferimenti">
+            {() => (
+              <Guard area="magazzino">
+                <RequireModulo codice="TRASFERIMENTI">
+                  <RequirePermission permission="magazzino.view">
+                    <LegacyTrasferimentiRedirect />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/preparazione-consegne">
+            {() => (
+              <Guard area="magazzino">
+                <RequireModulo codice="MAGAZZINO_SOLIDALE">
+                  <RequirePermission permission="magazzino.view">
+                    <PreparazioneConsegne />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/scarichi">
+            {() => (
+              <Guard area="magazzino">
+                <RequireModulo codice="SCARICHI">
+                  <RequirePermission permission="magazzino.view">
+                    <Scarichi />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
 
-        <Route path="/report/dashboard">
-          {() => (
-            <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <ReportingRoute section="generale" />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/report/pacchi">
-          {() => (
-            <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <ReportingRoute
-                  section="pacchi"
-                  areas={["sociale"]}
-                  modules={["MAGAZZINO_SOLIDALE", "BOLLE"]}
-                />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/report/centro-ascolto">
-          {() => (
-            <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <ReportingRoute
-                  section="centro-ascolto"
-                  areas={["sociale"]}
-                  modules={["CENTRO_ASCOLTO"]}
-                />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/report/emporio">
-          {() => (
-            <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <ReportingRoute
-                  section="emporio"
-                  areas={["emporio"]}
-                  modules={["EMPORIO_SOLIDALE"]}
-                />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/report/mensa">
-          {() => (
-            <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <ReportingRoute
-                  section="mensa"
-                  areas={["mensa"]}
-                  modules={["MENSA"]}
-                  permission="mensa.reports.view"
-                />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/report/uds">
-          {() => (
-            <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <ReportingRoute
-                  section="uds"
-                  areas={["uds"]}
-                  modules={["UDS"]}
-                  permission="uds.reports.view"
-                />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/report/magazzino-logistica">
-          {() => (
-            <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <ReportingRoute
-                  section="magazzino-logistica"
-                  areas={["magazzino", "logistica"]}
-                  anyModules={[
-                    "MAGAZZINO_SOLIDALE",
-                    "LOTTI",
-                    "TRASFERIMENTI",
-                    "MEZZI",
-                    "FORNITORI",
-                    "APPROVVIGIONAMENTI",
+          <Route path="/emporio/cassa">
+            {() => (
+              <Guard area="emporio">
+                <RequireModulo codice="EMPORIO_SOLIDALE">
+                  <RequirePermission permission="emporio.cassa.view">
+                    <EmporioCassa />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/emporio/crediti-saldo">
+            {() => (
+              <Guard area="emporio">
+                <RequireModulo codice="EMPORIO_SOLIDALE">
+                  <RequireModulo codice="CREDITO_SOLIDALE">
+                    <RequirePermission permission="credito.view">
+                      <EmporioCreditiSaldo />
+                    </RequirePermission>
+                  </RequireModulo>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/emporio/accessi">
+            {() => (
+              <Guard area="emporio">
+                <RequireModulo codice="EMPORIO_SOLIDALE">
+                  <RequirePermission permission="emporio.access.view">
+                    <EmporioAccessi />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/emporio/spese">
+            {() => (
+              <Guard area="emporio">
+                <RequireModulo codice="EMPORIO_SOLIDALE">
+                  <RequirePermission permission="emporio.sales.view">
+                    <EmporioSpese />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+
+          <Route path="/centri-ascolto">
+            {() => (
+              <Guard area="amministrazione">
+                <RequireAnyModulo
+                  codici={[
+                    "CENTRO_ASCOLTO",
+                    "EMPORIO_SOLIDALE",
+                    "MENSA",
+                    "CREDITO_SOLIDALE",
                   ]}
-                />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/report/fse-plus">
-          {() => (
-            <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <ReportingRoute section="fse-plus" permission="magazzino.fse.view" />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/report">
-          {() => (
-            <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <ReportingLanding />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/report-uds">
-          {() => (
-            <Guard area="analisi">
-              <RequireModulo codice="REPORT">
-                <ReportingRoute
-                  section="uds"
-                  areas={["uds"]}
-                  modules={["UDS"]}
-                  permission="uds.reports.view"
-                />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/aree-operative">
-          {() => (
-            <Guard area="amministrazione">
-              <AreeOperative />
-            </Guard>
-          )}
-        </Route>
-        <Route path="/zone-uds">
-          {() => (
-            <Guard area="amministrazione">
-              <RequireModulo codice="UDS">
-                <RequirePermission permission="uds.directory.view">
-                  <ZoneUds />
-                </RequirePermission>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/ruoli-volontari">
-          {() => (
-            <Guard area="amministrazione">
-              <RequireModulo codice="VOLONTARI">
-                <RuoliVolontari />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/tipi-intervento">
-          {() => (
-            <Guard area="amministrazione">
-              <RequireAnyModulo codici={["CENTRO_ASCOLTO", "UDS"]}>
-                <TipiIntervento />
-              </RequireAnyModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/tipologie-fornitore">
-          {() => (
-            <Guard area="amministrazione">
-              <RequireModulo codice="FORNITORI">
-                <TipologieFornitore />
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/politiche-credito-solidale">
-          {() => (
-            <Guard area="amministrazione">
-              <RequireModulo codice="EMPORIO_SOLIDALE">
-                <RequireModulo codice="CREDITO_SOLIDALE">
-                  <PoliticheCreditoSolidale />
+                >
+                  <CentriAscolto />
+                </RequireAnyModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/beneficiari">
+            {() => (
+              <Guard area="sociale">
+                <RequireModulo codice="CENTRO_ASCOLTO">
+                  <RequirePermission permission="beneficiari.view">
+                    <Beneficiari />
+                  </RequirePermission>
                 </RequireModulo>
-              </RequireModulo>
-            </Guard>
-          )}
-        </Route>
-        <Route path="/impostazioni-stampa">
-          {() => (
-            <Guard area="amministrazione">
-              <ImpostazioniStampa />
-            </Guard>
-          )}
-        </Route>
-        <Route path="/impostazioni-moduli">
-          {() => (
-            <RequireSuperAdmin>
-              <ImpostazioniModuli />
-            </RequireSuperAdmin>
-          )}
-        </Route>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/beneficiari/:id">
+            {() => (
+              <Guard area={["sociale", "uds"]}>
+                <RequireAreaModulo
+                  requisiti={[
+                    { area: "sociale", moduloCodice: "CENTRO_ASCOLTO" },
+                    { area: "uds", moduloCodice: "UDS" },
+                  ]}
+                >
+                  <RequirePermission permission="beneficiari.view">
+                    <BeneficiarioDettaglio />
+                  </RequirePermission>
+                </RequireAreaModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/interventi">
+            {() => (
+              <Guard area="sociale">
+                <RequireModulo codice="CENTRO_ASCOLTO">
+                  <RequirePermission permission="sociale.interventi.view">
+                    <Interventi />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/consegne">
+            {() => (
+              <Guard area="sociale">
+                <RequireModulo codice="CENTRO_ASCOLTO">
+                  <RequireModulo codice="CONSEGNE">
+                    <RequirePermission permission="consegne.view">
+                      <Consegne />
+                    </RequirePermission>
+                  </RequireModulo>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/bolle">
+            {() => (
+              <RequireDocumentiOperativiAccess>
+                <Bolle />
+              </RequireDocumentiOperativiAccess>
+            )}
+          </Route>
+          <Route path="/turni">
+            {() => (
+              <Guard area="sociale">
+                <RequireModulo codice="CENTRO_ASCOLTO">
+                  <RequirePermission permission="logistica.turni.view">
+                    <Turni />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
 
-        <Route path="/super-admin/configurazione-ambiente">
-          {() => (
-            <RequireSuperAdmin>
-              <SuperAdminConfigurazioneAmbiente />
-            </RequireSuperAdmin>
-          )}
-        </Route>
-        <Route path="/super-admin/moduli">
-          {() => (
-            <RequireSuperAdmin>
-              <SuperAdminModuli />
-            </RequireSuperAdmin>
-          )}
-        </Route>
-        <Route path="/super-admin/audit-configurazioni">
-          {() => (
-            <RequireSuperAdmin>
-              <SuperAdminAuditConfigurazioni />
-            </RequireSuperAdmin>
-          )}
-        </Route>
-        <Route path="/super-admin/log-sistema">
-          {() => (
-            <RequireSuperAdmin>
-              <SuperAdminLogSistema />
-            </RequireSuperAdmin>
-          )}
-        </Route>
+          <Route path="/uds/anagrafica">
+            {() => (
+              <Guard area="uds">
+                <RequireModulo codice="UDS">
+                  <RequirePermission permission="uds.directory.view">
+                    <UdsAnagrafica />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
 
-        <Route path="/utenti">
-          {() => (
-            <Guard area="amministrazione">
-              <Utenti />
-            </Guard>
-          )}
-        </Route>
-        <Route path="/ruoli">
-          {() => (
-            <Guard area="amministrazione">
-              <Ruoli />
-            </Guard>
-          )}
-        </Route>
+          <Route path="/mensa/postazione">
+            {() => (
+              <MensaRoute view="postazione" permission="mensa.access.scan" />
+            )}
+          </Route>
+          <Route path="/mensa/pasti">
+            {() => <MensaRoute view="pasti" permission="mensa.view" />}
+          </Route>
+          <Route path="/mensa/abilitazioni">
+            {() => (
+              <MensaRoute
+                view="abilitazioni"
+                permission="mensa.eligibility.manage"
+              />
+            )}
+          </Route>
+          <Route path="/mensa/trasferimenti">
+            {() => (
+              <MensaRoute
+                view="trasferimenti"
+                permission="mensa.transfers.request"
+              />
+            )}
+          </Route>
+          <Route path="/mensa/consumi">
+            {() => (
+              <MensaRoute
+                view="consumi"
+                permission="mensa.consumption.manage"
+              />
+            )}
+          </Route>
+          <Route path="/mensa/eccezioni">
+            {() => <MensaRoute view="eccezioni" permission="mensa.view" />}
+          </Route>
+          <Route path="/mensa/report">
+            {() => <MensaRoute view="report" permission="mensa.reports.view" />}
+          </Route>
+          <Route path="/uds/interventi">
+            {() => (
+              <Guard area="uds">
+                <RequireModulo codice="UDS">
+                  <RequirePermission permission="uds.interventi.view">
+                    <UdsInterventi />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/uds/report-giornaliero">
+            {() => (
+              <Guard area="uds">
+                <RequireModulo codice="UDS">
+                  <RequirePermission permission="uds.reports.view">
+                    <UdsReportGiornaliero />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
 
-        <Route path="/sostieni-progetto">{() => <SostieniProgetto />}</Route>
+          <Route path="/volontari">
+            {() => (
+              <Guard area="logistica">
+                <RequireModulo codice="VOLONTARI">
+                  <RequirePermission permission="logistica.volontari.view">
+                    <Volontari />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/mezzi">
+            {() => (
+              <Guard area="logistica">
+                <RequireModulo codice="MEZZI">
+                  <RequirePermission permission="logistica.mezzi.view">
+                    <Mezzi />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/approvazioni-logistica">
+            {() => (
+              <Guard area="logistica">
+                <RequireAnyModulo codici={["VOLONTARI", "MEZZI"]}>
+                  <RequirePermission permission="logistica.approvazioni.view">
+                    <ApprovazioniLogistica />
+                  </RequirePermission>
+                </RequireAnyModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/fornitori">
+            {() => (
+              <Guard area="logistica">
+                <RequireModulo codice="FORNITORI">
+                  <Fornitori />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/approvvigionamenti">
+            {() => (
+              <Guard area="logistica">
+                <RequireModulo codice="APPROVVIGIONAMENTI">
+                  <RequirePermission permission="approvvigionamenti.view">
+                    <Approvvigionamenti />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
 
-        <Route component={NotFound} />
-      </Switch>
+          <Route path="/report/dashboard">
+            {() => (
+              <Guard area="analisi">
+                <RequireModulo codice="REPORT">
+                  <ReportingRoute section="generale" />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/report/pacchi">
+            {() => (
+              <Guard area="analisi">
+                <RequireModulo codice="REPORT">
+                  <ReportingRoute
+                    section="pacchi"
+                    areas={["sociale"]}
+                    modules={["MAGAZZINO_SOLIDALE", "BOLLE"]}
+                  />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/report/centro-ascolto">
+            {() => (
+              <Guard area="analisi">
+                <RequireModulo codice="REPORT">
+                  <ReportingRoute
+                    section="centro-ascolto"
+                    areas={["sociale"]}
+                    modules={["CENTRO_ASCOLTO"]}
+                  />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/report/emporio">
+            {() => (
+              <Guard area="analisi">
+                <RequireModulo codice="REPORT">
+                  <ReportingRoute
+                    section="emporio"
+                    areas={["emporio"]}
+                    modules={["EMPORIO_SOLIDALE"]}
+                  />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/report/mensa">
+            {() => (
+              <Guard area="analisi">
+                <RequireModulo codice="REPORT">
+                  <ReportingRoute
+                    section="mensa"
+                    areas={["mensa"]}
+                    modules={["MENSA"]}
+                    permission="mensa.reports.view"
+                  />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/report/uds">
+            {() => (
+              <Guard area="analisi">
+                <RequireModulo codice="REPORT">
+                  <ReportingRoute
+                    section="uds"
+                    areas={["uds"]}
+                    modules={["UDS"]}
+                    permission="uds.reports.view"
+                  />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/report/magazzino-logistica">
+            {() => (
+              <Guard area="analisi">
+                <RequireModulo codice="REPORT">
+                  <ReportingRoute
+                    section="magazzino-logistica"
+                    areas={["magazzino", "logistica"]}
+                    anyModules={[
+                      "MAGAZZINO_SOLIDALE",
+                      "LOTTI",
+                      "TRASFERIMENTI",
+                      "MEZZI",
+                      "FORNITORI",
+                      "APPROVVIGIONAMENTI",
+                    ]}
+                  />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/report/fse-plus">
+            {() => (
+              <Guard area="analisi">
+                <RequireModulo codice="REPORT">
+                  <ReportingRoute
+                    section="fse-plus"
+                    permission="magazzino.fse.view"
+                  />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/report">
+            {() => (
+              <Guard area="analisi">
+                <RequireModulo codice="REPORT">
+                  <ReportingLanding />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/report-uds">
+            {() => (
+              <Guard area="analisi">
+                <RequireModulo codice="REPORT">
+                  <ReportingRoute
+                    section="uds"
+                    areas={["uds"]}
+                    modules={["UDS"]}
+                    permission="uds.reports.view"
+                  />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/aree-operative">
+            {() => (
+              <Guard area="amministrazione">
+                <AreeOperative />
+              </Guard>
+            )}
+          </Route>
+          <Route path="/zone-uds">
+            {() => (
+              <Guard area="amministrazione">
+                <RequireModulo codice="UDS">
+                  <RequirePermission permission="uds.directory.view">
+                    <ZoneUds />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/ruoli-volontari">
+            {() => (
+              <Guard area="amministrazione">
+                <RequireModulo codice="VOLONTARI">
+                  <RuoliVolontari />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/tipi-intervento">
+            {() => (
+              <Guard area="amministrazione">
+                <RequireAnyModulo codici={["CENTRO_ASCOLTO", "UDS"]}>
+                  <TipiIntervento />
+                </RequireAnyModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/tipologie-fornitore">
+            {() => (
+              <Guard area="amministrazione">
+                <RequireModulo codice="FORNITORI">
+                  <TipologieFornitore />
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/politiche-credito-solidale">
+            {() => (
+              <Guard area="amministrazione">
+                <RequireModulo codice="EMPORIO_SOLIDALE">
+                  <RequireModulo codice="CREDITO_SOLIDALE">
+                    <PoliticheCreditoSolidale />
+                  </RequireModulo>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/impostazioni-stampa">
+            {() => (
+              <Guard area="amministrazione">
+                <ImpostazioniStampa />
+              </Guard>
+            )}
+          </Route>
+          <Route path="/impostazioni-moduli">
+            {() => (
+              <RequireSuperAdmin>
+                <ImpostazioniModuli />
+              </RequireSuperAdmin>
+            )}
+          </Route>
+
+          <Route path="/super-admin/configurazione-ambiente">
+            {() => (
+              <RequireSuperAdmin>
+                <SuperAdminConfigurazioneAmbiente />
+              </RequireSuperAdmin>
+            )}
+          </Route>
+          <Route path="/super-admin/moduli">
+            {() => (
+              <RequireSuperAdmin>
+                <SuperAdminModuli />
+              </RequireSuperAdmin>
+            )}
+          </Route>
+          <Route path="/super-admin/audit-configurazioni">
+            {() => (
+              <RequireSuperAdmin>
+                <SuperAdminAuditConfigurazioni />
+              </RequireSuperAdmin>
+            )}
+          </Route>
+          <Route path="/super-admin/log-sistema">
+            {() => (
+              <RequireSuperAdmin>
+                <SuperAdminLogSistema />
+              </RequireSuperAdmin>
+            )}
+          </Route>
+
+          <Route path="/utenti">
+            {() => (
+              <Guard area="amministrazione">
+                <Utenti />
+              </Guard>
+            )}
+          </Route>
+          <Route path="/ruoli">
+            {() => (
+              <Guard area="amministrazione">
+                <Ruoli />
+              </Guard>
+            )}
+          </Route>
+
+          <Route path="/sostieni-progetto">{() => <SostieniProgetto />}</Route>
+
+          <Route component={NotFound} />
+        </Switch>
       </Suspense>
     </AppLayout>
   );

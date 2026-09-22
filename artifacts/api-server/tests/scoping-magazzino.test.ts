@@ -1,4 +1,13 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from "vitest";
+import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { db, pool, utentiTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -42,9 +51,12 @@ let magB: number;
 let prod: number;
 let forn: number;
 
-const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
-const appAs = (router: Parameters<typeof makeScopedApp>[0], centro: number | null) =>
-  makeScopedApp(router, { id: operatoreId, centroAscoltoId: centro });
+const idsOf = (body: unknown) =>
+  (body as Array<{ id: number }>).map((r) => r.id);
+const appAs = (
+  router: Parameters<typeof makeScopedApp>[0],
+  centro: number | null,
+) => makeScopedApp(router, { id: operatoreId, centroAscoltoId: centro });
 
 beforeAll(async () => {
   bootScope = newScope();
@@ -75,9 +87,21 @@ afterAll(async () => {
 
 describe("Lotti — scoping via magazzino visibile", () => {
   it("lista: A vede i lotti di magA + magazzino comune, non quelli di magB", async () => {
-    const lA = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const lB = await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
-    const lNull = await createLotto(scope, { prodottoId: prod, magazzinoId: magNull, quantita: 10 });
+    const lA = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 10,
+    });
+    const lB = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magB,
+      quantita: 10,
+    });
+    const lNull = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magNull,
+      quantita: 10,
+    });
     const res = await request(appAs(lottiRouter, centroA)).get("/lotti");
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
@@ -87,47 +111,59 @@ describe("Lotti — scoping via magazzino visibile", () => {
   });
 
   it("lista: il caller globale vede tutto", async () => {
-    const lA = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    const lB = await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
+    const lA = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 10,
+    });
+    const lB = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magB,
+      quantita: 10,
+    });
     const res = await request(appAs(lottiRouter, null)).get("/lotti");
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([lA, lB]));
   });
 
   it("GET /:id fuori centro → 403", async () => {
-    const lB = await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
+    const lB = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magB,
+      quantita: 10,
+    });
     const res = await request(appAs(lottiRouter, centroA)).get(`/lotti/${lB}`);
     expect(res.status).toBe(403);
   });
 
   it("POST: non può creare un lotto in un magazzino di un altro centro → 403", async () => {
-    const res = await request(appAs(lottiRouter, centroA))
-      .post("/lotti")
-      .send({
-        prodottoId: prod,
-        magazzinoId: magB,
-        dataCarico: "2026-06-01",
-        quantitaCaricata: 10,
-        fornitoreId: forn,
-      });
+    const res = await request(appAs(lottiRouter, centroA)).post("/lotti").send({
+      prodottoId: prod,
+      magazzinoId: magB,
+      dataCarico: "2026-06-01",
+      quantitaCaricata: 10,
+      fornitoreId: forn,
+    });
     expect(res.status).toBe(403);
   });
 
   it("POST: crea un lotto in un magazzino del proprio centro", async () => {
-    const res = await request(appAs(lottiRouter, centroA))
-      .post("/lotti")
-      .send({
-        prodottoId: prod,
-        magazzinoId: magA,
-        dataCarico: "2026-06-01",
-        quantitaCaricata: 10,
-        fornitoreId: forn,
-      });
+    const res = await request(appAs(lottiRouter, centroA)).post("/lotti").send({
+      prodottoId: prod,
+      magazzinoId: magA,
+      dataCarico: "2026-06-01",
+      quantitaCaricata: 10,
+      fornitoreId: forn,
+    });
     expect(res.status).toBe(201);
     scope.lottoIds.push(res.body.id);
   });
 
   it("PATCH: impedisce sempre lo spostamento retroattivo del lotto", async () => {
-    const lA = await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
+    const lA = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 10,
+    });
     const res = await request(appAs(lottiRouter, centroA))
       .patch(`/lotti/${lA}`)
       .send({ magazzinoId: magB });
@@ -138,9 +174,17 @@ describe("Lotti — scoping via magazzino visibile", () => {
 describe("Trasferimenti — scoping via magazzini visibili (origine O destino)", () => {
   it("lista: A vede un trasferimento che tocca un suo magazzino, non uno tutto interno a B", async () => {
     const magB2 = await createMagazzino(scope, centroB);
-    const tVisible = await insertTrasferimento(scope, { origineId: magA, destinoId: magNull });
-    const tHidden = await insertTrasferimento(scope, { origineId: magB, destinoId: magB2 });
-    const res = await request(appAs(trasferimentiRouter, centroA)).get("/trasferimenti");
+    const tVisible = await insertTrasferimento(scope, {
+      origineId: magA,
+      destinoId: magNull,
+    });
+    const tHidden = await insertTrasferimento(scope, {
+      origineId: magB,
+      destinoId: magB2,
+    });
+    const res = await request(appAs(trasferimentiRouter, centroA)).get(
+      "/trasferimenti",
+    );
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(tVisible);
@@ -149,19 +193,37 @@ describe("Trasferimenti — scoping via magazzini visibili (origine O destino)",
 
   it("lista: il caller globale vede tutti i trasferimenti", async () => {
     const magB2 = await createMagazzino(scope, centroB);
-    const tA = await insertTrasferimento(scope, { origineId: magA, destinoId: magNull });
-    const tB = await insertTrasferimento(scope, { origineId: magB, destinoId: magB2 });
-    const res = await request(appAs(trasferimentiRouter, null)).get("/trasferimenti");
+    const tA = await insertTrasferimento(scope, {
+      origineId: magA,
+      destinoId: magNull,
+    });
+    const tB = await insertTrasferimento(scope, {
+      origineId: magB,
+      destinoId: magB2,
+    });
+    const res = await request(appAs(trasferimentiRouter, null)).get(
+      "/trasferimenti",
+    );
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([tA, tB]));
   });
 
   it("GET /:id: 200 se tocca un magazzino visibile, 403 se tutto interno a un altro centro", async () => {
     const magB2 = await createMagazzino(scope, centroB);
-    const tVisible = await insertTrasferimento(scope, { origineId: magA, destinoId: magNull });
-    const tHidden = await insertTrasferimento(scope, { origineId: magB, destinoId: magB2 });
+    const tVisible = await insertTrasferimento(scope, {
+      origineId: magA,
+      destinoId: magNull,
+    });
+    const tHidden = await insertTrasferimento(scope, {
+      origineId: magB,
+      destinoId: magB2,
+    });
     const appA = appAs(trasferimentiRouter, centroA);
-    expect((await request(appA).get(`/trasferimenti/${tVisible}`)).status).toBe(200);
-    expect((await request(appA).get(`/trasferimenti/${tHidden}`)).status).toBe(403);
+    expect((await request(appA).get(`/trasferimenti/${tVisible}`)).status).toBe(
+      200,
+    );
+    expect((await request(appA).get(`/trasferimenti/${tHidden}`)).status).toBe(
+      403,
+    );
   });
 
   it("POST: non può creare un trasferimento tutto interno a un altro centro → 403", async () => {
@@ -169,6 +231,7 @@ describe("Trasferimenti — scoping via magazzini visibili (origine O destino)",
     const res = await request(appAs(trasferimentiRouter, centroA))
       .post("/trasferimenti")
       .send({
+        idempotencyKey: `scope-transfer-create-hidden-${randomUUID()}`,
         magazzinoOrigineId: magB,
         magazzinoDestinoId: magB2,
         dataRichiesta: "2026-06-01",
@@ -182,6 +245,7 @@ describe("Trasferimenti — scoping via magazzini visibili (origine O destino)",
     const res = await request(appAs(trasferimentiRouter, centroA))
       .post("/trasferimenti")
       .send({
+        idempotencyKey: `scope-transfer-create-visible-${randomUUID()}`,
         magazzinoOrigineId: magA,
         magazzinoDestinoId: magNull,
         dataRichiesta: "2026-06-01",
@@ -194,27 +258,67 @@ describe("Trasferimenti — scoping via magazzini visibili (origine O destino)",
 
   it("PATCH IDOR: modificare un trasferimento tutto interno a un altro centro → 403", async () => {
     const magB2 = await createMagazzino(scope, centroB);
-    const tHidden = await insertTrasferimento(scope, { origineId: magB, destinoId: magB2 });
+    const tHidden = await insertTrasferimento(scope, {
+      origineId: magB,
+      destinoId: magB2,
+    });
     const res = await request(appAs(trasferimentiRouter, centroA))
       .patch(`/trasferimenti/${tHidden}`)
-      .send({ versione: 1, righe: [{ prodottoId: prod, quantita: 2, unitaMisura: "kg" }] });
+      .send({
+        idempotencyKey: `scope-transfer-update-hidden-${randomUUID()}`,
+        versione: 1,
+        righe: [{ prodottoId: prod, quantita: 2, unitaMisura: "kg" }],
+      });
     expect(res.status).toBe(403);
   });
 
   it("azioni (avvia/conferma) tutto interno a un altro centro → 403", async () => {
     const magB2 = await createMagazzino(scope, centroB);
-    const tHidden = await insertTrasferimento(scope, { origineId: magB, destinoId: magB2 });
+    const tHidden = await insertTrasferimento(scope, {
+      origineId: magB,
+      destinoId: magB2,
+    });
     const appA = appAs(trasferimentiRouter, centroA);
-    expect((await request(appA).post(`/trasferimenti/${tHidden}/avvia`).send({ versione: 1 })).status).toBe(403);
-    expect((await request(appA).post(`/trasferimenti/${tHidden}/conferma`).send({ versione: 1 })).status).toBe(403);
+    expect(
+      (
+        await request(appA)
+          .post(`/trasferimenti/${tHidden}/avvia`)
+          .send({
+            idempotencyKey: `scope-transfer-dispatch-hidden-${randomUUID()}`,
+            versione: 1,
+          })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(appA)
+          .post(`/trasferimenti/${tHidden}/conferma`)
+          .send({
+            idempotencyKey: `scope-transfer-receive-hidden-${randomUUID()}`,
+            versione: 1,
+          })
+      ).status,
+    ).toBe(403);
   });
 });
 
 describe("Giacenze — scoping via magazzino visibile", () => {
   it("lista: A aggrega soltanto la propria Area e non include magazzini legacy o di altre Aree", async () => {
-    await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
-    await createLotto(scope, { prodottoId: prod, magazzinoId: magNull, quantita: 10 });
+    await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 10,
+    });
+    await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magB,
+      quantita: 10,
+    });
+    await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magNull,
+      quantita: 10,
+    });
     const res = await request(appAs(giacenzeRouter, centroA)).get(
       `/giacenze?areaOperativaId=${areaA}`,
     );
@@ -229,8 +333,16 @@ describe("Giacenze — scoping via magazzino visibile", () => {
   });
 
   it("lista: un utente senza centro può consultare un magazzino per volta nella relativa Area", async () => {
-    await createLotto(scope, { prodottoId: prod, magazzinoId: magA, quantita: 10 });
-    await createLotto(scope, { prodottoId: prod, magazzinoId: magB, quantita: 10 });
+    await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 10,
+    });
+    await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magB,
+      quantita: 10,
+    });
     const [resA, resB] = await Promise.all([
       request(appAs(giacenzeRouter, null)).get(
         `/giacenze?areaOperativaId=${areaA}&magazzinoId=${magA}`,
@@ -246,10 +358,21 @@ describe("Giacenze — scoping via magazzino visibile", () => {
 
 describe("Movimenti — scoping via magazzino visibile", () => {
   it("lista: A vede i movimenti di magA + magazzino comune, non quelli di magB", async () => {
-    const mA = await insertMovimento(scope, { magazzinoId: magA, prodottoId: prod });
-    const mB = await insertMovimento(scope, { magazzinoId: magB, prodottoId: prod });
-    const mNull = await insertMovimento(scope, { magazzinoId: magNull, prodottoId: prod });
-    const res = await request(appAs(movimentiRouter, centroA)).get("/movimenti");
+    const mA = await insertMovimento(scope, {
+      magazzinoId: magA,
+      prodottoId: prod,
+    });
+    const mB = await insertMovimento(scope, {
+      magazzinoId: magB,
+      prodottoId: prod,
+    });
+    const mNull = await insertMovimento(scope, {
+      magazzinoId: magNull,
+      prodottoId: prod,
+    });
+    const res = await request(appAs(movimentiRouter, centroA)).get(
+      "/movimenti",
+    );
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(mA);
@@ -265,8 +388,14 @@ describe("Movimenti — scoping via magazzino visibile", () => {
   });
 
   it("lista: il caller globale vede tutti i movimenti", async () => {
-    const mA = await insertMovimento(scope, { magazzinoId: magA, prodottoId: prod });
-    const mB = await insertMovimento(scope, { magazzinoId: magB, prodottoId: prod });
+    const mA = await insertMovimento(scope, {
+      magazzinoId: magA,
+      prodottoId: prod,
+    });
+    const mB = await insertMovimento(scope, {
+      magazzinoId: magB,
+      prodottoId: prod,
+    });
     const res = await request(appAs(movimentiRouter, null)).get("/movimenti");
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([mA, mB]));
   });

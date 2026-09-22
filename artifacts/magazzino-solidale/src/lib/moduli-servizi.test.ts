@@ -41,9 +41,9 @@ describe("moduli-servizio e navigazione", () => {
       "SCARICHI",
     ]);
 
-    const centerKeys = NAV_ITEMS.filter((item) => item.groupKey === "sociale").map(
-      (item) => item.key,
-    );
+    const centerKeys = NAV_ITEMS.filter(
+      (item) => item.groupKey === "sociale",
+    ).map((item) => item.key);
     expect(keys).not.toEqual(expect.arrayContaining(centerKeys));
     expect(keys).toContain("mensaPostazione");
     expect(keys).toContain("emporioCassa");
@@ -60,24 +60,32 @@ describe("moduli-servizio e navigazione", () => {
     expect(keys).toContain("emporioCassa");
   });
 
+  it("mantiene indipendenti i moduli Trasferimenti e Bolle nella facciata comune", () => {
+    expect(enabledKeys(["TRASFERIMENTI"])).toContain("trasferimenti");
+    expect(enabledKeys(["TRASFERIMENTI"])).not.toContain("bolle");
+    expect(enabledKeys(["MAGAZZINO_SOLIDALE", "BOLLE"])).toContain("bolle");
+    expect(enabledKeys(["MAGAZZINO_SOLIDALE", "BOLLE"])).not.toContain(
+      "trasferimenti",
+    );
+  });
+
   it.each([
     ["EMPORIO_SOLIDALE", "emporio"],
     ["MENSA", "mensa"],
     ["UDS", "uds"],
-  ])("nasconde l'intero gruppo %s quando il servizio è spento", (disabled, groupKey) => {
-    const active = new Set([
-      ...SERVICE_CODES,
-      "CREDITO_SOLIDALE",
-      "REPORT",
-    ]);
-    active.delete(disabled);
-    const keys = enabledKeys([...active]);
-    const groupKeys = NAV_ITEMS.filter(
-      (item) => item.groupKey === groupKey,
-    ).map((item) => item.key);
+  ])(
+    "nasconde l'intero gruppo %s quando il servizio è spento",
+    (disabled, groupKey) => {
+      const active = new Set([...SERVICE_CODES, "CREDITO_SOLIDALE", "REPORT"]);
+      active.delete(disabled);
+      const keys = enabledKeys([...active]);
+      const groupKeys = NAV_ITEMS.filter(
+        (item) => item.groupKey === groupKey,
+      ).map((item) => item.key);
 
-    expect(keys).not.toEqual(expect.arrayContaining(groupKeys));
-  });
+      expect(keys).not.toEqual(expect.arrayContaining(groupKeys));
+    },
+  );
 
   it("posiziona Scarichi Manuali nel Magazzino subito dopo Bolle di Consegna", () => {
     const warehouseKeys = NAV_ITEMS.filter(
@@ -100,7 +108,9 @@ describe("moduli-servizio e navigazione", () => {
 
   it("usa REPORT per la landing e applica i moduli sorgente alle dashboard", () => {
     const reportLanding = NAV_ITEMS.find((item) => item.key === "report");
-    const reportCentro = NAV_ITEMS.find((item) => item.key === "reportCentroAscolto");
+    const reportCentro = NAV_ITEMS.find(
+      (item) => item.key === "reportCentroAscolto",
+    );
     const reportUds = NAV_ITEMS.find((item) => item.key === "reportUds");
 
     expect(reportLanding?.moduloCodice).toBe("REPORT");
@@ -127,24 +137,25 @@ describe("moduli-servizio e navigazione", () => {
   it("mantiene Impostazioni Stampa indipendente dai moduli Bolle e Magazzino", () => {
     expect(enabledKeys([])).toContain("impostazioniStampa");
     expect(enabledKeys(["BOLLE"])).toContain("impostazioniStampa");
-    expect(enabledKeys(["MAGAZZINO_SOLIDALE"])).toContain(
-      "impostazioniStampa",
-    );
+    expect(enabledKeys(["MAGAZZINO_SOLIDALE"])).toContain("impostazioniStampa");
   });
 
-  it.each([
-    "CENTRO_ASCOLTO",
-    "EMPORIO_SOLIDALE",
-    "MENSA",
-    "CREDITO_SOLIDALE",
-  ])("mantiene configurabili i Centri quando è attivo %s", (modulo) => {
-    expect(enabledKeys([modulo])).toContain("centriAscolto");
-  });
+  it.each(["CENTRO_ASCOLTO", "EMPORIO_SOLIDALE", "MENSA", "CREDITO_SOLIDALE"])(
+    "mantiene configurabili i Centri quando è attivo %s",
+    (modulo) => {
+      expect(enabledKeys([modulo])).toContain("centriAscolto");
+    },
+  );
 
   it("non altera le altre voci amministrative senza feature flag", () => {
     const keys = enabledKeys([]);
     expect(keys).toEqual(
-      expect.arrayContaining(["areeOperative", "utenti", "ruoli", "impostazioniStampa"]),
+      expect.arrayContaining([
+        "areeOperative",
+        "utenti",
+        "ruoli",
+        "impostazioniStampa",
+      ]),
     );
   });
 
@@ -168,7 +179,10 @@ describe("moduli-servizio e navigazione", () => {
 
   it("mostra MAPS solo quando le capabilities contengono almeno un layer", () => {
     const maps = NAV_ITEMS.find((item) => item.key === "maps");
-    expect(maps).toMatchObject({ permission: "maps.operational", requiresMapsLayer: true });
+    expect(maps).toMatchObject({
+      permission: "maps.operational",
+      requiresMapsLayer: true,
+    });
     expect(isNavItemEnabledByCapabilities(maps!, 0)).toBe(false);
     expect(isNavItemEnabledByCapabilities(maps!, 1)).toBe(true);
   });

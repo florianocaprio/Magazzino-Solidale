@@ -15,7 +15,7 @@ import {
   prodottiTable,
   utentiTable,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import areasRouter from "../src/routes/aree-operative";
 import carichiRouter from "../src/routes/carichi";
 import giacenzeRouter from "../src/routes/giacenze";
@@ -861,7 +861,8 @@ describe("M2 — lotto logico operativo", () => {
           eq(auditEventiTable.entitaTipo, "lotto_logico"),
           eq(auditEventiTable.entitaId, logicalLotId),
         ),
-      );
+      )
+      .orderBy(asc(auditEventiTable.id));
     expect(events.map((event) => event.azione)).toEqual([
       "LOTTO_LOGICO_CREATO",
       "LOTTO_LOGICO_MODIFICATO",
