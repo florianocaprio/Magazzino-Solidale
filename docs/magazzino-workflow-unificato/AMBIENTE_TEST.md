@@ -451,3 +451,98 @@ attivo con gli stessi ID (`magazzino-web` `64601804539f`, `magazzino-api`
 persistenti `magazzino-solidale_magazzino_pgdata` e
 `magazzino-solidale_magazzino_uploads` invariati. Nessun rebuild, restart,
 Compose, migrazione o push schema ha interessato l'ambiente persistente.
+
+## M4A — laboratorio disposable dell'hardening post-code-review
+
+Data: 23 settembre 2026. Sono stati creati esclusivamente tre container
+PostgreSQL disposable, in sequenza. Il primo,
+`magazzino-m4a-hardening-db-20260923` (ID
+`42074bbb4463fbe70418c0e59908c48495778401728a5354c89aa661642ac3ce`,
+label `magazzino.milestone=M4A-hardening`, immagine `postgres:16-alpine`),
+era esposto solo su `127.0.0.1:55445`. I dati erano su `tmpfs`; l'ispezione
+pre-cleanup mostrava `Mounts=[]`. Sono stati usati i due database temporanei
+`magazzino_m4a_hardening` e `magazzino_m4a_hardening_rerun`: il primo per il
+tentativo iniziale e il secondo per il rerun dopo la correzione delle fixture.
+Il secondo, `magazzino-m4a-hardening-verify-db-20260923` (ID
+`4f5990759515a8872bb0aa11304a7ec6520deab7d70d7d3fbb2b9386167965ae`,
+stessa label/immagine, `tmpfs`, `Mounts=[]`), era esposto solo su
+`127.0.0.1:55446` e ha ospitato il database
+`magazzino_m4a_hardening_verify` per il test finale dello scope
+transazionale. Il terzo, `magazzino-m4a-hardening-scope-db-20260923` (ID
+`041503cd6bad2d3ba596b3aa203f0f4a889176ba534ee9620668d9f10279efaa`,
+stessa label/immagine, `tmpfs`, `Mounts=[]`), era esposto solo su
+`127.0.0.1:55447` e ha ospitato `magazzino_m4a_hardening_scope` per la
+prova fail-closed UDS senza Area. Il bootstrap `drizzle push` è stato applicato **solo** a
+questi database freschi e disposable, seguito dalle 40 migrazioni e dal seed
+di test. Nessun database operativo o popolato è stato sottoposto a `push`.
+
+I container sono stati rimossi nominativamente con `docker rm -f` sui tre
+nomi esatti dopo verifica di nome/label; i `tmpfs` e i quattro database sono stati
+eliminati con essi. Nessuna rete o volume Docker dedicato
+è stato creato; è stata usata la rete `bridge` preesistente. La verifica
+finale `docker ps -a`, `docker network ls`, `docker volume ls` non mostra
+risorse disposable M4A residue. Nessun prune o comando globale è stato usato.
+
+`magazzino-web` (`64601804539f`), `magazzino-api` (`fe52b85bc235`) e
+`magazzino-postgres` (`57e462be280a`) sono rimasti attivi con gli stessi ID,
+senza rebuild, restart, migrazioni o scritture sul loro database. I volumi
+persistenti `magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads`, così come le risorse degli altri
+progetti, sono rimasti invariati.
+
+## M4A — rerun formale post-code-review hardening
+
+Data: 23 settembre 2026. È stato creato **un solo** container PostgreSQL
+disposable: `magazzino-m4a-formal-db-20260923`, ID
+`e7148cc96597bada3d2f58939680a44eccc1e8e8ed32641a9559292fab9d75b4`,
+immagine `postgres:16-alpine`, label
+`magazzino.milestone=M4A-formal-postreview`, porta solo
+`127.0.0.1:55448`, dati in `tmpfs`. L'ispezione prima della rimozione
+confermava `Mounts=[]` e rete `bridge` preesistente. Non sono stati creati
+volumi o reti Docker M4A.
+
+| Database nel container         | Scopo                                               | Destino                          |
+| ------------------------------ | --------------------------------------------------- | -------------------------------- |
+| `magazzino_m4a_formal_fresh`   | schema vuoto, 40 migrazioni, seed/smoke/replay      | eliminato con il container/tmpfs |
+| `magazzino_m4a_formal_api`     | copie pulite per la suite API completa              | eliminato con il container/tmpfs |
+| `magazzino_m4a_formal_e2e`     | copie pulite con seed demo ufficiale per Playwright | eliminato con il container/tmpfs |
+| `magazzino_m4a_formal_upgrade` | upgrade popolato autentico M3/39 → M4A/40 e replay  | eliminato con il container/tmpfs |
+
+Il bootstrap `drizzle push` è stato usato soltanto sul database **vuoto**
+fresh. L'upgrade popolato è passato esclusivamente dal runner ufficiale:
+39 migrazioni preesistenti riconosciute, solo la 40 applicata; al controllo
+finale 40 record nel ledger, 9 partite, 8 movimenti, 1 Bolla e 1
+Trasferimento, come nelle fixture precedenti. Nessun `push` sul popolato.
+API ed E2E avevano database separati; il runner migrazioni ha creato e
+rimosso i propri database interni sullo stesso PostgreSQL temporaneo.
+
+Gli output locali della fase, tutti eliminati nominativamente dopo le
+prove, erano:
+
+- `/private/tmp/magazzino-m4a-native-20260923` (binding macOS per
+  Lightning CSS/Tailwind usati solo dalla toolchain locale);
+- `/private/tmp/magazzino-m4a-upgrade.sBGv85` (archive read-only della base
+  M3 per la prova 39→40);
+- `/private/tmp/magazzino-m4a-pdf-20260923`,
+  `/private/tmp/magazzino-m4a-pdf-render-20260923` e
+  `/private/tmp/magazzino-m4a-fontcache-20260923` (sette PDF reali, render e
+  cache di ispezione);
+- `artifacts/magazzino-solidale/test-results/playwright/.last-run.json`
+  (output ignorato e non tracciato, con directory vuote rimosse).
+
+I processi temporanei API/Vite di Playwright sulle porte 18181/4173 sono
+terminati; dopo un'interruzione diagnostica sono stati fermati
+nominativamente i soli PID identificati sulle due porte. Il container è
+stato rimosso con `docker rm -f magazzino-m4a-formal-db-20260923`; nessun
+`prune`, `down -v` o comando globale è stato eseguito. `docker ps -a`,
+`docker network ls`, `docker volume ls`, la ricerca dei tmp M4A e il
+controllo delle porte 18181/4173/55448 non mostrano risorse residue di
+questa run.
+
+I container originali `magazzino-web` (`64601804539f`), `magazzino-api`
+(`fe52b85bc235`) e `magazzino-postgres` (`57e462be280a`) sono ancora
+attivi con gli stessi ID. I volumi persistenti
+`magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads` sono ancora presenti e invariati.
+Nessun altro progetto Docker è stato modificato; nessun Docker locale
+persistente è stato ricostruito o migrato.

@@ -1304,3 +1304,61 @@ PostgreSQL disposable M4A sono stati rimossi nominativamente; l'ambiente
 Docker persistente non è stato ricostruito, migrato o modificato. Restano
 `NE-MAN-CAMERA`, `NE-MAN-TABLET` e la validazione manuale M4A: non sono
 dichiarati superati. M4B non è iniziata; `main` non è stato modificato.
+
+## M4A — hardening post-code-review ChatGPT
+
+Data: 23 settembre 2026. Base pubblicata locale/remota:
+`18765925706ff4d1bcd6c8f57e0371d78a492136` sul branch
+`codex/magazzino-workflow-unificato`. Il GO G1–G8 precedente resta storico;
+la review ha riaperto M4A con CR-M4A-01 e CR-M4A-02. Stato attuale:
+**correzioni nel working tree, `NE-TEST-M4A/NE-MAN`**, senza commit/push.
+
+- CR-M4A-01: il Trasferimento rispetta il lotto fisico scelto sotto lock,
+  rivalida disponibilità netta e non ripiega su FEFO; senza lotto conserva
+  FEFO multi-partita. Form di creazione/modifica, draft, dirty guard e
+  payload ora mantengono la selezione, obbligatoria quando richiesta dal
+  prodotto. `GET /lotti` espone la disponibilità netta per il selettore;
+  OpenAPI/client sono stati rigenerati. Nessuna migrazione/schema.
+- CR-M4A-02: la Zona UDS filtra solo Bolle Beneficiario; Bolle Ente seguono
+  Area, Magazzino visibile, RBAC e feature flag in liste, dettaglio ed export.
+  La sessione UDS senza Area resta fail-closed, coerentemente fra lista e
+  dettaglio, senza concedere visibilità globale all'Ente.
+
+Prove di sviluppo: API M4A/Trasferimenti 44/44, frontend mirato 5/5 e
+frontend completo 411/411, typecheck workspace, codegen e `git diff --check`
+verdi. L'intera suite API esplorativa ha 1312 pass, 2 skip e 3 failure:
+due per un percorso Excel originale digitato erroneamente e una per un test
+M2 che asserisce un ordine SQL senza `ORDER BY`; i tre file ripetuti con il
+percorso corretto passano 50/50. Il primo run API mirato aveva inoltre
+individuato una fixture di cleanup non FK-safe per il nuovo lotto esplicito
+e un'asserzione testuale troppo rigida; corretti e ripetuti verdi. Nessuna
+failure è promossa a PASS della suite completa.
+
+T09/T10 e i gate G1–G8 devono essere rivalutati su questo nuovo candidato
+nel separato `##test M4A`. Docker persistente non aggiornato, M4B non avviato,
+`main` invariato.
+
+## M4A — rerun formale post-code-review hardening
+
+Data: 23 settembre 2026. Base `18765925706ff4d1bcd6c8f57e0371d78a492136`;
+**M4A post-code-review test automatici superati — candidato pronto per nuova
+code review ChatGPT**. La revisione statica ha chiuso CR-M4A-01 (lotto fisico
+esplicito nel Trasferimento, senza fallback FEFO) e CR-M4A-02 (scope UDS
+coerente per Ente, senza indebolire il Beneficiario). T09/T10 e T01–T32 sono
+stati rivalutati; G1–G8 risultano GO per il perimetro automatico.
+
+Sul candidato finale: API completa 116 file/1315 pass/2 skip opzionali,
+frontend completa 75 file/411 pass, Playwright completo senza retry 67 pass
+e 103 skip di progetto/viewport. Fresh 40/40, upgrade populated 39→40,
+runner migrazioni 24/24, codegen ripetuto con hash identico, typecheck,
+build, budget, runtime, Prettier e diff check sono documentati in
+`ESITI_TEST_M4A.md`. Le failure diagnostiche e le correzioni pertinenti
+restano nello stesso rapporto; non sono state convertite retroattivamente
+in PASS.
+
+L'unico PostgreSQL disposable di questa fase e i file temporanei sono stati
+rimossi nominativamente. `magazzino-web`, `magazzino-api`,
+`magazzino-postgres` e i volumi persistenti sono invariati; nessun nuovo
+Docker locale è stato costruito. Restano **NE-MAN** la validazione umana M4A,
+**NE-MAN-CAMERA** la fotocamera reale e **NE-MAN-TABLET** il tablet fisico.
+M4A non è dichiarato chiuso; M4B non è iniziata e `main` non è stato toccato.

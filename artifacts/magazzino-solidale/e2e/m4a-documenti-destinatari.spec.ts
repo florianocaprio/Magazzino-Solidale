@@ -899,6 +899,17 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
         WHERE magazzino_id = $1 AND prodotto_id = $2`,
       [fixtures.origin.id, fixtures.product.id],
     );
+    const lotsResponse = await page.request.get(
+      `/api/lotti?magazzinoId=${fixtures.origin.id}&prodottoId=${fixtures.product.id}`,
+    );
+    expect(lotsResponse.ok()).toBe(true);
+    const availableLot = (
+      (await lotsResponse.json()) as Array<{
+        id: number;
+        disponibileReale: number;
+      }>
+    ).find((lot) => lot.disponibileReale >= 1);
+    expect(availableLot).toBeTruthy();
     const idempotencyKey = key("transfer-create");
     const transfer = await expectJson<Trasferimento>(
       await page.request.post("/api/trasferimenti", {
@@ -912,6 +923,7 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
           righe: [
             {
               prodottoId: fixtures.product.id,
+              lottoId: availableLot!.id,
               quantita: 1,
               unitaMisura: fixtures.product.unitaMisura,
             },
@@ -995,5 +1007,113 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
       row.getByRole("button", { name: /bolla/i }),
       "trasferimento-bozza",
     );
+  });
+
+  test("LOT-EX E2E: la scelta del lotto fisico nella UI prevale sul FEFO alla partenza", async ({
+    page,
+  }) => {
+    const fixtures = await loadDemoFixtures(page);
+    const code = `M4A-EX-${randomUUID().slice(0, 8)}`;
+    const product = await database.query<{ id: number }>(
+      `INSERT INTO prodotti (codice, nome, tipo_prodotto, unita_misura)
+       VALUES ($1, $2, 'alimentare', 'pz') RETURNING id`,
+      [code, `Prodotto lotto esplicito ${runSuffix}`],
+    );
+    const lots = await database.query<{ id: number; codice_lotto: string }>(
+      `INSERT INTO lotti (prodotto_id, codice_lotto, data_scadenza, data_carico,
+                          quantita_caricata, quantita_residua, magazzino_id,
+                          fondo_origine, fse_plus)
+       VALUES ($1, $2, '2027-01-01', $4, 3, 3, $5, 'NESSUN_FONDO', false),
+              ($1, $3, '2027-06-01', $4, 3, 3, $5, 'NESSUN_FONDO', false)
+       RETURNING id, codice_lotto`,
+      [
+        product.rows[0].id,
+        `${code}-A`,
+        `${code}-B`,
+        today(),
+        fixtures.origin.id,
+      ],
+    );
+    const earlier = lots.rows.find((lot) => lot.codice_lotto === `${code}-A`)!;
+    const selected = lots.rows.find((lot) => lot.codice_lotto === `${code}-B`)!;
+
+    await page.goto("/trasferimenti");
+    await page.getByRole("button", { name: /^nuovo$/i }).click();
+    await page
+      .getByRole("dialog", { name: /nuovo documento operativo/i })
+      .getByRole("button", { name: /trasferimenti/i })
+      .click();
+    const form = page.getByRole("dialog", { name: /nuovo trasferimento/i });
+    await selectOption(
+      page,
+      form.getByRole("combobox", { name: /magazzino di partenza/i }),
+      fixtures.origin.nome,
+    );
+    await selectOption(
+      page,
+      form.getByRole("combobox", { name: /magazzino di destinazione/i }),
+      fixtures.destination.nome,
+    );
+    await selectOption(
+      page,
+      form.getByRole("combobox", { name: /trasportatore/i }),
+      /altro/i,
+    );
+    await form
+      .getByPlaceholder(/nome.*trasportatore/i)
+      .fill("Corriere lotto esplicito");
+    await selectOption(
+      page,
+      form.getByRole("combobox", { name: /prodotto 1/i }),
+      new RegExp(`Prodotto lotto esplicito ${runSuffix}`),
+    );
+    await selectOption(
+      page,
+      form.getByRole("combobox", { name: /lotto fisico 1/i }),
+      new RegExp(`${code}-B`),
+    );
+    await form.getByRole("spinbutton", { name: /quantità 1/i }).fill("2");
+    const createdResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/trasferimenti") &&
+        response.request().method() === "POST",
+    );
+    await form.getByRole("button", { name: /crea e genera bolla/i }).click();
+    const createdHttp = await createdResponse;
+    expect(createdHttp.status(), await createdHttp.text()).toBe(201);
+    const created = (await createdHttp.json()) as Trasferimento;
+    const draftLot = await database.query<{ lotto_id: number }>(
+      `SELECT lotto_id FROM trasferimento_righe WHERE trasferimento_id = $1`,
+      [created.id],
+    );
+    expect(draftLot.rows).toEqual([{ lotto_id: selected.id }]);
+    const dispatched = await expectJson<Trasferimento>(
+      await page.request.post(`/api/trasferimenti/${created.id}/avvia`, {
+        data: {
+          idempotencyKey: key("lot-explicit-dispatch"),
+          versione: created.versione,
+        },
+      }),
+      200,
+    );
+    expect(dispatched.stato).toBe("in_transito");
+    const actual = await database.query<{
+      id: number;
+      quantita_residua: string;
+      movements: string;
+    }>(
+      `SELECT l.id, l.quantita_residua::text,
+              (SELECT count(*)::text FROM movimenti m
+                WHERE m.trasferimento_id = $3 AND m.lotto_id = l.id
+                  AND m.tipo_dettaglio = 'uscita') AS movements
+         FROM lotti l WHERE l.id IN ($1, $2) ORDER BY l.id`,
+      [earlier.id, selected.id, created.id],
+    );
+    const earlyState = actual.rows.find((lot) => lot.id === earlier.id)!;
+    const chosenState = actual.rows.find((lot) => lot.id === selected.id)!;
+    expect(Number(earlyState.quantita_residua)).toBe(3);
+    expect(earlyState.movements).toBe("0");
+    expect(Number(chosenState.quantita_residua)).toBe(1);
+    expect(chosenState.movements).toBe("1");
   });
 });

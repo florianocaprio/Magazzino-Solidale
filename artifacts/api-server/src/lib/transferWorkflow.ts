@@ -86,6 +86,8 @@ export async function normalizeTransferRows(
       (row) =>
         !Number.isSafeInteger(row.prodottoId) ||
         row.prodottoId <= 0 ||
+        (row.lottoId != null &&
+          (!Number.isSafeInteger(row.lottoId) || row.lottoId <= 0)) ||
         (row.unitaMisura != null && typeof row.unitaMisura !== "string"),
     )
   ) {
@@ -101,6 +103,7 @@ export async function normalizeTransferRows(
       unitaMisura: prodottiTable.unitaMisura,
       attivo: prodottiTable.attivo,
       quantitaFrazionabile: prodottiTable.quantitaFrazionabile,
+      lottoFisicoObbligatorio: prodottiTable.lottoFisicoObbligatorio,
       nome: prodottiTable.nome,
     })
     .from(prodottiTable)
@@ -128,6 +131,12 @@ export async function normalizeTransferRows(
     const product = productById.get(row.prodottoId)!;
     if (!product.attivo) {
       throw new TransferRequestError(400, "Il Prodotto non è attivo");
+    }
+    if (product.lottoFisicoObbligatorio && row.lottoId == null) {
+      throw new TransferRequestError(
+        400,
+        "Il lotto fisico è obbligatorio per questo Prodotto",
+      );
     }
     if (row.unitaMisura != null) {
       if (

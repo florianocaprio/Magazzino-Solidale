@@ -40,9 +40,11 @@ formale post-NO-GO. Non include validazione umana: `NE-MAN`,
 | DEL-01  | M4B/M5B           | PB/NE                                         | Bolla e consegna hanno sync bidirezionale; serve servizio comune con operation key e test da due sessioni/menu.                                                                                                                                                         |
 | CAN-01  | M4B/M5B           | PB/NE                                         | M1C offre `audit_eventi.motivo` e Rettifica motivata, ma la Bolla ammette ancora annullamento senza motivo testuale. Obbligatorietà e UX restano da chiudere in M4B.                                                                                                    |
 | CAN-02  | M4B/M5B           | PB/NE/APP-M0                                  | Approvati `in_trasporto` e `rientro_atteso`, senza parziali; per consegna finale mancano ancora implementazione e test del non reintegro automatico.                                                                                                                    |
-| DDT-01  | M4A               | OK-M4A/NE-MAN                                 | Rerun formale: F1–F8 chiusi, T01–T32 e G1–G8 GO automatici; API 1308 pass, frontend 408 pass, E2E 66 pass; fresh/upgrade populated 39→40 verdi. Il NO-GO storico resta nel rapporto; validazione umana M4A non eseguita.                                                |
+| DDT-01  | M4A               | OK-M4A/NE-MAN                                 | Rerun post-review: CR-M4A-01/02 chiusi, T01–T32 e G1–G8 GO automatici; API 1315 pass, frontend 411 pass, E2E 67 pass; fresh/upgrade populated 39→40 verdi. Il NO-GO storico resta nel rapporto; validazione umana M4A non eseguita.                                     |
 | DDT-01A | M4A               | OK-M4A/NE-MAN                                 | Tre destinatari, segno `CONSEGNA_ENTE`, idempotenza, snapshot congelato e fallback legacy, PDF A4 FEFO e multipagina verificati nella fase formale; prova manuale non eseguita.                                                                                         |
 | DDT-01B | M4A               | OK-M4A/NE-MAN                                 | Facciata e permessi per ramo, lista/export, URL composto, draft/replay e Trasferimenti same/cross Area verificati con API/frontend/E2E completi; prova manuale non eseguita.                                                                                            |
+| DDT-01C | M4A               | OK-M4A/NE-MAN                                 | CR-M4A-01 e T09/T10 ricertificati: lotto fisico scelto rispettato senza fallback, rifiuto atomico e concorrenza PostgreSQL; LOT-EX-01..05, UI e FEFO multi-partita senza selezione passano nelle suite complete.                                                        |
+| DDT-01D | M4A               | OK-M4A/NE-MAN                                 | CR-M4A-02 ricertificato: Ente Area A visibile in lista/dettaglio/export con Zona UDS A1; Area B esclusa, UDS senza Area fail-closed e Beneficiario Zona A2 ancora escluso. UDS-ENTE-01..03/UDS-BEN-REG-01 passano nella suite completa.                                 |
 | MOV-01  | M4B               | PB/NE                                         | Nature contabili e collegamento al movimento origine esistono; testare segni, autore e documento per entrata/storno.                                                                                                                                                    |
 | DB-01   | M2+               | OK-M2                                         | Migrazione 36 provata su copia popolata: conteggi e quantità invariati, 21/21 dettagli legacy ancora null, 6 `Generale`, due anomalie legacy classificate e replay idempotente.                                                                                         |
 | DB-02   | M0/M2+            | OK-TEST-M0/OK-M1C/OK-M2/OK-M3B                | Fresh/replay M3B da zero con 39 migrazioni e checksum/ordine verdi; upgrade populated 38→39 applica solo gli alias identità e conserva hash di ledger, movimenti, legacy e audit. Le prime 38 migrazioni restano byte-identiche.                                        |
@@ -50,6 +52,16 @@ formale post-NO-GO. Non include validazione umana: `NE-MAN`,
 | REG-01  | ogni milestone/M6 | OK-TEST-M0/OK-M1C/OK-M2/OK-M3B                | M3B post-review: suite API/frontend complete, H1–H4, E2E desktop e viewport tablet, originali, populated/fresh 39, runner, typecheck, build, bundle/runtime e hygiene verdi; OpenAPI/generated invariati, hardware fisico pendente.                                     |
 
 ## Copertura minima per fase
+
+Le righe DDT-01/01A/01B conservano anche l'evidenza storica del candidato
+`187659257...`; la review successiva aveva riaperto M4A. Il rerun formale
+post-hardening ha ricertificato T09/T10 e T01–T32 sul candidato corretto con
+G1–G8 GO automatici; DDT-01C/01D passano da prove mirate di sviluppo a
+`OK-M4A/NE-MAN`. Questo non equivale a validazione umana né chiude M4A.
+T27 include sette PDF reali A4, con FEFO e tre pagine per 60 righe;
+T28 resta `NE-MAN-TABLET/NE-MAN-CAMERA` per hardware fisico; T30 include
+suite API/frontend/E2E complete e i due XLSX originali M3B. La matrice
+T01–T32 dettagliata è in `ESITI_TEST_M4A.md`.
 
 | Fase | ID primari                                      | Evidenza richiesta prima di proseguire                                                                                                    |
 | ---- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |

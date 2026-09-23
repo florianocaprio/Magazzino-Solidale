@@ -7,11 +7,14 @@ import {
   useConfermaTrasferimento,
   useListMagazzini,
   useListGiacenze,
+  useListLotti,
+  useListProdotti,
   useListVolontari,
   useGetImpostazioniStampa,
   listTrasferimenti,
   getListTrasferimentiQueryKey,
   getListGiacenzeQueryKey,
+  getListLottiQueryKey,
   type Trasferimento,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -72,7 +75,12 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { loadAllPages } from "@/lib/paged-export";
 import { todayEuropeRome } from "@/lib/europe-rome";
-import { trasferimentoDraftIsDirty } from "@/lib/trasferimento-draft";
+import {
+  transferLotIsAvailable,
+  transferRowsForPayload,
+  transferRowsHaveRequiredLots,
+  trasferimentoDraftIsDirty,
+} from "@/lib/trasferimento-draft";
 import {
   UnsavedChangesDialog,
   useUnsavedChangesGuard,
@@ -83,6 +91,7 @@ interface RigaDraft {
   prodottoId: string;
   quantita: string;
   unitaMisura: string;
+  lottoId: string;
 }
 
 function newRiga(): RigaDraft {
@@ -91,12 +100,13 @@ function newRiga(): RigaDraft {
     prodottoId: "",
     quantita: "",
     unitaMisura: "pz",
+    lottoId: "",
   };
 }
 
 // ─── Editor righe (dipende dal magazzino origine) ────────────────────────────
 
-function RigheEditor({
+export function RigheEditor({
   magazzinoId,
   areaOperativaId,
   righe,
@@ -117,6 +127,53 @@ function RigheEditor({
       },
     },
   );
+  const { data: prodotti } = useListProdotti();
+  const { data: lotti } = useListLotti(
+    { magazzinoId },
+    {
+      query: {
+        enabled: areaOperativaId > 0 && magazzinoId > 0,
+        queryKey: getListLottiQueryKey({ magazzinoId }),
+      },
+    },
+  );
+  useEffect(() => {
+    if (!lotti) return;
+    if (
+      righe.some(
+        (r) =>
+          r.lottoId &&
+          !lotti.some(
+            (lotto) =>
+              lotto.id === Number(r.lottoId) &&
+              transferLotIsAvailable(
+                lotto,
+                Number(r.prodottoId),
+                magazzinoId,
+                todayEuropeRome(),
+              ),
+          ),
+      )
+    ) {
+      setRighe(
+        righe.map((r) =>
+          r.lottoId &&
+          !lotti.some(
+            (lotto) =>
+              lotto.id === Number(r.lottoId) &&
+              transferLotIsAvailable(
+                lotto,
+                Number(r.prodottoId),
+                magazzinoId,
+                todayEuropeRome(),
+              ),
+          )
+            ? { ...r, lottoId: "" }
+            : r,
+        ),
+      );
+    }
+  }, [lotti, magazzinoId, righe, setRighe]);
 
   const update = (key: string, patch: Partial<RigaDraft>) =>
     setRighe(righe.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -136,7 +193,25 @@ function RigheEditor({
         const giac = giacenze?.find(
           (g) => g.prodottoId === parseInt(r.prodottoId),
         );
-        const max = Math.max(0, giac?.disponibileReale ?? 0);
+        const prodotto = prodotti?.find((p) => p.id === Number(r.prodottoId));
+        const lottiDisponibili =
+          lotti?.filter((lotto) =>
+            transferLotIsAvailable(
+              lotto,
+              Number(r.prodottoId),
+              magazzinoId,
+              todayEuropeRome(),
+            ),
+          ) ?? [];
+        const lottoScelto = lottiDisponibili.find(
+          (lotto) => lotto.id === Number(r.lottoId),
+        );
+        const max = Math.max(
+          0,
+          r.lottoId
+            ? (lottoScelto?.disponibileReale ?? 0)
+            : (giac?.disponibileReale ?? 0),
+        );
         const qNum = parseFloat(r.quantita || "0");
         const eccede = !!r.prodottoId && qNum > max;
         return (
@@ -154,6 +229,7 @@ function RigheEditor({
                       prodottoId: v,
                       unitaMisura: g?.unitaMisura ?? "pz",
                       quantita: "",
+                      lottoId: "",
                     });
                   }}
                 >
@@ -193,6 +269,48 @@ function RigheEditor({
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
+            {r.prodottoId && (
+              <div className="space-y-2">
+                <Label className="text-xs">
+                  {t("trasferimenti.lottoFisico")}
+                  {prodotto?.lottoFisicoObbligatorio ? " *" : ""}
+                </Label>
+                <Select
+                  value={r.lottoId || "fefo"}
+                  onValueChange={(value) =>
+                    update(r.key, { lottoId: value === "fefo" ? "" : value })
+                  }
+                >
+                  <SelectTrigger
+                    aria-label={`${t("trasferimenti.lottoFisico")} ${index + 1}`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!prodotto?.lottoFisicoObbligatorio && (
+                      <SelectItem value="fefo">
+                        {t("trasferimenti.fefoAutomatico")}
+                      </SelectItem>
+                    )}
+                    {lottiDisponibili.map((lotto) => (
+                      <SelectItem key={lotto.id} value={String(lotto.id)}>
+                        {lotto.codiceLotto ||
+                          t("trasferimenti.lottoSenzaCodice")}{" "}
+                        ·{" "}
+                        {lotto.dataScadenza ||
+                          t("trasferimenti.lottoSenzaScadenza")}{" "}
+                        ·{" "}
+                        {t("trasferimenti.disponibile", {
+                          max: lotto.disponibileRealePrecisa,
+                          um: giac?.unitaMisura ?? "",
+                        })}
+                        {lotto.fornitoreNome ? ` · ${lotto.fornitoreNome}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-xs">{t("common.quantity")}</Label>
@@ -311,6 +429,7 @@ export function NuovoTrasferimentoForm({
       queryKey: getListGiacenzeQueryKey(giacenzeParams),
     },
   });
+  const { data: prodotti } = useListProdotti();
 
   const reset = () => {
     commandIntents.discard("trasferimento:create");
@@ -328,7 +447,9 @@ export function NuovoTrasferimentoForm({
     !!trasportatoreAltro ||
     !!note ||
     righe.length !== 1 ||
-    righe.some((riga) => !!riga.prodottoId || !!riga.quantita);
+    righe.some(
+      (riga) => !!riga.prodottoId || !!riga.quantita || !!riga.lottoId,
+    );
   const unsavedGuard = useUnsavedChangesGuard(open && isDirty);
   const requestClose = () => {
     if (createTrasferimento.isPending) return;
@@ -356,6 +477,8 @@ export function NuovoTrasferimentoForm({
     !!destinoId &&
     origineId !== destinoId &&
     righeValide.length > 0 &&
+    !!prodotti &&
+    transferRowsHaveRequiredLots(righeValide, prodotti) &&
     !hasEccesso &&
     trasportatoreValido &&
     !createTrasferimento.isPending;
@@ -375,11 +498,7 @@ export function NuovoTrasferimentoForm({
           ? trasportatoreAltro.trim() || undefined
           : undefined,
       note: note || undefined,
-      righe: righeValide.map((r) => ({
-        prodottoId: parseInt(r.prodottoId),
-        quantita: r.quantita,
-        unitaMisura: r.unitaMisura,
-      })),
+      righe: transferRowsForPayload(righeValide),
     };
     createTrasferimento.mutate(
       {
@@ -579,6 +698,7 @@ export function ModificaTrasferimentoForm({
     (trasferimento.righe ?? []).map((r) => ({
       key: Math.random().toString(36).slice(2),
       prodottoId: String(r.prodottoId),
+      lottoId: r.lottoId == null ? "" : String(r.lottoId),
       quantita: String(r.quantita),
       unitaMisura: r.unitaMisura,
     })),
@@ -594,6 +714,7 @@ export function ModificaTrasferimentoForm({
     note: trasferimento.note ?? "",
     righe: (trasferimento.righe ?? []).map((riga) => ({
       prodottoId: String(riga.prodottoId),
+      lottoId: riga.lottoId == null ? "" : String(riga.lottoId),
       quantita: String(riga.quantita),
       unitaMisura: riga.unitaMisura,
     })),
@@ -631,6 +752,7 @@ export function ModificaTrasferimentoForm({
       queryKey: getListGiacenzeQueryKey(giacenzeParams),
     },
   });
+  const { data: prodotti } = useListProdotti();
 
   const righeValide = righe.filter(
     (r) => r.prodottoId && parseFloat(r.quantita || "0") > 0,
@@ -644,6 +766,8 @@ export function ModificaTrasferimentoForm({
   const canSubmit =
     origineAreaId > 0 &&
     righeValide.length > 0 &&
+    !!prodotti &&
+    transferRowsHaveRequiredLots(righeValide, prodotti) &&
     !hasEccesso &&
     !updateTrasferimento.isPending;
 
@@ -651,11 +775,7 @@ export function ModificaTrasferimentoForm({
     if (!canSubmit) return;
     const semanticInput = {
       note,
-      righe: righeValide.map((r) => ({
-        prodottoId: parseInt(r.prodottoId),
-        quantita: r.quantita,
-        unitaMisura: r.unitaMisura,
-      })),
+      righe: transferRowsForPayload(righeValide),
     };
     updateTrasferimento.mutate(
       {

@@ -300,19 +300,21 @@ export async function cleanup(scope: SeedScope): Promise<void> {
           scope.magazzinoIds,
         ),
       );
+    if (scope.trasferimentoIds.length > 0) {
+      await db
+        .delete(trasferimentoRigheTable)
+        .where(
+          inArray(
+            trasferimentoRigheTable.trasferimentoId,
+            scope.trasferimentoIds,
+          ),
+        );
+    }
     await db
       .delete(lottiTable)
       .where(inArray(lottiTable.magazzinoId, scope.magazzinoIds));
   }
   if (scope.trasferimentoIds.length > 0) {
-    await db
-      .delete(trasferimentoRigheTable)
-      .where(
-        inArray(
-          trasferimentoRigheTable.trasferimentoId,
-          scope.trasferimentoIds,
-        ),
-      );
     await db
       .delete(trasferimentiTable)
       .where(inArray(trasferimentiTable.id, scope.trasferimentoIds));

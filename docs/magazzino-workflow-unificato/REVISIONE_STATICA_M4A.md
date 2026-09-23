@@ -482,3 +482,91 @@ modifica di stack o struttura. Il churn di formattazione dei grandi file
 legacy rimane un costo di review esplicito, non una prova funzionale; la
 code review ChatGPT resta il prossimo controllo indipendente. Non sono stati
 introdotti requisiti M4B.
+
+## Code review ChatGPT post-pubblicazione — CR-M4A-01 / CR-M4A-02
+
+Data: 23 settembre 2026. Base pubblicata `18765925706ff4d1bcd6c8f57e0371d78a492136`.
+Il GO automatico del 22 settembre resta evidenza storica di quel commit; la
+review successiva ha riaperto M4A. Questa sezione registra il solo hardening
+di sviluppo, non un nuovo GO G1–G8 né validazione umana.
+
+### CR-M4A-01 — Lotto esplicito nel Trasferimento
+
+**Controesempio e causa.** La riga poteva conservare `lottoId=B`, ma
+`POST /trasferimenti/:id/avvia` chiamava `trasferimentoUscitaFEFO` senza quel
+valore: con A in scadenza prima di B il ledger scaricava A. Il form non
+permetteva la scelta e perdeva il campo nel draft/payload.
+
+**Correzione.** `routes/trasferimenti.ts` passa il lotto alla stessa uscita
+inventariale. Il pre-lock globale resta per prodotto/partita; la query
+transazionale blocca e rivalida prodotto, magazzino, scadenza e disponibilità
+netta degli impegni. Con scelta esplicita non c'è fallback FEFO e il conflitto
+409 annulla anche stato, audit e movimenti. Senza scelta resta FEFO
+multi-partita. `transferWorkflow.ts` richiede il lotto se il prodotto ha
+`lottoFisicoObbligatorio`. La pagina Trasferimenti conserva il campo nella
+creazione, modifica, ripresa e dirty guard; il selettore mostra solo lotti
+compatibili e l'opzione FEFO solo se consentita. `GET /lotti` aggiunge la
+disponibilità netta di sola lettura, con OpenAPI e client rigenerati; nessuno
+schema o migrazione è stato modificato.
+
+**Regressioni.** `LOT-EX-01/02/03/05`, FEFO multi-lotto già presente e prova
+di impegno attivo in `trasferimenti.test.ts` e
+`documenti-operativi-m4a.test.ts`; selettore e draft/payload in
+`trasferimenti-lotti.test.tsx` e `trasferimento-draft.test.ts`. Test API M4A
+mirati 44/44 e frontend 411/411 verdi. **Stato:** corretto con prove mirate;
+T09/T10 da rivalutare nel successivo `##test M4A`.
+
+### CR-M4A-02 — Scope UDS Bolla Ente
+
+**Controesempio e causa.** Una sessione Area A/Zona A1 apriva il dettaglio
+Ente dell'Area A, ma `GET /bolle`, lista ed export comuni lo eliminavano
+applicando `zonaUdsId` alla join Beneficiario nulla. Il dettaglio Ente aveva
+inoltre una condizione UDS/Area non pertinente.
+
+**Correzione.** `routes/bolle.ts` e `routes/documenti-operativi.ts`
+applicano Zona UDS soltanto al ramo Beneficiario. Il ramo Ente mantiene Area,
+magazzino visibile, permesso e modulo; le varianti di accesso dettaglio e
+transazionale usano la medesima semantica. Nessuna FK o Zona fittizia è stata
+aggiunta. La lista Bolle usa anche il filtro sui magazzini visibili.
+
+**Regressioni.** `UDS-ENTE-01/02` e `UDS-BEN-REG-01` verificano con due Aree
+e due Zone lista Bolle, lista comune, dettagli/deep link, comando
+transazionale di modifica ed export XLSX: Ente
+Area A visibile, Ente Area B escluso, Beneficiario Zona A2 escluso. Test API
+M4A mirati 44/44 verdi. **Stato:** corretto con prove mirate; la coerenza
+complessiva sarà rivalutata nel successivo `##test M4A`.
+
+**Boundary senza Area.** Per una sessione con Zona UDS ma senza Area
+assegnata resta il rifiuto preesistente sul dettaglio Ente; liste e facciata
+comune ora applicano lo stesso fail-closed. Non viene inferita una Zona
+fittizia sull'Ente né concessa visibilità globale ai magazzini.
+
+## Rilettura statica finale post-hardening — 23 settembre 2026
+
+La rilettura del delta rispetto a `18765925706ff4d1bcd6c8f57e0371d78a492136`
+conferma che **CR-M4A-01** è chiuso: il lotto fisico selezionato arriva dal
+form al draft, al payload e alla riga persistente; all'avvio la query sotto
+lock prende solo quella partita, rivalida prodotto/deposito/scadenza e
+disponibilità al netto delle prenotazioni, senza fallback FEFO. Il ramo senza
+lotto mantiene FEFO multi-partita e il prodotto che richiede il lotto fisico
+non può creare una riga senza selezione. Le regressioni LOT-EX-01..05 e la
+prova UI coprono il controesempio originale.
+
+**CR-M4A-02** è chiuso: lista Bolle, lista/export comuni, dettaglio e
+modifiche transazionali distinguono Ente da Beneficiario. L'Ente segue Area,
+magazzino visibile, permesso e modulo, non una Zona UDS inesistente;
+Beneficiario continua a rispettare la propria Zona. La sessione UDS senza
+Area resta fail-closed. I casi UDS-ENTE-01..03 e UDS-BEN-REG-01 coprono la
+coerenza dei percorsi.
+
+La rilettura del contratto ha inoltre individuato un difetto collaterale
+circoscritto: lo schema `Lotto` richiede la nuova disponibilità netta anche
+nelle risposte singole, mentre solo `GET /lotti` la serializzava. La stessa
+funzione di calcolo ora serve lista, dettaglio, creazione, modifica e
+rettifica; un'asserzione regressiva verifica `GET /lotti/:id` con prenotazione
+attiva. Nessuna colonna o migrazione è stata introdotta. Il test M2 che
+presupponeva l'ordine cronologico dell'audit ora dichiara esplicitamente
+`ORDER BY id`, coerente con l'ID append-only, senza modificare il ledger.
+
+Nessun finding bloccante resta aperto nella review statica del perimetro M4A;
+il GO complessivo dipende comunque dai gate formali G1–G8 del rapporto test.

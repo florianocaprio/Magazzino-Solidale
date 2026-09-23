@@ -355,7 +355,8 @@ describe("M2 — catalogo globale e quantità", () => {
           eq(auditEventiTable.entitaTipo, "prodotto"),
           eq(auditEventiTable.entitaId, product.id),
         ),
-      );
+      )
+      .orderBy(asc(auditEventiTable.id));
     expect(audit.map((row) => row.azione)).toEqual([
       "PRODOTTO_CREATO",
       "PRODOTTO_MODIFICATO",

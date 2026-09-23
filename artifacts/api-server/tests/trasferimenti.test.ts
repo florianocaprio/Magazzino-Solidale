@@ -17,6 +17,7 @@ import {
   lottiLogiciTable,
   magazziniTable,
   movimentiTable,
+  prodottiTable,
   pool,
   trasferimentiTable,
 } from "@workspace/db";
@@ -567,6 +568,192 @@ describe("comandi Trasferimento — idempotenza e versione", () => {
 });
 
 describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
+  it("LOT-EX-01: usa solo il lotto esplicito anche se un altro scade prima", async () => {
+    const prodottoId = await createProdotto(scope);
+    const lottoA = await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 10,
+      dataScadenza: "2027-01-01",
+    });
+    const lottoB = await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 10,
+      dataScadenza: "2027-06-01",
+    });
+    const transfer = await creaTrasferimento({
+      prodottoId,
+      quantita: 6,
+      lottoId: lottoB,
+    });
+    const started = await request(app)
+      .post(`/trasferimenti/${transfer.id}/avvia`)
+      .send(commandBody({ versione: transfer.versione }));
+    expect(started.status, started.text).toBe(200);
+    expect(Number((await getLotto(lottoA)).quantitaResidua)).toBe(10);
+    expect(Number((await getLotto(lottoB)).quantitaResidua)).toBe(4);
+    const outputs = (await getMovimentiForTrasferimento(transfer.id)).filter(
+      (m) => m.tipoDettaglio === "uscita",
+    );
+    expect(outputs).toHaveLength(1);
+    expect(outputs[0].lottoId).toBe(lottoB);
+    expect(Number(outputs[0].quantita)).toBe(6);
+  });
+
+  it("LOT-EX-02: lotto esplicito insufficiente non ripiega su FEFO", async () => {
+    const prodottoId = await createProdotto(scope);
+    const lottoA = await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 10,
+      dataScadenza: "2027-01-01",
+    });
+    const lottoB = await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 2,
+      dataScadenza: "2027-06-01",
+    });
+    const transfer = await creaTrasferimento({
+      prodottoId,
+      quantita: 5,
+      lottoId: lottoB,
+    });
+    const started = await request(app)
+      .post(`/trasferimenti/${transfer.id}/avvia`)
+      .send(commandBody({ versione: transfer.versione }));
+    expect(started.status).toBe(409);
+    expect(Number((await getLotto(lottoA)).quantitaResidua)).toBe(10);
+    expect(Number((await getLotto(lottoB)).quantitaResidua)).toBe(2);
+    expect(await getMovimentiForTrasferimento(transfer.id)).toHaveLength(0);
+    expect(
+      (await request(app).get(`/trasferimenti/${transfer.id}`)).body.stato,
+    ).toBe("richiesto");
+  });
+
+  it("LOT-EX-03: rifiuta lotto di altro prodotto, deposito o scaduto", async () => {
+    const prodottoId = await createProdotto(scope);
+    const altroProdotto = await createProdotto(scope);
+    const invalidi = [
+      await createLotto({
+        prodottoId: altroProdotto,
+        magazzinoId: origineId,
+        quantita: 8,
+      }),
+      await createLotto({ prodottoId, magazzinoId: destinoId, quantita: 8 }),
+      await createLotto({
+        prodottoId,
+        magazzinoId: origineId,
+        quantita: 8,
+        dataScadenza: "2020-01-01",
+      }),
+    ];
+    for (const lottoId of invalidi) {
+      const transfer = await creaTrasferimento({
+        prodottoId,
+        quantita: 3,
+        lottoId,
+      });
+      const started = await request(app)
+        .post(`/trasferimenti/${transfer.id}/avvia`)
+        .send(commandBody({ versione: transfer.versione }));
+      expect(started.status, started.text).toBe(409);
+      expect(Number((await getLotto(lottoId)).quantitaResidua)).toBe(8);
+      expect(await getMovimentiForTrasferimento(transfer.id)).toHaveLength(0);
+    }
+  });
+
+  it("richiede il lotto quando il prodotto lo prevede", async () => {
+    const prodottoId = await createProdotto(scope);
+    await db
+      .update(prodottiTable)
+      .set({ lottoFisicoObbligatorio: true })
+      .where(eq(prodottiTable.id, prodottoId));
+    const response = await request(app)
+      .post("/trasferimenti")
+      .send(
+        commandBody({
+          magazzinoOrigineId: origineId,
+          magazzinoDestinoId: destinoId,
+          dataRichiesta: "2026-06-24",
+          trasportatoreNome: "Trasporto test",
+          righe: [{ prodottoId, quantita: 1 }],
+        }),
+      );
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/lotto fisico.*obbligatorio/i);
+  });
+
+  it("LOT-EX-05: due Trasferimenti concorrenti sullo stesso lotto esplicito non duplicano il prelievo", async () => {
+    const prodottoId = await createProdotto(scope);
+    const lottoA = await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 10,
+      dataScadenza: "2027-01-01",
+    });
+    const lottoB = await createLotto({
+      prodottoId,
+      magazzinoId: origineId,
+      quantita: 10,
+      dataScadenza: "2027-06-01",
+    });
+    const first = await creaTrasferimento({
+      prodottoId,
+      quantita: 6,
+      lottoId: lottoB,
+    });
+    const second = await creaTrasferimento({
+      prodottoId,
+      quantita: 6,
+      lottoId: lottoB,
+    });
+    const blocker = await pool.connect();
+    let committed = false;
+    let pendingFirst: Promise<request.Response> | undefined;
+    let pendingSecond: Promise<request.Response> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      const pid = await blocker.query<{ pid: number }>(
+        "SELECT pg_backend_pid() AS pid",
+      );
+      await blocker.query("SELECT id FROM lotti WHERE id = $1 FOR UPDATE", [
+        lottoB,
+      ]);
+      pendingFirst = request(app)
+        .post(`/trasferimenti/${first.id}/avvia`)
+        .send(commandBody({ versione: first.versione }))
+        .then((response) => response);
+      await waitForBlockedBackend(pid.rows[0].pid);
+      pendingSecond = request(app)
+        .post(`/trasferimenti/${second.id}/avvia`)
+        .send(commandBody({ versione: second.versione }))
+        .then((response) => response);
+      await waitForBlockedBackend(pid.rows[0].pid, 2);
+      await blocker.query("COMMIT");
+      committed = true;
+      const responses = await Promise.all([pendingFirst, pendingSecond]);
+      expect(responses.map((response) => response.status).sort()).toEqual([
+        200, 409,
+      ]);
+      expect(Number((await getLotto(lottoA)).quantitaResidua)).toBe(10);
+      expect(Number((await getLotto(lottoB)).quantitaResidua)).toBe(4);
+      const outputs = (await getMovimentiForTrasferimento(first.id))
+        .concat(await getMovimentiForTrasferimento(second.id))
+        .filter((m) => m.tipoDettaglio === "uscita");
+      expect(outputs).toHaveLength(1);
+      expect(outputs[0].lottoId).toBe(lottoB);
+    } finally {
+      if (!committed) await blocker.query("ROLLBACK").catch(() => undefined);
+      blocker.release();
+      await Promise.allSettled(
+        [pendingFirst, pendingSecond].filter(
+          (pending): pending is Promise<request.Response> => pending != null,
+        ),
+      );
+    }
+  });
   it("pre-locka prodotti e lotti in ordine globale con righe Trasferimento inverse", async () => {
     const prodottoA = await createProdotto(scope);
     const prodottoB = await createProdotto(scope);

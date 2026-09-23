@@ -225,7 +225,7 @@ async function queryDocumentRows(
       WHERE ${access.canReadBolle}
         AND (${centroId}::integer IS NULL OR b.tipo_destinatario = 'ente' OR ben.centro_ascolto_id = ${centroId})
         AND (${areaId}::integer IS NULL OR COALESCE(ben.area_operativa_id, b.area_operativa_id_snapshot) = ${areaId})
-        AND (${zonaId}::integer IS NULL OR (b.tipo_destinatario = 'beneficiario' AND ben.zona_uds_id = ${zonaId}))
+        AND (${zonaId}::integer IS NULL OR (b.tipo_destinatario = 'ente' AND ${areaId}::integer IS NOT NULL) OR (b.tipo_destinatario = 'beneficiario' AND ben.zona_uds_id = ${zonaId}))
       UNION ALL
       SELECT
         'trasferimento'::text,

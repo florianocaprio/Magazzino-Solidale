@@ -12469,6 +12469,11 @@ components:
           $ref: "#/components/schemas/QuantitaContabile"
         quantitaResiduaPrecisa:
           $ref: "#/components/schemas/QuantitaContabile"
+        disponibileReale:
+          type: number
+          description: Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa.
+        disponibileRealePrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
         magazzinoId:
           type: integer
         magazzinoNome:
@@ -12503,6 +12508,8 @@ components:
           quantitaResidua,
           quantitaCaricataPrecisa,
           quantitaResiduaPrecisa,
+          disponibileReale,
+          disponibileRealePrecisa,
           magazzinoId,
           fsePlus,
           fondoOrigine,

@@ -312,6 +312,11 @@ test.describe("workflow Magazzino reali", () => {
       sheet.getByRole("combobox", { name: /prodotto 1/i }),
       /Pasta Demo 500g/,
     );
+    await selectOption(
+      page,
+      sheet.getByRole("combobox", { name: /lotto fisico 1/i }),
+      /LOT-DEMO-001/,
+    );
     const quantity = sheet.getByRole("spinbutton", { name: /quantità 1/i });
     await quantity.fill(String(originBefore + 1));
     await expect(sheet.getByText(/massimo disponibile/i)).toBeVisible();

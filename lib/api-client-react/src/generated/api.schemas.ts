@@ -2509,6 +2509,9 @@ export interface Lotto {
   quantitaResidua: number;
   quantitaCaricataPrecisa: QuantitaContabile;
   quantitaResiduaPrecisa: QuantitaContabile;
+  /** Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa. */
+  disponibileReale: number;
+  disponibileRealePrecisa: QuantitaContabile;
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;

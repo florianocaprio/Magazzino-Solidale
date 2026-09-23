@@ -353,6 +353,7 @@ async function trasferimentoUscitaFEFO(
     trasferimentoCodice: string;
     operatoreId: number;
     auditEventoId: number;
+    lottoId: number | null;
   },
 ) {
   let rimanente = InventoryDecimal.parse(opts.quantita);
@@ -363,7 +364,9 @@ async function trasferimentoUscitaFEFO(
       and(
         eq(lottiTable.prodottoId, opts.prodottoId),
         eq(lottiTable.magazzinoId, opts.magazzinoId),
-        gt(lottiTable.quantitaResidua, "0"),
+        opts.lottoId == null
+          ? gt(lottiTable.quantitaResidua, "0")
+          : eq(lottiTable.id, opts.lottoId),
         or(
           isNull(lottiTable.dataScadenza),
           gte(lottiTable.dataScadenza, opts.dataMovimento),
@@ -376,6 +379,13 @@ async function trasferimentoUscitaFEFO(
       asc(lottiTable.id),
     )
     .for("update");
+
+  if (opts.lottoId != null && lotti.length !== 1) {
+    throw new TransferRequestError(
+      409,
+      "Lotto selezionato non disponibile per Prodotto, Magazzino o data operativa",
+    );
+  }
 
   for (const lotto of lotti) {
     if (!rimanente.isPositive()) break;
@@ -427,6 +437,12 @@ async function trasferimentoUscitaFEFO(
     rimanente = rimanente.subtract(scala);
   }
   if (rimanente.isPositive()) {
+    if (opts.lottoId != null) {
+      throw new TransferRequestError(
+        409,
+        "Disponibilità del lotto selezionato insufficiente",
+      );
+    }
     throw new Error(
       "Disponibilità FEFO insufficiente o composta solo da lotti scaduti",
     );
@@ -1428,6 +1444,7 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
       for (const r of righe) {
         await trasferimentoUscitaFEFO(tx, {
           prodottoId: r.prodottoId,
+          lottoId: r.lottoId ?? null,
           magazzinoId: locked.magazzinoOrigineId,
           quantita: r.quantita,
           unitaMisura: r.unitaMisura,

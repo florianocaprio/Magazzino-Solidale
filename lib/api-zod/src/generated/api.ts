@@ -3404,6 +3404,7 @@ export const ListLottiQueryParams = zod.object({
 
 export const listLottiResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const listLottiResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listLottiResponseDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 export const ListLottiResponseItem = zod.object({
@@ -3418,6 +3419,8 @@ export const ListLottiResponseItem = zod.object({
   "quantitaResidua": zod.number(),
   "quantitaCaricataPrecisa": zod.string().regex(listLottiResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "quantitaResiduaPrecisa": zod.string().regex(listLottiResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "disponibileReale": zod.number().describe('Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa.'),
+  "disponibileRealePrecisa": zod.string().regex(listLottiResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "fornitoreId": zod.number().nullish(),
@@ -3460,6 +3463,7 @@ export const GetLottoParams = zod.object({
 
 export const getLottoResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const getLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getLottoResponseDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 export const GetLottoResponse = zod.object({
@@ -3474,6 +3478,8 @@ export const GetLottoResponse = zod.object({
   "quantitaResidua": zod.number(),
   "quantitaCaricataPrecisa": zod.string().regex(getLottoResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "quantitaResiduaPrecisa": zod.string().regex(getLottoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "disponibileReale": zod.number().describe('Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa.'),
+  "disponibileRealePrecisa": zod.string().regex(getLottoResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "fornitoreId": zod.number().nullish(),
@@ -3502,6 +3508,7 @@ export const UpdateLottoBody = zod.object({
 
 export const updateLottoResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const updateLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const updateLottoResponseDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 export const UpdateLottoResponse = zod.object({
@@ -3516,6 +3523,8 @@ export const UpdateLottoResponse = zod.object({
   "quantitaResidua": zod.number(),
   "quantitaCaricataPrecisa": zod.string().regex(updateLottoResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "quantitaResiduaPrecisa": zod.string().regex(updateLottoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "disponibileReale": zod.number().describe('Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa.'),
+  "disponibileRealePrecisa": zod.string().regex(updateLottoResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "fornitoreId": zod.number().nullish(),
@@ -3550,6 +3559,7 @@ export const RettificaLottoBody = zod.object({
 
 export const rettificaLottoResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const rettificaLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const rettificaLottoResponseDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
 export const RettificaLottoResponse = zod.object({
@@ -3564,6 +3574,8 @@ export const RettificaLottoResponse = zod.object({
   "quantitaResidua": zod.number(),
   "quantitaCaricataPrecisa": zod.string().regex(rettificaLottoResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "quantitaResiduaPrecisa": zod.string().regex(rettificaLottoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "disponibileReale": zod.number().describe('Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa.'),
+  "disponibileRealePrecisa": zod.string().regex(rettificaLottoResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
   "fornitoreId": zod.number().nullish(),

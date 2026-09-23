@@ -336,3 +336,136 @@ La decisione è **GO per i test automatici M4A**, non per la validazione
 manuale. Lo stato da pubblicare è `OK-M4A/NE-MAN`; la code review ChatGPT e
 l'eventuale prova umana sono fasi successive. M4B non è iniziata e il Docker
 locale persistente non è stato aggiornato.
+
+## Rerun post code-review hardening CR-M4A-01/02
+
+Data: 23 settembre 2026. Base pubblicata
+`18765925706ff4d1bcd6c8f57e0371d78a492136`; candidato finale: delta
+M4A hardenizzato sul medesimo branch, incluse le correzioni diagnostiche
+sotto. Il GO precedente e il NO-GO storico non sono modificati
+retroattivamente. Nessuna validazione manuale M4A è stata eseguita.
+
+### Finding prioritari e controesempi
+
+| Caso                    | Evidenza sul candidato finale                                                                                                            | Esito |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| CR-M4A-01 / LOT-EX-01   | B scelto sebbene A scada prima: A invariato, B scalato, solo movimento B; prova anche E2E dalla UI.                                      | PASS  |
+| LOT-EX-02               | B scelto ma insufficiente, A sufficiente: 409, nessun movimento o cambio stato/stock, nessun fallback FEFO.                              | PASS  |
+| LOT-EX-03               | Lotto di altro prodotto/deposito o scaduto: rifiuto atomico; il lotto totalmente prenotato non è disponibile/selezionabile.              | PASS  |
+| LOT-EX-04               | Senza scelta, FEFO storico usa più partite reali in ordine; il prodotto con lotto fisico obbligatorio rifiuta la riga senza lotto.       | PASS  |
+| LOT-EX-05               | Due richieste PostgreSQL concorrenti sul medesimo lotto esplicito: una sola uscita valida, nessun negativo, fallback o effetto parziale. | PASS  |
+| CR-M4A-02 / UDS-ENTE-01 | Caller Area A/Zona A1: Ente Area A presente in `/bolle`, `/documenti-operativi`, dettaglio e XLSX, con modifica coerente.                | PASS  |
+| UDS-ENTE-02             | Ente Area B assente da liste/export; dettaglio e modifica vietati.                                                                       | PASS  |
+| UDS-ENTE-03             | Caller con Zona ma senza Area: Ente fail-closed in liste/facciata/dettaglio.                                                             | PASS  |
+| UDS-BEN-REG-01          | Beneficiario Zona A2 resta invisibile a Zona A1.                                                                                         | PASS  |
+
+Le prove backend sono in `trasferimenti.test.ts` e
+`documenti-operativi-m4a.test.ts`, quelle frontend in
+`trasferimenti-lotti.test.tsx` e `trasferimento-draft.test.ts`, la prova UI
+reale in `m4a-documenti-destinatari.spec.ts`. La disponibilità netta è ora
+serializzata anche nelle risposte singole `POST/GET/PATCH/rettifica` di
+`/lotti`, non solo nella lista; il dettaglio con prenotazione attiva è
+asserito da un test regressivo. Nessuna migrazione o nuova colonna.
+
+### Suite e toolchain finali
+
+| Prova                   | Risultato                                                                                                                                                                                                                                           |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Installazione           | `CI=true pnpm install --frozen-lockfile` PASS; lockfile invariato. Il primo tentativo offline non aveva i binding macOS opzionali; quelli necessari a Vite sono stati predisposti solo in `/private/tmp`.                                           |
+| API completa            | 116 file, **1315 pass**, 2 skip AGEA opzionali senza `acceptancePath`, 0 fail; PostgreSQL disposable e due XLSX originali M3B.                                                                                                                      |
+| Frontend completa       | 75 file, **411 pass**, 0 fail.                                                                                                                                                                                                                      |
+| Playwright completo     | Cinque viewport, `--retries=0`: **67 pass**, 103 skip di progetto/viewport, 0 fail; database disposable con seed demo ufficiale.                                                                                                                    |
+| PDF reali               | Sette A4 dell'E2E finale: Beneficiario bozza/confermata FEFO/multipagina, Ente bozza/confermata, Trasferimento bozza/in transito FEFO. Sei PDF da una pagina e uno da tre pagine/60 righe; testo/fondi FEFO e render visivo senza clipping.         |
+| Fresh                   | Database vuoto: 40/40 migrazioni, seed, login/cambio password, CRUD smoke, replay, verify/status verdi. `drizzle push` solo sul vuoto.                                                                                                              |
+| Upgrade populated 39→40 | Base M3 reale con 39/39 e fixture Bolla, Trasferimento, Carico, audit, legacy e stock: solo migrazione 40 applicata, conteggi/quantità/relazioni invariati, replay/verify/status verdi. Nessun `push` sul popolato; prime 39 migrazioni senza diff. |
+| Runner                  | 24/24 PASS, rieseguito sul candidato finale.                                                                                                                                                                                                        |
+| Codegen                 | Due run ufficiali, 843 file generated; hash identico `59b8f2c6e406d6dd4efac8b6aa7160d75ea4a54e89086612d94603a77faf95eb`, solo tre generated attesi nel diff.                                                                                        |
+| Toolchain               | Typecheck workspace PASS; build workspace PASS con `PORT=18492 BASE_PATH=/` richiesti dal mockup; budget entry 1307,7 KiB/361,6 KiB gzip sotto 400 KiB; runtime WEB PASS. Warning sourcemap/chunk Vite non bloccanti.                               |
+| Hygiene                 | Prettier sui sorgenti/documenti non generati e `git diff --check`; generated riproducibili dal codegen ufficiale, non riformattati manualmente. Indice/diff verificati; nessun output temporaneo, segreto, `.env` o PDF nel commit.                 |
+
+### Failure diagnostiche conservate
+
+1. Prima suite API completa: 1314 pass, 2 skip, una failure M2. Il test
+   assumeva ordine audit senza `ORDER BY`; poiché verifica la cronologia
+   append-only, è stato aggiunto `ORDER BY id` **al solo test**, non al ledger.
+2. Secondo run API: 1314 pass, 2 skip, un isolato `socket hang up` Supertest
+   in password recovery. Nessuna modifica applicativa; il run finale pulito
+   e non concorrente è verde 1315/1315.
+3. Primo E2E completo: 64 pass, 2 fail, 103 skip e un test non eseguito. Due
+   fixture storiche omettevano il lotto divenuto obbligatorio; i test M4A e
+   Magazzino ora selezionano una partita reale. Prove mirate e run completo
+   diagnostico successivi verdi.
+4. Un rerun E2E su copia fresh senza seed demo ha fallito su `Area Demo`
+   assente ed è stato interrotto. Copia eliminata, ricreata e inizializzata
+   con `environment:data seed-demo`; i soli server orfani sulle porte
+   18181/4173 sono stati fermati nominativamente. Il run **finale** è verde
+   67 pass/0 fail senza retry.
+5. La rilettura statica ha rilevato che il contratto `Lotto` richiedeva la
+   disponibilità netta anche nelle risposte singole, mentre solo la lista la
+   esponeva. Helper comune e asserzione regressiva con prenotazione attiva
+   hanno chiuso il difetto; API ed E2E completi sono stati ripetuti dopo.
+6. La prima build generale mancava `PORT` e `BASE_PATH` richiesti dal
+   mockup-sandbox. La build completa con queste sole variabili di test è
+   passata, senza modifica del mockup.
+
+Nessun tentativo incompleto è contato come PASS finale.
+
+### Matrice T01–T32 ricertificata
+
+`OK-AUTO-M4A` indica prova automatica, non validazione umana. I casi
+storici sono stati rieseguiti nelle tre suite complete; qui sono riportate
+le evidenze distintive del candidato post-hardening. I due XLSX originali
+M3B erano disponibili ai test.
+
+| ID  | Stato              | Evidenza sul candidato finale                                                           |
+| --- | ------------------ | --------------------------------------------------------------------------------------- |
+| T01 | OK-AUTO-M4A        | Vincoli SQL/FK destinatario e fresh.                                                    |
+| T02 | OK-AUTO-M4A        | CRUD/scope Enti e replay API.                                                           |
+| T03 | OK-AUTO-M4A        | E2E ripresa dei tre destinatari dopo logout/login e dirty guard.                        |
+| T04 | OK-AUTO-M4A        | Ingressi Bolle/Consegne e API/frontend.                                                 |
+| T05 | OK-AUTO-M4A        | Ciclo bozza/conferma Ente senza effetto sociale fittizio.                               |
+| T06 | OK-AUTO-M4A        | `CONSEGNA_ENTE` con uscita fisica/report/export.                                        |
+| T07 | OK-AUTO-M4A        | Trasferimento dalla facciata comune fino alla ricezione.                                |
+| T08 | OK-AUTO-M4A        | Same/cross Area, FEFO e ricezione reali.                                                |
+| T09 | OK-AUTO-M4A        | LOT-EX-01/02/03/05: lotto esplicito, conflitti, atomicità e lock.                       |
+| T10 | OK-AUTO-M4A        | LOT-EX-04, selettore, obbligo fisico e FEFO multi-partita senza scelta.                 |
+| T11 | OK-AUTO-M4A        | Quantità, righe ripetute e lock inventariali.                                           |
+| T12 | OK-AUTO-M4A        | Disponibilità/scadenza rivalidate sotto lock.                                           |
+| T13 | OK-AUTO-M4A        | Annullamento ordinario pre-uscita e replay.                                             |
+| T14 | OK-AUTO-M4A        | Storno amministrativo motivato, RBAC, audit e rollback.                                 |
+| T15 | OK-AUTO-M4A        | Chiave/hash/versione/ricevuta e idempotenza.                                            |
+| T16 | OK-AUTO-M4A        | E2E risposta persa su creazione e conferma versionata, retry senza doppia prenotazione. |
+| T17 | OK-AUTO-M4A        | Rilettura autorevole sotto lock nella transazione.                                      |
+| T18 | OK-AUTO-M4A        | Concorrenza inventariale/documentale PostgreSQL.                                        |
+| T19 | OK-AUTO-M4A        | Audit e snapshot obbligatori, rollback su errore.                                       |
+| T20 | OK-AUTO-M4A        | Scope/revoca prima del replay; UDS-ENTE-01..03 e Beneficiario segregato.                |
+| T21 | OK-AUTO-M4A        | `magazzino.view` senza accesso indebito ai comandi Bolle.                               |
+| T22 | OK-AUTO-M4A        | Permessi/modulo/scope per ramo prima dei conteggi.                                      |
+| T23 | OK-AUTO-M4A        | Identità URL composta anche con collisione ID.                                          |
+| T24 | OK-AUTO-M4A        | Lista, filtri, paginazione e XLSX con scope Ente/Beneficiario.                          |
+| T25 | OK-AUTO-M4A        | Deep link, redirect, draft e risposte tardive.                                          |
+| T26 | OK-AUTO-M4A        | Snapshot Ente prevale sul live, fallback legacy esplicito.                              |
+| T27 | OK-AUTO-M4A        | Sette PDF A4 reali, FEFO/fondi, Ente e multipagina 60 righe.                            |
+| T28 | OK-AUTO-M4A/NE-MAN | E2E cinque viewport, tastiera/touch, sei lingue e RTL; tablet/fotocamera fisici NE-MAN. |
+| T29 | OK-AUTO-M4A        | Consumer verticali Mensa/Consegne/Emporio/UDS e storno nelle suite complete.            |
+| T30 | OK-AUTO-M4A        | API 1315, frontend 411, E2E 67; regressioni M1–M3 e originali XLSX.                     |
+| T31 | OK-AUTO-M4A        | Fresh 40/40 e upgrade popolato 39→40 senza variazioni legacy.                           |
+| T32 | OK-AUTO-M4A        | Runner, codegen deterministico, typecheck/build/budget/runtime/hygiene.                 |
+
+### Gate G1–G8 sul candidato post-review
+
+| Gate | Stato | Fondamento                                                                                                                                          |
+| ---- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| G1   | GO    | Branch `codex/magazzino-workflow-unificato`, base locale/remota coerente prima della pubblicazione, `main` non modificato.                          |
+| G2   | GO    | Seconda review statica conclusa: CR-M4A-01/02 chiusi, serializzazione `Lotto` corretta, nessun finding bloccante.                                   |
+| G3   | GO    | T01–T32 ricertificati sul candidato finale; prove manuali separate.                                                                                 |
+| G4   | GO    | API 116 file/1315 pass, frontend 75 file/411 pass, E2E 67 pass senza retry; skip API/E2E motivati.                                                  |
+| G5   | GO    | Fresh, upgrade populated 39→40, replay/verify e runner 24/24.                                                                                       |
+| G6   | GO    | Codegen ripetuto identico, typecheck, build, budget, runtime, Prettier non-generated e diff check.                                                  |
+| G7   | GO    | Storia delle failure conservata, documentazione aggiornata senza attribuire prova umana.                                                            |
+| G8   | GO    | Un PostgreSQL M4A disposable rimosso nominativamente con tmpfs, output temporanei eliminati; nessuna rete/volume M4A, Docker persistente invariato. |
+
+Decisione: **GO per i test automatici M4A post-code-review** e stato
+`OK-M4A/NE-MAN`. Restano `NE-MAN-CAMERA`, `NE-MAN-TABLET`, nuova code review
+ChatGPT e validazione umana; M4A non è dichiarato chiuso. Nessun Docker
+locale persistente aggiornato, M4B non avviata, nessun merge/push su `main`.

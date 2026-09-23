@@ -37,7 +37,7 @@ import {
   callerZonaUdsId,
   centroScopeFilter,
   areaOperativaScopeFilter,
-  zonaUdsScopeFilter,
+  magazzinoScopeFilter,
   canAccessCentro,
   canAccessAreaOperativa,
   canAccessZonaUds,
@@ -591,13 +591,13 @@ export async function canAccessBollaOperativa(
   areaOperativaId: number | null,
   zonaUdsId: number | null,
 ): Promise<boolean> {
-  if (
-    bolla.tipoDestinatario === "beneficiario" &&
-    bolla.beneficiarioId != null &&
-    (!canAccessCentro(
-      await beneficiarioCentroId(bolla.beneficiarioId),
-      caller,
-    ) ||
+  if (bolla.tipoDestinatario === "beneficiario") {
+    if (bolla.beneficiarioId == null) return false;
+    if (
+      !canAccessCentro(
+        await beneficiarioCentroId(bolla.beneficiarioId),
+        caller,
+      ) ||
       !canAccessAreaOperativa(
         await beneficiarioAreaOperativaId(bolla.beneficiarioId),
         areaOperativaId,
@@ -605,13 +605,15 @@ export async function canAccessBollaOperativa(
       !canAccessZonaUds(
         await beneficiarioZonaUdsId(bolla.beneficiarioId),
         zonaUdsId,
-      ))
-  ) {
-    return false;
+      )
+    )
+      return false;
   }
   if (bolla.tipoDestinatario === "ente") {
     if (!canAccessAreaOperativa(bolla.areaOperativaIdSnapshot, areaOperativaId))
       return false;
+    // Una sessione UDS priva di Area non ha uno scope territoriale utile
+    // per un Ente: fail closed, senza inferire una Zona sull'anagrafica Ente.
     if (zonaUdsId != null && areaOperativaId == null) return false;
   }
 
@@ -876,6 +878,11 @@ router.get("/bolle", requirePermission("bolle.view"), async (req, res) => {
   const caller = callerCentroId(req);
   const callerArea = callerAreaOperativaId(req);
   const visibleWarehouses = await visibleMagazzinoIds(caller, callerArea);
+  const warehouseFilter = magazzinoScopeFilter(
+    bolleTable.magazzinoId,
+    visibleWarehouses,
+  );
+  if (warehouseFilter) conditions.push(warehouseFilter);
   if (caller != null) {
     conditions.push(
       or(
@@ -915,11 +922,20 @@ router.get("/bolle", requirePermission("bolle.view"), async (req, res) => {
         ),
       )!,
     );
-  const zonaFilter = zonaUdsScopeFilter(
-    beneficiariTable.zonaUdsId,
-    callerZonaUdsId(req),
-  );
-  if (zonaFilter) conditions.push(zonaFilter);
+  const zonaId = callerZonaUdsId(req);
+  if (zonaId != null) {
+    conditions.push(
+      or(
+        callerArea != null
+          ? eq(bolleTable.tipoDestinatario, "ente")
+          : sql`false`,
+        and(
+          eq(bolleTable.tipoDestinatario, "beneficiario"),
+          eq(beneficiariTable.zonaUdsId, zonaId),
+        ),
+      )!,
+    );
+  }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
   const [{ total }] = await db

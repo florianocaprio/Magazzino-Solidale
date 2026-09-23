@@ -14,6 +14,7 @@ import { and, eq } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
   bolleTable,
+  bollaRigheTable,
   db,
   entiDestinatariTable,
   interventiTable,
@@ -28,15 +29,18 @@ import bolleRouter from "../src/routes/bolle";
 import documentiRouter from "../src/routes/documenti-operativi";
 import entiRouter from "../src/routes/enti-destinatari";
 import trasferimentiRouter from "../src/routes/trasferimenti";
+import lottiRouter from "../src/routes/lotti";
 import {
   cleanup,
   createAreaOperativa,
+  createBeneficiario,
   createCentroRec,
   createLotto,
   createMagazzino,
   createMagazzinoRec,
   createProdotto,
   createUtente,
+  createZona,
   insertTrasferimento,
   makeScopedApp,
   newScope,
@@ -109,6 +113,312 @@ afterAll(async () => {
 });
 
 describe("M4A — destinatario Ente e facciata documentale", () => {
+  it("LOT-EX-03: il lotto prenotato non è disponibile né selezionabile per il Trasferimento", async () => {
+    const earlyLot = await createLotto(scope, {
+      prodottoId,
+      magazzinoId,
+      quantita: 10,
+      dataScadenza: "2027-01-01",
+    });
+    const bookedLot = await createLotto(scope, {
+      prodottoId,
+      magazzinoId,
+      quantita: 10,
+      dataScadenza: "2027-06-01",
+    });
+    const [entity] = await db
+      .insert(entiDestinatariTable)
+      .values({
+        denominazione: "Ente prenotante",
+        indirizzo: "Via Test",
+        areaOperativaId: areaId,
+      })
+      .returning();
+    scope.enteDestinatarioIds.push(entity.id);
+    const [bolla] = await db
+      .insert(bolleTable)
+      .values({
+        numeroBolla: `BOOK-${randomUUID().slice(0, 8)}`,
+        dataBolla: "2026-09-22",
+        tipoDestinatario: "ente",
+        enteDestinatarioId: entity.id,
+        magazzinoId,
+        areaOperativaIdSnapshot: areaId,
+        stato: "confermato",
+      })
+      .returning();
+    scope.bollaIds.push(bolla.id);
+    const [bollaRow] = await db
+      .insert(bollaRigheTable)
+      .values({
+        bollaId: bolla.id,
+        prodottoId,
+        lottoId: bookedLot,
+        quantita: "8",
+        unitaMisura: "kg",
+      })
+      .returning();
+    await db.insert(prenotazioniMagazzinoTable).values({
+      bollaId: bolla.id,
+      rigaBollaId: bollaRow.id,
+      prodottoId,
+      lottoId: bookedLot,
+      magazzinoId,
+      quantita: "8",
+      stato: "attiva",
+    });
+    const centroDestino = await createCentroRec(scope, {
+      areaOperativaId: areaId,
+    });
+    const destination = await createMagazzino(scope, centroDestino.id, {
+      areaOperativaId: areaId,
+    });
+    const router = express.Router();
+    router.use(lottiRouter, trasferimentiRouter);
+    const warehouseApp = makeScopedApp(router, {
+      id: operatoreId,
+      centroAscoltoId: null,
+      areaOperativaId: areaId,
+      permessi: [
+        "magazzino.view",
+        "magazzino.transfers.create",
+        "magazzino.transfers.dispatch",
+      ],
+      aree: ["magazzino"],
+    });
+    const available = await request(warehouseApp)
+      .get("/lotti")
+      .query({ prodottoId, magazzinoId });
+    expect(available.status, available.text).toBe(200);
+    expect(
+      available.body.find((lotto: { id: number }) => lotto.id === bookedLot)
+        .disponibileReale,
+    ).toBe(2);
+    const detail = await request(warehouseApp).get(`/lotti/${bookedLot}`);
+    expect(detail.status, detail.text).toBe(200);
+    expect(detail.body).toMatchObject({
+      id: bookedLot,
+      disponibileReale: 2,
+      disponibileRealePrecisa: "2.000000",
+    });
+    const created = await request(warehouseApp)
+      .post("/trasferimenti")
+      .send({
+        idempotencyKey: commandKey("booked-transfer"),
+        magazzinoOrigineId: magazzinoId,
+        magazzinoDestinoId: destination,
+        dataRichiesta: "2026-09-22",
+        trasportatoreNome: "Test prenotato",
+        righe: [
+          { prodottoId, lottoId: bookedLot, quantita: 5, unitaMisura: "kg" },
+        ],
+      });
+    expect(created.status, created.text).toBe(201);
+    scope.trasferimentoIds.push(created.body.id);
+    const started = await request(warehouseApp)
+      .post(`/trasferimenti/${created.body.id}/avvia`)
+      .send({
+        idempotencyKey: commandKey("booked-dispatch"),
+        versione: created.body.versione,
+      });
+    expect(started.status, started.text).toBe(409);
+    expect(
+      Number(
+        (
+          await db
+            .select({ quantity: lottiTable.quantitaResidua })
+            .from(lottiTable)
+            .where(eq(lottiTable.id, bookedLot))
+        )[0].quantity,
+      ),
+    ).toBe(10);
+    expect(
+      Number(
+        (
+          await db
+            .select({ quantity: lottiTable.quantitaResidua })
+            .from(lottiTable)
+            .where(eq(lottiTable.id, earlyLot))
+        )[0].quantity,
+      ),
+    ).toBe(10);
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.trasferimentoId, created.body.id)),
+    ).toHaveLength(0);
+  });
+  it("UDS-ENTE-01/02 e UDS-BEN-REG-01: lista, dettaglio ed export rispettano Area/Magazzino senza applicare Zona all'Ente", async () => {
+    const zonaA1 = await createZona(scope, areaId);
+    const zonaA2 = await createZona(scope, areaId);
+    const areaB = await createAreaOperativa(scope);
+    await createZona(scope, areaB);
+    const centroB = await createCentroRec(scope, { areaOperativaId: areaB });
+    const magazzinoB = await createMagazzino(scope, centroB.id, {
+      areaOperativaId: areaB,
+    });
+    const [enteA, enteB] = await db
+      .insert(entiDestinatariTable)
+      .values([
+        {
+          denominazione: "Ente Area A",
+          indirizzo: "Via A 1",
+          areaOperativaId: areaId,
+        },
+        {
+          denominazione: "Ente Area B",
+          indirizzo: "Via B 1",
+          areaOperativaId: areaB,
+        },
+      ])
+      .returning();
+    scope.enteDestinatarioIds.push(enteA.id, enteB.id);
+    const beneficiarioA2 = await createBeneficiario(scope, null, {
+      areaOperativaId: areaId,
+      zonaUdsId: zonaA2.id,
+      uds: true,
+    });
+    const unique = randomUUID().slice(0, 8);
+    const [bollaA, bollaB, bollaBeneficiario] = await db
+      .insert(bolleTable)
+      .values([
+        {
+          numeroBolla: `UDSA-${unique}`,
+          dataBolla: "2026-09-22",
+          tipoDestinatario: "ente",
+          enteDestinatarioId: enteA.id,
+          magazzinoId,
+          areaOperativaIdSnapshot: areaId,
+        },
+        {
+          numeroBolla: `UDSB-${unique}`,
+          dataBolla: "2026-09-22",
+          tipoDestinatario: "ente",
+          enteDestinatarioId: enteB.id,
+          magazzinoId: magazzinoB,
+          areaOperativaIdSnapshot: areaB,
+        },
+        {
+          numeroBolla: `UDSX-${unique}`,
+          dataBolla: "2026-09-22",
+          tipoDestinatario: "beneficiario",
+          beneficiarioId: beneficiarioA2,
+          magazzinoId,
+          areaOperativaIdSnapshot: areaId,
+        },
+      ])
+      .returning();
+    scope.bollaIds.push(bollaA.id, bollaB.id, bollaBeneficiario.id);
+    const restrictedRouter = express.Router();
+    restrictedRouter.use(bolleRouter, documentiRouter);
+    const restricted = makeScopedApp(restrictedRouter, {
+      id: operatoreId,
+      centroAscoltoId: null,
+      areaOperativaId: areaId,
+      zonaUdsId: zonaA1.id,
+      permessi: ["bolle.view", "bolle.manage"],
+      aree: ["magazzino"],
+    });
+
+    const bolleList = await request(restricted).get("/bolle");
+    expect(bolleList.status, bolleList.text).toBe(200);
+    expect(bolleList.body.map((row: { id: number }) => row.id)).toContain(
+      bollaA.id,
+    );
+    expect(bolleList.body.map((row: { id: number }) => row.id)).not.toContain(
+      bollaB.id,
+    );
+    expect(bolleList.body.map((row: { id: number }) => row.id)).not.toContain(
+      bollaBeneficiario.id,
+    );
+
+    const commonList = await request(restricted).get("/documenti-operativi");
+    expect(commonList.status, commonList.text).toBe(200);
+    const identities = commonList.body.items.map(
+      (row: { documentoId: string }) => row.documentoId,
+    );
+    expect(identities).toContain(`bolla:${bollaA.id}`);
+    expect(identities).not.toContain(`bolla:${bollaB.id}`);
+    expect(identities).not.toContain(`bolla:${bollaBeneficiario.id}`);
+
+    for (const path of ["/bolle", "/documenti-operativi/bolla"]) {
+      expect(
+        (await request(restricted).get(`${path}/${bollaA.id}`)).status,
+      ).toBe(200);
+      expect(
+        (await request(restricted).get(`${path}/${bollaB.id}`)).status,
+      ).toBe(403);
+      expect(
+        (await request(restricted).get(`${path}/${bollaBeneficiario.id}`))
+          .status,
+      ).toBe(403);
+    }
+    const changed = await request(restricted)
+      .patch(`/bolle/${bollaA.id}`)
+      .send({
+        idempotencyKey: commandKey("uds-ente-update"),
+        versione: bollaA.versione,
+        noteConsegna: "Scope Ente verificato sotto lock",
+      });
+    expect(changed.status, changed.text).toBe(200);
+    expect(changed.body.noteConsegna).toBe("Scope Ente verificato sotto lock");
+    expect(
+      (
+        await request(restricted)
+          .patch(`/bolle/${bollaB.id}`)
+          .send({
+            idempotencyKey: commandKey("uds-ente-forbidden"),
+            versione: bollaB.versione,
+            noteConsegna: "non ammesso",
+          })
+      ).status,
+    ).toBe(403);
+    const exported = await request(restricted)
+      .get("/documenti-operativi/export.xlsx")
+      .buffer(true)
+      .parse(parseBinary);
+    expect(exported.status, exported.text).toBe(200);
+    const workbook = XLSX.read(exported.body, { type: "buffer" });
+    const exportedIds = XLSX.utils
+      .sheet_to_json<
+        Record<string, unknown>
+      >(workbook.Sheets[workbook.SheetNames[0]], { raw: true })
+      .map((row) => row["Identità"]);
+    expect(exportedIds).toContain(`bolla:${bollaA.id}`);
+    expect(exportedIds).not.toContain(`bolla:${bollaB.id}`);
+    expect(exportedIds).not.toContain(`bolla:${bollaBeneficiario.id}`);
+
+    const zoneWithoutArea = makeScopedApp(restrictedRouter, {
+      id: operatoreId,
+      centroAscoltoId: null,
+      areaOperativaId: null,
+      zonaUdsId: zonaA1.id,
+      permessi: ["bolle.view"],
+      aree: ["magazzino"],
+    });
+    const missingAreaList = await request(zoneWithoutArea).get("/bolle");
+    expect(missingAreaList.status).toBe(200);
+    expect(
+      missingAreaList.body.map((row: { id: number }) => row.id),
+    ).not.toContain(bollaA.id);
+    const missingAreaCommon = await request(zoneWithoutArea).get(
+      "/documenti-operativi",
+    );
+    expect(missingAreaCommon.status).toBe(200);
+    expect(
+      missingAreaCommon.body.items.map(
+        (row: { documentoId: string }) => row.documentoId,
+      ),
+    ).not.toContain(`bolla:${bollaA.id}`);
+    expect(
+      (
+        await request(zoneWithoutArea).get(
+          `/documenti-operativi/bolla/${bollaA.id}`,
+        )
+      ).status,
+    ).toBe(403);
+  });
   it("protegge creazione e modifica Ente con replay, hash, versione e scope correnti", async () => {
     const createKey = commandKey("ente-create-replay");
     const createPayload = {

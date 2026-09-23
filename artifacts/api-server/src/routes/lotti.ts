@@ -8,9 +8,10 @@ import {
   prodottiTable,
   magazziniTable,
   fornitoriTable,
+  prenotazioniMagazzinoTable,
   type FondoOrigine,
 } from "@workspace/db";
-import { eq, and, lte, gt, type SQL } from "drizzle-orm";
+import { eq, and, lte, gt, inArray, sum, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import {
   callerCentroId,
@@ -28,6 +29,8 @@ import {
   RETTIFICA_CAUSALI,
 } from "../lib/inventoryLedger";
 import { auditContextFromRequest } from "../lib/auditEvent";
+import { PRENOTAZIONE_MAGAZZINO_ATTIVA } from "../lib/disponibilitaMagazzino";
+import { InventoryDecimal } from "../lib/inventoryDecimal";
 import {
   addDaysToCivilDate,
   dataCivileEuropeRome,
@@ -46,6 +49,43 @@ const lottoJson = (row: typeof lottiTable.$inferSelect) => ({
   quantitaResiduaPrecisa: row.quantitaResidua,
   dataCreazione: row.dataCreazione.toISOString(),
 });
+
+function disponibilitaLotto(
+  row: typeof lottiTable.$inferSelect,
+  prenotato: InventoryDecimal,
+  dataOperativa: string,
+) {
+  const netto = InventoryDecimal.parse(row.quantitaResidua).subtract(prenotato);
+  const disponibile =
+    (row.dataScadenza != null && row.dataScadenza < dataOperativa) ||
+    netto.isNegative()
+      ? InventoryDecimal.zero()
+      : netto;
+  return {
+    disponibileReale: Number(disponibile.toDb()),
+    disponibileRealePrecisa: disponibile.toDb(),
+  };
+}
+
+async function lottoJsonConDisponibilita(row: typeof lottiTable.$inferSelect) {
+  const [prenotazione] = await db
+    .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
+    .from(prenotazioniMagazzinoTable)
+    .where(
+      and(
+        eq(prenotazioniMagazzinoTable.lottoId, row.id),
+        eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_MAGAZZINO_ATTIVA),
+      ),
+    );
+  return {
+    ...lottoJson(row),
+    ...disponibilitaLotto(
+      row,
+      InventoryDecimal.parse(prenotazione?.totale ?? "0"),
+      dataCivileEuropeRome(),
+    ),
+  };
+}
 
 function positiveInteger(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) > 0;
@@ -104,32 +144,65 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
     .where(and(...conditions))
     .orderBy(lottiTable.dataScadenza);
 
+  const prenotati = rows.length
+    ? await db
+        .select({
+          lottoId: prenotazioniMagazzinoTable.lottoId,
+          totale: sum(prenotazioniMagazzinoTable.quantita),
+        })
+        .from(prenotazioniMagazzinoTable)
+        .where(
+          and(
+            inArray(
+              prenotazioniMagazzinoTable.lottoId,
+              rows.map((row) => row.lotto.id),
+            ),
+            eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_MAGAZZINO_ATTIVA),
+          ),
+        )
+        .groupBy(prenotazioniMagazzinoTable.lottoId)
+    : [];
+  const prenotatoPerLotto = new Map(
+    prenotati.map((row) => [
+      row.lottoId,
+      InventoryDecimal.parse(row.totale ?? "0"),
+    ]),
+  );
+  const dataOperativa = dataCivileEuropeRome();
+
   res.json(
-    rows.map((r) => ({
-      id: r.lotto.id,
-      prodottoId: r.lotto.prodottoId,
-      lottoLogicoId: r.lotto.lottoLogicoId ?? null,
-      prodottoNome: r.prodottoNome ?? null,
-      codiceLotto: r.lotto.codiceLotto ?? null,
-      dataScadenza: r.lotto.dataScadenza ?? null,
-      dataCarico: r.lotto.dataCarico,
-      quantitaCaricata: parseFloat(r.lotto.quantitaCaricata),
-      quantitaResidua: parseFloat(r.lotto.quantitaResidua),
-      quantitaCaricataPrecisa: r.lotto.quantitaCaricata,
-      quantitaResiduaPrecisa: r.lotto.quantitaResidua,
-      magazzinoId: r.lotto.magazzinoId,
-      magazzinoNome: r.magazzinoNome ?? null,
-      fornitoreId: r.lotto.fornitoreId ?? null,
-      fornitoreNome: r.fornitoreNome ?? null,
-      fsePlus: r.lotto.fsePlus,
-      fondoOrigine: r.lotto.fondoOrigine,
-      codiceLottoNormalizzato: r.lotto.codiceLottoNormalizzato,
-      dataUltimoCarico: r.lotto.dataUltimoCarico,
-      fattoreKgLtPezzo: r.lotto.fattoreKgLtPezzo,
-      documentoCarico: r.lotto.documentoCarico ?? null,
-      note: r.lotto.note ?? null,
-      dataCreazione: r.lotto.dataCreazione.toISOString(),
-    })),
+    rows.map((r) => {
+      return {
+        id: r.lotto.id,
+        prodottoId: r.lotto.prodottoId,
+        lottoLogicoId: r.lotto.lottoLogicoId ?? null,
+        prodottoNome: r.prodottoNome ?? null,
+        codiceLotto: r.lotto.codiceLotto ?? null,
+        dataScadenza: r.lotto.dataScadenza ?? null,
+        dataCarico: r.lotto.dataCarico,
+        quantitaCaricata: parseFloat(r.lotto.quantitaCaricata),
+        quantitaResidua: parseFloat(r.lotto.quantitaResidua),
+        quantitaCaricataPrecisa: r.lotto.quantitaCaricata,
+        quantitaResiduaPrecisa: r.lotto.quantitaResidua,
+        ...disponibilitaLotto(
+          r.lotto,
+          prenotatoPerLotto.get(r.lotto.id) ?? InventoryDecimal.zero(),
+          dataOperativa,
+        ),
+        magazzinoId: r.lotto.magazzinoId,
+        magazzinoNome: r.magazzinoNome ?? null,
+        fornitoreId: r.lotto.fornitoreId ?? null,
+        fornitoreNome: r.fornitoreNome ?? null,
+        fsePlus: r.lotto.fsePlus,
+        fondoOrigine: r.lotto.fondoOrigine,
+        codiceLottoNormalizzato: r.lotto.codiceLottoNormalizzato,
+        dataUltimoCarico: r.lotto.dataUltimoCarico,
+        fattoreKgLtPezzo: r.lotto.fattoreKgLtPezzo,
+        documentoCarico: r.lotto.documentoCarico ?? null,
+        note: r.lotto.note ?? null,
+        dataCreazione: r.lotto.dataCreazione.toISOString(),
+      };
+    }),
   );
 });
 
@@ -204,7 +277,7 @@ router.post(
           audit: auditContextFromRequest(req),
         }),
       );
-      res.status(201).json(lottoJson(row));
+      res.status(201).json(await lottoJsonConDisponibilita(row));
     } catch (error) {
       if (error instanceof InventoryLedgerError) {
         res.status(error.status).json({ error: error.message });
@@ -239,7 +312,7 @@ router.get(
         .json({ error: "Risorsa non accessibile per il tuo profilo" });
       return;
     }
-    res.json(lottoJson(row));
+    res.json(await lottoJsonConDisponibilita(row));
   },
 );
 
@@ -289,7 +362,7 @@ router.patch(
       .set(update)
       .where(eq(lottiTable.id, id))
       .returning();
-    res.json(lottoJson(row));
+    res.json(await lottoJsonConDisponibilita(row));
   },
 );
 
@@ -347,7 +420,7 @@ router.post(
           audit: auditContextFromRequest(req),
         }),
       );
-      res.json(lottoJson(row));
+      res.json(await lottoJsonConDisponibilita(row));
     } catch (error) {
       if (error instanceof InventoryLedgerError) {
         res.status(error.status).json({ error: error.message });
