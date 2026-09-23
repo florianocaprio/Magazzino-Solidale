@@ -458,3 +458,31 @@ contiene un'implementazione candidata e prove mirate, ma la revisione statica
 resta NO-GO finché i correttivi post-review e un nuovo `##test M4A` separato
 non sono completati. Non risultano quindi ancora acquisiti GO formale,
 validazione umana o chiusura M4A.
+
+## M4B.1 — Prenotazione comune e «Pronto» reale
+
+La specifica M4B approvata resta il contratto architetturale; M4B.1 ne
+implementa solo la prima sezione. Una prenotazione appartiene **o** a una
+Bolla **o** a un Trasferimento, con coppia testata/riga completa e coerente
+protetta nel database. Solo lo stato `attiva` riduce la disponibilità reale.
+Le prenotazioni Bolla legacy rimangono attribuite alla Bolla, senza conversione
+retroattiva. Lotto esplicito e selezione FEFO senza lotto usano lo stesso
+servizio transazionale e la stessa contabilità a precisione fissa.
+
+Il Trasferimento nasce `richiesto` senza impegnare merce. «Segna pronto»
+prenota atomicamente tutte le righe e lo porta a `preparato`, mostrato come
+**Pronto**; il residuo fisico non cambia. Da Pronto non si modificano righe o
+metadati e non è previsto «Riapri». «Avvia» è consentito solo da Pronto e
+converte le prenotazioni esatte in movimenti di uscita, senza rifare FEFO.
+Un annullamento motivato da `richiesto` o `preparato` rilascia gli impegni,
+non genera movimenti e non è consentito dopo la partenza.
+
+Preparazione, partenza, ricezione e annullamento sono capacità distinte;
+Mensa mantiene la propria policy e non acquisisce automaticamente la facoltà
+di spedizione del Magazzino origine. Audit, versione e ricevuta idempotente
+sono atomici con ogni transizione. Trasferimenti già `in_transito` prima della
+migrazione rimangono ricevibili. Affidamento Bolla, rientro fisico e stati
+M4B.2 **non** fanno parte di questo incremento.
+
+Queste sono decisioni/requisiti; l'implementazione M4B.1 nel working tree è
+ancora `DEV-M4B.1/NE-TEST/NE-MAN`, non validazione formale o umana.

@@ -858,3 +858,231 @@ conservati. L'installazione e la validazione manuale M4A sono completate:
 **`OK-M4A/OK-MAN-M4A` — M4A CHIUSA**. Fotocamera reale e tablet fisico
 restano `NE-MAN-CAMERA` e `NE-MAN-TABLET`, opzionali e non bloccanti; M4B
 non è iniziata.
+
+### M4B.1 — laboratorio isolato di sviluppo (non validazione formale)
+
+Il solo Docker creato per lo sviluppo M4B.1 è stato il container
+`magazzino-m4b1-test-db-20260923` (PostgreSQL 16 Alpine, ID
+`8f4e52c59859`, porta locale `127.0.0.1:55441`, dati su `tmpfs`,
+`--rm`). Nessuna rete o volume Docker M4B.1 dedicato è stato creato.
+Nel container sono stati usati database temporanei `m4b1lab`,
+`m4b1gate`, `m4b1gate2`, `m4b1suite` e `m4b1final`; sono scomparsi
+insieme al container. Il bootstrap su database vuoto con schema corrente,
+runner ufficiale 1–41 e verify è passato (41 applicate, 0 pending).
+
+Le prove mirate M4B.1/Bolle hanno dato 58/58 e la suite API seriale sul
+database nuovo `m4b1final` 117 file verdi, 1323 test superati e 4 skipped.
+Una corsa precedente su database già riutilizzato ha avuto un fallimento
+404/409 in un test Interventi storico; quel file è poi passato isolato
+(24/24) e nell'intera suite su `m4b1final`. Frontend 411/411, typecheck
+e build API verdi. La build workspace su macOS non è completabile con la
+configurazione preesistente: il lockfile esclude il pacchetto nativo
+`lightningcss-darwin-arm64` necessario al mockup sandbox. Questo limite
+non è stato aggirato modificando le dipendenze fuori dal perimetro M4B.1.
+
+Il container effimero è stato fermato nominativamente e rimosso da
+`--rm`; la verifica `docker ps -a` non mostra risorse M4B.1 residue. I
+container persistenti `magazzino-postgres` (`57e462be280a`),
+`magazzino-api` (`2beebbad6c21`) e `magazzino-web` (`f344ed86a768`)
+sono rimasti attivi con gli stessi ID; i volumi persistenti
+`magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads` sono rimasti presenti. Nessun
+Docker persistente è stato aggiornato e nessuna risorsa di altri progetti
+è stata toccata. Restano alla fase `##test M4B.1` la prova populated
+40→41, il gate formale e le verifiche manuali.
+
+### M4B.1 — laboratorio della validazione formale (separato dallo sviluppo)
+
+Il target è stato verificato prima di seed, migrazioni e test: PostgreSQL
+16 Alpine effimero `magazzino-m4b1-formal-db-20260923`, porta locale
+`127.0.0.1:55449`, dati su `tmpfs`, `--rm`, etichetta
+`magazzino.milestone=M4B1-formal`. Database distinti `m4b1_api`,
+`m4b1_api_final`, `m4b1_api_publish`, `m4b1_e2e`, `m4b1_fresh` e
+`m4b1_upgrade`; il runner
+crea/distrugge i propri DB. La password e le credenziali di test sono
+sintetiche e non appartengono all'ambiente originale. Nessuna rete Docker
+o volume nominato è stata creata.
+
+La base M4A è stata estratta con `git archive` in
+`/private/tmp/m4b1-baseline-sxJNXZ`, con dipendenze indipendenti: lo schema
+e il runner della base hanno generato il popolato 40/40 prima dell'upgrade
+reale alla migrazione 41. Il candidato Linux è una copia in
+`/private/tmp/m4b1-linux-Jt7evk/candidate` da manifest Git tracked e
+untracked, esclusi `.env`, segreti, `node_modules` macOS e artefatti; hash
+aggregato sorgente/copia verificato prima della build. Su quella copia sono
+stati usati container `node:24-slim` e Playwright
+`mcr.microsoft.com/playwright:v1.62.1-noble`, sempre `--platform linux/amd64`
+e `--rm`, con nomi `magazzino-m4b1-*` specifici. Nessuna immagine/tag del
+persistente è stata ricostruita, sostituita o usata per i test. Il browser
+di produzione ha servito la build candidata in container temporaneo con la
+runtime config prevista; non ha esposto l'applicazione reale.
+
+Durante la validazione i container persistenti sono rimasti
+`magazzino-postgres` (`57e462be280a`), `magazzino-api` (`2beebbad6c21`)
+e `magazzino-web` (`f344ed86a768`): nessun comando di test/migrazione è
+stato puntato verso di essi o i loro volumi. L'eventuale variazione dei dati
+live per attività umana esterna non è attribuita a questa run. La pulizia
+nominativa finale è stata eseguita: `docker stop` del solo
+`magazzino-m4b1-formal-db-20260923` (rimozione automatica `--rm`), tutti
+gli altri container di build/browser/runtime `magazzino-m4b1-*` erano già
+auto-rimossi. Sono stati creati esclusivamente per questa run i container
+effimeri `magazzino-m4b1-build-final-20260923`,
+`magazzino-m4b1-build-publish-20260923`,
+`magazzino-m4b1-e2e-new-20260923`,
+`magazzino-m4b1-e2e-tablets-20260923`,
+`magazzino-m4b1-e2e-reg-20260923`,
+`magazzino-m4b1-e2e-mensa-20260923`,
+`magazzino-m4b1-e2e-mensa-rerun-20260923`,
+`magazzino-m4b1-e2e-mensa-final-20260923`,
+`magazzino-m4b1-e2e-mensa-check-20260923`,
+`magazzino-m4b1-e2e-mensa-ui-20260923`,
+`magazzino-m4b1-e2e-i18n-20260923`,
+`magazzino-m4b1-e2e-final-20260923`,
+`magazzino-m4b1-prod-smoke-20260923`,
+`magazzino-m4b1-prod-smoke-diagnostic-20260923`,
+`magazzino-m4b1-prod-smoke-final-20260923`,
+`magazzino-m4b1-prod-render-final-20260923`,
+`magazzino-m4b1-runtime-alpine-20260923` e
+`magazzino-m4b1-runtime-alpine-default-20260923`; nessuno resta in
+`docker ps -a`. Nessuna rete/volume M4B.1 è stata creata o resta in
+`docker network ls`/`docker volume ls`. Le copie M4A/candidato, cookie,
+fixture, screenshot/trace e log di questa run in `/private/tmp/m4b1-*`
+sono stati eliminati dopo gli esiti sanitizzati; `find` non restituisce
+residui. Nessun prune o cleanup globale.
+
+I tre container persistenti conservano gli ID sopra e sono in esecuzione;
+i volumi `magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads` sono presenti. Le due immagini/cache
+Linux x64 `node:24-slim` e Playwright scaricate restano come cache Docker
+condivisa: non sono container/reti/volumi candidati, e rimuoverle per tag
+potrebbe interessare altri progetti. L'immagine Nginx Alpine era già
+presente. Nessun'altra risorsa Docker è stata fermata o cancellata.
+
+Il test runtime nel vero Nginx Alpine ha confermato il caso ordinario e
+ha riprodotto il difetto di escaping speciale della base M4A. Perciò G8
+è GO ma G6 resta NO-GO; il Docker persistente non è stato aggiornato.
+
+### M4B.1 — laboratorio della ripresa G6 dopo WEB-RUNTIME-01
+
+Questa sezione registra una **run successiva** al NO-GO storico sopra;
+non lo cancella. Ingresso: 38 file M4B.1 tracked/untracked, branch
+`codex/magazzino-workflow-unificato`, base/remota
+`be033bf565c82dccb8187d8cf72e2d1d1732a474`, index vuoto.
+Manifest SHA-256 sanitizzati fuori Git:
+`/private/tmp/m4b1-hotfix-input-manifest-20260923.txt`
+(`75b5aaf9b5525f5c57f31c12637e0f6f31fff3739fbbc24addb646111c70f8a1`)
+e `/private/tmp/m4b1-hotfix-frozen-manifest-20260923.txt`
+(`eb21949d7c3fa06564203ff38145886fd95307aefe09750676e6da252e64cd03`).
+La sola modifica successiva alla fase A, oltre ai documenti di esito,
+è la fixture E2E Mensa M4B.1 autonoma. Nessun segreto o XLSX è nel Git.
+
+Il laboratorio Linux amd64 è
+`/private/tmp/m4b1-hotfix-linux.Scmu6M/candidate`, copia dei file Git
+tracked/untracked del candidato con `pnpm install --frozen-lockfile`;
+nessun `.env` né `node_modules` macOS copiato. Immagini usate:
+`node:24-slim` (manifest
+`sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6`),
+`nginx:1.27-alpine` (manifest
+`sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10`),
+`postgres:16-alpine`, Playwright `v1.62.1-noble`. I soli tag WEB costruiti
+qui sono `magazzino-m4b1-hotfix-web:20260923` e, dopo la fixture E2E,
+`magazzino-m4b1-hotfix-web-final:20260923`, mai il tag del persistente.
+
+Risorse nominative create per questa run: rete isolata
+`magazzino-m4b1-hotfix-net-20260923`; container WEB
+`magazzino-m4b1-hotfix-web-candidate-20260923` (solo porta loopback
+`127.0.0.1:18683`) e `magazzino-m4b1-hotfix-web-final-20260923` (solo
+`127.0.0.1:18684`), stub API tecnico
+`magazzino-m4b1-hotfix-api-stub-20260923`, PostgreSQL
+`magazzino-m4b1-hotfix-db-20260923` (dati `tmpfs`, nessun volume e nessuna
+porta host), database distinti `m4b1_hotfix_e2e` e `m4b1_hotfix_api`.
+Container one-shot `--rm` della matrice runtime RT-01…11, build, smoke
+browser, fresh/seed/runner/API/E2E hanno nomi con prefisso
+`magazzino-m4b1-hotfix-`; i test E2E funzionali avviano API e Vite propri
+sulla rete isolata, **non** lo stub. I due XLSX originali FSE sono montati
+singolarmente `:ro` soltanto nel container API; le loro impronte sono
+`4e4b8ba724a35cb048d42070299c34b3ecfe673206390c8fde2d67c20488c901`
+e `e1b4ab9c0b647adb0f3fb48bb4f0f76b493aee005933cb0a223a3218cba554de`.
+
+I container persistenti protetti erano e restano
+`magazzino-postgres` (`57e462be280a`), `magazzino-api`
+(`2beebbad6c21`) e `magazzino-web` (`f344ed86a768`); i volumi
+`magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads` non sono stati montati nei test.
+Nessun `prune`, reset, seed o migrazione è stato diretto al database
+persistente. La pulizia nominativa e il controllo conclusivo di container,
+rete, volumi e immagine candidata sono registrati nell'esito finale della
+run, dopo l'ultima prova.
+
+La pulizia finale ha fermato nominativamente i quattro container
+`magazzino-m4b1-hotfix-web-final-20260923`,
+`magazzino-m4b1-hotfix-web-candidate-20260923`,
+`magazzino-m4b1-hotfix-api-stub-20260923` e
+`magazzino-m4b1-hotfix-db-20260923` (tutti `--rm`). La rete è stata
+verificata vuota e rimossa per nome; rimossi per tag soltanto
+`magazzino-m4b1-hotfix-web:20260923` e
+`magazzino-m4b1-hotfix-web-final:20260923`. Tutti i container one-shot
+erano già auto-rimossi. Non è stato creato alcun volume Docker M4B.1.
+La directory di laboratorio, verificata come percorso esatto
+`/private/tmp/m4b1-hotfix-linux.Scmu6M`, è stata rimossa con i suoi
+output temporanei; i manifest sanitizzati fuori Git sono conservati.
+Le immagini base/cache condivise non sono state cancellate.
+
+Il controllo successivo con `docker ps -a`, `docker network ls` e
+`docker volume ls` non mostra risorse disposable con prefisso
+`magazzino-m4b1-hotfix-`. I tre container persistenti conservano gli ID
+iniziali e sono attivi; i due volumi persistenti restano presenti. Le
+risorse degli altri progetti presenti nell'inventario non sono state
+fermate, eliminate o modificate. G8 è GO, indipendentemente dal blocco
+API G3/G4 riportato in `ESITI_TEST_M4B1.md`.
+
+### M4B.1 — laboratorio della ripresa G3/G4 / SCARICO-TEST-01
+
+Questa sezione riguarda solo la run **successiva** al NO-GO/G3-G4 sopra.
+Il DB usato non è il persistente: URL di test con host loopback
+`127.0.0.1:55452` per macOS e nome della rete disposable per i
+container Linux; credenziali sintetiche non registrate. Nessun servizio
+esterno necessario. Gli XLSX FSE originali sono stati montati nei
+container API come singoli file `:ro`, mai copiati nel repository.
+
+Risorse create per questa run:
+
+- PostgreSQL `magazzino-m4b1-scarico-db-20260923` (ID
+  `73fce5232224`, `--rm`, dati su `tmpfs`, porta solo loopback);
+- rete `magazzino-m4b1-scarico-net-20260923` (ID `496855e8f141`),
+  collegata soltanto al DB disposable;
+- DB interni disposable `m4b1_scarico`, `m4b1_scarico_target`,
+  `m4b1_scarico_target2`, `m4b1_scarico_mutation`,
+  `m4b1_scarico_formal`, `m4b1_scarico_formal2`,
+  `m4b1_scarico_linux`, `m4b1_scarico_perf` e
+  `m4b1_scarico_linux_final`; ogni DB di prova formale è stato creato
+  fresh con schema/migrazioni 41/41;
+- container Linux one-shot `--rm` con prefisso
+  `magazzino-m4b1-scarico-node-`: `check`, `install`, `install10`,
+  `fresh`, `api`, `perf`, `fse-check`, `api-final` (suffisso data
+  `20260923`); nessuno ha montato volumi persistenti;
+- copie temporanee esatte `/private/tmp/m4b1-scarico-mutation.OR8kw6`
+  e `/private/tmp/m4b1-scarico-linux.VFobWe`, rispettivamente per
+  SCAR-06 e il run Linux compatibile.
+
+Il primo install nel container one-shot ha selezionato pnpm 12 tramite
+Corepack e ha fallito per la nuova policy degli script; l'install frozen
+è poi passato con pnpm 10.34.5 e Node 24.21.0, senza cambiare
+lockfile/policy del progetto. La suite API Linux iniziale ha trovato
+il timeout del singolo test FSE-R2, misurato e corretto localmente come
+descritto in `ESITI_TEST_M4B1.md`; la suite completa finale è verde.
+
+Cleanup nominativo completato: `docker stop` del solo DB disposable
+(`--rm`), poi `docker network rm` della sola rete sopra; tutti i
+container one-shot erano già auto-rimossi. Non è stato creato alcun
+volume Docker temporaneo. Le due copie diagnostiche esatte sono state
+rimosse; restano fuori Git soltanto i manifest SHA-256 sanitizzati.
+Il controllo finale `docker ps -a`, `docker network ls` e
+`docker volume ls` non mostra risorse con prefisso
+`magazzino-m4b1-scarico-`. I tre container protetti mantengono gli ID
+`magazzino-postgres` `57e462be280a`, `magazzino-api` `2beebbad6c21`,
+`magazzino-web` `f344ed86a768`; i volumi
+`magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads` sono ancora presenti. Le reti
+storiche e le risorse di altri progetti non sono state modificate.
+Nessun prune, Docker persistente invariato.

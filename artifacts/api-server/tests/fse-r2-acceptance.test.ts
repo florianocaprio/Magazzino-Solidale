@@ -487,5 +487,5 @@ describe("Magazzino 2.0C-R2 — acceptance A/B/C/D e coverage contenuto", () => 
     exportIds.push(snapshot.export.id);
     expect(snapshot.report?.lines).toHaveLength(5000);
     expect(snapshot.export.righeTotali).toBe(5000);
-  });
+  }, 60_000); // Il workload completo supera 30 s nel laboratorio Linux x64 emulato.
 });

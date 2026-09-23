@@ -9,6 +9,7 @@ import {
 } from "vitest";
 import { randomUUID } from "node:crypto";
 import request from "supertest";
+import express from "express";
 import {
   db,
   pool,
@@ -26,9 +27,11 @@ import {
   comandiOperativiTable,
   entiDestinatariTable,
   magazziniTable,
+  trasferimentoRigheTable,
 } from "@workspace/db";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import bolleRouter from "../src/routes/bolle";
+import trasferimentiRouter from "../src/routes/trasferimenti";
 import consegneRouter from "../src/routes/consegne";
 import preparazioneConsegneRouter from "../src/routes/preparazione-consegne";
 import reportRouter from "../src/routes/report";
@@ -56,6 +59,7 @@ import {
   insertBollaRiga,
   insertMovimento,
   insertPrenotazioneMagazzino,
+  insertTrasferimento,
 } from "./scope-helpers";
 
 let bootScope: SeedScope;
@@ -215,6 +219,267 @@ afterAll(async () => {
 });
 
 describe("Bolle — prenotazione merce su conferma", () => {
+  it("M4B.1 PREP-TR-05: Bolla e Trasferimento contesi sull'ultima unità producono una sola prenotazione", async () => {
+    const lottoId = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 1,
+    });
+    const bollaId = await insertBolla(scope, {
+      beneficiarioId: benA,
+      magazzinoId: magA,
+    });
+    await insertBollaRiga(scope, {
+      bollaId,
+      prodottoId: prod,
+      lottoId,
+      quantita: 1,
+    });
+    const trasferimentoId = await insertTrasferimento(scope, {
+      origineId: magA,
+      destinoId: magB,
+    });
+    await db.insert(trasferimentoRigheTable).values({
+      trasferimentoId,
+      prodottoId: prod,
+      lottoId,
+      quantita: "1",
+      unitaMisura: "kg",
+    });
+    const router = express.Router();
+    router.use(bolleRouter, trasferimentiRouter);
+    const target = makeScopedApp(router, {
+      id: operatoreId,
+      centroAscoltoId: null,
+    });
+    const blocker = await pool.connect();
+    let committed = false;
+    let pendingBolla: Promise<request.Response> | undefined;
+    let pendingTransfer: Promise<request.Response> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      const pid = await blocker.query<{ pid: number }>(
+        "SELECT pg_backend_pid() AS pid",
+      );
+      await blocker.query("SELECT id FROM lotti WHERE id = $1 FOR UPDATE", [
+        lottoId,
+      ]);
+      pendingBolla = request(target)
+        .post(`/bolle/${bollaId}/conferma`)
+        .send({
+          idempotencyKey: commandKey("bolla-vs-transfer"),
+          versione: await bollaVersione(bollaId),
+        })
+        .then((response) => response);
+      await waitForBlockedBackends(pid.rows[0].pid, 1);
+      pendingTransfer = request(target)
+        .post(`/trasferimenti/${trasferimentoId}/prepara`)
+        .send({ idempotencyKey: commandKey("transfer-vs-bolla"), versione: 1 })
+        .then((response) => response);
+      await waitForBlockedBackends(pid.rows[0].pid, 2);
+      await blocker.query("COMMIT");
+      committed = true;
+      const responses = await Promise.all([pendingBolla, pendingTransfer]);
+      expect(responses.map((response) => response.status).sort()).toEqual([
+        200, 409,
+      ]);
+      const active = await db
+        .select()
+        .from(prenotazioniMagazzinoTable)
+        .where(
+          and(
+            eq(prenotazioniMagazzinoTable.lottoId, lottoId),
+            eq(prenotazioniMagazzinoTable.stato, "attiva"),
+          ),
+        );
+      expect(active).toHaveLength(1);
+      expect(Number(active[0].quantita)).toBe(1);
+      expect(await lottoResidua(lottoId)).toBe(1);
+    } finally {
+      if (!committed) await blocker.query("ROLLBACK").catch(() => undefined);
+      blocker.release();
+      await Promise.allSettled(
+        [pendingBolla, pendingTransfer].filter(
+          (pending): pending is Promise<request.Response> => pending != null,
+        ),
+      );
+    }
+  });
+
+  it("M4B.1 PREP-TR-05: Bolla e Trasferimento con prodotti inversi serializzano senza sovraprenotare", async () => {
+    const secondProduct = await createProdotto(scope);
+    const products = [prod, secondProduct].sort((a, b) => a - b);
+    const lots = new Map<number, number>();
+    for (const prodottoId of products) {
+      lots.set(
+        prodottoId,
+        await createLotto(scope, {
+          prodottoId,
+          magazzinoId: magA,
+          quantita: 1,
+        }),
+      );
+    }
+    const bollaId = await insertBolla(scope, {
+      beneficiarioId: benA,
+      magazzinoId: magA,
+    });
+    for (const prodottoId of products) {
+      await insertBollaRiga(scope, {
+        bollaId,
+        prodottoId,
+        lottoId: lots.get(prodottoId)!,
+        quantita: 1,
+      });
+    }
+    const trasferimentoId = await insertTrasferimento(scope, {
+      origineId: magA,
+      destinoId: magB,
+    });
+    for (const prodottoId of [...products].reverse()) {
+      await db.insert(trasferimentoRigheTable).values({
+        trasferimentoId,
+        prodottoId,
+        lottoId: lots.get(prodottoId)!,
+        quantita: "1",
+        unitaMisura: "kg",
+      });
+    }
+    const router = express.Router();
+    router.use(bolleRouter, trasferimentiRouter);
+    const target = makeScopedApp(router, {
+      id: operatoreId,
+      centroAscoltoId: null,
+    });
+    const blocker = await pool.connect();
+    let committed = false;
+    let pendingBolla: Promise<request.Response> | undefined;
+    let pendingTransfer: Promise<request.Response> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      const pid = await blocker.query<{ pid: number }>(
+        "SELECT pg_backend_pid() AS pid",
+      );
+      await blocker.query("SELECT id FROM lotti WHERE id = $1 FOR UPDATE", [
+        lots.get(products[0]),
+      ]);
+      pendingBolla = request(target)
+        .post(`/bolle/${bollaId}/conferma`)
+        .send({
+          idempotencyKey: commandKey("bolla-inverse"),
+          versione: await bollaVersione(bollaId),
+        })
+        .then((response) => response);
+      await waitForBlockedBackends(pid.rows[0].pid, 1);
+      pendingTransfer = request(target)
+        .post(`/trasferimenti/${trasferimentoId}/prepara`)
+        .send({ idempotencyKey: commandKey("transfer-inverse"), versione: 1 })
+        .then((response) => response);
+      await waitForBlockedBackends(pid.rows[0].pid, 2);
+      await blocker.query("COMMIT");
+      committed = true;
+      const responses = await Promise.all([pendingBolla, pendingTransfer]);
+      expect(responses.map((response) => response.status).sort()).toEqual([
+        200, 409,
+      ]);
+      for (const lotId of lots.values()) {
+        const active = await db
+          .select()
+          .from(prenotazioniMagazzinoTable)
+          .where(
+            and(
+              eq(prenotazioniMagazzinoTable.lottoId, lotId),
+              eq(prenotazioniMagazzinoTable.stato, "attiva"),
+            ),
+          );
+        expect(active).toHaveLength(1);
+        expect(Number(active[0].quantita)).toBe(1);
+        expect(await lottoResidua(lotId)).toBe(1);
+      }
+    } finally {
+      if (!committed) await blocker.query("ROLLBACK").catch(() => undefined);
+      blocker.release();
+      await Promise.allSettled(
+        [pendingBolla, pendingTransfer].filter(
+          (pending): pending is Promise<request.Response> => pending != null,
+        ),
+      );
+    }
+  });
+
+  it("M4B.1 PREP-TR-07: Avvia consuma la propria riserva senza sottrarre due volte quella della Bolla", async () => {
+    const lottoId = await createLotto(scope, {
+      prodottoId: prod,
+      magazzinoId: magA,
+      quantita: 10,
+    });
+    const trasferimentoId = await insertTrasferimento(scope, {
+      origineId: magA,
+      destinoId: magB,
+    });
+    await db.insert(trasferimentoRigheTable).values({
+      trasferimentoId,
+      prodottoId: prod,
+      lottoId,
+      quantita: "6",
+      unitaMisura: "kg",
+    });
+    const bollaId = await insertBolla(scope, {
+      beneficiarioId: benA,
+      magazzinoId: magA,
+    });
+    await insertBollaRiga(scope, {
+      bollaId,
+      prodottoId: prod,
+      lottoId,
+      quantita: 4,
+    });
+    const router = express.Router();
+    router.use(bolleRouter, trasferimentiRouter);
+    const target = makeScopedApp(router, {
+      id: operatoreId,
+      centroAscoltoId: null,
+    });
+    const ready = await request(target)
+      .post(`/trasferimenti/${trasferimentoId}/prepara`)
+      .send({ idempotencyKey: commandKey("own-reserve"), versione: 1 });
+    expect(ready.status, ready.text).toBe(200);
+    const confirmed = await request(target)
+      .post(`/bolle/${bollaId}/conferma`)
+      .send({
+        idempotencyKey: commandKey("other-reserve"),
+        versione: await bollaVersione(bollaId),
+      });
+    expect(confirmed.status, confirmed.text).toBe(200);
+    expect(await lottoResidua(lottoId)).toBe(10);
+    const started = await request(target)
+      .post(`/trasferimenti/${trasferimentoId}/avvia`)
+      .send({
+        idempotencyKey: commandKey("own-dispatch"),
+        versione: ready.body.versione,
+      });
+    expect(started.status, started.text).toBe(200);
+    expect(await lottoResidua(lottoId)).toBe(4);
+    const active = await db
+      .select()
+      .from(prenotazioniMagazzinoTable)
+      .where(
+        and(
+          eq(prenotazioniMagazzinoTable.lottoId, lottoId),
+          eq(prenotazioniMagazzinoTable.stato, "attiva"),
+        ),
+      );
+    expect(active).toHaveLength(1);
+    expect(active[0].bollaId).toBe(bollaId);
+    expect(Number(active[0].quantita)).toBe(4);
+    const outgoing = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.trasferimentoId, trasferimentoId));
+    expect(outgoing).toHaveLength(1);
+    expect(Number(outgoing[0].quantita)).toBe(6);
+  });
+
   it("mantiene la precedenza applicativa per id tra righe FEFO e lotto esplicito", async () => {
     const prodottoId = await createProdotto(scope);
     const lottoPrimaScadenza = await createLotto(scope, {

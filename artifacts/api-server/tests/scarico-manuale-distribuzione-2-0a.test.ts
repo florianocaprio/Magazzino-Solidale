@@ -5,6 +5,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   areeOperativeTable,
+  auditEventiTable,
   beneficiariTable,
   centriAscoltoTable,
   db,
@@ -13,12 +14,13 @@ import {
   movimentiTable,
   operazioniDistribuzioneMagazzinoTable,
   pool,
+  prenotazioniMagazzinoTable,
   prodottiTable,
   scarichiTable,
   scaricoRigheTable,
   utentiTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import scarichiRouter from "../src/routes/scarichi";
 import { isReportingSnapshotConcurrencyError } from "../src/lib/reporting/eventSnapshots";
 import {
@@ -28,17 +30,266 @@ import {
 } from "../src/lib/configurazioneAmbiente";
 
 let app: Express;
-let userId: number;
-let magazzinoId: number;
-let prodottoId: number;
-let lottoId: number;
-let beneficiarioId: number;
-let areaOperativaId: number;
-let centroAscoltoId: number;
-let areaOperativaAlternativaId: number;
-let centroAscoltoAlternativoId: number;
+let userId = 0;
+let magazzinoId = 0;
+let prodottoId = 0;
+let lottoId = 0;
+let beneficiarioId = 0;
+let areaOperativaId = 0;
+let centroAscoltoId = 0;
+let areaOperativaAlternativaId = 0;
+let centroAscoltoAlternativoId = 0;
 let originalScarichiAttivo = true;
+let scarichiFlagChanged = false;
 const suffix = `${process.pid}${Date.now().toString(36)}`;
+let beneficiarySequence = 0;
+
+function scaricoRequest(beneficiaryId: number, quantity = 1) {
+  return request(app)
+    .post("/scarichi")
+    .send({
+      magazzinoId,
+      beneficiarioId: beneficiaryId,
+      dataScarico: "2026-08-22",
+      causale: "consegna_beneficiario",
+      canaleOperativo: "PACCHI",
+      righe: [{ prodottoId, quantita: quantity, unitaMisura: "kg" }],
+    });
+}
+
+async function createCaseBeneficiary(areaId: number, centreId: number) {
+  const [{ id }] = await db
+    .insert(beneficiariTable)
+    .values({
+      codice: `S20T-${suffix}-${++beneficiarySequence}`.slice(0, 20),
+      nome: "Beneficiario",
+      cognome: "Caso isolato",
+      sesso: "X",
+      areaOperativaId: areaId,
+      centroAscoltoId: centreId,
+    })
+    .returning({ id: beneficiariTable.id });
+  return id;
+}
+
+async function inventorySnapshot() {
+  const [scarichi, righe, operazioni, movimenti, prenotazioni, audit, lotto] =
+    await Promise.all([
+      db
+        .select({ id: scarichiTable.id })
+        .from(scarichiTable)
+        .where(eq(scarichiTable.magazzinoId, magazzinoId)),
+      db
+        .select({ id: scaricoRigheTable.id })
+        .from(scaricoRigheTable)
+        .where(eq(scaricoRigheTable.prodottoId, prodottoId)),
+      db
+        .select({ id: operazioniDistribuzioneMagazzinoTable.id })
+        .from(operazioniDistribuzioneMagazzinoTable)
+        .where(
+          eq(operazioniDistribuzioneMagazzinoTable.magazzinoId, magazzinoId),
+        ),
+      db
+        .select({ id: movimentiTable.id })
+        .from(movimentiTable)
+        .where(eq(movimentiTable.magazzinoId, magazzinoId)),
+      db
+        .select({
+          id: prenotazioniMagazzinoTable.id,
+          stato: prenotazioniMagazzinoTable.stato,
+          quantita: prenotazioniMagazzinoTable.quantita,
+        })
+        .from(prenotazioniMagazzinoTable)
+        .where(eq(prenotazioniMagazzinoTable.lottoId, lottoId)),
+      db
+        .select({ id: auditEventiTable.id })
+        .from(auditEventiTable)
+        .where(
+          and(
+            eq(auditEventiTable.magazzinoIdSnapshot, magazzinoId),
+            eq(auditEventiTable.azione, "SCARICO_MAGAZZINO_CREATO"),
+          ),
+        ),
+      db
+        .select({ quantitaResidua: lottiTable.quantitaResidua })
+        .from(lottiTable)
+        .where(eq(lottiTable.id, lottoId)),
+    ]);
+  return {
+    scarichi: scarichi.map((row) => row.id).sort(),
+    righe: righe.map((row) => row.id).sort(),
+    operazioni: operazioni.map((row) => row.id).sort(),
+    movimenti: movimenti.map((row) => row.id).sort(),
+    prenotazioni: prenotazioni.sort((a, b) => a.id - b.id),
+    audit: audit.map((row) => row.id).sort(),
+    residuo: lotto[0]?.quantitaResidua,
+  };
+}
+
+function expectSanitizedDenial(body: unknown, message: string) {
+  expect(body).toEqual({ error: message });
+  const serialized = JSON.stringify(body);
+  for (const value of [
+    areaOperativaAlternativaId,
+    centroAscoltoAlternativoId,
+  ]) {
+    expect(serialized).not.toContain(String(value));
+  }
+  expect(serialized).not.toContain("Beneficiario Caso isolato");
+}
+
+async function waitForBeneficiaryLock(
+  blockerPid: number,
+  isSettled: () => boolean,
+) {
+  const deadline = Date.now() + 8_000;
+  while (Date.now() < deadline) {
+    if (isSettled())
+      throw new Error(
+        "La richiesta Scarico è terminata prima del lock transazionale",
+      );
+    const observation = await pool.query<{ pid: number }>(
+      `SELECT pid FROM pg_stat_activity
+       WHERE datname = current_database()
+         AND pid <> pg_backend_pid()
+         AND pid <> $1
+         AND $1 = ANY(pg_blocking_pids(pid))
+         AND wait_event_type = 'Lock'
+         AND state = 'active'
+         AND query ILIKE '%beneficiari%'
+         AND query ILIKE '%for update%'`,
+      [blockerPid],
+    );
+    if (observation.rows.length === 1) {
+      if (isSettled())
+        throw new Error(
+          "La richiesta Scarico è terminata durante l'osservazione del lock",
+        );
+      return observation.rows[0].pid;
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(
+    "Nessun backend HTTP osservato sul lock Beneficiario della transazione di test entro 8 s",
+  );
+}
+
+async function withLockedBeneficiary(inject?: {
+  beforeCommit?: () => void;
+  afterCommit?: () => void;
+}) {
+  let caseBeneficiaryId = 0;
+  let client: Awaited<ReturnType<typeof pool.connect>> | undefined;
+  let transactionOpen = false;
+  let httpRequest: ReturnType<typeof scaricoRequest> | undefined;
+  let pending:
+    | Promise<{ response?: { status: number; body: unknown }; error?: unknown }>
+    | undefined;
+  let settled = false;
+  let result: Awaited<NonNullable<typeof pending>> | undefined;
+  let primaryError: unknown;
+  const cleanupErrors: unknown[] = [];
+  try {
+    caseBeneficiaryId = await createCaseBeneficiary(
+      areaOperativaId,
+      centroAscoltoId,
+    );
+    const [original] = await db
+      .select({
+        areaOperativaId: beneficiariTable.areaOperativaId,
+        centroAscoltoId: beneficiariTable.centroAscoltoId,
+        numComponenti: beneficiariTable.numComponenti,
+      })
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, caseBeneficiaryId));
+    expect(original).toMatchObject({ areaOperativaId, centroAscoltoId });
+    client = await pool.connect();
+    await client.query("BEGIN");
+    transactionOpen = true;
+    const blocker = await client.query<{ pid: number }>(
+      "SELECT pg_backend_pid()::int AS pid",
+    );
+    await client.query(
+      `UPDATE beneficiari SET area_operativa_id = $1, centro_ascolto_id = $2,
+       num_componenti = $3 WHERE id = $4`,
+      [
+        areaOperativaAlternativaId,
+        centroAscoltoAlternativoId,
+        original.numComponenti + 1,
+        caseBeneficiaryId,
+      ],
+    );
+    inject?.beforeCommit?.();
+    httpRequest = scaricoRequest(caseBeneficiaryId).timeout({
+      deadline: 12_000,
+    });
+    pending = Promise.resolve(httpRequest)
+      .then(
+        (response) => ({ response }),
+        (error: unknown) => ({ error }),
+      )
+      .then((outcome) => {
+        settled = true;
+        return outcome;
+      });
+    const waitingPid = await waitForBeneficiaryLock(
+      blocker.rows[0].pid,
+      () => settled,
+    );
+    expect(waitingPid).not.toBe(blocker.rows[0].pid);
+    await client.query("COMMIT");
+    transactionOpen = false;
+    result = await pending;
+    if (result.error) throw result.error;
+    inject?.afterCommit?.();
+    expect(result.response?.status).toBe(403);
+    expectSanitizedDenial(
+      result.response?.body,
+      "Risorsa non accessibile per il tuo profilo",
+    );
+  } catch (error) {
+    primaryError = error;
+  } finally {
+    if (transactionOpen && httpRequest) httpRequest.abort();
+    if (client && transactionOpen) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    if (pending) {
+      try {
+        await pending;
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    if (client) client.release();
+    if (caseBeneficiaryId) {
+      try {
+        await db
+          .delete(beneficiariTable)
+          .where(eq(beneficiariTable.id, caseBeneficiaryId));
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+  }
+  if (primaryError && cleanupErrors.length)
+    throw new AggregateError(
+      [primaryError, ...cleanupErrors],
+      "Scarico fallito e cleanup incompleto",
+    );
+  if (primaryError) throw primaryError;
+  if (cleanupErrors.length)
+    throw new AggregateError(cleanupErrors, "Cleanup Scarico incompleto");
+  return {
+    blockerObserved: true,
+    response: result!.response!,
+    caseBeneficiaryId,
+  };
+}
 
 beforeAll(async () => {
   await ensureAmbienteModuli();
@@ -46,6 +297,7 @@ beforeAll(async () => {
     (await listModuliFunzionali()).find((item) => item.codice === "SCARICHI")
       ?.attivo ?? true;
   await updateModuloAmbiente("SCARICHI", true, null);
+  scarichiFlagChanged = true;
   [{ id: userId }] = await db
     .insert(utentiTable)
     .values({
@@ -139,157 +391,150 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db
-    .delete(movimentiTable)
-    .where(eq(movimentiTable.magazzinoId, magazzinoId));
-  await db
-    .delete(operazioniDistribuzioneMagazzinoTable)
-    .where(eq(operazioniDistribuzioneMagazzinoTable.magazzinoId, magazzinoId));
-  const scarichi = await db
-    .select({ id: scarichiTable.id })
-    .from(scarichiTable)
-    .where(eq(scarichiTable.magazzinoId, magazzinoId));
-  for (const scarico of scarichi) {
-    await db
-      .delete(scaricoRigheTable)
-      .where(eq(scaricoRigheTable.scaricoId, scarico.id));
+  const errors: unknown[] = [];
+  const clean = async (action: () => Promise<unknown>) => {
+    try {
+      await action();
+    } catch (error) {
+      errors.push(error);
+    }
+  };
+  if (magazzinoId) {
+    await clean(() =>
+      db
+        .delete(movimentiTable)
+        .where(eq(movimentiTable.magazzinoId, magazzinoId)),
+    );
+    await clean(() =>
+      db
+        .delete(operazioniDistribuzioneMagazzinoTable)
+        .where(
+          eq(operazioniDistribuzioneMagazzinoTable.magazzinoId, magazzinoId),
+        ),
+    );
+    await clean(async () => {
+      const scarichi = await db
+        .select({ id: scarichiTable.id })
+        .from(scarichiTable)
+        .where(eq(scarichiTable.magazzinoId, magazzinoId));
+      for (const scarico of scarichi) {
+        await db
+          .delete(scaricoRigheTable)
+          .where(eq(scaricoRigheTable.scaricoId, scarico.id));
+      }
+    });
+    await clean(() =>
+      db
+        .delete(scarichiTable)
+        .where(eq(scarichiTable.magazzinoId, magazzinoId)),
+    );
   }
-  await db
-    .delete(scarichiTable)
-    .where(eq(scarichiTable.magazzinoId, magazzinoId));
-  await db.delete(lottiTable).where(eq(lottiTable.id, lottoId));
-  await db.delete(prodottiTable).where(eq(prodottiTable.id, prodottoId));
-  await db.delete(magazziniTable).where(eq(magazziniTable.id, magazzinoId));
-  await db
-    .delete(beneficiariTable)
-    .where(eq(beneficiariTable.id, beneficiarioId));
-  await db
-    .delete(centriAscoltoTable)
-    .where(eq(centriAscoltoTable.id, centroAscoltoId));
-  await db
-    .delete(centriAscoltoTable)
-    .where(eq(centriAscoltoTable.id, centroAscoltoAlternativoId));
-  await db
-    .delete(areeOperativeTable)
-    .where(eq(areeOperativeTable.id, areaOperativaId));
-  await db
-    .delete(areeOperativeTable)
-    .where(eq(areeOperativeTable.id, areaOperativaAlternativaId));
-  await db.delete(utentiTable).where(eq(utentiTable.id, userId));
-  await updateModuloAmbiente("SCARICHI", originalScarichiAttivo, null);
-  await pool.end();
+  if (lottoId)
+    await clean(() => db.delete(lottiTable).where(eq(lottiTable.id, lottoId)));
+  if (prodottoId)
+    await clean(() =>
+      db.delete(prodottiTable).where(eq(prodottiTable.id, prodottoId)),
+    );
+  if (magazzinoId)
+    await clean(() =>
+      db.delete(magazziniTable).where(eq(magazziniTable.id, magazzinoId)),
+    );
+  if (beneficiarioId)
+    await clean(() =>
+      db
+        .delete(beneficiariTable)
+        .where(eq(beneficiariTable.id, beneficiarioId)),
+    );
+  if (centroAscoltoId)
+    await clean(() =>
+      db
+        .delete(centriAscoltoTable)
+        .where(eq(centriAscoltoTable.id, centroAscoltoId)),
+    );
+  if (centroAscoltoAlternativoId)
+    await clean(() =>
+      db
+        .delete(centriAscoltoTable)
+        .where(eq(centriAscoltoTable.id, centroAscoltoAlternativoId)),
+    );
+  if (areaOperativaId)
+    await clean(() =>
+      db
+        .delete(areeOperativeTable)
+        .where(eq(areeOperativeTable.id, areaOperativaId)),
+    );
+  if (areaOperativaAlternativaId)
+    await clean(() =>
+      db
+        .delete(areeOperativeTable)
+        .where(eq(areeOperativeTable.id, areaOperativaAlternativaId)),
+    );
+  if (userId)
+    await clean(() => db.delete(utentiTable).where(eq(utentiTable.id, userId)));
+  if (scarichiFlagChanged)
+    await clean(() =>
+      updateModuloAmbiente("SCARICHI", originalScarichiAttivo, null),
+    );
+  await clean(() => pool.end());
+  if (errors.length)
+    throw new AggregateError(errors, "Cleanup fixture Scarico incompleto");
 });
 
 describe("scarico manuale beneficiario 2.0A", () => {
-  it("nega atomicamente lo Scarico scoped se il Beneficiario cambia Area mentre attende il lock", async () => {
-    const scarichiPrima = await db
-      .select({ id: scarichiTable.id })
-      .from(scarichiTable)
-      .where(eq(scarichiTable.magazzinoId, magazzinoId));
-    const operazioniPrima = await db
-      .select({ id: operazioniDistribuzioneMagazzinoTable.id })
-      .from(operazioniDistribuzioneMagazzinoTable)
-      .where(
-        eq(operazioniDistribuzioneMagazzinoTable.magazzinoId, magazzinoId),
-      );
-    const movimentiPrima = await db
-      .select({ id: movimentiTable.id })
-      .from(movimentiTable)
-      .where(eq(movimentiTable.magazzinoId, magazzinoId));
-    const [lottoPrima] = await db
-      .select({ quantitaResidua: lottiTable.quantitaResidua })
-      .from(lottiTable)
-      .where(eq(lottiTable.id, lottoId));
-
-    const client = await pool.connect();
-    let committed = false;
+  it("SCAR-01: nega preliminarmente il Beneficiario già fuori scope senza effetti", async () => {
+    const before = await inventorySnapshot();
+    let caseBeneficiaryId = 0;
     try {
-      await client.query("BEGIN");
-      await client.query(
-        `UPDATE beneficiari
-         SET area_operativa_id = $1, centro_ascolto_id = $2, num_componenti = 4
-         WHERE id = $3`,
-        [areaOperativaAlternativaId, centroAscoltoAlternativoId, beneficiarioId,
-        ],
+      caseBeneficiaryId = await createCaseBeneficiary(
+        areaOperativaAlternativaId,
+        centroAscoltoAlternativoId,
       );
-
-      const responsePromise = Promise.resolve(
-        request(app)
-          .post("/scarichi")
-          .send({
-            magazzinoId,
-            beneficiarioId,
-            dataScarico: "2026-08-22",
-            causale: "consegna_beneficiario",
-            canaleOperativo: "PACCHI",
-            righe: [{ prodottoId, quantita: 1, unitaMisura: "kg" }],
-          }),
-      );
-      const beforeCommit = await Promise.race([
-        responsePromise.then(() => "resolved" as const),
-        new Promise<"blocked">((resolve) =>
-          setTimeout(() => resolve("blocked"), 50),
-        ),
-      ]);
-      expect(beforeCommit).toBe("blocked");
-
-      await client.query("COMMIT");
-      committed = true;
-      const response = await Promise.race([
-        responsePromise,
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Lo Scarico scoped è rimasto in attesa")),
-            5_000,
-          ),
-        ),
-      ]);
+      const response = await scaricoRequest(caseBeneficiaryId);
       expect(response.status).toBe(403);
-      expect(response.body).toEqual({
-        error: "Risorsa non accessibile per il tuo profilo",
-      });
-      expect(JSON.stringify(response.body)).not.toContain(
-        String(areaOperativaAlternativaId),
-      );
-      expect(JSON.stringify(response.body)).not.toContain(
-        String(centroAscoltoAlternativoId),
+      expectSanitizedDenial(
+        response.body,
+        "Beneficiario non accessibile per il tuo profilo",
       );
     } finally {
-      if (!committed) await client.query("ROLLBACK");
-      client.release();
+      if (caseBeneficiaryId)
+        await db
+          .delete(beneficiariTable)
+          .where(eq(beneficiariTable.id, caseBeneficiaryId));
     }
+    expect(await inventorySnapshot()).toEqual(before);
+  });
 
-    await db
-      .update(beneficiariTable)
-      .set({
-        areaOperativaId,
-        centroAscoltoId,
-        numComponenti: 1,
-      })
-      .where(eq(beneficiariTable.id, beneficiarioId));
+  it("SCAR-02: nega atomicamente lo Scarico scoped dopo il lock del Beneficiario", async () => {
+    const before = await inventorySnapshot();
+    const result = await withLockedBeneficiary();
+    expect(result.blockerObserved).toBe(true);
+    expect(
+      await db
+        .select({ id: beneficiariTable.id })
+        .from(beneficiariTable)
+        .where(eq(beneficiariTable.id, result.caseBeneficiaryId)),
+    ).toHaveLength(0);
+    expect(await inventorySnapshot()).toEqual(before);
+  });
 
-    const scarichiDopo = await db
-      .select({ id: scarichiTable.id })
-      .from(scarichiTable)
-      .where(eq(scarichiTable.magazzinoId, magazzinoId));
-    const operazioniDopo = await db
-      .select({ id: operazioniDistribuzioneMagazzinoTable.id })
-      .from(operazioniDistribuzioneMagazzinoTable)
-      .where(
-        eq(operazioniDistribuzioneMagazzinoTable.magazzinoId, magazzinoId),
-      );
-    const movimentiDopo = await db
-      .select({ id: movimentiTable.id })
-      .from(movimentiTable)
-      .where(eq(movimentiTable.magazzinoId, magazzinoId));
-    const [lottoDopo] = await db
-      .select({ quantitaResidua: lottiTable.quantitaResidua })
-      .from(lottiTable)
-      .where(eq(lottiTable.id, lottoId));
-    expect(scarichiDopo).toHaveLength(scarichiPrima.length);
-    expect(operazioniDopo).toHaveLength(operazioniPrima.length);
-    expect(movimentiDopo).toHaveLength(movimentiPrima.length);
-    expect(lottoDopo.quantitaResidua).toBe(lottoPrima.quantitaResidua);
+  it("SCAR-03: ripulisce dopo un errore controllato successivo al COMMIT", async () => {
+    const before = await inventorySnapshot();
+    await expect(
+      withLockedBeneficiary({
+        beforeCommit: () => {
+          throw new Error("iniezione SCAR-03 prima del COMMIT");
+        },
+      }),
+    ).rejects.toThrow("iniezione SCAR-03 prima del COMMIT");
+    expect(await inventorySnapshot()).toEqual(before);
+    await expect(
+      withLockedBeneficiary({
+        afterCommit: () => {
+          throw new Error("iniezione SCAR-03 dopo COMMIT");
+        },
+      }),
+    ).rejects.toThrow("iniezione SCAR-03 dopo COMMIT");
+    expect(await inventorySnapshot()).toEqual(before);
   });
 
   it("classifica deadlock e serializzazione per una risposta 409 applicativa", () => {

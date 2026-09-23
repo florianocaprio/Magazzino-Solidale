@@ -173,3 +173,19 @@ concorrenza, replay/idempotenza, scope e revoca, collisione degli ID, PDF,
 lista mista, flussi Ente e regressioni complete M1–M3. La validazione manuale
 deve restare distinta. L'ambiente Docker persistente non viene aggiornato in
 sviluppo.
+
+## Incremento M4B.1 nel working tree
+
+Il primo incremento M4B realizza la prenotazione comune per Bolla e
+Trasferimento. Il trasferimento segue `richiesto → preparato (Pronto) →
+in_transito → completato`, con ramo di annullamento motivato solo prima
+dell'uscita. `preparato` corrisponde a impegni attivi persistiti, non a un
+badge informativo; `Avvia` converte esclusivamente tali impegni nel ledger.
+La migrazione 41 è additiva, mantiene i dati legacy e aggiunge owner
+esclusivo, FK coerenti e indici. La facciata comune, la pagina Trasferimenti
+e Mensa espongono la sequenza e le partite prenotate.
+
+Questo paragrafo aggiorna lo stato di sviluppo rispetto all'«Obiettivo M4B,
+non implementato» storico sopra: il solo slice M4B.1 è presente nel working
+tree. Mancano ancora `##test M4B.1` e validazione manuale; affidamento e
+rientro M4B.2 non sono iniziati. Il Docker persistente rimane M4A.

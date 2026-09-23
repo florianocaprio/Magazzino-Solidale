@@ -94,10 +94,10 @@ import {
 } from "../lib/inventoryLedger";
 import { lockInventoryLotsInGlobalOrder } from "../lib/inventoryLocks";
 import {
-  dataOperativaEuropeRome,
-  isLottoDistribuibile,
-  lottoDistribuibileCondition,
-} from "../lib/lottoPolicy";
+  InventoryReservationError,
+  reserveInventoryRow,
+} from "../lib/inventoryReservations";
+import { isLottoDistribuibile } from "../lib/lottoPolicy";
 import {
   effectiveBollaRigaId,
   fseDistributionNatureCondition,
@@ -310,6 +310,7 @@ export async function buildDettaglio(id: number) {
     }>
   >();
   for (const ripartizione of ripartizioniPrenotate) {
+    if (ripartizione.rigaBollaId == null) continue;
     const current = ripartizioniPerRiga.get(ripartizione.rigaBollaId) ?? [];
     current.push({
       lottoId: ripartizione.lottoId,
@@ -690,157 +691,31 @@ async function productName(prodottoId: number): Promise<string> {
   return prod?.nome ?? `prodotto #${prodottoId}`;
 }
 
-async function lockLottiFEFO(
-  tx: Tx,
-  prodottoId: number,
-  magazzinoId: number,
-): Promise<Array<typeof lottiTable.$inferSelect>> {
-  const dataOperativa = dataOperativaEuropeRome();
-  await tx.execute(sql`
-    SELECT id
-    FROM ${lottiTable}
-    WHERE ${lottiTable.prodottoId} = ${prodottoId}
-      AND ${lottiTable.magazzinoId} = ${magazzinoId}
-      AND ${lottiTable.quantitaResidua} > 0
-      AND (${lottiTable.dataScadenza} IS NULL OR ${lottiTable.dataScadenza} >= ${dataOperativa})
-    ORDER BY ${lottiTable.dataScadenza} ASC, ${lottiTable.dataCarico} ASC, ${lottiTable.id} ASC
-    FOR UPDATE
-  `);
-
-  return tx
-    .select()
-    .from(lottiTable)
-    .where(
-      and(
-        eq(lottiTable.prodottoId, prodottoId),
-        eq(lottiTable.magazzinoId, magazzinoId),
-        gt(lottiTable.quantitaResidua, "0"),
-        lottoDistribuibileCondition(dataOperativa),
-      ),
-    )
-    .orderBy(
-      asc(lottiTable.dataScadenza),
-      asc(lottiTable.dataCarico),
-      asc(lottiTable.id),
-    );
-}
-
-async function impegnatoAttivoLotto(
-  tx: Tx,
-  lottoId: number,
-): Promise<InventoryDecimal> {
-  const [res] = await tx
-    .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
-    .from(prenotazioniMagazzinoTable)
-    .where(
-      and(
-        eq(prenotazioniMagazzinoTable.lottoId, lottoId),
-        eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
-      ),
-    );
-  return InventoryDecimal.parse(res?.totale ?? "0");
-}
-
-async function creaPrenotazione(
-  tx: Tx,
-  opts: {
-    bollaId: number;
-    rigaBollaId: number;
-    prodottoId: number;
-    lottoId: number;
-    magazzinoId: number;
-    quantita: string;
-  },
-): Promise<void> {
-  await tx.insert(prenotazioniMagazzinoTable).values({
-    bollaId: opts.bollaId,
-    rigaBollaId: opts.rigaBollaId,
-    prodottoId: opts.prodottoId,
-    lottoId: opts.lottoId,
-    magazzinoId: opts.magazzinoId,
-    quantita: opts.quantita,
-    stato: PRENOTAZIONE_ATTIVA,
-  });
-}
-
 async function prenotaRigaFEFO(
   tx: Tx,
   bolla: typeof bolleTable.$inferSelect,
   riga: typeof bollaRigheTable.$inferSelect,
 ): Promise<void> {
-  const richiesta = InventoryDecimal.parse(riga.quantita);
-  let rimanente = richiesta;
-  let primoLottoId: number | null = null;
-
-  if (riga.lottoId != null) {
-    const lotto = await lockLotto(tx, riga.lottoId);
-    if (
-      lotto.prodottoId !== riga.prodottoId ||
-      lotto.magazzinoId !== bolla.magazzinoId
-    ) {
-      throw new BollaActionError(
-        400,
-        "Il lotto selezionato non appartiene al prodotto o al magazzino della bolla",
-      );
-    }
-    if (!isLottoDistribuibile(lotto.dataScadenza)) {
-      throw new BollaActionError(
-        409,
-        "Il lotto selezionato è scaduto e non può essere distribuito",
-      );
-    }
-    const disponibileReale = InventoryDecimal.parse(
-      lotto.quantitaResidua,
-    ).subtract(await impegnatoAttivoLotto(tx, lotto.id));
-    if (disponibileReale.compare(richiesta) < 0) {
-      throw new BollaActionError(
-        409,
-        `Disponibilità reale insufficiente nel lotto ${lotto.codiceLotto ?? `#${lotto.id}`} per ${await productName(riga.prodottoId)}: disponibili ${disponibileReale.isNegative() ? "0" : disponibileReale.toCanonical()}, richiesti ${richiesta.toCanonical()}`,
-      );
-    }
-    await creaPrenotazione(tx, {
+  try {
+    const { firstLotId } = await reserveInventoryRow(tx, {
       bollaId: bolla.id,
       rigaBollaId: riga.id,
       prodottoId: riga.prodottoId,
-      lottoId: lotto.id,
       magazzinoId: bolla.magazzinoId,
-      quantita: richiesta.toDb(),
+      lottoId: riga.lottoId,
+      quantita: riga.quantita,
     });
-    return;
-  }
-
-  const lotti = await lockLottiFEFO(tx, riga.prodottoId, bolla.magazzinoId);
-  for (const lotto of lotti) {
-    if (!rimanente.isPositive()) break;
-    const disponibileReale = InventoryDecimal.parse(
-      lotto.quantitaResidua,
-    ).subtract(await impegnatoAttivoLotto(tx, lotto.id));
-    if (!disponibileReale.isPositive()) continue;
-    const prenota = disponibileReale.min(rimanente);
-    await creaPrenotazione(tx, {
-      bollaId: bolla.id,
-      rigaBollaId: riga.id,
-      prodottoId: riga.prodottoId,
-      lottoId: lotto.id,
-      magazzinoId: bolla.magazzinoId,
-      quantita: prenota.toDb(),
-    });
-    if (primoLottoId == null) primoLottoId = lotto.id;
-    rimanente = rimanente.subtract(prenota);
-  }
-
-  if (rimanente.isPositive()) {
-    throw new BollaActionError(
-      409,
-      `Disponibilità reale insufficiente per ${await productName(riga.prodottoId)}: disponibili ${richiesta.subtract(rimanente).toCanonical()}, richiesti ${richiesta.toCanonical()}`,
-    );
-  }
-
-  if (primoLottoId != null) {
-    await tx
-      .update(bollaRigheTable)
-      .set({ lottoId: primoLottoId })
-      .where(eq(bollaRigheTable.id, riga.id));
+    if (riga.lottoId == null) {
+      await tx
+        .update(bollaRigheTable)
+        .set({ lottoId: firstLotId })
+        .where(eq(bollaRigheTable.id, riga.id));
+    }
+  } catch (error) {
+    if (error instanceof InventoryReservationError) {
+      throw new BollaActionError(error.status, error.message);
+    }
+    throw error;
   }
 }
 

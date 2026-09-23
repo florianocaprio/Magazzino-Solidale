@@ -14,6 +14,7 @@ import {
   carichiMagazzinoRigheTable,
   carichiMagazzinoTable,
   operazioniDistribuzioneMagazzinoTable,
+  prenotazioniMagazzinoTable,
   areeOperativeTable,
   lottiLogiciTable,
 } from "@workspace/db";
@@ -301,6 +302,14 @@ export async function cleanup(scope: SeedScope): Promise<void> {
         ),
       );
     if (scope.trasferimentoIds.length > 0) {
+      await db
+        .delete(prenotazioniMagazzinoTable)
+        .where(
+          inArray(
+            prenotazioniMagazzinoTable.trasferimentoId,
+            scope.trasferimentoIds,
+          ),
+        );
       await db
         .delete(trasferimentoRigheTable)
         .where(

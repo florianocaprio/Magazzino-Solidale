@@ -3,6 +3,8 @@ import {
   useListTrasferimenti,
   useCreateTrasferimento,
   useUpdateTrasferimento,
+  usePreparaTrasferimento,
+  useAnnullaTrasferimento,
   useAvviaTrasferimento,
   useConfermaTrasferimento,
   useListMagazzini,
@@ -1069,6 +1071,12 @@ export default function Trasferimenti() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const canCreate = hasPermission("magazzino.transfers.create");
+  const canPrepare =
+    hasPermission("magazzino.transfers.prepare") ||
+    hasPermission("mensa.transfers.prepare");
+  const canCancel =
+    hasPermission("magazzino.transfers.cancel") ||
+    hasPermission("mensa.transfers.cancel");
   const canDispatch = hasPermission("magazzino.transfers.dispatch");
   const canReceive = hasPermission("magazzino.transfers.receive");
   const [page, setPage] = useState(1);
@@ -1086,11 +1094,41 @@ export default function Trasferimenti() {
   const [editing, setEditing] = useState<Trasferimento | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const avviaTrasferimento = useAvviaTrasferimento();
+  const preparaTrasferimento = usePreparaTrasferimento();
+  const annullaTrasferimento = useAnnullaTrasferimento();
   const confermaTrasferimento = useConfermaTrasferimento();
   const commandIntents = useCommandIntentRegistry();
 
   const handleAction = (tr: Trasferimento) => {
-    if (tr.stato === "richiesto" || tr.stato === "preparato") {
+    if (tr.stato === "richiesto") {
+      const slot = `trasferimento:${tr.id}:prepare`;
+      preparaTrasferimento.mutate(
+        {
+          id: tr.id,
+          data: commandIntents.prepare(slot, {}, { versione: tr.versione }),
+        },
+        {
+          onSuccess: () => {
+            commandIntents.complete(slot);
+            queryClient.invalidateQueries({
+              queryKey: getListTrasferimentiQueryKey(),
+            });
+            queryClient.invalidateQueries({
+              queryKey: getListGiacenzeQueryKey(),
+            });
+            toast({ title: t("trasferimenti.toastPronto") });
+          },
+          onError: (error) => {
+            commandIntents.fail(slot, error);
+            toast({
+              title: t("trasferimenti.errorTitle"),
+              description: t("trasferimenti.errorUpdate"),
+              variant: "destructive",
+            });
+          },
+        },
+      );
+    } else if (tr.stato === "preparato") {
       const slot = `trasferimento:${tr.id}:start`;
       avviaTrasferimento.mutate(
         {
@@ -1148,6 +1186,42 @@ export default function Trasferimenti() {
         },
       );
     }
+  };
+
+  const handleCancel = (tr: Trasferimento) => {
+    const motivo = window.prompt(t("trasferimenti.motivoAnnullamento"))?.trim();
+    if (!motivo) return;
+    const slot = `trasferimento:${tr.id}:cancel`;
+    annullaTrasferimento.mutate(
+      {
+        id: tr.id,
+        data: commandIntents.prepare(
+          slot,
+          { motivo },
+          { versione: tr.versione, motivo },
+        ),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          queryClient.invalidateQueries({
+            queryKey: getListTrasferimentiQueryKey(),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getListGiacenzeQueryKey(),
+          });
+          toast({ title: t("trasferimenti.toastAnnullato") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
+            description: t("trasferimenti.errorUpdate"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
   };
 
   const downloadBolla = async (tr: Trasferimento) => {
@@ -1360,7 +1434,10 @@ export default function Trasferimenti() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <TrasportatoreCell t={tr} canEdit={canCreate} />
+                      <TrasportatoreCell
+                        t={tr}
+                        canEdit={canCreate && tr.stato === "richiesto"}
+                      />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {t("trasferimenti.articoliCount", {
@@ -1384,9 +1461,12 @@ export default function Trasferimenti() {
                         </Button>
                         {(tr.stato === "richiesto" ||
                           tr.stato === "preparato") &&
-                          (canCreate || canDispatch) && (
+                          (canCreate ||
+                            canPrepare ||
+                            canDispatch ||
+                            canCancel) && (
                             <>
-                              {canCreate && (
+                              {tr.stato === "richiesto" && canCreate && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -1397,7 +1477,18 @@ export default function Trasferimenti() {
                                   {t("common.edit")}
                                 </Button>
                               )}
-                              {canDispatch && (
+                              {tr.stato === "richiesto" && canPrepare && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleAction(tr)}
+                                  disabled={preparaTrasferimento.isPending}
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />{" "}
+                                  {t("trasferimenti.segnaPronto")}
+                                </Button>
+                              )}
+                              {tr.stato === "preparato" && canDispatch && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -1407,6 +1498,16 @@ export default function Trasferimenti() {
                                 >
                                   <Play className="h-3.5 w-3.5" />{" "}
                                   {t("trasferimenti.avvia")}
+                                </Button>
+                              )}
+                              {canCancel && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleCancel(tr)}
+                                  disabled={annullaTrasferimento.isPending}
+                                >
+                                  {t("trasferimenti.annulla")}
                                 </Button>
                               )}
                             </>

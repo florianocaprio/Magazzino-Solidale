@@ -3778,6 +3778,7 @@ export const ListTrasferimentiResponseItem = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -3856,6 +3857,7 @@ export const GetTrasferimentoResponse = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -3931,6 +3933,7 @@ export const UpdateTrasferimentoResponse = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -3960,7 +3963,146 @@ export const UpdateTrasferimentoResponse = zod.object({
 
 
 /**
- * @summary Phase 1 - start transfer (deduct from origin)
+ * @summary Segna Pronto prenotando tutte le righe senza scaricare stock
+ */
+export const PreparaTrasferimentoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const preparaTrasferimentoBodyIdempotencyKeyMax = 120;
+
+
+
+
+export const PreparaTrasferimentoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(preparaTrasferimentoBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1)
+})
+
+export const PreparaTrasferimentoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "versione": zod.number(),
+  "magazzinoOrigineId": zod.number(),
+  "magazzinoOrigineNome": zod.string().nullish(),
+  "magazzinoOrigineIndirizzo": zod.string().nullish(),
+  "magazzinoOrigineComune": zod.string().nullish(),
+  "magazzinoOrigineZona": zod.string().nullish(),
+  "magazzinoDestinoId": zod.number(),
+  "magazzinoDestinoNome": zod.string().nullish(),
+  "magazzinoDestinoIndirizzo": zod.string().nullish(),
+  "magazzinoDestinoComune": zod.string().nullish(),
+  "magazzinoDestinoZona": zod.string().nullish(),
+  "trasportatoreVolontarioId": zod.number().nullish(),
+  "trasportatoreVolontarioNome": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "dataRichiesta": zod.string(),
+  "dataEsecuzione": zod.string().nullish(),
+  "dataConfermaRicezione": zod.string().nullish(),
+  "stato": zod.string(),
+  "note": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "mensaId": zod.number().nullish(),
+  "idempotencyKey": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
+  "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+})).optional(),
+  "dataCreazione": zod.string()
+})
+
+
+/**
+ * @summary Annulla prima della partenza e libera le prenotazioni
+ */
+export const AnnullaTrasferimentoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const annullaTrasferimentoBodyIdempotencyKeyMax = 120;
+
+
+export const annullaTrasferimentoBodyMotivoMax = 500;
+
+
+
+export const AnnullaTrasferimentoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(annullaTrasferimentoBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "motivo": zod.string().min(1).max(annullaTrasferimentoBodyMotivoMax)
+})
+
+export const AnnullaTrasferimentoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "versione": zod.number(),
+  "magazzinoOrigineId": zod.number(),
+  "magazzinoOrigineNome": zod.string().nullish(),
+  "magazzinoOrigineIndirizzo": zod.string().nullish(),
+  "magazzinoOrigineComune": zod.string().nullish(),
+  "magazzinoOrigineZona": zod.string().nullish(),
+  "magazzinoDestinoId": zod.number(),
+  "magazzinoDestinoNome": zod.string().nullish(),
+  "magazzinoDestinoIndirizzo": zod.string().nullish(),
+  "magazzinoDestinoComune": zod.string().nullish(),
+  "magazzinoDestinoZona": zod.string().nullish(),
+  "trasportatoreVolontarioId": zod.number().nullish(),
+  "trasportatoreVolontarioNome": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "dataRichiesta": zod.string(),
+  "dataEsecuzione": zod.string().nullish(),
+  "dataConfermaRicezione": zod.string().nullish(),
+  "stato": zod.string(),
+  "note": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "mensaId": zod.number().nullish(),
+  "idempotencyKey": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
+  "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+})).optional(),
+  "dataCreazione": zod.string()
+})
+
+
+/**
+ * @summary Avvia solo un Trasferimento Pronto consumando le prenotazioni
  */
 export const AvviaTrasferimentoParams = zod.object({
   "id": zod.coerce.number()
@@ -3998,6 +4140,7 @@ export const AvviaTrasferimentoResponse = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -4055,6 +4198,7 @@ export const GetDocumentoTrasferimentoResponse = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -4124,6 +4268,7 @@ export const ConfermaTrasferimentoResponse = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -9462,6 +9607,7 @@ export const GetDocumentoOperativoResponse = zod.object({
   "dataConfermaRicezione": zod.string().nullish(),
   "stato": zod.string(),
   "note": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),

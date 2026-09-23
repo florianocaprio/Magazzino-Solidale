@@ -44,6 +44,8 @@ export interface Trasferimento {
   /** @nullable */
   note?: string | null;
   /** @nullable */
+  motivoAnnullamento?: string | null;
+  /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;

@@ -622,11 +622,20 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
       }),
       201,
     );
+    const ready = await expectJson<Trasferimento>(
+      await page.request.post(`/api/trasferimenti/${transfer.id}/prepara`, {
+        data: {
+          idempotencyKey: key("pdf-fefo-transfer-prepare"),
+          versione: transfer.versione,
+        },
+      }),
+      200,
+    );
     const started = await expectJson<Trasferimento>(
       await page.request.post(`/api/trasferimenti/${transfer.id}/avvia`, {
         data: {
           idempotencyKey: key("pdf-fefo-transfer-start"),
-          versione: transfer.versione,
+          versione: ready.versione,
         },
       }),
       200,
@@ -1087,15 +1096,30 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
       [created.id],
     );
     expect(draftLot.rows).toEqual([{ lotto_id: selected.id }]);
-    const dispatched = await expectJson<Trasferimento>(
-      await page.request.post(`/api/trasferimenti/${created.id}/avvia`, {
-        data: {
-          idempotencyKey: key("lot-explicit-dispatch"),
-          versione: created.versione,
-        },
-      }),
-      200,
+    const transferDetail = await openDocument(
+      page,
+      "trasferimento",
+      created.id,
     );
+    const readyResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/trasferimenti/${created.id}/prepara`) &&
+        response.request().method() === "POST",
+    );
+    await transferDetail.getByRole("button", { name: /segna pronto/i }).click();
+    const readyHttp = await readyResponse;
+    expect(readyHttp.status(), await readyHttp.text()).toBe(200);
+    const ready = (await readyHttp.json()) as Trasferimento;
+    expect(ready.stato).toBe("preparato");
+    const dispatchResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/trasferimenti/${created.id}/avvia`) &&
+        response.request().method() === "POST",
+    );
+    await transferDetail.getByRole("button", { name: /^avvia$/i }).click();
+    const dispatchHttp = await dispatchResponse;
+    expect(dispatchHttp.status(), await dispatchHttp.text()).toBe(200);
+    const dispatched = (await dispatchHttp.json()) as Trasferimento;
     expect(dispatched.stato).toBe("in_transito");
     const actual = await database.query<{
       id: number;
@@ -1115,5 +1139,16 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     expect(earlyState.movements).toBe("0");
     expect(Number(chosenState.quantita_residua)).toBe(1);
     expect(chosenState.movements).toBe("1");
+    const receiveResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/trasferimenti/${created.id}/conferma`) &&
+        response.request().method() === "POST",
+    );
+    await transferDetail.getByRole("button", { name: /conferma ric/i }).click();
+    const receiveHttp = await receiveResponse;
+    expect(receiveHttp.status(), await receiveHttp.text()).toBe(200);
+    expect(((await receiveHttp.json()) as Trasferimento).stato).toBe(
+      "completato",
+    );
   });
 });

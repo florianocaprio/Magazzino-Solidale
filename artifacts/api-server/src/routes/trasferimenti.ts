@@ -19,10 +19,8 @@ import {
   and,
   desc,
   inArray,
-  gt,
   sum,
   asc,
-  gte,
   isNull,
   or,
   sql,
@@ -36,7 +34,6 @@ import {
   visibleMagazzinoIds,
   trasferimentoScopeFilter,
 } from "../lib/centroScope";
-import { PRENOTAZIONE_MAGAZZINO_ATTIVA } from "../lib/disponibilitaMagazzino";
 import { requireModulo } from "../lib/featureFlags";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 import {
@@ -46,6 +43,14 @@ import {
   InventoryLedgerError,
 } from "../lib/inventoryLedger";
 import { lockInventoryLotsInGlobalOrder } from "../lib/inventoryLocks";
+import {
+  InventoryReservationError,
+  PRENOTAZIONE_ATTIVA,
+  PRENOTAZIONE_CONVERTITA_TRASFERIMENTO,
+  PRENOTAZIONE_RILASCIATA,
+  reserveInventoryRow,
+} from "../lib/inventoryReservations";
+import { isLottoDistribuibile } from "../lib/lottoPolicy";
 import {
   createTransferRequest,
   normalizeTransferRows,
@@ -92,6 +97,8 @@ function canManageMensaTransfers(req: Request): boolean {
     [
       "mensa.transfers.manage",
       "mensa.transfers.request",
+      "mensa.transfers.prepare",
+      "mensa.transfers.cancel",
       "mensa.transfers.receive",
     ].some((permission) => (req.user?.permessi ?? []).includes(permission))
   );
@@ -231,9 +238,13 @@ function requireGenericTransferPermission(
     const mensaPermission =
       permission === "magazzino.transfers.create"
         ? "mensa.transfers.request"
-        : permission === "magazzino.transfers.receive"
-          ? "mensa.transfers.receive"
-          : null;
+        : permission === "magazzino.transfers.prepare"
+          ? "mensa.transfers.prepare"
+          : permission === "magazzino.transfers.cancel"
+            ? "mensa.transfers.cancel"
+            : permission === "magazzino.transfers.receive"
+              ? "mensa.transfers.receive"
+              : null;
     if (
       mensaPermission != null &&
       (hasPermission(req, mensaPermission) ||
@@ -318,34 +329,14 @@ async function fseBreakdownTrasferimenti(ids: number[]) {
   return result;
 }
 
-async function impegnatoAttivoLotto(
-  tx: Tx,
-  lottoId: number,
-): Promise<InventoryDecimal> {
-  const [res] = await tx
-    .select({ totale: sum(prenotazioniMagazzinoTable.quantita) })
-    .from(prenotazioniMagazzinoTable)
-    .where(
-      and(
-        eq(prenotazioniMagazzinoTable.lottoId, lottoId),
-        eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_MAGAZZINO_ATTIVA),
-      ),
-    );
-  return InventoryDecimal.parse(res?.totale ?? "0");
-}
-
-/**
- * Uscita FEFO dal magazzino origine: scala la quantità dai lotti per scadenza
- * crescente e registra un movimento "trasferimento/uscita" per ogni lotto toccato.
- * I movimenti registrano il lotto origine così che la conferma possa ricreare i
- * lotti a destinazione preservando scadenza e provenienza (FEFO).
- */
-async function trasferimentoUscitaFEFO(
+/** La partenza consuma solo l'allocazione congelata da Segna pronto. */
+async function trasferimentoUscitaPrenotata(
   tx: Tx,
   opts: {
+    prenotazioneId: number;
     prodottoId: number;
     magazzinoId: number;
-    quantita: string | number;
+    quantita: string;
     unitaMisura: string;
     dataMovimento: string;
     trasferimentoId: number;
@@ -353,100 +344,81 @@ async function trasferimentoUscitaFEFO(
     trasferimentoCodice: string;
     operatoreId: number;
     auditEventoId: number;
-    lottoId: number | null;
+    lottoId: number;
   },
 ) {
-  let rimanente = InventoryDecimal.parse(opts.quantita);
-  const lotti = await tx
+  const [lotto] = await tx
     .select()
     .from(lottiTable)
-    .where(
-      and(
-        eq(lottiTable.prodottoId, opts.prodottoId),
-        eq(lottiTable.magazzinoId, opts.magazzinoId),
-        opts.lottoId == null
-          ? gt(lottiTable.quantitaResidua, "0")
-          : eq(lottiTable.id, opts.lottoId),
-        or(
-          isNull(lottiTable.dataScadenza),
-          gte(lottiTable.dataScadenza, opts.dataMovimento),
-        ),
-      ),
-    )
-    .orderBy(
-      asc(lottiTable.dataScadenza),
-      asc(lottiTable.dataCarico),
-      asc(lottiTable.id),
-    )
+    .where(eq(lottiTable.id, opts.lottoId))
     .for("update");
-
-  if (opts.lottoId != null && lotti.length !== 1) {
+  if (
+    !lotto ||
+    lotto.prodottoId !== opts.prodottoId ||
+    lotto.magazzinoId !== opts.magazzinoId ||
+    !isLottoDistribuibile(lotto.dataScadenza, opts.dataMovimento)
+  ) {
     throw new TransferRequestError(
       409,
-      "Lotto selezionato non disponibile per Prodotto, Magazzino o data operativa",
+      "Partita prenotata non più disponibile per Prodotto, Magazzino o data operativa",
     );
   }
-
-  for (const lotto of lotti) {
-    if (!rimanente.isPositive()) break;
-    const disp = InventoryDecimal.parse(lotto.quantitaResidua);
-    const netto = disp.subtract(await impegnatoAttivoLotto(tx, lotto.id));
-    const disponibileReale = netto.isNegative()
-      ? InventoryDecimal.zero()
-      : netto;
-    const scala = disponibileReale.min(rimanente);
-    if (!scala.isPositive()) continue;
-
-    await tx
-      .update(lottiTable)
-      .set({ quantitaResidua: disp.subtract(scala).toDb() })
-      .where(eq(lottiTable.id, lotto.id));
-
-    const dimensions = resolveInventoryQuantityDimensions({
-      quantitaOperativa: scala.toDb(),
-      unitaMisura: opts.unitaMisura,
-      fattorePartita: lotto.fattoreKgLtPezzo,
-    });
-
-    await tx.insert(movimentiTable).values({
-      tipoMovimento: "trasferimento",
-      tipoDettaglio: "uscita",
-      dataMovimento: opts.dataMovimento,
-      magazzinoId: opts.magazzinoId,
-      prodottoId: opts.prodottoId,
-      lottoId: lotto.id,
-      quantita: scala.toDb(),
-      quantitaPezzi: dimensions.quantitaPezzi,
-      quantitaKgLt: dimensions.quantitaKgLt,
-      fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
-      unitaMisura: opts.unitaMisura,
-      fornitoreId: lotto.fornitoreId,
-      operatoreId: opts.operatoreId,
-      auditEventoId: opts.auditEventoId,
-      trasferimentoId: opts.trasferimentoId,
-      fondoOrigine: lotto.fondoOrigine,
-      naturaContabile: "TRASFERIMENTO_INTERNO_USCITA",
-      dominioOrigine: "TRASFERIMENTO",
-      entitaOrigineTipo: "trasferimento",
-      entitaOrigineId: opts.trasferimentoId,
-      rigaOrigineId: opts.rigaOrigineId,
-      documentoRiferimento: opts.trasferimentoCodice,
-      note: `Trasferimento ${opts.trasferimentoCodice} — uscita`,
-    });
-
-    rimanente = rimanente.subtract(scala);
-  }
-  if (rimanente.isPositive()) {
-    if (opts.lottoId != null) {
-      throw new TransferRequestError(
-        409,
-        "Disponibilità del lotto selezionato insufficiente",
-      );
-    }
-    throw new Error(
-      "Disponibilità FEFO insufficiente o composta solo da lotti scaduti",
+  const disp = InventoryDecimal.parse(lotto.quantitaResidua);
+  const scala = InventoryDecimal.parse(opts.quantita);
+  if (disp.compare(scala) < 0)
+    throw new TransferRequestError(
+      409,
+      "Residuo della partita prenotata insufficiente",
     );
-  }
+  await tx
+    .update(lottiTable)
+    .set({ quantitaResidua: disp.subtract(scala).toDb() })
+    .where(eq(lottiTable.id, lotto.id));
+
+  const dimensions = resolveInventoryQuantityDimensions({
+    quantitaOperativa: scala.toDb(),
+    unitaMisura: opts.unitaMisura,
+    fattorePartita: lotto.fattoreKgLtPezzo,
+  });
+
+  await tx.insert(movimentiTable).values({
+    tipoMovimento: "trasferimento",
+    tipoDettaglio: "uscita",
+    dataMovimento: opts.dataMovimento,
+    magazzinoId: opts.magazzinoId,
+    prodottoId: opts.prodottoId,
+    lottoId: lotto.id,
+    quantita: scala.toDb(),
+    quantitaPezzi: dimensions.quantitaPezzi,
+    quantitaKgLt: dimensions.quantitaKgLt,
+    fattoreKgLtPezzo: dimensions.fattoreKgLtPezzo,
+    unitaMisura: opts.unitaMisura,
+    fornitoreId: lotto.fornitoreId,
+    operatoreId: opts.operatoreId,
+    auditEventoId: opts.auditEventoId,
+    trasferimentoId: opts.trasferimentoId,
+    fondoOrigine: lotto.fondoOrigine,
+    naturaContabile: "TRASFERIMENTO_INTERNO_USCITA",
+    dominioOrigine: "TRASFERIMENTO",
+    entitaOrigineTipo: "trasferimento",
+    entitaOrigineId: opts.trasferimentoId,
+    rigaOrigineId: opts.rigaOrigineId,
+    documentoRiferimento: opts.trasferimentoCodice,
+    note: `Trasferimento ${opts.trasferimentoCodice} — uscita`,
+  });
+
+  await tx
+    .update(prenotazioniMagazzinoTable)
+    .set({
+      stato: PRENOTAZIONE_CONVERTITA_TRASFERIMENTO,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(prenotazioniMagazzinoTable.id, opts.prenotazioneId),
+        eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
+      ),
+    );
 }
 
 type TrasportatoreResult =
@@ -585,6 +557,42 @@ export async function getTrasferimentoWithRighe(id: number) {
     });
     ripartizioniPerRiga.set(ripartizione.rigaOrigineId, current);
   }
+  if (t.t.stato === "preparato") {
+    const reservations = await db
+      .select({
+        rigaId: prenotazioniMagazzinoTable.rigaTrasferimentoId,
+        lottoId: prenotazioniMagazzinoTable.lottoId,
+        quantita: prenotazioniMagazzinoTable.quantita,
+        codiceLotto: lottiTable.codiceLotto,
+        fondoOrigine: lottiTable.fondoOrigine,
+      })
+      .from(prenotazioniMagazzinoTable)
+      .innerJoin(
+        lottiTable,
+        eq(prenotazioniMagazzinoTable.lottoId, lottiTable.id),
+      )
+      .where(
+        and(
+          eq(prenotazioniMagazzinoTable.trasferimentoId, id),
+          eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
+        ),
+      )
+      .orderBy(
+        asc(prenotazioniMagazzinoTable.rigaTrasferimentoId),
+        asc(prenotazioniMagazzinoTable.id),
+      );
+    for (const reservation of reservations) {
+      if (reservation.rigaId == null) continue;
+      const current = ripartizioniPerRiga.get(reservation.rigaId) ?? [];
+      current.push({
+        lottoId: reservation.lottoId,
+        codiceLotto: reservation.codiceLotto,
+        fondoOrigine: reservation.fondoOrigine,
+        quantita: Number(reservation.quantita),
+      });
+      ripartizioniPerRiga.set(reservation.rigaId, current);
+    }
+  }
   const provenance = await fseBreakdownTrasferimenti([id]);
 
   return {
@@ -609,6 +617,7 @@ export async function getTrasferimentoWithRighe(id: number) {
     dataConfermaRicezione: t.t.dataConfermaRicezione ?? null,
     stato: t.t.stato,
     note: t.t.note ?? null,
+    motivoAnnullamento: t.t.motivoAnnullamento ?? null,
     operatoreId: t.t.operatoreId ?? null,
     operatoreCodice: t.operatoreMatricola ?? t.operatoreUsername ?? null,
     mensaId: t.t.mensaId ?? null,
@@ -627,7 +636,8 @@ export async function getTrasferimentoWithRighe(id: number) {
         fondoOrigine: r.fondoOrigine ?? null,
         ripartizioniLotto:
           ripartizioniPerRiga.get(r.r.id) ??
-          (r.r.lottoId != null
+          (r.r.lottoId != null &&
+          (t.t.stato === "in_transito" || t.t.stato === "completato")
             ? [
                 {
                   lottoId: r.r.lottoId,
@@ -1138,9 +1148,7 @@ router.patch("/trasferimenti/:id", async (req, res) => {
     updates.trasportatoreNome = trasportatore.nome;
   }
 
-  // Item rows can only be edited before the transfer is started ("avvia"
-  // deducts stock from the origin lots, so rewriting righe afterwards would
-  // desync giacenze). Allowed states: richiesto / preparato.
+  // Dopo Segna pronto anche le righe e i metadati sono congelati.
   const editRighe = "righe" in body;
   let righeInput: Array<{
     prodottoId: number;
@@ -1204,14 +1212,10 @@ router.patch("/trasferimenti/:id", async (req, res) => {
       });
       if (receipt) return;
       assertExpectedVersion(locked, versione);
-      if (
-        editRighe &&
-        locked.stato !== "richiesto" &&
-        locked.stato !== "preparato"
-      ) {
+      if (locked.stato !== "richiesto") {
         throw new TransferRequestError(
-          400,
-          "Le righe possono essere modificate solo prima dell'avvio del trasferimento",
+          409,
+          "Il Trasferimento è modificabile solo nello stato richiesto",
         );
       }
       if (
@@ -1321,8 +1325,256 @@ router.patch("/trasferimenti/:id", async (req, res) => {
   res.json(result);
 });
 
-// Avvia: deduce le quantità dai lotti del magazzino origine (FEFO) e mette il
-// trasferimento "in_transito". Da qui in poi le righe non sono più modificabili.
+router.post("/trasferimenti/:id/prepara", async (req, res) => {
+  if (
+    !requireGenericTransferPermission(req, res, "magazzino.transfers.prepare")
+  )
+    return;
+  const id = Number(req.params.id);
+  let versione: number;
+  let idempotencyKey: string;
+  try {
+    versione = requireExpectedVersion(req.body?.versione);
+    idempotencyKey = requireIdempotencyKey(req.body?.idempotencyKey);
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    throw error;
+  }
+  const [current] = await db
+    .select()
+    .from(trasferimentiTable)
+    .where(eq(trasferimentiTable.id, id));
+  if (!current) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const mensaError = await enforceMensaTransfer(req, current.mensaId);
+  if (mensaError) {
+    res.status(403).json({ error: mensaError });
+    return;
+  }
+  const requestHash = commandRequestHash({ id, versione });
+  const audit = auditContextFromRequest(req, { operationKey: idempotencyKey });
+  try {
+    await db.transaction(async (tx) => {
+      await lockDocumentCommand(tx, "trasferimento.prepare", idempotencyKey);
+      const locked = await lockTransfer(tx, id);
+      await assertCurrentTransferScope(tx, req, locked, "origin");
+      const receipt = await findDocumentCommand(tx, {
+        tipoComando: "trasferimento.prepare",
+        idempotencyKey,
+        requestHash,
+        actorUserId: req.user!.id,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+      });
+      if (receipt) return;
+      assertExpectedVersion(locked, versione);
+      if (locked.stato !== "richiesto")
+        throw new TransferRequestError(
+          409,
+          "Solo un Trasferimento richiesto può essere segnato Pronto",
+        );
+      await requireOperationalMagazzino(tx, locked.magazzinoOrigineId);
+      const righe = await tx
+        .select()
+        .from(trasferimentoRigheTable)
+        .where(eq(trasferimentoRigheTable.trasferimentoId, id))
+        .orderBy(
+          asc(trasferimentoRigheTable.prodottoId),
+          asc(trasferimentoRigheTable.id),
+        );
+      if (righe.length === 0)
+        throw new TransferRequestError(
+          400,
+          "Il trasferimento non ha prodotti da trasferire",
+        );
+      await lockInventoryLotsInGlobalOrder(tx, {
+        kind: "warehouse-products",
+        magazzinoId: locked.magazzinoOrigineId,
+        prodottoIds: righe.map((r) => r.prodottoId),
+      });
+      for (const riga of righe) {
+        await reserveInventoryRow(tx, {
+          trasferimentoId: id,
+          rigaTrasferimentoId: riga.id,
+          prodottoId: riga.prodottoId,
+          magazzinoId: locked.magazzinoOrigineId,
+          lottoId: riga.lottoId,
+          quantita: riga.quantita,
+        });
+      }
+      const [updated] = await tx
+        .update(trasferimentiTable)
+        .set({
+          stato: "preparato",
+          versione: locked.versione + 1,
+          operatoreId: req.user!.id,
+        })
+        .where(eq(trasferimentiTable.id, id))
+        .returning();
+      await recordAuditEvent(tx, {
+        command: audit,
+        azione: "TRASFERIMENTO_PREPARATO",
+        entitaTipo: "trasferimento",
+        entitaId: id,
+        documentoTipo: "trasferimento",
+        documentoId: id,
+        magazzinoIdSnapshot: locked.magazzinoOrigineId,
+        dataOperativa: dataCivileEuropeRome(new Date()),
+        changes: auditFields(
+          { statoPrecedente: locked.stato, statoNuovo: "preparato" },
+          ["statoPrecedente", "statoNuovo"],
+        ),
+      });
+      await storeDocumentCommand(tx, {
+        tipoComando: "trasferimento.prepare",
+        idempotencyKey,
+        requestHash,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+        versioneRichiesta: versione,
+        versioneRisultante: updated.versione,
+        resultSnapshot: {
+          id,
+          stato: updated.stato,
+          versione: updated.versione,
+        },
+        actorUserId: req.user!.id,
+      });
+    });
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    if (
+      error instanceof InventoryReservationError ||
+      error instanceof TransferRequestError ||
+      error instanceof InventoryLedgerError
+    ) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
+  res.json(await getTrasferimentoWithRighe(id));
+});
+
+router.post("/trasferimenti/:id/annulla", async (req, res) => {
+  if (!requireGenericTransferPermission(req, res, "magazzino.transfers.cancel"))
+    return;
+  const id = Number(req.params.id);
+  const motivo =
+    typeof req.body?.motivo === "string" ? req.body.motivo.trim() : "";
+  if (!motivo || motivo.length > 500) {
+    res.status(400).json({
+      error: "Indicare un motivo di annullamento (massimo 500 caratteri)",
+    });
+    return;
+  }
+  let versione: number;
+  let idempotencyKey: string;
+  try {
+    versione = requireExpectedVersion(req.body?.versione);
+    idempotencyKey = requireIdempotencyKey(req.body?.idempotencyKey);
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    throw error;
+  }
+  const [current] = await db
+    .select()
+    .from(trasferimentiTable)
+    .where(eq(trasferimentiTable.id, id));
+  if (!current) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const mensaError = await enforceMensaTransfer(req, current.mensaId);
+  if (mensaError) {
+    res.status(403).json({ error: mensaError });
+    return;
+  }
+  const requestHash = commandRequestHash({ id, versione, motivo });
+  const audit = auditContextFromRequest(req, { operationKey: idempotencyKey });
+  try {
+    await db.transaction(async (tx) => {
+      await lockDocumentCommand(tx, "trasferimento.cancel", idempotencyKey);
+      const locked = await lockTransfer(tx, id);
+      await assertCurrentTransferScope(tx, req, locked, "origin");
+      const receipt = await findDocumentCommand(tx, {
+        tipoComando: "trasferimento.cancel",
+        idempotencyKey,
+        requestHash,
+        actorUserId: req.user!.id,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+      });
+      if (receipt) return;
+      assertExpectedVersion(locked, versione);
+      if (locked.stato !== "richiesto" && locked.stato !== "preparato")
+        throw new TransferRequestError(
+          409,
+          "Annullamento ordinario consentito solo prima della partenza",
+        );
+      await tx
+        .update(prenotazioniMagazzinoTable)
+        .set({ stato: PRENOTAZIONE_RILASCIATA, updatedAt: new Date() })
+        .where(
+          and(
+            eq(prenotazioniMagazzinoTable.trasferimentoId, id),
+            eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
+          ),
+        );
+      const [updated] = await tx
+        .update(trasferimentiTable)
+        .set({
+          stato: "annullato",
+          motivoAnnullamento: motivo,
+          versione: locked.versione + 1,
+          operatoreId: req.user!.id,
+        })
+        .where(eq(trasferimentiTable.id, id))
+        .returning();
+      await recordAuditEvent(tx, {
+        command: audit,
+        azione: "TRASFERIMENTO_ANNULLATO",
+        entitaTipo: "trasferimento",
+        entitaId: id,
+        documentoTipo: "trasferimento",
+        documentoId: id,
+        magazzinoIdSnapshot: locked.magazzinoOrigineId,
+        dataOperativa: dataCivileEuropeRome(new Date()),
+        changes: auditFields(
+          { statoPrecedente: locked.stato, statoNuovo: "annullato", motivo },
+          ["statoPrecedente", "statoNuovo", "motivo"],
+        ),
+      });
+      await storeDocumentCommand(tx, {
+        tipoComando: "trasferimento.cancel",
+        idempotencyKey,
+        requestHash,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+        versioneRichiesta: versione,
+        versioneRisultante: updated.versione,
+        resultSnapshot: {
+          id,
+          stato: updated.stato,
+          versione: updated.versione,
+        },
+        actorUserId: req.user!.id,
+      });
+    });
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    if (error instanceof TransferRequestError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
+  res.json(await getTrasferimentoWithRighe(id));
+});
+
+// Avvia usa le partite già prenotate: non esegue una nuova scelta FEFO.
 router.post("/trasferimenti/:id/avvia", async (req, res) => {
   const id = Number(req.params.id);
   const body = req.body ?? {};
@@ -1386,10 +1638,10 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
       });
       if (receipt) return;
       assertExpectedVersion(locked, versione);
-      if (locked.stato !== "richiesto" && locked.stato !== "preparato") {
+      if (locked.stato !== "preparato") {
         throw new TransferRequestError(
-          400,
-          "Il trasferimento è già stato avviato",
+          409,
+          "Il Trasferimento deve essere Pronto prima della partenza",
         );
       }
       await requireOperationalMagazzino(tx, locked.magazzinoOrigineId);
@@ -1413,6 +1665,60 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
         magazzinoId: locked.magazzinoOrigineId,
         prodottoIds: righe.map((riga) => riga.prodottoId),
       });
+      const prenotazioni = await tx
+        .select()
+        .from(prenotazioniMagazzinoTable)
+        .where(
+          and(
+            eq(prenotazioniMagazzinoTable.trasferimentoId, id),
+            eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
+          ),
+        )
+        .orderBy(
+          asc(prenotazioniMagazzinoTable.rigaTrasferimentoId),
+          asc(prenotazioniMagazzinoTable.lottoId),
+          asc(prenotazioniMagazzinoTable.id),
+        )
+        .for("update");
+      if (prenotazioni.length === 0)
+        throw new TransferRequestError(
+          409,
+          "Trasferimento Pronto senza prenotazioni attive",
+        );
+      const righeById = new Map(righe.map((riga) => [riga.id, riga]));
+      const totals = new Map<number, InventoryDecimal>();
+      for (const prenotazione of prenotazioni) {
+        const riga = righeById.get(prenotazione.rigaTrasferimentoId ?? -1);
+        if (
+          !riga ||
+          prenotazione.prodottoId !== riga.prodottoId ||
+          prenotazione.magazzinoId !== locked.magazzinoOrigineId ||
+          (riga.lottoId != null && prenotazione.lottoId !== riga.lottoId)
+        ) {
+          throw new TransferRequestError(
+            409,
+            "Prenotazione incoerente con le righe del Trasferimento",
+          );
+        }
+        totals.set(
+          riga.id,
+          (totals.get(riga.id) ?? InventoryDecimal.zero()).add(
+            InventoryDecimal.parse(prenotazione.quantita),
+          ),
+        );
+      }
+      for (const riga of righe) {
+        if (
+          (totals.get(riga.id) ?? InventoryDecimal.zero()).compare(
+            InventoryDecimal.parse(riga.quantita),
+          ) !== 0
+        ) {
+          throw new TransferRequestError(
+            409,
+            "Prenotazioni incomplete per il Trasferimento Pronto",
+          );
+        }
+      }
       const [claimed] = await tx
         .update(trasferimentiTable)
         .set({
@@ -1441,12 +1747,14 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
           ["magazzinoDestinoId"],
         ),
       });
-      for (const r of righe) {
-        await trasferimentoUscitaFEFO(tx, {
+      for (const prenotazione of prenotazioni) {
+        const r = righeById.get(prenotazione.rigaTrasferimentoId!)!;
+        await trasferimentoUscitaPrenotata(tx, {
+          prenotazioneId: prenotazione.id,
           prodottoId: r.prodottoId,
-          lottoId: r.lottoId ?? null,
+          lottoId: prenotazione.lottoId,
           magazzinoId: locked.magazzinoOrigineId,
-          quantita: r.quantita,
+          quantita: prenotazione.quantita,
           unitaMisura: r.unitaMisura,
           dataMovimento: dataEsecuzione,
           trasferimentoId: id,

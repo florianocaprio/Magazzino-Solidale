@@ -182,6 +182,7 @@ describe("M4A — destinatario Ente e facciata documentale", () => {
       permessi: [
         "magazzino.view",
         "magazzino.transfers.create",
+        "magazzino.transfers.prepare",
         "magazzino.transfers.dispatch",
       ],
       aree: ["magazzino"],
@@ -216,7 +217,7 @@ describe("M4A — destinatario Ente e facciata documentale", () => {
     expect(created.status, created.text).toBe(201);
     scope.trasferimentoIds.push(created.body.id);
     const started = await request(warehouseApp)
-      .post(`/trasferimenti/${created.body.id}/avvia`)
+      .post(`/trasferimenti/${created.body.id}/prepara`)
       .send({
         idempotencyKey: commandKey("booked-dispatch"),
         versione: created.body.versione,

@@ -2399,11 +2399,59 @@ paths:
               schema:
                 $ref: "#/components/schemas/Trasferimento"
 
+  /trasferimenti/{id}/prepara:
+    post:
+      operationId: preparaTrasferimento
+      tags: [trasferimenti]
+      summary: Segna Pronto prenotando tutte le righe senza scaricare stock
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComandoVersionatoInput"
+      responses:
+        "200":
+          description: Trasferimento Pronto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trasferimento"
+
+  /trasferimenti/{id}/annulla:
+    post:
+      operationId: annullaTrasferimento
+      tags: [trasferimenti]
+      summary: Annulla prima della partenza e libera le prenotazioni
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnnullaTrasferimentoInput"
+      responses:
+        "200":
+          description: Trasferimento annullato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trasferimento"
+
   /trasferimenti/{id}/avvia:
     post:
       operationId: avviaTrasferimento
       tags: [trasferimenti]
-      summary: Phase 1 - start transfer (deduct from origin)
+      summary: Avvia solo un Trasferimento Pronto consumando le prenotazioni
       parameters:
         - name: id
           in: path
@@ -12909,6 +12957,8 @@ components:
           type: string
         note:
           type: ["string", "null"]
+        motivoAnnullamento:
+          type: ["string", "null"]
         operatoreId:
           type: ["integer", "null"]
         operatoreCodice:
@@ -12988,6 +13038,22 @@ components:
           items:
             $ref: "#/components/schemas/TrasferimentoRigaInput"
       required: [idempotencyKey, versione]
+
+    AnnullaTrasferimentoInput:
+      type: object
+      properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 120
+        versione:
+          type: integer
+          minimum: 1
+        motivo:
+          type: string
+          minLength: 1
+          maxLength: 500
+      required: [idempotencyKey, versione, motivo]
 
     TrasferimentoRiga:
       type: object

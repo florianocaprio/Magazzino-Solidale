@@ -2801,6 +2801,8 @@ export interface Trasferimento {
   /** @nullable */
   note?: string | null;
   /** @nullable */
+  motivoAnnullamento?: string | null;
+  /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
@@ -2852,6 +2854,21 @@ export interface TrasferimentoUpdate {
   trasportatoreNome?: string | null;
   note?: string;
   righe?: TrasferimentoRigaInput[];
+}
+
+export interface AnnullaTrasferimentoInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  motivo: string;
 }
 
 export interface ScaricoRiga {

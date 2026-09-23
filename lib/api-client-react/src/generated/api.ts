@@ -51,6 +51,7 @@ import type {
   AnalyzeAgeaImportazioneParams,
   AnalyzeFsePracticeImportParams,
   AnalyzeVolontariImportParams,
+  AnnullaTrasferimentoInput,
   AnnullaTurnoInput,
   ApprovazioniLogistica,
   Approvvigionamento,
@@ -7560,6 +7561,150 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getUpdateTrasferimentoMutationOptions(options));
     }
 
+export const getPreparaTrasferimentoUrl = (id: number,) => {
+
+
+
+
+  return `/api/trasferimenti/${id}/prepara`
+}
+
+/**
+ * @summary Segna Pronto prenotando tutte le righe senza scaricare stock
+ */
+export const preparaTrasferimento = async (id: number,
+    comandoVersionatoInput: ComandoVersionatoInput, options?: RequestInit): Promise<Trasferimento> => {
+
+  return customFetch<Trasferimento>(getPreparaTrasferimentoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      comandoVersionatoInput,)
+  }
+);}
+
+
+
+
+export const getPreparaTrasferimentoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preparaTrasferimento>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof preparaTrasferimento>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext> => {
+
+const mutationKey = ['preparaTrasferimento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof preparaTrasferimento>>, {id: number;data: BodyType<ComandoVersionatoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  preparaTrasferimento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreparaTrasferimentoMutationResult = NonNullable<Awaited<ReturnType<typeof preparaTrasferimento>>>
+    export type PreparaTrasferimentoMutationBody = BodyType<ComandoVersionatoInput>
+    export type PreparaTrasferimentoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Segna Pronto prenotando tutte le righe senza scaricare stock
+ */
+export const usePreparaTrasferimento = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preparaTrasferimento>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof preparaTrasferimento>>,
+        TError,
+        {id: number;data: BodyType<ComandoVersionatoInput>},
+        TContext
+      > => {
+      return useMutation(getPreparaTrasferimentoMutationOptions(options));
+    }
+
+export const getAnnullaTrasferimentoUrl = (id: number,) => {
+
+
+
+
+  return `/api/trasferimenti/${id}/annulla`
+}
+
+/**
+ * @summary Annulla prima della partenza e libera le prenotazioni
+ */
+export const annullaTrasferimento = async (id: number,
+    annullaTrasferimentoInput: AnnullaTrasferimentoInput, options?: RequestInit): Promise<Trasferimento> => {
+
+  return customFetch<Trasferimento>(getAnnullaTrasferimentoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      annullaTrasferimentoInput,)
+  }
+);}
+
+
+
+
+export const getAnnullaTrasferimentoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaTrasferimento>>, TError,{id: number;data: BodyType<AnnullaTrasferimentoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof annullaTrasferimento>>, TError,{id: number;data: BodyType<AnnullaTrasferimentoInput>}, TContext> => {
+
+const mutationKey = ['annullaTrasferimento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof annullaTrasferimento>>, {id: number;data: BodyType<AnnullaTrasferimentoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  annullaTrasferimento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnnullaTrasferimentoMutationResult = NonNullable<Awaited<ReturnType<typeof annullaTrasferimento>>>
+    export type AnnullaTrasferimentoMutationBody = BodyType<AnnullaTrasferimentoInput>
+    export type AnnullaTrasferimentoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Annulla prima della partenza e libera le prenotazioni
+ */
+export const useAnnullaTrasferimento = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annullaTrasferimento>>, TError,{id: number;data: BodyType<AnnullaTrasferimentoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof annullaTrasferimento>>,
+        TError,
+        {id: number;data: BodyType<AnnullaTrasferimentoInput>},
+        TContext
+      > => {
+      return useMutation(getAnnullaTrasferimentoMutationOptions(options));
+    }
+
 export const getAvviaTrasferimentoUrl = (id: number,) => {
 
 
@@ -7569,7 +7714,7 @@ export const getAvviaTrasferimentoUrl = (id: number,) => {
 }
 
 /**
- * @summary Phase 1 - start transfer (deduct from origin)
+ * @summary Avvia solo un Trasferimento Pronto consumando le prenotazioni
  */
 export const avviaTrasferimento = async (id: number,
     comandoVersionatoInput: ComandoVersionatoInput, options?: RequestInit): Promise<Trasferimento> => {
@@ -7619,7 +7764,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type AvviaTrasferimentoMutationError = ErrorType<unknown>
 
     /**
- * @summary Phase 1 - start transfer (deduct from origin)
+ * @summary Avvia solo un Trasferimento Pronto consumando le prenotazioni
  */
 export const useAvviaTrasferimento = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avviaTrasferimento>>, TError,{id: number;data: BodyType<ComandoVersionatoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}

@@ -9,6 +9,10 @@ formale post-NO-GO. `OK-MAN-M4A` registra separatamente la validazione
 funzionale manuale comunicata da Floriano alla chiusura. Le prove hardware
 `NE-MAN-CAMERA` e `NE-MAN-TABLET` restano distinte e non bloccanti.
 
+`DEV-M4B.1/NE-TEST/NE-MAN` indica implementazione candidata M4B.1 nel
+working tree con sole prove di sviluppo, senza fase formale `##test M4B.1` né
+validazione umana. Non modifica gli esiti chiusi di M4A.
+
 | ID      | Milestone         | Stato                                         | Evidenza baseline / prova richiesta                                                                                                                                                                                                                                     |
 | ------- | ----------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | UX-01   | M1A               | OK-M1A/NE-MAN                                 | Feedback immediato e stati persistenti del `Button` verificati per varianti, focus, disabled, `asChild` e target touch; prova fisica ancora pendente.                                                                                                                   |
@@ -51,6 +55,29 @@ funzionale manuale comunicata da Floriano alla chiusura. Le prove hardware
 | DB-02   | M0/M2+            | OK-TEST-M0/OK-M1C/OK-M2/OK-M3B                | Fresh/replay M3B da zero con 39 migrazioni e checksum/ordine verdi; upgrade populated 38→39 applica solo gli alias identità e conserva hash di ledger, movimenti, legacy e audit. Le prime 38 migrazioni restano byte-identiche.                                        |
 | RUN-01  | M0/M6             | OK-TEST-M0                                    | Immagini web/API ricostruite senza cache dalla stessa SHA `787d7c5`, digest registrati; health, Nginx, runtime config e login browser verificati. Ripetere in M6.                                                                                                       |
 | REG-01  | ogni milestone/M6 | OK-TEST-M0/OK-M1C/OK-M2/OK-M3B                | M3B post-review: suite API/frontend complete, H1–H4, E2E desktop e viewport tablet, originali, populated/fresh 39, runner, typecheck, build, bundle/runtime e hygiene verdi; OpenAPI/generated invariati, hardware fisico pendente.                                     |
+
+### M4B.1 — test automatici GO; review e validazione manuale pendenti
+
+| ID         | Stato                | Evidenza funzionale                                                                                                                                                                       |
+| ---------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PREP-TR-01 | OK-TEST-M4B.1/NE-MAN | Richiesto senza prenotazione o movimento, campi conservati; API/UI e DB isolato.                                                                                                          |
+| PREP-TR-02 | OK-TEST-M4B.1/NE-MAN | Pronto atomico completo; rollback di riga insufficiente, righe ripetute e quantità fixed-point.                                                                                           |
+| PREP-TR-03 | OK-TEST-M4B.1/NE-MAN | FEFO multi-partita, ripartizioni, disponibilità comune e lineage.                                                                                                                         |
+| PREP-TR-04 | OK-TEST-M4B.1/NE-MAN | Lotto esplicito vincolante senza fallback; prodotto/deposito/scadenza/requisito fisico.                                                                                                   |
+| PREP-TR-05 | OK-TEST-M4B.1/NE-MAN | Bolla vs Trasferimento su ultima unità, barriera PostgreSQL, più prodotti con ordini inversi; nessuna sovraprenotazione.                                                                  |
+| PREP-TR-06 | OK-TEST-M4B.1/NE-MAN | Doppio Pronto/replay/mismatch/stale; un solo effetto, audit e ricevuta coerenti.                                                                                                          |
+| PREP-TR-07 | OK-TEST-M4B.1/NE-MAN | Partenza solo da Pronto, proprie riserve esatte; nuovo FEFO non le sostituisce, 6+4 condivisi e retry unici.                                                                              |
+| PREP-TR-08 | OK-TEST-M4B.1/NE-MAN | Annullamento motivato pre-uscita, no reintegro; righe immutabili e gara Annulla/Avvia.                                                                                                    |
+| PREP-TR-09 | OK-TEST-M4B.1/NE-MAN | Versione/hash/replay, revoca prima o durante lock, attore backend e rollback audit obbligatorio.                                                                                          |
+| PREP-TR-10 | OK-TEST-M4B.1/NE-MAN | Permessi distinti e nessun grant Mensa implicito; due sessioni reali Magazzino/Mensa E2E, ricezione storico/same/cross Area.                                                              |
+| REG-M4A    | OK-TEST-M4B.1/NE-MAN | Rerun API finale completo: 117 file, 1336 pass/0 fail/2 skip AGEA opzionali; Scarico 2.0A con lock osservato, cleanup e PACCHI 201. Frontend/E2E mantenuti con verifica di applicabilità. |
+
+`OK-TEST-M4B.1` indica i gate automatici G1–G8 superati nel rerun finale,
+non la validazione manuale. I precedenti NO-GO/G6 e NO-GO/G3-G4 restano
+registrati cronologicamente in `ESITI_TEST_M4B1.md`. Code review ChatGPT
+e validazione manuale M4B.1 restano da svolgere. I test con hardware fisico
+`NE-MAN-CAMERA` e `NE-MAN-TABLET` restano non eseguiti e non bloccano il
+gate automatico. M4B complessiva non è chiusa; M4B.2 non è iniziata.
 
 ## Copertura minima per fase
 

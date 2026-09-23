@@ -134,6 +134,8 @@ export function makeScopedApp(
         "magazzino.stock.issue",
         "magazzino.stock.adjust",
         "magazzino.transfers.create",
+        "magazzino.transfers.prepare",
+        "magazzino.transfers.cancel",
         "magazzino.transfers.dispatch",
         "magazzino.transfers.receive",
         "bolle.view",
@@ -841,6 +843,14 @@ export async function cleanup(scope: SeedScope): Promise<void> {
       );
   }
   if (scope.trasferimentoIds.length > 0) {
+    await db
+      .delete(prenotazioniMagazzinoTable)
+      .where(
+        inArray(
+          prenotazioniMagazzinoTable.trasferimentoId,
+          scope.trasferimentoIds,
+        ),
+      );
     await db
       .delete(trasferimentoRigheTable)
       .where(

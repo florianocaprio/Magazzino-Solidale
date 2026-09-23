@@ -29,6 +29,7 @@ export const trasferimentiTable = pgTable(
     trasportatoreVolontarioId: integer("trasportatore_volontario_id"),
     trasportatoreNome: varchar("trasportatore_nome", { length: 120 }),
     note: text("note"),
+    motivoAnnullamento: varchar("motivo_annullamento", { length: 500 }),
     operatoreId: integer("operatore_id").references(() => utentiTable.id),
     mensaId: integer("mensa_id").references(() => menseTable.id),
     idempotencyKey: varchar("idempotency_key", { length: 80 }),
@@ -41,20 +42,35 @@ export const trasferimentiTable = pgTable(
   ],
 );
 
-export const trasferimentoRigheTable = pgTable("trasferimento_righe", {
-  id: serial("id").primaryKey(),
-  trasferimentoId: integer("trasferimento_id").notNull(),
-  prodottoId: integer("prodotto_id").notNull(),
-  lottoId: integer("lotto_id"),
-  quantita: decimal("quantita", { precision: 14, scale: 6 }).notNull(),
-  unitaMisura: varchar("unita_misura", { length: 20 }).notNull(),
-  note: text("note"),
-});
+export const trasferimentoRigheTable = pgTable(
+  "trasferimento_righe",
+  {
+    id: serial("id").primaryKey(),
+    trasferimentoId: integer("trasferimento_id").notNull(),
+    prodottoId: integer("prodotto_id").notNull(),
+    lottoId: integer("lotto_id"),
+    quantita: decimal("quantita", { precision: 14, scale: 6 }).notNull(),
+    unitaMisura: varchar("unita_misura", { length: 20 }).notNull(),
+    note: text("note"),
+  },
+  (table) => [
+    uniqueIndex("trasferimento_righe_id_trasferimento_unique").on(
+      table.id,
+      table.trasferimentoId,
+    ),
+  ],
+);
 
-export const insertTrasferimentoSchema = createInsertSchema(trasferimentiTable).omit({ id: true, dataCreazione: true });
+export const insertTrasferimentoSchema = createInsertSchema(
+  trasferimentiTable,
+).omit({ id: true, dataCreazione: true });
 export type InsertTrasferimento = z.infer<typeof insertTrasferimentoSchema>;
 export type Trasferimento = typeof trasferimentiTable.$inferSelect;
 
-export const insertTrasferimentoRigaSchema = createInsertSchema(trasferimentoRigheTable).omit({ id: true });
-export type InsertTrasferimentoRiga = z.infer<typeof insertTrasferimentoRigaSchema>;
+export const insertTrasferimentoRigaSchema = createInsertSchema(
+  trasferimentoRigheTable,
+).omit({ id: true });
+export type InsertTrasferimentoRiga = z.infer<
+  typeof insertTrasferimentoRigaSchema
+>;
 export type TrasferimentoRiga = typeof trasferimentoRigheTable.$inferSelect;

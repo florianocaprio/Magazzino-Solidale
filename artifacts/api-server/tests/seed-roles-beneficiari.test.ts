@@ -115,9 +115,11 @@ describe("permessi del ruolo Emporio standard", () => {
 });
 
 describe("permessi del ruolo Mensa standard", () => {
-  it("separa richiesta/ricezione da spedizione, override e riapertura", () => {
+  it("separa richiesta/ricezione da preparazione, annullamento, spedizione, override e riapertura", () => {
     const permissions = defaultMensaRolePermissions([
       "mensa.transfers.manage",
+      "mensa.transfers.prepare",
+      "mensa.transfers.cancel",
       "mensa.meals.override",
       "mensa.service.reopen",
       "magazzino.transfers.dispatch",
@@ -135,6 +137,8 @@ describe("permessi del ruolo Mensa standard", () => {
     expect(permissions).not.toEqual(
       expect.arrayContaining([
         "mensa.transfers.manage",
+        "mensa.transfers.prepare",
+        "mensa.transfers.cancel",
         "mensa.meals.override",
         "mensa.service.reopen",
         "magazzino.transfers.dispatch",

@@ -24,6 +24,8 @@ import {
   useGetDocumentoOperativo,
   useGetTrasferimento,
   useAvviaTrasferimento,
+  usePreparaTrasferimento,
+  useAnnullaTrasferimento,
   useConfermaTrasferimento,
   getDocumentoOperativo,
   exportDocumentiOperativi,
@@ -2786,9 +2788,17 @@ function TrasferimentoDettaglioComune({
   const isLoading = trasferimentoData == null && legacyTransferLoading;
   const [editing, setEditing] = useState(false);
   const avvia = useAvviaTrasferimento();
+  const prepara = usePreparaTrasferimento();
+  const annulla = useAnnullaTrasferimento();
   const ricevi = useConfermaTrasferimento();
   const commandIntents = useCommandIntentRegistry();
   const canEdit = hasPermission("magazzino.transfers.create");
+  const canPrepare =
+    hasPermission("magazzino.transfers.prepare") ||
+    hasPermission("mensa.transfers.prepare");
+  const canCancel =
+    hasPermission("magazzino.transfers.cancel") ||
+    hasPermission("mensa.transfers.cancel");
   const canDispatch = hasPermission("magazzino.transfers.dispatch");
   const canReceive = hasPermission("magazzino.transfers.receive");
 
@@ -2818,8 +2828,65 @@ function TrasferimentoDettaglioComune({
       </p>
     );
 
-  const avviabile =
-    trasferimento.stato === "richiesto" || trasferimento.stato === "preparato";
+  const avviabile = trasferimento.stato === "preparato";
+  const onPrepara = () => {
+    const slot = `trasferimento:${trasferimento.id}:prepare`;
+    prepara.mutate(
+      {
+        id: trasferimento.id,
+        data: commandIntents.prepare(
+          slot,
+          {},
+          { versione: trasferimento.versione },
+        ),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidate();
+          toast({ title: t("trasferimenti.toastPronto") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
+            description: t("trasferimenti.errorUpdate"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+  const onAnnulla = () => {
+    const motivo = window.prompt(t("trasferimenti.motivoAnnullamento"))?.trim();
+    if (!motivo) return;
+    const slot = `trasferimento:${trasferimento.id}:cancel`;
+    annulla.mutate(
+      {
+        id: trasferimento.id,
+        data: commandIntents.prepare(
+          slot,
+          { motivo },
+          { versione: trasferimento.versione, motivo },
+        ),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidate();
+          toast({ title: t("trasferimenti.toastAnnullato") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
+            description: t("trasferimenti.errorUpdate"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
   const onAvvia = () => {
     const slot = `trasferimento:${trasferimento.id}:start`;
     avvia.mutate(
@@ -2911,7 +2978,20 @@ function TrasferimentoDettaglioComune({
             key={riga.id}
             className="flex justify-between gap-3 border-b py-2 text-sm"
           >
-            <span>{riga.prodottoNome}</span>
+            <div>
+              <span>{riga.prodottoNome}</span>
+              {(riga.ripartizioniLotto ?? []).map((split, index) => (
+                <p
+                  key={`${split.lottoId}-${index}`}
+                  className="text-xs text-muted-foreground"
+                >
+                  {t("trasferimenti.ripartizioneLotto", {
+                    lotto: split.codiceLotto ?? `#${split.lottoId}`,
+                    quantita: split.quantita,
+                  })}
+                </p>
+              ))}
+            </div>
             <span className="font-medium">
               {riga.quantita} {riga.unitaMisura}
             </span>
@@ -2921,11 +3001,27 @@ function TrasferimentoDettaglioComune({
       {trasferimento.note && (
         <p className="rounded-md bg-muted p-3 text-sm">{trasferimento.note}</p>
       )}
+      {trasferimento.motivoAnnullamento && (
+        <p className="rounded-md bg-muted p-3 text-sm">
+          {t("trasferimenti.motivoAnnullamento")}:{" "}
+          {trasferimento.motivoAnnullamento}
+        </p>
+      )}
       <div className="flex flex-wrap justify-end gap-2">
-        {avviabile && canEdit && (
+        {trasferimento.stato === "richiesto" && canEdit && (
           <Button variant="outline" onClick={() => setEditing(true)}>
             <Pencil className="mr-1.5 h-4 w-4" />
             {t("common.edit")}
+          </Button>
+        )}
+        {trasferimento.stato === "richiesto" && canPrepare && (
+          <Button
+            variant="outline"
+            onClick={onPrepara}
+            disabled={prepara.isPending}
+          >
+            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+            {t("trasferimenti.segnaPronto")}
           </Button>
         )}
         {avviabile && canDispatch && (
@@ -2938,6 +3034,17 @@ function TrasferimentoDettaglioComune({
             {t("trasferimenti.avvia")}
           </Button>
         )}
+        {(trasferimento.stato === "richiesto" ||
+          trasferimento.stato === "preparato") &&
+          canCancel && (
+            <Button
+              variant="outline"
+              onClick={onAnnulla}
+              disabled={annulla.isPending}
+            >
+              {t("trasferimenti.annulla")}
+            </Button>
+          )}
         {trasferimento.stato === "in_transito" && canReceive && (
           <Button onClick={onRicevi} disabled={ricevi.isPending}>
             <CheckCircle2 className="mr-1.5 h-4 w-4" />

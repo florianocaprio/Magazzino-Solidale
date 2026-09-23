@@ -1474,3 +1474,153 @@ lista/export, migrazione e Docker persistente. Restano separati e non
 bloccanti `NE-MAN-CAMERA` e `NE-MAN-TABLET`: non risultano dichiarate prove
 con fotocamera reale o tablet fisico. M4B **non avviata**; nessun merge/push
 su `main`.
+
+## M4B.1 — sviluppo prenotazioni comuni e Trasferimento Pronto
+
+Base: M4A chiusa, branch `codex/magazzino-workflow-unificato`, SHA iniziale
+`be033bf565c82dccb8187d8cf72e2d1d1732a474`. Sviluppo solo nel working
+tree: nessun commit, staging, push, merge, aggiornamento Docker persistente o
+avvio di M4B.2.
+
+La migrazione 41 estende `prenotazioni_magazzino` con owner Trasferimento
+esclusivo e vincoli testata/riga; conserva le prenotazioni Bolla e i
+Trasferimenti storici. Bolla e Trasferimento condividono ora il servizio di
+prenotazione FEFO/lotto esplicito. La creazione del Trasferimento resta senza
+effetto stock; il nuovo comando «Segna pronto» prenota tutte le righe in una
+transazione, «Avvia» scarica esattamente le partite prenotate, «Annulla» prima
+dell'uscita libera gli impegni senza movimento. Stato, scope, permessi,
+versione, audit e ricevuta sono verificati nel comando. La UI comune,
+Trasferimenti e Mensa distinguono Richiesto da Pronto.
+
+Prove di sviluppo su PostgreSQL isolato: bootstrap e migrazioni 1–41
+applicate e verificate (41 applicate, 0 pending); suite mirate
+Trasferimenti/M4A/Mensa 121/121 e M4B.1/Bolle 58/58, frontend 411/411.
+La suite API completa, ripetuta serialmente su un database nuovo, ha dato
+117 file verdi, 1323 test superati e 4 skipped. Una corsa precedente sul DB
+già usato da altre prove aveva un fallimento 404/409 in un test storico
+Interventi: lo stesso file è passato isolatamente (24/24) e poi nell'intera
+suite sul DB nuovo. Sono passati typecheck e build API; la build workspace
+su macOS è bloccata dalla configurazione preesistente che esclude il binario
+`lightningcss-darwin-arm64`, non da un errore TypeScript/M4B.1. La fase
+formale `##test M4B.1`, la prova populated 40→41 e la validazione manuale
+restano non eseguite.
+
+**Stato: `DEV-M4B.1/NE-TEST/NE-MAN`**; M4A resta
+`OK-M4A/OK-MAN-M4A`. Docker persistente non aggiornato.
+
+## M4B.1 — validazione formale automatica post-sviluppo
+
+Il `##test` ha ripreso e preservato il working tree M4B.1 dalla base
+`be033bf565c82dccb8187d8cf72e2d1d1732a474` sul solo branch dedicato.
+Il precedente stato `DEV-M4B.1/NE-TEST/NE-MAN` e i limiti di sviluppo sopra
+restano parte della cronologia; i rapporti formali sono
+`ESITI_TEST_M4B1.md` e `REVISIONE_STATICA_M4B1.md`. La revisione locale ha
+chiuso l'escalation implicita dei nuovi permessi Mensa standard, l'attesa
+obsoleta 40→41 del runner e ha aggiunto prove PostgreSQL/E2E per i casi
+concorrenti e UI mancanti. Nessun refactoring fuori perimetro.
+
+SQL diretto, fresh 41/41, runner e **upgrade autentico popolato 40→41**
+sono verdi: vecchi record, impronte ordinate e stock per unità/fondo
+invariati dalla sola migrazione, replay/verify 41/41, smoke documenti
+storici riusciti. Suite API completa sul DB nuovo e in modalità seriale:
+117 file, 1334 pass, 2 skip opzionali AGEA già presenti in M4A; i due
+test con XLSX originali M3B sono stati eseguiti e sono verdi. Frontend
+75 file/411 test verdi. La build macOS nativa resta bloccata dalla
+dipendenza LightningCSS esclusa nella configurazione preesistente; la copia
+hash-identica del candidato in Linux x64/glibc ha passato install frozen,
+typecheck, build API/frontend/workspace, budget e smoke browser della build
+di produzione. Codegen doppio byte-identico. Le failure intermedie di
+laboratorio e i rerun integrali sono registrati, non cancellati.
+
+E2E: i flussi comuni e le regressioni M4A sono stati provati su UI/API/DB
+reali isolati; nuove azioni su desktop/tablet emulati, risposta persa,
+annullamento e profili reali Mensa/Magazzino; sei lingue, RTL e controlli
+tastiera/touch. La verifica finale dei gate, del cleanup e del candidato
+pubblicabile è nel rapporto degli esiti. **Nessuna validazione manuale M4B.1
+o chiusura dell'intera M4B** è implicata. `NE-MAN-CAMERA` e
+`NE-MAN-TABLET` rimangono separati e non bloccanti. Docker persistente e
+`main` non aggiornati; M4B.2 non avviata.
+
+**Esito formale: `NO-GO-M4B.1/G6`.** Pur essendo verdi PREP-TR-01…10,
+REG-M4A, suite API/frontend/E2E, fresh, upgrade, runner, codegen,
+typecheck, build e budget, il test di escaping della runtime config WEB
+fallisce su Linux Node/Debian e nel runtime effettivo Nginx Alpine: un
+backslash seguito da `b` diventa backspace. La configurazione ordinaria e
+il login di produzione funzionano, ma non compensano il difetto. Gli script
+coinvolti sono byte-identici alla base M4A e la loro correzione è
+infrastrutturale, non strettamente M4B.1. Servono mandato separato e rerun
+dei gate interessati. Nessun commit, staging o push; working tree
+conservato. Il laboratorio effimero è stato ripulito nominativamente;
+ambiente persistente e `main` invariati. M4B.1 non è pubblicata né
+validata manualmente; M4B.2 non iniziata e M4B complessiva non chiusa.
+
+## M4B.1 — hotfix runtime WEB e ripresa G6
+
+Il successivo mandato ha autorizzato la correzione del finding
+**WEB-RUNTIME-01**, preesistente alla base M4A: il generatore `config.js`
+interpretava in modo non portabile il backslash seguito da `b` nel runtime
+Nginx Alpine. La serializzazione byte-per-byte usa ora soltanto strumenti
+già disponibili nello stadio finale; default, contratto delle chiavi e
+pubblicazione atomica restano invariati. RT-01…12, build WEB finale,
+typecheck, codegen, bundle budget, Nginx e rendering browser reali sono
+verdi su ambiente compatibile. La build nativa macOS resta bloccata dalla
+policy LightningCSS preesistente, non risolta né dichiarata verde.
+
+Il rerun frontend completo è 411/411; E2E M4B.1 è 10 pass/2 skip di
+progetto sui tre viewport, dopo aver reso autonoma la fixture Mensa nel
+solo test. Fresh 41/41 su due DB nuovi e runner 24/24 sono verdi; l'upgrade
+popolato 40→41 e i controlli SQL diretti conservano l'evidenza precedente
+perché migrazione e business code non sono cambiati nell'hotfix.
+
+La suite API integrale ripetuta serialmente su DB nuovo ha invece dato
+**1332 pass, 2 fail, 2 skip AGEA**. Le due failure sono nel vecchio file
+Scarico manuale 2.0A, non modificato dalla base: il test di concorrenza
+attende il messaggio 403 del controllo transazionale ma può ricevere il
+403 del controllo preliminare dopo il cambio Area; interrompendosi prima
+del ripristino, causa il secondo 403 a cascata. Due rerun mirati hanno
+riprodotto la failure. Nessun test estraneo o route Scarichi è stato
+riscritto per forzare il verde. I dettagli e la decisione formale sono in
+`ESITI_TEST_M4B1.md`.
+
+**Stato finale della ripresa: `NO-GO-M4B.1/G3-G4`**. G6 è GO, ma REG-M4A
+e API completa non sono verdi in questa run: nessun staging, commit o
+push. Working tree M4B.1 preservato sul branch dedicato; laboratorio
+Docker disposable ripulito, ambiente persistente e `main` invariati.
+M4B.2 non avviata, M4B non chiusa, code review ChatGPT e validazione
+manuale M4B.1 non eseguite. Restano `NE-MAN-CAMERA` e `NE-MAN-TABLET`.
+
+## M4B.1 — hardening Scarico 2.0A e rerun G3/G4
+
+Il precedente NO-GO/G3-G4 resta storico. Con mandato separato è stato
+corretto **solo il test** Scarico 2.0A: il timer da 50 ms non provava il
+raggiungimento del lock e l'assert fallito saltava il ripristino della
+fixture, contaminando il PACCHI seguente. SCAR-01/02 distinguono il 403
+preliminare dal 403 transazionale; quest'ultimo è verificato soltanto
+dopo una barriera PostgreSQL positiva su `pg_stat_activity` e
+`pg_blocking_pids`. SCAR-03/04 provano cleanup e PACCHI 201; SCAR-05
+è verde per dieci run consecutivi; SCAR-06 fallisce come previsto
+nella copia diagnostica senza rivalidazione. Nessuna policy o route
+Scarichi è stata modificata.
+
+La fase formale successiva ha eseguito 165 test API mirati, poi la suite
+API completa su nuovo DB fresh 41/41: **117 file, 1336 pass, 0 fail,
+2 skip AGEA opzionali**. Due run native macOS intermedie hanno avuto
+singole failure non riprodotte nei test isolati; il primo run Linux
+compatibile ha mostrato il timeout di 30 s del test FSE-R2 da 5.000
+movimenti, che in isolamento termina in circa 34–35 s sul Linux x64
+emulato. È stato elevato a 60 s soltanto il timeout di quel caso,
+con assert/fixture invariati, e l'intera suite è stata rieseguita verde.
+
+Frontend 411/411, E2E M4B.1 10 pass/2 skip di progetto, upgrade
+popolato 40→41, runner 24/24, codegen, RT-01…12, build compatibile e
+budget sono **evidenze precedenti mantenute con verifica di hash e
+applicabilità**, non prove inventate in questa run. Fresh e typecheck
+sono stati rieseguiti. WEB-RUNTIME-01 è preservato. Il limite della
+build nativa macOS dovuto alla policy LightningCSS preesistente non è
+risolto né dichiarato verde.
+
+**Esito del perimetro automatico: `OK-TEST-M4B.1/NE-MAN`, G1–G8 GO.**
+La code review ChatGPT e la validazione manuale M4B.1 restano
+successive; `NE-MAN-CAMERA` e `NE-MAN-TABLET` restano non eseguiti.
+M4B complessiva non è chiusa e M4B.2 non è iniziata. Il Docker
+persistente e `main` rimangono invariati.

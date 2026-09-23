@@ -111,6 +111,17 @@ async function creaTrasferimento(opts: {
   return res.body;
 }
 
+async function segnaPronto(
+  transfer: { id: number; versione: number },
+  targetApp: Express = app,
+) {
+  const response = await request(targetApp)
+    .post(`/trasferimenti/${transfer.id}/prepara`)
+    .send(commandBody({ versione: transfer.versione }));
+  expect(response.status, response.text).toBe(200);
+  return response.body as { id: number; versione: number; stato: string };
+}
+
 async function getLogicalLotState(logicalLotId: number) {
   const response = await request(app).get(`/lotti-logici/${logicalLotId}`);
   expect(response.status).toBe(200);
@@ -207,18 +218,19 @@ describe("POST /trasferimenti — unità di misura canonica", () => {
       );
     expect(created.status).toBe(201);
     scope.trasferimentoIds.push(created.body.id);
+    const ready = await segnaPronto(created.body, dispatcherApp);
     expect(
       (
         await request(dispatcherApp)
           .post(`/trasferimenti/${created.body.id}/avvia`)
-          .send(commandBody({ versione: created.body.versione }))
+          .send(commandBody({ versione: ready.versione }))
       ).status,
     ).toBe(200);
     expect(
       (
         await request(receiverApp)
           .post(`/trasferimenti/${created.body.id}/conferma`)
-          .send(commandBody({ versione: created.body.versione + 1 }))
+          .send(commandBody({ versione: ready.versione + 1 }))
       ).status,
     ).toBe(200);
     const movements = await getMovimentiForTrasferimento(created.body.id);
@@ -441,6 +453,74 @@ describe("comandi Trasferimento — idempotenza e versione", () => {
     }
   });
 
+  it("M4B.1 PREP-TR-09: il replay di Pronto rivalida lo scope mutato durante il lock", async () => {
+    const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
+    await createLotto({ prodottoId, magazzinoId: origineId, quantita: 2 });
+    const transfer = await creaTrasferimento({
+      prodottoId,
+      quantita: 1,
+      unitaMisura: "pz",
+    });
+    const scopedApp = makeApp(operatoreId, {
+      isAdmin: false,
+      aree: ["magazzino"],
+      permessi: ["magazzino.view", "magazzino.transfers.prepare"],
+      areaOperativaId: scope.areaOperativaIds[0],
+    });
+    const idempotencyKey = `transfer-prepare-scope-${Date.now()}`;
+    const payload = { idempotencyKey, versione: transfer.versione };
+    const prepared = await request(scopedApp)
+      .post(`/trasferimenti/${transfer.id}/prepara`)
+      .send(payload);
+    expect(prepared.status, prepared.text).toBe(200);
+
+    const [revokedArea] = await db
+      .insert(areeOperativeTable)
+      .values({ nome: `Area revoca Pronto ${Date.now()}` })
+      .returning({ id: areeOperativeTable.id });
+    scope.areaOperativaIds.push(revokedArea.id);
+    const [revokedGeneral] = await db
+      .insert(lottiLogiciTable)
+      .values({
+        areaOperativaId: revokedArea.id,
+        codice: "GENERALE",
+        descrizione: "Generale",
+        isGenerale: true,
+      })
+      .returning({ id: lottiLogiciTable.id });
+    scope.lottoLogicoIds.push(revokedGeneral.id);
+
+    const blocker = await pool.connect();
+    let replayPromise: Promise<request.Response> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      const blockerPid = await blocker.query<{ pid: number }>(
+        "SELECT pg_backend_pid() AS pid",
+      );
+      await blocker.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`document-command:trasferimento.prepare:${idempotencyKey}`],
+      );
+      replayPromise = request(scopedApp)
+        .post(`/trasferimenti/${transfer.id}/prepara`)
+        .send(payload)
+        .then((response) => response);
+      await waitForBlockedBackend(blockerPid.rows[0].pid);
+      await db
+        .update(magazziniTable)
+        .set({ areaOperativaId: revokedArea.id })
+        .where(inArray(magazziniTable.id, [origineId, destinoId]));
+      await blocker.query("COMMIT");
+      const replay = await replayPromise;
+      expect(replay.status, replay.text).toBe(403);
+      expect(replay.body.error).toMatch(/non accessibile/i);
+    } finally {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      blocker.release();
+      await replayPromise?.catch(() => undefined);
+    }
+  });
+
   it("richiede una chiave client sui quattro comandi mutanti", async () => {
     const prodottoId = await createProdotto(scope, { unitaMisura: "pz" });
     await createLotto({ prodottoId, magazzinoId: origineId, quantita: 5 });
@@ -475,9 +555,10 @@ describe("comandi Trasferimento — idempotenza e versione", () => {
       ).status,
     ).toBe(400);
 
+    const ready = await segnaPronto(transfer);
     const dispatched = await request(app)
       .post(`/trasferimenti/${transfer.id}/avvia`)
-      .send(commandBody({ versione: transfer.versione }));
+      .send(commandBody({ versione: ready.versione }));
     expect(dispatched.status).toBe(200);
     expect(
       (
@@ -531,8 +612,9 @@ describe("comandi Trasferimento — idempotenza e versione", () => {
       ).status,
     ).toBe(409);
 
+    const ready = await segnaPronto(updated.body);
     const dispatchKey = `transfer-dispatch-${Date.now()}`;
-    const dispatchPayload = { versione: updated.body.versione };
+    const dispatchPayload = { versione: ready.versione };
     const dispatched = await request(app)
       .post(`/trasferimenti/${transfer.id}/avvia`)
       .send(commandBody(dispatchPayload, dispatchKey));
@@ -587,9 +669,10 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
       quantita: 6,
       lottoId: lottoB,
     });
+    const ready = await segnaPronto(transfer);
     const started = await request(app)
       .post(`/trasferimenti/${transfer.id}/avvia`)
-      .send(commandBody({ versione: transfer.versione }));
+      .send(commandBody({ versione: ready.versione }));
     expect(started.status, started.text).toBe(200);
     expect(Number((await getLotto(lottoA)).quantitaResidua)).toBe(10);
     expect(Number((await getLotto(lottoB)).quantitaResidua)).toBe(4);
@@ -621,7 +704,7 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
       lottoId: lottoB,
     });
     const started = await request(app)
-      .post(`/trasferimenti/${transfer.id}/avvia`)
+      .post(`/trasferimenti/${transfer.id}/prepara`)
       .send(commandBody({ versione: transfer.versione }));
     expect(started.status).toBe(409);
     expect(Number((await getLotto(lottoA)).quantitaResidua)).toBe(10);
@@ -649,16 +732,16 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
         dataScadenza: "2020-01-01",
       }),
     ];
-    for (const lottoId of invalidi) {
+    for (const [index, lottoId] of invalidi.entries()) {
       const transfer = await creaTrasferimento({
         prodottoId,
         quantita: 3,
         lottoId,
       });
       const started = await request(app)
-        .post(`/trasferimenti/${transfer.id}/avvia`)
+        .post(`/trasferimenti/${transfer.id}/prepara`)
         .send(commandBody({ versione: transfer.versione }));
-      expect(started.status, started.text).toBe(409);
+      expect(started.status, started.text).toBe(index === 2 ? 409 : 400);
       expect(Number((await getLotto(lottoId)).quantitaResidua)).toBe(8);
       expect(await getMovimentiForTrasferimento(transfer.id)).toHaveLength(0);
     }
@@ -685,7 +768,7 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
     expect(response.body.error).toMatch(/lotto fisico.*obbligatorio/i);
   });
 
-  it("LOT-EX-05: due Trasferimenti concorrenti sullo stesso lotto esplicito non duplicano il prelievo", async () => {
+  it("LOT-EX-05: due Trasferimenti concorrenti sullo stesso lotto esplicito non duplicano la prenotazione", async () => {
     const prodottoId = await createProdotto(scope);
     const lottoA = await createLotto({
       prodottoId,
@@ -722,12 +805,12 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
         lottoB,
       ]);
       pendingFirst = request(app)
-        .post(`/trasferimenti/${first.id}/avvia`)
+        .post(`/trasferimenti/${first.id}/prepara`)
         .send(commandBody({ versione: first.versione }))
         .then((response) => response);
       await waitForBlockedBackend(pid.rows[0].pid);
       pendingSecond = request(app)
-        .post(`/trasferimenti/${second.id}/avvia`)
+        .post(`/trasferimenti/${second.id}/prepara`)
         .send(commandBody({ versione: second.versione }))
         .then((response) => response);
       await waitForBlockedBackend(pid.rows[0].pid, 2);
@@ -738,12 +821,11 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
         200, 409,
       ]);
       expect(Number((await getLotto(lottoA)).quantitaResidua)).toBe(10);
-      expect(Number((await getLotto(lottoB)).quantitaResidua)).toBe(4);
+      expect(Number((await getLotto(lottoB)).quantitaResidua)).toBe(10);
       const outputs = (await getMovimentiForTrasferimento(first.id))
         .concat(await getMovimentiForTrasferimento(second.id))
         .filter((m) => m.tipoDettaglio === "uscita");
-      expect(outputs).toHaveLength(1);
-      expect(outputs[0].lottoId).toBe(lottoB);
+      expect(outputs).toHaveLength(0);
     } finally {
       if (!committed) await blocker.query("ROLLBACK").catch(() => undefined);
       blocker.release();
@@ -810,12 +892,12 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
       ]);
 
       pendingAB = request(app)
-        .post(`/trasferimenti/${createdAB.body.id}/avvia`)
+        .post(`/trasferimenti/${createdAB.body.id}/prepara`)
         .send(commandBody({ versione: createdAB.body.versione }))
         .then((response) => response);
       await waitForBlockedBackend(blockerPid.rows[0].pid);
       pendingBA = request(app)
-        .post(`/trasferimenti/${createdBA.body.id}/avvia`)
+        .post(`/trasferimenti/${createdBA.body.id}/prepara`)
         .send(commandBody({ versione: createdBA.body.versione }))
         .then((response) => response);
       await waitForBlockedBackend(blockerPid.rows[0].pid, 2);
@@ -849,11 +931,12 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
       prodottoId,
       quantita: 1,
     });
+    const ready = await segnaPronto(transfer);
     const suffix = `${process.pid}_${Date.now()}_${++commandSequence}`;
     const functionName = `test_transfer_deadlock_${suffix}`;
     const triggerName = `test_transfer_deadlock_trg_${suffix}`;
     const idempotencyKey = `transfer-deadlock-${suffix}`;
-    const body = commandBody({ versione: transfer.versione }, idempotencyKey);
+    const body = commandBody({ versione: ready.versione }, idempotencyKey);
 
     await pool.query(`
       CREATE FUNCTION "${functionName}"() RETURNS trigger
@@ -904,10 +987,11 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
     });
 
     const t = await creaTrasferimento({ prodottoId, quantita: 15 });
+    const ready = await segnaPronto(t);
 
     const res = await request(app)
       .post(`/trasferimenti/${t.id}/avvia`)
-      .send(commandBody({ versione: t.versione }));
+      .send(commandBody({ versione: ready.versione }));
     expect(res.status).toBe(200);
     expect(res.body.stato).toBe("in_transito");
 
@@ -943,7 +1027,7 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
     const t = await creaTrasferimento({ prodottoId, quantita: 10 });
 
     const res = await request(app)
-      .post(`/trasferimenti/${t.id}/avvia`)
+      .post(`/trasferimenti/${t.id}/prepara`)
       .send(commandBody({ versione: t.versione }));
     expect(res.status).toBe(409);
     expect(res.body.error).toMatch(/insufficiente/i);
@@ -958,10 +1042,11 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
     await createLotto({ prodottoId, magazzinoId: origineId, quantita: 20 });
 
     const t = await creaTrasferimento({ prodottoId, quantita: 5 });
+    const ready = await segnaPronto(t);
 
     const first = await request(app)
       .post(`/trasferimenti/${t.id}/avvia`)
-      .send(commandBody({ versione: t.versione }));
+      .send(commandBody({ versione: ready.versione }));
     expect(first.status).toBe(200);
 
     // Secondo avvio con una nuova intenzione e versione superata → 409.
@@ -982,10 +1067,10 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
     const t = await creaTrasferimento({ prodottoId, quantita: 5 });
 
     const response = await request(app)
-      .post(`/trasferimenti/${t.id}/avvia`)
+      .post(`/trasferimenti/${t.id}/prepara`)
       .send(commandBody({ versione: t.versione }));
     expect(response.status).toBe(409);
-    expect(response.body.error).toMatch(/scaduti|FEFO/i);
+    expect(response.body.error).toMatch(/insufficiente/i);
     expect(parseFloat((await getLotto(expired)).quantitaResidua)).toBe(10);
     expect(await getMovimentiForTrasferimento(t.id)).toHaveLength(0);
   });
@@ -998,14 +1083,15 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
       quantita: 10,
     });
     const t = await creaTrasferimento({ prodottoId, quantita: 6 });
+    const ready = await segnaPronto(t);
 
     const responses = await Promise.all([
       request(app)
         .post(`/trasferimenti/${t.id}/avvia`)
-        .send(commandBody({ versione: t.versione })),
+        .send(commandBody({ versione: ready.versione })),
       request(app)
         .post(`/trasferimenti/${t.id}/avvia`)
-        .send(commandBody({ versione: t.versione })),
+        .send(commandBody({ versione: ready.versione })),
     ]);
     expect(
       responses.filter((response) => response.status === 200),
@@ -1040,12 +1126,13 @@ describe("POST /trasferimenti/:id/avvia — uscita FEFO", () => {
       fsePlus: false,
     });
     const trasferimento = await creaTrasferimento({ prodottoId, quantita: 10 });
+    const ready = await segnaPronto(trasferimento);
 
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${trasferimento.id}/avvia`)
-          .send(commandBody({ versione: trasferimento.versione }))
+          .send(commandBody({ versione: ready.versione }))
       ).status,
     ).toBe(200);
     const detail = await request(app).get(`/trasferimenti/${trasferimento.id}`);
@@ -1223,11 +1310,12 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
 
     const transfer = await creaTrasferimento({ prodottoId, quantita: 5 });
     expect(transfer.righe[0].lottoId).toBeNull();
+    const ready = await segnaPronto(transfer);
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${transfer.id}/avvia`)
-          .send(commandBody({ versione: transfer.versione }))
+          .send(commandBody({ versione: ready.versione }))
       ).status,
     ).toBe(200);
     expect(Number((await getLotto(sourceLotId)).quantitaResidua)).toBe(0);
@@ -1243,7 +1331,7 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
 
     const received = await request(app)
       .post(`/trasferimenti/${transfer.id}/conferma`)
-      .send(commandBody({ versione: transfer.versione + 1 }));
+      .send(commandBody({ versione: ready.versione + 1 }));
     expect(received.status).toBe(200);
     const [destinationLot] = await getLottiInMagazzino(destinoId);
     expect(destinationLot).toMatchObject({
@@ -1289,9 +1377,10 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
 
     const transfer = await creaTrasferimento({ prodottoId, quantita: 10 });
     expect(transfer.righe[0].lottoId).toBeNull();
+    const ready = await segnaPronto(transfer);
     const started = await request(app)
       .post(`/trasferimenti/${transfer.id}/avvia`)
-      .send(commandBody({ versione: transfer.versione }));
+      .send(commandBody({ versione: ready.versione }));
     expect(started.status).toBe(200);
     expect(started.body.stato).toBe("in_transito");
 
@@ -1332,9 +1421,10 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
 
     const transfer = await creaTrasferimento({ prodottoId, quantita: 5 });
     expect(transfer.righe[0].lottoId).toBeNull();
+    const ready = await segnaPronto(transfer);
     const started = await request(app)
       .post(`/trasferimenti/${transfer.id}/avvia`)
-      .send(commandBody({ versione: transfer.versione }));
+      .send(commandBody({ versione: ready.versione }));
     expect(started.status).toBe(200);
 
     const state = await getLogicalLotState(logicalLot.id);
@@ -1392,11 +1482,12 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
       codiceLotto: "DON-FISICO",
     });
     const transfer = await creaTrasferimento({ prodottoId, quantita: 4 });
+    const ready = await segnaPronto(transfer);
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${transfer.id}/avvia`)
-          .send(commandBody({ versione: transfer.versione }))
+          .send(commandBody({ versione: ready.versione }))
       ).status,
     ).toBe(200);
     expect(await getLogicalLotState(sourceLogicalLot.id)).toMatchObject({
@@ -1408,7 +1499,7 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
       (
         await request(app)
           .post(`/trasferimenti/${transfer.id}/conferma`)
-          .send(commandBody({ versione: transfer.versione + 1 }))
+          .send(commandBody({ versione: ready.versione + 1 }))
       ).status,
     ).toBe(200);
 
@@ -1459,17 +1550,18 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
     });
 
     const t = await creaTrasferimento({ prodottoId, quantita: 8 });
+    const ready = await segnaPronto(t);
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/avvia`)
-          .send(commandBody({ versione: t.versione }))
+          .send(commandBody({ versione: ready.versione }))
       ).status,
     ).toBe(200);
 
     const res = await request(app)
       .post(`/trasferimenti/${t.id}/conferma`)
-      .send(commandBody({ versione: t.versione + 1 }));
+      .send(commandBody({ versione: ready.versione + 1 }));
     expect(res.status).toBe(200);
     expect(res.body.stato).toBe("completato");
 
@@ -1495,18 +1587,19 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
     });
 
     const t = await creaTrasferimento({ prodottoId, quantita: 4 });
+    const ready = await segnaPronto(t);
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/avvia`)
-          .send(commandBody({ versione: t.versione }))
+          .send(commandBody({ versione: ready.versione }))
       ).status,
     ).toBe(200);
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/conferma`)
-          .send(commandBody({ versione: t.versione + 1 }))
+          .send(commandBody({ versione: ready.versione + 1 }))
       ).status,
     ).toBe(200);
 
@@ -1520,18 +1613,19 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
     await createLotto({ prodottoId, magazzinoId: origineId, quantita: 6 });
 
     const t = await creaTrasferimento({ prodottoId, quantita: 6 });
+    const ready = await segnaPronto(t);
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/avvia`)
-          .send(commandBody({ versione: t.versione }))
+          .send(commandBody({ versione: ready.versione }))
       ).status,
     ).toBe(200);
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/conferma`)
-          .send(commandBody({ versione: t.versione + 1 }))
+          .send(commandBody({ versione: ready.versione + 1 }))
       ).status,
     ).toBe(200);
 
@@ -1563,21 +1657,22 @@ describe("POST /trasferimenti/:id/conferma — entrata a destinazione", () => {
     const prodottoId = await createProdotto(scope);
     await createLotto({ prodottoId, magazzinoId: origineId, quantita: 6 });
     const t = await creaTrasferimento({ prodottoId, quantita: 6 });
+    const ready = await segnaPronto(t);
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/avvia`)
-          .send(commandBody({ versione: t.versione }))
+          .send(commandBody({ versione: ready.versione }))
       ).status,
     ).toBe(200);
 
     const responses = await Promise.all([
       request(app)
         .post(`/trasferimenti/${t.id}/conferma`)
-        .send(commandBody({ versione: t.versione + 1 })),
+        .send(commandBody({ versione: ready.versione + 1 })),
       request(app)
         .post(`/trasferimenti/${t.id}/conferma`)
-        .send(commandBody({ versione: t.versione + 1 })),
+        .send(commandBody({ versione: ready.versione + 1 })),
     ]);
     expect(
       responses.filter((response) => response.status === 200),
@@ -1661,9 +1756,10 @@ describe("PATCH /trasferimenti/:id — modifica righe", () => {
       { prodottoId, quantita: 4, unitaMisura: "pz" },
     ]);
 
+    const ready = await segnaPronto(withoutUnit.body);
     const started = await request(app)
       .post(`/trasferimenti/${transfer.id}/avvia`)
-      .send(commandBody({ versione: withoutUnit.body.versione }));
+      .send(commandBody({ versione: ready.versione }));
     expect(started.status).toBe(200);
     const received = await request(app)
       .post(`/trasferimenti/${transfer.id}/conferma`)
@@ -1745,11 +1841,12 @@ describe("PATCH /trasferimenti/:id — modifica righe", () => {
     await createLotto({ prodottoId, magazzinoId: origineId, quantita: 20 });
 
     const t = await creaTrasferimento({ prodottoId, quantita: 5 });
+    const ready = await segnaPronto(t);
     expect(
       (
         await request(app)
           .post(`/trasferimenti/${t.id}/avvia`)
-          .send(commandBody({ versione: t.versione }))
+          .send(commandBody({ versione: ready.versione }))
       ).status,
     ).toBe(200);
 
@@ -1757,12 +1854,12 @@ describe("PATCH /trasferimenti/:id — modifica righe", () => {
       .patch(`/trasferimenti/${t.id}`)
       .send(
         commandBody({
-          versione: t.versione + 1,
+          versione: ready.versione + 1,
           righe: [{ prodottoId, quantita: 3, unitaMisura: "kg" }],
         }),
       );
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/prima dell'avvio/i);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/stato richiesto/i);
   });
 
   it("consente la modifica delle righe prima dell'avvio", async () => {

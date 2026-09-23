@@ -49,6 +49,7 @@ export * from './allocazioneMezziRiga';
 export * from './analyzeAgeaImportazioneParams';
 export * from './analyzeFsePracticeImportParams';
 export * from './analyzeVolontariImportParams';
+export * from './annullaTrasferimentoInput';
 export * from './annullaTurnoInput';
 export * from './approvazioneMezzo';
 export * from './approvazioneVolontario';

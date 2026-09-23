@@ -8,6 +8,8 @@ import {
   getListConsumiMensaQueryKey,
   useAutorizzaEccezioneMensa,
   useAvviaTrasferimento,
+  usePreparaTrasferimento,
+  useAnnullaTrasferimento,
   useConfermaTrasferimento,
   useCreateAccessoTemporaneoMensa,
   useCreateMensaAbilitazione,
@@ -1219,6 +1221,7 @@ type TransferRow = {
 };
 
 function TrasferimentiView() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { hasPermission } = useAuth();
@@ -1242,6 +1245,8 @@ function TrasferimentiView() {
   );
   const create = useCreateTrasferimentoMensa();
   const start = useAvviaTrasferimento();
+  const prepare = usePreparaTrasferimento();
+  const cancel = useAnnullaTrasferimento();
   const confirm = useConfermaTrasferimento();
   const commandIntents = useCommandIntentRegistry();
   const refresh = () =>
@@ -1323,6 +1328,66 @@ function TrasferimentiView() {
           commandIntents.fail(slot, error);
           toast({
             title: "Trasferimento non avviato",
+            description: errorMessage(error),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+  const prepareTransfer = (row: TransferRow) => {
+    const slot = `trasferimento:${row.id}:prepare`;
+    prepare.mutate(
+      {
+        id: row.id,
+        data: commandIntents.prepare(slot, {}, { versione: row.versione }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          refresh();
+          queryClient.invalidateQueries({
+            queryKey: getListGiacenzeMensaQueryKey(stockParams),
+          });
+          toast({ title: t("trasferimenti.toastPronto") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
+            description: errorMessage(error),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+  const cancelTransfer = (row: TransferRow) => {
+    const motivo = window.prompt(t("trasferimenti.motivoAnnullamento"))?.trim();
+    if (!motivo) return;
+    const slot = `trasferimento:${row.id}:cancel`;
+    cancel.mutate(
+      {
+        id: row.id,
+        data: commandIntents.prepare(
+          slot,
+          { motivo },
+          { versione: row.versione, motivo },
+        ),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          refresh();
+          queryClient.invalidateQueries({
+            queryKey: getListGiacenzeMensaQueryKey(stockParams),
+          });
+          toast({ title: t("trasferimenti.toastAnnullato") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
             description: errorMessage(error),
             variant: "destructive",
           });
@@ -1457,13 +1522,50 @@ function TrasferimentiView() {
                   <TableCell>{row.magazzinoOrigineNome}</TableCell>
                   <TableCell>{row.mensaNome}</TableCell>
                   <TableCell>
-                    <Badge>{row.stato}</Badge>
+                    <Badge>
+                      {row.stato === "richiesto"
+                        ? t("trasferimenti.statusRichiesto")
+                        : row.stato === "preparato"
+                          ? t("trasferimenti.statusPreparato")
+                          : row.stato === "in_transito"
+                            ? t("trasferimenti.statusInTransito")
+                            : row.stato === "annullato"
+                              ? t("trasferimenti.statusAnnullato")
+                              : row.stato}
+                    </Badge>
                   </TableCell>
                   <TableCell className="space-x-2">
                     {row.stato === "richiesto" &&
+                      (hasPermission("mensa.transfers.prepare") ||
+                        hasPermission("magazzino.transfers.prepare")) && (
+                        <Button
+                          size="sm"
+                          onClick={() => prepareTransfer(row)}
+                          disabled={prepare.isPending}
+                        >
+                          {t("trasferimenti.segnaPronto")}
+                        </Button>
+                      )}
+                    {row.stato === "preparato" &&
                       hasPermission("magazzino.transfers.dispatch") && (
-                        <Button size="sm" onClick={() => startTransfer(row)}>
-                          Avvia
+                        <Button
+                          size="sm"
+                          onClick={() => startTransfer(row)}
+                          disabled={start.isPending}
+                        >
+                          {t("trasferimenti.avvia")}
+                        </Button>
+                      )}
+                    {(row.stato === "richiesto" || row.stato === "preparato") &&
+                      (hasPermission("mensa.transfers.cancel") ||
+                        hasPermission("magazzino.transfers.cancel")) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => cancelTransfer(row)}
+                          disabled={cancel.isPending}
+                        >
+                          {t("trasferimenti.annulla")}
                         </Button>
                       )}
                     {row.stato === "in_transito" &&
