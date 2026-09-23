@@ -546,3 +546,315 @@ attivi con gli stessi ID. I volumi persistenti
 `magazzino-solidale_magazzino_uploads` sono ancora presenti e invariati.
 Nessun altro progetto Docker è stato modificato; nessun Docker locale
 persistente è stato ricostruito o migrato.
+
+## M4A — aggiornamento ambiente locale persistente
+
+Data: 23 settembre 2026. Candidato approvato
+`329ae3ad4f367f8d1a1a70c1bd90970c7ce7e80e` su
+`codex/magazzino-workflow-unificato`; HEAD locale/remoto coincidenti e
+working tree pulito prima della build. `main` locale e remoto non modificati.
+
+### Preflight e backup, prima dell'upgrade
+
+Il progetto Compose effettivo è `magazzino-solidale`, rete
+`magazzino-solidale_default`. Le label mostrano che `magazzino-postgres`
+proviene storicamente da
+`/Users/florianocaprio/Documents/Magazzino-Solidale/docker-compose.yml`,
+mentre `magazzino-api` e `magazzino-web` usano
+`/Users/florianocaprio/Projects/Magazzino-Solidale/docker-compose.yml`.
+Il Compose risolto dal checkout di sviluppo conserva i servizi `db/api/web`,
+il DB `db:5432/magazzino`, la porta web 8082, i nomi dei volumi e il
+progetto. Nessun `.env.docker` o segreto è stato stampato.
+
+| Risorsa    | Container iniziale | Immagine iniziale                                                         | Dato da preservare                                                          |
+| ---------- | ------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| PostgreSQL | `57e462be280a`     | `sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777` | `magazzino-solidale_magazzino_pgdata` montato su `/var/lib/postgresql/data` |
+| API        | `fe52b85bc235`     | `sha256:ba0675f6be38f3b3dcd23657db1ee42e1f324adf128fc3e0c8dd376bccb51e49` | `magazzino-solidale_magazzino_uploads` montato su `/app/uploads`            |
+| Web        | `64601804539f`     | `sha256:fc839965c1bfef3d4cd91cce44d9ea7c1763d7bb705a9090734c4a8ed2e1be23` | porta 8082 invariata                                                        |
+
+PostgreSQL 16.14, database `magazzino` di 33.315.863 byte. Ledger ufficiale:
+39/39 applicate, 0 pending/mismatch/out-of-order, ultima
+`20260918_za_m3b_fse_identity_aliases.sql`. Conteggi iniziali:
+prodotti 10, lotti 13, lotti logici 4, movimenti 37, prenotazioni 6,
+Bolle 25, Trasferimenti 3, Scarichi 10, carichi Magazzino 2, pratiche
+Carico 0, audit eventi 0, utenti 7. Residuo per unità: `cf` 388 su due
+partite; `pz` 1079 su undici. Gli aggregati per codice prodotto × codice
+magazzino sono stati rilevati senza dati personali per il confronto
+post-migrazione. Upload: 0 file prima e dopo la copia.
+
+Backup durevoli fuori Git, nella directory `0700`
+`/Users/florianocaprio/.local/share/magazzino-solidale/backups/m4a/2026-09-23T0939-Rome/`:
+
+| Backup                                                            | Dimensione   | SHA-256                                                            | Verifica                                                   |
+| ----------------------------------------------------------------- | ------------ | ------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `magazzino-pre-m4a.dump` (`pg_dump -Fc`)                          | 859.192 byte | `df954392a3f6ce6d0d818c0b2f4ebac2ef8adc24c24987924e95d8e54f151272` | `pg_restore --list` riuscito, 1.555 voci                   |
+| `magazzino-pre-m4a-frozen.dump` (`pg_dump -Fc` dopo stop API/web) | 859.192 byte | `75052267e9696eed2a608e1228f8e946ccbefe19024444399c06982b3ef26bd3` | `pg_restore --list` riuscito; backup canonico per rollback |
+| `uploads-pre-m4a.tar`                                             | 10.240 byte  | `5821adbea2f96642570df9a33bed91da835d523c0a741e6d6b953c48a39784dc` | `tar -tf` riuscito, sola directory vuota                   |
+
+I tre file sono `0600`. Nessun backup è in Git o in una directory
+temporanea. Nessun volume è stato modificato dal processo di copia.
+Con API/web fermati e PostgreSQL ancora attivo, il vettore pre-migrazione
+definitivo (prodotti, lotti, lotti logici, movimenti, prenotazioni, Bolle,
+Trasferimenti, Scarichi, carichi, pratiche, audit, utenti, somma residui) è
+`10|13|4|37|6|25|3|10|2|0|0|7|1467.000000`; l'impronta MD5 degli
+aggregati anonimi prodotto × magazzino è
+`5b9daf369ae304c49a5fcc22ce4d1d76`.
+
+### Piano di rollback definito prima della migrazione
+
+Conservare le immagini API/web precedenti mediante tag di sicurezza prima
+di sostituire i tag Compose. Se la migrazione o lo smoke falliscono:
+
+1. fermare soltanto API/web nuovi; lasciare PostgreSQL e i volumi integri;
+2. non tentare un downgrade automatico dello schema;
+3. verificare dump, hash, identità del DB e stato del ledger; provare il
+   ripristino su destinazione isolata/controllata prima di valutare un
+   ripristino sul DB persistente;
+4. se un ripristino persistente è indispensabile, confermare il bersaglio
+   esatto e ripristinare il dump pre-M4A; ripristinare l'archivio upload
+   soltanto se il volume fosse cambiato;
+5. riavviare le immagini precedenti solo con database compatibile, quindi
+   verificare health, ledger, conteggi e stock.
+
+Nessuna vecchia immagine verrà cancellata prima della conclusione della
+validazione manuale. Le due nuove immagini sono state costruite dal checkout
+pulito alla SHA approvata e identificate dalla label OCI
+`org.opencontainers.image.revision=329ae3ad4f367f8d1a1a70c1bd90970c7ce7e80e`:
+API `sha256:cfa6c84dd0172c55c33e9e107b5ba59d13a8583f3a7e33767a5b29665ad60df1`,
+web `sha256:7b9fe75ea2e20df4a77544641d92e5c040b01ec062697978363c804d24726a7e`.
+La build non ha arrestato il DB né ricreato container o volumi.
+
+### Esito dell'upgrade: NO-GO e rollback applicativo
+
+Dopo avere fermato soltanto web e API, il DB è rimasto healthy con ID
+`57e462be280a`. Il dump definitivo `magazzino-pre-m4a-frozen.dump` è
+stato creato e verificato con le scritture applicative congelate. I tag
+operativi Compose sono stati temporaneamente associati alle immagini M4A;
+le immagini vecchie sono state conservate come
+`magazzino-solidale-api:pre-m4a-20260923` e
+`magazzino-solidale-web:pre-m4a-20260923`. Una simulazione Compose
+`--dry-run --no-deps --no-build --force-recreate api` coinvolgeva solo API.
+
+La ricreazione della sola nuova API ha avviato il runner incrementale:
+39 file già applicati verificati, **solo migrazione 40 pendente**. La
+migrazione `20260919_m4a_documenti_destinatari.sql` è fallita con SQLSTATE
+`23505` nel creare l'indice univoco `bolle_consegna_attiva_unique`.
+Controesempio reale, limitato a ID e stati: le Bolle `3093` e `3094`, entrambe
+`consegnato`, condividono `consegna_id=3868`. Nessun record è stato
+cancellato, modificato o riclassificato. Il restart automatico ha prodotto
+cinque tentativi FAILED (run 60–64, 0 migrazioni applicate), poi l'API M4A
+è stata fermata. **Il web M4A non è stato avviato.**
+
+La migrazione è risultata transazionale: il ledger è rimasto a 39, non
+esistono `enti_destinatari`, `comandi_operativi`, l'indice fallito o la
+colonna `bolle.tipo_destinatario`. Il vettore di entità/stock dopo il
+fallimento è identico al pre-upgrade:
+`10|13|4|37|6|25|3|10|2|0|0|7|1467.000000`. L'impronta degli aggregati
+prodotto × magazzino resta `5b9daf369ae304c49a5fcc22ce4d1d76`.
+Solo il metadata di esecuzione del runner registra i tentativi falliti.
+Non è stato necessario ripristinare il dump sul DB persistente; entrambi
+i backup durevoli restano conservati.
+
+Per rendere di nuovo disponibile l'ambiente, i tag Compose `latest` sono
+stati riportati alle immagini precedenti e la sola API precedente è stata
+ricreata (`1efee1d55dd0`, immagine
+`sha256:ba0675f6be38f3b3dcd23657db1ee42e1f324adf128fc3e0c8dd376bccb51e49`).
+Il runner precedente ha confermato 39/39, 0 pending/mismatch/out-of-order
+(run 65 SUCCESS). È stato poi riavviato il **vecchio** container web
+`64601804539f` con la sua immagine originale
+`sha256:fc839965c1bfef3d4cd91cce44d9ea7c1763d7bb705a9090734c4a8ed2e1be23`.
+PostgreSQL conserva ID e volume originali; l'API conserva il volume upload
+originale, ancora con 0 file. I tre container sono attivi, API/DB healthy;
+via porta persistente 8082, `/api/healthz`, `/api/readyz`, `/login` e
+`/config.js` hanno risposto HTTP 200. Il vettore e l'impronta stock sono
+stati confermati ancora identici dopo il rollback.
+
+Sono state create due nuove **immagini**, conservate con tag
+`m4a-329ae3a` per diagnosi futura, ma nessun container candidato M4A è
+rimasto in esecuzione, nessuna nuova rete/volume/stack permanente è stata
+creata e nessun altro progetto Docker è stato toccato. Le vecchie immagini
+restano disponibili per rollback; nessun prune o comando globale.
+
+**Stato:** M4A non installato sul Docker persistente; ambiente precedente
+operativo e protetto. Il conflitto fra il nuovo vincolo e i dati legacy
+richiede una decisione/correzione M4A separata e nuova validazione prima di
+ritentare l'upgrade. Nessuna validazione manuale M4A è stata dichiarata.
+
+### Retry `##db-cleanup + docker M4A`: NO-GO prima della cancellazione
+
+Il 23 settembre 2026 Floriano ha autorizzato la cancellazione **mirata** dei
+documenti legacy incompatibili, mantenendo però invariati `movimenti`, audit
+append-only e stock. HEAD locale/remoto: `329ae3ad4f367f8d1a1a70c1bd90970c7ce7e80e`.
+Il backup frozen è stato riletto e verificato: 859.192 byte, SHA-256
+`75052267e9696eed2a608e1228f8e946ccbefe19024444399c06982b3ef26bd3`,
+`pg_restore --list` riuscito. Il backup upload conserva SHA-256
+`5821adbea2f96642570df9a33bed91da835d523c0a741e6d6b953c48a39784dc`.
+Nessuno dei due è stato sovrascritto.
+
+Il dump è stato ripristinato in un unico PostgreSQL disposable
+`magazzino-m4a-legacy-cleanup-test-20260923`, con storage `tmpfs`, nessun
+volume e porta `127.0.0.1:15434`. Il censimento sul clone ha trovato una sola
+collisione: `consegna_id=3868 → {3093,3094}`. Entrambe le Bolle sono
+`consegnato` e hanno movimenti fisici: la 3093 ha righe 1929/1930 e movimenti
+2294/2295 (1 cf + 1 pz); la 3094 ha riga 1931 e movimento 2296 (4 cf).
+Non ci sono prenotazioni né interventi collegati alle due Bolle; `spese_emporio`
+43/44 e `spese_emporio_righe` 29/30/31 le referenziano rispettivamente.
+
+Il catalogo PostgreSQL ha rilevato otto FK verso `bolle`/`bolla_righe`:
+da `bolla_righe`, `interventi`, `prenotazioni_magazzino`, `spese_emporio`,
+`spese_emporio_righe` e, decisivamente, **due da `movimenti`**. Le FK
+`movimenti.bolla_id → bolle.id` e
+`movimenti.bolla_riga_id → bolla_righe.id` sono entrambe `ON DELETE RESTRICT`.
+Anche applicando la regola di keeper 3093, l'eliminazione della 3094 e della
+sua riga 1931 richiederebbe cancellare o aggiornare il movimento 2296. Ciò
+viola il vincolo esplicito di conservare il ledger fisico. Inoltre la 3094
+non è una copia senza effetti: registra uno scarico reale di 4 cf. La regola
+del prompt impone in questo caso di **fermarsi prima del DB reale**.
+
+Nessuna `DELETE`, migrazione 40 o ricreazione API/web è stata eseguita, neppure
+sul clone. Il clone `8eda34614904` è stato rimosso nominativamente; il suo
+`tmpfs` è sparito con il container. Nessuna rete o volume Docker è stato
+creato. Il DB persistente resta a 25 Bolle, 37 movimenti, 1.467 unità di
+residuo e due Bolle attive per la Consegna 3868; DB/API/web e i volumi
+`magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads` sono rimasti in funzione e invariati.
+Le immagini M4A costruite dalla SHA approvata restano non operative.
+
+**Stato:** NO-GO per il cleanup prescritto e per l'upgrade M4A; serve una
+nuova decisione esplicita che concili eliminazione del duplicato e integrità
+referenziale/storica del movimento 2296. M4A non è `READY-MANUAL` né validato
+manualmente; M4B non è iniziata.
+
+### Reset autorizzato dello storico Bolle/Consegne e installazione M4A
+
+Il 23 settembre 2026 Floriano ha autorizzato un **nuovo perimetro distruttivo**
+del solo database locale: eliminare tutto lo storico Bolle/Consegne e le
+dipendenze documentali, inclusi i movimenti inventariali delle Bolle, ma
+preservare integralmente lotti, stock corrente e domini indipendenti. Questa
+decisione supera il NO-GO del cleanup puntuale sopra; non lo cancella dalla
+storia. Branch/HEAD locale e remoto restano
+`codex/magazzino-workflow-unificato` /
+`329ae3ad4f367f8d1a1a70c1bd90970c7ce7e80e`.
+
+Il backup frozen DB originale è stato verificato nuovamente: 859.192 byte,
+SHA-256 `75052267e9696eed2a608e1228f8e946ccbefe19024444399c06982b3ef26bd3`
+e `pg_restore --list` riuscito. Il backup upload mantiene SHA-256
+`5821adbea2f96642570df9a33bed91da835d523c0a741e6d6b953c48a39784dc`.
+Con API/web fermati è stato aggiunto, senza sovrascrivere i precedenti, il
+backup supplementare `magazzino-pre-domain-reset-frozen.dump` (865.906 byte,
+SHA-256 `eadcc7cd0449eaf6df6ce01eb4dfc3fb266108d7247d37ef3a1b33ebe579f421`,
+permessi `0600`, `pg_restore --list` riuscito) nella stessa directory durevole.
+
+#### Grafo e classificazione
+
+Il catalogo PostgreSQL mostra FK da `movimenti`, `prenotazioni_magazzino`,
+`interventi`, `spese_emporio` e `spese_emporio_righe` verso Bolle/righe; da
+`sessioni_cassa_emporio`, `spese_emporio` e `turni_consegne` verso Consegne;
+ulteriori FK da righe e storni verso sessioni/spese/Scarichi e da FSE/Carico
+verso `movimenti`. I riferimenti effettivi FSE/Carico/Mensa ai record da
+eliminare erano zero. Non sono stati disabilitati FK o trigger.
+
+- **DELETE:** 25 Bolle, 24 righe, 391 Consegne, 6 prenotazioni, 11 Interventi
+  `pacco_alimentare` legati solo a Bolle, 9 Spese Emporio e 12 righe, 15
+  sessioni cassa Emporio e 15 righe, 9 Scarichi Emporio e 12 righe, 21
+  movimenti inventariali Bolla, 9 movimenti credito solidale con
+  `riferimento_tipo=spesa_emporio`; turni e storni dipendenti erano zero.
+- **KEEP:** 16 movimenti inventariali indipendenti, lo Scarico `deteriorata`,
+  prodotti, magazzini, lotti fisici/logici, Carichi, pratiche, import
+  AGEA/FSE, Trasferimenti, utenti, beneficiari (inclusi i saldi correnti),
+  audit append-only (zero eventi preesistenti).
+- **REVIEW risolti sul clone:** Scarichi/sessioni/credito Emporio avevano
+  riferimenti anche non-FK alle Spese; sono stati classificati nel dominio
+  storico cancellato. La rimozione dei 9 movimenti di credito **non** ha
+  ricalcolato né cambiato i saldi correnti dei beneficiari; lo storico del
+  credito relativo a quelle Spese non è più consultabile. Nessuna dipendenza
+  ancora ambigua verso stock, Carichi, FSE o Trasferimenti è rimasta.
+
+#### Prova sul clone
+
+Unico PostgreSQL disposable `magazzino-m4a-domain-reset-test-20260923` su
+`tmpfs`, porta `127.0.0.1:15435`, senza volume: dump frozen ripristinato,
+39 migrazioni, 25 Bolle, 391 Consegne, 37 movimenti, collisione 3868 e
+stock 1.079 pz / 388 cf confermati. Un unico script SQL esplicito,
+transazionale e con pre/post-assert ha cancellato esattamente i record
+elencati sopra. Digest delle righe complete nelle tabelle KEEP, dei
+movimenti/Interventi/Scarichi indipendenti e di ogni aggregato
+Magazzino × Prodotto × unità/lotto sono rimasti identici. Dopo il commit:
+0 Bolle, 0 righe, 0 Consegne, 16 movimenti, 13 lotti, stock invariato.
+
+Il runner ufficiale ha applicato solo
+`20260919_m4a_documenti_destinatari.sql` (39→40); verify e status: 40/40,
+0 pending/mismatch/out-of-order; replay: 0 migrazioni. L'indice
+`bolle_consegna_attiva_unique` esiste. L'API M4A temporanea sul clone ha
+risposto 200 a `/api/healthz` e `/api/readyz`. I tre file di test mirati
+M4A/documenti, ritiro Bolla e Trasferimenti hanno dato **53/53 test verdi**;
+al termine le fixture sono state rimosse (0 Bolle/Consegne, stock invariato).
+Un'ulteriore prova SQL in transazione, poi rollbackata, ha confermato il
+rifiuto della seconda Bolla attiva per una Consegna e la nuova preparazione
+dopo l'annullamento della prima.
+
+Un primo comando con separatore `--` ha avviato erroneamente la suite API
+completa; è stato interrotto dopo un failure non pertinente ai tre file
+mirati. Il clone, contaminato dalle fixture della suite interrotta, è stato
+riportato **nello stesso container** al dump frozen e ha ripetuto con esito
+verde reset, migrazione e test filtrati correttamente. Nessun dato del DB
+reale è stato coinvolto da quel run. API temporanea e clone sono stati
+rimossi nominativamente; nessun nuovo volume o rete permanente.
+
+#### Applicazione persistente
+
+Pre-reset, con `magazzino-web` e `magazzino-api` fermati e
+`magazzino-postgres` (`57e462be280a`) attivo, conteggi, IDs 3093/3094,
+movimento 2296 e stock coincidevano con il clone. Ledger ancora 39/40.
+Lo **stesso script SQL** validato sul clone è stato eseguito e committato
+senza errori sul database persistente. Numeri cancellati per tabella sono
+quelli della lista DELETE; 0 Bolle/righe/Consegne, 16 movimenti e 13 lotti
+subito dopo il reset, con stock ancora 1.079 pz / 388 cf. Gli assert
+interni hanno verificato digest invariati di lotti, Catalogo, Magazzini,
+Carichi, pratiche, import, Trasferimenti, utenti, beneficiari, audit e
+record indipendenti.
+
+L'immagine API `m4a-329ae3a`
+(`sha256:cfa6c84dd0172c55c33e9e107b5ba59d13a8583f3a7e33767a5b29665ad60df1`)
+e l'immagine web `m4a-329ae3a`
+(`sha256:7b9fe75ea2e20df4a77544641d92e5c040b01ec062697978363c804d24726a7e`)
+portano entrambe la label OCI della SHA approvata. È stata ricreata prima
+solo l'API (`2beebbad6c21`, healthy): applicata soltanto migrazione 40,
+status/verify 40/40, 0 pending/mismatch/out-of-order, indice univoco
+presente. Poi è stato ricreato solo il web (`f344ed86a768`). PostgreSQL,
+rete Compose, volumi `magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads` non sono stati ricreati.
+
+Via porta persistente 8082, `/api/healthz`, `/api/readyz`, `/login`,
+`/config.js`, `/bolle`, `/consegne`, `/giacenze`, `/carico-merce` e
+`/trasferimenti` hanno risposto HTTP 200. Il controllo di login con utente
+esistente e dei dati nelle viste autenticate resta **non eseguito**: nessuna
+credenziale è stata usata; la prova visiva browser era impedita dal Mac
+bloccato. Sono quindi confermati upgrade, API e reachability web, ma non
+ancora il dry run manuale. Nessuna operazione inventariale reale è stata
+finalizzata per prova.
+
+### M4A — validazione manuale e chiusura dell'ambiente
+
+Floriano ha poi comunicato esito **PASS** («validazione manuale PERFETTA»)
+della validazione funzionale sull'applicazione locale installata alla SHA
+`329ae3ad4f367f8d1a1a70c1bd90970c7ce7e80e`. L'ambiente è operativo e
+utilizzabile, senza blocker M4A residui segnalati. Questo supera
+cronologicamente il precedente stato `NE-MAN` senza cancellare le diagnosi,
+i NO-GO o i limiti di smoke registrati sopra. Non sono attribuite a Floriano
+prove puntuali non documentate.
+
+Nel post-installazione è stata segnalata una schermata bianca su
+`http://localhost:8082/`: container web/API e `index.html` erano serviti
+correttamente, il bundle corrente era disponibile, mentre il browser
+`localhost` richiedeva un vecchio bundle JS cacheato. L'accesso tramite
+`127.0.0.1` funzionava; la pulizia dei dati/cache del sito `localhost` ha
+risolto completamente. Classificazione: **cache browser locale post-deploy**,
+risolta senza patch software, modifica a `nginx.conf` o hotfix.
+
+DB persistente a 40/40 migrazioni, Bolle/Consegne legacy zero, stock
+1.079 pz e 388 cf, volumi originali e backup frozen/supplementare
+conservati. L'installazione e la validazione manuale M4A sono completate:
+**`OK-M4A/OK-MAN-M4A` — M4A CHIUSA**. Fotocamera reale e tablet fisico
+restano `NE-MAN-CAMERA` e `NE-MAN-TABLET`, opzionali e non bloccanti; M4B
+non è iniziata.

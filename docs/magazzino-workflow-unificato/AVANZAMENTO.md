@@ -1362,3 +1362,115 @@ rimossi nominativamente. `magazzino-web`, `magazzino-api`,
 Docker locale è stato costruito. Restano **NE-MAN** la validazione umana M4A,
 **NE-MAN-CAMERA** la fotocamera reale e **NE-MAN-TABLET** il tablet fisico.
 M4A non è dichiarato chiuso; M4B non è iniziata e `main` non è stato toccato.
+
+## M4A — tentativo di aggiornamento Docker persistente: NO-GO
+
+Data: 23 settembre 2026. Il commit applicativo approvato
+`329ae3ad4f367f8d1a1a70c1bd90970c7ce7e80e` è rimasto invariato;
+API e web M4A sono state costruite dalla stessa SHA dopo backup certificati
+di DB e upload. Sul database locale **reale** (39 migrazioni), la nuova API
+non ha potuto applicare la migrazione 40: la creazione dell'indice
+`bolle_consegna_attiva_unique` incontra due Bolle legacy `consegnato`
+(`3093`, `3094`) con lo stesso `consegna_id=3868`. La prova populated
+automatica precedente non comprendeva questo caso. **M4A non è installato
+né pronto per il dry run manuale.** Nessun dato legacy è stato corretto
+automaticamente e il web M4A non è stato avviato.
+
+La migrazione fallita è stata rollbackata transazionalmente: ledger 39,
+schema M4A assente, conteggi e stock invariati. Le immagini precedenti
+API/web sono state ripristinate; l'ambiente persistente precedente è di
+nuovo operativo e healthy con gli stessi container DB/web e gli stessi
+volumi. I backup durevoli verificati e la diagnosi completa sono in
+`AMBIENTE_TEST.md`. Il solo delta Git è documentale e resta non committato;
+nessun push/merge su `main` o sul branch dedicato.
+
+Stato: test automatici del commit M4A già superati, ma **installazione
+Docker M4A bloccata / NE-MAN**. Serve una decisione esplicita su come
+trattare le due Bolle storiche o un hardening della migrazione M4A,
+seguito da nuova prova su copia popolata rappresentativa e da un nuovo
+tentativo protetto. Fotocamera e tablet fisici restano `NE-MAN-CAMERA` e
+`NE-MAN-TABLET`. M4B non è iniziata.
+
+## M4A — `##db-cleanup + docker`: NO-GO per FK del ledger
+
+Il 23 settembre 2026 è stata autorizzata una pulizia distruttiva **solo** dei
+documenti legacy incompatibili del DB locale, senza modificare `movimenti`,
+audit o stock. Backup frozen e upload verificati per dimensione/hash;
+PostgreSQL disposable con dump frozen ripristinato e poi rimosso. Il clone
+contiene una sola collisione, Bolle 3093/3094 su `consegna_id=3868`.
+
+Il censimento FK ha mostrato che anche la Bolla 3094 ha uno scarico fisico
+reale (movimento 2296, 4 cf), con FK `ON DELETE RESTRICT` sia a `bolle` sia a
+`bolla_righe`. Eliminarla lasciando il ledger invariato è impossibile con lo
+schema corrente. In applicazione della clausola di arresto del prompt,
+**nessuna cancellazione è stata effettuata** sul clone o sul DB reale; nessun
+retry della migrazione 40, nessun cambio API/web. Stock e container
+persistenti restano invariati. Il dettaglio è in `AMBIENTE_TEST.md`.
+
+Stato: **NO-GO cleanup/upgrade Docker M4A; M4A non `READY-MANUAL`, NE-MAN**.
+Occorre una nuova decisione esplicita sul trattamento del movimento storico
+e dei suoi riferimenti documentali. Nessun commit/push; M4B non avviata,
+`main` non toccato.
+
+## M4A — reset storico Bolle/Consegne locale e installazione Docker
+
+Il 23 settembre 2026 Floriano ha autorizzato un **nuovo perimetro**: azzerare
+lo storico locale Bolle/Consegne e le sue dipendenze, inclusi i movimenti
+inventariali Bolla, mantenendo stock fisico, lotti, Carichi, import,
+Trasferimenti indipendenti e utenti. Il precedente NO-GO resta documentato.
+Backup frozen DB/upload verificati e backup DB supplementare creato a
+scritture congelate; dettagli, hash e grafo FK in `AMBIENTE_TEST.md`.
+
+Sul clone tmpfs il reset transazionale ha eliminato 25 Bolle, 24 righe,
+391 Consegne, 21 movimenti Bolla e le dipendenze Emporio/Interventi;
+0 Bolle/Consegne, stock 1.079 pz / 388 cf e digest dei domini KEEP invariati.
+Il runner ufficiale ha applicato solo la migrazione 40, status/verify 40/40 e
+replay 0. API clone health/readiness 200; tre file test API mirati 53/53
+verdi, più prova transazionale del vincolo una Bolla attiva per Consegna e
+della nuova preparazione dopo annullamento. Laboratorio Docker rimosso.
+
+Il medesimo SQL validato sul clone è stato poi eseguito sul DB persistente
+con web/API fermati; gli assert sono passati e gli stessi conteggi sono
+stati cancellati. Stock, lotti e record indipendenti sono rimasti invariati.
+La nuova API/web alla SHA
+`329ae3ad4f367f8d1a1a70c1bd90970c7ce7e80e` sono stati ricreati
+separatamente nello stesso progetto Compose, mantenendo DB e volumi. API
+healthy, migrazione 40 applicata, status/verify 40/40, indice unico presente;
+HTTP health, readiness, login e route web 200. Bolle e Consegne finali zero.
+
+**Smoke autenticato ancora non eseguito:** il Mac era bloccato e non sono state
+usate credenziali; il login dell'utente esistente e la navigazione dei dati
+nelle viste restano alla prossima verifica con Floriano. Non è stato
+finalizzato alcun nuovo movimento reale. Fino a tale verifica, installazione
+M4A riuscita ma `READY-MANUAL` non confermato integralmente; validazione
+manuale M4A resta `NE-MAN`. Nessun commit/push, M4B non avviata, `main`
+invariato.
+
+## M4A — validazione manuale e chiusura
+
+Floriano ha successivamente comunicato **«validazione manuale PERFETTA»** per
+l'ambiente M4A installato alla SHA applicativa
+`329ae3ad4f367f8d1a1a70c1bd90970c7ce7e80e`: esito funzionale manuale
+**PASS**, ambiente locale operativo e applicazione utilizzabile, senza blocker
+M4A residui segnalati. La dichiarazione completa lo stato che nel paragrafo
+precedente era ancora `NE-MAN`; non attribuisce a Floriano singole prove non
+documentate.
+
+I gate automatici G1–G8 e la code review ChatGPT, incluso l'hardening
+CR-M4A-01/02, erano già GO. Il Docker persistente usa la SHA sopra, il DB è
+a 40/40 migrazioni dopo il reset locale autorizzato dello storico
+Bolle/Consegne, e lo stock resta 1.079 pz e 388 cf. I backup frozen e
+supplementare sono conservati. Durante il post-deploy, la schermata bianca
+su `http://localhost:8082/` è stata ricondotta a un vecchio bundle JS nella
+cache del browser `localhost`: `127.0.0.1` funzionava e la pulizia locale
+dei dati/cache del sito ha risolto. È un incidente di cache browser
+post-deploy, **non** un finding software; nessuna patch applicativa o modifica
+di `nginx.conf` è stata necessaria.
+
+**M4A CHIUSA — `OK-M4A/OK-MAN-M4A`.** Il documento operativo comune integra
+destinatari Beneficiario/Ente/Altro Magazzino, Bolle e Trasferimenti,
+snapshot Ente, PDF, lotto fisico esplicito/FEFO, scope, idempotenza, audit,
+lista/export, migrazione e Docker persistente. Restano separati e non
+bloccanti `NE-MAN-CAMERA` e `NE-MAN-TABLET`: non risultano dichiarate prove
+con fotocamera reale o tablet fisico. M4B **non avviata**; nessun merge/push
+su `main`.

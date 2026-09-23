@@ -469,3 +469,20 @@ Decisione: **GO per i test automatici M4A post-code-review** e stato
 `OK-M4A/NE-MAN`. Restano `NE-MAN-CAMERA`, `NE-MAN-TABLET`, nuova code review
 ChatGPT e validazione umana; M4A non è dichiarato chiuso. Nessun Docker
 locale persistente aggiornato, M4B non avviata, nessun merge/push su `main`.
+
+## Validazione manuale finale
+
+Successivamente ai gate automatici G1–G8 GO, alla code review ChatGPT con
+CR-M4A-01/02 chiusi e all'installazione sul Docker persistente, Floriano ha
+comunicato **PASS** della validazione funzionale manuale M4A
+(«validazione manuale PERFETTA»). La SHA applicativa validata è
+`329ae3ad4f367f8d1a1a70c1bd90970c7ce7e80e`; il DB installato è a
+40/40 migrazioni dopo il reset locale autorizzato Bolle/Consegne. Non si
+attribuiscono alla validazione umana singoli casi T01–T32 non descritti da
+Floriano: le relative evidenze automatiche restano quelle della matrice sopra.
+
+Stato finale **`OK-M4A/OK-MAN-M4A` — M4A CHIUSA**. Fotocamera reale e tablet
+fisico restano rispettivamente `NE-MAN-CAMERA` e `NE-MAN-TABLET`, non
+bloccanti. La schermata bianca post-deploy su `localhost:8082` è stata
+risolta cancellando i dati/cache locali del sito; non ha richiesto una
+correzione software. M4B non è iniziata.
