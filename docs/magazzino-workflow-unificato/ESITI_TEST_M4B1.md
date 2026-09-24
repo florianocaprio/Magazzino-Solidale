@@ -416,3 +416,110 @@ ChatGPT, non validata manualmente; M4B non è chiusa e M4B.2 non è
 iniziata. La pubblicazione, se effettuata, avviene solo sul branch
 dedicato e non su `main`; lo stato Git definitivo è registrato nel
 resoconto della run.
+
+## Hardening post-code-review — CR-M4B1-01 (24 settembre 2026)
+
+Base locale/remota verificata:
+`9e4d9dd6c40b69d96a47f251920d716d5f990ccb`, branch
+`codex/magazzino-workflow-unificato`, working tree iniziale pulito,
+divergenza 0/0. La migrazione 41 è invariata (SHA-256
+`2b04816cac86bdb82611880cf9c98f5f3b5fdba671c9d1344c3641e52a7409d2`);
+41 file migration, nessuna 42. Il delta riguarda solo tre modelli Drizzle,
+un test DB strutturale e i rapporti CR.
+
+### Causa e parità
+
+Il modello `prenotazioniMagazzino.ts` ometteva le due FK owner composte
+già create dalla migrazione. Ora le dichiara con `foreignKey` e
+`onDelete("restrict")`. Il primo tentativo fresh ha trovato un secondo
+vincolo d'ordine del tool: Drizzle Kit emette le FK prima dei
+`uniqueIndex` parent, causando PostgreSQL `42830`. Le due chiavi
+`(id,bolla_id)` e `(id,trasferimento_id)` sono state rese `unique`
+inline nei rispettivi modelli, mantenendo i nomi e l'unicità. Il
+fresh-db-gate ufficiale successivo è verde. Le FK singole e il CHECK
+owner restano inalterati.
+
+| Catalogo `pg_constraint`                             | Colonne locali → tabella/colonne referenziate                                           | Delete   |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------- | -------- |
+| `prenotazioni_magazzino_bolla_riga_owner_fk`         | `(riga_bolla_id,bolla_id)` → `bolla_righe(id,bolla_id)`                                 | RESTRICT |
+| `prenotazioni_magazzino_trasferimento_riga_owner_fk` | `(riga_trasferimento_id,trasferimento_id)` → `trasferimento_righe(id,trasferimento_id)` | RESTRICT |
+
+Il sesto caso strutturale confronta questi nomi, colonne e azioni in
+metadata Drizzle, migrazione 41 e catalogo PostgreSQL. Verifica anche
+le due chiavi univoche parent per nome/colonne. I casi OWNER-FK-01…05
+eseguono `INSERT` diretti, ogni fixture in transazione con `ROLLBACK`:
+
+| Caso        | Esito                                                                                |
+| ----------- | ------------------------------------------------------------------------------------ |
+| OWNER-FK-01 | Bolla A con riga di Bolla B → `23503` sul FK composto Bolla.                         |
+| OWNER-FK-02 | Trasferimento A con riga di Trasferimento B → `23503` sul FK composto Trasferimento. |
+| OWNER-FK-03 | Bolla e propria riga → INSERT valido.                                                |
+| OWNER-FK-04 | Trasferimento e propria riga → INSERT valido.                                        |
+| OWNER-FK-05 | Owner incompleto o misto → `23514` su `owner_exclusive`.                             |
+
+Esito finale del nuovo file: **6/6 PASS** su DB fresh 41/41 e **6/6
+PASS** su copia disposable con le chiavi parent nella forma di indici
+univoci della migrazione 41. Il primo run del sesto caso era fallito
+soltanto perché `pg` restituiva l'array SQL di tipo `name[]` come testo;
+la query di test usa ora `to_json` e confronta gli array effettivi. Non
+è stata cambiata un'aspettativa funzionale per ottenere il verde.
+
+### Regressione e limite di tool
+
+La suite mirata finale (OWNER-FK, Pronto M4B.1, Trasferimenti, Bolle
+prenotazioni e Giacenze prenotazioni) su un secondo DB fresh è **5/5
+file, 117/117 test PASS**, exit 0. Una run intermedia sul primo DB aveva
+116 PASS/1 FAIL: un test storico Trasferimenti ha ricevuto 404 in
+`/conferma` dopo `Avvia`. Isolato è PASS; il gruppo completo è poi
+PASS sul primo DB e su un secondo DB fresh. Il corpo del 404 non è
+stato acquisito, quindi non gli si attribuisce una causa dimostrata;
+nessuna route o fixture di quel test è stata alterata. La diagnostica
+temporanea dell'assert è stata rimossa dal working tree. Resta una
+cautela se il 404 dovesse ricomparire, non un PASS inventato della run
+fallita.
+
+Il **fresh-db-gate ufficiale** su DB vuoto è PASS: bootstrap Drizzle,
+41/41 migrazioni, seed, login/cambio password, CRUD Area, replay 0/41,
+verify/status 41/41 senza mismatch. Runner migrazioni **24/24 PASS**;
+verify del catalogo copia-indice **41/41 PASS**. Typecheck workspace
+PASS. Codegen, FSE completo, E2E browser, build WEB e upgrade popolato
+40→41 non sono stati ripetuti: schema dei contratti API, codice business,
+migrazione 41, runtime e lockfile sono byte-identici alla base; le loro
+evidenze precedenti restano applicabili. Prettier e `git diff --check`
+sono stati eseguiti sui file finali.
+
+Un tentativo di `pnpm install --frozen-lockfile --offline` sulla
+postazione si è fermato **prima di modificare `node_modules`** perché
+pnpm chiedeva conferma interattiva di purge (`NO_TTY`); typecheck e
+test hanno usato le dipendenze già installate, mentre lockfile e
+toolchain non sono stati modificati.
+
+Prova diagnostica aggiuntiva, **non** gate di upgrade: sulla copia
+disposable con i soli indici parent della migrazione 41,
+`drizzle-kit push` ha tentato di aggiungere constraint `UNIQUE` con
+nomi già occupati dagli indici e ha stampato PostgreSQL `42P07`. Non
+si dichiara quella prova verde. Il progetto usa `push` solo nel
+bootstrap **vuoto**, passato, e il runner migration sui DB esistenti,
+anch'esso passato. La differenza fisica constraint/indice parent è
+documentata in `REVISIONE_STATICA_M4B1.md`; la semantica e il catalogo
+dei due FK owner coincidono in entrambe le forme. Nessuna migrazione
+è stata riscritta o aggiunta per mascherare il limite del tool.
+
+Il laboratorio ha creato soltanto
+`magazzino-m4b1-owner-fk-db-20260924` (PostgreSQL 16 `--rm`, dati
+`tmpfs`, porta `127.0.0.1:55453`) e cinque database interni
+disposable: `m4b1_owner_fk`, `m4b1_owner_fk_fresh`,
+`m4b1_owner_fk_target`, `m4b1_owner_fk_index`,
+`m4b1_owner_fk_gate`. Il container è stato arrestato e auto-rimosso
+per nome dopo le prove; nessuna rete o volume disposable è stata
+creata. Il controllo finale non mostra risorse con prefisso
+`magazzino-m4b1-owner-fk-`. I container persistenti
+`magazzino-postgres` (`57e462be280a`), `magazzino-api`
+(`2beebbad6c21`) e `magazzino-web` (`f344ed86a768`) conservano gli
+ID iniziali e sono attivi; i due volumi persistenti originali sono
+presenti. Nessun altro progetto Docker è stato interessato.
+
+**CR-M4B1-01 corretto e verificato nel perimetro richiesto; M4B.1
+rimane `OK-TEST-M4B.1/NE-MAN`, pronta per chiusura della code review.**
+La validazione manuale non è stata eseguita; M4B non è chiusa e M4B.2
+non è iniziata. Docker persistente e `main` non sono stati modificati.

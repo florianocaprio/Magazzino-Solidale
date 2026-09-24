@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
+  unique,
   uniqueIndex,
   pgTable,
   serial,
@@ -124,7 +125,7 @@ export const bollaRigheTable = pgTable(
     dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("bolla_righe_id_bolla_unique").on(table.id, table.bollaId),
+    unique("bolla_righe_id_bolla_unique").on(table.id, table.bollaId),
   ],
 );
 

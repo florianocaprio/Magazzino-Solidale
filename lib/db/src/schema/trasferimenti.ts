@@ -7,6 +7,7 @@ import {
   serial,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -54,7 +55,7 @@ export const trasferimentoRigheTable = pgTable(
     note: text("note"),
   },
   (table) => [
-    uniqueIndex("trasferimento_righe_id_trasferimento_unique").on(
+    unique("trasferimento_righe_id_trasferimento_unique").on(
       table.id,
       table.trasferimentoId,
     ),

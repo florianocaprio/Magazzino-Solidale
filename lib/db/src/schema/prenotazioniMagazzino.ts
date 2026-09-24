@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   decimal,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -63,6 +64,19 @@ export const prenotazioniMagazzinoTable = pgTable(
       table.rigaTrasferimentoId,
     ),
     index("prenotazioni_magazzino_stato_idx").on(table.stato),
+    foreignKey({
+      name: "prenotazioni_magazzino_bolla_riga_owner_fk",
+      columns: [table.rigaBollaId, table.bollaId],
+      foreignColumns: [bollaRigheTable.id, bollaRigheTable.bollaId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "prenotazioni_magazzino_trasferimento_riga_owner_fk",
+      columns: [table.rigaTrasferimentoId, table.trasferimentoId],
+      foreignColumns: [
+        trasferimentoRigheTable.id,
+        trasferimentoRigheTable.trasferimentoId,
+      ],
+    }).onDelete("restrict"),
     check(
       "prenotazioni_magazzino_quantita_positive",
       sql`${table.quantita} > 0`,

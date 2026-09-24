@@ -149,3 +149,49 @@ adiacente autorizzata è un timeout locale di 60 s a quel caso in
 `artifacts/api-server/tests/fse-r2-acceptance.test.ts`: assert, dati,
 fixture e parallelismo invariati. Il file completo è passato senza override
 CLI e la suite API completa finale è stata rieseguita dopo il cambio.
+
+## Code review ChatGPT — CR-M4B1-01
+
+La review del commit `9e4d9dd6c40b69d96a47f251920d716d5f990ccb`
+ha individuato un disallineamento dichiarativo: la migrazione 41 crea
+`prenotazioni_magazzino_bolla_riga_owner_fk` e
+`prenotazioni_magazzino_trasferimento_riga_owner_fk`, ma
+`prenotazioniMagazzino.ts` riportava soltanto le quattro FK singole.
+Il controllo `owner_exclusive` non sostituisce i due FK composti, perché
+non lega l'ID della riga all'ID del relativo documento.
+
+Lo schema Drizzle ora dichiara entrambi i `foreignKey(...)` con le
+colonne nello stesso ordine della migrazione e `ON DELETE RESTRICT`.
+FK singole, colonne owner nullable, CHECK e indici restano. Il primo
+bootstrap fresh ha però dimostrato che Drizzle Kit emette questi FK
+prima degli indici univoci parent: con `uniqueIndex(...)` su
+`bolla_righe(id,bolla_id)` e
+`trasferimento_righe(id,trasferimento_id)` PostgreSQL ha rifiutato il
+primo FK (`42830`). I due parent sono stati quindi dichiarati con
+`unique(...)` **inline**, preservando nome, colonne e unicità delle
+chiavi: è lo stesso principio già usato in `zoneUds.ts` per un FK
+composto. È una modifica limitata ai tre file di schema coinvolti;
+nessuna logica di prenotazione, FEFO, route o permesso cambia.
+
+La migrazione 41 e le precedenti non sono state modificate; non esiste
+migrazione 42. Un DB fresh creato dallo schema attuale ha constraint
+`UNIQUE` con indice backing omonimo; un DB già migrato dalla 41 può
+avere solo il `CREATE UNIQUE INDEX` omonimo. Entrambe le forme
+garantiscono le medesime chiavi `(id, owner_id)` e permettono gli stessi
+FK owner; i sei test strutturali passano su entrambe. La forma fisica
+parent non è però identica: una prova diagnostica di
+`drizzle-kit push` sulla **copia disposable già migrata** ha tentato
+di creare il constraint con nome dell'indice esistente ed è fallita
+(`42P07`). Questo comando non è il percorso di upgrade supportato:
+`fresh-db-gate` usa `push` solo su DB vuoto, mentre sui DB esistenti
+l'entrypoint usa il runner delle migrazioni, verificato 41/41. Il
+limite del tool su un popolato viene conservato come cautela esplicita,
+non presentato come prova superata né risolto modificando la 41.
+
+La parità richiesta per i **due FK owner** è verificata da metadata
+Drizzle, testo della migrazione e `pg_constraint`: nomi, colonne locali,
+tabella/colonne referenziate e `ON DELETE RESTRICT` coincidono. Il
+catalogo conferma inoltre i due indici univoci parent per nome e
+colonne. OWNER-FK-01…05 coprono gli `INSERT` diretti errati e validi;
+il test di parità è un sesto caso nello stesso file. Nessun altro
+finding applicativo è emerso dalla correzione CR-M4B1-01.

@@ -1624,3 +1624,38 @@ La code review ChatGPT e la validazione manuale M4B.1 restano
 successive; `NE-MAN-CAMERA` e `NE-MAN-TABLET` restano non eseguiti.
 M4B complessiva non è chiusa e M4B.2 non è iniziata. Il Docker
 persistente e `main` rimangono invariati.
+
+## M4B.1 — hardening code review CR-M4B1-01
+
+Sul candidato pubblicato `9e4d9dd6c40b69d96a47f251920d716d5f990ccb`
+la review ha rilevato che le due FK owner composte della migrazione 41
+non erano dichiarate nel modello Drizzle delle prenotazioni. Sono state
+aggiunte con stessi nomi, colonne e `ON DELETE RESTRICT`; le chiavi
+parent `(id,bolla_id)` e `(id,trasferimento_id)` sono dichiarate
+`unique` inline perché il bootstrap Drizzle crea le FK prima degli
+indici post-tabella. FK singole, colonne nullable, `owner_exclusive`,
+indici e logica applicativa restano invariati. Nessuna migrazione è
+stata modificata o aggiunta.
+
+OWNER-FK-01…05 e parità Drizzle/migrazione/catalogo sono **6/6 PASS**
+sia sul fresh sia sulla copia con indici parent della migrazione 41.
+Le regressioni mirate finali sono **117/117 PASS** su 5 file; il
+fresh-db-gate ufficiale ha superato 41/41 migrazioni, seed, smoke,
+replay e verify; runner 24/24 e typecheck sono verdi. Una run
+intermedia aveva mostrato un 404 non riprodotto nel test storico di
+conferma Trasferimento: il caso isolato e due gruppi successivi sono
+verdi, ma la causa del 404 non è dimostrata e rimane segnalata nel
+rapporto test.
+
+Il percorso supportato sui DB popolati è il migration runner. Una
+prova diagnostica di `drizzle-kit push` su copia **già migrata** con
+indici parent ha incontrato collisione nome `42P07`: non si dichiara
+quel comando verde né lo si usa sul Docker persistente. Il bootstrap
+fresh con `push` è invece verde. La differenza fisica tra constraint
+`UNIQUE` fresh e indice univoco della 41 è registrata; i due FK owner
+e la loro protezione sono semanticamente coincidenti.
+
+**Stato: CR-M4B1-01 corretto, `OK-TEST-M4B.1/NE-MAN`, pronto per la
+chiusura della code review ChatGPT.** La validazione manuale M4B.1
+non è eseguita; M4B non è chiusa, M4B.2 non avviata. Docker
+persistente e `main` restano invariati.
