@@ -1709,3 +1709,24 @@ persistente e `main` non sono stati aggiornati. Dopo i controlli finali e
 il cleanup nominativo, G1–G10 sono GO: stato M4
 **`OK-TEST-M4/NE-MAN`**, in attesa di code review ChatGPT e successivo
 dry run umano autorizzato. M4 non è dichiarata `OK-MAN`.
+
+## M4 — hardening code review CR-M4-01
+
+Sulla base pubblicata `a64db9307008238cdc4265b5398fe2f0aa83b0fe`,
+`Affida` aveva introdotto una violazione del contratto M4A: chiedeva
+sempre un nome libero e poteva salvarlo insieme al volontario già
+assegnato. La route ora conserva l'incaricato esclusivo (volontario
+oppure nome esterno), rifiuta payload incoerenti e richiede un nome
+soltanto se assente. La UI mostra l'assegnato senza reinserimento.
+
+CR-M4-01-A…F, regressioni M4B.2/Bolle/Consegne e E2E pertinenti sono
+verdi: API finale 119 file/1378 pass/2 skip AGEA storici, frontend
+77 file/415 pass, M4B.2 6/6 e Consegne desktop/tablet simulato 2 prove
+uniche. Build Linux API/WEB, typecheck e budget sono verdi. Fresh 42/42
+è stato ripetuto; upgrade 41→42, runner, reporting, runtime e codegen
+restano evidenze M4 applicabili per hash/input invariati. Dettagli e
+failure ambientali risolte nel verbale `ESITI_TEST_M4.md`; review locale
+in `REVISIONE_STATICA_M4.md`. Nessuna migration 43, modifica inventariale,
+reporting o permessi. M4 resta **`OK-TEST-M4/NE-MAN`**, in attesa di nuova
+code review ChatGPT; nessuna validazione manuale M4 è implicata. Docker
+persistente e `main` invariati; M5 non avviata.

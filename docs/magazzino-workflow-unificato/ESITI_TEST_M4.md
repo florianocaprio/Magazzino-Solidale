@@ -161,3 +161,69 @@ Le prove su fotocamera reale e tablet fisico restano `NE-MAN-CAMERA` e
 `NE-MAN-TABLET`; non diventano skip applicativi. Nessun dry run manuale
 M4B o dell'intera M4 è stato eseguito. Commit/push restano condizionati
 ai controlli Git e hygiene finali e a una nuova verifica della SHA remota.
+
+## Hardening CR-M4-01 — incaricato esclusivo in `Affida`
+
+Base della code review `a64db9307008238cdc4265b5398fe2f0aa83b0fe`.
+Il finding era reale: il form chiedeva sempre un nome libero e la route lo
+salvava anche se la Bolla aveva già `volontarioConsegnaId`, violando lo XOR
+M4A. La review locale del delta e della correzione è in
+`REVISIONE_STATICA_M4.md`. Il backend conserva l'incaricato già assegnato,
+rifiuta la combinazione o la sostituzione durante `Affida`, richiede un
+nome solo quando manca; la UI segue gli stessi tre rami. Nessun secondo
+scarico, nessuna nuova semantica di cambio incaricato.
+
+| Regressione | Esito sul candidato CR-M4-01                                                                                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A           | Volontario valido, payload senza nome: `200`, `in_trasporto`, ID conservato, nome nullo, stock −Q una volta, nessuna distribuzione; retry stessa chiave senza altro effetto. |
+| B           | Nome esterno aggiunto a volontario: `400`, Bolla ancora `confermato`, zero movimenti, stock invariato.                                                                       |
+| C           | Nome esterno preesistente: senza reinvio `200` e nome conservato; cambio nome tentato `400`.                                                                                 |
+| D           | Nessun incaricato e nessun nome: `400`, zero effetti.                                                                                                                        |
+| E           | Nome libero: 121 caratteri `400`; nome valido con trim `200`, unico incaricato e un solo scarico.                                                                            |
+| F           | Browser reale: volontario e nome esterno già assegnati mostrati senza input e senza `trasportatoreNome` nel POST; senza incaricato input obbligatorio e nome inviato.        |
+
+Test PostgreSQL/API mirati: CR-A…E **5/5**; sei file M4B.2/Bolle/
+Consegne **108/108**. Suite API finale in un singolo run sul DB fresh
+disposable: **119/119 file, 1378 pass, 2 skip AGEA preesistenti, 0 fail**.
+I due XLSX FSE originali sono stati verificati con gli stessi SHA del
+verbale M4 e realmente usati. Frontend completa Linux x64:
+**77/77 file, 415/415 pass, 0 fail**. E2E su UI/API/DB candidati:
+CR-F **1/1** mirato; spec M4B.2 completa **6/6** (Beneficiario, Ente,
+mancata consegna, rientro, Trasferimento); Consegne condivise **1/1**
+desktop e **1/1** viewport tablet simulato. La spec Consegne disattiva
+intenzionalmente il caso dell'altro progetto in ciascun run: entrambe le
+prove uniche sono state eseguite, non sono prove manuali su tablet fisico.
+
+Fresh DB 42/42, seed/smoke, replay e verify 42/42 ripetuti nel laboratorio
+disposable. L'upgrade autentico popolato 41→42, parità, runner 24/24,
+reporting G6, runtime WEB e codegen doppio restano evidenze M4 applicabili:
+nessuno dei relativi input cambia rispetto alla base. Verifica SHA-256:
+migration 42 `d5714bc6c4f8c0699994a0b953f6ea47d57a22fae215cf90cdff069eda52994c`;
+runtime `a189f1174cca6f20ab0cab910005a2cded75e3067fa4a52c68a03d45101e83e4`,
+test runtime `7a2d3400c68dc8aae2a1105ed7fa54aa06c2f675970a068351e168c1ba5cb20b`,
+OpenAPI `6bb6a07600a9399ebc90410a45cd2de8a465402dfac2c2d5c55d3b20467e5a91`;
+generated invariato nel diff Git (hash M4
+`41fc0f32bd6292cc2452b392e3ed087959d5dd8530723e6fd901b7a7b6237b45`).
+Nessuna migration 43 o modifica a schema, OpenAPI, generated, reporting,
+runtime, permessi o modello inventariale.
+
+Frozen install pnpm 10/Node 24, build API e WEB Linux x64, typecheck
+workspace e bundle budget superati; entry candidato **1322,5 KiB / 366,5
+KiB gzip**, sotto il limite gzip 400 KiB. Prettier e `git diff --check`
+sono controlli finali prima della pubblicazione.
+
+Cronologia diagnostica: il primo fresh gate host ha incontrato `EPERM`
+nel sandbox locale; il rerun autorizzato sul solo PostgreSQL disposable è
+passato. Il primo frontend Linux usava `NODE_ENV=production` ereditato
+dallo stadio di build, dove React non esporta `act`: il rerun con
+`NODE_ENV=test` è interamente verde. Il tentativo E2E host non ha avviato
+Vite per il modulo nativo macOS `lightningcss.darwin-arm64.node` assente;
+le spec sono state eseguite senza cambi di policy/dependency nel runner
+Playwright Linux temporaneo. Nessuna di queste failure è nascosta o
+dichiarata un pass. L'E2E multi-spec del precedente M4 resta una
+limitazione storica del pool singleton; qui le spec sono state eseguite
+in processi isolati, senza skip/retry aggiunti al prodotto.
+
+Il Docker persistente e `main` restano fuori dal perimetro. Le risorse
+temporanee CR-M4-01 sono rimosse nominativamente al termine. Stato M4:
+**`OK-TEST-M4/NE-MAN`**; `NE-MAN-CAMERA` e `NE-MAN-TABLET` non sono superati.

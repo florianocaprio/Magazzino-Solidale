@@ -32,6 +32,7 @@ import {
   createMagazzino,
   createProdotto,
   createUtente,
+  createVolontario,
   insertBolla,
   insertBollaRiga,
   insertConsegna,
@@ -279,6 +280,155 @@ afterEach(async () => {
 });
 afterAll(async () => {
   await pool.end();
+});
+
+describe("CR-M4-01 — incaricato esclusivo in Affida", () => {
+  it("CR-M4-01-A: usa il volontario assegnato senza nome esterno né distribuzione", async () => {
+    const volontarioId = await createVolontario(scope, centreId);
+    const id = await readyBolla(2);
+    await db
+      .update(bolleTable)
+      .set({ volontarioConsegnaId: volontarioId })
+      .where(eq(bolleTable.id, id));
+
+    const payload = command(await bollaVersion(id));
+    const response = await request(bollaApp())
+      .post(`/bolle/${id}/affida`)
+      .send(payload);
+    expect(response.status, response.text).toBe(200);
+    expect(response.body).toMatchObject({
+      stato: "in_trasporto",
+      volontarioConsegnaId: volontarioId,
+      trasportatoreNome: null,
+    });
+    expect(await lotAmount()).toBe(98);
+    const movements = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.bollaId, id));
+    expect(movements).toHaveLength(1);
+    expect(movements[0]).toMatchObject({
+      tipoDettaglio: "affidamento_trasporto",
+      naturaContabile: "AFFIDAMENTO_TRASPORTO",
+    });
+    const retry = await request(bollaApp())
+      .post(`/bolle/${id}/affida`)
+      .send(payload);
+    expect(retry.status, retry.text).toBe(200);
+    expect(await lotAmount()).toBe(98);
+    expect(
+      await db
+        .select()
+        .from(operazioniDistribuzioneMagazzinoTable)
+        .where(eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, id)),
+    ).toHaveLength(0);
+  });
+
+  it("CR-M4-01-B: rifiuta nome esterno se il volontario è già assegnato", async () => {
+    const volontarioId = await createVolontario(scope, centreId);
+    const id = await readyBolla(2);
+    await db
+      .update(bolleTable)
+      .set({ volontarioConsegnaId: volontarioId })
+      .where(eq(bolleTable.id, id));
+
+    const response = await request(bollaApp())
+      .post(`/bolle/${id}/affida`)
+      .send(command(await bollaVersion(id), { trasportatoreNome: "Esterno" }));
+    expect(response.status, response.text).toBe(400);
+    expect(response.body.error).toMatch(/volontario OPPURE/i);
+    const [bolla] = await db
+      .select()
+      .from(bolleTable)
+      .where(eq(bolleTable.id, id));
+    expect(bolla).toMatchObject({
+      stato: "confermato",
+      volontarioConsegnaId: volontarioId,
+      trasportatoreNome: null,
+    });
+    expect(await lotAmount()).toBe(100);
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.bollaId, id)),
+    ).toHaveLength(0);
+  });
+
+  it("CR-M4-01-C: conserva il nome esterno già assegnato senza reinvio", async () => {
+    const id = await readyBolla(2);
+    await db
+      .update(bolleTable)
+      .set({ trasportatoreNome: "Incaricato già assegnato" })
+      .where(eq(bolleTable.id, id));
+
+    const changed = await request(bollaApp())
+      .post(`/bolle/${id}/affida`)
+      .send(
+        command(await bollaVersion(id), { trasportatoreNome: "Altro nome" }),
+      );
+    expect(changed.status, changed.text).toBe(400);
+    expect(await lotAmount()).toBe(100);
+
+    const response = await request(bollaApp())
+      .post(`/bolle/${id}/affida`)
+      .send(command(await bollaVersion(id)));
+    expect(response.status, response.text).toBe(200);
+    expect(response.body).toMatchObject({
+      stato: "in_trasporto",
+      volontarioConsegnaId: null,
+      trasportatoreNome: "Incaricato già assegnato",
+    });
+    expect(await lotAmount()).toBe(98);
+  });
+
+  it("CR-M4-01-D: senza incaricato il nome è obbligatorio", async () => {
+    const id = await readyBolla(2);
+    const response = await request(bollaApp())
+      .post(`/bolle/${id}/affida`)
+      .send(command(await bollaVersion(id)));
+    expect(response.status, response.text).toBe(400);
+    expect(response.body.error).toMatch(/indicare il trasportatore/i);
+    const [bolla] = await db
+      .select()
+      .from(bolleTable)
+      .where(eq(bolleTable.id, id));
+    expect(bolla.stato).toBe("confermato");
+    expect(await lotAmount()).toBe(100);
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.bollaId, id)),
+    ).toHaveLength(0);
+  });
+
+  it("CR-M4-01-E: salva soltanto un nome libero valido e scarica una volta", async () => {
+    const id = await readyBolla(2);
+    const version = await bollaVersion(id);
+    const tooLong = await request(bollaApp())
+      .post(`/bolle/${id}/affida`)
+      .send(command(version, { trasportatoreNome: "A".repeat(121) }));
+    expect(tooLong.status, tooLong.text).toBe(400);
+    expect(await lotAmount()).toBe(100);
+
+    const response = await request(bollaApp())
+      .post(`/bolle/${id}/affida`)
+      .send(command(version, { trasportatoreNome: "  Autista esterno  " }));
+    expect(response.status, response.text).toBe(200);
+    expect(response.body).toMatchObject({
+      stato: "in_trasporto",
+      volontarioConsegnaId: null,
+      trasportatoreNome: "Autista esterno",
+    });
+    expect(await lotAmount()).toBe(98);
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.bollaId, id)),
+    ).toHaveLength(1);
+  });
 });
 
 describe("M4B.2 — effetto fisico e Bolla affidata", () => {

@@ -105,6 +105,7 @@ async function createReadyBolla(
   data: Fixture,
   amount: number,
   owner: "beneficiario" | "ente" = "beneficiario",
+  assignee: { volontarioConsegnaId?: number; trasportatoreNome?: string } = {},
 ): Promise<Document> {
   let enteId: number | undefined;
   if (owner === "ente") {
@@ -122,6 +123,7 @@ async function createReadyBolla(
         beneficiarioId: owner === "beneficiario" ? data.beneficiaryId : null,
         enteDestinatarioId: enteId ?? null,
         magazzinoId: data.originId,
+        ...assignee,
       },
     }),
     201,
@@ -145,6 +147,26 @@ async function createReadyBolla(
     }),
     200,
   );
+}
+
+async function createAssignedVolunteer(beneficiaryId: number) {
+  const result = await database.query<{ id: number; cognome: string }>(
+    `INSERT INTO volontari (
+       nome, cognome, ruolo, centro_ascolto_id, attivo, stato_approvazione
+     )
+     SELECT 'Volontario', $1, 'autista', centro_ascolto_id, true, 'approvato'
+     FROM beneficiari WHERE id = $2
+     RETURNING id, cognome`,
+    [`CR-M4-${randomUUID().slice(0, 8)}`, beneficiaryId],
+  );
+  expect(result.rows).toHaveLength(1);
+  await database.query(
+    `INSERT INTO coperture_assicurative_volontari (
+       volontario_id, data_inizio, data_fine, tipo_operazione, note
+     ) VALUES ($1, '2000-01-01', '2099-12-31', 'NUOVA_COPERTURA', $2)`,
+    [result.rows[0].id, "Copertura sintetica E2E CR-M4-01"],
+  );
+  return result.rows[0];
 }
 
 async function openBolla(page: Page, id: number) {
@@ -189,6 +211,98 @@ test.describe("M4B.2 — browser, API e ledger su candidato reale", () => {
       "I lifecycle mutanti M4B.2 girano una volta sul desktop",
     );
     await login(page);
+  });
+
+  test("CR-M4-01-F: Affida riusa volontario o nome esterno e richiede il nome solo se assente", async ({
+    page,
+  }) => {
+    const volunteerData = await fixture(page);
+    const volunteer = await createAssignedVolunteer(
+      volunteerData.beneficiaryId,
+    );
+    const volunteerBolla = await createReadyBolla(
+      page,
+      volunteerData,
+      1,
+      "beneficiario",
+      { volontarioConsegnaId: volunteer.id },
+    );
+    let detail = await openBolla(page, volunteerBolla.id);
+    await detail.getByRole("button", { name: /affida al trasporto/i }).click();
+    let dialog = page.getByRole("dialog", { name: /affida al trasporto/i });
+    await expect(dialog.getByTestId("bolla-affida-assignee")).toContainText(
+      volunteer.cognome,
+    );
+    await expect(dialog.getByLabel(/trasportatore o incaricato/i)).toHaveCount(
+      0,
+    );
+    const volunteerResponse = page.waitForResponse((response) =>
+      response.url().endsWith(`/api/bolle/${volunteerBolla.id}/affida`),
+    );
+    await dialog.getByRole("button", { name: /conferma affidamento/i }).click();
+    const volunteerResult = await volunteerResponse;
+    expect(volunteerResult.status()).toBe(200);
+    expect(volunteerResult.request().postDataJSON()).not.toHaveProperty(
+      "trasportatoreNome",
+    );
+    expect((await volunteerResult.json()).volontarioConsegnaId).toBe(
+      volunteer.id,
+    );
+
+    const externalData = await fixture(page);
+    const externalBolla = await createReadyBolla(
+      page,
+      externalData,
+      1,
+      "beneficiario",
+      { trasportatoreNome: "Incaricato esterno già assegnato" },
+    );
+    detail = await openBolla(page, externalBolla.id);
+    await detail.getByRole("button", { name: /affida al trasporto/i }).click();
+    dialog = page.getByRole("dialog", { name: /affida al trasporto/i });
+    await expect(dialog.getByTestId("bolla-affida-assignee")).toContainText(
+      "Incaricato esterno già assegnato",
+    );
+    await expect(dialog.getByLabel(/trasportatore o incaricato/i)).toHaveCount(
+      0,
+    );
+    const externalResponse = page.waitForResponse((response) =>
+      response.url().endsWith(`/api/bolle/${externalBolla.id}/affida`),
+    );
+    await dialog.getByRole("button", { name: /conferma affidamento/i }).click();
+    const externalResult = await externalResponse;
+    expect(externalResult.status()).toBe(200);
+    expect(externalResult.request().postDataJSON()).not.toHaveProperty(
+      "trasportatoreNome",
+    );
+    expect((await externalResult.json()).trasportatoreNome).toBe(
+      "Incaricato esterno già assegnato",
+    );
+
+    const unassignedData = await fixture(page);
+    const unassignedBolla = await createReadyBolla(page, unassignedData, 1);
+    detail = await openBolla(page, unassignedBolla.id);
+    await detail.getByRole("button", { name: /affida al trasporto/i }).click();
+    dialog = page.getByRole("dialog", { name: /affida al trasporto/i });
+    await expect(dialog.getByTestId("bolla-affida-assignee")).toHaveCount(0);
+    const freeName = dialog.getByLabel(/trasportatore o incaricato/i);
+    await expect(freeName).toBeVisible();
+    const confirm = dialog.getByRole("button", {
+      name: /conferma affidamento/i,
+    });
+    await expect(confirm).toBeDisabled();
+    await freeName.fill("Nome libero CR-M4-01");
+    await expect(confirm).toBeEnabled();
+    const unassignedResponse = page.waitForResponse((response) =>
+      response.url().endsWith(`/api/bolle/${unassignedBolla.id}/affida`),
+    );
+    await confirm.click();
+    const unassignedResult = await unassignedResponse;
+    expect(unassignedResult.status()).toBe(200);
+    expect(unassignedResult.request().postDataJSON()).toHaveProperty(
+      "trasportatoreNome",
+      "Nome libero CR-M4-01",
+    );
   });
 
   test("Beneficiario: Affida → Conferma consegna senza secondo scarico", async ({

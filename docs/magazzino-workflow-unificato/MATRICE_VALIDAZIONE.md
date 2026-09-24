@@ -159,3 +159,24 @@ riportate in `ESITI_TEST_M4.md`, con le prove successivamente verdi. Gli
 skip AGEA preesistenti sono opzionali e non coprono M4. `NE-MAN-CAMERA` e
 `NE-MAN-TABLET` restano prove hardware fisiche non eseguite e non
 equivalgono agli E2E su viewport simulato.
+
+## CR-M4-01 — esclusività incaricato in `Affida`
+
+Il finding della code review successiva al candidato M4 è corretto sullo
+stesso branch, senza cambiare lo stato manuale della milestone.
+
+| ID         | Stato             | Evidenza                                                                                      |
+| ---------- | ----------------- | --------------------------------------------------------------------------------------------- |
+| CR-M4-01-A | OK-TEST-M4/NE-MAN | Volontario preservato, nome nullo, un solo scarico, nessuna distribuzione, retry unico.       |
+| CR-M4-01-B | OK-TEST-M4/NE-MAN | Nome esterno con volontario già assegnato: `400`, stato/stock/ledger invariati.               |
+| CR-M4-01-C | OK-TEST-M4/NE-MAN | Nome esterno assegnato conservato senza reinvio; cambio in `Affida` rifiutato.                |
+| CR-M4-01-D | OK-TEST-M4/NE-MAN | Nessun incaricato e nessun nome: `400`, zero effetti.                                         |
+| CR-M4-01-E | OK-TEST-M4/NE-MAN | Nome libero valido unico, massimo 120 caratteri, scarico una volta.                           |
+| CR-M4-01-F | OK-TEST-M4/NE-MAN | Browser: i due assegnati non richiedono input; non assegnato lo richiede; payload verificato. |
+
+API completa finale 1378 pass/2 skip AGEA preesistenti, frontend 415
+pass, E2E M4B.2 6/6 e Consegne 2 prove uniche verdi; fresh 42/42
+ripetuto. Le evidenze M4 su upgrade, schema, runner, reporting, runtime e
+codegen restano applicabili perché i loro input sono invariati. La
+validazione manuale M4B/M4 non è stata eseguita; `NE-MAN-CAMERA` e
+`NE-MAN-TABLET` restano pendenti.

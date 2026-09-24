@@ -2752,10 +2752,33 @@ router.post(
             "Lo snapshot del destinatario non è congelato",
           );
         }
+        const existingName = current.trasportatoreNome?.trim() || null;
+        if (current.volontarioConsegnaId != null && existingName) {
+          throw new BollaActionError(
+            409,
+            "La Bolla ha già due incaricati; correggere il documento",
+          );
+        }
+        if (current.volontarioConsegnaId != null && trasportatoreNome) {
+          throw new BollaActionError(
+            400,
+            "Indicare un volontario OPPURE un trasportatore esterno, non entrambi",
+          );
+        }
         if (
-          !trasportatoreNome &&
-          !current.trasportatoreNome &&
-          current.volontarioConsegnaId == null
+          existingName &&
+          trasportatoreNome &&
+          trasportatoreNome !== existingName
+        ) {
+          throw new BollaActionError(
+            400,
+            "L'incaricato già assegnato non può essere cambiato in Affida",
+          );
+        }
+        if (
+          current.volontarioConsegnaId == null &&
+          !existingName &&
+          !trasportatoreNome
         ) {
           throw new BollaActionError(
             400,
@@ -2797,7 +2820,12 @@ router.post(
           .update(bolleTable)
           .set({
             stato: "in_trasporto",
-            trasportatoreNome: trasportatoreNome ?? current.trasportatoreNome,
+            trasportatoreNome:
+              current.volontarioConsegnaId != null
+                ? null
+                : existingName
+                  ? current.trasportatoreNome
+                  : trasportatoreNome,
             operatoreId: req.user!.id,
             versione: current.versione + 1,
           })

@@ -1466,6 +1466,18 @@ export function BollaDettaglio({
       enabled: bolla != null && beneficiari != null,
     },
   });
+  const volontarioAssegnato =
+    bolla?.volontarioConsegnaId != null
+      ? volontari?.find((v) => v.id === bolla.volontarioConsegnaId)
+      : undefined;
+  const incaricatoAssegnato =
+    bolla?.volontarioConsegnaId != null
+      ? (bolla.volontarioNome ??
+        (volontarioAssegnato ? volontarioLabel(volontarioAssegnato) : null) ??
+        String(bolla.volontarioConsegnaId))
+      : (bolla?.trasportatoreNome?.trim() ?? null);
+  const richiedeNomeIncaricato =
+    bolla?.volontarioConsegnaId == null && !bolla?.trasportatoreNome?.trim();
   const { data: centri } = useListCentriAscolto();
   const { data: impostazioni, isLoading: impostazioniLoading } =
     useGetImpostazioniStampa();
@@ -1620,9 +1632,12 @@ export function BollaDettaglio({
   };
 
   const onAffida = () => {
-    if (!bolla || !affidaTrasportatore.trim()) return;
+    if (!bolla || (richiedeNomeIncaricato && !affidaTrasportatore.trim()))
+      return;
     const slot = `bolla:${bollaId}:entrust`;
-    const semantic = { trasportatoreNome: affidaTrasportatore.trim() };
+    const semantic = richiedeNomeIncaricato
+      ? { trasportatoreNome: affidaTrasportatore.trim() }
+      : {};
     affidaBolla.mutate(
       {
         id: bollaId,
@@ -2371,9 +2386,7 @@ export function BollaDettaglio({
                       variant="outline"
                       className="w-full"
                       onClick={() => {
-                        setAffidaTrasportatore(
-                          bolla.trasportatoreNome ?? bolla.volontarioNome ?? "",
-                        );
+                        setAffidaTrasportatore("");
                         setAffidaOpen(true);
                       }}
                       disabled={affidaBolla.isPending}
@@ -2486,19 +2499,32 @@ export function BollaDettaglio({
           <DialogHeader>
             <DialogTitle>{t("transportReturn.entrust")}</DialogTitle>
           </DialogHeader>
-          <Label htmlFor="bolla-affida-trasportatore">
-            {t("transportReturn.assignee")}
-          </Label>
-          <Input
-            id="bolla-affida-trasportatore"
-            value={affidaTrasportatore}
-            maxLength={120}
-            onChange={(event) => setAffidaTrasportatore(event.target.value)}
-          />
+          {richiedeNomeIncaricato ? (
+            <>
+              <Label htmlFor="bolla-affida-trasportatore">
+                {t("transportReturn.assignee")}
+              </Label>
+              <Input
+                id="bolla-affida-trasportatore"
+                value={affidaTrasportatore}
+                maxLength={120}
+                onChange={(event) => setAffidaTrasportatore(event.target.value)}
+              />
+            </>
+          ) : (
+            <p className="text-sm" data-testid="bolla-affida-assignee">
+              {t("transportReturn.assignedAssignee", {
+                name: incaricatoAssegnato,
+              })}
+            </p>
+          )}
           <DialogFooter>
             <Button
               onClick={onAffida}
-              disabled={!affidaTrasportatore.trim() || affidaBolla.isPending}
+              disabled={
+                (richiedeNomeIncaricato && !affidaTrasportatore.trim()) ||
+                affidaBolla.isPending
+              }
             >
               {t("transportReturn.confirmEntrust")}
             </Button>
