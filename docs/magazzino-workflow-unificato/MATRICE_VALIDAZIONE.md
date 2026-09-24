@@ -114,3 +114,48 @@ T01–T32 dettagliata è in `ESITI_TEST_M4A.md`.
 - Un test obbligatorio non eseguibile resta `NE`/bloccato.
 - Ogni regressione viene distinta da un difetto già presente in questa baseline.
 - Le righe subordinate possono essere aggiunte, ma gli ID originari non vengono rinominati o rimossi.
+
+## M4B.2 — sviluppo, prove mirate e validazione ancora pendente
+
+La decisione sul rientro è approvata, ma nessuna riga qui sotto è una
+validazione formale `##test M4` o manuale. `DEV-M4B.2/NE-TEST/NE-MAN`
+indica implementazione candidata nel working tree con prove di sviluppo.
+
+| ID                          | Stato                    | Prova di sviluppo presente; prova formale pendente                                                                                                  |
+| --------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BOLLA-DIRECT-REG, AFF-01…04 | DEV-M4B.2/NE-TEST/NE-MAN | Scarico diretto invariato; affidamento una volta, impegni convertiti, incaricato distinto dall'attore.                                              |
+| DEL-01…04                   | DEV-M4B.2/NE-TEST/NE-MAN | Esito fisico zero dopo affidamento, Beneficiario/Ente distinti, replay unico.                                                                       |
+| FAIL-01…02                  | DEV-M4B.2/NE-TEST/NE-MAN | Mancata consegna motivata, stato rientro atteso senza reintegro.                                                                                    |
+| RET-01…10                   | DEV-M4B.2/NE-TEST/NE-MAN | Idonea, deteriorata, scaduta, mancante e rubata; 18/1/1 → 98, over/under-return e doppio comando respinti, stato terminale. Nessuna classe `altro`. |
+| TR-RET-01…05, TR-REG-M4B1   | DEV-M4B.2/NE-TEST/NE-MAN | Rientro all'origine, nessuna entrata al destino, partita FEFO multipla, regressione del percorso ricevuto preservata.                               |
+| DB-RET-01, CONC-AFF/RET-01  | DEV-M4B.2/NE-TEST/NE-MAN | FK composta su uscita/documento e serializzazione osservata con lock PostgreSQL.                                                                    |
+| REP-M4B2                    | DEV-M4B.2/NE-TEST/NE-MAN | Proiezione fisica del ledger separata dal fatto contabile di distribuzione; test 100→80 e 100→98; riesame completo richiesto in `##test M4`.        |
+
+Migrazione 42 fresh e runner, codegen, typecheck e suite di sviluppo sono
+registrati in `ESITI_SVILUPPO_M4B2.md`. Restano `NE-MAN-CAMERA` e
+`NE-MAN-TABLET`; non sono dichiarati superati.
+
+## M4 — test formale integrato M4A + M4B.1 + M4B.2
+
+`OK-TEST-M4/NE-MAN` indica che i gate automatici G1–G10 della milestone
+integrata sono stati valutati sul candidato finale; **non** aggiunge una
+validazione umana a M4B.1, M4B.2 o M4 complessiva. M4A conserva invece la
+propria precedente validazione manuale `OK-MAN-M4A`. Le righe storiche di
+sviluppo sopra restano come cronologia e non come stato corrente.
+
+| Gruppo                        | Stato automatico M4   | Evidenza formale                                                                                                                           |
+| ----------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| M4-DIRECT-01, REG-M4A         | OK-TEST-M4/NE-MAN-M4B | Consegna diretta con un solo scarico, Beneficiario/Ente e fatto finale corretti; regressioni M4A/API/E2E verdi.                            |
+| PREP-TR-01…10                 | OK-TEST-M4/NE-MAN     | Richiesto, Pronto, FEFO, prenotazioni comuni, partenza, ricezione, scope e concorrenza preservati.                                         |
+| M4-AFF-01…04, M4-DEL-01…03    | OK-TEST-M4/NE-MAN     | Uscita all'affidamento, autore/incaricato distinti, consegna Beneficiario/Ente come esito neutro, replay unico.                            |
+| M4-FAIL-01, M4-RET-01…11      | OK-TEST-M4/NE-MAN     | Mancata consegna senza reintegro; cinque classi esclusive, stock/lineage, documenti automatici/anomalie e terminalità.                     |
+| M4-TR-01…06, M4-TR-RET-01…06  | OK-TEST-M4/NE-MAN     | Ricezione normale e same/cross Area; rientro all'origine senza carico a destino.                                                           |
+| STORNO-01…05, CONC-M4         | OK-TEST-M4/NE-MAN     | Effetto fisico dello storno, lock osservabili, idempotenza, stale, revoca, audit e ricevuta.                                               |
+| REPORT-M4-A…D, REPORT-M4-B-KG | OK-TEST-M4/NE-MAN     | 100→80 diretto/trasportato, 100→98 misto, Ente senza sociale, kg FSE+ e as-of corretti.                                                    |
+| DB-M4-42, REG-M4              | OK-TEST-M4/NE-MAN     | Fresh 42/42, upgrade popolato 41→42, parità, runner 24/24, API 1373/2 skip AGEA, frontend 415, E2E 24 prove uniche, build/runtime/codegen. |
+
+Le failure intermedie e la composizione E2E multi-spec non verde sono
+riportate in `ESITI_TEST_M4.md`, con le prove successivamente verdi. Gli
+skip AGEA preesistenti sono opzionali e non coprono M4. `NE-MAN-CAMERA` e
+`NE-MAN-TABLET` restano prove hardware fisiche non eseguite e non
+equivalgono agli E2E su viewport simulato.

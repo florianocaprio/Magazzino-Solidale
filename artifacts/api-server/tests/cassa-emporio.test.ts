@@ -1893,9 +1893,16 @@ describe("Cassa Emporio", () => {
     });
     const lottoId = lottoIds.at(-1)!;
     const sessione = await openSession(fixture.accessoId);
-    await addProduct(sessione.body.id, prodottoId, 1);
-    await postSessionAction(sessione.body.id, "pronta-per-chiusura");
+    expect(sessione.status, sessione.text).toBe(201);
+    const add = await addProduct(sessione.body.id, prodottoId, 1);
+    expect(add.status, add.text).toBe(201);
+    const ready = await postSessionAction(
+      sessione.body.id,
+      "pronta-per-chiusura",
+    );
+    expect(ready.status, ready.text).toBe(200);
     const close = await postSessionAction(sessione.body.id, "chiudi");
+    expect(close.status, close.text).toBe(200);
     await trackSpesa(close.body.spesa.id);
     const [lottoPrima] = await db
       .select()

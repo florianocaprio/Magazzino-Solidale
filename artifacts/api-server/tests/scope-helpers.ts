@@ -49,6 +49,8 @@ import {
   registroVolontariEventiTable,
   statiVolontariTable,
   entiDestinatariTable,
+  rientriTrasportoTable,
+  rientroTrasportoRigheTable,
 } from "@workspace/db";
 import { inArray, sql } from "drizzle-orm";
 
@@ -491,6 +493,11 @@ export async function createUtente(
   scope: SeedScope,
   opts: { centroId?: number | null; ruoloId?: number | null } = {},
 ): Promise<number> {
+  // Session stubs do not bypass the M4B.2 post-lock DB permission recheck.
+  const roleId =
+    opts.ruoloId === undefined
+      ? await createRuolo(scope, { isAdmin: true })
+      : opts.ruoloId;
   const [u] = await db
     .insert(utentiTable)
     .values({
@@ -499,7 +506,7 @@ export async function createUtente(
       nome: "Test",
       cognome: "Utente",
       centroAscoltoId: opts.centroId ?? null,
-      ruoloId: opts.ruoloId ?? null,
+      ruoloId: roleId,
     })
     .returning({ id: utentiTable.id });
   scope.utenteIds.push(u.id);
@@ -788,6 +795,37 @@ export async function insertMovimento(
 
 /** Deletes every row created under this scope, in FK-safe (child→parent) order. */
 export async function cleanup(scope: SeedScope): Promise<void> {
+  const returnHeaders =
+    scope.magazzinoIds.length > 0
+      ? await db
+          .select({ id: rientriTrasportoTable.id })
+          .from(rientriTrasportoTable)
+          .where(
+            inArray(
+              rientriTrasportoTable.magazzinoOrigineId,
+              scope.magazzinoIds,
+            ),
+          )
+      : [];
+  const returnIds = returnHeaders.map((item) => item.id);
+  const returnLines =
+    returnIds.length > 0
+      ? await db
+          .select({ scaricoId: rientroTrasportoRigheTable.scaricoId })
+          .from(rientroTrasportoRigheTable)
+          .where(inArray(rientroTrasportoRigheTable.rientroId, returnIds))
+      : [];
+  const automaticScaricoIds = returnLines.flatMap((item) =>
+    item.scaricoId == null ? [] : [item.scaricoId],
+  );
+  if (returnIds.length > 0) {
+    await db
+      .delete(rientroTrasportoRigheTable)
+      .where(inArray(rientroTrasportoRigheTable.rientroId, returnIds));
+    await db
+      .delete(rientriTrasportoTable)
+      .where(inArray(rientriTrasportoTable.id, returnIds));
+  }
   if (scope.emissioneRegistroIds.length > 0) {
     await db
       .delete(emissioniRegistroVolontariTable)
@@ -907,13 +945,16 @@ export async function cleanup(scope: SeedScope): Promise<void> {
       .delete(consegneTable)
       .where(inArray(consegneTable.id, cleanupConsegnaIds));
   }
-  if (scope.scaricoIds.length > 0) {
+  const allScaricoIds = [
+    ...new Set([...scope.scaricoIds, ...automaticScaricoIds]),
+  ];
+  if (allScaricoIds.length > 0) {
     await db
       .delete(scaricoRigheTable)
-      .where(inArray(scaricoRigheTable.scaricoId, scope.scaricoIds));
+      .where(inArray(scaricoRigheTable.scaricoId, allScaricoIds));
     await db
       .delete(scarichiTable)
-      .where(inArray(scarichiTable.id, scope.scaricoIds));
+      .where(inArray(scarichiTable.id, allScaricoIds));
   }
   if (scope.approvvigionamentoIds.length > 0) {
     await db

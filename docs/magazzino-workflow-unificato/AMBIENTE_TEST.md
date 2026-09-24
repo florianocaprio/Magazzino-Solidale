@@ -1086,3 +1086,70 @@ Il controllo finale `docker ps -a`, `docker network ls` e
 `magazzino-solidale_magazzino_uploads` sono ancora presenti. Le reti
 storiche e le risorse di altri progetti non sono state modificate.
 Nessun prune, Docker persistente invariato.
+
+### M4B.2 — laboratorio disposable dello sviluppo
+
+Lo sviluppo M4B.2 ha usato soltanto PostgreSQL nel container
+`magazzino-m4b2-dev-db-20260924` (ID `eaa91acf7f1a`), immagine
+`postgres:16-alpine`, porta `127.0.0.1:55442`, dati su tmpfs
+`/var/lib/postgresql/data` da 1 GiB, senza mount o volume Docker.
+Il database interno era dedicato alle prove e ai fresh 42/42; il runner
+ha creato e rimosso propri database interni temporanei. Una prima
+istanza con lo stesso nome, anch'essa `--rm`, era stata fermata dopo
+la correzione della migrazione 42; la seconda è stata arrestata per nome
+al termine delle verifiche ed eliminata automaticamente.
+
+Non sono state create reti dedicate M4B.2, volumi temporanei o immagini
+candidate. Il controllo finale `docker ps -a`, `docker network ls` e
+`docker volume ls` non mostra risorse M4B.2 residue. I container protetti
+restano attivi con gli ID iniziali: `magazzino-postgres` `57e462be280a`,
+`magazzino-api` `2beebbad6c21`, `magazzino-web` `f344ed86a768`.
+I volumi persistenti `magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads` sono presenti e non sono stati
+modificati. Reti storiche e risorse di altri progetti sono state solo
+inventariate, mai toccate. Nessun prune o aggiornamento del Docker
+persistente.
+
+### M4 — laboratorio formale disposable e cleanup
+
+La validazione formale M4 del 24 settembre ha usato soltanto risorse
+nominative disposable, con rete isolata
+`magazzino-m4-formal-net-20260924` e PostgreSQL
+`magazzino-m4-formal-db-20260924` (`--rm`, dati su tmpfs, porta host
+solo `127.0.0.1:55442`, nessun volume Docker). Database interni di prova:
+`m4_fresh`, `m4_fresh2`, `m4_upgrade41`, `m4_upgrade41_fixed`,
+`m4_api_final`…`m4_api_final5`, `m4_e2e`, `m4_e2e_final` e
+`m4_e2e_final2`, oltre ai DB temporanei auto-gestiti dal runner.
+L'upgrade autentico ha usato una copia `git archive` della base 41 in
+`/private/tmp/m4-base41-dWZQqU`, non il repository corrente né il DB
+persistente. I due XLSX FSE originali sono stati letti come file di input
+del laboratorio, non copiati nel repository.
+
+I container applicativi candidati erano
+`magazzino-m4-formal-api-20260924` e
+`magazzino-m4-formal-web-20260924`. Le immagini nominate erano
+`magazzino-m4-formal-build:20260924`,
+`magazzino-m4-formal-api:20260924`,
+`magazzino-m4-formal-web:20260924` e
+`magazzino-m4-formal-playwright:20260924`. I runner Playwright erano
+container one-shot `--rm` con prefisso `magazzino-m4-formal-`, senza
+volumi persistenti. Per gli E2E è stata usata una credenziale sintetica
+solo nei DB disposable; nessun file di credenziali è nel repository.
+L'API E2E è stata riavviata esclusivamente nel laboratorio per usare
+una copia fresh e disabilitare il geocoding pubblico.
+
+Cleanup nominativo completato: arrestati e auto-rimossi i tre container
+M4; eliminata la sola rete M4 e le quattro immagini M4; eliminate le due
+configurazioni temporanee Playwright nel repository, il Dockerfile
+temporaneo `/private/tmp/m4-formal-playwright-20260924.Dockerfile` e
+l'archivio temporaneo esatto della base 41. Non è stato creato alcun
+volume Docker M4; i database temporanei sono spariti con il container
+PostgreSQL su tmpfs. Nessun prune, `down -v` o cleanup globale.
+
+L'inventario finale `docker ps -a`, `docker network ls` e
+`docker volume ls` non mostra risorse M4-formal. Restano attivi e con gli
+ID iniziali `magazzino-web` `f344ed86a768`, `magazzino-api`
+`2beebbad6c21` e `magazzino-postgres` `57e462be280a`; i volumi
+`magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads` sono presenti e non toccati.
+Reti/volumi storici e risorse di altri progetti sono rimasti invariati.

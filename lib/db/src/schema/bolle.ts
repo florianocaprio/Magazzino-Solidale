@@ -84,6 +84,9 @@ export const bolleTable = pgTable(
       length: 500,
     }),
     motivoAnnullamento: varchar("motivo_annullamento", { length: 500 }),
+    motivoMancataConsegna: varchar("motivo_mancata_consegna", {
+      length: 500,
+    }),
     versione: integer("versione").notNull().default(1),
     dataCreazione: timestamp("data_creazione").notNull().defaultNow(),
   },

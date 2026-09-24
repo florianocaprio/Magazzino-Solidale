@@ -189,3 +189,51 @@ Questo paragrafo aggiorna lo stato di sviluppo rispetto all'«Obiettivo M4B,
 non implementato» storico sopra: il solo slice M4B.1 è presente nel working
 tree. Mancano ancora `##test M4B.1` e validazione manuale; affidamento e
 rientro M4B.2 non sono iniziati. Il Docker persistente rimane M4A.
+
+## Incremento M4B.2 nel working tree (24 settembre 2026)
+
+La base approvata M4B.1 è `98835207ed047dd764633b234ba91f87738c296b`.
+M4B.2 aggiunge, senza alterare i dati storici, l'affidamento Bolla che
+converte le prenotazioni in uscite fisiche, e la successiva consegna che
+registra un evento `esito` a effetto fisico zero. La consegna diretta M4A
+mantiene invece il proprio scarico fisico. Un servizio di finalizzazione
+condiviso serve sia la Bolla sia la pagina Consegne.
+
+Dopo mancata consegna o mancato arrivo, il documento passa a
+`rientro_atteso`, senza alterare la giacenza. La riconciliazione prende le
+partite dal ledger di uscita, esige quantità esatte per ciascun movimento e
+registra un'unica testata con righe/classi collegate al movimento originario.
+Il Magazzino di rientro è vincolato all'origine. Un vincolo owner esclusivo,
+unicità per documento, FK composte e trigger PostgreSQL impediscono la
+commistione tra documento, uscita, prodotto e lotto.
+
+Idonea produce rientro `+Q` sul lotto originario; deteriorata/scaduta
+producono rientro `+Q` e Scarico automatico `-Q` nello stesso commit;
+mancante/rubata producono soltanto esito/documento di anomalia a effetto
+fisico zero. Il documento di riconciliazione è stampabile come PDF derivato,
+mentre gli scarti usano il documento Scarichi esistente. La classificazione
+`altro` non esiste. Il ledger `movimenti` rimane unico: la proiezione del
+segno fisico usa tipo/dettaglio del movimento, quella contabile distingue
+distribuzione finale e custodia. Il reporting as-of è stato adattato per non
+sottrarre due volte l'esito successivo all'affidamento.
+
+La migrazione additiva è la 42. API, tipi generati, UI, test e documentazione
+nel working tree costituiscono **solo sviluppo candidato**:
+`DEV-M4B.2/NE-TEST/NE-MAN`. Il successivo `##test M4` deve ancora verificare
+formalmente regressioni, upgrade popolato, build compatibile, review e
+validazione manuale; il Docker persistente resta invariato.
+
+## Verifica formale integrata M4
+
+Il separato `##test M4`, registrato in `ESITI_TEST_M4.md`, ha verificato
+insieme M4A diretto, le prenotazioni comuni M4B.1 e il ciclo fisico M4B.2.
+La stessa quantità non è scaricata alla consegna dopo l'affidamento: il
+ledger distingue uscita fisica, esito, distribuzione e rientro. Sono stati
+testati anche il ramo Ente senza fatto sociale, il rientro Trasferimento
+senza entrata al destino, scarto reale di merce deteriorata/scaduta e
+anomalia non fisica di merce mancante/rubata. L'upgrade popolato 41→42 non
+riclassifica i documenti storici e la migration 42 è in parità con Drizzle.
+
+L'evidenza automatica non modifica il contratto approvato e non sostituisce
+la prova manuale. Il Docker locale persistente rimane alla sua versione
+precedente finché un mandato separato non ne autorizzerà l'aggiornamento.

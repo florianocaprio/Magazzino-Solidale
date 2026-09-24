@@ -12,7 +12,7 @@ import {
   prenotazioniMagazzinoTable,
   prodottiTable,
 } from "@workspace/db";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
 import { requireOperationalMagazzino } from "./inventoryLedger";
 import { lockInventoryLotsInGlobalOrder } from "./inventoryLocks";
@@ -47,9 +47,15 @@ import {
   storeDocumentCommand,
   validateDocumentCommand,
 } from "./documentCommand";
+import { movementPhysicalEffect } from "./movementPhysicalEffect";
+import {
+  CurrentCommandActorError,
+  requireCurrentCommandActor,
+} from "./currentCommandActor";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 const PRENOTAZIONE_CONVERTITA = "convertita_in_scarico";
+const PRENOTAZIONE_CONVERTITA_AFFIDAMENTO = "convertita_in_affidamento";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -74,6 +80,10 @@ export function handleBollaActionError(err: unknown, res: Response): boolean {
     return true;
   }
   if (err instanceof BollaActionError) {
+    res.status(err.status).json({ error: err.message });
+    return true;
+  }
+  if (err instanceof CurrentCommandActorError) {
     res.status(err.status).json({ error: err.message });
     return true;
   }
@@ -259,7 +269,19 @@ export async function stornoRigheTx(
       and(
         eq(movimentiTable.bollaId, bollaId),
         inArray(movimentiTable.bollaRigaId, rigaIds),
-        eq(movimentiTable.tipoMovimento, "scarico"),
+        or(
+          and(
+            eq(movimentiTable.tipoMovimento, "scarico"),
+            ne(movimentiTable.tipoDettaglio, "affidamento_trasporto"),
+          ),
+          and(
+            eq(movimentiTable.tipoMovimento, "esito"),
+            inArray(movimentiTable.naturaContabile, [
+              "DISTRIBUZIONE_FINALE",
+              "CONSEGNA_ENTE",
+            ]),
+          ),
+        ),
       ),
     )
     .orderBy(
@@ -288,14 +310,25 @@ export async function stornoRigheTx(
         "Il movimento della Bolla è già stato stornato",
       );
     }
-    const lotto = await lockLotto(tx, mov.lottoId);
-    const nuovaQta = InventoryDecimal.parse(lotto.quantitaResidua).add(
-      InventoryDecimal.parse(mov.quantita),
-    );
-    await tx
-      .update(lottiTable)
-      .set({ quantitaResidua: nuovaQta.toDb() })
-      .where(eq(lottiTable.id, mov.lottoId));
+    const physicalEffect = movementPhysicalEffect(mov);
+    if (physicalEffect !== 0) {
+      const lotto = await lockLotto(tx, mov.lottoId);
+      const quantity = InventoryDecimal.parse(mov.quantita);
+      const nuovaQta =
+        physicalEffect < 0
+          ? InventoryDecimal.parse(lotto.quantitaResidua).add(quantity)
+          : InventoryDecimal.parse(lotto.quantitaResidua).subtract(quantity);
+      if (nuovaQta.isNegative()) {
+        throw new BollaActionError(
+          409,
+          "Lo storno supererebbe la giacenza reale del lotto",
+        );
+      }
+      await tx
+        .update(lottiTable)
+        .set({ quantitaResidua: nuovaQta.toDb() })
+        .where(eq(lottiTable.id, mov.lottoId));
+    }
     await tx.insert(movimentiTable).values({
       tipoMovimento: "storno",
       tipoDettaglio: "storno_bolla",
@@ -347,13 +380,14 @@ export async function scarichiFisiciBolla(
   return rows.length;
 }
 
-async function convertiPrenotazioniAttiveInScarico(
+export async function convertiPrenotazioniAttiveInScarico(
   tx: Tx,
   bolla: typeof bolleTable.$inferSelect,
   opts: {
     dataMovimento: string;
     operatoreId: number;
     auditEventoId: number | null;
+    mode?: "consegna" | "affidamento";
   },
 ): Promise<number> {
   const prenotazioni = await tx
@@ -375,6 +409,44 @@ async function convertiPrenotazioniAttiveInScarico(
       asc(prenotazioniMagazzinoTable.id),
     );
 
+  const righeBolla = await tx
+    .select({
+      id: bollaRigheTable.id,
+      quantita: bollaRigheTable.quantita,
+    })
+    .from(bollaRigheTable)
+    .where(eq(bollaRigheTable.bollaId, bolla.id));
+  const reservedByRow = new Map<number, InventoryDecimal>();
+  for (const item of prenotazioni) {
+    if (item.p.rigaBollaId == null || !item.r || item.r.bollaId !== bolla.id) {
+      throw new BollaActionError(
+        409,
+        "Prenotazione priva di riga Bolla coerente",
+      );
+    }
+    reservedByRow.set(
+      item.p.rigaBollaId,
+      (reservedByRow.get(item.p.rigaBollaId) ?? InventoryDecimal.zero()).add(
+        InventoryDecimal.parse(item.p.quantita),
+      ),
+    );
+  }
+  if (
+    opts.mode === "affidamento" &&
+    (righeBolla.length === 0 ||
+      righeBolla.some(
+        (riga) =>
+          (reservedByRow.get(riga.id) ?? InventoryDecimal.zero()).compare(
+            InventoryDecimal.parse(riga.quantita),
+          ) !== 0,
+      ))
+  ) {
+    throw new BollaActionError(
+      409,
+      "Le prenotazioni non coprono esattamente la Bolla",
+    );
+  }
+
   await lockInventoryLotsInGlobalOrder(tx, {
     kind: "lot-ids",
     lottoIds: prenotazioni.map((row) => row.p.lottoId),
@@ -386,25 +458,26 @@ async function convertiPrenotazioniAttiveInScarico(
       ? "DOMICILIARE"
       : "RITIRO_SEDE"
     : "ALTRO";
-  const operation = isBeneficiario
-    ? await ensureDistributionOperation(tx, {
-        magazzinoId: bolla.magazzinoId,
-        dataDistribuzione: opts.dataMovimento,
-        canaleOperativo,
-        dominioOrigine: "BOLLA",
-        entitaOrigineTipo: "bolla",
-        entitaOrigineId: bolla.id,
-        areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
-        centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
-        territorioClassificazione:
-          bolla.areaOperativaIdSnapshot == null
-            ? "legacy_sconosciuto"
-            : "attribuito",
-        numeroDocumento: bolla.numeroBolla,
-        numeroPacchi: 1,
-        creatoDa: opts.operatoreId,
-      })
-    : null;
+  const operation =
+    isBeneficiario && opts.mode !== "affidamento"
+      ? await ensureDistributionOperation(tx, {
+          magazzinoId: bolla.magazzinoId,
+          dataDistribuzione: opts.dataMovimento,
+          canaleOperativo,
+          dominioOrigine: "BOLLA",
+          entitaOrigineTipo: "bolla",
+          entitaOrigineId: bolla.id,
+          areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+          centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
+          territorioClassificazione:
+            bolla.areaOperativaIdSnapshot == null
+              ? "legacy_sconosciuto"
+              : "attribuito",
+          numeroDocumento: bolla.numeroBolla,
+          numeroPacchi: 1,
+          creatoDa: opts.operatoreId,
+        })
+      : null;
 
   for (const row of prenotazioni) {
     const prenotazione = row.p;
@@ -438,7 +511,12 @@ async function convertiPrenotazioniAttiveInScarico(
 
     await tx.insert(movimentiTable).values({
       tipoMovimento: "scarico",
-      tipoDettaglio: isBeneficiario ? "consegna_beneficiario" : "consegna_ente",
+      tipoDettaglio:
+        opts.mode === "affidamento"
+          ? "affidamento_trasporto"
+          : isBeneficiario
+            ? "consegna_beneficiario"
+            : "consegna_ente",
       dataMovimento: opts.dataMovimento,
       magazzinoId: prenotazione.magazzinoId,
       prodottoId: prenotazione.prodottoId,
@@ -454,9 +532,12 @@ async function convertiPrenotazioniAttiveInScarico(
       bollaId: bolla.id,
       bollaRigaId: prenotazione.rigaBollaId,
       fondoOrigine: lotto.fondoOrigine,
-      naturaContabile: isBeneficiario
-        ? "DISTRIBUZIONE_FINALE"
-        : "CONSEGNA_ENTE",
+      naturaContabile:
+        opts.mode === "affidamento"
+          ? "AFFIDAMENTO_TRASPORTO"
+          : isBeneficiario
+            ? "DISTRIBUZIONE_FINALE"
+            : "CONSEGNA_ENTE",
       dominioOrigine: "BOLLA",
       entitaOrigineTipo: "bolla",
       entitaOrigineId: bolla.id,
@@ -469,11 +550,114 @@ async function convertiPrenotazioniAttiveInScarico(
 
     await tx
       .update(prenotazioniMagazzinoTable)
-      .set({ stato: PRENOTAZIONE_CONVERTITA, updatedAt: new Date() })
+      .set({
+        stato:
+          opts.mode === "affidamento"
+            ? PRENOTAZIONE_CONVERTITA_AFFIDAMENTO
+            : PRENOTAZIONE_CONVERTITA,
+        updatedAt: new Date(),
+      })
       .where(eq(prenotazioniMagazzinoTable.id, prenotazione.id));
   }
 
   return prenotazioni.length;
+}
+
+/** Final outcome of entrusted goods: accounting distribution, zero physical stock. */
+async function registraEsitoAffidamentoTx(
+  tx: Tx,
+  bolla: typeof bolleTable.$inferSelect,
+  opts: { dataMovimento: string; operatoreId: number; auditEventoId: number },
+): Promise<number> {
+  const uscite = await tx
+    .select()
+    .from(movimentiTable)
+    .where(
+      and(
+        eq(movimentiTable.bollaId, bolla.id),
+        eq(movimentiTable.tipoMovimento, "scarico"),
+        eq(movimentiTable.tipoDettaglio, "affidamento_trasporto"),
+      ),
+    )
+    .orderBy(asc(movimentiTable.id))
+    .for("update");
+  if (uscite.length === 0) {
+    throw new BollaActionError(409, "Nessuna merce affidata da consegnare");
+  }
+  const isBeneficiario = bolla.tipoDestinatario === "beneficiario";
+  const canaleOperativo = isBeneficiario
+    ? bolla.consegnaId != null
+      ? "DOMICILIARE"
+      : "RITIRO_SEDE"
+    : "ALTRO";
+  const operation = isBeneficiario
+    ? await ensureDistributionOperation(tx, {
+        magazzinoId: bolla.magazzinoId,
+        dataDistribuzione: opts.dataMovimento,
+        canaleOperativo,
+        dominioOrigine: "BOLLA",
+        entitaOrigineTipo: "bolla",
+        entitaOrigineId: bolla.id,
+        areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
+        territorioClassificazione:
+          bolla.areaOperativaIdSnapshot == null
+            ? "legacy_sconosciuto"
+            : "attribuito",
+        numeroDocumento: bolla.numeroBolla,
+        numeroPacchi: 1,
+        creatoDa: opts.operatoreId,
+      })
+    : null;
+  for (const uscita of uscite) {
+    const [existing] = await tx
+      .select({ id: movimentiTable.id })
+      .from(movimentiTable)
+      .where(
+        and(
+          eq(movimentiTable.movimentoOrigineId, uscita.id),
+          eq(movimentiTable.tipoMovimento, "esito"),
+          inArray(movimentiTable.naturaContabile, [
+            "DISTRIBUZIONE_FINALE",
+            "CONSEGNA_ENTE",
+          ]),
+        ),
+      );
+    if (existing)
+      throw new BollaActionError(409, "Esito di consegna già registrato");
+    await tx.insert(movimentiTable).values({
+      tipoMovimento: "esito",
+      tipoDettaglio: isBeneficiario ? "consegna_beneficiario" : "consegna_ente",
+      dataMovimento: opts.dataMovimento,
+      magazzinoId: uscita.magazzinoId,
+      prodottoId: uscita.prodottoId,
+      lottoId: uscita.lottoId,
+      quantita: uscita.quantita,
+      quantitaPezzi: uscita.quantitaPezzi,
+      quantitaKgLt: uscita.quantitaKgLt,
+      fattoreKgLtPezzo: uscita.fattoreKgLtPezzo,
+      unitaMisura: uscita.unitaMisura,
+      fornitoreId: uscita.fornitoreId,
+      beneficiarioId: isBeneficiario ? bolla.beneficiarioId : null,
+      bollaId: bolla.id,
+      bollaRigaId: uscita.bollaRigaId,
+      movimentoOrigineId: uscita.id,
+      fondoOrigine: uscita.fondoOrigine,
+      naturaContabile: isBeneficiario
+        ? "DISTRIBUZIONE_FINALE"
+        : "CONSEGNA_ENTE",
+      dominioOrigine: "BOLLA",
+      entitaOrigineTipo: "bolla",
+      entitaOrigineId: bolla.id,
+      rigaOrigineId: uscita.bollaRigaId,
+      operazioneDistribuzioneId: operation?.id ?? null,
+      canaleOperativo,
+      operatoreId: opts.operatoreId,
+      auditEventoId: opts.auditEventoId,
+      documentoRiferimento: bolla.numeroBolla,
+    });
+  }
+  return uscite.length;
 }
 
 async function syncConsegnaDaBollaTx(
@@ -576,6 +760,7 @@ export async function completeBollaDelivery(opts: {
   allowAlreadyConsegnata?: boolean;
   beneficiaryAccessScope: BeneficiarioAccessScope;
   expectedConsegna: { id: number; beneficiarioId: number } | null;
+  requiredPermission?: "bolle.deliver" | "consegne.complete";
   documentCommand?: {
     tipoComando: string;
     idempotencyKey: string;
@@ -600,6 +785,16 @@ export async function completeBollaDelivery(opts: {
       await lockConsegnaBollaRelation(tx, opts.expectedConsegna.id);
     }
     const current = await lockBolla(tx, opts.bollaId);
+    const freshActor = await requireCurrentCommandActor(
+      tx,
+      auditUserId(opts.audit),
+      opts.requiredPermission ?? "bolle.deliver",
+    );
+    const currentScope = {
+      areaOperativaId: freshActor.areaOperativaId,
+      centroAscoltoId: freshActor.centroAscoltoId,
+      zonaUdsId: freshActor.zonaUdsId,
+    };
     const isBeneficiario = current.tipoDestinatario === "beneficiario";
     const existingReceipt = opts.documentCommand
       ? await loadDocumentCommand(tx, {
@@ -608,11 +803,7 @@ export async function completeBollaDelivery(opts: {
         })
       : null;
     if (existingReceipt && opts.documentCommand) {
-      await lockAndAuthorizeBollaDeliveryScope(
-        tx,
-        current,
-        opts.beneficiaryAccessScope,
-      );
+      await lockAndAuthorizeBollaDeliveryScope(tx, current, currentScope);
       validateDocumentCommand(existingReceipt, {
         tipoComando: opts.documentCommand.tipoComando,
         idempotencyKey: opts.documentCommand.idempotencyKey,
@@ -655,7 +846,7 @@ export async function completeBollaDelivery(opts: {
     const reportingContext = await lockAndAuthorizeBollaDeliveryScope(
       tx,
       current,
-      opts.beneficiaryAccessScope,
+      currentScope,
     );
     if (
       opts.documentCommand &&
@@ -715,7 +906,7 @@ export async function completeBollaDelivery(opts: {
       return;
     }
 
-    if (current.stato !== "confermato") {
+    if (current.stato !== "confermato" && current.stato !== "in_trasporto") {
       throw new BollaActionError(
         400,
         "La bolla deve essere in stato confermato per essere consegnata",
@@ -762,7 +953,9 @@ export async function completeBollaDelivery(opts: {
       ...effectiveReportingSnapshot,
     };
 
-    await requireOperationalMagazzino(tx, effectiveBolla.magazzinoId);
+    if (current.stato === "confermato") {
+      await requireOperationalMagazzino(tx, effectiveBolla.magazzinoId);
+    }
     const operatoreId = auditUserId(opts.audit);
     const auditEventoId = await recordAuditEvent(tx, {
       command: opts.audit,
@@ -784,16 +977,19 @@ export async function completeBollaDelivery(opts: {
         ["confermaRicezione"],
       ),
     });
-    const convertite = await convertiPrenotazioniAttiveInScarico(
-      tx,
-      effectiveBolla,
-      {
-        dataMovimento,
-        operatoreId,
-        auditEventoId,
-      },
-    );
-    if (convertite === 0) {
+    const convertite =
+      current.stato === "in_trasporto"
+        ? await registraEsitoAffidamentoTx(tx, effectiveBolla, {
+            dataMovimento,
+            operatoreId,
+            auditEventoId,
+          })
+        : await convertiPrenotazioniAttiveInScarico(tx, effectiveBolla, {
+            dataMovimento,
+            operatoreId,
+            auditEventoId,
+          });
+    if (convertite === 0 && current.stato === "confermato") {
       const scarichiLegacy = await scarichiFisiciBolla(tx, opts.bollaId);
       if (scarichiLegacy === 0) {
         throw new BollaActionError(

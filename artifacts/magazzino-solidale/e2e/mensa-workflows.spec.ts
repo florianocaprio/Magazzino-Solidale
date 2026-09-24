@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { login, selectOption } from "./helpers";
 
@@ -43,7 +44,10 @@ test("Mensa autorizza una persona temporanea, registra il pasto e rende il repla
     canteen = (await response.json()) as Mensa;
   }
 
-  const suffix = Date.now();
+  const suffix = randomUUID()
+    .replaceAll("-", "")
+    .slice(0, 12)
+    .replace(/[0-9]/g, (digit) => String.fromCharCode(103 + Number(digit)));
   await page.goto("/mensa/postazione");
   await selectOption(
     page,
@@ -53,8 +57,8 @@ test("Mensa autorizza una persona temporanea, registra il pasto e rende il repla
   await page
     .getByRole("button", { name: /nuova persona.*accesso temporaneo/i })
     .click();
-  await page.getByLabel(/^nome$/i).fill(`Persona${suffix}`);
-  await page.getByLabel(/^cognome$/i).fill("Temporanea E2E");
+  await page.getByLabel(/^nome$/i).fill(`U${suffix}`);
+  await page.getByLabel(/^cognome$/i).fill(`V${suffix}`);
 
   await selectOption(
     page,
@@ -79,7 +83,10 @@ test("Mensa autorizza una persona temporanea, registra il pasto e rende il repla
     .getByRole("button", { name: /verifica e autorizza per oggi/i })
     .click();
   const temporaryAccessResponse = await temporaryAccessPromise;
-  expect(temporaryAccessResponse.status()).toBe(201);
+  expect(
+    temporaryAccessResponse.status(),
+    await temporaryAccessResponse.text(),
+  ).toBe(201);
   const access = (await temporaryAccessResponse.json()) as {
     id: number;
     beneficiarioId: number;

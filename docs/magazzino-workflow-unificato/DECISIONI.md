@@ -486,3 +486,34 @@ M4B.2 **non** fanno parte di questo incremento.
 
 Queste sono decisioni/requisiti; l'implementazione M4B.1 nel working tree è
 ancora `DEV-M4B.1/NE-TEST/NE-MAN`, non validazione formale o umana.
+
+## M4B.2 — decisione approvata sul rientro fisico
+
+La decisione successiva di Floriano chiude l'ambiguità della classificazione
+`altro`: **non è ammessa**. Ogni quantità realmente uscita deve essere
+riconciliata esattamente come idonea, deteriorata, scaduta, mancante o rubata.
+Idonea/deteriorata/scaduta sono merce fisicamente rientrata; mancante/rubata
+non lo sono. Le note restano descrittive, mai sostitutive della classe.
+
+Il rientro è sempre e soltanto nel Magazzino origine del documento, senza
+scelta dell'operatore, cambio Area o trasferimento implicito. Il lotto fisico
+si ricostruisce dal movimento reale di uscita, non dalla sola riga documento.
+L'idonea reintegra quel lotto; deteriorata e scaduta lo reintegrano e, nella
+stessa transazione, sono scaricate con il motore Scarichi esistente. Mancante
+e rubata generano documenti/eventi di anomalia a effetto fisico zero: nessun
+secondo scarico. Una riconciliazione completa chiude Bolla o Trasferimento in
+`rientrato`, stato terminale; un nuovo tentativo richiede un nuovo documento.
+
+Questa è una **decisione approvata**. Il codice M4B.2 nel working tree è
+`DEV-M4B.2/NE-TEST/NE-MAN`: le prove di sviluppo non equivalgono al separato
+`##test M4` né alla validazione manuale.
+
+### Evidenza formale successiva
+
+Il successivo `##test M4` ha verificato automaticamente la decisione nel
+ledger, nel DB PostgreSQL, nelle API, nella UI, nei PDF e nel reporting;
+vedere `ESITI_TEST_M4.md`. La classificazione `altro` resta assente, il
+rientro usa sempre origine e partita realmente uscita, e l'evento `esito`
+non diventa un secondo scarico. Questo è stato di **requisito approvato e
+test automatico**, non una nuova decisione né una validazione manuale:
+`NE-MAN` permane per M4B/M4.

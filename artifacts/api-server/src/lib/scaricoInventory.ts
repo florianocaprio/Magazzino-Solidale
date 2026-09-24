@@ -73,6 +73,7 @@ export interface InventorySourceContext {
   entitaOrigineId: number;
   canaleOperativo?: CanaleOperativo | null;
   operazioneDistribuzioneId?: number | null;
+  movimentoOrigineId?: number | null;
 }
 
 export interface ScaricoInventarialeInput {
@@ -208,6 +209,7 @@ async function scaricaRigaFefo(
       entitaOrigineId: input.source?.entitaOrigineId ?? null,
       rigaOrigineId: riga.rigaOrigineId ?? null,
       operazioneDistribuzioneId: operationId,
+      movimentoOrigineId: input.source?.movimentoOrigineId ?? null,
       canaleOperativo: input.source?.canaleOperativo ?? null,
       documentoRiferimento: input.documentoRiferimento ?? null,
       note: `Scarico ${input.codice}${riga.note ? ` — ${riga.note}` : ""}`,
@@ -292,6 +294,7 @@ async function scaricaRigaLottoEsatto(
     entitaOrigineId: input.source?.entitaOrigineId ?? null,
     rigaOrigineId: riga.rigaOrigineId ?? null,
     operazioneDistribuzioneId: operationId,
+    movimentoOrigineId: input.source?.movimentoOrigineId ?? null,
     canaleOperativo: input.source?.canaleOperativo ?? null,
     documentoRiferimento: input.documentoRiferimento ?? null,
     note: `Scarico ${input.codice}${riga.note ? ` — ${riga.note}` : ""}`,

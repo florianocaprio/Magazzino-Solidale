@@ -31,6 +31,7 @@ export const trasferimentiTable = pgTable(
     trasportatoreNome: varchar("trasportatore_nome", { length: 120 }),
     note: text("note"),
     motivoAnnullamento: varchar("motivo_annullamento", { length: 500 }),
+    motivoMancatoArrivo: varchar("motivo_mancato_arrivo", { length: 500 }),
     operatoreId: integer("operatore_id").references(() => utentiTable.id),
     mensaId: integer("mensa_id").references(() => menseTable.id),
     idempotencyKey: varchar("idempotency_key", { length: 80 }),

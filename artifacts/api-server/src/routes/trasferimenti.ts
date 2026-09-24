@@ -35,7 +35,7 @@ import {
   trasferimentoScopeFilter,
 } from "../lib/centroScope";
 import { requireModulo } from "../lib/featureFlags";
-import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
+import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
   inventoryPartyBusinessKey,
   lockInventoryPartyBusinessKeys,
@@ -77,6 +77,16 @@ import {
   requireIdempotencyKey,
   storeDocumentCommand,
 } from "../lib/documentCommand";
+import {
+  requireCurrentCommandActor,
+  CurrentCommandActorError,
+} from "../lib/currentCommandActor";
+import {
+  loadTransportReturnDetail,
+  reconcileTransportReturnTx,
+  TransportReturnError,
+  type ReturnLineInput,
+} from "../lib/transportReturn";
 
 const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
@@ -109,6 +119,10 @@ function hasPermission(req: Request, permission: string): boolean {
 }
 
 function sendDocumentCommandError(error: unknown, res: Response): boolean {
+  if (error instanceof CurrentCommandActorError) {
+    res.status(error.status).json({ error: error.message });
+    return true;
+  }
   if (databaseErrorCode(error) === "40P01") {
     res.status(409).json({
       error: "Operazione concorrente sul magazzino: ricarica i dati e riprova",
@@ -138,9 +152,17 @@ async function assertCurrentTransferScope(
     "magazzinoOrigineId" | "magazzinoDestinoId"
   >,
   requiredWarehouse: "both" | "either" | "origin" | "destination",
+  freshScope?: {
+    centroAscoltoId: number | null;
+    areaOperativaId: number | null;
+  },
 ): Promise<void> {
-  const centroId = callerCentroId(req);
-  const areaOperativaId = callerAreaOperativaId(req);
+  const centroId = freshScope
+    ? freshScope.centroAscoltoId
+    : callerCentroId(req);
+  const areaOperativaId = freshScope
+    ? freshScope.areaOperativaId
+    : callerAreaOperativaId(req);
   if (centroId == null && areaOperativaId == null) return;
   const warehouseIds = [
     ...new Set([transfer.magazzinoOrigineId, transfer.magazzinoDestinoId]),
@@ -618,6 +640,7 @@ export async function getTrasferimentoWithRighe(id: number) {
     stato: t.t.stato,
     note: t.t.note ?? null,
     motivoAnnullamento: t.t.motivoAnnullamento ?? null,
+    motivoMancatoArrivo: t.t.motivoMancatoArrivo ?? null,
     operatoreId: t.t.operatoreId ?? null,
     operatoreCodice: t.operatoreMatricola ?? t.operatoreUsername ?? null,
     mensaId: t.t.mensaId ?? null,
@@ -2157,6 +2180,275 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
 
   const result = await getTrasferimentoWithRighe(id);
   res.json(result);
+});
+
+router.post("/trasferimenti/:id/mancato-arrivo", async (req, res) => {
+  if (
+    !requireGenericTransferPermission(req, res, "magazzino.transfers.dispatch")
+  )
+    return;
+  const id = Number(req.params.id);
+  const motivo =
+    typeof req.body?.motivo === "string" ? req.body.motivo.trim() : "";
+  if (!motivo || motivo.length > 500) {
+    res
+      .status(400)
+      .json({ error: "Motivo obbligatorio (massimo 500 caratteri)" });
+    return;
+  }
+  let versione: number;
+  let idempotencyKey: string;
+  try {
+    versione = requireExpectedVersion(req.body?.versione);
+    idempotencyKey = requireIdempotencyKey(req.body?.idempotencyKey);
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    throw error;
+  }
+  const tipoComando = "trasferimento.mancato_arrivo";
+  const requestHash = commandRequestHash({ id, versione, motivo });
+  try {
+    await db.transaction(async (tx) => {
+      await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+      const locked = await lockTransfer(tx, id);
+      const actor = await requireCurrentCommandActor(
+        tx,
+        req.user!.id,
+        "magazzino.transfers.dispatch",
+      );
+      await assertCurrentTransferScope(tx, req, locked, "origin", actor);
+      const receipt = await findDocumentCommand(tx, {
+        tipoComando,
+        idempotencyKey,
+        requestHash,
+        actorUserId: req.user!.id,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+      });
+      if (receipt) return;
+      assertExpectedVersion(locked, versione);
+      if (locked.stato !== "in_transito")
+        throw new TransferRequestError(
+          409,
+          "Solo un Trasferimento in transito può segnalare un mancato arrivo",
+        );
+      const dataOperativa = dataCivileEuropeRome(new Date());
+      await recordAuditEvent(tx, {
+        command: auditContextFromRequest(req, {
+          operationKey: `m4b2:${tipoComando}:${idempotencyKey}`,
+        }),
+        azione: "TRASFERIMENTO_MANCATO_ARRIVO",
+        entitaTipo: "trasferimento",
+        entitaId: id,
+        documentoTipo: "trasferimento",
+        documentoId: id,
+        magazzinoIdSnapshot: locked.magazzinoOrigineId,
+        dataOperativa,
+        motivo,
+        changes: auditFields(
+          { statoPrecedente: locked.stato, statoNuovo: "rientro_atteso" },
+          ["statoPrecedente", "statoNuovo"],
+        ),
+      });
+      const [updated] = await tx
+        .update(trasferimentiTable)
+        .set({
+          stato: "rientro_atteso",
+          motivoMancatoArrivo: motivo,
+          operatoreId: req.user!.id,
+          versione: locked.versione + 1,
+        })
+        .where(eq(trasferimentiTable.id, id))
+        .returning();
+      await storeDocumentCommand(tx, {
+        tipoComando,
+        idempotencyKey,
+        requestHash,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+        versioneRichiesta: versione,
+        versioneRisultante: updated.versione,
+        resultSnapshot: {
+          id,
+          stato: updated.stato,
+          versione: updated.versione,
+        },
+        actorUserId: req.user!.id,
+      });
+    });
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    if (error instanceof TransferRequestError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
+  res.json(await getTrasferimentoWithRighe(id));
+});
+
+router.get("/trasferimenti/:id/rientro", async (req, res) => {
+  if (!requireGenericTransferPermission(req, res, "magazzino.view")) return;
+  const id = Number(req.params.id);
+  const [transfer] = await db
+    .select()
+    .from(trasferimentiTable)
+    .where(eq(trasferimentiTable.id, id));
+  if (!transfer) {
+    res.status(404).json({ error: "Trasferimento non trovato" });
+    return;
+  }
+  const visibleIds = await visibleMagazzinoIds(
+    callerCentroId(req),
+    callerAreaOperativaId(req),
+  );
+  if (visibleIds != null && !visibleIds.includes(transfer.magazzinoOrigineId)) {
+    res.status(403).json({ error: "Magazzino origine non accessibile" });
+    return;
+  }
+  res.json(
+    await db.transaction((tx) =>
+      loadTransportReturnDetail(
+        tx,
+        {
+          tipo: "trasferimento",
+          id,
+          magazzinoOrigineId: transfer.magazzinoOrigineId,
+          numeroDocumento: transfer.codice,
+        },
+        transfer.stato,
+      ),
+    ),
+  );
+});
+
+router.post("/trasferimenti/:id/rientro", async (req, res) => {
+  if (!requireGenericTransferPermission(req, res, "magazzino.stock.receive"))
+    return;
+  const id = Number(req.params.id);
+  let versione: number;
+  let idempotencyKey: string;
+  try {
+    versione = requireExpectedVersion(req.body?.versione);
+    idempotencyKey = requireIdempotencyKey(req.body?.idempotencyKey);
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    throw error;
+  }
+  const lines = req.body?.righe as ReturnLineInput[];
+  const dataRientro = req.body?.dataRientro ?? dataCivileEuropeRome(new Date());
+  if (
+    !Array.isArray(lines) ||
+    typeof dataRientro !== "string" ||
+    !isDateOnly(dataRientro) ||
+    Object.keys(req.body ?? {}).some(
+      (key) =>
+        ![
+          "idempotencyKey",
+          "versione",
+          "dataRientro",
+          "note",
+          "righe",
+        ].includes(key),
+    )
+  ) {
+    res.status(400).json({
+      error: "Righe/data non valide o Magazzino di rientro non ammesso",
+    });
+    return;
+  }
+  const tipoComando = "trasferimento.rientro";
+  const requestHash = commandRequestHash({
+    id,
+    versione,
+    dataRientro,
+    righe: lines,
+    note: req.body?.note ?? null,
+  });
+  let rientroId: number | null = null;
+  try {
+    await db.transaction(async (tx) => {
+      await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+      const locked = await lockTransfer(tx, id);
+      const actor = await requireCurrentCommandActor(
+        tx,
+        req.user!.id,
+        "magazzino.stock.receive",
+      );
+      await assertCurrentTransferScope(tx, req, locked, "origin", actor);
+      const receipt = await findDocumentCommand(tx, {
+        tipoComando,
+        idempotencyKey,
+        requestHash,
+        actorUserId: req.user!.id,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+      });
+      if (receipt) {
+        rientroId = Number(
+          (receipt.resultSnapshot as { rientroId: number }).rientroId,
+        );
+        return;
+      }
+      assertExpectedVersion(locked, versione);
+      if (locked.stato !== "rientro_atteso")
+        throw new TransferRequestError(
+          409,
+          "Il rientro non è atteso per questo Trasferimento",
+        );
+      const rientro = await reconcileTransportReturnTx(tx, {
+        owner: {
+          tipo: "trasferimento",
+          id,
+          magazzinoOrigineId: locked.magazzinoOrigineId,
+          numeroDocumento: locked.codice,
+        },
+        dataRientro,
+        note: req.body?.note,
+        lines,
+        audit: auditContextFromRequest(req, {
+          operationKey: `m4b2:${tipoComando}:${idempotencyKey}`,
+        }),
+      });
+      rientroId = rientro.id;
+      const [updated] = await tx
+        .update(trasferimentiTable)
+        .set({
+          stato: "rientrato",
+          operatoreId: req.user!.id,
+          versione: locked.versione + 1,
+        })
+        .where(eq(trasferimentiTable.id, id))
+        .returning();
+      await storeDocumentCommand(tx, {
+        tipoComando,
+        idempotencyKey,
+        requestHash,
+        aggregatoTipo: "trasferimento",
+        aggregatoId: id,
+        versioneRichiesta: versione,
+        versioneRisultante: updated.versione,
+        resultSnapshot: {
+          id,
+          stato: updated.stato,
+          versione: updated.versione,
+          rientroId,
+        },
+        actorUserId: req.user!.id,
+      });
+    });
+  } catch (error) {
+    if (sendDocumentCommandError(error, res)) return;
+    if (
+      error instanceof TransferRequestError ||
+      error instanceof TransportReturnError
+    ) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
+  res.json({ ...(await getTrasferimentoWithRighe(id)), rientroId });
 });
 
 export default router;

@@ -8,6 +8,9 @@ import {
   useDeleteBollaRiga,
   useConfermaBolla,
   useConsegnaBolla,
+  useAffidaBolla,
+  useSegnalaMancataConsegnaBolla,
+  useSegnalaMancatoArrivoTrasferimento,
   useAnnullaBolla,
   useStornaAmministrativamenteBolla,
   useUpdateBolla,
@@ -151,6 +154,7 @@ import {
   type DocumentoOperativoSelection,
 } from "@/lib/documenti-operativi-url";
 import { useTranslation } from "react-i18next";
+import { TransportReturnPanel } from "@/components/transport-return-panel";
 import i18n from "@/lib/i18n";
 import {
   ModificaTrasferimentoForm,
@@ -158,6 +162,22 @@ import {
 } from "@/pages/trasferimenti";
 
 function statoBadge(stato: string) {
+  if (stato === "in_trasporto")
+    return (
+      <Badge className="bg-amber-500 text-white">
+        {i18n.t("transportReturn.inDelivery")}
+      </Badge>
+    );
+  if (stato === "rientro_atteso")
+    return (
+      <Badge className="bg-amber-100 text-amber-900">
+        {i18n.t("transportReturn.awaitingReturn")}
+      </Badge>
+    );
+  if (stato === "rientrato")
+    return (
+      <Badge variant="secondary">{i18n.t("transportReturn.returned")}</Badge>
+    );
   if (stato === "consegnato")
     return (
       <Badge className="bg-green-500 text-white">
@@ -167,7 +187,7 @@ function statoBadge(stato: string) {
   if (stato === "confermato")
     return (
       <Badge className="border-blue-300 text-blue-700 bg-blue-50">
-        {i18n.t("bolle.statoConfermato")}
+        {i18n.t("transportReturn.ready")}
       </Badge>
     );
   if (stato === "annullato")
@@ -1400,6 +1420,7 @@ export function BollaDettaglio({
   const canDeliver = hasPermission("bolle.deliver");
   const canCancel = hasPermission("bolle.cancel");
   const canReverseAdmin = hasPermission("bolle.reverse.admin");
+  const canReceiveReturn = hasPermission("magazzino.stock.receive");
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [annullaOpen, setAnnullaOpen] = useState(false);
@@ -1411,6 +1432,10 @@ export function BollaDettaglio({
   const [assegnaOpen, setAssegnaOpen] = useState(false);
   const [ritiroOpen, setRitiroOpen] = useState(false);
   const [ritiroMotivo, setRitiroMotivo] = useState("");
+  const [mancataOpen, setMancataOpen] = useState(false);
+  const [mancataMotivo, setMancataMotivo] = useState("");
+  const [affidaOpen, setAffidaOpen] = useState(false);
+  const [affidaTrasportatore, setAffidaTrasportatore] = useState("");
   const [conversioneOpen, setConversioneOpen] = useState(false);
   const [conversioneIndirizzo, setConversioneIndirizzo] = useState("");
   const [conversioneData, setConversioneData] = useState("");
@@ -1447,6 +1472,8 @@ export function BollaDettaglio({
   const deleteRiga = useDeleteBollaRiga();
   const confermaBolla = useConfermaBolla();
   const consegnaBolla = useConsegnaBolla();
+  const affidaBolla = useAffidaBolla();
+  const segnalaMancataConsegna = useSegnalaMancataConsegnaBolla();
   const annullaBolla = useAnnullaBolla();
   const stornaAmministrativamente = useStornaAmministrativamenteBolla();
   const updateBolla = useUpdateBolla();
@@ -1585,6 +1612,66 @@ export function BollaDettaglio({
           toast({
             title: t("bolle.error"),
             description: errMsg(err, t("bolle.consegnaError")),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onAffida = () => {
+    if (!bolla || !affidaTrasportatore.trim()) return;
+    const slot = `bolla:${bollaId}:entrust`;
+    const semantic = { trasportatoreNome: affidaTrasportatore.trim() };
+    affidaBolla.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(slot, semantic, {
+          ...semantic,
+          versione: bolla.versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          setAffidaOpen(false);
+          invalidateAll();
+          toast({ title: t("transportReturn.actionSaved") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("transportReturn.actionError"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onMancataConsegna = () => {
+    if (!bolla || !mancataMotivo.trim()) return;
+    const slot = `bolla:${bollaId}:missing-delivery`;
+    const semantic = { motivo: mancataMotivo.trim() };
+    segnalaMancataConsegna.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(slot, semantic, {
+          ...semantic,
+          versione: bolla.versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          setMancataOpen(false);
+          invalidateAll();
+          toast({ title: t("transportReturn.actionSaved") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("transportReturn.actionError"),
             variant: "destructive",
           });
         },
@@ -1956,6 +2043,7 @@ export function BollaDettaglio({
   const isBozza = bolla.stato === "bozza";
   const isConfermato = bolla.stato === "confermato";
   const isConsegnato = bolla.stato === "consegnato";
+  const isInTrasporto = bolla.stato === "in_trasporto";
   const isAnnullato = bolla.stato === "annullato";
   const stornoAmministrativoReady = administrativeReversalReady({
     canReverseAdmin,
@@ -2068,7 +2156,10 @@ export function BollaDettaglio({
               })}
             </p>
           )}
-          {isConsegnato ? (
+          {isConsegnato ||
+          isInTrasporto ||
+          bolla.stato === "rientro_atteso" ||
+          bolla.stato === "rientrato" ? (
             <p className="text-sm font-medium">
               {bolla.volontarioNome ??
                 bolla.trasportatoreNome ??
@@ -2257,67 +2348,101 @@ export function BollaDettaglio({
                   : t("bolle.confermaBolla")}
               </Button>
             )}
-            {isConfermato && canDeliver && !hideConsegnaActions && (
-              <>
-                {!bolla.ritiroNonEffettuatoAt && (
-                  <Button
-                    className="w-full gap-2 bg-green-600 hover:bg-green-700"
-                    onClick={onConsegna}
-                    disabled={consegnaBolla.isPending}
-                  >
-                    <Truck className="h-4 w-4" />
-                    {consegnaBolla.isPending
-                      ? t("bolle.registrazione")
-                      : t("bolle.segnaConsegnata")}
-                  </Button>
-                )}
-                {bolla.tipoDestinatario === "beneficiario" &&
-                  bolla.consegnaId == null &&
-                  !bolla.ritiroNonEffettuatoAt && (
+            {(isConfermato || isInTrasporto) &&
+              canDeliver &&
+              !hideConsegnaActions && (
+                <>
+                  {!bolla.ritiroNonEffettuatoAt && (
+                    <Button
+                      className="w-full gap-2 bg-green-600 hover:bg-green-700"
+                      onClick={onConsegna}
+                      disabled={consegnaBolla.isPending}
+                    >
+                      <Truck className="h-4 w-4" />
+                      {consegnaBolla.isPending
+                        ? t("bolle.registrazione")
+                        : isInTrasporto
+                          ? t("transportReturn.confirmDelivery")
+                          : t("bolle.segnaConsegnata")}
+                    </Button>
+                  )}
+                  {isConfermato && !bolla.ritiroNonEffettuatoAt && (
                     <Button
                       variant="outline"
-                      className="w-full gap-2 border-amber-300 text-amber-800"
-                      onClick={() => setRitiroOpen(true)}
+                      className="w-full"
+                      onClick={() => {
+                        setAffidaTrasportatore(
+                          bolla.trasportatoreNome ?? bolla.volontarioNome ?? "",
+                        );
+                        setAffidaOpen(true);
+                      }}
+                      disabled={affidaBolla.isPending}
                     >
-                      <AlertTriangle className="h-4 w-4" />
-                      {t("maps.reportMissedPickup")}
+                      {t("transportReturn.entrust")}
                     </Button>
                   )}
-                {bolla.tipoDestinatario === "beneficiario" &&
-                  bolla.consegnaId == null &&
-                  bolla.ritiroNonEffettuatoAt && (
-                    <Button className="w-full gap-2" onClick={openConversione}>
-                      <House className="h-4 w-4" />
-                      {t("maps.convertDelivery")}
-                    </Button>
-                  )}
-                {bolla.consegnaId != null && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    {t("bolle.giaAssegnata")}
-                  </p>
-                )}
-                {bolla.consegnaId != null && (
-                  <RouteActions
-                    consegnaId={bolla.consegnaId}
-                    available={Boolean(bolla.indirizzoConsegna)}
-                    className="justify-center"
-                  />
-                )}
-                {bolla.tipoDestinatario === "beneficiario" &&
-                  !bolla.ritiroNonEffettuatoAt && (
+                  {isInTrasporto && (
                     <Button
                       variant="outline"
-                      className="w-full gap-2"
-                      onClick={() => setAssegnaOpen(true)}
+                      className="w-full"
+                      onClick={() => setMancataOpen(true)}
                     >
-                      <CalendarClock className="h-4 w-4" />
-                      {t("bolle.assegnaPianificazione")}
+                      {t("transportReturn.missingDelivery")}
                     </Button>
                   )}
-              </>
-            )}
+                  {isConfermato &&
+                    bolla.tipoDestinatario === "beneficiario" &&
+                    bolla.consegnaId == null &&
+                    !bolla.ritiroNonEffettuatoAt && (
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2 border-amber-300 text-amber-800"
+                        onClick={() => setRitiroOpen(true)}
+                      >
+                        <AlertTriangle className="h-4 w-4" />
+                        {t("maps.reportMissedPickup")}
+                      </Button>
+                    )}
+                  {isConfermato &&
+                    bolla.tipoDestinatario === "beneficiario" &&
+                    bolla.consegnaId == null &&
+                    bolla.ritiroNonEffettuatoAt && (
+                      <Button
+                        className="w-full gap-2"
+                        onClick={openConversione}
+                      >
+                        <House className="h-4 w-4" />
+                        {t("maps.convertDelivery")}
+                      </Button>
+                    )}
+                  {isConfermato && bolla.consegnaId != null && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      {t("bolle.giaAssegnata")}
+                    </p>
+                  )}
+                  {bolla.consegnaId != null && (
+                    <RouteActions
+                      consegnaId={bolla.consegnaId}
+                      available={Boolean(bolla.indirizzoConsegna)}
+                      className="justify-center"
+                    />
+                  )}
+                  {isConfermato &&
+                    bolla.tipoDestinatario === "beneficiario" &&
+                    !bolla.ritiroNonEffettuatoAt && (
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => setAssegnaOpen(true)}
+                      >
+                        <CalendarClock className="h-4 w-4" />
+                        {t("bolle.assegnaPianificazione")}
+                      </Button>
+                    )}
+                </>
+              )}
             {/* Annulla */}
-            {canCancel && !isConsegnato && (
+            {canCancel && (isBozza || isConfermato) && (
               <Button
                 variant="outline"
                 className="w-full gap-2 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5"
@@ -2342,8 +2467,71 @@ export function BollaDettaglio({
               </Button>
             )}
           </div>
+          {(bolla.stato === "rientro_atteso" ||
+            bolla.stato === "rientrato") && (
+            <TransportReturnPanel
+              owner="bolla"
+              id={bollaId}
+              version={bolla.versione}
+              documentNumber={bolla.numeroBolla}
+              canReceive={canReceiveReturn}
+              onComplete={invalidateAll}
+            />
+          )}
         </>
       )}
+
+      <Dialog open={affidaOpen} onOpenChange={setAffidaOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("transportReturn.entrust")}</DialogTitle>
+          </DialogHeader>
+          <Label htmlFor="bolla-affida-trasportatore">
+            {t("transportReturn.assignee")}
+          </Label>
+          <Input
+            id="bolla-affida-trasportatore"
+            value={affidaTrasportatore}
+            maxLength={120}
+            onChange={(event) => setAffidaTrasportatore(event.target.value)}
+          />
+          <DialogFooter>
+            <Button
+              onClick={onAffida}
+              disabled={!affidaTrasportatore.trim() || affidaBolla.isPending}
+            >
+              {t("transportReturn.confirmEntrust")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mancataOpen} onOpenChange={setMancataOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("transportReturn.missingDelivery")}</DialogTitle>
+          </DialogHeader>
+          <Label htmlFor="bolla-mancata-motivo">
+            {t("transportReturn.reason")}
+          </Label>
+          <Input
+            id="bolla-mancata-motivo"
+            value={mancataMotivo}
+            maxLength={500}
+            onChange={(event) => setMancataMotivo(event.target.value)}
+          />
+          <DialogFooter>
+            <Button
+              onClick={onMancataConsegna}
+              disabled={
+                !mancataMotivo.trim() || segnalaMancataConsegna.isPending
+              }
+            >
+              {t("transportReturn.submitReason")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {isConsegnato && (
         <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800">
@@ -2735,6 +2923,16 @@ export function BollaDettaglio({
 // ─── Pagina principale ───────────────────────────────────────────────────────
 
 function trasferimentoStatoBadge(stato: string) {
+  if (stato === "rientro_atteso")
+    return (
+      <Badge className="bg-amber-100 text-amber-900">
+        {i18n.t("transportReturn.awaitingReturn")}
+      </Badge>
+    );
+  if (stato === "rientrato")
+    return (
+      <Badge variant="secondary">{i18n.t("transportReturn.returned")}</Badge>
+    );
   if (stato === "completato")
     return (
       <Badge className="bg-green-500 text-white">
@@ -2787,10 +2985,13 @@ function TrasferimentoDettaglioComune({
   const trasferimento = trasferimentoData ?? fetchedTrasferimento;
   const isLoading = trasferimentoData == null && legacyTransferLoading;
   const [editing, setEditing] = useState(false);
+  const [mancatoOpen, setMancatoOpen] = useState(false);
+  const [mancatoMotivo, setMancatoMotivo] = useState("");
   const avvia = useAvviaTrasferimento();
   const prepara = usePreparaTrasferimento();
   const annulla = useAnnullaTrasferimento();
   const ricevi = useConfermaTrasferimento();
+  const segnalaMancatoArrivo = useSegnalaMancatoArrivoTrasferimento();
   const commandIntents = useCommandIntentRegistry();
   const canEdit = hasPermission("magazzino.transfers.create");
   const canPrepare =
@@ -2801,6 +3002,7 @@ function TrasferimentoDettaglioComune({
     hasPermission("mensa.transfers.cancel");
   const canDispatch = hasPermission("magazzino.transfers.dispatch");
   const canReceive = hasPermission("magazzino.transfers.receive");
+  const canReceiveReturn = hasPermission("magazzino.stock.receive");
 
   const invalidate = () => {
     queryClient.invalidateQueries({
@@ -2949,6 +3151,36 @@ function TrasferimentoDettaglioComune({
     );
   };
 
+  const onMancatoArrivo = () => {
+    if (!mancatoMotivo.trim()) return;
+    const slot = `trasferimento:${trasferimento.id}:missing-arrival`;
+    const semantic = { motivo: mancatoMotivo.trim() };
+    segnalaMancatoArrivo.mutate(
+      {
+        id: trasferimento.id,
+        data: commandIntents.prepare(slot, semantic, {
+          ...semantic,
+          versione: trasferimento.versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          setMancatoOpen(false);
+          invalidate();
+          toast({ title: t("transportReturn.actionSaved") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("transportReturn.actionError"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
   return (
     <div className="mt-5 space-y-5">
       <div className="flex items-center justify-between gap-2">
@@ -3051,10 +3283,50 @@ function TrasferimentoDettaglioComune({
             {t("trasferimenti.confermaRic")}
           </Button>
         )}
+        {trasferimento.stato === "in_transito" && canDispatch && (
+          <Button variant="outline" onClick={() => setMancatoOpen(true)}>
+            {t("transportReturn.missingArrival")}
+          </Button>
+        )}
         <Button variant="ghost" onClick={onClose}>
           {t("common.close")}
         </Button>
       </div>
+      {(trasferimento.stato === "rientro_atteso" ||
+        trasferimento.stato === "rientrato") && (
+        <TransportReturnPanel
+          owner="trasferimento"
+          id={trasferimento.id}
+          version={trasferimento.versione}
+          documentNumber={trasferimento.codice}
+          canReceive={canReceiveReturn}
+          onComplete={invalidate}
+        />
+      )}
+      <Dialog open={mancatoOpen} onOpenChange={setMancatoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("transportReturn.missingArrival")}</DialogTitle>
+          </DialogHeader>
+          <Label htmlFor="trasferimento-mancato-motivo">
+            {t("transportReturn.reason")}
+          </Label>
+          <Input
+            id="trasferimento-mancato-motivo"
+            value={mancatoMotivo}
+            maxLength={500}
+            onChange={(event) => setMancatoMotivo(event.target.value)}
+          />
+          <DialogFooter>
+            <Button
+              onClick={onMancatoArrivo}
+              disabled={!mancatoMotivo.trim() || segnalaMancatoArrivo.isPending}
+            >
+              {t("transportReturn.submitReason")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {editing && (
         <ModificaTrasferimentoForm
           key={trasferimento.id}
@@ -3552,12 +3824,31 @@ export default function Bolle() {
   );
   const statusOptions =
     filters.tipoAggregato === "bolla"
-      ? ["bozza", "confermato", "consegnato", "annullato"]
+      ? [
+          "bozza",
+          "confermato",
+          "in_trasporto",
+          "rientro_atteso",
+          "rientrato",
+          "consegnato",
+          "annullato",
+        ]
       : filters.tipoAggregato === "trasferimento"
-        ? ["richiesto", "preparato", "in_transito", "completato", "annullato"]
+        ? [
+            "richiesto",
+            "preparato",
+            "in_transito",
+            "rientro_atteso",
+            "rientrato",
+            "completato",
+            "annullato",
+          ]
         : [
             "bozza",
             "confermato",
+            "in_trasporto",
+            "rientro_atteso",
+            "rientrato",
             "consegnato",
             "richiesto",
             "preparato",
@@ -3569,6 +3860,9 @@ export default function Bolle() {
     const labels: Record<string, string> = {
       bozza: t("bolle.statoBozza"),
       confermato: t("bolle.statoConfermato"),
+      in_trasporto: t("transportReturn.inDelivery"),
+      rientro_atteso: t("transportReturn.awaitingReturn"),
+      rientrato: t("transportReturn.returned"),
       consegnato: t("bolle.statoConsegnato"),
       annullato: t("bolle.statoAnnullato"),
       richiesto: t("trasferimenti.statusRichiesto"),
@@ -4012,7 +4306,12 @@ export default function Bolle() {
                               {t("bolle.segnaConsegnata")}
                             </Button>
                           )}
-                          {(row.bolla.stato === "confermato" ||
+                          {([
+                            "confermato",
+                            "in_trasporto",
+                            "rientro_atteso",
+                            "rientrato",
+                          ].includes(row.bolla.stato) ||
                             row.bolla.stato === "consegnato" ||
                             row.bolla.stato === "annullato") && (
                             <Button

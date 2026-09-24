@@ -344,6 +344,17 @@ test.describe("workflow Magazzino reali", () => {
     const detail = page.getByRole("dialog", {
       name: /dettaglio trasferimento/i,
     });
+    const prepareResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/api/trasferimenti/${created.id}/prepara`) &&
+        response.request().method() === "POST",
+    );
+    await detail.getByRole("button", { name: /segna pronto/i }).click();
+    expect((await prepareResponse).status()).toBe(200);
+    await expect(detail).toContainText(/pronto/i);
+    // Pronto riserva una unità: il disponibile cala, lo stock fisico solo ad Avvia.
+    expect(await readStock(origin)).toBe(originBefore - 1);
+
     const dispatchResponse = page.waitForResponse(
       (response) =>
         response.url().includes(`/api/trasferimenti/${created.id}/avvia`) &&

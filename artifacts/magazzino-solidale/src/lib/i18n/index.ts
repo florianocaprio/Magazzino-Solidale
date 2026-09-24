@@ -1,6 +1,12 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { LANGUAGES, LANGUAGE_CODES, STORAGE_KEY, applyDirection, type LanguageCode } from "./languages";
+import {
+  LANGUAGES,
+  LANGUAGE_CODES,
+  STORAGE_KEY,
+  applyDirection,
+  type LanguageCode,
+} from "./languages";
 import { base } from "./namespaces/base";
 import { dashboard } from "./namespaces/dashboard";
 import { magazzini } from "./namespaces/magazzini";
@@ -22,6 +28,7 @@ import { udsAnagrafica } from "./namespaces/udsAnagrafica";
 import { udsInterventi } from "./namespaces/udsInterventi";
 import { consegne } from "./namespaces/consegne";
 import { bolle } from "./namespaces/bolle";
+import { transportReturn } from "./namespaces/transportReturn";
 import { volontari } from "./namespaces/volontari";
 import { ruoliVolontari } from "./namespaces/ruoliVolontari";
 import { tipiIntervento } from "./namespaces/tipiIntervento";
@@ -85,6 +92,7 @@ const PAGE_NAMESPACES = {
   udsInterventi,
   consegne,
   bolle,
+  transportReturn,
   volontari,
   ruoliVolontari,
   tipiIntervento,
@@ -126,9 +134,12 @@ const PAGE_NAMESPACES = {
 } as const;
 
 function buildResources() {
-  const resources: Record<string, { translation: Record<string, unknown> }> = {};
+  const resources: Record<string, { translation: Record<string, unknown> }> =
+    {};
   for (const lng of LANGUAGE_CODES) {
-    const translation: Record<string, unknown> = { ...(base as Record<LanguageCode, Record<string, unknown>>)[lng] };
+    const translation: Record<string, unknown> = {
+      ...(base as Record<LanguageCode, Record<string, unknown>>)[lng],
+    };
     for (const [key, ns] of Object.entries(PAGE_NAMESPACES)) {
       translation[key] = (ns as Record<LanguageCode, unknown>)[lng];
     }
@@ -137,8 +148,10 @@ function buildResources() {
   return resources;
 }
 
-const saved = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-const initialLng = saved && LANGUAGES.some((l) => l.code === saved) ? saved : "it";
+const saved =
+  typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+const initialLng =
+  saved && LANGUAGES.some((l) => l.code === saved) ? saved : "it";
 
 i18n.use(initReactI18next).init({
   resources: buildResources(),

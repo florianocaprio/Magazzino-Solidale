@@ -4,6 +4,7 @@ import type { ReportFilters } from "./types";
 import { andSql, number, reportScope, rows } from "./sql";
 import { dashboard, kpi, quality, text } from "./shared";
 import { signedMovementSql } from "../fseAccounting";
+import { signedPhysicalMovementSql } from "../movementPhysicalEffect";
 import {
   fseCanonicalPeriodCondition,
   fseDistributionNatureCondition,
@@ -159,21 +160,25 @@ export async function buildFsePlusReport(filters: ReportFilters) {
         sql`, `,
       )})`
     : sql`false`;
-  const signedPieces = signedMovementSql(
+  const signedPieces = signedPhysicalMovementSql(
     sql`mv.quantita_pezzi`,
-    sql`mv.natura_contabile`,
-    sql`original.natura_contabile`,
+    sql`mv.tipo_movimento`,
+    sql`mv.tipo_dettaglio`,
+    sql`original.tipo_movimento`,
+    sql`original.tipo_dettaglio`,
   );
-  const signedKgLt = signedMovementSql(
+  const signedKgLt = signedPhysicalMovementSql(
     sql`mv.quantita_kg_lt`,
-    sql`mv.natura_contabile`,
-    sql`original.natura_contabile`,
+    sql`mv.tipo_movimento`,
+    sql`mv.tipo_dettaglio`,
+    sql`original.tipo_movimento`,
+    sql`original.tipo_dettaglio`,
   );
   const signedQuantity = fseSignedQuantity(sql`mv.quantita`);
   const distributedQuantity = fseNetDistributedQuantity(sql`mv.quantita`);
   const distributedKgLt = sql`CASE WHEN mv.natura_contabile = 'LEGACY'
     AND lower(mv.unita_misura) IN ('kg', 'lt', 'l')
-    THEN abs(mv.quantita::numeric) ELSE -(${signedKgLt}) END`;
+    THEN abs(mv.quantita::numeric) ELSE ${fseNetDistributedQuantity(sql`mv.quantita_kg_lt`)} END`;
   const beneficiaryProfilesCte = sql`
     WITH movimenti_famiglie AS (
       SELECT b.beneficiario_id,
@@ -1004,14 +1009,19 @@ export async function buildFsePlusReport(filters: ReportFilters) {
       text("fseSnapshotAtDate"),
       text("fseFutureSnapshotsExcluded", { date: filters.a }),
       peopleCoverage < totalFseHouseholds
-        ? text("fsePeoplePartialCoverage", { covered: peopleCoverage, total: totalFseHouseholds })
+        ? text("fsePeoplePartialCoverage", {
+            covered: peopleCoverage,
+            total: totalFseHouseholds,
+          })
         : text("fsePeopleFullCoverage"),
       text("fseSources"),
       text("fseCanonicalChannels"),
       text("fseAdministrativeDates", {
         exportDate: String(administrative.ultima_esportazione ?? "—"),
         importDate: String(administrative.ultima_importazione ?? "—"),
-        reconciliationDate: String(administrative.ultima_riconciliazione ?? "—"),
+        reconciliationDate: String(
+          administrative.ultima_riconciliazione ?? "—",
+        ),
       }),
     ],
   });

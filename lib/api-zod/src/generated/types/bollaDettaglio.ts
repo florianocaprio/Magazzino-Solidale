@@ -74,6 +74,8 @@ export interface BollaDettaglio {
   operatoreCodice?: string | null;
   /** @nullable */
   motivoAnnullamento?: string | null;
+  /** @nullable */
+  motivoMancataConsegna?: string | null;
   /** @minimum 1 */
   versione: number;
   dataCreazione: string;

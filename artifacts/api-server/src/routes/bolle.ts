@@ -60,6 +60,7 @@ import {
   annullaInterventoDaBollaTx,
   scarichiFisiciBolla,
   stornoRigheTx,
+  convertiPrenotazioniAttiveInScarico,
 } from "../lib/bollaDelivery";
 import { InventoryDecimal } from "../lib/inventoryDecimal";
 import {
@@ -121,6 +122,13 @@ import {
   storeDocumentCommand,
   validateDocumentCommand,
 } from "../lib/documentCommand";
+import { requireCurrentCommandActor } from "../lib/currentCommandActor";
+import {
+  loadTransportReturnDetail,
+  reconcileTransportReturnTx,
+  TransportReturnError,
+  type ReturnLineInput,
+} from "../lib/transportReturn";
 
 const router: IRouter = Router();
 
@@ -427,6 +435,7 @@ export async function buildDettaglio(id: number) {
     operatoreId: row.b.operatoreId ?? null,
     operatoreCodice: row.operatoreMatricola ?? row.operatoreUsername ?? null,
     motivoAnnullamento: row.b.motivoAnnullamento ?? null,
+    motivoMancataConsegna: row.b.motivoMancataConsegna ?? null,
     versione: row.b.versione,
     dataCreazione: row.b.dataCreazione.toISOString(),
     righe:
@@ -899,6 +908,7 @@ router.get("/bolle", requirePermission("bolle.view"), async (req, res) => {
       operatoreId: r.b.operatoreId ?? null,
       operatoreCodice: r.operatoreMatricola ?? r.operatoreUsername ?? null,
       motivoAnnullamento: r.b.motivoAnnullamento ?? null,
+      motivoMancataConsegna: r.b.motivoMancataConsegna ?? null,
       versione: r.b.versione,
       dataCreazione: r.b.dataCreazione.toISOString(),
     })),
@@ -2635,6 +2645,470 @@ router.post(
 );
 
 // ─── CONSEGNA (confermato → consegnato) ──────────────────────────────────────
+
+async function assertBollaTransportAccessTx(
+  tx: Tx,
+  req: import("express").Request,
+  bolla: typeof bolleTable.$inferSelect,
+  permission: string,
+) {
+  const actor = await requireCurrentCommandActor(tx, req.user!.id, permission);
+  if (
+    !(await canAccessBollaOperativaTx(
+      tx,
+      bolla,
+      actor.centroAscoltoId,
+      actor.areaOperativaId,
+      actor.zonaUdsId,
+    ))
+  ) {
+    throw new BollaActionError(
+      403,
+      "Risorsa non accessibile per il tuo centro",
+    );
+  }
+  return actor;
+}
+
+router.post(
+  "/bolle/:id/affida",
+  requirePermission("bolle.deliver"),
+  async (req, res) => {
+    const bollaId = Number(req.params.id);
+    if (!Number.isSafeInteger(bollaId) || bollaId <= 0) {
+      res.status(400).json({ error: "ID Bolla non valido" });
+      return;
+    }
+    let idempotencyKey: string;
+    let expectedVersion: number;
+    try {
+      ({ idempotencyKey, expectedVersion } = commandEnvelope(req.body, true));
+    } catch (error) {
+      if (sendDocumentCommandError(error, res)) return;
+      throw error;
+    }
+    const trasportatoreNome =
+      typeof req.body?.trasportatoreNome === "string"
+        ? req.body.trasportatoreNome.trim()
+        : null;
+    if (
+      trasportatoreNome != null &&
+      (!trasportatoreNome || trasportatoreNome.length > 120)
+    ) {
+      res.status(400).json({
+        error: "Indicare un incaricato valido (massimo 120 caratteri)",
+      });
+      return;
+    }
+    const tipoComando = "BOLLA_AFFIDA";
+    const requestHash = commandRequestHash({
+      bollaId,
+      versione: expectedVersion,
+      trasportatoreNome,
+    });
+    try {
+      await db.transaction(async (tx) => {
+        await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        const [beforeLock] = await tx
+          .select({ consegnaId: bolleTable.consegnaId })
+          .from(bolleTable)
+          .where(eq(bolleTable.id, bollaId));
+        if (beforeLock?.consegnaId != null) {
+          await lockConsegnaBollaRelation(tx, beforeLock.consegnaId);
+        }
+        const current = await lockBolla(tx, bollaId);
+        if (current.consegnaId !== (beforeLock?.consegnaId ?? null)) {
+          throw new BollaActionError(
+            409,
+            "La pianificazione è cambiata; ricaricare i dati",
+          );
+        }
+        await assertBollaTransportAccessTx(tx, req, current, "bolle.deliver");
+        const receipt = await findDocumentCommand(tx, {
+          tipoComando,
+          idempotencyKey,
+          requestHash,
+          actorUserId: req.user!.id,
+          aggregatoTipo: "bolla",
+          aggregatoId: bollaId,
+        });
+        if (receipt) return;
+        if (current.versione !== expectedVersion)
+          throw new DocumentCommandError(
+            409,
+            "Versione non aggiornata; ricaricare i dati",
+          );
+        if (current.stato !== "confermato")
+          throw new BollaActionError(
+            409,
+            "Solo una Bolla pronta può essere affidata",
+          );
+        if (
+          current.tipoDestinatario === "ente" &&
+          !current.destinatarioSnapshotCongelato
+        ) {
+          throw new BollaActionError(
+            409,
+            "Lo snapshot del destinatario non è congelato",
+          );
+        }
+        if (
+          !trasportatoreNome &&
+          !current.trasportatoreNome &&
+          current.volontarioConsegnaId == null
+        ) {
+          throw new BollaActionError(
+            400,
+            "Indicare il trasportatore o incaricato",
+          );
+        }
+        await requireOperationalMagazzino(tx, current.magazzinoId);
+        const dataMovimento = dataCivileEuropeRome(new Date());
+        const auditEventoId = await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req, {
+            operationKey: `m4b2:${tipoComando}:${idempotencyKey}`,
+          }),
+          azione: "BOLLA_AFFIDATA",
+          entitaTipo: "bolla",
+          entitaId: bollaId,
+          documentoTipo: "bolla",
+          documentoId: bollaId,
+          areaOperativaIdSnapshot: current.areaOperativaIdSnapshot,
+          centroAscoltoIdSnapshot: current.centroAscoltoIdSnapshot,
+          magazzinoIdSnapshot: current.magazzinoId,
+          dataOperativa: dataMovimento,
+          changes: auditFields(
+            { statoPrecedente: current.stato, statoNuovo: "in_trasporto" },
+            ["statoPrecedente", "statoNuovo"],
+          ),
+        });
+        const count = await convertiPrenotazioniAttiveInScarico(tx, current, {
+          dataMovimento,
+          operatoreId: req.user!.id,
+          auditEventoId,
+          mode: "affidamento",
+        });
+        if (count === 0)
+          throw new BollaActionError(
+            409,
+            "Nessuna prenotazione attiva da affidare",
+          );
+        const [updated] = await tx
+          .update(bolleTable)
+          .set({
+            stato: "in_trasporto",
+            trasportatoreNome: trasportatoreNome ?? current.trasportatoreNome,
+            operatoreId: req.user!.id,
+            versione: current.versione + 1,
+          })
+          .where(eq(bolleTable.id, bollaId))
+          .returning();
+        await storeDocumentCommand(tx, {
+          tipoComando,
+          idempotencyKey,
+          requestHash,
+          aggregatoTipo: "bolla",
+          aggregatoId: bollaId,
+          versioneRichiesta: expectedVersion,
+          versioneRisultante: updated.versione,
+          resultSnapshot: {
+            id: bollaId,
+            stato: updated.stato,
+            versione: updated.versione,
+          },
+          actorUserId: req.user!.id,
+        });
+      });
+    } catch (error) {
+      if (handleBollaActionError(error, res)) return;
+      if (error instanceof InventoryLedgerError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      throw error;
+    }
+    res.json(await buildDettaglio(bollaId));
+  },
+);
+
+router.post(
+  "/bolle/:id/mancata-consegna",
+  requirePermission("bolle.deliver"),
+  async (req, res) => {
+    const bollaId = Number(req.params.id);
+    const motivo =
+      typeof req.body?.motivo === "string" ? req.body.motivo.trim() : "";
+    if (!motivo || motivo.length > 500) {
+      res
+        .status(400)
+        .json({ error: "Motivo obbligatorio (massimo 500 caratteri)" });
+      return;
+    }
+    let idempotencyKey: string;
+    let expectedVersion: number;
+    try {
+      ({ idempotencyKey, expectedVersion } = commandEnvelope(req.body, true));
+    } catch (error) {
+      if (sendDocumentCommandError(error, res)) return;
+      throw error;
+    }
+    const tipoComando = "BOLLA_MANCATA_CONSEGNA";
+    const requestHash = commandRequestHash({
+      bollaId,
+      versione: expectedVersion,
+      motivo,
+    });
+    try {
+      await db.transaction(async (tx) => {
+        await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        const current = await lockBolla(tx, bollaId);
+        await assertBollaTransportAccessTx(tx, req, current, "bolle.deliver");
+        const receipt = await findDocumentCommand(tx, {
+          tipoComando,
+          idempotencyKey,
+          requestHash,
+          actorUserId: req.user!.id,
+          aggregatoTipo: "bolla",
+          aggregatoId: bollaId,
+        });
+        if (receipt) return;
+        if (current.versione !== expectedVersion)
+          throw new DocumentCommandError(
+            409,
+            "Versione non aggiornata; ricaricare i dati",
+          );
+        if (current.stato !== "in_trasporto")
+          throw new BollaActionError(409, "La Bolla non è in consegna");
+        const dataOperativa = dataCivileEuropeRome(new Date());
+        await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req, {
+            operationKey: `m4b2:${tipoComando}:${idempotencyKey}`,
+          }),
+          azione: "BOLLA_MANCATA_CONSEGNA",
+          entitaTipo: "bolla",
+          entitaId: bollaId,
+          documentoTipo: "bolla",
+          documentoId: bollaId,
+          areaOperativaIdSnapshot: current.areaOperativaIdSnapshot,
+          centroAscoltoIdSnapshot: current.centroAscoltoIdSnapshot,
+          magazzinoIdSnapshot: current.magazzinoId,
+          dataOperativa,
+          motivo,
+          changes: auditFields(
+            { statoPrecedente: current.stato, statoNuovo: "rientro_atteso" },
+            ["statoPrecedente", "statoNuovo"],
+          ),
+        });
+        const [updated] = await tx
+          .update(bolleTable)
+          .set({
+            stato: "rientro_atteso",
+            motivoMancataConsegna: motivo,
+            operatoreId: req.user!.id,
+            versione: current.versione + 1,
+          })
+          .where(eq(bolleTable.id, bollaId))
+          .returning();
+        await storeDocumentCommand(tx, {
+          tipoComando,
+          idempotencyKey,
+          requestHash,
+          aggregatoTipo: "bolla",
+          aggregatoId: bollaId,
+          versioneRichiesta: expectedVersion,
+          versioneRisultante: updated.versione,
+          resultSnapshot: {
+            id: bollaId,
+            stato: updated.stato,
+            versione: updated.versione,
+          },
+          actorUserId: req.user!.id,
+        });
+      });
+    } catch (error) {
+      if (handleBollaActionError(error, res)) return;
+      throw error;
+    }
+    res.json(await buildDettaglio(bollaId));
+  },
+);
+
+router.get(
+  "/bolle/:id/rientro",
+  requirePermission("bolle.view"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const [bolla] = await db
+      .select()
+      .from(bolleTable)
+      .where(eq(bolleTable.id, id));
+    if (!bolla) {
+      res.status(404).json({ error: "Bolla non trovata" });
+      return;
+    }
+    if (
+      !(await canAccessBollaOperativa(
+        bolla,
+        callerCentroId(req),
+        callerAreaOperativaId(req),
+        callerZonaUdsId(req),
+      ))
+    ) {
+      res
+        .status(403)
+        .json({ error: "Risorsa non accessibile per il tuo centro" });
+      return;
+    }
+    res.json(
+      await db.transaction(async (tx) =>
+        loadTransportReturnDetail(
+          tx,
+          {
+            tipo: "bolla",
+            id,
+            magazzinoOrigineId: bolla.magazzinoId,
+            numeroDocumento: bolla.numeroBolla,
+          },
+          bolla.stato,
+        ),
+      ),
+    );
+  },
+);
+
+router.post(
+  "/bolle/:id/rientro",
+  requirePermission("magazzino.stock.receive"),
+  async (req, res) => {
+    const bollaId = Number(req.params.id);
+    let idempotencyKey: string;
+    let expectedVersion: number;
+    try {
+      ({ idempotencyKey, expectedVersion } = commandEnvelope(req.body, true));
+    } catch (error) {
+      if (sendDocumentCommandError(error, res)) return;
+      throw error;
+    }
+    const lines = req.body?.righe as ReturnLineInput[];
+    const dataRientro =
+      req.body?.dataRientro ?? dataCivileEuropeRome(new Date());
+    if (
+      !Array.isArray(lines) ||
+      typeof dataRientro !== "string" ||
+      !isDateOnly(dataRientro) ||
+      Object.keys(req.body ?? {}).some(
+        (key) =>
+          ![
+            "idempotencyKey",
+            "versione",
+            "dataRientro",
+            "note",
+            "righe",
+          ].includes(key),
+      )
+    ) {
+      res.status(400).json({
+        error: "Righe/data non valide o Magazzino di rientro non ammesso",
+      });
+      return;
+    }
+    const tipoComando = "BOLLA_RIENTRO";
+    const requestHash = commandRequestHash({
+      bollaId,
+      versione: expectedVersion,
+      dataRientro,
+      righe: lines,
+      note: req.body?.note ?? null,
+    });
+    let rientroId: number | null = null;
+    try {
+      await db.transaction(async (tx) => {
+        await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        const current = await lockBolla(tx, bollaId);
+        await assertBollaTransportAccessTx(
+          tx,
+          req,
+          current,
+          "magazzino.stock.receive",
+        );
+        const receipt = await findDocumentCommand(tx, {
+          tipoComando,
+          idempotencyKey,
+          requestHash,
+          actorUserId: req.user!.id,
+          aggregatoTipo: "bolla",
+          aggregatoId: bollaId,
+        });
+        if (receipt) {
+          rientroId = Number(
+            (receipt.resultSnapshot as { rientroId: number }).rientroId,
+          );
+          return;
+        }
+        if (current.versione !== expectedVersion)
+          throw new DocumentCommandError(
+            409,
+            "Versione non aggiornata; ricaricare i dati",
+          );
+        if (current.stato !== "rientro_atteso")
+          throw new BollaActionError(
+            409,
+            "Il rientro non è atteso per questa Bolla",
+          );
+        const rientro = await reconcileTransportReturnTx(tx, {
+          owner: {
+            tipo: "bolla",
+            id: bollaId,
+            magazzinoOrigineId: current.magazzinoId,
+            numeroDocumento: current.numeroBolla,
+            areaOperativaIdSnapshot: current.areaOperativaIdSnapshot,
+            centroAscoltoIdSnapshot: current.centroAscoltoIdSnapshot,
+          },
+          dataRientro,
+          note: req.body?.note,
+          lines,
+          audit: auditContextFromRequest(req, {
+            operationKey: `m4b2:${tipoComando}:${idempotencyKey}`,
+          }),
+        });
+        rientroId = rientro.id;
+        const [updated] = await tx
+          .update(bolleTable)
+          .set({
+            stato: "rientrato",
+            operatoreId: req.user!.id,
+            versione: current.versione + 1,
+          })
+          .where(eq(bolleTable.id, bollaId))
+          .returning();
+        await storeDocumentCommand(tx, {
+          tipoComando,
+          idempotencyKey,
+          requestHash,
+          aggregatoTipo: "bolla",
+          aggregatoId: bollaId,
+          versioneRichiesta: expectedVersion,
+          versioneRisultante: updated.versione,
+          resultSnapshot: {
+            id: bollaId,
+            stato: updated.stato,
+            versione: updated.versione,
+            rientroId,
+          },
+          actorUserId: req.user!.id,
+        });
+      });
+    } catch (error) {
+      if (handleBollaActionError(error, res)) return;
+      if (error instanceof TransportReturnError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      throw error;
+    }
+    res.json({ ...(await buildDettaglio(bollaId)), rientroId });
+  },
+);
 
 router.post(
   "/bolle/:id/consegna",

@@ -1106,6 +1106,7 @@ export default function Consegne() {
               consegne.map((c) => {
                 const bollaPronta =
                   c.bollaStato === "confermato" ||
+                  c.bollaStato === "in_trasporto" ||
                   c.bollaStato === "consegnato";
                 return (
                   <article
@@ -1395,6 +1396,7 @@ export default function Consegne() {
                         const consegnata = c.stato === "effettuata";
                         const pronta =
                           c.bollaStato === "confermato" ||
+                          c.bollaStato === "in_trasporto" ||
                           c.bollaStato === "consegnato";
                         const badge =
                           c.bollaStato == null ? (
@@ -1509,6 +1511,7 @@ export default function Consegne() {
                       ) : (
                         <div className="flex items-center justify-end gap-2">
                           {(c.bollaStato === "confermato" ||
+                            c.bollaStato === "in_trasporto" ||
                             c.bollaStato === "consegnato") &&
                           canComplete ? (
                             <Button

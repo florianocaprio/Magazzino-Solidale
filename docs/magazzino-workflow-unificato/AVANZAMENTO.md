@@ -1659,3 +1659,53 @@ e la loro protezione sono semanticamente coincidenti.
 chiusura della code review ChatGPT.** La validazione manuale M4B.1
 non è eseguita; M4B non è chiusa, M4B.2 non avviata. Docker
 persistente e `main` restano invariati.
+
+## M4B.2 — sviluppo candidato sul branch dedicato
+
+Sulla base verificata `98835207ed047dd764633b234ba91f87738c296b`,
+senza staging/commit/push, è stato implementato il ciclo fisico: Bolla
+`confermato → in_trasporto → consegnato` oppure `rientro_atteso →
+rientrato`, e il ramo `in_transito → rientro_atteso → rientrato` del
+Trasferimento. L'affidamento consuma una sola volta prenotazioni e stock;
+la consegna dopo affidamento produce un esito neutro sul piano fisico;
+la consegna diretta M4A conserva lo scarico originario. Il rientro è
+integrale per le partite di uscita reali e va soltanto al Magazzino origine.
+
+La decisione umana sopravvenuta è applicata: nessuna classe `altro`;
+idonea/deteriorata/scaduta sono realmente rientrate, con Scarico automatico
+transazionale per le ultime due; mancante/rubata sono anomalie documentate
+senza un secondo decremento. Il ledger unico, il lineage, la migrazione 42,
+le FK/constraint/trigger, le ricevute idempotenti, l'audit, i controlli
+post-lock, il reporting fisico, OpenAPI/generated, UI i18n e PDF derivato
+sono aggiornati. Il dettaglio delle prove è in `ESITI_SVILUPPO_M4B2.md`.
+
+Le verifiche di sviluppo comprendono fresh 42/42 con replay, suite API
+completa 119 file/1353 pass/4 skip, frontend 77 file/415 pass, runner
+migrazioni 24/24, test mirati M4B.2, typecheck, codegen deterministico e
+build API. La build nativa completa incontra la dipendenza LightningCSS
+macOS non presente nel workspace, già nota; la build compatibile e i gate
+formali restano al separato `##test M4`. Nessun test manuale è stato
+eseguito. Stato: **`DEV-M4B.2/NE-TEST/NE-MAN`**. M4 complessiva non è chiusa,
+M5 non avviata, Docker persistente e `main` invariati.
+
+## M4 — validazione automatica integrata
+
+Il separato `##test M4` ha ripreso il candidato M4B.2 sulla base pubblicata
+`98835207ed047dd764633b234ba91f87738c296b`, senza ricominciare lo
+sviluppo. Il verbale completo, compresi i tentativi falliti e le correzioni
+circoscritte, è `ESITI_TEST_M4.md`. Fresh 42/42, upgrade autentico popolato
+41→42, parità schema/migrazione, runner 24/24, test diretti e concorrenti,
+report quantitativi, suite API finale 119 file/1373 pass/2 skip AGEA,
+frontend 77 file/415 pass, 24 E2E pertinenti, codegen, typecheck,
+build/budget/runtime Linux e rendering browser sono stati verificati.
+
+La review ha corretto nomi FK della migration 42, proiezione FSE+ dei kg
+distribuiti e fixture/assert di test direttamente bloccanti. Le failure
+intermedie, incluso il run E2E aggregato non verde per pool singleton e
+stock demo già consumato, non sono state cancellate dalla cronologia.
+L'esito automatico non costituisce validazione umana M4B/M4. Fotocamera
+reale e tablet fisico restano `NE-MAN-CAMERA`/`NE-MAN-TABLET`. Il Docker
+persistente e `main` non sono stati aggiornati. Dopo i controlli finali e
+il cleanup nominativo, G1–G10 sono GO: stato M4
+**`OK-TEST-M4/NE-MAN`**, in attesa di code review ChatGPT e successivo
+dry run umano autorizzato. M4 non è dichiarata `OK-MAN`.

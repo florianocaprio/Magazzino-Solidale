@@ -3779,6 +3779,7 @@ export const ListTrasferimentiResponseItem = zod.object({
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancatoArrivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -3858,6 +3859,7 @@ export const GetTrasferimentoResponse = zod.object({
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancatoArrivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -3934,6 +3936,7 @@ export const UpdateTrasferimentoResponse = zod.object({
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancatoArrivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -4002,6 +4005,7 @@ export const PreparaTrasferimentoResponse = zod.object({
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancatoArrivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -4073,6 +4077,7 @@ export const AnnullaTrasferimentoResponse = zod.object({
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancatoArrivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -4141,6 +4146,7 @@ export const AvviaTrasferimentoResponse = zod.object({
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancatoArrivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -4199,6 +4205,7 @@ export const GetDocumentoTrasferimentoResponse = zod.object({
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancatoArrivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -4269,6 +4276,209 @@ export const ConfermaTrasferimentoResponse = zod.object({
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancatoArrivo": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "mensaId": zod.number().nullish(),
+  "idempotencyKey": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
+  "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+})).optional(),
+  "dataCreazione": zod.string()
+})
+
+
+/**
+ * @summary Segnala il mancato arrivo senza reintegrare stock
+ */
+export const SegnalaMancatoArrivoTrasferimentoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const segnalaMancatoArrivoTrasferimentoBodyIdempotencyKeyMax = 120;
+
+
+export const segnalaMancatoArrivoTrasferimentoBodyMotivoMax = 500;
+
+
+
+export const SegnalaMancatoArrivoTrasferimentoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(segnalaMancatoArrivoTrasferimentoBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "motivo": zod.string().min(1).max(segnalaMancatoArrivoTrasferimentoBodyMotivoMax)
+})
+
+export const SegnalaMancatoArrivoTrasferimentoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "versione": zod.number(),
+  "magazzinoOrigineId": zod.number(),
+  "magazzinoOrigineNome": zod.string().nullish(),
+  "magazzinoOrigineIndirizzo": zod.string().nullish(),
+  "magazzinoOrigineComune": zod.string().nullish(),
+  "magazzinoOrigineZona": zod.string().nullish(),
+  "magazzinoDestinoId": zod.number(),
+  "magazzinoDestinoNome": zod.string().nullish(),
+  "magazzinoDestinoIndirizzo": zod.string().nullish(),
+  "magazzinoDestinoComune": zod.string().nullish(),
+  "magazzinoDestinoZona": zod.string().nullish(),
+  "trasportatoreVolontarioId": zod.number().nullish(),
+  "trasportatoreVolontarioNome": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "dataRichiesta": zod.string(),
+  "dataEsecuzione": zod.string().nullish(),
+  "dataConfermaRicezione": zod.string().nullish(),
+  "stato": zod.string(),
+  "note": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancatoArrivo": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "mensaId": zod.number().nullish(),
+  "idempotencyKey": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
+  "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string(),
+  "note": zod.string().nullish()
+})).optional(),
+  "dataCreazione": zod.string()
+})
+
+
+/**
+ * @summary Partite fisiche uscite e riconciliazione del rientro
+ */
+export const GetRientroTrasferimentoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const getRientroTrasferimentoResponsePartiteItemQuantitaUscitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getRientroTrasferimentoResponseDocumentiItemQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const GetRientroTrasferimentoResponse = zod.object({
+  "id": zod.number(),
+  "stato": zod.string(),
+  "magazzinoOrigineId": zod.number(),
+  "rientroId": zod.number().nullish(),
+  "dataRientro": zod.coerce.date().nullish(),
+  "partite": zod.array(zod.object({
+  "movimentoUscitaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string(),
+  "lottoId": zod.number(),
+  "codiceLotto": zod.string().nullish(),
+  "quantitaUscita": zod.string().regex(getRientroTrasferimentoResponsePartiteItemQuantitaUscitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "unitaMisura": zod.string().nullable(),
+  "quantitaFrazionabile": zod.boolean().optional()
+})),
+  "documenti": zod.array(zod.object({
+  "tipo": zod.enum(['rientro', 'deteriorata', 'scaduta', 'mancante', 'rubata']),
+  "movimentoUscitaId": zod.number(),
+  "prodottoId": zod.number(),
+  "lottoId": zod.number(),
+  "quantita": zod.string().regex(getRientroTrasferimentoResponseDocumentiItemQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "scaricoId": zod.number().nullish(),
+  "nota": zod.string().nullish()
+})).optional()
+})
+
+
+/**
+ * @summary Riconcilia e chiude il Trasferimento all'origine
+ */
+export const RegistraRientroTrasferimentoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const registraRientroTrasferimentoBodyIdempotencyKeyMax = 120;
+
+
+export const registraRientroTrasferimentoBodyNoteMax = 1000;
+
+
+export const registraRientroTrasferimentoBodyRigheItemIdoneaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const registraRientroTrasferimentoBodyRigheItemDeteriorataRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const registraRientroTrasferimentoBodyRigheItemScadutaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const registraRientroTrasferimentoBodyRigheItemMancanteRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const registraRientroTrasferimentoBodyRigheItemRubataRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const registraRientroTrasferimentoBodyRigheItemNotaMax = 500;
+
+
+
+
+export const RegistraRientroTrasferimentoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(registraRientroTrasferimentoBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "dataRientro": zod.coerce.date().optional(),
+  "note": zod.string().max(registraRientroTrasferimentoBodyNoteMax).nullish(),
+  "righe": zod.array(zod.object({
+  "movimentoUscitaId": zod.number().min(1),
+  "idonea": zod.string().regex(registraRientroTrasferimentoBodyRigheItemIdoneaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "deteriorata": zod.string().regex(registraRientroTrasferimentoBodyRigheItemDeteriorataRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "scaduta": zod.string().regex(registraRientroTrasferimentoBodyRigheItemScadutaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "mancante": zod.string().regex(registraRientroTrasferimentoBodyRigheItemMancanteRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "rubata": zod.string().regex(registraRientroTrasferimentoBodyRigheItemRubataRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "nota": zod.string().max(registraRientroTrasferimentoBodyRigheItemNotaMax).nullish()
+})).min(1)
+})
+
+export const RegistraRientroTrasferimentoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "versione": zod.number(),
+  "magazzinoOrigineId": zod.number(),
+  "magazzinoOrigineNome": zod.string().nullish(),
+  "magazzinoOrigineIndirizzo": zod.string().nullish(),
+  "magazzinoOrigineComune": zod.string().nullish(),
+  "magazzinoOrigineZona": zod.string().nullish(),
+  "magazzinoDestinoId": zod.number(),
+  "magazzinoDestinoNome": zod.string().nullish(),
+  "magazzinoDestinoIndirizzo": zod.string().nullish(),
+  "magazzinoDestinoComune": zod.string().nullish(),
+  "magazzinoDestinoZona": zod.string().nullish(),
+  "trasportatoreVolontarioId": zod.number().nullish(),
+  "trasportatoreVolontarioNome": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "dataRichiesta": zod.string(),
+  "dataEsecuzione": zod.string().nullish(),
+  "dataConfermaRicezione": zod.string().nullish(),
+  "stato": zod.string(),
+  "note": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancatoArrivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -9558,6 +9768,7 @@ export const GetDocumentoOperativoResponse = zod.object({
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
   "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
@@ -9608,6 +9819,7 @@ export const GetDocumentoOperativoResponse = zod.object({
   "stato": zod.string(),
   "note": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancatoArrivo": zod.string().nullish(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "mensaId": zod.number().nullish(),
@@ -9687,6 +9899,7 @@ export const ListBolleResponseItem = zod.object({
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
   "versione": zod.number().min(1),
   "dataCreazione": zod.string()
 })
@@ -9759,6 +9972,7 @@ export const GetBollaResponse = zod.object({
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
   "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
@@ -9853,6 +10067,7 @@ export const UpdateBollaResponse = zod.object({
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
   "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
@@ -10023,6 +10238,7 @@ export const ConfermaBollaResponse = zod.object({
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
   "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
@@ -10115,6 +10331,7 @@ export const AnnullaBollaResponse = zod.object({
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
   "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
@@ -10213,6 +10430,7 @@ export const StornaAmministrativamenteBollaResponse = zod.object({
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
   "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
@@ -10244,7 +10462,7 @@ export const StornaAmministrativamenteBollaResponse = zod.object({
 
 
 /**
- * @summary Mark bolla as delivered - move from confermato to consegnato
+ * @summary Consegna diretta o esito finale dopo affidamento, senza doppio scarico
  */
 export const ConsegnaBollaParams = zod.object({
   "id": zod.coerce.number()
@@ -10304,6 +10522,344 @@ export const ConsegnaBollaResponse = zod.object({
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
+  "versione": zod.number().min(1),
+  "dataCreazione": zod.string(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
+  "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string().nullable(),
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
+}))
+})
+
+
+/**
+ * @summary Affida una Bolla Pronta al trasporto consumando le prenotazioni
+ */
+export const AffidaBollaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const affidaBollaBodyIdempotencyKeyMax = 120;
+
+
+export const affidaBollaBodyTrasportatoreNomeMax = 120;
+
+
+
+export const AffidaBollaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(affidaBollaBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "trasportatoreNome": zod.string().max(affidaBollaBodyTrasportatoreNomeMax).nullish()
+})
+
+
+
+
+
+export const AffidaBollaResponse = zod.object({
+  "id": zod.number(),
+  "numeroBolla": zod.string(),
+  "dataBolla": zod.string(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
+  "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "enteDestinatarioIndirizzo": zod.string().nullish(),
+  "enteDestinatarioTelefono": zod.string().nullish(),
+  "enteDestinatarioEmail": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
+  "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "volontarioConsegnaId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
+  "magazzinoIndirizzo": zod.string().nullish(),
+  "magazzinoComune": zod.string().nullish(),
+  "beneficiarioIndirizzo": zod.string().nullish(),
+  "beneficiarioTelefono": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "mezzoAltro": zod.boolean().optional(),
+  "stato": zod.string(),
+  "noteConsegna": zod.string().nullish(),
+  "confermaRicezione": zod.boolean(),
+  "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
+  "versione": zod.number().min(1),
+  "dataCreazione": zod.string(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
+  "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string().nullable(),
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
+}))
+})
+
+
+/**
+ * @summary Segnala mancata consegna senza reintegro fisico
+ */
+export const SegnalaMancataConsegnaBollaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const segnalaMancataConsegnaBollaBodyIdempotencyKeyMax = 120;
+
+
+export const segnalaMancataConsegnaBollaBodyMotivoMax = 500;
+
+
+
+export const SegnalaMancataConsegnaBollaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(segnalaMancataConsegnaBollaBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "motivo": zod.string().min(1).max(segnalaMancataConsegnaBollaBodyMotivoMax)
+})
+
+
+
+
+
+export const SegnalaMancataConsegnaBollaResponse = zod.object({
+  "id": zod.number(),
+  "numeroBolla": zod.string(),
+  "dataBolla": zod.string(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
+  "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "enteDestinatarioIndirizzo": zod.string().nullish(),
+  "enteDestinatarioTelefono": zod.string().nullish(),
+  "enteDestinatarioEmail": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
+  "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "volontarioConsegnaId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
+  "magazzinoIndirizzo": zod.string().nullish(),
+  "magazzinoComune": zod.string().nullish(),
+  "beneficiarioIndirizzo": zod.string().nullish(),
+  "beneficiarioTelefono": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "mezzoAltro": zod.boolean().optional(),
+  "stato": zod.string(),
+  "noteConsegna": zod.string().nullish(),
+  "confermaRicezione": zod.boolean(),
+  "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
+  "versione": zod.number().min(1),
+  "dataCreazione": zod.string(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "bollaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "fondoOrigine": zod.string().nullish(),
+  "ripartizioniLotto": zod.array(zod.object({
+  "lottoId": zod.number().nullable(),
+  "codiceLotto": zod.string().nullable(),
+  "fondoOrigine": zod.string(),
+  "quantita": zod.number()
+})),
+  "fsePlus": zod.boolean(),
+  "fsePlusQuantita": zod.number().optional(),
+  "nonFsePlusQuantita": zod.number().optional(),
+  "quantitaLorda": zod.number().optional().describe('Quantità distribuita prima degli storni, dal ledger canonico'),
+  "quantitaStornata": zod.number().optional().describe('Quantità complessivamente stornata'),
+  "quantitaNetta": zod.number().optional().describe('Quantità distribuita netta dopo gli storni'),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string().nullable(),
+  "note": zod.string().nullish(),
+  "versioneBolla": zod.number().min(1).optional()
+}))
+})
+
+
+/**
+ * @summary Partite fisiche affidate e riconciliazione del rientro
+ */
+export const GetRientroBollaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const getRientroBollaResponsePartiteItemQuantitaUscitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getRientroBollaResponseDocumentiItemQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const GetRientroBollaResponse = zod.object({
+  "id": zod.number(),
+  "stato": zod.string(),
+  "magazzinoOrigineId": zod.number(),
+  "rientroId": zod.number().nullish(),
+  "dataRientro": zod.coerce.date().nullish(),
+  "partite": zod.array(zod.object({
+  "movimentoUscitaId": zod.number(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string(),
+  "lottoId": zod.number(),
+  "codiceLotto": zod.string().nullish(),
+  "quantitaUscita": zod.string().regex(getRientroBollaResponsePartiteItemQuantitaUscitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "unitaMisura": zod.string().nullable(),
+  "quantitaFrazionabile": zod.boolean().optional()
+})),
+  "documenti": zod.array(zod.object({
+  "tipo": zod.enum(['rientro', 'deteriorata', 'scaduta', 'mancante', 'rubata']),
+  "movimentoUscitaId": zod.number(),
+  "prodottoId": zod.number(),
+  "lottoId": zod.number(),
+  "quantita": zod.string().regex(getRientroBollaResponseDocumentiItemQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "scaricoId": zod.number().nullish(),
+  "nota": zod.string().nullish()
+})).optional()
+})
+
+
+/**
+ * @summary Riconcilia il rientro al Magazzino origine e chiude la Bolla
+ */
+export const RegistraRientroBollaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const registraRientroBollaBodyIdempotencyKeyMax = 120;
+
+
+export const registraRientroBollaBodyNoteMax = 1000;
+
+
+export const registraRientroBollaBodyRigheItemIdoneaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const registraRientroBollaBodyRigheItemDeteriorataRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const registraRientroBollaBodyRigheItemScadutaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const registraRientroBollaBodyRigheItemMancanteRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const registraRientroBollaBodyRigheItemRubataRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const registraRientroBollaBodyRigheItemNotaMax = 500;
+
+
+
+
+export const RegistraRientroBollaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(registraRientroBollaBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "dataRientro": zod.coerce.date().optional(),
+  "note": zod.string().max(registraRientroBollaBodyNoteMax).nullish(),
+  "righe": zod.array(zod.object({
+  "movimentoUscitaId": zod.number().min(1),
+  "idonea": zod.string().regex(registraRientroBollaBodyRigheItemIdoneaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "deteriorata": zod.string().regex(registraRientroBollaBodyRigheItemDeteriorataRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "scaduta": zod.string().regex(registraRientroBollaBodyRigheItemScadutaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "mancante": zod.string().regex(registraRientroBollaBodyRigheItemMancanteRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "rubata": zod.string().regex(registraRientroBollaBodyRigheItemRubataRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "nota": zod.string().max(registraRientroBollaBodyRigheItemNotaMax).nullish()
+})).min(1)
+})
+
+
+
+
+
+export const RegistraRientroBollaResponse = zod.object({
+  "id": zod.number(),
+  "numeroBolla": zod.string(),
+  "dataBolla": zod.string(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente']),
+  "beneficiarioId": zod.number().nullish(),
+  "beneficiarioNome": zod.string().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "enteDestinatarioNome": zod.string().nullish(),
+  "enteDestinatarioIndirizzo": zod.string().nullish(),
+  "enteDestinatarioTelefono": zod.string().nullish(),
+  "enteDestinatarioEmail": zod.string().nullish(),
+  "destinatarioSnapshotCongelato": zod.boolean(),
+  "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
+  "consegnaId": zod.number().nullish(),
+  "daPianificazione": zod.boolean().optional(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "volontarioConsegnaId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
+  "magazzinoIndirizzo": zod.string().nullish(),
+  "magazzinoComune": zod.string().nullish(),
+  "beneficiarioIndirizzo": zod.string().nullish(),
+  "beneficiarioTelefono": zod.string().nullish(),
+  "trasportatoreNome": zod.string().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "mezzoAltro": zod.boolean().optional(),
+  "stato": zod.string(),
+  "noteConsegna": zod.string().nullish(),
+  "confermaRicezione": zod.boolean(),
+  "noteRicezione": zod.string().nullish(),
+  "ritiroNonEffettuatoAt": zod.coerce.date().nullish(),
+  "ritiroNonEffettuatoOperatoreId": zod.number().nullish(),
+  "ritiroNonEffettuatoMotivo": zod.string().nullish(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
   "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({
@@ -10391,6 +10947,7 @@ export const SegnalaRitiroNonEffettuatoResponse = zod.object({
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
+  "motivoMancataConsegna": zod.string().nullish(),
   "versione": zod.number().min(1),
   "dataCreazione": zod.string(),
   "righe": zod.array(zod.object({

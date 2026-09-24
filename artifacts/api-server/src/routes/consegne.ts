@@ -1268,14 +1268,16 @@ router.post(
         .json({ error: "Risorsa non accessibile per il tuo centro" });
       return;
     }
-    // serve una bolla pronta (confermata) o già consegnata, dello stesso beneficiario
+    // Pronta, in consegna o già consegnata: il servizio condiviso decide l'esito senza doppio scarico.
     const bolle = await db
       .select()
       .from(bolleTable)
       .where(eq(bolleTable.consegnaId, consegnaId));
     const bollaPronta = bolle.find(
       (b) =>
-        (b.stato === "confermato" || b.stato === "consegnato") &&
+        (b.stato === "confermato" ||
+          b.stato === "in_trasporto" ||
+          b.stato === "consegnato") &&
         b.beneficiarioId === consegna.beneficiarioId,
     );
     if (!bollaPronta) {
@@ -1317,6 +1319,7 @@ router.post(
         }),
         confermaRicezione: true,
         allowAlreadyConsegnata: true,
+        requiredPermission: "consegne.complete",
         beneficiaryAccessScope: beneficiarioAccessScopeFromRequest(req),
         expectedConsegna: {
           id: consegnaId,

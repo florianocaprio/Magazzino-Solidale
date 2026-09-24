@@ -46,6 +46,8 @@ export interface Trasferimento {
   /** @nullable */
   motivoAnnullamento?: string | null;
   /** @nullable */
+  motivoMancatoArrivo?: string | null;
+  /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;

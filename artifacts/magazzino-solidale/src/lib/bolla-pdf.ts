@@ -269,6 +269,18 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     y += 8;
   }
 
+  const transportStatus: Record<string, string> = {
+    in_trasporto: "MERCE AFFIDATA AL TRASPORTO",
+    rientro_atteso: "MANCATA CONSEGNA — RIENTRO ATTESO",
+    rientrato: "RIENTRATA — DOCUMENTO CHIUSO",
+  };
+  if (transportStatus[bolla.stato]) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(transportStatus[bolla.stato], margin, y);
+    y += 7;
+  }
+
   // ---- Banner ANNULLATA: non implica automaticamente un reintegro ----
   if (isAnnullato) {
     doc.setFillColor(RED[0], RED[1], RED[2]);

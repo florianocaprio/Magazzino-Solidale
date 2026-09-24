@@ -2803,6 +2803,8 @@ export interface Trasferimento {
   /** @nullable */
   motivoAnnullamento?: string | null;
   /** @nullable */
+  motivoMancatoArrivo?: string | null;
+  /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
   operatoreCodice?: string | null;
@@ -2977,6 +2979,102 @@ export interface ComandoVersionatoInput {
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
+}
+
+export interface MancatoTrasportoInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  motivo: string;
+}
+
+export interface RientroTrasportoRigaInput {
+  /** @minimum 1 */
+  movimentoUscitaId: number;
+  idonea?: QuantitaContabile;
+  deteriorata?: QuantitaContabile;
+  scaduta?: QuantitaContabile;
+  mancante?: QuantitaContabile;
+  rubata?: QuantitaContabile;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  nota?: string | null;
+}
+
+export interface RientroTrasportoInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
+  dataRientro?: string;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  note?: string | null;
+  /** @minItems 1 */
+  righe: RientroTrasportoRigaInput[];
+}
+
+export interface RientroTrasportoPartita {
+  movimentoUscitaId: number;
+  prodottoId: number;
+  prodottoNome: string;
+  lottoId: number;
+  /** @nullable */
+  codiceLotto?: string | null;
+  quantitaUscita: QuantitaContabile;
+  /** @nullable */
+  unitaMisura: string | null;
+  quantitaFrazionabile?: boolean;
+}
+
+export type RientroTrasportoDocumentoTipo = typeof RientroTrasportoDocumentoTipo[keyof typeof RientroTrasportoDocumentoTipo];
+
+
+export const RientroTrasportoDocumentoTipo = {
+  rientro: 'rientro',
+  deteriorata: 'deteriorata',
+  scaduta: 'scaduta',
+  mancante: 'mancante',
+  rubata: 'rubata',
+} as const;
+
+export interface RientroTrasportoDocumento {
+  tipo: RientroTrasportoDocumentoTipo;
+  movimentoUscitaId: number;
+  prodottoId: number;
+  lottoId: number;
+  quantita: QuantitaContabile;
+  /** @nullable */
+  scaricoId?: number | null;
+  /** @nullable */
+  nota?: string | null;
+}
+
+export interface RientroTrasportoDettaglio {
+  id: number;
+  stato: string;
+  magazzinoOrigineId: number;
+  /** @nullable */
+  rientroId?: number | null;
+  /** @nullable */
+  dataRientro?: string | null;
+  partite: RientroTrasportoPartita[];
+  documenti?: RientroTrasportoDocumento[];
 }
 
 export interface VersioneInput {
@@ -6786,6 +6884,8 @@ export interface BollaDettaglio {
   operatoreCodice?: string | null;
   /** @nullable */
   motivoAnnullamento?: string | null;
+  /** @nullable */
+  motivoMancataConsegna?: string | null;
   /** @minimum 1 */
   versione: number;
   dataCreazione: string;
@@ -6870,6 +6970,8 @@ export interface Bolla {
   operatoreCodice?: string | null;
   /** @nullable */
   motivoAnnullamento?: string | null;
+  /** @nullable */
+  motivoMancataConsegna?: string | null;
   /** @minimum 1 */
   versione: number;
   dataCreazione: string;
@@ -6900,6 +7002,21 @@ export interface ConsegnaRicezioneInput {
   versione: number;
   noteRicezione?: string;
   confermaRicezione?: boolean;
+}
+
+export interface AffidaBollaInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  trasportatoreNome?: string | null;
 }
 
 export interface BollaAnnullamentoInput {

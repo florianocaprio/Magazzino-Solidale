@@ -3,7 +3,7 @@ import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
 import { dashboard, kpi, quality, text } from "./shared";
 import { isModuloAttivo } from "../featureFlags";
-import { signedMovementSql } from "../fseAccounting";
+import { signedPhysicalMovementSql } from "../movementPhysicalEffect";
 
 function warehouseConditions(
   filters: ReportFilters,
@@ -60,20 +60,26 @@ export async function buildLogisticaReport(filters: ReportFilters) {
   const warehouseWhere = andSql(warehouseConditions(filters));
   const movementWhere = andSql(movementConditions(filters));
   const transferWhere = transferCondition(filters);
-  const signedPieces = signedMovementSql(
+  const signedPieces = signedPhysicalMovementSql(
     sql`mv.quantita_pezzi`,
-    sql`mv.natura_contabile`,
-    sql`original.natura_contabile`,
+    sql`mv.tipo_movimento`,
+    sql`mv.tipo_dettaglio`,
+    sql`original.tipo_movimento`,
+    sql`original.tipo_dettaglio`,
   );
-  const signedKgLt = signedMovementSql(
+  const signedKgLt = signedPhysicalMovementSql(
     sql`mv.quantita_kg_lt`,
-    sql`mv.natura_contabile`,
-    sql`original.natura_contabile`,
+    sql`mv.tipo_movimento`,
+    sql`mv.tipo_dettaglio`,
+    sql`original.tipo_movimento`,
+    sql`original.tipo_dettaglio`,
   );
-  const signedQuantity = signedMovementSql(
+  const signedQuantity = signedPhysicalMovementSql(
     sql`mv.quantita`,
-    sql`mv.natura_contabile`,
-    sql`original.natura_contabile`,
+    sql`mv.tipo_movimento`,
+    sql`mv.tipo_dettaglio`,
+    sql`original.tipo_movimento`,
+    sql`original.tipo_dettaglio`,
   );
   const [
     stock,
@@ -161,7 +167,7 @@ export async function buildLogisticaReport(filters: ReportFilters) {
     `),
     rows<Record<string, unknown>>(sql`
       SELECT COUNT(*) FILTER (WHERE tr.stato = 'richiesto') AS richiesti,
-             COUNT(*) FILTER (WHERE tr.stato IN ('avviato', 'in_transito')) AS in_transito,
+             COUNT(*) FILTER (WHERE tr.stato IN ('avviato', 'in_transito', 'rientro_atteso')) AS in_transito,
              COUNT(*) FILTER (WHERE tr.stato IN ('completato', 'confermato')) AS completati
       FROM trasferimenti tr
       JOIN magazzini mo ON mo.id = tr.magazzino_origine_id

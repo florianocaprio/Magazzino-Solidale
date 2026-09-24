@@ -13,9 +13,9 @@ import {
   accountingDisposition,
   isAdministrativeDisposition,
   signedInventoryValue,
-  signedMovementSql,
 } from "./fseAccounting";
 import { InventoryDecimal } from "./inventoryDecimal";
+import { signedPhysicalMovementSql } from "./movementPhysicalEffect";
 
 export const FSE_CANONICAL_FORMAT = "FSE_CANONICAL_AUDIT_XLSX_V1";
 export const FSE_OBSERVED_CONTROL_FORMAT =
@@ -1023,15 +1023,19 @@ export async function loadFseBalances(
     maxOperazioneDistribuzioneId: number;
   },
 ): Promise<FseBalanceSnapshot[]> {
-  const pieces = signedMovementSql(
+  const pieces = signedPhysicalMovementSql(
     sql`mv.quantita_pezzi`,
-    sql`mv.natura_contabile`,
-    sql`original.natura_contabile`,
+    sql`mv.tipo_movimento`,
+    sql`mv.tipo_dettaglio`,
+    sql`original.tipo_movimento`,
+    sql`original.tipo_dettaglio`,
   );
-  const kgLt = signedMovementSql(
+  const kgLt = signedPhysicalMovementSql(
     sql`mv.quantita_kg_lt`,
-    sql`mv.natura_contabile`,
-    sql`original.natura_contabile`,
+    sql`mv.tipo_movimento`,
+    sql`mv.tipo_dettaglio`,
+    sql`original.tipo_movimento`,
+    sql`original.tipo_dettaglio`,
   );
   const result = await executor.execute(sql`
     SELECT mv.magazzino_id, mv.fondo_origine, mv.prodotto_id,
@@ -1092,15 +1096,19 @@ async function loadProgressiveBalances(
   >
 > {
   if (input.movementIds.length === 0) return new Map();
-  const pieces = signedMovementSql(
+  const pieces = signedPhysicalMovementSql(
     sql`mv.quantita_pezzi`,
-    sql`mv.natura_contabile`,
-    sql`original.natura_contabile`,
+    sql`mv.tipo_movimento`,
+    sql`mv.tipo_dettaglio`,
+    sql`original.tipo_movimento`,
+    sql`original.tipo_dettaglio`,
   );
-  const kgLt = signedMovementSql(
+  const kgLt = signedPhysicalMovementSql(
     sql`mv.quantita_kg_lt`,
-    sql`mv.natura_contabile`,
-    sql`original.natura_contabile`,
+    sql`mv.tipo_movimento`,
+    sql`mv.tipo_dettaglio`,
+    sql`original.tipo_movimento`,
+    sql`original.tipo_dettaglio`,
   );
   const result = await executor.execute(sql`
     WITH signed AS (

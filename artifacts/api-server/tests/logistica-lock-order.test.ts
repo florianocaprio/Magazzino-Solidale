@@ -62,7 +62,8 @@ async function concurrent<T>(operations: Array<PromiseLike<T>>): Promise<T[]> {
       Promise.all(operations.map((operation) => Promise.resolve(operation))),
       new Promise<never>((_, reject) => {
         timeout = setTimeout(
-          () => reject(new Error("Le operazioni concorrenti non si sono concluse")),
+          () =>
+            reject(new Error("Le operazioni concorrenti non si sono concluse")),
           5_000,
         );
       }),
@@ -73,7 +74,9 @@ async function concurrent<T>(operations: Array<PromiseLike<T>>): Promise<T[]> {
 }
 
 async function trackTurni(centroAscoltoId: number) {
-  const turni = await db.select({ id: turniTable.id }).from(turniTable)
+  const turni = await db
+    .select({ id: turniTable.id })
+    .from(turniTable)
     .where(eq(turniTable.centroAscoltoId, centroAscoltoId));
   for (const row of turni) {
     if (!scope.turnoIds.includes(row.id)) scope.turnoIds.push(row.id);
@@ -106,7 +109,9 @@ describe("ordine globale lock pianificazione Logistica", () => {
     expect([turno.status, consegna.status]).toEqual([200, 201]);
     scope.consegnaIds.push(consegna.body.id);
     await trackTurni(f.centro.id);
-    const slots = await db.select().from(turniTable)
+    const slots = await db
+      .select()
+      .from(turniTable)
       .where(eq(turniTable.centroAscoltoId, f.centro.id));
     expect(slots).toHaveLength(1);
     expect(slots[0]).toMatchObject({ data, fascia: "09-13", mezzoId: f.mezzo });
@@ -117,13 +122,15 @@ describe("ordine globale lock pianificazione Logistica", () => {
     const f = await fixture();
     const data = "2026-12-02";
     const [turno, consegna] = await concurrent([
-      request(app(turniRouter)).put("/turni").send({
-        centroAscoltoId: f.centro.id,
-        data,
-        fascia: "14-18",
-        versione: 1,
-        volontari: [{ volontarioId: f.volontario }],
-      }),
+      request(app(turniRouter))
+        .put("/turni")
+        .send({
+          centroAscoltoId: f.centro.id,
+          data,
+          fascia: "14-18",
+          versione: 1,
+          volontari: [{ volontarioId: f.volontario }],
+        }),
       request(app(consegneRouter)).post("/consegne").send({
         beneficiarioId: f.beneficiario,
         tipoConsegna: "domicilio",
@@ -137,11 +144,17 @@ describe("ordine globale lock pianificazione Logistica", () => {
     expect([turno.status, consegna.status]).toEqual([200, 201]);
     scope.consegnaIds.push(consegna.body.id);
     await trackTurni(f.centro.id);
-    const [slot] = await db.select().from(turniTable)
+    const [slot] = await db
+      .select()
+      .from(turniTable)
       .where(eq(turniTable.centroAscoltoId, f.centro.id));
     expect(slot).toMatchObject({ data, fascia: "14-18" });
-    expect(await db.select().from(turniVolontariTable)
-      .where(eq(turniVolontariTable.turnoId, slot.id))).toHaveLength(1);
+    expect(
+      await db
+        .select()
+        .from(turniVolontariTable)
+        .where(eq(turniVolontariTable.turnoId, slot.id)),
+    ).toHaveLength(1);
     expect(await db.select().from(turniConsegneTable)).toHaveLength(1);
   });
 
@@ -159,25 +172,29 @@ describe("ordine globale lock pianificazione Logistica", () => {
     });
     expect(created.status).toBe(201);
     scope.consegnaIds.push(created.body.id);
-    const target = await request(app(turniRouter)).put("/turni").send({
-      centroAscoltoId: f.centro.id,
-      data: "2026-12-04",
-      fascia: "18-20",
-      mezzoId: f.mezzo,
-      volontari: [{ volontarioId: f.volontario }],
-    });
+    const target = await request(app(turniRouter))
+      .put("/turni")
+      .send({
+        centroAscoltoId: f.centro.id,
+        data: "2026-12-04",
+        fascia: "18-20",
+        mezzoId: f.mezzo,
+        volontari: [{ volontarioId: f.volontario }],
+      });
     expect(target.status).toBe(200);
     scope.turnoIds.push(target.body.id);
 
     const [turno, moved] = await concurrent([
-      request(app(turniRouter)).put("/turni").send({
-        centroAscoltoId: f.centro.id,
-        data: "2026-12-04",
-        fascia: "18-20",
-        versione: target.body.versione,
-        mezzoId: f.mezzo,
-        volontari: [{ volontarioId: f.volontario }],
-      }),
+      request(app(turniRouter))
+        .put("/turni")
+        .send({
+          centroAscoltoId: f.centro.id,
+          data: "2026-12-04",
+          fascia: "18-20",
+          versione: target.body.versione,
+          mezzoId: f.mezzo,
+          volontari: [{ volontarioId: f.volontario }],
+        }),
       request(app(consegneRouter)).patch(`/consegne/${created.body.id}`).send({
         dataPrevista: "2026-12-04",
         fasciaOraria: "Sera",
@@ -186,14 +203,22 @@ describe("ordine globale lock pianificazione Logistica", () => {
     expect(turno.status).toBe(200);
     expect(moved.status).toBe(200);
     await trackTurni(f.centro.id);
-    const [source] = await db.select().from(turniConsegneTable)
+    const [source] = await db
+      .select()
+      .from(turniConsegneTable)
       .where(eq(turniConsegneTable.consegnaId, created.body.id));
     expect(source.turnoId).toBe(target.body.id);
-    const old = await db.select().from(turniTable)
+    const old = await db
+      .select()
+      .from(turniTable)
       .where(eq(turniTable.data, "2026-12-03"));
     expect(old[0]).toMatchObject({ stato: "annullato", mezzoId: null });
-    expect(await db.select().from(turniVolontariTable)
-      .where(eq(turniVolontariTable.turnoId, old[0].id))).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(turniVolontariTable)
+        .where(eq(turniVolontariTable.turnoId, old[0].id)),
+    ).toHaveLength(0);
   });
 
   it("ordina deterministicamente due PATCH Consegna A→B e B→A", async () => {
@@ -208,37 +233,52 @@ describe("ordine globale lock pianificazione Logistica", () => {
       volontarioId: f.volontario,
       mezzoId: f.mezzo,
     });
-    const first = await request(app(consegneRouter)).post("/consegne")
+    const first = await request(app(consegneRouter))
+      .post("/consegne")
       .send(payload("2026-12-05"));
-    const second = await request(app(consegneRouter)).post("/consegne")
+    const second = await request(app(consegneRouter))
+      .post("/consegne")
       .send(payload("2026-12-06"));
     expect([first.status, second.status]).toEqual([201, 201]);
     scope.consegnaIds.push(first.body.id, second.body.id);
 
     const [aToB, bToA] = await concurrent([
-      request(app(consegneRouter)).patch(`/consegne/${first.body.id}`)
+      request(app(consegneRouter))
+        .patch(`/consegne/${first.body.id}`)
         .send({ dataPrevista: "2026-12-06" }),
-      request(app(consegneRouter)).patch(`/consegne/${second.body.id}`)
+      request(app(consegneRouter))
+        .patch(`/consegne/${second.body.id}`)
         .send({ dataPrevista: "2026-12-05" }),
     ]);
-    expect([aToB.status, bToA.status]).toEqual([200, 200]);
     await trackTurni(f.centro.id);
-    const sources = await db.select({
-      consegnaId: turniConsegneTable.consegnaId,
-      data: turniTable.data,
-    }).from(turniConsegneTable)
+    expect(aToB.status, aToB.text).toBe(200);
+    expect(bToA.status, bToA.text).toBe(200);
+    const sources = await db
+      .select({
+        consegnaId: turniConsegneTable.consegnaId,
+        data: turniTable.data,
+      })
+      .from(turniConsegneTable)
       .innerJoin(turniTable, eq(turniConsegneTable.turnoId, turniTable.id));
-    expect(sources).toEqual(expect.arrayContaining([
-      { consegnaId: first.body.id, data: "2026-12-06" },
-      { consegnaId: second.body.id, data: "2026-12-05" },
-    ]));
+    expect(sources).toEqual(
+      expect.arrayContaining([
+        { consegnaId: first.body.id, data: "2026-12-06" },
+        { consegnaId: second.body.id, data: "2026-12-05" },
+      ]),
+    );
     expect(sources).toHaveLength(2);
-    const turni = await db.select().from(turniTable)
+    const turni = await db
+      .select()
+      .from(turniTable)
       .where(eq(turniTable.centroAscoltoId, f.centro.id));
     expect(turni).toHaveLength(2);
     for (const turno of turni) {
-      expect(await db.select().from(turniVolontariTable)
-        .where(eq(turniVolontariTable.turnoId, turno.id))).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(turniVolontariTable)
+          .where(eq(turniVolontariTable.turnoId, turno.id)),
+      ).toHaveLength(1);
     }
   });
 

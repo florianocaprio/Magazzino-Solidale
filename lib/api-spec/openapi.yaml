@@ -2516,6 +2516,65 @@ paths:
               schema:
                 $ref: "#/components/schemas/Trasferimento"
 
+  /trasferimenti/{id}/mancato-arrivo:
+    post:
+      operationId: segnalaMancatoArrivoTrasferimento
+      tags: [trasferimenti]
+      summary: Segnala il mancato arrivo senza reintegrare stock
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MancatoTrasportoInput" }
+      responses:
+        "200":
+          description: Rientro atteso all'origine
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Trasferimento" }
+
+  /trasferimenti/{id}/rientro:
+    get:
+      operationId: getRientroTrasferimento
+      tags: [trasferimenti]
+      summary: Partite fisiche uscite e riconciliazione del rientro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Partite reali e documenti derivati dal rientro
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RientroTrasportoDettaglio" }
+    post:
+      operationId: registraRientroTrasferimento
+      tags: [trasferimenti]
+      summary: Riconcilia e chiude il Trasferimento all'origine
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RientroTrasportoInput" }
+      responses:
+        "200":
+          description: Trasferimento rientrato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Trasferimento" }
+
   /scarichi:
     get:
       operationId: listScarichi
@@ -5743,7 +5802,7 @@ paths:
     post:
       operationId: consegnaBolla
       tags: [bolle]
-      summary: Mark bolla as delivered - move from confermato to consegnato
+      summary: Consegna diretta o esito finale dopo affidamento, senza doppio scarico
       parameters:
         - name: id
           in: path
@@ -5763,6 +5822,87 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BollaDettaglio"
+
+  /bolle/{id}/affida:
+    post:
+      operationId: affidaBolla
+      tags: [bolle]
+      summary: Affida una Bolla Pronta al trasporto consumando le prenotazioni
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AffidaBollaInput" }
+      responses:
+        "200":
+          description: Bolla in consegna
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BollaDettaglio" }
+
+  /bolle/{id}/mancata-consegna:
+    post:
+      operationId: segnalaMancataConsegnaBolla
+      tags: [bolle]
+      summary: Segnala mancata consegna senza reintegro fisico
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MancatoTrasportoInput" }
+      responses:
+        "200":
+          description: Bolla in attesa di rientro
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BollaDettaglio" }
+
+  /bolle/{id}/rientro:
+    get:
+      operationId: getRientroBolla
+      tags: [bolle]
+      summary: Partite fisiche affidate e riconciliazione del rientro
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Partite reali e documenti derivati dal rientro
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RientroTrasportoDettaglio" }
+    post:
+      operationId: registraRientroBolla
+      tags: [bolle]
+      summary: Riconcilia il rientro al Magazzino origine e chiude la Bolla
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RientroTrasportoInput" }
+      responses:
+        "200":
+          description: Bolla rientrata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BollaDettaglio" }
 
   /bolle/{id}/ritiro-non-effettuato:
     post:
@@ -12959,6 +13099,8 @@ components:
           type: ["string", "null"]
         motivoAnnullamento:
           type: ["string", "null"]
+        motivoMancatoArrivo:
+          type: ["string", "null"]
         operatoreId:
           type: ["integer", "null"]
         operatoreCodice:
@@ -13237,6 +13379,95 @@ components:
           type: integer
           minimum: 1
       required: [idempotencyKey, versione]
+
+    MancatoTrasportoInput:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, versione, motivo]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        versione: { type: integer, minimum: 1 }
+        motivo: { type: string, minLength: 1, maxLength: 500 }
+
+    RientroTrasportoRigaInput:
+      type: object
+      additionalProperties: false
+      required: [movimentoUscitaId]
+      properties:
+        movimentoUscitaId: { type: integer, minimum: 1 }
+        idonea: { $ref: "#/components/schemas/QuantitaContabile" }
+        deteriorata: { $ref: "#/components/schemas/QuantitaContabile" }
+        scaduta: { $ref: "#/components/schemas/QuantitaContabile" }
+        mancante: { $ref: "#/components/schemas/QuantitaContabile" }
+        rubata: { $ref: "#/components/schemas/QuantitaContabile" }
+        nota: { type: ["string", "null"], maxLength: 500 }
+
+    RientroTrasportoInput:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, versione, righe]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        versione: { type: integer, minimum: 1 }
+        dataRientro: { type: string, format: date }
+        note: { type: ["string", "null"], maxLength: 1000 }
+        righe:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/RientroTrasportoRigaInput" }
+
+    RientroTrasportoPartita:
+      type: object
+      required:
+        [
+          movimentoUscitaId,
+          prodottoId,
+          prodottoNome,
+          lottoId,
+          quantitaUscita,
+          unitaMisura,
+        ]
+      properties:
+        movimentoUscitaId: { type: integer }
+        prodottoId: { type: integer }
+        prodottoNome: { type: string }
+        lottoId: { type: integer }
+        codiceLotto: { type: ["string", "null"] }
+        quantitaUscita: { $ref: "#/components/schemas/QuantitaContabile" }
+        unitaMisura: { type: ["string", "null"] }
+        quantitaFrazionabile: { type: boolean }
+
+    RientroTrasportoDettaglio:
+      type: object
+      required: [id, stato, magazzinoOrigineId, partite]
+      properties:
+        id: { type: integer }
+        stato: { type: string }
+        magazzinoOrigineId: { type: integer }
+        rientroId: { type: ["integer", "null"] }
+        dataRientro: { type: ["string", "null"], format: date }
+        partite:
+          type: array
+          items: { $ref: "#/components/schemas/RientroTrasportoPartita" }
+        documenti:
+          type: array
+          items: { $ref: "#/components/schemas/RientroTrasportoDocumento" }
+
+    RientroTrasportoDocumento:
+      type: object
+      required: [tipo, movimentoUscitaId, prodottoId, lottoId, quantita]
+      properties:
+        tipo:
+          {
+            type: string,
+            enum: [rientro, deteriorata, scaduta, mancante, rubata],
+          }
+        movimentoUscitaId: { type: integer }
+        prodottoId: { type: integer }
+        lottoId: { type: integer }
+        quantita: { $ref: "#/components/schemas/QuantitaContabile" }
+        scaricoId: { type: ["integer", "null"] }
+        nota: { type: ["string", "null"] }
 
     VersioneInput:
       type: object
@@ -17903,6 +18134,8 @@ components:
           type: ["string", "null"]
         motivoAnnullamento:
           type: ["string", "null"]
+        motivoMancataConsegna:
+          type: ["string", "null"]
         versione:
           type: integer
           minimum: 1
@@ -18001,6 +18234,8 @@ components:
         operatoreCodice:
           type: ["string", "null"]
         motivoAnnullamento:
+          type: ["string", "null"]
+        motivoMancataConsegna:
           type: ["string", "null"]
         versione:
           type: integer
@@ -18133,6 +18368,15 @@ components:
         confermaRicezione:
           type: boolean
       required: [idempotencyKey, versione]
+
+    AffidaBollaInput:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, versione]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        versione: { type: integer, minimum: 1 }
+        trasportatoreNome: { type: ["string", "null"], maxLength: 120 }
 
     BollaAnnullamentoInput:
       type: object

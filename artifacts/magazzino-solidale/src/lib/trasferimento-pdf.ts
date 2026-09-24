@@ -134,6 +134,18 @@ export async function generateTrasferimentoPdf(
     doc.setFont("helvetica", "normal");
     y += 12;
   }
+  if (t.stato === "rientro_atteso" || t.stato === "rientrato") {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text(
+      t.stato === "rientrato"
+        ? "RIENTRATO ALL'ORIGINE — DOCUMENTO CHIUSO"
+        : "MANCATO ARRIVO — RIENTRO ATTESO ALL'ORIGINE",
+      margin,
+      y,
+    );
+    y += 8;
+  }
 
   // ---- Origine / Destinazione ----
   const colDestX = pageW / 2 + 4;

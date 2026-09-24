@@ -27,6 +27,7 @@ import type {
   AccessoEmporioStatoUpdate,
   AccessoEmporioUpdate,
   ActionResult,
+  AffidaBollaInput,
   AgeaBadRequestResponse,
   AgeaConflictResponse,
   AgeaCorrezioneDataInput,
@@ -322,6 +323,7 @@ import type {
   Magazzino,
   MagazzinoInput,
   MagazzinoUpdate,
+  MancatoTrasportoInput,
   MapsCapabilities,
   MapsMarker,
   MapsRoute,
@@ -394,6 +396,8 @@ import type {
   ReportingDashboard,
   ResetPasswordInput,
   RettificaLottoInput,
+  RientroTrasportoDettaglio,
+  RientroTrasportoInput,
   RitiroNonEffettuatoInput,
   Ruolo,
   RuoloInput,
@@ -7924,6 +7928,227 @@ export const useConfermaTrasferimento = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getConfermaTrasferimentoMutationOptions(options));
+    }
+
+export const getSegnalaMancatoArrivoTrasferimentoUrl = (id: number,) => {
+
+
+
+
+  return `/api/trasferimenti/${id}/mancato-arrivo`
+}
+
+/**
+ * @summary Segnala il mancato arrivo senza reintegrare stock
+ */
+export const segnalaMancatoArrivoTrasferimento = async (id: number,
+    mancatoTrasportoInput: MancatoTrasportoInput, options?: RequestInit): Promise<Trasferimento> => {
+
+  return customFetch<Trasferimento>(getSegnalaMancatoArrivoTrasferimentoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mancatoTrasportoInput,)
+  }
+);}
+
+
+
+
+export const getSegnalaMancatoArrivoTrasferimentoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof segnalaMancatoArrivoTrasferimento>>, TError,{id: number;data: BodyType<MancatoTrasportoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof segnalaMancatoArrivoTrasferimento>>, TError,{id: number;data: BodyType<MancatoTrasportoInput>}, TContext> => {
+
+const mutationKey = ['segnalaMancatoArrivoTrasferimento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof segnalaMancatoArrivoTrasferimento>>, {id: number;data: BodyType<MancatoTrasportoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  segnalaMancatoArrivoTrasferimento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SegnalaMancatoArrivoTrasferimentoMutationResult = NonNullable<Awaited<ReturnType<typeof segnalaMancatoArrivoTrasferimento>>>
+    export type SegnalaMancatoArrivoTrasferimentoMutationBody = BodyType<MancatoTrasportoInput>
+    export type SegnalaMancatoArrivoTrasferimentoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Segnala il mancato arrivo senza reintegrare stock
+ */
+export const useSegnalaMancatoArrivoTrasferimento = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof segnalaMancatoArrivoTrasferimento>>, TError,{id: number;data: BodyType<MancatoTrasportoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof segnalaMancatoArrivoTrasferimento>>,
+        TError,
+        {id: number;data: BodyType<MancatoTrasportoInput>},
+        TContext
+      > => {
+      return useMutation(getSegnalaMancatoArrivoTrasferimentoMutationOptions(options));
+    }
+
+export const getGetRientroTrasferimentoUrl = (id: number,) => {
+
+
+
+
+  return `/api/trasferimenti/${id}/rientro`
+}
+
+/**
+ * @summary Partite fisiche uscite e riconciliazione del rientro
+ */
+export const getRientroTrasferimento = async (id: number, options?: RequestInit): Promise<RientroTrasportoDettaglio> => {
+
+  return customFetch<RientroTrasportoDettaglio>(getGetRientroTrasferimentoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRientroTrasferimentoQueryKey = (id: number,) => {
+    return [
+    `/api/trasferimenti/${id}/rientro`
+    ] as const;
+    }
+
+
+export const getGetRientroTrasferimentoQueryOptions = <TData = Awaited<ReturnType<typeof getRientroTrasferimento>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRientroTrasferimento>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRientroTrasferimentoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRientroTrasferimento>>> = ({ signal }) => getRientroTrasferimento(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRientroTrasferimento>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRientroTrasferimentoQueryResult = NonNullable<Awaited<ReturnType<typeof getRientroTrasferimento>>>
+export type GetRientroTrasferimentoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Partite fisiche uscite e riconciliazione del rientro
+ */
+
+export function useGetRientroTrasferimento<TData = Awaited<ReturnType<typeof getRientroTrasferimento>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRientroTrasferimento>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRientroTrasferimentoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRegistraRientroTrasferimentoUrl = (id: number,) => {
+
+
+
+
+  return `/api/trasferimenti/${id}/rientro`
+}
+
+/**
+ * @summary Riconcilia e chiude il Trasferimento all'origine
+ */
+export const registraRientroTrasferimento = async (id: number,
+    rientroTrasportoInput: RientroTrasportoInput, options?: RequestInit): Promise<Trasferimento> => {
+
+  return customFetch<Trasferimento>(getRegistraRientroTrasferimentoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      rientroTrasportoInput,)
+  }
+);}
+
+
+
+
+export const getRegistraRientroTrasferimentoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registraRientroTrasferimento>>, TError,{id: number;data: BodyType<RientroTrasportoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registraRientroTrasferimento>>, TError,{id: number;data: BodyType<RientroTrasportoInput>}, TContext> => {
+
+const mutationKey = ['registraRientroTrasferimento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registraRientroTrasferimento>>, {id: number;data: BodyType<RientroTrasportoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  registraRientroTrasferimento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegistraRientroTrasferimentoMutationResult = NonNullable<Awaited<ReturnType<typeof registraRientroTrasferimento>>>
+    export type RegistraRientroTrasferimentoMutationBody = BodyType<RientroTrasportoInput>
+    export type RegistraRientroTrasferimentoMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Riconcilia e chiude il Trasferimento all'origine
+ */
+export const useRegistraRientroTrasferimento = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registraRientroTrasferimento>>, TError,{id: number;data: BodyType<RientroTrasportoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registraRientroTrasferimento>>,
+        TError,
+        {id: number;data: BodyType<RientroTrasportoInput>},
+        TContext
+      > => {
+      return useMutation(getRegistraRientroTrasferimentoMutationOptions(options));
     }
 
 export const getListScarichiUrl = (params?: ListScarichiParams,) => {
@@ -16744,7 +16969,7 @@ export const getConsegnaBollaUrl = (id: number,) => {
 }
 
 /**
- * @summary Mark bolla as delivered - move from confermato to consegnato
+ * @summary Consegna diretta o esito finale dopo affidamento, senza doppio scarico
  */
 export const consegnaBolla = async (id: number,
     consegnaRicezioneInput: ConsegnaRicezioneInput, options?: RequestInit): Promise<BollaDettaglio> => {
@@ -16794,7 +17019,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ConsegnaBollaMutationError = ErrorType<unknown>
 
     /**
- * @summary Mark bolla as delivered - move from confermato to consegnato
+ * @summary Consegna diretta o esito finale dopo affidamento, senza doppio scarico
  */
 export const useConsegnaBolla = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof consegnaBolla>>, TError,{id: number;data: BodyType<ConsegnaRicezioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -16805,6 +17030,299 @@ export const useConsegnaBolla = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getConsegnaBollaMutationOptions(options));
+    }
+
+export const getAffidaBollaUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/affida`
+}
+
+/**
+ * @summary Affida una Bolla Pronta al trasporto consumando le prenotazioni
+ */
+export const affidaBolla = async (id: number,
+    affidaBollaInput: AffidaBollaInput, options?: RequestInit): Promise<BollaDettaglio> => {
+
+  return customFetch<BollaDettaglio>(getAffidaBollaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      affidaBollaInput,)
+  }
+);}
+
+
+
+
+export const getAffidaBollaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof affidaBolla>>, TError,{id: number;data: BodyType<AffidaBollaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof affidaBolla>>, TError,{id: number;data: BodyType<AffidaBollaInput>}, TContext> => {
+
+const mutationKey = ['affidaBolla'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof affidaBolla>>, {id: number;data: BodyType<AffidaBollaInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  affidaBolla(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AffidaBollaMutationResult = NonNullable<Awaited<ReturnType<typeof affidaBolla>>>
+    export type AffidaBollaMutationBody = BodyType<AffidaBollaInput>
+    export type AffidaBollaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Affida una Bolla Pronta al trasporto consumando le prenotazioni
+ */
+export const useAffidaBolla = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof affidaBolla>>, TError,{id: number;data: BodyType<AffidaBollaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof affidaBolla>>,
+        TError,
+        {id: number;data: BodyType<AffidaBollaInput>},
+        TContext
+      > => {
+      return useMutation(getAffidaBollaMutationOptions(options));
+    }
+
+export const getSegnalaMancataConsegnaBollaUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/mancata-consegna`
+}
+
+/**
+ * @summary Segnala mancata consegna senza reintegro fisico
+ */
+export const segnalaMancataConsegnaBolla = async (id: number,
+    mancatoTrasportoInput: MancatoTrasportoInput, options?: RequestInit): Promise<BollaDettaglio> => {
+
+  return customFetch<BollaDettaglio>(getSegnalaMancataConsegnaBollaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mancatoTrasportoInput,)
+  }
+);}
+
+
+
+
+export const getSegnalaMancataConsegnaBollaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof segnalaMancataConsegnaBolla>>, TError,{id: number;data: BodyType<MancatoTrasportoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof segnalaMancataConsegnaBolla>>, TError,{id: number;data: BodyType<MancatoTrasportoInput>}, TContext> => {
+
+const mutationKey = ['segnalaMancataConsegnaBolla'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof segnalaMancataConsegnaBolla>>, {id: number;data: BodyType<MancatoTrasportoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  segnalaMancataConsegnaBolla(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SegnalaMancataConsegnaBollaMutationResult = NonNullable<Awaited<ReturnType<typeof segnalaMancataConsegnaBolla>>>
+    export type SegnalaMancataConsegnaBollaMutationBody = BodyType<MancatoTrasportoInput>
+    export type SegnalaMancataConsegnaBollaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Segnala mancata consegna senza reintegro fisico
+ */
+export const useSegnalaMancataConsegnaBolla = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof segnalaMancataConsegnaBolla>>, TError,{id: number;data: BodyType<MancatoTrasportoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof segnalaMancataConsegnaBolla>>,
+        TError,
+        {id: number;data: BodyType<MancatoTrasportoInput>},
+        TContext
+      > => {
+      return useMutation(getSegnalaMancataConsegnaBollaMutationOptions(options));
+    }
+
+export const getGetRientroBollaUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/rientro`
+}
+
+/**
+ * @summary Partite fisiche affidate e riconciliazione del rientro
+ */
+export const getRientroBolla = async (id: number, options?: RequestInit): Promise<RientroTrasportoDettaglio> => {
+
+  return customFetch<RientroTrasportoDettaglio>(getGetRientroBollaUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRientroBollaQueryKey = (id: number,) => {
+    return [
+    `/api/bolle/${id}/rientro`
+    ] as const;
+    }
+
+
+export const getGetRientroBollaQueryOptions = <TData = Awaited<ReturnType<typeof getRientroBolla>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRientroBolla>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRientroBollaQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRientroBolla>>> = ({ signal }) => getRientroBolla(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRientroBolla>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRientroBollaQueryResult = NonNullable<Awaited<ReturnType<typeof getRientroBolla>>>
+export type GetRientroBollaQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Partite fisiche affidate e riconciliazione del rientro
+ */
+
+export function useGetRientroBolla<TData = Awaited<ReturnType<typeof getRientroBolla>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRientroBolla>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRientroBollaQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRegistraRientroBollaUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/rientro`
+}
+
+/**
+ * @summary Riconcilia il rientro al Magazzino origine e chiude la Bolla
+ */
+export const registraRientroBolla = async (id: number,
+    rientroTrasportoInput: RientroTrasportoInput, options?: RequestInit): Promise<BollaDettaglio> => {
+
+  return customFetch<BollaDettaglio>(getRegistraRientroBollaUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      rientroTrasportoInput,)
+  }
+);}
+
+
+
+
+export const getRegistraRientroBollaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registraRientroBolla>>, TError,{id: number;data: BodyType<RientroTrasportoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registraRientroBolla>>, TError,{id: number;data: BodyType<RientroTrasportoInput>}, TContext> => {
+
+const mutationKey = ['registraRientroBolla'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registraRientroBolla>>, {id: number;data: BodyType<RientroTrasportoInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  registraRientroBolla(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegistraRientroBollaMutationResult = NonNullable<Awaited<ReturnType<typeof registraRientroBolla>>>
+    export type RegistraRientroBollaMutationBody = BodyType<RientroTrasportoInput>
+    export type RegistraRientroBollaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Riconcilia il rientro al Magazzino origine e chiude la Bolla
+ */
+export const useRegistraRientroBolla = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registraRientroBolla>>, TError,{id: number;data: BodyType<RientroTrasportoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registraRientroBolla>>,
+        TError,
+        {id: number;data: BodyType<RientroTrasportoInput>},
+        TContext
+      > => {
+      return useMutation(getRegistraRientroBollaMutationOptions(options));
     }
 
 export const getSegnalaRitiroNonEffettuatoUrl = (id: number,) => {

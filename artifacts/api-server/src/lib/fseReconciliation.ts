@@ -12,7 +12,8 @@ import {
   currentFseCutoff,
   FseReportingError,
 } from "./fseCanonicalReporting";
-import { signedInventoryValue, signedMovementSql } from "./fseAccounting";
+import { signedInventoryValue } from "./fseAccounting";
+import { signedPhysicalMovementSql } from "./movementPhysicalEffect";
 import { InventoryDecimal } from "./inventoryDecimal";
 
 type DbExecutor =
@@ -536,15 +537,19 @@ async function loadBalanceRows(
     maxOperazioneDistribuzioneId: number;
   },
 ): Promise<ReconciliationRow[]> {
-  const piecesSql = signedMovementSql(
+  const piecesSql = signedPhysicalMovementSql(
     sql`mv.quantita_pezzi`,
-    sql`mv.natura_contabile`,
-    sql`original.natura_contabile`,
+    sql`mv.tipo_movimento`,
+    sql`mv.tipo_dettaglio`,
+    sql`original.tipo_movimento`,
+    sql`original.tipo_dettaglio`,
   );
-  const kgLtSql = signedMovementSql(
+  const kgLtSql = signedPhysicalMovementSql(
     sql`mv.quantita_kg_lt`,
-    sql`mv.natura_contabile`,
-    sql`original.natura_contabile`,
+    sql`mv.tipo_movimento`,
+    sql`mv.tipo_dettaglio`,
+    sql`original.tipo_movimento`,
+    sql`original.tipo_dettaglio`,
   );
   const result = await executor.execute(sql`
     WITH local_balance AS (

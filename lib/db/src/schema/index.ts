@@ -41,6 +41,7 @@ export * from "./speseEmporioStorni";
 export * from "./bolle";
 export * from "./prenotazioniMagazzino";
 export * from "./trasferimenti";
+export * from "./rientriTrasporto";
 export * from "./scarichi";
 export * from "./approvvigionamenti";
 export * from "./turni";

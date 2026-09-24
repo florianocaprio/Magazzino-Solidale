@@ -86,7 +86,7 @@ async function derivedState(logicalLotId: number) {
     .where(
       and(
         eq(lottiTable.lottoLogicoId, logicalLotId),
-        eq(trasferimentiTable.stato, "in_transito"),
+        inArray(trasferimentiTable.stato, ["in_transito", "rientro_atteso"]),
         eq(movimentiTable.tipoMovimento, "trasferimento"),
         eq(movimentiTable.tipoDettaglio, "uscita"),
       ),
