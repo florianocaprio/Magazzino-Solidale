@@ -36,7 +36,7 @@ const it = {
   factor: "Fattore kg/litri per pezzo (se noto)",
   register: "Conferma carico a magazzino",
   saveSelectedRowsBeforeRegister:
-    "Salva le modifiche alle righe selezionate prima di registrare la merce.",
+    "Salva le modifiche alle righe selezionate prima di caricare a magazzino.",
   confirmRegister: "Confermi il carico a magazzino?",
   confirmBody:
     "Magazzino: {{warehouse}} · {{count}} righe selezionate. Saranno caricate soltanto queste righe.",

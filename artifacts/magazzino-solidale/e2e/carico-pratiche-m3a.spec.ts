@@ -170,8 +170,7 @@ test.describe("M3A — pratica di carico persistente", () => {
       .getByRole("button", { name: /salva bozza/i })
       .last()
       .click();
-    await expect(resumedPage.getByRole("checkbox")).toBeEnabled();
-    await resumedPage.getByRole("checkbox").check();
+    await expect(resumedPage.getByRole("checkbox")).toBeChecked();
     await resumedPage
       .getByRole("button", { name: /conferma carico a magazzino/i })
       .click();
@@ -203,7 +202,7 @@ test.describe("M3A — pratica di carico persistente", () => {
       .getByRole("button", { name: /salva bozza/i })
       .last()
       .click();
-    await resumedPage.getByRole("checkbox").check();
+    await expect(resumedPage.getByRole("checkbox")).toBeChecked();
     await resumedPage
       .getByRole("button", { name: /conferma carico a magazzino/i })
       .click();
@@ -358,7 +357,9 @@ test.describe("M3A — pratica di carico persistente", () => {
     const quantity = page.getByLabel(/quantità/i);
     await expect(quantity).toHaveValue("5.00");
     await quantity.fill("8");
-    await page.getByLabel("Codice lotto produttore").fill("LOT-B");
+    await page
+      .getByRole("textbox", { name: "Codice lotto produttore" })
+      .fill("LOT-B");
     await page.getByLabel("Scadenza effettiva").fill("2028-01-31");
 
     const register = page.getByRole("button", {
@@ -368,7 +369,7 @@ test.describe("M3A — pratica di carico persistente", () => {
     await expect(register).toBeDisabled();
     await expect(
       page.getByText(
-        "Salva le modifiche alle righe selezionate prima di registrare la merce.",
+        "Salva le modifiche alle righe selezionate prima di caricare a magazzino.",
       ),
     ).toBeVisible();
 

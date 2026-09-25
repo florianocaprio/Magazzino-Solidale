@@ -17,4 +17,8 @@ fondoOrigine?: FondoOrigine;
  * Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.
  */
 origineCaricoPresente?: OrigineCarico;
+/**
+ * Include anche le partite con residuo zero; omesso mantiene il filtro storico sui soli residui positivi.
+ */
+includeEsauriti?: boolean;
 };

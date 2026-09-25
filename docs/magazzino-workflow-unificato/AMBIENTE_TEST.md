@@ -1153,3 +1153,67 @@ ID iniziali `magazzino-web` `f344ed86a768`, `magazzino-api`
 `magazzino-solidale_magazzino_pgdata` e
 `magazzino-solidale_magazzino_uploads` sono presenti e non toccati.
 Reti/volumi storici e risorse di altri progetti sono rimasti invariati.
+
+### UX-CARICO-LOTTI — laboratorio Fase A disposable
+
+Il 25 settembre 2026 è stato usato solo il container PostgreSQL
+`magazzino-ux-carico-lotti-test-20260925` (ID
+`706e073abc0beefc929dd129c10dc8538bdf0179214db847de583ac95f85f17c`),
+porta casuale legata a `127.0.0.1:57972`, database sintetico
+`magazzino_ux_carico_lotti_test`, dati su `tmpfs` da 512 MiB.
+`docker inspect` ha confermato `mounts=[]`: nessun volume Docker di test.
+Bootstrap dello schema e 42/42 migrazioni ufficiali sono stati applicati
+**solo** a questo database effimero. La prima invocazione del runner prima
+del bootstrap ha fallito come previsto per tabella mancante; dopo il
+bootstrap il runner ha completato 42/42. I test API non hanno usato il DB
+persistente.
+
+Le build WEB Linux hanno usato container `node:24-slim` one-shot con
+`--rm --network none` e bind del repository; i primi tentativi hanno
+evidenziato mismatch architettura/variabili Vite, poi la build Linux x64
+è risultata verde. Nessuna immagine è stata costruita e nessuna rete o
+volume candidato è stata creata.
+
+Cleanup nominativo completato con `docker stop` sul solo container di test
+`--rm`. Inventario finale `docker ps -a`, `docker network ls`,
+`docker volume ls`: nessuna risorsa disposable UX-CARICO-LOTTI residua.
+Restano attivi `magazzino-web` (`53d1749ac465`), `magazzino-api`
+(`82a4c3d6a82b`) e `magazzino-postgres` (`57e462be280a`), senza
+arresti o aggiornamenti durante questa fase. I volumi persistenti
+`magazzino-solidale_magazzino_pgdata` e
+`magazzino-solidale_magazzino_uploads` sono invariati; anche reti,
+volumi storici e altri progetti sono stati lasciati intatti.
+
+### UX-CARICO-LOTTI — laboratorio formale disposable
+
+Il `##test` finale del 25 settembre 2026 ha usato il solo PostgreSQL
+temporaneo `magazzino-ux-lotti-formal-db-20260925` (ID
+`adf1a3d6c3a36fbafe5b83a7d9efff8408928be4f937a0a061247d67568cb155`),
+immagine `postgres:16-alpine`, porta `127.0.0.1:55443`, dati su `tmpfs`
+da 768 MiB, `Mounts=[]`, `--rm`. Al suo interno, database sintetici
+isolati per fresh 42/42, API mirate/completa e E2E. Il runner ufficiale
+ha verificato `applicate=42`, `pending=0` e 24/24 test con PostgreSQL.
+
+Per E2E e build WEB Linux è stata usata una copia temporanea del working
+tree in `/private/tmp/ux-lotti-formal-20260925.3wpzg8` con dipendenze
+Linux installate tramite `pnpm install --frozen-lockfile`; i container
+Playwright `mcr.microsoft.com/playwright:v1.62.1-noble` erano one-shot
+con `--rm`. I due XLSX originali M3B sono stati montati in sola lettura.
+Non sono stati creati stack persistenti, reti dedicate o volumi Docker
+temporanei. Il Docker locale persistente `magazzino-postgres`,
+`magazzino-api`, `magazzino-web`, la rete e i volumi pgdata/uploads non
+sono stati aggiornati né usati come banco prova.
+
+Cleanup nominativo completato: `docker stop` ha arrestato e auto-rimosso
+soltanto `magazzino-ux-lotti-formal-db-20260925`; la copia esatta
+`/private/tmp/ux-lotti-formal-20260925.3wpzg8` è stata rimossa dopo la
+build finale. `docker ps -a` non mostra container UX-Lotti disposable;
+`docker network ls` e `docker volume ls` non mostrano nuove risorse del
+test. I container persistenti conservano gli ID iniziali:
+`magazzino-postgres` `57e462be280a`, `magazzino-api` `935c8e07c2bf` e
+`magazzino-web` `10eb0d43ceb1`. La rete
+`magazzino-solidale_default` e i volumi
+`magazzino-solidale_magazzino_pgdata` /
+`magazzino-solidale_magazzino_uploads` sono presenti e invariati. Altre
+risorse Docker della macchina non sono state toccate; nessun prune,
+`down -v` o reset DB persistente.

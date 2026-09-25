@@ -842,11 +842,17 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       `/api/giacenze?areaOperativaId=${base.area.id}&magazzinoId=${warehouse.id}`,
     );
     expect((await zeroStock.json()) as Stock[]).toHaveLength(0);
-    for (const checkbox of await page.getByRole("checkbox").all())
+    const importedRows = page.locator('[data-testid^="carico-row-"]');
+    await expect(importedRows).toHaveCount(7);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const importedCheckboxes = importedRows.getByRole("checkbox");
+    await expect(importedCheckboxes).toHaveCount(7);
+    for (const checkbox of await importedCheckboxes.all())
       await checkbox.check();
     const registerButton = page.getByRole("button", {
       name: /conferma carico a magazzino/i,
     });
+    await expect(registerButton).toBeEnabled();
     await registerButton.scrollIntoViewIfNeeded();
     await registerButton.click();
     const registration = page.waitForResponse(

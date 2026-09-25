@@ -20,6 +20,7 @@ import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { canAccessMapsApplication } from "@/lib/maps-access";
 import { createAppQueryClient } from "@/lib/query-client";
 import { canonicalLegacyTrasferimentiSearch } from "@/lib/documenti-operativi-location";
+import { canonicalLegacyLottiSearch } from "@/lib/carico-merce-location";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,8 +41,17 @@ import type { MensaView } from "@/pages/mensa";
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const Magazzini = lazy(() => import("@/pages/magazzini"));
 const Prodotti = lazy(() => import("@/pages/prodotti"));
-const Lotti = lazy(() => import("@/pages/lotti"));
 const CaricoMerce = lazy(() => import("@/pages/carico-merce"));
+
+function LegacyLottiRedirect() {
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    navigate(canonicalLegacyLottiSearch(window.location.search), {
+      replace: true,
+    });
+  }, [navigate]);
+  return null;
+}
 const Giacenze = lazy(() => import("@/pages/giacenze"));
 const PreparazioneConsegne = lazy(
   () => import("@/pages/preparazione-consegne"),
@@ -357,7 +367,7 @@ function AppRoutes() {
               <Guard area="magazzino">
                 <RequireModulo codice="LOTTI">
                   <RequirePermission permission="magazzino.view">
-                    <Lotti />
+                    <LegacyLottiRedirect />
                   </RequirePermission>
                 </RequireModulo>
               </Guard>

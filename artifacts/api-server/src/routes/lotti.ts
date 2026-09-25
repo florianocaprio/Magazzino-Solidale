@@ -5,6 +5,7 @@ import {
   carichiMagazzinoTable,
   FONDI_ORIGINE,
   lottiTable,
+  lottiLogiciTable,
   prodottiTable,
   magazziniTable,
   fornitoriTable,
@@ -98,8 +99,14 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
     inScadenza,
     fondoOrigine,
     origineCaricoPresente,
+    includeEsauriti,
   } = req.query as Record<string, string>;
-  const conditions: SQL[] = [gt(lottiTable.quantitaResidua, "0")];
+  if (includeEsauriti && !["true", "false"].includes(includeEsauriti)) {
+    res.status(400).json({ error: "includeEsauriti non valido" });
+    return;
+  }
+  const conditions: SQL[] =
+    includeEsauriti === "true" ? [] : [gt(lottiTable.quantitaResidua, "0")];
   if (prodottoId)
     conditions.push(eq(lottiTable.prodottoId, parseInt(prodottoId)));
   if (magazzinoId)
@@ -134,12 +141,20 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
     .select({
       lotto: lottiTable,
       prodottoNome: prodottiTable.nome,
+      prodottoCodice: prodottiTable.codice,
       magazzinoNome: magazziniTable.nome,
+      areaOperativaId: magazziniTable.areaOperativaId,
+      lottoLogicoCodice: lottiLogiciTable.codice,
+      lottoLogicoDescrizione: lottiLogiciTable.descrizione,
       fornitoreNome: fornitoriTable.nome,
     })
     .from(lottiTable)
     .leftJoin(prodottiTable, eq(lottiTable.prodottoId, prodottiTable.id))
     .leftJoin(magazziniTable, eq(lottiTable.magazzinoId, magazziniTable.id))
+    .leftJoin(
+      lottiLogiciTable,
+      eq(lottiTable.lottoLogicoId, lottiLogiciTable.id),
+    )
     .leftJoin(fornitoriTable, eq(lottiTable.fornitoreId, fornitoriTable.id))
     .where(and(...conditions))
     .orderBy(lottiTable.dataScadenza);
@@ -168,6 +183,50 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
       InventoryDecimal.parse(row.totale ?? "0"),
     ]),
   );
+  const carichi = rows.length
+    ? await db
+        .select({
+          lottoId: carichiMagazzinoRigheTable.lottoId,
+          origineCarico: carichiMagazzinoTable.origineCarico,
+          numeroDocumento: carichiMagazzinoTable.numeroDocumento,
+          dataDocumento: carichiMagazzinoTable.dataDocumento,
+          fornitoreId: carichiMagazzinoTable.fornitoreId,
+          fornitoreNome: fornitoriTable.nome,
+          caricoId: carichiMagazzinoTable.id,
+          dataCarico: carichiMagazzinoTable.dataCarico,
+          statoCarico: carichiMagazzinoTable.stato,
+          quantitaOperativa: carichiMagazzinoRigheTable.quantitaOperativa,
+          unitaMisuraOperativa: carichiMagazzinoRigheTable.unitaMisuraOperativa,
+        })
+        .from(carichiMagazzinoRigheTable)
+        .innerJoin(
+          carichiMagazzinoTable,
+          eq(
+            carichiMagazzinoRigheTable.caricoMagazzinoId,
+            carichiMagazzinoTable.id,
+          ),
+        )
+        .leftJoin(
+          fornitoriTable,
+          eq(carichiMagazzinoTable.fornitoreId, fornitoriTable.id),
+        )
+        .where(
+          inArray(
+            carichiMagazzinoRigheTable.lottoId,
+            rows.map((row) => row.lotto.id),
+          ),
+        )
+        .orderBy(
+          carichiMagazzinoTable.id,
+          carichiMagazzinoRigheTable.numeroRiga,
+        )
+    : [];
+  const lineagePerLotto = new Map<number, typeof carichi>();
+  for (const carico of carichi) {
+    const existing = lineagePerLotto.get(carico.lottoId) ?? [];
+    existing.push(carico);
+    lineagePerLotto.set(carico.lottoId, existing);
+  }
   const dataOperativa = dataCivileEuropeRome();
 
   res.json(
@@ -176,7 +235,10 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
         id: r.lotto.id,
         prodottoId: r.lotto.prodottoId,
         lottoLogicoId: r.lotto.lottoLogicoId ?? null,
+        lottoLogicoCodice: r.lottoLogicoCodice ?? null,
+        lottoLogicoDescrizione: r.lottoLogicoDescrizione ?? null,
         prodottoNome: r.prodottoNome ?? null,
+        prodottoCodice: r.prodottoCodice ?? null,
         codiceLotto: r.lotto.codiceLotto ?? null,
         dataScadenza: r.lotto.dataScadenza ?? null,
         dataCarico: r.lotto.dataCarico,
@@ -184,6 +246,47 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
         quantitaResidua: parseFloat(r.lotto.quantitaResidua),
         quantitaCaricataPrecisa: r.lotto.quantitaCaricata,
         quantitaResiduaPrecisa: r.lotto.quantitaResidua,
+        quantitaPrenotata: Number(
+          (prenotatoPerLotto.get(r.lotto.id) ?? InventoryDecimal.zero()).toDb(),
+        ),
+        quantitaPrenotataPrecisa: (
+          prenotatoPerLotto.get(r.lotto.id) ?? InventoryDecimal.zero()
+        ).toDb(),
+        provenienze: [
+          ...new Set(
+            (lineagePerLotto.get(r.lotto.id) ?? []).map(
+              (carico) => carico.origineCarico,
+            ),
+          ),
+        ],
+        documentiCarico: [
+          ...new Map(
+            (lineagePerLotto.get(r.lotto.id) ?? [])
+              .filter((carico) => carico.numeroDocumento)
+              .map((carico) => [
+                carico.caricoId,
+                {
+                  caricoId: carico.caricoId,
+                  numero: carico.numeroDocumento!,
+                  data: carico.dataDocumento ?? null,
+                },
+              ]),
+          ).values(),
+        ],
+        lineageCarichi: (lineagePerLotto.get(r.lotto.id) ?? []).map(
+          (carico) => ({
+            caricoId: carico.caricoId,
+            dataCarico: carico.dataCarico,
+            statoCarico: carico.statoCarico,
+            origineCarico: carico.origineCarico,
+            numeroDocumento: carico.numeroDocumento ?? null,
+            dataDocumento: carico.dataDocumento ?? null,
+            fornitoreId: carico.fornitoreId ?? null,
+            fornitoreNome: carico.fornitoreNome ?? null,
+            quantitaOperativa: carico.quantitaOperativa,
+            unitaMisuraOperativa: carico.unitaMisuraOperativa,
+          }),
+        ),
         ...disponibilitaLotto(
           r.lotto,
           prenotatoPerLotto.get(r.lotto.id) ?? InventoryDecimal.zero(),
@@ -191,6 +294,7 @@ router.get("/lotti", requirePermission("magazzino.view"), async (req, res) => {
         ),
         magazzinoId: r.lotto.magazzinoId,
         magazzinoNome: r.magazzinoNome ?? null,
+        areaOperativaId: r.areaOperativaId ?? null,
         fornitoreId: r.lotto.fornitoreId ?? null,
         fornitoreNome: r.fornitoreNome ?? null,
         fsePlus: r.lotto.fsePlus,

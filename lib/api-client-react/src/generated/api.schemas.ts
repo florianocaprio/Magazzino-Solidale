@@ -2493,13 +2493,43 @@ export interface LottoLogicoTransitionInput {
   motivo?: string;
 }
 
+export type LottoDocumentiCaricoItem = {
+  caricoId: number;
+  numero: string;
+  /** @nullable */
+  data: string | null;
+};
+
+export type LottoLineageCarichiItem = {
+  caricoId: number;
+  dataCarico: string;
+  statoCarico: string;
+  origineCarico: string;
+  /** @nullable */
+  numeroDocumento: string | null;
+  /** @nullable */
+  dataDocumento: string | null;
+  /** @nullable */
+  fornitoreId: number | null;
+  /** @nullable */
+  fornitoreNome: string | null;
+  quantitaOperativa: QuantitaContabile;
+  unitaMisuraOperativa: string;
+};
+
 export interface Lotto {
   id: number;
   prodottoId: number;
   /** @nullable */
   lottoLogicoId?: number | null;
   /** @nullable */
+  lottoLogicoCodice?: string | null;
+  /** @nullable */
+  lottoLogicoDescrizione?: string | null;
+  /** @nullable */
   prodottoNome?: string | null;
+  /** @nullable */
+  prodottoCodice?: string | null;
   /** @nullable */
   codiceLotto?: string | null;
   /** @nullable */
@@ -2509,12 +2539,21 @@ export interface Lotto {
   quantitaResidua: number;
   quantitaCaricataPrecisa: QuantitaContabile;
   quantitaResiduaPrecisa: QuantitaContabile;
+  quantitaPrenotata?: number;
+  quantitaPrenotataPrecisa?: QuantitaContabile;
+  /** Origini distinte derivate dalle registrazioni di carico collegate alla partita. */
+  provenienze?: string[];
+  documentiCarico?: LottoDocumentiCaricoItem[];
+  /** Registrazioni di carico collegate alla partita, senza attribuire arbitrariamente il residuo corrente a una provenienza. */
+  lineageCarichi?: LottoLineageCarichiItem[];
   /** Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa. */
   disponibileReale: number;
   disponibileRealePrecisa: QuantitaContabile;
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
+  /** @nullable */
+  areaOperativaId?: number | null;
   /** @nullable */
   fornitoreId?: number | null;
   /** @nullable */
@@ -9820,6 +9859,10 @@ fondoOrigine?: FondoOrigine;
  * Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.
  */
 origineCaricoPresente?: OrigineCarico;
+/**
+ * Include anche le partite con residuo zero; omesso mantiene il filtro storico sui soli residui positivi.
+ */
+includeEsauriti?: boolean;
 };
 
 export type ListMovimentiParams = {

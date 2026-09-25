@@ -195,3 +195,22 @@ simulati: `NE-MAN-CAMERA` e `NE-MAN-TABLET` non sono trasformati in PASS.
 
 Prove automatiche e tentativi iniziali sono dettagliati in
 `ESITI_TEST_UX_CARICO_01.md`; la matrice M4 precedente resta invariata.
+
+## UX-CARICO-LOTTI — validazione formale
+
+| ID           | Stato                                          | Evidenza                                                                                                      |
+| ------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| UX-LOT-01…02 | OK-TEST-UX-CARICO-LOTTI/OK-MAN-UX-CARICO-LOTTI | Tre tab, query string reattiva, deep-link, reload, back/forward e fallback tab invalido in unit/E2E.          |
+| UX-LOT-03…07 | OK-TEST-UX-CARICO-LOTTI/OK-MAN-UX-CARICO-LOTTI | Crea/modifica/chiudi/riapri/archivia, `Generale` protetto; E2E confronta lo stock prima e dopo.               |
+| UX-LOT-08…12 | OK-TEST-UX-CARICO-LOTTI/OK-MAN-UX-CARICO-LOTTI | GET scoped, filtri, default residuo, storico esauriti, quantità/prenotazioni e lineage multiplo in API/E2E.   |
+| UX-LOT-13…14 | OK-TEST-UX-CARICO-LOTTI/OK-MAN-UX-CARICO-LOTTI | Il lotto fisico nasce dal carico; la vista non introduce un writer stock parallelo.                           |
+| UX-LOT-15…20 | OK-TEST-UX-CARICO-LOTTI/OK-MAN-UX-CARICO-LOTTI | Fornitore/DDT, scanner, suggerimenti, lotto opzionale/obbligatorio, conferma unica e retry verificati.        |
+| UX-LOT-21…22 | OK-TEST-UX-CARICO-LOTTI/OK-MAN-UX-CARICO-LOTTI | FSE+ separato e regressione con XLSX originali; `/lotti` usa il redirect compatibile.                         |
+| SEL-01…10    | OK-TEST-UX-CARICO-LOTTI/OK-MAN-UX-CARICO-LOTTI | Auto-selezione della sola riga completa salvata, parziale, dirty, pending, idempotenza e draft altrui.        |
+| LOT-COLOR    | OK-TEST-UX-CARICO-LOTTI/OK-MAN-UX-CARICO-LOTTI | Facoltativo normale; obbligatorio blu + etichetta in Catalogo, selettore e Carico, anche light/dark/viewport. |
+
+La validazione manuale di Floriano riguarda questa UX, non l'intera M4.
+Le prove su fotocamera reale e tablet fisico restano rispettivamente
+`NE-MAN-CAMERA` e `NE-MAN-TABLET`; gli skip E2E viewport già presenti non
+equivalgono a PASS hardware. Evidenze e limiti in
+`ESITI_TEST_UX_CARICO_LOTTI.md`.

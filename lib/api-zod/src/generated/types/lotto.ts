@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FondoOrigine } from './fondoOrigine';
+import type { LottoDocumentiCaricoItem } from './lottoDocumentiCaricoItem';
+import type { LottoLineageCarichiItem } from './lottoLineageCarichiItem';
 import type { QuantitaContabile } from './quantitaContabile';
 
 export interface Lotto {
@@ -14,7 +16,13 @@ export interface Lotto {
   /** @nullable */
   lottoLogicoId?: number | null;
   /** @nullable */
+  lottoLogicoCodice?: string | null;
+  /** @nullable */
+  lottoLogicoDescrizione?: string | null;
+  /** @nullable */
   prodottoNome?: string | null;
+  /** @nullable */
+  prodottoCodice?: string | null;
   /** @nullable */
   codiceLotto?: string | null;
   /** @nullable */
@@ -24,12 +32,21 @@ export interface Lotto {
   quantitaResidua: number;
   quantitaCaricataPrecisa: QuantitaContabile;
   quantitaResiduaPrecisa: QuantitaContabile;
+  quantitaPrenotata?: number;
+  quantitaPrenotataPrecisa?: QuantitaContabile;
+  /** Origini distinte derivate dalle registrazioni di carico collegate alla partita. */
+  provenienze?: string[];
+  documentiCarico?: LottoDocumentiCaricoItem[];
+  /** Registrazioni di carico collegate alla partita, senza attribuire arbitrariamente il residuo corrente a una provenienza. */
+  lineageCarichi?: LottoLineageCarichiItem[];
   /** Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa. */
   disponibileReale: number;
   disponibileRealePrecisa: QuantitaContabile;
   magazzinoId: number;
   /** @nullable */
   magazzinoNome?: string | null;
+  /** @nullable */
+  areaOperativaId?: number | null;
   /** @nullable */
   fornitoreId?: number | null;
   /** @nullable */

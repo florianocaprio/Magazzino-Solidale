@@ -1769,3 +1769,59 @@ giacenza una sola volta. Stato UX: **`OK-UX-CARICO-01/OK-MAN-UX-CARICO-01`**.
 La validazione è specifica di UX-CARICO-01: non attribuisce `OK-MAN-M4`
 all'intera milestone. Il Docker persistente non è stato modificato durante
 la fase `##test`; `main` e M5 restano fuori perimetro.
+
+## UX-CARICO-LOTTI — Fase A di sviluppo
+
+Sulla base chiusa e pubblicata `efa38a9c103186bc33946f1b5b751570911d861c`
+sono stati introdotti i tab **Carichi**, **Raccolte / Attività** e
+**Lotti fisici** dentro Carico Merce, con deep-link. UX-CARICO-01 resta
+nel flusso Carichi: conferma selettiva, errori persistenti, evidenziazione,
+bozze incomplete e draft locali non sono stati sostituiti. La creazione
+della Raccolta usa un dialog comune; elenco, dettaglio, filtri e lifecycle
+usano i lotti logici esistenti. La vista dei lotti fisici è consultiva,
+include su richiesta gli esauriti e mostra provenienze/documenti multipli
+dal lineage reale dei carichi. La rettifica preesistente resta disponibile
+solo con permesso e su magazzino attivo.
+
+Nel carico manuale sono esposti fornitore ordinario, numero/data DDT,
+scanner del codice lotto produttore e suggerimenti che precompilano la
+bozza senza effetti sullo stock. FSE+/AGEA resta nel suo wizard; il vecchio
+`/lotti` reindirizza ai nuovi tab e non espone più un secondo writer di
+nuovo stock. GET `/lotti` è estesa in modo additivo, senza migrazione o
+modifiche al motore inventariale. Le verifiche e i limiti della Fase A
+sono in `ESITI_SVILUPPO_UX_CARICO_LOTTI.md`.
+
+Prove di sviluppo sul candidato finale: frontend 79 file/426 pass, API
+119 file/1377 pass/4 skip storici, typecheck, build API e WEB Linux x64,
+codegen deterministico, Prettier e diff check verdi. Il primo run API
+non verde per `SESSION_SECRET` assente e timeout concorrenti è riportato
+nel verbale; il rerun isolato è verde. Il database di test su tmpfs e i
+container build one-shot sono stati rimossi; Docker persistente invariato.
+
+Stato **`DEV-UX-CARICO-LOTTI/NE-TEST/NE-MAN`**: nessun commit, push o
+deploy Docker; il separato `##test UX-CARICO-LOTTI` e la validazione
+manuale non sono stati eseguiti. `main` e M5 invariati.
+
+## UX-CARICO-LOTTI — test formale e consolidamento
+
+Floriano ha dichiarato **PASS manuale** per tre tab e navigazione,
+Raccolte/Attività, Lotti fisici, Carico Merce, salvataggio e auto-selezione,
+carico parziale con righe incomplete non selezionate, colori «Lotto
+richiesto» e regola lotto obbligatorio/facoltativo. Questo è
+`OK-MAN-UX-CARICO-LOTTI`, non `OK-MAN-M4`; fotocamera reale e tablet fisico
+restano `NE-MAN-CAMERA` e `NE-MAN-TABLET`.
+
+La fase formale ha verificato routing reattivo, lifecycle della Raccolta
+senza stock, lista lotti con storico/lineage multiplo, fornitore/DDT,
+scanner e suggerimenti, UX-CARICO-01, auto-selezione e carico selettivo.
+Risultato finale: frontend **81 file/436 pass**, API **119 file/1377 pass/4
+skip storici**, E2E pertinenti **26 pass/29 skip viewport preesistenti**,
+fresh DB e migration verify **42/42**, runner PostgreSQL **24/24**,
+typecheck, build API e WEB Linux, budget, runtime, doppio codegen e
+controlli diff verdi. Il primo run API completo non verde e la correzione
+del test E2E M3B sono documentati senza cancellarne la storia in
+`ESITI_TEST_UX_CARICO_LOTTI.md`.
+
+Stato: **`OK-TEST-UX-CARICO-LOTTI/OK-MAN-UX-CARICO-LOTTI`** per il
+candidato UX. Nessuna migration nuova, nessun deploy del Docker
+persistente, nessun avvio M5 e nessun merge su `main`.

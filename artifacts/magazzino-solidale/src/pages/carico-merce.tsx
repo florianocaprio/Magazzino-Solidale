@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetCaricoPraticaQueryKey,
   getListCaricoPraticheQueryKey,
+  getListLottiQueryKey,
   getListLottiLogiciQueryKey,
   useAddCaricoPraticaRiga,
   useCancelCaricoPratica,
   useCloseCaricoPratica,
   useCreateCaricoPratica,
-  useCreateLottoLogico,
   useDeleteCaricoPraticaRiga,
   useGetCaricoPratica,
   useListAreeOperative,
   useListCaricoPratiche,
   useListLottiLogici,
+  useListLotti,
+  useListFornitori,
   useListMagazzini,
   useListProdotti,
   useRegisterCaricoPratica,
@@ -27,20 +29,20 @@ import {
 } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
+import { ProductLotRequirementLabel } from "@/components/product-lot-requirement-label";
+import {
+  ActivityDialog,
+  CaricoMerceTabs,
+  LottiFisiciTab,
+  RaccolteTab,
+} from "@/components/carico-merce-tabs";
+import { parseCaricoMerceTab } from "@/lib/carico-merce-location";
 import { FseImportPracticeWizard } from "@/components/fse-import-practice-wizard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -69,6 +71,11 @@ import {
 } from "@/hooks/use-unsaved-changes-guard";
 import { useAuth } from "@/lib/auth";
 import { errorMessage } from "@/lib/api-error";
+import {
+  scannedPhysicalLotDraft,
+  suggestedPhysicalLotDraft,
+  suggestedPhysicalLots,
+} from "@/lib/carico-lotti";
 import {
   blocksCaricoDraftSave,
   caricoDraftFromRow,
@@ -110,6 +117,8 @@ type HeaderForm = {
   dataCarico: string;
   descrizione: string;
   numeroDocumento: string;
+  dataDocumento: string;
+  fornitoreId: string;
   note: string;
 };
 
@@ -126,6 +135,8 @@ function emptyHeader(): HeaderForm {
     dataCarico: today(),
     descrizione: "",
     numeroDocumento: "",
+    dataDocumento: "",
+    fornitoreId: "",
     note: "",
   };
 }
@@ -139,6 +150,8 @@ function headerFromPractice(practice: CaricoPraticaDettaglio): HeaderForm {
     dataCarico: practice.dataCarico,
     descrizione: practice.descrizione,
     numeroDocumento: practice.numeroDocumento ?? "",
+    dataDocumento: practice.dataDocumento ?? "",
+    fornitoreId: practice.fornitoreId ? String(practice.fornitoreId) : "",
     note: practice.note ?? "",
   };
 }
@@ -163,7 +176,7 @@ function rowIssueKey(field: CaricoRowField, issue: CaricoRowIssue): string {
   return "caricoPratiche.fundRequired";
 }
 
-export default function CaricoMerce() {
+function CarichiContent() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { hasPermission } = useAuth();
@@ -202,10 +215,6 @@ export default function CaricoMerce() {
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [registrationUncertain, setRegistrationUncertain] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [activityCode, setActivityCode] = useState("");
-  const [activityDescription, setActivityDescription] = useState("");
-  const [activityAttempted, setActivityAttempted] = useState(false);
-  const [activityError, setActivityError] = useState<string | null>(null);
   const [fseImportOpen, setFseImportOpen] = useState(false);
   const [openImportAfterSave, setOpenImportAfterSave] = useState(false);
   const registrationKey = useRef<string | null>(null);
@@ -217,6 +226,17 @@ export default function CaricoMerce() {
   const { data: areas = [] } = useListAreeOperative();
   const { data: warehouses = [] } = useListMagazzini();
   const { data: products = [] } = useListProdotti();
+  const { data: suppliers = [] } = useListFornitori();
+  const knownLotsParams = {
+    magazzinoId: header.magazzinoId ? Number(header.magazzinoId) : undefined,
+    includeEsauriti: true,
+  };
+  const { data: knownLots = [] } = useListLotti(knownLotsParams, {
+    query: {
+      enabled: Boolean(header.magazzinoId),
+      queryKey: getListLottiQueryKey(knownLotsParams),
+    },
+  });
   const selectedAreaId = header.areaOperativaId
     ? Number(header.areaOperativaId)
     : null;
@@ -416,7 +436,6 @@ export default function CaricoMerce() {
   }, [hasUnsavedChanges, navigate, unsavedGuard.requestClose]);
 
   const createMutation = useCreateCaricoPratica();
-  const createLogicalLotMutation = useCreateLottoLogico();
   const updateMutation = useUpdateCaricoPratica();
   const addRowMutation = useAddCaricoPraticaRiga();
   const updateRowMutation = useUpdateCaricoPraticaRiga();
@@ -427,7 +446,6 @@ export default function CaricoMerce() {
   const cancelMutation = useCancelCaricoPratica();
   const pending =
     createMutation.isPending ||
-    createLogicalLotMutation.isPending ||
     updateMutation.isPending ||
     addRowMutation.isPending ||
     updateRowMutation.isPending ||
@@ -498,6 +516,8 @@ export default function CaricoMerce() {
     dataCarico: header.dataCarico,
     descrizione: header.descrizione.trim(),
     numeroDocumento: header.numeroDocumento.trim() || null,
+    dataDocumento: header.dataDocumento || null,
+    fornitoreId: header.fornitoreId ? Number(header.fornitoreId) : null,
     note: header.note.trim() || null,
   });
 
@@ -578,35 +598,6 @@ export default function CaricoMerce() {
     }
   };
 
-  const createLogicalLot = async () => {
-    if (selectedAreaId == null || !canReceive) return;
-    setActivityAttempted(true);
-    if (!activityCode.trim() || !activityDescription.trim()) return;
-    try {
-      const created = await createLogicalLotMutation.mutateAsync({
-        data: {
-          areaOperativaId: selectedAreaId,
-          codice: activityCode.trim(),
-          descrizione: activityDescription.trim(),
-        },
-      });
-      await logicalLotsQuery.refetch();
-      setHeader((current) => ({
-        ...current,
-        lottoLogicoId: String(created.id),
-      }));
-      setDirty(true);
-      setActivityOpen(false);
-      setActivityCode("");
-      setActivityDescription("");
-      setActivityAttempted(false);
-      setActivityError(null);
-    } catch (error) {
-      setActivityError(errorMessage(error, t("caricoPratiche.error")));
-      showError(error);
-    }
-  };
-
   const scanProduct = (barcode: string) => {
     const now = Date.now();
     if (!shouldAcceptBarcodeScan(lastScan.current, barcode, now)) return;
@@ -627,6 +618,7 @@ export default function CaricoMerce() {
     if (rowErrors[row.id] === t("caricoPratiche.rowConflict")) return;
     const draft = rowDrafts[row.id] ?? caricoDraftFromRow(row);
     const issues = validateCaricoRow(row, draft);
+    const complete = Object.keys(issues).length === 0;
     setRowAttempted((current) => new Set(current).add(row.id));
     const firstIssue = (Object.keys(issues) as CaricoRowField[])[0];
     if (blocksCaricoDraftSave(issues)) {
@@ -652,6 +644,12 @@ export default function CaricoMerce() {
       });
       savedRowId.current = row.id;
       updateDetailCache(updated);
+      setSelectedRows((current) => {
+        const next = new Set(current);
+        if (complete) next.add(row.id);
+        else next.delete(row.id);
+        return next;
+      });
       setRowErrors((current) => {
         const next = { ...current };
         delete next[row.id];
@@ -659,7 +657,7 @@ export default function CaricoMerce() {
       });
       setRowSavedIncomplete((current) => {
         const next = new Set(current);
-        if (Object.keys(issues).length) next.add(row.id);
+        if (!complete) next.add(row.id);
         else next.delete(row.id);
         return next;
       });
@@ -820,9 +818,9 @@ export default function CaricoMerce() {
           </div>
           <div className="flex gap-2">
             <Button asChild variant="outline">
-              <Link href="/lotti?tab=carichi">
+              <Link href="/carico-merce?tab=lotti">
                 <History className="mr-2 h-4 w-4" />
-                {t("caricoPratiche.legacy")}
+                {t("uxCaricoLotti.tabLotti")}
               </Link>
             </Button>
             {canReceive && (
@@ -1036,6 +1034,7 @@ export default function CaricoMerce() {
                   areaOperativaId: value,
                   magazzinoId: "",
                   lottoLogicoId: "",
+                  fornitoreId: "",
                 }));
                 setDirty(true);
               }}
@@ -1318,6 +1317,68 @@ export default function CaricoMerce() {
               }}
             />
           </div>
+          <div className="space-y-2">
+            <Label>{t("uxCaricoLotti.supplier")}</Label>
+            <Select
+              value={header.fornitoreId || "none"}
+              disabled={
+                Boolean(practice?.integrazioni.length) ||
+                pending ||
+                Boolean(practice && !canEditManual)
+              }
+              onValueChange={(value) => {
+                setHeader((current) => ({
+                  ...current,
+                  fornitoreId: value === "none" ? "" : value,
+                }));
+                setDirty(true);
+              }}
+            >
+              <SelectTrigger aria-label={t("uxCaricoLotti.supplier")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">
+                  {t("uxCaricoLotti.noSupplier")}
+                </SelectItem>
+                {suppliers
+                  .filter(
+                    (supplier) =>
+                      (supplier.attivo &&
+                        (supplier.areaOperativaId == null ||
+                          supplier.areaOperativaId === selectedAreaId)) ||
+                      String(supplier.id) === header.fornitoreId,
+                  )
+                  .map((supplier) => (
+                    <SelectItem key={supplier.id} value={String(supplier.id)}>
+                      {supplier.nome}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="carico-document-date">
+              {t("uxCaricoLotti.documentDate")}
+            </Label>
+            <Input
+              id="carico-document-date"
+              type="date"
+              value={header.dataDocumento}
+              disabled={
+                Boolean(practice?.integrazioni.length) ||
+                pending ||
+                Boolean(practice && !canEditManual)
+              }
+              onChange={(event) => {
+                setHeader((current) => ({
+                  ...current,
+                  dataDocumento: event.target.value,
+                }));
+                setDirty(true);
+              }}
+            />
+          </div>
           <div className="space-y-2 md:col-span-2">
             <Label>{t("caricoPratiche.notes")}</Label>
             <Textarea
@@ -1349,6 +1410,9 @@ export default function CaricoMerce() {
         <Card>
           <CardHeader>
             <CardTitle>{t("caricoPratiche.addProduct")}</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {t("uxCaricoLotti.lotLegend")}
+            </p>
           </CardHeader>
           <CardContent className="space-y-3">
             {sectionError && (
@@ -1377,17 +1441,19 @@ export default function CaricoMerce() {
                     key={product.id}
                     type="button"
                     variant="ghost"
-                    className="h-auto justify-start py-2 text-left"
+                    className="h-auto w-full min-w-0 justify-start py-2 text-left"
                     disabled={pending}
                     onClick={() => void addProduct(product.id)}
                   >
-                    <span>
-                      <strong>{product.codice}</strong> — {product.nome}
-                      <br />
-                      <small className="text-muted-foreground">
-                        {product.unitaMisura}
+                    <span className="block min-w-0">
+                      <ProductLotRequirementLabel
+                        name={product.nome}
+                        lotRequired={product.lottoFisicoObbligatorio}
+                      />
+                      <span className="block text-xs text-muted-foreground">
+                        {product.codice} · {product.unitaMisura}
                         {product.codiceBarre ? ` · ${product.codiceBarre}` : ""}
-                      </small>
+                      </span>
                     </span>
                   </Button>
                 ))}
@@ -1452,8 +1518,11 @@ export default function CaricoMerce() {
                         }
                       }}
                     />
-                    <div>
-                      <strong>{row.prodottoNome}</strong>
+                    <div className="min-w-0">
+                      <ProductLotRequirementLabel
+                        name={row.prodottoNome}
+                        lotRequired={row.lottoFisicoObbligatorio}
+                      />
                       <p className="text-xs text-muted-foreground">
                         {row.prodottoCodice}
                       </p>
@@ -1571,34 +1640,85 @@ export default function CaricoMerce() {
                       {t("caricoPratiche.physicalLot")}
                       {row.lottoFisicoObbligatorio ? " *" : ""}
                     </Label>
-                    <Input
-                      id={`carico-lot-${row.id}`}
-                      aria-label={t("caricoPratiche.physicalLot")}
-                      aria-invalid={Boolean(
-                        fieldError("codiceLottoProduttore"),
-                      )}
-                      aria-describedby={
-                        fieldError("codiceLottoProduttore")
-                          ? `carico-lot-error-${row.id}`
-                          : undefined
-                      }
-                      className={
-                        fieldError("codiceLottoProduttore")
-                          ? "border-destructive ring-1 ring-destructive"
-                          : undefined
-                      }
-                      value={draft.codiceLottoProduttore}
-                      disabled={pending || !canEditManual}
-                      onChange={(event) => {
-                        setRowDrafts((current) => ({
-                          ...current,
-                          [row.id]: {
-                            ...draft,
-                            codiceLottoProduttore: event.target.value,
-                          },
-                        }));
-                      }}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id={`carico-lot-${row.id}`}
+                        aria-label={t("caricoPratiche.physicalLot")}
+                        aria-invalid={Boolean(
+                          fieldError("codiceLottoProduttore"),
+                        )}
+                        aria-describedby={
+                          fieldError("codiceLottoProduttore")
+                            ? `carico-lot-error-${row.id}`
+                            : undefined
+                        }
+                        className={
+                          fieldError("codiceLottoProduttore")
+                            ? "border-destructive ring-1 ring-destructive"
+                            : undefined
+                        }
+                        value={draft.codiceLottoProduttore}
+                        disabled={pending || !canEditManual}
+                        onChange={(event) => {
+                          setRowDrafts((current) => ({
+                            ...current,
+                            [row.id]: {
+                              ...draft,
+                              codiceLottoProduttore: event.target.value,
+                            },
+                          }));
+                        }}
+                      />
+                      <BarcodeScannerButton
+                        disabled={pending || !canEditManual}
+                        label={t("uxCaricoLotti.scanPhysicalLot")}
+                        onScan={(value) =>
+                          setRowDrafts((current) => ({
+                            ...current,
+                            [row.id]: scannedPhysicalLotDraft(draft, value),
+                          }))
+                        }
+                      />
+                    </div>
+                    {suggestedPhysicalLots(
+                      knownLots,
+                      row.prodottoId,
+                      practice.magazzinoId,
+                    ).length > 0 && (
+                      <Select
+                        onValueChange={(id) => {
+                          const lot = knownLots.find(
+                            (entry) => entry.id === Number(id),
+                          );
+                          if (!lot) return;
+                          setRowDrafts((current) => ({
+                            ...current,
+                            [row.id]: suggestedPhysicalLotDraft(draft, lot),
+                          }));
+                        }}
+                      >
+                        <SelectTrigger
+                          aria-label={t("uxCaricoLotti.suggestedLots")}
+                        >
+                          <SelectValue
+                            placeholder={t("uxCaricoLotti.suggestedLots")}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {suggestedPhysicalLots(
+                            knownLots,
+                            row.prodottoId,
+                            practice.magazzinoId,
+                          ).map((lot) => (
+                            <SelectItem key={lot.id} value={String(lot.id)}>
+                              {lot.codiceLotto} · {lot.dataScadenza ?? "—"} ·{" "}
+                              {lot.lottoLogicoDescrizione ?? "—"} ·{" "}
+                              {lot.fondoOrigine} · {lot.fornitoreNome ?? "—"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     {fieldError("codiceLottoProduttore") && (
                       <p
                         id={`carico-lot-error-${row.id}`}
@@ -1807,8 +1927,14 @@ export default function CaricoMerce() {
                 key={row.id}
                 className="flex flex-wrap justify-between gap-2 rounded-md border p-3"
               >
-                <span>
-                  <strong>{row.prodottoNome}</strong> · {row.fondoOrigine}
+                <span className="min-w-0">
+                  <ProductLotRequirementLabel
+                    name={row.prodottoNome}
+                    lotRequired={row.lottoFisicoObbligatorio}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {row.fondoOrigine}
+                  </span>
                 </span>
                 <Badge>
                   {row.quantita} {row.unitaMisura}
@@ -1871,113 +1997,27 @@ export default function CaricoMerce() {
             </Button>
           )}
           <Button asChild variant="ghost">
-            <Link href="/lotti?tab=partite">{t("caricoPratiche.legacy")}</Link>
+            <Link href="/carico-merce?tab=lotti">
+              {t("uxCaricoLotti.tabLotti")}
+            </Link>
           </Button>
         </div>
       )}
 
-      <Dialog
+      <ActivityDialog
         open={activityOpen}
-        onOpenChange={(open) => {
-          setActivityOpen(open);
-          if (!open) {
-            setActivityError(null);
-            setActivityAttempted(false);
-          }
+        onOpenChange={setActivityOpen}
+        areaId={selectedAreaId}
+        areaName={areas.find((item) => item.id === selectedAreaId)?.nome ?? ""}
+        onCreated={async (created) => {
+          await logicalLotsQuery.refetch();
+          setHeader((current) => ({
+            ...current,
+            lottoLogicoId: String(created.id),
+          }));
+          setDirty(true);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("caricoPratiche.newActivityTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("caricoPratiche.activityArea", {
-                area:
-                  areas.find((item) => item.id === selectedAreaId)?.nome ?? "",
-              })}
-            </DialogDescription>
-          </DialogHeader>
-          {activityError && (
-            <Alert variant="destructive">
-              <AlertDescription>{activityError}</AlertDescription>
-            </Alert>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="carico-activity-code">
-              {t("caricoPratiche.activityCodePrompt")} *
-            </Label>
-            <Input
-              id="carico-activity-code"
-              value={activityCode}
-              maxLength={80}
-              aria-invalid={activityAttempted && !activityCode.trim()}
-              aria-describedby={
-                activityAttempted && !activityCode.trim()
-                  ? "carico-activity-code-error"
-                  : undefined
-              }
-              className={
-                activityAttempted && !activityCode.trim()
-                  ? "border-destructive ring-1 ring-destructive"
-                  : undefined
-              }
-              onChange={(event) => setActivityCode(event.target.value)}
-            />
-            {activityAttempted && !activityCode.trim() && (
-              <p
-                id="carico-activity-code-error"
-                className="text-sm text-destructive"
-              >
-                {t("caricoPratiche.activityCodeRequired")}
-              </p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="carico-activity-description">
-              {t("caricoPratiche.activityDescriptionPrompt")} *
-            </Label>
-            <Input
-              id="carico-activity-description"
-              value={activityDescription}
-              maxLength={200}
-              aria-invalid={activityAttempted && !activityDescription.trim()}
-              aria-describedby={
-                activityAttempted && !activityDescription.trim()
-                  ? "carico-activity-description-error"
-                  : undefined
-              }
-              className={
-                activityAttempted && !activityDescription.trim()
-                  ? "border-destructive ring-1 ring-destructive"
-                  : undefined
-              }
-              onChange={(event) => setActivityDescription(event.target.value)}
-            />
-            {activityAttempted && !activityDescription.trim() && (
-              <p
-                id="carico-activity-description-error"
-                className="text-sm text-destructive"
-              >
-                {t("caricoPratiche.activityDescriptionRequired")}
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              disabled={createLogicalLotMutation.isPending}
-              onClick={() => setActivityOpen(false)}
-            >
-              {t("barcodeScanner.cancel")}
-            </Button>
-            <Button
-              disabled={createLogicalLotMutation.isPending}
-              onClick={() => void createLogicalLot()}
-            >
-              {t("caricoPratiche.createActivity")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      />
       <AlertDialog open={confirmRegister} onOpenChange={setConfirmRegister}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -2042,6 +2082,22 @@ export default function CaricoMerce() {
             if (practiceId === practice.id) void detailQuery.refetch();
           }}
         />
+      )}
+    </div>
+  );
+}
+
+export default function CaricoMerce() {
+  const active = parseCaricoMerceTab(useSearch());
+  return (
+    <div>
+      <CaricoMerceTabs active={active} />
+      {active === "carichi" ? (
+        <CarichiContent />
+      ) : active === "raccolte" ? (
+        <RaccolteTab />
+      ) : (
+        <LottiFisiciTab />
       )}
     </div>
   );

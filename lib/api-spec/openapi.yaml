@@ -2090,6 +2090,11 @@ paths:
             Non attribuisce la quantità residua alla provenienza selezionata.
           schema:
             $ref: "#/components/schemas/OrigineCarico"
+        - name: includeEsauriti
+          in: query
+          description: Include anche le partite con residuo zero; omesso mantiene il filtro storico sui soli residui positivi.
+          schema:
+            type: boolean
       responses:
         "200":
           description: List of lots
@@ -12641,7 +12646,13 @@ components:
           type: integer
         lottoLogicoId:
           type: [integer, "null"]
+        lottoLogicoCodice:
+          type: [string, "null"]
+        lottoLogicoDescrizione:
+          type: [string, "null"]
         prodottoNome:
+          type: ["string", "null"]
+        prodottoCodice:
           type: ["string", "null"]
         codiceLotto:
           type: ["string", "null"]
@@ -12657,6 +12668,56 @@ components:
           $ref: "#/components/schemas/QuantitaContabile"
         quantitaResiduaPrecisa:
           $ref: "#/components/schemas/QuantitaContabile"
+        quantitaPrenotata:
+          type: number
+        quantitaPrenotataPrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
+        provenienze:
+          type: array
+          items:
+            type: string
+          description: Origini distinte derivate dalle registrazioni di carico collegate alla partita.
+        documentiCarico:
+          type: array
+          items:
+            type: object
+            properties:
+              caricoId: { type: integer }
+              numero: { type: string }
+              data: { type: [string, "null"], format: date }
+            required: [caricoId, numero, data]
+        lineageCarichi:
+          type: array
+          description: >-
+            Registrazioni di carico collegate alla partita, senza attribuire
+            arbitrariamente il residuo corrente a una provenienza.
+          items:
+            type: object
+            properties:
+              caricoId: { type: integer }
+              dataCarico: { type: string, format: date }
+              statoCarico: { type: string }
+              origineCarico: { type: string }
+              numeroDocumento: { type: [string, "null"] }
+              dataDocumento: { type: [string, "null"], format: date }
+              fornitoreId: { type: [integer, "null"] }
+              fornitoreNome: { type: [string, "null"] }
+              quantitaOperativa:
+                { $ref: "#/components/schemas/QuantitaContabile" }
+              unitaMisuraOperativa: { type: string }
+            required:
+              [
+                caricoId,
+                dataCarico,
+                statoCarico,
+                origineCarico,
+                numeroDocumento,
+                dataDocumento,
+                fornitoreId,
+                fornitoreNome,
+                quantitaOperativa,
+                unitaMisuraOperativa,
+              ]
         disponibileReale:
           type: number
           description: Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa.
@@ -12666,6 +12727,8 @@ components:
           type: integer
         magazzinoNome:
           type: ["string", "null"]
+        areaOperativaId:
+          type: [integer, "null"]
         fornitoreId:
           type: ["integer", "null"]
         fornitoreNome:

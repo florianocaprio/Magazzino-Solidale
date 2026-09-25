@@ -1026,3 +1026,94 @@ describe("M2 — lotto logico operativo", () => {
     }
   });
 });
+
+describe("UX-CARICO-LOTTI — vista consultiva delle partite", () => {
+  it("mantiene il default, espone lineage multiplo e include gli esauriti soltanto su richiesta", async () => {
+    const product = await createProduct({
+      codice: `UXLOT-${suffix}`.slice(0, 30),
+      nome: `Partita UX ${suffix}`,
+    });
+    expect(product.status).toBe(201);
+    const first = await postLoad({
+      lottoLogicoId: generalAId,
+      numeroDocumento: `DDT-A-${suffix}`.slice(0, 100),
+      dataDocumento: "2026-09-17",
+      righe: [
+        {
+          prodottoId: product.body.id,
+          fondoOrigine: "NESSUN_FONDO",
+          quantitaOperativa: "2",
+          codiceLotto: "LOT-UX",
+        },
+      ],
+    });
+    expect(first.status).toBe(201);
+    const second = await postLoad({
+      lottoLogicoId: generalAId,
+      origineCarico: "ACQUISTO",
+      numeroDocumento: `DDT-B-${suffix}`.slice(0, 100),
+      dataDocumento: "2026-09-18",
+      righe: [
+        {
+          prodottoId: product.body.id,
+          fondoOrigine: "NESSUN_FONDO",
+          quantitaOperativa: "1",
+          codiceLotto: "LOT-UX",
+        },
+      ],
+    });
+    expect(second.status).toBe(201);
+    const lottoId = first.body.righe[0].lottoId as number;
+    expect(second.body.righe[0].lottoId).toBe(lottoId);
+
+    const current = await request(app)
+      .get("/lotti")
+      .query({ prodottoId: product.body.id });
+    expect(current.status).toBe(200);
+    expect(current.body).toEqual([
+      expect.objectContaining({
+        id: lottoId,
+        prodottoCodice: product.body.codice,
+        lottoLogicoId: generalAId,
+        lottoLogicoCodice: "GENERALE",
+        areaOperativaId: areaAId,
+        quantitaPrenotataPrecisa: "0.000000",
+        provenienze: expect.arrayContaining(["DONAZIONE", "ACQUISTO"]),
+        documentiCarico: expect.arrayContaining([
+          expect.objectContaining({ numero: `DDT-A-${suffix}`.slice(0, 100) }),
+          expect.objectContaining({ numero: `DDT-B-${suffix}`.slice(0, 100) }),
+        ]),
+        lineageCarichi: expect.arrayContaining([
+          expect.objectContaining({ origineCarico: "DONAZIONE" }),
+          expect.objectContaining({ origineCarico: "ACQUISTO" }),
+        ]),
+      }),
+    ]);
+    expect(Number(current.body[0].quantitaResiduaPrecisa)).toBe(3);
+    expect(
+      current.body[0].lineageCarichi.map(
+        (event: { quantitaOperativa: string }) =>
+          Number(event.quantitaOperativa),
+      ),
+    ).toEqual([2, 1]);
+
+    await db
+      .update(lottiTable)
+      .set({ quantitaResidua: "0" })
+      .where(eq(lottiTable.id, lottoId));
+    expect(
+      (await request(app).get("/lotti").query({ prodottoId: product.body.id }))
+        .body,
+    ).toEqual([]);
+    const history = await request(app)
+      .get("/lotti")
+      .query({ prodottoId: product.body.id, includeEsauriti: true });
+    expect(history.status).toBe(200);
+    expect(history.body).toEqual([expect.objectContaining({ id: lottoId })]);
+    expect(Number(history.body[0].quantitaResiduaPrecisa)).toBe(0);
+    expect(
+      (await request(app).get("/lotti").query({ includeEsauriti: "invalid" }))
+        .status,
+    ).toBe(400);
+  });
+});

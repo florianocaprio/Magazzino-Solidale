@@ -649,7 +649,7 @@ export function FseImportPracticeWizard({
                           placeholder={t("caricoPratiche.fseSelectProduct")}
                         />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[min(18rem,var(--radix-select-content-available-height))]">
                         {products
                           .filter((product) => product.attivo)
                           .map((product) => (

@@ -3399,11 +3399,14 @@ export const ListLottiQueryParams = zod.object({
   "magazzinoId": zod.coerce.number().optional(),
   "inScadenza": zod.coerce.boolean().optional(),
   "fondoOrigine": zod.enum(['FSE_PLUS', 'FONDO_NAZIONALE', 'FONDO_NAZIONALE_COFINANZIATO', 'NESSUN_FONDO']).optional(),
-  "origineCaricoPresente": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']).optional().describe('Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.')
+  "origineCaricoPresente": zod.enum(['AGEA_SIFEAD', 'RACCOLTA_ALIMENTARE', 'DONAZIONE', 'ACQUISTO', 'FORNITORE', 'RETTIFICA_INVENTARIO', 'SALDO_INIZIALE', 'ALTRO', 'LEGACY']).optional().describe('Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.'),
+  "includeEsauriti": zod.coerce.boolean().optional().describe('Include anche le partite con residuo zero; omesso mantiene il filtro storico sui soli residui positivi.')
 })
 
 export const listLottiResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const listLottiResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listLottiResponseQuantitaPrenotataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listLottiResponseLineageCarichiItemQuantitaOperativaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const listLottiResponseDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
@@ -3411,7 +3414,10 @@ export const ListLottiResponseItem = zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
   "lottoLogicoId": zod.number().nullish(),
+  "lottoLogicoCodice": zod.string().nullish(),
+  "lottoLogicoDescrizione": zod.string().nullish(),
   "prodottoNome": zod.string().nullish(),
+  "prodottoCodice": zod.string().nullish(),
   "codiceLotto": zod.string().nullish(),
   "dataScadenza": zod.string().nullish(),
   "dataCarico": zod.string(),
@@ -3419,10 +3425,31 @@ export const ListLottiResponseItem = zod.object({
   "quantitaResidua": zod.number(),
   "quantitaCaricataPrecisa": zod.string().regex(listLottiResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "quantitaResiduaPrecisa": zod.string().regex(listLottiResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "quantitaPrenotata": zod.number().optional(),
+  "quantitaPrenotataPrecisa": zod.string().regex(listLottiResponseQuantitaPrenotataPrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "provenienze": zod.array(zod.string()).optional().describe('Origini distinte derivate dalle registrazioni di carico collegate alla partita.'),
+  "documentiCarico": zod.array(zod.object({
+  "caricoId": zod.number(),
+  "numero": zod.string(),
+  "data": zod.coerce.date().nullable()
+})).optional(),
+  "lineageCarichi": zod.array(zod.object({
+  "caricoId": zod.number(),
+  "dataCarico": zod.coerce.date(),
+  "statoCarico": zod.string(),
+  "origineCarico": zod.string(),
+  "numeroDocumento": zod.string().nullable(),
+  "dataDocumento": zod.coerce.date().nullable(),
+  "fornitoreId": zod.number().nullable(),
+  "fornitoreNome": zod.string().nullable(),
+  "quantitaOperativa": zod.string().regex(listLottiResponseLineageCarichiItemQuantitaOperativaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "unitaMisuraOperativa": zod.string()
+})).optional().describe('Registrazioni di carico collegate alla partita, senza attribuire arbitrariamente il residuo corrente a una provenienza.'),
   "disponibileReale": zod.number().describe('Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa.'),
   "disponibileRealePrecisa": zod.string().regex(listLottiResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fsePlus": zod.boolean(),
@@ -3463,6 +3490,8 @@ export const GetLottoParams = zod.object({
 
 export const getLottoResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const getLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getLottoResponseQuantitaPrenotataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const getLottoResponseLineageCarichiItemQuantitaOperativaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const getLottoResponseDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
@@ -3470,7 +3499,10 @@ export const GetLottoResponse = zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
   "lottoLogicoId": zod.number().nullish(),
+  "lottoLogicoCodice": zod.string().nullish(),
+  "lottoLogicoDescrizione": zod.string().nullish(),
   "prodottoNome": zod.string().nullish(),
+  "prodottoCodice": zod.string().nullish(),
   "codiceLotto": zod.string().nullish(),
   "dataScadenza": zod.string().nullish(),
   "dataCarico": zod.string(),
@@ -3478,10 +3510,31 @@ export const GetLottoResponse = zod.object({
   "quantitaResidua": zod.number(),
   "quantitaCaricataPrecisa": zod.string().regex(getLottoResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "quantitaResiduaPrecisa": zod.string().regex(getLottoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "quantitaPrenotata": zod.number().optional(),
+  "quantitaPrenotataPrecisa": zod.string().regex(getLottoResponseQuantitaPrenotataPrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "provenienze": zod.array(zod.string()).optional().describe('Origini distinte derivate dalle registrazioni di carico collegate alla partita.'),
+  "documentiCarico": zod.array(zod.object({
+  "caricoId": zod.number(),
+  "numero": zod.string(),
+  "data": zod.coerce.date().nullable()
+})).optional(),
+  "lineageCarichi": zod.array(zod.object({
+  "caricoId": zod.number(),
+  "dataCarico": zod.coerce.date(),
+  "statoCarico": zod.string(),
+  "origineCarico": zod.string(),
+  "numeroDocumento": zod.string().nullable(),
+  "dataDocumento": zod.coerce.date().nullable(),
+  "fornitoreId": zod.number().nullable(),
+  "fornitoreNome": zod.string().nullable(),
+  "quantitaOperativa": zod.string().regex(getLottoResponseLineageCarichiItemQuantitaOperativaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "unitaMisuraOperativa": zod.string()
+})).optional().describe('Registrazioni di carico collegate alla partita, senza attribuire arbitrariamente il residuo corrente a una provenienza.'),
   "disponibileReale": zod.number().describe('Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa.'),
   "disponibileRealePrecisa": zod.string().regex(getLottoResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fsePlus": zod.boolean(),
@@ -3508,6 +3561,8 @@ export const UpdateLottoBody = zod.object({
 
 export const updateLottoResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const updateLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const updateLottoResponseQuantitaPrenotataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const updateLottoResponseLineageCarichiItemQuantitaOperativaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const updateLottoResponseDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
@@ -3515,7 +3570,10 @@ export const UpdateLottoResponse = zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
   "lottoLogicoId": zod.number().nullish(),
+  "lottoLogicoCodice": zod.string().nullish(),
+  "lottoLogicoDescrizione": zod.string().nullish(),
   "prodottoNome": zod.string().nullish(),
+  "prodottoCodice": zod.string().nullish(),
   "codiceLotto": zod.string().nullish(),
   "dataScadenza": zod.string().nullish(),
   "dataCarico": zod.string(),
@@ -3523,10 +3581,31 @@ export const UpdateLottoResponse = zod.object({
   "quantitaResidua": zod.number(),
   "quantitaCaricataPrecisa": zod.string().regex(updateLottoResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "quantitaResiduaPrecisa": zod.string().regex(updateLottoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "quantitaPrenotata": zod.number().optional(),
+  "quantitaPrenotataPrecisa": zod.string().regex(updateLottoResponseQuantitaPrenotataPrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "provenienze": zod.array(zod.string()).optional().describe('Origini distinte derivate dalle registrazioni di carico collegate alla partita.'),
+  "documentiCarico": zod.array(zod.object({
+  "caricoId": zod.number(),
+  "numero": zod.string(),
+  "data": zod.coerce.date().nullable()
+})).optional(),
+  "lineageCarichi": zod.array(zod.object({
+  "caricoId": zod.number(),
+  "dataCarico": zod.coerce.date(),
+  "statoCarico": zod.string(),
+  "origineCarico": zod.string(),
+  "numeroDocumento": zod.string().nullable(),
+  "dataDocumento": zod.coerce.date().nullable(),
+  "fornitoreId": zod.number().nullable(),
+  "fornitoreNome": zod.string().nullable(),
+  "quantitaOperativa": zod.string().regex(updateLottoResponseLineageCarichiItemQuantitaOperativaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "unitaMisuraOperativa": zod.string()
+})).optional().describe('Registrazioni di carico collegate alla partita, senza attribuire arbitrariamente il residuo corrente a una provenienza.'),
   "disponibileReale": zod.number().describe('Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa.'),
   "disponibileRealePrecisa": zod.string().regex(updateLottoResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fsePlus": zod.boolean(),
@@ -3559,6 +3638,8 @@ export const RettificaLottoBody = zod.object({
 
 export const rettificaLottoResponseQuantitaCaricataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const rettificaLottoResponseQuantitaResiduaPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const rettificaLottoResponseQuantitaPrenotataPrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const rettificaLottoResponseLineageCarichiItemQuantitaOperativaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 export const rettificaLottoResponseDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
@@ -3566,7 +3647,10 @@ export const RettificaLottoResponse = zod.object({
   "id": zod.number(),
   "prodottoId": zod.number(),
   "lottoLogicoId": zod.number().nullish(),
+  "lottoLogicoCodice": zod.string().nullish(),
+  "lottoLogicoDescrizione": zod.string().nullish(),
   "prodottoNome": zod.string().nullish(),
+  "prodottoCodice": zod.string().nullish(),
   "codiceLotto": zod.string().nullish(),
   "dataScadenza": zod.string().nullish(),
   "dataCarico": zod.string(),
@@ -3574,10 +3658,31 @@ export const RettificaLottoResponse = zod.object({
   "quantitaResidua": zod.number(),
   "quantitaCaricataPrecisa": zod.string().regex(rettificaLottoResponseQuantitaCaricataPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "quantitaResiduaPrecisa": zod.string().regex(rettificaLottoResponseQuantitaResiduaPrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "quantitaPrenotata": zod.number().optional(),
+  "quantitaPrenotataPrecisa": zod.string().regex(rettificaLottoResponseQuantitaPrenotataPrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "provenienze": zod.array(zod.string()).optional().describe('Origini distinte derivate dalle registrazioni di carico collegate alla partita.'),
+  "documentiCarico": zod.array(zod.object({
+  "caricoId": zod.number(),
+  "numero": zod.string(),
+  "data": zod.coerce.date().nullable()
+})).optional(),
+  "lineageCarichi": zod.array(zod.object({
+  "caricoId": zod.number(),
+  "dataCarico": zod.coerce.date(),
+  "statoCarico": zod.string(),
+  "origineCarico": zod.string(),
+  "numeroDocumento": zod.string().nullable(),
+  "dataDocumento": zod.coerce.date().nullable(),
+  "fornitoreId": zod.number().nullable(),
+  "fornitoreNome": zod.string().nullable(),
+  "quantitaOperativa": zod.string().regex(rettificaLottoResponseLineageCarichiItemQuantitaOperativaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
+  "unitaMisuraOperativa": zod.string()
+})).optional().describe('Registrazioni di carico collegate alla partita, senza attribuire arbitrariamente il residuo corrente a una provenienza.'),
   "disponibileReale": zod.number().describe('Disponibilità della partita al netto degli impegni attivi e della scadenza alla data operativa.'),
   "disponibileRealePrecisa": zod.string().regex(rettificaLottoResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
   "fornitoreId": zod.number().nullish(),
   "fornitoreNome": zod.string().nullish(),
   "fsePlus": zod.boolean(),

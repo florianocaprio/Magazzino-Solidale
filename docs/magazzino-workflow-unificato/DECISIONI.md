@@ -517,3 +517,48 @@ rientro usa sempre origine e partita realmente uscita, e l'evento `esito`
 non diventa un secondo scarico. Questo è stato di **requisito approvato e
 test automatico**, non una nuova decisione né una validazione manuale:
 `NE-MAN` permane per M4B/M4.
+
+## UX-CARICO-LOTTI — Fase A (contratto tecnico di sviluppo)
+
+La nuova navigazione di Carico Merce usa tre tab con deep-link
+`carichi|raccolte|lotti`. `lotto_logico` resta la Raccolta/Attività dell'Area
+e `lotti` resta la partita fisica reale: la UI non introduce un'anagrafica
+parallela né crea stock dalla tabella dei lotti. Il dialog di creazione della
+Raccolta è condiviso tra Carichi e Raccolte; le azioni di lifecycle chiamano
+solo le API già esistenti e `Generale` rimane immutabile.
+
+La lista `/lotti` è estesa in modo additivo: `includeEsauriti` è opt-in,
+mentre il default conserva il filtro sul residuo positivo. La risposta
+consultiva espone Area, prodotto, Raccolta, prenotato/disponibile e il
+lineage delle registrazioni di carico. Provenienze e documenti multipli
+sono mostrati come tali: la quantità residua **non** viene attribuita
+arbitrariamente a un'origine. I dati legacy privi di collegamento sono
+indicati come non disponibili, senza retrodatazione.
+
+Il fornitore è un riferimento distinto da `origineCarico`; il carico manuale
+usa `fornitoreId`, numero e data DDT già presenti nella pratica e continua
+a contabilizzare tramite il servizio inventariale autorevole. Scanner e
+suggerimenti precompilano soltanto la bozza della riga; nessun saldo è
+modificato prima della conferma. Il vecchio `/lotti` è un redirect
+compatibile; la rettifica inventariale esistente resta accessibile nella
+vista dei lotti fisici con il permesso preesistente, mentre il vecchio
+writer diretto di un nuovo lotto non è più esposto.
+
+La Fase A aveva stato `DEV-UX-CARICO-LOTTI/NE-TEST/NE-MAN`; la successiva
+validazione formale è registrata in `ESITI_TEST_UX_CARICO_LOTTI.md` come
+`OK-TEST-UX-CARICO-LOTTI/OK-MAN-UX-CARICO-LOTTI`. Il PASS manuale è quello
+dichiarato da Floriano per questa UX, non una validazione dell'intera M4.
+Restano `NE-MAN-CAMERA` e `NE-MAN-TABLET` per l'hardware fisico.
+
+La conferma del carico considera **solo** righe persistite, complete e
+selezionate: il salvataggio di una riga completa la seleziona, mentre una
+bozza incompleta non selezionata non blocca il carico parziale. Una riga
+selezionata modificata localmente blocca la conferma finché non viene
+salvata; i draft delle altre righe rimangono intatti. La richiesta del
+codice lotto dipende esclusivamente da `lottoFisicoObbligatorio`: se falso
+il lotto è facoltativo e usa l'aspetto normale; se vero è obbligatorio ed
+evidenziato in blu con «Lotto richiesto» in Catalogo, selettore prodotto
+e riga Carico. Non esistono eccezioni per provenienza, fornitore o FSE+.
+
+Nessuna migrazione è stata introdotta; Docker persistente e `main` sono
+rimasti invariati durante `##test`.
