@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
-import type { Magazzino, Prodotto } from "@workspace/api-client-react";
+import type {
+  CaricoPraticaRiga,
+  Magazzino,
+  Prodotto,
+} from "@workspace/api-client-react";
 import {
+  blocksCaricoDraftSave,
+  caricoDraftFromRow,
   isCaricoRowDraftDirty,
   normalizeUiQuantity,
   operationalWarehousesForArea,
   productForBarcode,
+  reconcileCaricoDrafts,
   shouldAcceptBarcodeScan,
+  validateCaricoRow,
   type CaricoRowDraft,
   visibleProducts,
 } from "./carico-merce";
@@ -56,6 +64,25 @@ const rowDraft = (overrides: Partial<CaricoRowDraft> = {}): CaricoRowDraft => ({
   note: "",
   ...overrides,
 });
+
+const practiceRow = (
+  id: number,
+  overrides: Partial<CaricoPraticaRiga> = {},
+): CaricoPraticaRiga =>
+  ({
+    id,
+    quantita: "5.000000",
+    fondoOrigine: "NESSUN_FONDO",
+    codiceLottoProduttore: "LOT-A",
+    dataScadenza: "2027-12-31",
+    fattoreKgLtPezzo: null,
+    note: null,
+    quantitaFrazionabile: false,
+    lottoFisicoObbligatorio: false,
+    gestioneScadenza: false,
+    registrata: false,
+    ...overrides,
+  }) as CaricoPraticaRiga;
 
 describe("Carico Merce M3A", () => {
   it("mostra l'elenco prodotti anche senza ricerca e filtra per nome/codice", () => {
@@ -143,6 +170,87 @@ describe("Carico Merce M3A", () => {
       expect(Object.keys(caricoPratiche[language]).sort()).toEqual(italianKeys);
     }
     expect(caricoPratiche.en.area).toBe("Operational Area");
-    expect(caricoPratiche.ar.register).toBe("تسجيل الصفوف الجديدة");
+    expect(caricoPratiche.ar.register).toBe("تأكيد إدخال البضاعة إلى المستودع");
+  });
+});
+
+describe("UX-CARICO-01 — validazione e draft locali", () => {
+  it("mostra insieme quantità, lotto e scadenza mancanti ma consente la bozza incompleta", () => {
+    const errors = validateCaricoRow(
+      practiceRow(1, { lottoFisicoObbligatorio: true, gestioneScadenza: true }),
+      rowDraft({ quantita: "", codiceLottoProduttore: "", dataScadenza: "" }),
+    );
+    expect(errors).toEqual({
+      quantita: "missing",
+      codiceLottoProduttore: "required",
+      dataScadenza: "required",
+    });
+    expect(blocksCaricoDraftSave(errors)).toBe(false);
+  });
+
+  it("blocca valori invalidi, non i campi opzionali vuoti, e rispetta la frazionabilità", () => {
+    const row = practiceRow(1);
+    expect(
+      validateCaricoRow(
+        row,
+        rowDraft({
+          quantita: "1,5",
+          codiceLottoProduttore: "",
+          dataScadenza: "",
+          fattoreKgLtPezzo: "",
+        }),
+      ),
+    ).toEqual({ quantita: "integer" });
+    expect(
+      validateCaricoRow(
+        { ...row, quantitaFrazionabile: true },
+        rowDraft({
+          quantita: "1,5",
+          codiceLottoProduttore: "",
+          dataScadenza: "",
+        }),
+      ),
+    ).toEqual({});
+    expect(
+      validateCaricoRow(
+        row,
+        rowDraft({
+          quantita: "0",
+          dataScadenza: "2027-02-30",
+          fattoreKgLtPezzo: "-2",
+        }),
+      ),
+    ).toEqual({
+      quantita: "positive",
+      dataScadenza: "format",
+      fattoreKgLtPezzo: "format",
+    });
+    expect(
+      blocksCaricoDraftSave(
+        validateCaricoRow(row, rowDraft({ quantita: "1.1234567" })),
+      ),
+    ).toBe(true);
+  });
+
+  it("salvare A preserva B modificata, la selezione non è ricalcolata e un conflitto sulla stessa riga emerge", () => {
+    const a = practiceRow(1);
+    const b = practiceRow(2);
+    const drafts = {
+      1: rowDraft({ quantita: "8" }),
+      2: rowDraft({ quantita: "9", note: "locale" }),
+    };
+    const savedA = practiceRow(1, { quantita: "8.000000" });
+    const merged = reconcileCaricoDrafts([a, b], [savedA, b], drafts, 1);
+    expect(merged.drafts[1]).toEqual(caricoDraftFromRow(savedA));
+    expect(merged.drafts[2]).toEqual(drafts[2]);
+    expect(merged.conflicts).toEqual([]);
+    const concurrent = reconcileCaricoDrafts(
+      [a, b],
+      [savedA, practiceRow(2, { quantita: "7.000000" })],
+      drafts,
+      1,
+    );
+    expect(concurrent.drafts[2]).toEqual(drafts[2]);
+    expect(concurrent.conflicts).toEqual([2]);
   });
 });

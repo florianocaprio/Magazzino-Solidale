@@ -162,18 +162,18 @@ test.describe("M3A — pratica di carico persistente", () => {
       .getByRole("button", { name: new RegExp(product.codice, "i") })
       .click();
     await resumedPage.getByLabel(/quantità/i).fill("80");
-    await expect(resumedPage.getByRole("checkbox")).toBeDisabled();
+    await expect(resumedPage.getByRole("checkbox")).toBeEnabled();
     await expect(
-      resumedPage.getByRole("button", { name: /registra nuove righe/i }),
+      resumedPage.getByRole("button", { name: /conferma carico a magazzino/i }),
     ).toBeDisabled();
     await resumedPage
       .getByRole("button", { name: /salva bozza/i })
       .last()
       .click();
     await expect(resumedPage.getByRole("checkbox")).toBeEnabled();
-    await expect(resumedPage.getByRole("checkbox")).toBeChecked();
+    await resumedPage.getByRole("checkbox").check();
     await resumedPage
-      .getByRole("button", { name: /registra nuove righe/i })
+      .getByRole("button", { name: /conferma carico a magazzino/i })
       .click();
     const firstRegistrationResponse = resumedPage.waitForResponse(
       (response) =>
@@ -182,7 +182,7 @@ test.describe("M3A — pratica di carico persistente", () => {
     );
     await resumedPage
       .getByRole("alertdialog")
-      .getByRole("button", { name: /registra nuove righe/i })
+      .getByRole("button", { name: /conferma carico$/i })
       .click();
     expect((await firstRegistrationResponse).status()).toBe(201);
     await expect(
@@ -203,8 +203,9 @@ test.describe("M3A — pratica di carico persistente", () => {
       .getByRole("button", { name: /salva bozza/i })
       .last()
       .click();
+    await resumedPage.getByRole("checkbox").check();
     await resumedPage
-      .getByRole("button", { name: /registra nuove righe/i })
+      .getByRole("button", { name: /conferma carico a magazzino/i })
       .click();
     const secondRegistrationResponse = resumedPage.waitForResponse(
       (response) =>
@@ -213,7 +214,7 @@ test.describe("M3A — pratica di carico persistente", () => {
     );
     await resumedPage
       .getByRole("alertdialog")
-      .getByRole("button", { name: /registra nuove righe/i })
+      .getByRole("button", { name: /conferma carico$/i })
       .click();
     expect((await secondRegistrationResponse).status()).toBe(201);
 
@@ -361,8 +362,9 @@ test.describe("M3A — pratica di carico persistente", () => {
     await page.getByLabel("Scadenza effettiva").fill("2028-01-31");
 
     const register = page.getByRole("button", {
-      name: /registra nuove righe/i,
+      name: /conferma carico a magazzino/i,
     });
+    await page.getByRole("checkbox").check();
     await expect(register).toBeDisabled();
     await expect(
       page.getByText(
@@ -429,7 +431,7 @@ test.describe("M3A — pratica di carico persistente", () => {
     );
     await page
       .getByRole("alertdialog")
-      .getByRole("button", { name: /registra nuove righe/i })
+      .getByRole("button", { name: /conferma carico$/i })
       .click();
     expect((await registrationResponse).status()).toBe(201);
 

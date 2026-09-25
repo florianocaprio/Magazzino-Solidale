@@ -32,6 +32,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -61,13 +70,19 @@ import {
 import { useAuth } from "@/lib/auth";
 import { errorMessage } from "@/lib/api-error";
 import {
+  blocksCaricoDraftSave,
+  caricoDraftFromRow,
   isCaricoRowDraftDirty,
   newCommandKey,
   normalizeUiQuantity,
   operationalWarehousesForArea,
   productForBarcode,
+  reconcileCaricoDrafts,
   shouldAcceptBarcodeScan,
   type CaricoRowDraft,
+  type CaricoRowField,
+  type CaricoRowIssue,
+  validateCaricoRow,
   visibleProducts,
 } from "@/lib/carico-merce";
 import {
@@ -76,6 +91,7 @@ import {
   History,
   Loader2,
   PackagePlus,
+  Plus,
   Save,
 } from "lucide-react";
 
@@ -127,19 +143,24 @@ function headerFromPractice(practice: CaricoPraticaDettaglio): HeaderForm {
   };
 }
 
-function rowDraft(row: CaricoPraticaRiga): CaricoRowDraft {
-  return {
-    quantita: row.quantita?.toString() ?? "",
-    fondoOrigine: row.fondoOrigine,
-    codiceLottoProduttore: row.codiceLottoProduttore ?? "",
-    dataScadenza: row.dataScadenza ?? "",
-    fattoreKgLtPezzo: row.fattoreKgLtPezzo?.toString() ?? "",
-    note: row.note ?? "",
-  };
-}
-
 function statusLabel(t: (key: string) => string, status: string) {
   return t(`caricoPratiche.status${status[0].toUpperCase()}${status.slice(1)}`);
+}
+
+function rowIssueKey(field: CaricoRowField, issue: CaricoRowIssue): string {
+  if (field === "quantita")
+    return `caricoPratiche.quantity${issue[0].toUpperCase()}${issue.slice(1)}`;
+  if (field === "codiceLottoProduttore")
+    return "caricoPratiche.physicalLotRequired";
+  if (field === "dataScadenza")
+    return issue === "format"
+      ? "caricoPratiche.expiryFormat"
+      : "caricoPratiche.expiryRequired";
+  if (field === "fattoreKgLtPezzo")
+    return issue === "positive"
+      ? "caricoPratiche.factorPositive"
+      : "caricoPratiche.factorFormat";
+  return "caricoPratiche.fundRequired";
 }
 
 export default function CaricoMerce() {
@@ -166,9 +187,31 @@ export default function CaricoMerce() {
   );
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [confirmRegister, setConfirmRegister] = useState(false);
+  const [headerAttempted, setHeaderAttempted] = useState(false);
+  const [headerError, setHeaderError] = useState<string | null>(null);
+  const [rowAttempted, setRowAttempted] = useState<Set<number>>(new Set());
+  const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
+  const [rowSavedIncomplete, setRowSavedIncomplete] = useState<Set<number>>(
+    new Set(),
+  );
+  const [focusRowField, setFocusRowField] = useState<{
+    rowId: number;
+    field: CaricoRowField;
+  } | null>(null);
+  const [sectionError, setSectionError] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [registrationUncertain, setRegistrationUncertain] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityCode, setActivityCode] = useState("");
+  const [activityDescription, setActivityDescription] = useState("");
+  const [activityAttempted, setActivityAttempted] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
   const [fseImportOpen, setFseImportOpen] = useState(false);
   const [openImportAfterSave, setOpenImportAfterSave] = useState(false);
   const registrationKey = useRef<string | null>(null);
+  const registrationAttemptedRows = useRef<number[]>([]);
+  const previousPractice = useRef<CaricoPraticaDettaglio | null>(null);
+  const savedRowId = useRef<number | undefined>(undefined);
   const lastScan = useRef<{ value: string; at: number } | null>(null);
 
   const { data: areas = [] } = useListAreeOperative();
@@ -255,7 +298,10 @@ export default function CaricoMerce() {
       practice.integrazioni.length === 0) ||
       practice?.origineCarico === "AGEA_SIFEAD");
   const isRowDirty = (row: CaricoPraticaRiga) =>
-    isCaricoRowDraftDirty(rowDrafts[row.id] ?? rowDraft(row), rowDraft(row));
+    isCaricoRowDraftDirty(
+      rowDrafts[row.id] ?? caricoDraftFromRow(row),
+      caricoDraftFromRow(row),
+    );
   const rowsHaveUnsavedChanges = pendingRows.some(isRowDirty);
   const selectedRowsHaveUnsavedChanges = pendingRows.some(
     (row) => selectedRows.has(row.id) && isRowDirty(row),
@@ -263,20 +309,76 @@ export default function CaricoMerce() {
   const hasUnsavedChanges = dirty || rowsHaveUnsavedChanges;
   const unsavedGuard = useUnsavedChangesGuard(hasUnsavedChanges);
 
+  const headerIssues = {
+    areaOperativaId: !header.areaOperativaId,
+    magazzinoId: !header.magazzinoId,
+    lottoLogicoId: !header.lottoLogicoId,
+    dataCarico:
+      !header.dataCarico ||
+      Number.isNaN(new Date(`${header.dataCarico}T00:00:00Z`).getTime()),
+    descrizione: !header.descrizione.trim(),
+  };
+  const selectedPendingRows = pendingRows.filter((row) =>
+    selectedRows.has(row.id),
+  );
+  const selectedInvalidRows = selectedPendingRows.filter(
+    (row) =>
+      Object.keys(
+        validateCaricoRow(row, rowDrafts[row.id] ?? caricoDraftFromRow(row)),
+      ).length > 0,
+  );
+
   useEffect(() => {
     if (!practice) return;
-    setHeader(headerFromPractice(practice));
-    setRowDrafts(
-      Object.fromEntries(practice.righe.map((row) => [row.id, rowDraft(row)])),
-    );
-    setSelectedRows(
-      new Set(
-        practice.righe
-          .filter((row) => !row.registrata && row.quantita != null)
-          .map((row) => row.id),
-      ),
-    );
-    setDirty(false);
+    const previous = previousPractice.current;
+    const samePractice = previous?.id === practice.id;
+    if (!samePractice) {
+      setHeader(headerFromPractice(practice));
+      setRowDrafts(
+        Object.fromEntries(
+          practice.righe.map((row) => [row.id, caricoDraftFromRow(row)]),
+        ),
+      );
+      setSelectedRows(new Set());
+      setRowAttempted(new Set());
+      setRowErrors({});
+      setRowSavedIncomplete(new Set());
+      setFocusRowField(null);
+      setHeaderAttempted(false);
+      setHeaderError(null);
+      setSectionError(null);
+      setRegisterError(null);
+      setRegistrationUncertain(false);
+      setDirty(false);
+      registrationKey.current = null;
+      registrationAttemptedRows.current = [];
+    } else {
+      if (!dirty) setHeader(headerFromPractice(practice));
+      const merged = reconcileCaricoDrafts(
+        previous.righe,
+        practice.righe,
+        rowDrafts,
+        savedRowId.current,
+      );
+      setRowDrafts(merged.drafts);
+      if (merged.conflicts.length)
+        setRowErrors((errors) => ({
+          ...errors,
+          ...Object.fromEntries(
+            merged.conflicts.map((id) => [id, t("caricoPratiche.rowConflict")]),
+          ),
+        }));
+      setSelectedRows(
+        (current) =>
+          new Set(
+            [...current].filter((id) =>
+              practice.righe.some((row) => row.id === id && !row.registrata),
+            ),
+          ),
+      );
+    }
+    previousPractice.current = practice;
+    savedRowId.current = undefined;
   }, [practice]);
 
   useEffect(() => {
@@ -334,6 +436,43 @@ export default function CaricoMerce() {
     closeMutation.isPending ||
     reopenMutation.isPending ||
     cancelMutation.isPending;
+  const registrationBlockReason = pending
+    ? t("caricoPratiche.operationPending")
+    : registrationUncertain
+      ? t("caricoPratiche.registrationRetryWarning")
+      : !canEdit
+        ? t("caricoPratiche.cannotEdit")
+        : selectedRows.size === 0
+          ? t("caricoPratiche.selectRows")
+          : dirty
+            ? t("caricoPratiche.saveHeaderBeforeRegister")
+            : selectedRowsHaveUnsavedChanges
+              ? t("caricoPratiche.saveSelectedRowsBeforeRegister")
+              : selectedInvalidRows.length > 0
+                ? t("caricoPratiche.selectedIncomplete", {
+                    count: selectedInvalidRows.length,
+                  })
+                : null;
+
+  useEffect(() => {
+    if (pending || !focusRowField) return;
+    const handle = requestAnimationFrame(() => {
+      const suffix = {
+        quantita: "quantity",
+        fondoOrigine: "fund",
+        codiceLottoProduttore: "lot",
+        dataScadenza: "expiry",
+        fattoreKgLtPezzo: "factor",
+      }[focusRowField.field];
+      const element = document.getElementById(
+        `carico-${suffix}-${focusRowField.rowId}`,
+      );
+      if (!element || element.hasAttribute("disabled")) return;
+      element.focus();
+      setFocusRowField(null);
+    });
+    return () => cancelAnimationFrame(handle);
+  }, [focusRowField, pending, practice]);
 
   const updateDetailCache = (value: CaricoPraticaDettaglio) => {
     queryClient.setQueryData(getGetCaricoPraticaQueryKey(value.id), value);
@@ -363,20 +502,33 @@ export default function CaricoMerce() {
   });
 
   const validHeader =
-    selectedAreaId != null &&
-    Boolean(header.magazzinoId) &&
-    Boolean(header.lottoLogicoId) &&
-    Boolean(header.dataCarico) &&
-    Boolean(header.descrizione.trim());
+    !Object.values(headerIssues).some(Boolean) &&
+    ORIGINS.includes(header.origineCarico);
 
   const saveHeader = async () => {
+    setHeaderAttempted(true);
     if (!validHeader) {
-      toast({
-        title: t("caricoPratiche.requiredHeader"),
-        variant: "destructive",
-      });
+      setHeaderError(t("caricoPratiche.requiredHeader"));
+      const first = (
+        [
+          "areaOperativaId",
+          "magazzinoId",
+          "lottoLogicoId",
+          "dataCarico",
+          "descrizione",
+        ] as const
+      ).find((field) => headerIssues[field]);
+      const id = {
+        areaOperativaId: "carico-area",
+        magazzinoId: "carico-warehouse",
+        lottoLogicoId: "carico-activity",
+        dataCarico: "carico-date",
+        descrizione: "carico-description",
+      }[first ?? "areaOperativaId"];
+      requestAnimationFrame(() => document.getElementById(id)?.focus());
       return;
     }
+    setHeaderError(null);
     try {
       if (creating) {
         const created = await createMutation.mutateAsync({
@@ -399,6 +551,7 @@ export default function CaricoMerce() {
       setDirty(false);
       toast({ title: t("caricoPratiche.saved") });
     } catch (error) {
+      setHeaderError(errorMessage(error, t("caricoPratiche.error")));
       showError(error);
     }
   };
@@ -418,25 +571,23 @@ export default function CaricoMerce() {
       });
       updateDetailCache(updated);
       setProductSearch("");
+      setSectionError(null);
     } catch (error) {
+      setSectionError(errorMessage(error, t("caricoPratiche.error")));
       showError(error);
     }
   };
 
   const createLogicalLot = async () => {
     if (selectedAreaId == null || !canReceive) return;
-    const code = window.prompt(t("caricoPratiche.activityCodePrompt"));
-    if (!code?.trim()) return;
-    const description = window.prompt(
-      t("caricoPratiche.activityDescriptionPrompt"),
-    );
-    if (!description?.trim()) return;
+    setActivityAttempted(true);
+    if (!activityCode.trim() || !activityDescription.trim()) return;
     try {
       const created = await createLogicalLotMutation.mutateAsync({
         data: {
           areaOperativaId: selectedAreaId,
-          codice: code.trim(),
-          descrizione: description.trim(),
+          codice: activityCode.trim(),
+          descrizione: activityDescription.trim(),
         },
       });
       await logicalLotsQuery.refetch();
@@ -445,7 +596,13 @@ export default function CaricoMerce() {
         lottoLogicoId: String(created.id),
       }));
       setDirty(true);
+      setActivityOpen(false);
+      setActivityCode("");
+      setActivityDescription("");
+      setActivityAttempted(false);
+      setActivityError(null);
     } catch (error) {
+      setActivityError(errorMessage(error, t("caricoPratiche.error")));
       showError(error);
     }
   };
@@ -467,7 +624,15 @@ export default function CaricoMerce() {
 
   const saveRow = async (row: CaricoPraticaRiga) => {
     if (!practice) return;
-    const draft = rowDrafts[row.id];
+    if (rowErrors[row.id] === t("caricoPratiche.rowConflict")) return;
+    const draft = rowDrafts[row.id] ?? caricoDraftFromRow(row);
+    const issues = validateCaricoRow(row, draft);
+    setRowAttempted((current) => new Set(current).add(row.id));
+    const firstIssue = (Object.keys(issues) as CaricoRowField[])[0];
+    if (blocksCaricoDraftSave(issues)) {
+      if (firstIssue) setFocusRowField({ rowId: row.id, field: firstIssue });
+      return;
+    }
     try {
       const updated = await updateRowMutation.mutateAsync({
         id: practice.id,
@@ -485,8 +650,25 @@ export default function CaricoMerce() {
           note: draft.note.trim() || null,
         },
       });
+      savedRowId.current = row.id;
       updateDetailCache(updated);
+      setRowErrors((current) => {
+        const next = { ...current };
+        delete next[row.id];
+        return next;
+      });
+      setRowSavedIncomplete((current) => {
+        const next = new Set(current);
+        if (Object.keys(issues).length) next.add(row.id);
+        else next.delete(row.id);
+        return next;
+      });
+      if (firstIssue) setFocusRowField({ rowId: row.id, field: firstIssue });
     } catch (error) {
+      setRowErrors((current) => ({
+        ...current,
+        [row.id]: errorMessage(error, t("caricoPratiche.error")),
+      }));
       showError(error);
     }
   };
@@ -500,34 +682,85 @@ export default function CaricoMerce() {
         data: { versione: practice.versione },
       });
       updateDetailCache(updated);
+      setSectionError(null);
+      setRowErrors((current) => {
+        const next = { ...current };
+        delete next[row.id];
+        return next;
+      });
     } catch (error) {
+      setSectionError(errorMessage(error, t("caricoPratiche.error")));
       showError(error);
     }
   };
 
   const registerRows = async () => {
-    if (!practice || selectedRows.size === 0 || selectedRowsHaveUnsavedChanges)
+    if (!practice || registrationBlockReason) {
+      setRowAttempted((current) => new Set([...current, ...selectedRows]));
       return;
+    }
+    setRegisterError(null);
     registrationKey.current ??= newCommandKey();
+    const attemptedIds = [...selectedRows];
+    registrationAttemptedRows.current = attemptedIds;
     try {
       await registerMutation.mutateAsync({
         id: practice.id,
         data: {
           versione: practice.versione,
-          rigaIds: [...selectedRows],
+          rigaIds: attemptedIds,
           idempotencyKey: registrationKey.current,
         },
       });
       registrationKey.current = null;
+      registrationAttemptedRows.current = [];
+      setRegistrationUncertain(false);
       setConfirmRegister(false);
-      await detailQuery.refetch();
+      void detailQuery.refetch();
       void queryClient.invalidateQueries({
         queryKey: ["/api/carico-pratiche"],
       });
       toast({ title: t("caricoPratiche.registered") });
     } catch (error) {
       setConfirmRegister(false);
+      setRegistrationUncertain(true);
+      const result = await detailQuery.refetch();
+      const after = result.data;
+      if (
+        after &&
+        attemptedIds.every((id) =>
+          after.righe.some((row) => row.id === id && row.registrata),
+        )
+      ) {
+        registrationKey.current = null;
+        registrationAttemptedRows.current = [];
+        setRegistrationUncertain(false);
+        toast({ title: t("caricoPratiche.registered") });
+        return;
+      }
+      if (result.isSuccess && !result.isRefetchError)
+        setRegistrationUncertain(false);
+      setRegisterError(
+        `${errorMessage(error, t("caricoPratiche.error"))} ${t("caricoPratiche.registrationRetryWarning")}`,
+      );
       showError(error);
+    }
+  };
+
+  const verifyRegistration = async () => {
+    const result = await detailQuery.refetch();
+    if (!result.isSuccess || result.isRefetchError || !result.data) return;
+    setRegistrationUncertain(false);
+    if (
+      registrationAttemptedRows.current.length > 0 &&
+      registrationAttemptedRows.current.every((id) =>
+        result.data.righe.some((row) => row.id === id && row.registrata),
+      )
+    ) {
+      registrationKey.current = null;
+      registrationAttemptedRows.current = [];
+      setRegisterError(null);
+      toast({ title: t("caricoPratiche.registered") });
     }
   };
 
@@ -553,7 +786,9 @@ export default function CaricoMerce() {
                 data: { versione: practice.versione, motivo: reason!.trim() },
               });
       updateDetailCache(updated);
+      setSectionError(null);
     } catch (error) {
+      setSectionError(errorMessage(error, t("caricoPratiche.error")));
       showError(error);
     }
   };
@@ -567,6 +802,9 @@ export default function CaricoMerce() {
       setSelectedId(null);
       setCreating(false);
       setDirty(false);
+      setHeaderAttempted(false);
+      setHeaderError(null);
+      setSectionError(null);
     });
   };
 
@@ -591,6 +829,10 @@ export default function CaricoMerce() {
               <Button
                 onClick={() => {
                   setHeader(emptyHeader());
+                  setHeaderAttempted(false);
+                  setHeaderError(null);
+                  setSectionError(null);
+                  setActivityOpen(false);
                   setOpenImportAfterSave(false);
                   setCreating(true);
                 }}
@@ -610,6 +852,9 @@ export default function CaricoMerce() {
                       filterWarehouse === "all" ? "" : filterWarehouse,
                     descrizione: t("caricoPratiche.fseDraftDescription"),
                   });
+                  setHeaderAttempted(false);
+                  setHeaderError(null);
+                  setSectionError(null);
                   setOpenImportAfterSave(true);
                   setCreating(true);
                 }}
@@ -766,8 +1011,18 @@ export default function CaricoMerce() {
           <CardTitle>{t("caricoPratiche.title")}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {headerError &&
+            (headerError !== t("caricoPratiche.requiredHeader") ||
+              !validHeader) && (
+              <Alert
+                variant="destructive"
+                className="md:col-span-2 lg:col-span-3"
+              >
+                <AlertDescription>{headerError}</AlertDescription>
+              </Alert>
+            )}
           <div className="space-y-2">
-            <Label>{t("caricoPratiche.area")}</Label>
+            <Label htmlFor="carico-area">{t("caricoPratiche.area")} *</Label>
             <Select
               disabled={
                 Boolean(practice?.integrazioni.length) ||
@@ -785,7 +1040,21 @@ export default function CaricoMerce() {
                 setDirty(true);
               }}
             >
-              <SelectTrigger aria-label={t("caricoPratiche.area")}>
+              <SelectTrigger
+                id="carico-area"
+                aria-label={t("caricoPratiche.area")}
+                aria-invalid={headerAttempted && headerIssues.areaOperativaId}
+                aria-describedby={
+                  headerAttempted && headerIssues.areaOperativaId
+                    ? "carico-area-error"
+                    : undefined
+                }
+                className={
+                  headerAttempted && headerIssues.areaOperativaId
+                    ? "border-destructive ring-1 ring-destructive"
+                    : undefined
+                }
+              >
                 <SelectValue placeholder={t("caricoPratiche.selectArea")} />
               </SelectTrigger>
               <SelectContent>
@@ -798,9 +1067,16 @@ export default function CaricoMerce() {
                   ))}
               </SelectContent>
             </Select>
+            {headerAttempted && headerIssues.areaOperativaId && (
+              <p id="carico-area-error" className="text-sm text-destructive">
+                {t("caricoPratiche.areaRequired")}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
-            <Label>{t("caricoPratiche.warehouse")}</Label>
+            <Label htmlFor="carico-warehouse">
+              {t("caricoPratiche.warehouse")} *
+            </Label>
             <Select
               disabled={
                 Boolean(practice?.integrazioni.length) ||
@@ -813,7 +1089,21 @@ export default function CaricoMerce() {
                 setDirty(true);
               }}
             >
-              <SelectTrigger aria-label={t("caricoPratiche.warehouse")}>
+              <SelectTrigger
+                id="carico-warehouse"
+                aria-label={t("caricoPratiche.warehouse")}
+                aria-invalid={headerAttempted && headerIssues.magazzinoId}
+                aria-describedby={
+                  headerAttempted && headerIssues.magazzinoId
+                    ? "carico-warehouse-error"
+                    : undefined
+                }
+                className={
+                  headerAttempted && headerIssues.magazzinoId
+                    ? "border-destructive ring-1 ring-destructive"
+                    : undefined
+                }
+              >
                 <SelectValue
                   placeholder={t("caricoPratiche.selectWarehouse")}
                 />
@@ -826,9 +1116,19 @@ export default function CaricoMerce() {
                 ))}
               </SelectContent>
             </Select>
+            {headerAttempted && headerIssues.magazzinoId && (
+              <p
+                id="carico-warehouse-error"
+                className="text-sm text-destructive"
+              >
+                {t("caricoPratiche.warehouseRequired")}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
-            <Label>{t("caricoPratiche.activity")}</Label>
+            <Label htmlFor="carico-activity">
+              {t("caricoPratiche.activity")} *
+            </Label>
             <Select
               disabled={
                 Boolean(practice?.integrazioni.length) ||
@@ -841,7 +1141,21 @@ export default function CaricoMerce() {
                 setDirty(true);
               }}
             >
-              <SelectTrigger aria-label={t("caricoPratiche.activity")}>
+              <SelectTrigger
+                id="carico-activity"
+                aria-label={t("caricoPratiche.activity")}
+                aria-invalid={headerAttempted && headerIssues.lottoLogicoId}
+                aria-describedby={
+                  headerAttempted && headerIssues.lottoLogicoId
+                    ? "carico-activity-error"
+                    : undefined
+                }
+                className={
+                  headerAttempted && headerIssues.lottoLogicoId
+                    ? "border-destructive ring-1 ring-destructive"
+                    : undefined
+                }
+              >
                 <SelectValue placeholder={t("caricoPratiche.selectActivity")} />
               </SelectTrigger>
               <SelectContent>
@@ -854,20 +1168,33 @@ export default function CaricoMerce() {
                 ))}
               </SelectContent>
             </Select>
+            {headerAttempted && headerIssues.lottoLogicoId && (
+              <p
+                id="carico-activity-error"
+                className="text-sm text-destructive"
+              >
+                {t("caricoPratiche.activityRequired")}
+              </p>
+            )}
             {canReceive &&
-              selectedAreaId != null &&
               (!practice || canEditManual) &&
               !practice?.integrazioni.length && (
                 <Button
                   type="button"
-                  variant="link"
-                  className="h-auto px-0"
-                  disabled={pending}
-                  onClick={() => void createLogicalLot()}
+                  variant="outline"
+                  className="w-full whitespace-normal text-start sm:w-auto"
+                  disabled={pending || selectedAreaId == null}
+                  onClick={() => setActivityOpen(true)}
                 >
+                  <Plus className="h-4 w-4" />
                   {t("caricoPratiche.newActivity")}
                 </Button>
               )}
+            {canReceive && selectedAreaId == null && (
+              <p className="text-sm text-muted-foreground">
+                {t("caricoPratiche.selectAreaFirst")}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label>{t("caricoPratiche.origin")}</Label>
@@ -899,9 +1226,21 @@ export default function CaricoMerce() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>{t("caricoPratiche.date")}</Label>
+            <Label htmlFor="carico-date">{t("caricoPratiche.date")} *</Label>
             <Input
+              id="carico-date"
               aria-label={t("caricoPratiche.date")}
+              aria-invalid={headerAttempted && headerIssues.dataCarico}
+              aria-describedby={
+                headerAttempted && headerIssues.dataCarico
+                  ? "carico-date-error"
+                  : undefined
+              }
+              className={
+                headerAttempted && headerIssues.dataCarico
+                  ? "border-destructive ring-1 ring-destructive"
+                  : undefined
+              }
               disabled={
                 Boolean(practice?.integrazioni.length) ||
                 pending ||
@@ -917,11 +1256,30 @@ export default function CaricoMerce() {
                 setDirty(true);
               }}
             />
+            {headerAttempted && headerIssues.dataCarico && (
+              <p id="carico-date-error" className="text-sm text-destructive">
+                {t("caricoPratiche.dateRequired")}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
-            <Label>{t("caricoPratiche.description")}</Label>
+            <Label htmlFor="carico-description">
+              {t("caricoPratiche.description")} *
+            </Label>
             <Input
+              id="carico-description"
               aria-label={t("caricoPratiche.description")}
+              aria-invalid={headerAttempted && headerIssues.descrizione}
+              aria-describedby={
+                headerAttempted && headerIssues.descrizione
+                  ? "carico-description-error"
+                  : undefined
+              }
+              className={
+                headerAttempted && headerIssues.descrizione
+                  ? "border-destructive ring-1 ring-destructive"
+                  : undefined
+              }
               disabled={pending || Boolean(practice && !canEditManual)}
               value={header.descrizione}
               onChange={(event) => {
@@ -932,6 +1290,14 @@ export default function CaricoMerce() {
                 setDirty(true);
               }}
             />
+            {headerAttempted && headerIssues.descrizione && (
+              <p
+                id="carico-description-error"
+                className="text-sm text-destructive"
+              >
+                {t("caricoPratiche.descriptionRequired")}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label>{t("caricoPratiche.document")}</Label>
@@ -969,9 +1335,7 @@ export default function CaricoMerce() {
           </div>
           <div className="flex items-end">
             <Button
-              disabled={
-                pending || !validHeader || Boolean(practice && !canEditManual)
-              }
+              disabled={pending || Boolean(practice && !canEditManual)}
               onClick={() => void saveHeader()}
             >
               <Save className="mr-2 h-4 w-4" />
@@ -987,6 +1351,11 @@ export default function CaricoMerce() {
             <CardTitle>{t("caricoPratiche.addProduct")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {sectionError && (
+              <Alert variant="destructive">
+                <AlertDescription>{sectionError}</AlertDescription>
+              </Alert>
+            )}
             <div className="flex gap-2">
               <Input
                 aria-label={t("caricoPratiche.productSearch")}
@@ -1039,25 +1408,49 @@ export default function CaricoMerce() {
             <CardTitle>{t("caricoPratiche.pendingRows")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {sectionError && (
+              <Alert variant="destructive">
+                <AlertDescription>{sectionError}</AlertDescription>
+              </Alert>
+            )}
             {pendingRows.map((row) => {
-              const draft = rowDrafts[row.id] ?? rowDraft(row);
+              const draft = rowDrafts[row.id] ?? caricoDraftFromRow(row);
+              const issues = rowAttempted.has(row.id)
+                ? validateCaricoRow(row, draft)
+                : {};
+              const fieldError = (field: CaricoRowField) =>
+                issues[field] ? t(rowIssueKey(field, issues[field])) : null;
               return (
                 <div
                   key={row.id}
+                  data-testid={`carico-row-${row.id}`}
                   className="grid gap-3 rounded-md border p-3 md:grid-cols-2 lg:grid-cols-4"
                 >
                   <div className="flex items-start gap-2">
                     <Checkbox
+                      aria-label={row.prodottoNome}
                       checked={selectedRows.has(row.id)}
-                      disabled={row.quantita == null || pending}
-                      onCheckedChange={(checked) =>
+                      disabled={pending || !canEdit}
+                      onCheckedChange={(checked) => {
+                        if (
+                          checked &&
+                          Object.keys(validateCaricoRow(row, draft)).length > 0
+                        )
+                          setRowAttempted((current) =>
+                            new Set(current).add(row.id),
+                          );
+                        if (!registrationUncertain) setRegisterError(null);
                         setSelectedRows((current) => {
                           const next = new Set(current);
                           if (checked) next.add(row.id);
                           else next.delete(row.id);
                           return next;
-                        })
-                      }
+                        });
+                        if (!registrationUncertain) {
+                          registrationKey.current = null;
+                          registrationAttemptedRows.current = [];
+                        }
+                      }}
                     />
                     <div>
                       <strong>{row.prodottoNome}</strong>
@@ -1077,15 +1470,28 @@ export default function CaricoMerce() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label>
+                    <Label htmlFor={`carico-quantity-${row.id}`}>
                       {t("caricoPratiche.quantity", { unit: row.unitaMisura })}
+                      {" *"}
                     </Label>
                     <Input
+                      id={`carico-quantity-${row.id}`}
                       aria-label={t("caricoPratiche.quantity", {
                         unit: row.unitaMisura,
                       })}
                       inputMode="decimal"
                       step={row.quantitaFrazionabile ? "0.000001" : "1"}
+                      aria-invalid={Boolean(fieldError("quantita"))}
+                      aria-describedby={
+                        fieldError("quantita")
+                          ? `carico-quantity-error-${row.id}`
+                          : undefined
+                      }
+                      className={
+                        fieldError("quantita")
+                          ? "border-destructive ring-1 ring-destructive"
+                          : undefined
+                      }
                       value={draft.quantita}
                       disabled={pending || !canEditManual}
                       onChange={(event) => {
@@ -1095,9 +1501,19 @@ export default function CaricoMerce() {
                         }));
                       }}
                     />
+                    {fieldError("quantita") && (
+                      <p
+                        id={`carico-quantity-error-${row.id}`}
+                        className="text-sm text-destructive"
+                      >
+                        {fieldError("quantita")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
-                    <Label>{t("caricoPratiche.fund")}</Label>
+                    <Label htmlFor={`carico-fund-${row.id}`}>
+                      {t("caricoPratiche.fund")} *
+                    </Label>
                     <Select
                       disabled={pending || !canEditManual}
                       value={draft.fondoOrigine}
@@ -1112,7 +1528,20 @@ export default function CaricoMerce() {
                         }));
                       }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger
+                        id={`carico-fund-${row.id}`}
+                        aria-invalid={Boolean(fieldError("fondoOrigine"))}
+                        aria-describedby={
+                          fieldError("fondoOrigine")
+                            ? `carico-fund-error-${row.id}`
+                            : undefined
+                        }
+                        className={
+                          fieldError("fondoOrigine")
+                            ? "border-destructive ring-1 ring-destructive"
+                            : undefined
+                        }
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1128,14 +1557,36 @@ export default function CaricoMerce() {
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                    {fieldError("fondoOrigine") && (
+                      <p
+                        id={`carico-fund-error-${row.id}`}
+                        className="text-sm text-destructive"
+                      >
+                        {fieldError("fondoOrigine")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
-                    <Label>
+                    <Label htmlFor={`carico-lot-${row.id}`}>
                       {t("caricoPratiche.physicalLot")}
                       {row.lottoFisicoObbligatorio ? " *" : ""}
                     </Label>
                     <Input
+                      id={`carico-lot-${row.id}`}
                       aria-label={t("caricoPratiche.physicalLot")}
+                      aria-invalid={Boolean(
+                        fieldError("codiceLottoProduttore"),
+                      )}
+                      aria-describedby={
+                        fieldError("codiceLottoProduttore")
+                          ? `carico-lot-error-${row.id}`
+                          : undefined
+                      }
+                      className={
+                        fieldError("codiceLottoProduttore")
+                          ? "border-destructive ring-1 ring-destructive"
+                          : undefined
+                      }
                       value={draft.codiceLottoProduttore}
                       disabled={pending || !canEditManual}
                       onChange={(event) => {
@@ -1148,14 +1599,34 @@ export default function CaricoMerce() {
                         }));
                       }}
                     />
+                    {fieldError("codiceLottoProduttore") && (
+                      <p
+                        id={`carico-lot-error-${row.id}`}
+                        className="text-sm text-destructive"
+                      >
+                        {fieldError("codiceLottoProduttore")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
-                    <Label>
+                    <Label htmlFor={`carico-expiry-${row.id}`}>
                       {t("caricoPratiche.expiry")}
                       {row.gestioneScadenza ? " *" : ""}
                     </Label>
                     <Input
+                      id={`carico-expiry-${row.id}`}
                       aria-label={t("caricoPratiche.expiry")}
+                      aria-invalid={Boolean(fieldError("dataScadenza"))}
+                      aria-describedby={
+                        fieldError("dataScadenza")
+                          ? `carico-expiry-error-${row.id}`
+                          : undefined
+                      }
+                      className={
+                        fieldError("dataScadenza")
+                          ? "border-destructive ring-1 ring-destructive"
+                          : undefined
+                      }
                       type="date"
                       value={draft.dataScadenza}
                       disabled={pending || !canEditManual}
@@ -1169,6 +1640,14 @@ export default function CaricoMerce() {
                         }));
                       }}
                     />
+                    {fieldError("dataScadenza") && (
+                      <p
+                        id={`carico-expiry-error-${row.id}`}
+                        className="text-sm text-destructive"
+                      >
+                        {fieldError("dataScadenza")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label>{t("caricoPratiche.notes")}</Label>
@@ -1187,8 +1666,22 @@ export default function CaricoMerce() {
                     row.unitaMisura.toLowerCase(),
                   ) && (
                     <div className="space-y-1">
-                      <Label>{t("caricoPratiche.factor")}</Label>
+                      <Label htmlFor={`carico-factor-${row.id}`}>
+                        {t("caricoPratiche.factor")}
+                      </Label>
                       <Input
+                        id={`carico-factor-${row.id}`}
+                        aria-invalid={Boolean(fieldError("fattoreKgLtPezzo"))}
+                        aria-describedby={
+                          fieldError("fattoreKgLtPezzo")
+                            ? `carico-factor-error-${row.id}`
+                            : undefined
+                        }
+                        className={
+                          fieldError("fattoreKgLtPezzo")
+                            ? "border-destructive ring-1 ring-destructive"
+                            : undefined
+                        }
                         inputMode="decimal"
                         value={draft.fattoreKgLtPezzo}
                         disabled={pending || !canEditManual}
@@ -1202,12 +1695,24 @@ export default function CaricoMerce() {
                           }));
                         }}
                       />
+                      {fieldError("fattoreKgLtPezzo") && (
+                        <p
+                          id={`carico-factor-error-${row.id}`}
+                          className="text-sm text-destructive"
+                        >
+                          {fieldError("fattoreKgLtPezzo")}
+                        </p>
+                      )}
                     </div>
                   )}
                   <div className="flex items-end gap-2">
                     <Button
                       variant="outline"
-                      disabled={pending || !canEditManual}
+                      disabled={
+                        pending ||
+                        !canEditManual ||
+                        rowErrors[row.id] === t("caricoPratiche.rowConflict")
+                      }
                       onClick={() => void saveRow(row)}
                     >
                       {t("caricoPratiche.saveDraft")}
@@ -1225,24 +1730,61 @@ export default function CaricoMerce() {
                       {t("caricoPratiche.incomplete")}
                     </Badge>
                   )}
+                  {rowErrors[row.id] && (
+                    <Alert
+                      variant="destructive"
+                      className="md:col-span-2 lg:col-span-4"
+                    >
+                      <AlertDescription>{rowErrors[row.id]}</AlertDescription>
+                    </Alert>
+                  )}
+                  {rowSavedIncomplete.has(row.id) &&
+                    Object.keys(validateCaricoRow(row, draft)).length > 0 &&
+                    !isRowDirty(row) && (
+                      <Alert className="md:col-span-2 lg:col-span-4">
+                        <AlertDescription>
+                          {t("caricoPratiche.savedIncomplete")}
+                        </AlertDescription>
+                      </Alert>
+                    )}
                 </div>
               );
             })}
             {pendingRows.length === 0 && (
               <p className="text-sm text-muted-foreground">—</p>
             )}
+            <p className="text-sm text-muted-foreground">
+              {t("caricoPratiche.registerHelp")}
+            </p>
+            {registrationBlockReason && (
+              <p
+                id="carico-register-reason"
+                role="status"
+                className="text-sm text-amber-700 dark:text-amber-300"
+              >
+                {registrationBlockReason}
+              </p>
+            )}
+            {registerError && (
+              <Alert variant="destructive">
+                <AlertDescription>{registerError}</AlertDescription>
+                {registrationUncertain && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2"
+                    onClick={() => void verifyRegistration()}
+                  >
+                    {t("caricoPratiche.verifyRegistration")}
+                  </Button>
+                )}
+              </Alert>
+            )}
             <Button
               aria-describedby={
-                selectedRowsHaveUnsavedChanges
-                  ? "carico-register-unsaved"
-                  : undefined
+                registrationBlockReason ? "carico-register-reason" : undefined
               }
-              disabled={
-                pending ||
-                selectedRows.size === 0 ||
-                !canEdit ||
-                selectedRowsHaveUnsavedChanges
-              }
+              disabled={Boolean(registrationBlockReason)}
               onClick={() => setConfirmRegister(true)}
             >
               {registerMutation.isPending && (
@@ -1250,15 +1792,6 @@ export default function CaricoMerce() {
               )}
               {t("caricoPratiche.register")}
             </Button>
-            {selectedRowsHaveUnsavedChanges && (
-              <p
-                id="carico-register-unsaved"
-                role="status"
-                className="text-sm text-amber-700 dark:text-amber-300"
-              >
-                {t("caricoPratiche.saveSelectedRowsBeforeRegister")}
-              </p>
-            )}
           </CardContent>
         </Card>
       )}
@@ -1343,6 +1876,108 @@ export default function CaricoMerce() {
         </div>
       )}
 
+      <Dialog
+        open={activityOpen}
+        onOpenChange={(open) => {
+          setActivityOpen(open);
+          if (!open) {
+            setActivityError(null);
+            setActivityAttempted(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("caricoPratiche.newActivityTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("caricoPratiche.activityArea", {
+                area:
+                  areas.find((item) => item.id === selectedAreaId)?.nome ?? "",
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          {activityError && (
+            <Alert variant="destructive">
+              <AlertDescription>{activityError}</AlertDescription>
+            </Alert>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="carico-activity-code">
+              {t("caricoPratiche.activityCodePrompt")} *
+            </Label>
+            <Input
+              id="carico-activity-code"
+              value={activityCode}
+              maxLength={80}
+              aria-invalid={activityAttempted && !activityCode.trim()}
+              aria-describedby={
+                activityAttempted && !activityCode.trim()
+                  ? "carico-activity-code-error"
+                  : undefined
+              }
+              className={
+                activityAttempted && !activityCode.trim()
+                  ? "border-destructive ring-1 ring-destructive"
+                  : undefined
+              }
+              onChange={(event) => setActivityCode(event.target.value)}
+            />
+            {activityAttempted && !activityCode.trim() && (
+              <p
+                id="carico-activity-code-error"
+                className="text-sm text-destructive"
+              >
+                {t("caricoPratiche.activityCodeRequired")}
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="carico-activity-description">
+              {t("caricoPratiche.activityDescriptionPrompt")} *
+            </Label>
+            <Input
+              id="carico-activity-description"
+              value={activityDescription}
+              maxLength={200}
+              aria-invalid={activityAttempted && !activityDescription.trim()}
+              aria-describedby={
+                activityAttempted && !activityDescription.trim()
+                  ? "carico-activity-description-error"
+                  : undefined
+              }
+              className={
+                activityAttempted && !activityDescription.trim()
+                  ? "border-destructive ring-1 ring-destructive"
+                  : undefined
+              }
+              onChange={(event) => setActivityDescription(event.target.value)}
+            />
+            {activityAttempted && !activityDescription.trim() && (
+              <p
+                id="carico-activity-description-error"
+                className="text-sm text-destructive"
+              >
+                {t("caricoPratiche.activityDescriptionRequired")}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={createLogicalLotMutation.isPending}
+              onClick={() => setActivityOpen(false)}
+            >
+              {t("barcodeScanner.cancel")}
+            </Button>
+            <Button
+              disabled={createLogicalLotMutation.isPending}
+              onClick={() => void createLogicalLot()}
+            >
+              {t("caricoPratiche.createActivity")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={confirmRegister} onOpenChange={setConfirmRegister}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1350,8 +1985,25 @@ export default function CaricoMerce() {
               {t("caricoPratiche.confirmRegister")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("caricoPratiche.confirmBody", { count: selectedRows.size })}
+              {t("caricoPratiche.confirmBody", {
+                count: selectedRows.size,
+                warehouse: practice?.magazzinoNome ?? "",
+              })}
             </AlertDialogDescription>
+            <ul className="max-h-56 list-disc space-y-1 overflow-auto ps-5 text-sm">
+              {selectedPendingRows.map((row) => (
+                <li key={row.id}>
+                  {row.prodottoNome}:{" "}
+                  {rowDrafts[row.id]?.quantita ?? row.quantita}{" "}
+                  {row.unitaMisura}
+                </li>
+              ))}
+            </ul>
+            {registerError && (
+              <Alert variant="destructive">
+                <AlertDescription>{registerError}</AlertDescription>
+              </Alert>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={registerMutation.isPending}>
@@ -1369,7 +2021,7 @@ export default function CaricoMerce() {
               {registerMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              {t("caricoPratiche.register")}
+              {t("caricoPratiche.confirmLoad")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

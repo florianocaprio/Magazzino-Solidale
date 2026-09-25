@@ -180,3 +180,18 @@ ripetuto. Le evidenze M4 su upgrade, schema, runner, reporting, runtime e
 codegen restano applicabili perché i loro input sono invariati. La
 validazione manuale M4B/M4 non è stata eseguita; `NE-MAN-CAMERA` e
 `NE-MAN-TABLET` restano pendenti.
+
+## UX-CARICO-01 — chiusura specifica Carico Merce
+
+Il dry run manuale **PASS** è stato comunicato da Floriano per questo
+correttivo UX; non vale come `OK-MAN-M4` complessivo. Gli E2E tablet sono
+simulati: `NE-MAN-CAMERA` e `NE-MAN-TABLET` non sono trasformati in PASS.
+
+| ID               | Stato                               | Evidenza                                                                                                       |
+| ---------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| UX-CARICO-01-A…D | OK-UX-CARICO-01/OK-MAN-UX-CARICO-01 | Bozza incompleta consentita, campi/errori contestuali e persistenti, draft di altre righe preservato.          |
+| UX-CARICO-01-E…H | OK-UX-CARICO-01/OK-MAN-UX-CARICO-01 | Selezione esplicita delle sole righe complete/salvate; dialog di conferma, carico e replay senza doppio stock. |
+| UX-CARICO-01-I…J | OK-UX-CARICO-01/OK-MAN-UX-CARICO-01 | Nuova raccolta con refetch/selezione/draft preservato; etichette nelle sei lingue.                             |
+
+Prove automatiche e tentativi iniziali sono dettagliati in
+`ESITI_TEST_UX_CARICO_01.md`; la matrice M4 precedente resta invariata.

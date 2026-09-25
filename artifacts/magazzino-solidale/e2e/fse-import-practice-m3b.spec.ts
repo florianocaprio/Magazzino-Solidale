@@ -375,8 +375,9 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await resumedPage.goto("/carico-merce");
     await openPractice(resumedPage, area, description);
     await expect(resumedPage.getByText(document)).toBeVisible();
+    await resumedPage.getByRole("checkbox").check();
     await resumedPage
-      .getByRole("button", { name: /registra nuove righe/i })
+      .getByRole("button", { name: /conferma carico a magazzino/i })
       .click();
     const registration = resumedPage.waitForResponse(
       (response) =>
@@ -387,7 +388,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     );
     await resumedPage
       .getByRole("alertdialog")
-      .getByRole("button", { name: /registra nuove righe/i })
+      .getByRole("button", { name: /conferma carico$/i })
       .click();
     expect((await registration).status()).toBe(201);
     expect(await readStock(resumedPage)).toBe(before + 10);
@@ -841,8 +842,10 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
       `/api/giacenze?areaOperativaId=${base.area.id}&magazzinoId=${warehouse.id}`,
     );
     expect((await zeroStock.json()) as Stock[]).toHaveLength(0);
+    for (const checkbox of await page.getByRole("checkbox").all())
+      await checkbox.check();
     const registerButton = page.getByRole("button", {
-      name: /registra nuove righe/i,
+      name: /conferma carico a magazzino/i,
     });
     await registerButton.scrollIntoViewIfNeeded();
     await registerButton.click();
@@ -855,7 +858,7 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     );
     await page
       .getByRole("alertdialog")
-      .getByRole("button", { name: /registra nuove righe/i })
+      .getByRole("button", { name: /conferma carico$/i })
       .click();
     expect((await registration).status()).toBe(201);
     const stock = await page.request.get(
@@ -992,8 +995,9 @@ test.describe("M3B — viewport tablet", () => {
     await expect(page.getByText("Pronto", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Vai al riepilogo" }).click();
     await page.getByRole("button", { name: "Aggiungi alla pratica" }).click();
+    await page.getByRole("checkbox").check();
     const register = page.getByRole("button", {
-      name: /registra nuove righe/i,
+      name: /conferma carico a magazzino/i,
     });
     await register.scrollIntoViewIfNeeded();
     await expect(register).toBeVisible();

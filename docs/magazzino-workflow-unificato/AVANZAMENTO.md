@@ -1730,3 +1730,42 @@ in `REVISIONE_STATICA_M4.md`. Nessuna migration 43, modifica inventariale,
 reporting o permessi. M4 resta **`OK-TEST-M4/NE-MAN`**, in attesa di nuova
 code review ChatGPT; nessuna validazione manuale M4 è implicata. Docker
 persistente e `main` invariati; M5 non avviata.
+
+## UX-CARICO-01 — correttivi Carico Merce in sviluppo
+
+Sulla base `d96680eeee82b2b5a4690602534168623826b544` del branch
+dedicato è stato aggiornato soltanto il percorso UI del Carico Merce:
+**Conferma carico a magazzino** esplicita l'operazione inventariale e le
+righe selezionate; gli errori restano contestuali e persistenti; i campi
+obbligatori vengono evidenziati già al salvataggio della riga, mantenendo
+le bozze incomplete ammesse; **+ Nuova raccolta / attività** è sotto il
+selettore. Il refetch dopo il salvataggio di una riga preserva le modifiche
+locali alle altre. Nessuna modifica al motore inventariale o al contratto
+API. Dettagli e risultati sono in `ESITI_SVILUPPO_UX_CARICO_01.md`.
+
+Frontend completa 77 file/418 test, API completa 119 file/1376 pass/4 skip,
+E2E UX desktop/tablet simulato e regressioni M3A/FSE pertinenti, typecheck
+e build Linux API/WEB sono verdi. La build nativa WEB macOS resta limitata
+dalla dipendenza LightningCSS assente; i tentativi iniziali non verdi e il
+rerun completo sono nel rapporto. Il candidato Docker disposable è stato
+eliminato; lo stack persistente non è stato aggiornato. Il documento locale
+di deploy preesistente è stato conservato. Stato:
+**`DEV-UX-CARICO-01/NE-TEST-UX/NE-MAN`**, pronto per il separato `##test`;
+nessun commit/push/merge, `main` invariato e M5 non avviata.
+
+## UX-CARICO-01 — test formale e dry run umano
+
+Il separato `##test UX-CARICO-01` ha ripreso il delta esistente sulla base
+`d96680eeee82b2b5a4690602534168623826b544`. Le prove A–J, frontend
+completo 77 file/418 pass, API mirata 49 pass/1 skip, E2E UX/M3A 4 pass/2
+skip, FSE 3 pass/7 skip, typecheck e build API/WEB sono verdi. La prima
+run browser con fixture condivise e le correzioni di isolamento/ordinamento
+sono conservate in `ESITI_TEST_UX_CARICO_01.md`. Nessuna modifica a backend,
+schema, API o motore inventariale.
+
+Floriano ha comunicato il **PASS** del dry run reale UX sul Docker locale:
+pratica, raccolta, errori/campi, bozze e draft locali, conferma selettiva e
+giacenza una sola volta. Stato UX: **`OK-UX-CARICO-01/OK-MAN-UX-CARICO-01`**.
+La validazione è specifica di UX-CARICO-01: non attribuisce `OK-MAN-M4`
+all'intera milestone. Il Docker persistente non è stato modificato durante
+la fase `##test`; `main` e M5 restano fuori perimetro.
