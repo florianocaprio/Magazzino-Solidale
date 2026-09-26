@@ -5,6 +5,314 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+export interface RichiestaMagazzinoError {
+  code?: string;
+  error: string;
+  correlationId?: string;
+}
+
+export type RichiestaMagazzinoCommandResultStato = typeof RichiestaMagazzinoCommandResultStato[keyof typeof RichiestaMagazzinoCommandResultStato];
+
+
+export const RichiestaMagazzinoCommandResultStato = {
+  inviata: 'inviata',
+  presa_in_carico: 'presa_in_carico',
+  chiusa: 'chiusa',
+  annullata: 'annullata',
+} as const;
+
+export interface RichiestaMagazzinoCommandResult {
+  id: number;
+  codice: string;
+  stato: RichiestaMagazzinoCommandResultStato;
+  versione: number;
+}
+
+export type RichiestaMagazzinoCreateTipoDestinatario = typeof RichiestaMagazzinoCreateTipoDestinatario[keyof typeof RichiestaMagazzinoCreateTipoDestinatario];
+
+
+export const RichiestaMagazzinoCreateTipoDestinatario = {
+  beneficiario: 'beneficiario',
+  ente: 'ente',
+  magazzino: 'magazzino',
+} as const;
+
+export type RichiestaMagazzinoCreateSorgente = typeof RichiestaMagazzinoCreateSorgente[keyof typeof RichiestaMagazzinoCreateSorgente];
+
+
+export const RichiestaMagazzinoCreateSorgente = {
+  beneficiario: 'beneficiario',
+  intervento_sociale: 'intervento_sociale',
+  operativa: 'operativa',
+} as const;
+
+export type RichiestaMagazzinoCreatePriorita = typeof RichiestaMagazzinoCreatePriorita[keyof typeof RichiestaMagazzinoCreatePriorita];
+
+
+export const RichiestaMagazzinoCreatePriorita = {
+  bassa: 'bassa',
+  normale: 'normale',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
+export type RichiestaMagazzinoCreateModalitaPreferita = typeof RichiestaMagazzinoCreateModalitaPreferita[keyof typeof RichiestaMagazzinoCreateModalitaPreferita];
+
+
+export const RichiestaMagazzinoCreateModalitaPreferita = {
+  da_definire: 'da_definire',
+  ritiro: 'ritiro',
+  domicilio: 'domicilio',
+} as const;
+
+export interface RichiestaMagazzinoCreate {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  tipoDestinatario: RichiestaMagazzinoCreateTipoDestinatario;
+  /** @minimum 1 */
+  beneficiarioId?: number;
+  /** @minimum 1 */
+  enteDestinatarioId?: number;
+  /** @minimum 1 */
+  magazzinoDestinatarioId?: number;
+  /** @minimum 1 */
+  interventoId?: number;
+  /** @minimum 1 */
+  areaOperativaId?: number;
+  /** @minimum 1 */
+  centroAscoltoId?: number;
+  sorgente: RichiestaMagazzinoCreateSorgente;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  bisogno: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  noteOperative?: string | null;
+  priorita?: RichiestaMagazzinoCreatePriorita;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  dataDesiderata?: string | null;
+  modalitaPreferita?: RichiestaMagazzinoCreateModalitaPreferita;
+}
+
+export type RichiestaMagazzinoUpdatePriorita = typeof RichiestaMagazzinoUpdatePriorita[keyof typeof RichiestaMagazzinoUpdatePriorita];
+
+
+export const RichiestaMagazzinoUpdatePriorita = {
+  bassa: 'bassa',
+  normale: 'normale',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
+export type RichiestaMagazzinoUpdateModalitaPreferita = typeof RichiestaMagazzinoUpdateModalitaPreferita[keyof typeof RichiestaMagazzinoUpdateModalitaPreferita];
+
+
+export const RichiestaMagazzinoUpdateModalitaPreferita = {
+  da_definire: 'da_definire',
+  ritiro: 'ritiro',
+  domicilio: 'domicilio',
+} as const;
+
+export interface RichiestaMagazzinoUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  bisogno?: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  noteOperative?: string | null;
+  priorita?: RichiestaMagazzinoUpdatePriorita;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  dataDesiderata?: string | null;
+  modalitaPreferita?: RichiestaMagazzinoUpdateModalitaPreferita;
+}
+
+export interface RichiestaMagazzinoVersionCommand {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
+}
+
+export interface RichiestaMagazzinoCancel {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  motivo: string;
+}
+
+export type RichiestaMagazzinoTipoDestinatario = typeof RichiestaMagazzinoTipoDestinatario[keyof typeof RichiestaMagazzinoTipoDestinatario];
+
+
+export const RichiestaMagazzinoTipoDestinatario = {
+  beneficiario: 'beneficiario',
+  ente: 'ente',
+  magazzino: 'magazzino',
+} as const;
+
+export type RichiestaMagazzinoSorgente = typeof RichiestaMagazzinoSorgente[keyof typeof RichiestaMagazzinoSorgente];
+
+
+export const RichiestaMagazzinoSorgente = {
+  beneficiario: 'beneficiario',
+  intervento_sociale: 'intervento_sociale',
+  operativa: 'operativa',
+} as const;
+
+export type RichiestaMagazzinoPriorita = typeof RichiestaMagazzinoPriorita[keyof typeof RichiestaMagazzinoPriorita];
+
+
+export const RichiestaMagazzinoPriorita = {
+  bassa: 'bassa',
+  normale: 'normale',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
+export type RichiestaMagazzinoModalitaPreferita = typeof RichiestaMagazzinoModalitaPreferita[keyof typeof RichiestaMagazzinoModalitaPreferita];
+
+
+export const RichiestaMagazzinoModalitaPreferita = {
+  da_definire: 'da_definire',
+  ritiro: 'ritiro',
+  domicilio: 'domicilio',
+} as const;
+
+export type RichiestaMagazzinoStato = typeof RichiestaMagazzinoStato[keyof typeof RichiestaMagazzinoStato];
+
+
+export const RichiestaMagazzinoStato = {
+  inviata: 'inviata',
+  presa_in_carico: 'presa_in_carico',
+  chiusa: 'chiusa',
+  annullata: 'annullata',
+} as const;
+
+/**
+ * Snapshot operativo; nessun dato del dossier sociale live.
+ */
+export interface RichiestaMagazzino {
+  id: number;
+  codice: string;
+  tipoDestinatario: RichiestaMagazzinoTipoDestinatario;
+  /** @nullable */
+  beneficiarioId?: number | null;
+  /** @nullable */
+  enteDestinatarioId?: number | null;
+  /** @nullable */
+  magazzinoDestinatarioId?: number | null;
+  areaOperativaId: number;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /**
+     * Contesto tecnico di scope sociale all'invio
+     * @nullable
+     */
+  zonaUdsIdSnapshot?: number | null;
+  sorgente: RichiestaMagazzinoSorgente;
+  /**
+     * Oscurato senza diritto di lettura Interventi sociali
+     * @nullable
+     */
+  interventoId?: number | null;
+  /** @nullable */
+  destinatarioCodiceSnapshot?: string | null;
+  destinatarioNomeSnapshot: string;
+  /** @nullable */
+  numComponentiSnapshot?: number | null;
+  areaNomeSnapshot: string;
+  /** @nullable */
+  centroNomeSnapshot?: string | null;
+  bisogno: string;
+  /** @nullable */
+  noteOperative?: string | null;
+  priorita: RichiestaMagazzinoPriorita;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  dataDesiderata?: string | null;
+  modalitaPreferita: RichiestaMagazzinoModalitaPreferita;
+  stato: RichiestaMagazzinoStato;
+  versione: number;
+  inviatoDa: number;
+  /** @nullable */
+  presoInCaricoDa?: number | null;
+  /** @nullable */
+  presoInCaricoCodiceSnapshot?: string | null;
+  /** @nullable */
+  presoInCaricoAt?: string | null;
+  /** @nullable */
+  annullatoDa?: number | null;
+  /** @nullable */
+  annullatoAt?: string | null;
+  /** @nullable */
+  motivoAnnullamento?: string | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export interface RichiesteMagazzinoPage {
+  items: RichiestaMagazzino[];
+  /** @minimum 0 */
+  total: number;
+  /** @minimum 1 */
+  page: number;
+  /** @minimum 1 */
+  limit: number;
+}
+
+/**
+ * @nullable
+ */
+export type RichiestaMagazzinoEventChanges = { [key: string]: unknown } | null;
+
+export interface RichiestaMagazzinoEvent {
+  id: number;
+  azione: string;
+  registratoAt: string;
+  actorCodeSnapshot: string;
+  correlationId: string;
+  /** @nullable */
+  motivo?: string | null;
+  /** @nullable */
+  changes?: RichiestaMagazzinoEventChanges;
+}
+
 export interface BeneficiariFseRowInput {
   'Nome Referente fascicolo': string;
   'Cognome Referente fascicolo': string;
@@ -9355,6 +9663,31 @@ export interface RuoloUpdate {
 }
 
 /**
+ * Input non valido
+ */
+export type RichiestaMagazzino400Response = RichiestaMagazzinoError;
+
+/**
+ * Sessione assente
+ */
+export type RichiestaMagazzino401Response = RichiestaMagazzinoError;
+
+/**
+ * Permesso o scope non disponibile
+ */
+export type RichiestaMagazzino403Response = RichiestaMagazzinoError;
+
+/**
+ * Richiesta inesistente o fuori scope
+ */
+export type RichiestaMagazzino404Response = RichiestaMagazzinoError;
+
+/**
+ * Conflitto di versione, unicità o idempotenza
+ */
+export type RichiestaMagazzino409Response = RichiestaMagazzinoError;
+
+/**
  * Richiesta FSE+ non valida
  */
 export type FseBadRequestResponse = FseErrorResponse;
@@ -9539,6 +9872,98 @@ export type MapsDaParameter = string;
  * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
  */
 export type MapsAParameter = string;
+
+export type ListRichiesteMagazzinoParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+stato?: ListRichiesteMagazzinoStato;
+priorita?: ListRichiesteMagazzinoPriorita;
+/**
+ * @minimum 1
+ */
+areaOperativaId?: number;
+/**
+ * @minimum 1
+ */
+centroAscoltoId?: number;
+tipoDestinatario?: ListRichiesteMagazzinoTipoDestinatario;
+/**
+ * @minimum 1
+ */
+beneficiarioId?: number;
+/**
+ * @minimum 1
+ */
+enteDestinatarioId?: number;
+/**
+ * @minimum 1
+ */
+magazzinoDestinatarioId?: number;
+/**
+ * @minimum 1
+ */
+interventoId?: number;
+sorgente?: ListRichiesteMagazzinoSorgente;
+/**
+ * @pattern ^\d{4}-\d{2}-\d{2}$
+ */
+dataDa?: string;
+/**
+ * @pattern ^\d{4}-\d{2}-\d{2}$
+ */
+dataA?: string;
+/**
+ * @minLength 2
+ * @maxLength 80
+ */
+ricerca?: string;
+};
+
+export type ListRichiesteMagazzinoStato = typeof ListRichiesteMagazzinoStato[keyof typeof ListRichiesteMagazzinoStato];
+
+
+export const ListRichiesteMagazzinoStato = {
+  aperte: 'aperte',
+  inviata: 'inviata',
+  presa_in_carico: 'presa_in_carico',
+  chiusa: 'chiusa',
+  annullata: 'annullata',
+} as const;
+
+export type ListRichiesteMagazzinoPriorita = typeof ListRichiesteMagazzinoPriorita[keyof typeof ListRichiesteMagazzinoPriorita];
+
+
+export const ListRichiesteMagazzinoPriorita = {
+  bassa: 'bassa',
+  normale: 'normale',
+  alta: 'alta',
+  urgente: 'urgente',
+} as const;
+
+export type ListRichiesteMagazzinoTipoDestinatario = typeof ListRichiesteMagazzinoTipoDestinatario[keyof typeof ListRichiesteMagazzinoTipoDestinatario];
+
+
+export const ListRichiesteMagazzinoTipoDestinatario = {
+  beneficiario: 'beneficiario',
+  ente: 'ente',
+  magazzino: 'magazzino',
+} as const;
+
+export type ListRichiesteMagazzinoSorgente = typeof ListRichiesteMagazzinoSorgente[keyof typeof ListRichiesteMagazzinoSorgente];
+
+
+export const ListRichiesteMagazzinoSorgente = {
+  beneficiario: 'beneficiario',
+  intervento_sociale: 'intervento_sociale',
+  operativa: 'operativa',
+} as const;
 
 export type ListProdottiParams = {
 categoria?: string;

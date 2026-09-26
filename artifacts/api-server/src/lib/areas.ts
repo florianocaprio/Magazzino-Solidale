@@ -42,6 +42,7 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   giacenze: "magazzino",
   trasferimenti: ["magazzino", MENSA_AREA_KEY],
   "preparazione-consegne": "magazzino",
+  "richieste-magazzino": ["sociale", "magazzino"],
 
   // Read by several operational areas to populate filters/forms; mutations are
   // admin-gated in the route.

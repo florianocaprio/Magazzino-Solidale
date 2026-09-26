@@ -114,6 +114,26 @@ export const SOCIALE_INTERVENTI_PERMISSIONS = [
   },
 ] as const;
 
+export const RICHIESTE_MAGAZZINO_PERMISSIONS = [
+  {
+    key: "richieste_magazzino.view",
+    label: "Richieste al Magazzino: consultazione",
+  },
+  { key: "richieste_magazzino.create", label: "Richieste al Magazzino: invio" },
+  {
+    key: "richieste_magazzino.update",
+    label: "Richieste al Magazzino: modifica",
+  },
+  {
+    key: "richieste_magazzino.take",
+    label: "Richieste al Magazzino: presa in carico",
+  },
+  {
+    key: "richieste_magazzino.cancel",
+    label: "Richieste al Magazzino: annullamento",
+  },
+] as const;
+
 export const CONSEGNE_PERMISSIONS = [
   { key: "consegne.view", label: "Consegne: consultazione" },
   { key: "consegne.manage", label: "Consegne: pianificazione e gestione" },
@@ -274,6 +294,7 @@ export const ALL_PERMISSIONS = [
   ...EMPORIO_ACCESS_PERMISSIONS,
   ...EMPORIO_CASSA_SALES_PERMISSIONS,
   ...SOCIALE_INTERVENTI_PERMISSIONS,
+  ...RICHIESTE_MAGAZZINO_PERMISSIONS,
   ...CONSEGNE_PERMISSIONS,
   ...UDS_PERMISSIONS,
   ...MAPS_PERMISSIONS,
@@ -307,6 +328,10 @@ export const AREA_PERMISSION_MAP = {
   generale: [],
   magazzino: [
     ...permissionKeys(MAGAZZINO_PERMISSIONS),
+    "richieste_magazzino.view",
+    "richieste_magazzino.create",
+    "richieste_magazzino.take",
+    "richieste_magazzino.cancel",
     ...permissionKeys(BOLLE_PERMISSIONS),
     "maps.operational",
   ],
@@ -317,6 +342,10 @@ export const AREA_PERMISSION_MAP = {
     "credito.adjust",
     ...permissionKeys(EMPORIO_ACCESS_PERMISSIONS),
     ...permissionKeys(SOCIALE_INTERVENTI_PERMISSIONS),
+    "richieste_magazzino.view",
+    "richieste_magazzino.create",
+    "richieste_magazzino.update",
+    "richieste_magazzino.cancel",
     ...permissionKeys(CONSEGNE_PERMISSIONS),
     ...permissionKeys(BOLLE_PERMISSIONS),
     "logistica.turni.view",

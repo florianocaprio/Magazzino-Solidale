@@ -8,6 +8,8 @@ const { createCardMutate, updateNucleoMutate } = vi.hoisted(() => ({
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
+  useListRichiesteMagazzino: () => ({ data: { items: [] }, isLoading: false, isError: false }),
+  getListRichiesteMagazzinoQueryKey: () => ["richieste-magazzino"],
   useGetBeneficiario: () => ({ data: {
     id: 42, codice: "BEN-42", codiceFiscale: null, statoAnagrafica: "completa",
     cognome: "Rossi", nome: "Mario", soprannome: null, dataNascita: null,
@@ -82,7 +84,7 @@ vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({ invalidateQue
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/lib/auth", () => ({ useAuth: () => ({ user: { id: 1, areaOperativaId: 1, centroAscoltoId: 7 }, hasArea: () => true, hasPermission: () => true }) }));
-vi.mock("@/lib/use-moduli", () => ({ EMPORIO_DISABLED_MESSAGE: "", UNITA_STRADA_DISABLED_MESSAGE: "", useModuloFlags: () => ({ emporioAbilitato: true, unitaStradaAbilitata: true, mensaAbilitato: true }) }));
+vi.mock("@/lib/use-moduli", () => ({ EMPORIO_DISABLED_MESSAGE: "", UNITA_STRADA_DISABLED_MESSAGE: "", useModuloFlags: () => ({ emporioAbilitato: true, unitaStradaAbilitata: true, mensaAbilitato: true }), useConfigurazioneAmbienteFlags: () => ({ isModuloAttivo: () => true }) }));
 vi.mock("@/lib/branding-ambiente", () => ({ loadTesseraBrandingForPdf: vi.fn() }));
 vi.mock("@/lib/tessera-pdf", () => ({ generateTesseraPdf: vi.fn(), buildTesseraLabels: vi.fn() }));
 vi.mock("@/components/export-buttons", () => ({ ExportButtons: () => null }));

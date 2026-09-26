@@ -297,6 +297,7 @@ import type {
   ListMovimentiParams,
   ListPastiMensaParams,
   ListProdottiParams,
+  ListRichiesteMagazzinoParams,
   ListScarichiParams,
   ListSessioniCassaEmporioParams,
   ListSpeseEmporioParams,
@@ -396,6 +397,19 @@ import type {
   ReportingDashboard,
   ResetPasswordInput,
   RettificaLottoInput,
+  RichiestaMagazzino,
+  RichiestaMagazzino400Response,
+  RichiestaMagazzino401Response,
+  RichiestaMagazzino403Response,
+  RichiestaMagazzino404Response,
+  RichiestaMagazzino409Response,
+  RichiestaMagazzinoCancel,
+  RichiestaMagazzinoCommandResult,
+  RichiestaMagazzinoCreate,
+  RichiestaMagazzinoEvent,
+  RichiestaMagazzinoUpdate,
+  RichiestaMagazzinoVersionCommand,
+  RichiesteMagazzinoPage,
   RientroTrasportoDettaglio,
   RientroTrasportoInput,
   RitiroNonEffettuatoInput,
@@ -496,6 +510,531 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getListRichiesteMagazzinoUrl = (params?: ListRichiesteMagazzinoParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/richieste-magazzino?${stringifiedParams}` : `/api/richieste-magazzino`
+}
+
+/**
+ * @summary Coda territoriale M5A, richiede richieste_magazzino.view e MAGAZZINO_SOLIDALE
+ */
+export const listRichiesteMagazzino = async (params?: ListRichiesteMagazzinoParams, options?: RequestInit): Promise<RichiesteMagazzinoPage> => {
+
+  return customFetch<RichiesteMagazzinoPage>(getListRichiesteMagazzinoUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRichiesteMagazzinoQueryKey = (params?: ListRichiesteMagazzinoParams,) => {
+    return [
+    `/api/richieste-magazzino`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListRichiesteMagazzinoQueryOptions = <TData = Awaited<ReturnType<typeof listRichiesteMagazzino>>, TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response>>(params?: ListRichiesteMagazzinoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRichiesteMagazzino>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRichiesteMagazzinoQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRichiesteMagazzino>>> = ({ signal }) => listRichiesteMagazzino(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRichiesteMagazzino>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListRichiesteMagazzinoQueryResult = NonNullable<Awaited<ReturnType<typeof listRichiesteMagazzino>>>
+export type ListRichiesteMagazzinoQueryError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response>
+
+
+/**
+ * @summary Coda territoriale M5A, richiede richieste_magazzino.view e MAGAZZINO_SOLIDALE
+ */
+
+export function useListRichiesteMagazzino<TData = Awaited<ReturnType<typeof listRichiesteMagazzino>>, TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response>>(
+ params?: ListRichiesteMagazzinoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRichiesteMagazzino>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListRichiesteMagazzinoQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateRichiestaMagazzinoUrl = () => {
+
+
+
+
+  return `/api/richieste-magazzino`
+}
+
+/**
+ * @summary Invia bisogno senza prenotazione, richiede create e scope del destinatario
+ */
+export const createRichiestaMagazzino = async (richiestaMagazzinoCreate: RichiestaMagazzinoCreate, options?: RequestInit): Promise<RichiestaMagazzinoCommandResult> => {
+
+  return customFetch<RichiestaMagazzinoCommandResult>(getCreateRichiestaMagazzinoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      richiestaMagazzinoCreate,)
+  }
+);}
+
+
+
+
+export const getCreateRichiestaMagazzinoMutationOptions = <TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRichiestaMagazzino>>, TError,{data: BodyType<RichiestaMagazzinoCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRichiestaMagazzino>>, TError,{data: BodyType<RichiestaMagazzinoCreate>}, TContext> => {
+
+const mutationKey = ['createRichiestaMagazzino'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRichiestaMagazzino>>, {data: BodyType<RichiestaMagazzinoCreate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createRichiestaMagazzino(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateRichiestaMagazzinoMutationResult = NonNullable<Awaited<ReturnType<typeof createRichiestaMagazzino>>>
+    export type CreateRichiestaMagazzinoMutationBody = BodyType<RichiestaMagazzinoCreate>
+    export type CreateRichiestaMagazzinoMutationError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>
+
+    /**
+ * @summary Invia bisogno senza prenotazione, richiede create e scope del destinatario
+ */
+export const useCreateRichiestaMagazzino = <TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRichiestaMagazzino>>, TError,{data: BodyType<RichiestaMagazzinoCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createRichiestaMagazzino>>,
+        TError,
+        {data: BodyType<RichiestaMagazzinoCreate>},
+        TContext
+      > => {
+      return useMutation(getCreateRichiestaMagazzinoMutationOptions(options));
+    }
+
+export const getGetRichiestaMagazzinoUrl = (id: number,) => {
+
+
+
+
+  return `/api/richieste-magazzino/${id}`
+}
+
+/**
+ * @summary Dettaglio operativo minimizzato, richiede view e scope
+ */
+export const getRichiestaMagazzino = async (id: number, options?: RequestInit): Promise<RichiestaMagazzino> => {
+
+  return customFetch<RichiestaMagazzino>(getGetRichiestaMagazzinoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRichiestaMagazzinoQueryKey = (id: number,) => {
+    return [
+    `/api/richieste-magazzino/${id}`
+    ] as const;
+    }
+
+
+export const getGetRichiestaMagazzinoQueryOptions = <TData = Awaited<ReturnType<typeof getRichiestaMagazzino>>, TError = ErrorType<RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRichiestaMagazzino>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRichiestaMagazzinoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRichiestaMagazzino>>> = ({ signal }) => getRichiestaMagazzino(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRichiestaMagazzino>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRichiestaMagazzinoQueryResult = NonNullable<Awaited<ReturnType<typeof getRichiestaMagazzino>>>
+export type GetRichiestaMagazzinoQueryError = ErrorType<RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>
+
+
+/**
+ * @summary Dettaglio operativo minimizzato, richiede view e scope
+ */
+
+export function useGetRichiestaMagazzino<TData = Awaited<ReturnType<typeof getRichiestaMagazzino>>, TError = ErrorType<RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRichiestaMagazzino>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRichiestaMagazzinoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateRichiestaMagazzinoUrl = (id: number,) => {
+
+
+
+
+  return `/api/richieste-magazzino/${id}`
+}
+
+/**
+ * @summary Modifica contenuto solo in inviata, richiede update e Centro
+ */
+export const updateRichiestaMagazzino = async (id: number,
+    richiestaMagazzinoUpdate: RichiestaMagazzinoUpdate, options?: RequestInit): Promise<RichiestaMagazzinoCommandResult> => {
+
+  return customFetch<RichiestaMagazzinoCommandResult>(getUpdateRichiestaMagazzinoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      richiestaMagazzinoUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateRichiestaMagazzinoMutationOptions = <TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRichiestaMagazzino>>, TError,{id: number;data: BodyType<RichiestaMagazzinoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRichiestaMagazzino>>, TError,{id: number;data: BodyType<RichiestaMagazzinoUpdate>}, TContext> => {
+
+const mutationKey = ['updateRichiestaMagazzino'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRichiestaMagazzino>>, {id: number;data: BodyType<RichiestaMagazzinoUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateRichiestaMagazzino(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRichiestaMagazzinoMutationResult = NonNullable<Awaited<ReturnType<typeof updateRichiestaMagazzino>>>
+    export type UpdateRichiestaMagazzinoMutationBody = BodyType<RichiestaMagazzinoUpdate>
+    export type UpdateRichiestaMagazzinoMutationError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>
+
+    /**
+ * @summary Modifica contenuto solo in inviata, richiede update e Centro
+ */
+export const useUpdateRichiestaMagazzino = <TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRichiestaMagazzino>>, TError,{id: number;data: BodyType<RichiestaMagazzinoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRichiestaMagazzino>>,
+        TError,
+        {id: number;data: BodyType<RichiestaMagazzinoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateRichiestaMagazzinoMutationOptions(options));
+    }
+
+export const getTakeRichiestaMagazzinoUrl = (id: number,) => {
+
+
+
+
+  return `/api/richieste-magazzino/${id}/presa-in-carico`
+}
+
+/**
+ * @summary inviata → presa_in_carico, richiede take e Area Magazzino
+ */
+export const takeRichiestaMagazzino = async (id: number,
+    richiestaMagazzinoVersionCommand: RichiestaMagazzinoVersionCommand, options?: RequestInit): Promise<RichiestaMagazzinoCommandResult> => {
+
+  return customFetch<RichiestaMagazzinoCommandResult>(getTakeRichiestaMagazzinoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      richiestaMagazzinoVersionCommand,)
+  }
+);}
+
+
+
+
+export const getTakeRichiestaMagazzinoMutationOptions = <TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof takeRichiestaMagazzino>>, TError,{id: number;data: BodyType<RichiestaMagazzinoVersionCommand>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof takeRichiestaMagazzino>>, TError,{id: number;data: BodyType<RichiestaMagazzinoVersionCommand>}, TContext> => {
+
+const mutationKey = ['takeRichiestaMagazzino'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof takeRichiestaMagazzino>>, {id: number;data: BodyType<RichiestaMagazzinoVersionCommand>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  takeRichiestaMagazzino(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TakeRichiestaMagazzinoMutationResult = NonNullable<Awaited<ReturnType<typeof takeRichiestaMagazzino>>>
+    export type TakeRichiestaMagazzinoMutationBody = BodyType<RichiestaMagazzinoVersionCommand>
+    export type TakeRichiestaMagazzinoMutationError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>
+
+    /**
+ * @summary inviata → presa_in_carico, richiede take e Area Magazzino
+ */
+export const useTakeRichiestaMagazzino = <TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof takeRichiestaMagazzino>>, TError,{id: number;data: BodyType<RichiestaMagazzinoVersionCommand>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof takeRichiestaMagazzino>>,
+        TError,
+        {id: number;data: BodyType<RichiestaMagazzinoVersionCommand>},
+        TContext
+      > => {
+      return useMutation(getTakeRichiestaMagazzinoMutationOptions(options));
+    }
+
+export const getCancelRichiestaMagazzinoUrl = (id: number,) => {
+
+
+
+
+  return `/api/richieste-magazzino/${id}/annulla`
+}
+
+/**
+ * @summary Annulla con motivo, richiede cancel e fase/ruolo consentiti
+ */
+export const cancelRichiestaMagazzino = async (id: number,
+    richiestaMagazzinoCancel: RichiestaMagazzinoCancel, options?: RequestInit): Promise<RichiestaMagazzinoCommandResult> => {
+
+  return customFetch<RichiestaMagazzinoCommandResult>(getCancelRichiestaMagazzinoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      richiestaMagazzinoCancel,)
+  }
+);}
+
+
+
+
+export const getCancelRichiestaMagazzinoMutationOptions = <TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelRichiestaMagazzino>>, TError,{id: number;data: BodyType<RichiestaMagazzinoCancel>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelRichiestaMagazzino>>, TError,{id: number;data: BodyType<RichiestaMagazzinoCancel>}, TContext> => {
+
+const mutationKey = ['cancelRichiestaMagazzino'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelRichiestaMagazzino>>, {id: number;data: BodyType<RichiestaMagazzinoCancel>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  cancelRichiestaMagazzino(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelRichiestaMagazzinoMutationResult = NonNullable<Awaited<ReturnType<typeof cancelRichiestaMagazzino>>>
+    export type CancelRichiestaMagazzinoMutationBody = BodyType<RichiestaMagazzinoCancel>
+    export type CancelRichiestaMagazzinoMutationError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>
+
+    /**
+ * @summary Annulla con motivo, richiede cancel e fase/ruolo consentiti
+ */
+export const useCancelRichiestaMagazzino = <TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelRichiestaMagazzino>>, TError,{id: number;data: BodyType<RichiestaMagazzinoCancel>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelRichiestaMagazzino>>,
+        TError,
+        {id: number;data: BodyType<RichiestaMagazzinoCancel>},
+        TContext
+      > => {
+      return useMutation(getCancelRichiestaMagazzinoMutationOptions(options));
+    }
+
+export const getGetRichiestaMagazzinoStoricoUrl = (id: number,) => {
+
+
+
+
+  return `/api/richieste-magazzino/${id}/storico`
+}
+
+/**
+ * @summary Audit minimizzato, richiede view e scope
+ */
+export const getRichiestaMagazzinoStorico = async (id: number, options?: RequestInit): Promise<RichiestaMagazzinoEvent[]> => {
+
+  return customFetch<RichiestaMagazzinoEvent[]>(getGetRichiestaMagazzinoStoricoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRichiestaMagazzinoStoricoQueryKey = (id: number,) => {
+    return [
+    `/api/richieste-magazzino/${id}/storico`
+    ] as const;
+    }
+
+
+export const getGetRichiestaMagazzinoStoricoQueryOptions = <TData = Awaited<ReturnType<typeof getRichiestaMagazzinoStorico>>, TError = ErrorType<RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRichiestaMagazzinoStorico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRichiestaMagazzinoStoricoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRichiestaMagazzinoStorico>>> = ({ signal }) => getRichiestaMagazzinoStorico(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRichiestaMagazzinoStorico>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRichiestaMagazzinoStoricoQueryResult = NonNullable<Awaited<ReturnType<typeof getRichiestaMagazzinoStorico>>>
+export type GetRichiestaMagazzinoStoricoQueryError = ErrorType<RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>
+
+
+/**
+ * @summary Audit minimizzato, richiede view e scope
+ */
+
+export function useGetRichiestaMagazzinoStorico<TData = Awaited<ReturnType<typeof getRichiestaMagazzinoStorico>>, TError = ErrorType<RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRichiestaMagazzinoStorico>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRichiestaMagazzinoStoricoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 

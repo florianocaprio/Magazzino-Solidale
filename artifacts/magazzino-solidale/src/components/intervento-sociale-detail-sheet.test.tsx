@@ -11,6 +11,21 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+vi.mock("@/lib/auth", () => ({
+  useAuth: () => ({ hasArea: () => false, hasPermission: () => false }),
+}));
+vi.mock("@/lib/use-moduli", () => ({
+  useConfigurazioneAmbienteFlags: () => ({ isModuloAttivo: () => true }),
+}));
+vi.mock("@workspace/api-client-react", () => ({
+  useListRichiesteMagazzino: () => ({
+    data: null,
+    isLoading: false,
+    isError: false,
+  }),
+  getListRichiesteMagazzinoQueryKey: () => ["richieste-magazzino"],
+}));
+
 const intervento = {
   id: 20,
   beneficiarioId: 10,

@@ -68,6 +68,7 @@ import { mensa } from "./namespaces/mensa";
 import { reporting } from "./namespaces/reporting";
 import { maps } from "./namespaces/maps";
 import { fseOperations } from "./namespaces/fseOperations";
+import { richiesteMagazzino } from "./namespaces/richiesteMagazzino";
 
 export { LANGUAGES, isRtl, applyDirection } from "./languages";
 export type { LanguageCode } from "./languages";
@@ -133,6 +134,7 @@ const PAGE_NAMESPACES = {
   reporting,
   maps,
   fseOperations,
+  richiesteMagazzino,
 } as const;
 
 function buildResources() {

@@ -23,7 +23,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { MoreHorizontal, Plus, Search, User, Trash2, MapPin, AlertCircle, Home, Pencil, FileDown, AlertTriangle, Upload } from "lucide-react";
 import { SchedaExportDialog } from "@/components/scheda-export";
 import { EditBeneficiarioSheet } from "@/pages/beneficiario-dettaglio";
-import { EMPORIO_DISABLED_MESSAGE, UNITA_STRADA_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
+import { EMPORIO_DISABLED_MESSAGE, UNITA_STRADA_DISABLED_MESSAGE, useModuloFlags, useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { SESSO_OPTIONS } from "@/lib/sesso-options";
 import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
@@ -110,6 +110,7 @@ const apiErrorMessage = (err: unknown, fallback: string): string => {
 export default function Beneficiari() {
   const { t } = useTranslation();
   const { user, hasArea, hasPermission } = useAuth();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
@@ -652,6 +653,9 @@ export default function Beneficiari() {
                             {t("beneficiari.profileDetail")}
                           </Link>
                         </DropdownMenuItem>
+                        {hasArea("sociale") && hasPermission("richieste_magazzino.create") && isModuloAttivo("MAGAZZINO_SOLIDALE") && isModuloAttivo("CENTRO_ASCOLTO") && <DropdownMenuItem asChild>
+                          <Link href={`/richieste-magazzino?beneficiarioId=${b.id}`} className="cursor-pointer w-full">{t("richiesteMagazzino.new")}</Link>
+                        </DropdownMenuItem>}
                         {canManage && <DropdownMenuItem onClick={() => setEditingId(b.id)} className="cursor-pointer"><Pencil className="mr-2 h-4 w-4" /> {t("beneficiari.editAnagrafica")}</DropdownMenuItem>}
                         {canExport && <DropdownMenuItem onClick={() => setSchedaId(b.id)} className="cursor-pointer"><FileDown className="mr-2 h-4 w-4" /> {t("scheda.esporta")}</DropdownMenuItem>}
                         {canDeactivate && <DropdownMenuItem className="text-destructive" onClick={() => setDeletingId(b.id)}><Trash2 className="mr-2 h-4 w-4" /> Disattiva</DropdownMenuItem>}

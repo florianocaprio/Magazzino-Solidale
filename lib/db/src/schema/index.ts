@@ -6,6 +6,7 @@ export * from "./lottiLogici";
 export * from "./movimenti";
 export * from "./auditEventi";
 export * from "./comandiOperativi";
+export * from "./richiesteMagazzino";
 export * from "./inventoryAccounting";
 export * from "./ageaImports";
 export * from "./fseImportPratiche";

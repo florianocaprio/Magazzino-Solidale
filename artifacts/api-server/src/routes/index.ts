@@ -53,6 +53,7 @@ import ageaRouter from "./agea";
 import fseImportazioniRouter from "./fse-importazioni";
 import fseRouter from "./fse";
 import mapsRouter from "./maps";
+import richiesteMagazzinoRouter from "./richieste-magazzino";
 import authRouter from "./auth";
 import utentiRouter from "./utenti";
 import ruoliRouter from "./ruoli";
@@ -129,6 +130,7 @@ router.use(ageaRouter);
 router.use(fseImportazioniRouter);
 router.use(fseRouter);
 router.use(mapsRouter);
+router.use(richiesteMagazzinoRouter);
 
 // Admin-only management endpoints.
 router.use(areeRouter);

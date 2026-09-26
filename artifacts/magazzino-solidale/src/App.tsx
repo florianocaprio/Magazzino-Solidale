@@ -70,6 +70,7 @@ const BeneficiarioDettaglio = lazy(
   () => import("@/pages/beneficiario-dettaglio"),
 );
 const Interventi = lazy(() => import("@/pages/interventi"));
+const RichiesteMagazzino = lazy(() => import("@/pages/richieste-magazzino"));
 const Consegne = lazy(() => import("@/pages/consegne"));
 const Bolle = lazy(() => import("@/pages/bolle"));
 const Turni = lazy(() => import("@/pages/turni"));
@@ -168,6 +169,18 @@ function RequireDocumentiOperativiAccess({
   ) {
     return <NotAuthorized />;
   }
+  return <>{children}</>;
+}
+
+function RequireRichiesteMagazzinoContext({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { hasArea } = useAuth();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  if (!hasArea("magazzino") && !isModuloAttivo("CENTRO_ASCOLTO"))
+    return <NotAuthorized />;
   return <>{children}</>;
 }
 
@@ -379,6 +392,19 @@ function AppRoutes() {
                 <RequireModulo codice="LOTTI">
                   <RequirePermission permission="magazzino.view">
                     <CaricoMerce />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/richieste-magazzino">
+            {() => (
+              <Guard area={["sociale", "magazzino"]}>
+                <RequireModulo codice="MAGAZZINO_SOLIDALE">
+                  <RequirePermission permission="richieste_magazzino.view">
+                    <RequireRichiesteMagazzinoContext>
+                      <RichiesteMagazzino />
+                    </RequireRichiesteMagazzinoContext>
                   </RequirePermission>
                 </RequireModulo>
               </Guard>

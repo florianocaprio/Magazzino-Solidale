@@ -3,8 +3,10 @@ import {
   useGetConfigurazioneAmbientePubblica,
 } from "@workspace/api-client-react";
 
-export const EMPORIO_DISABLED_MESSAGE = "Il modulo Emporio Solidale è disabilitato.";
-export const UNITA_STRADA_DISABLED_MESSAGE = "La gestione Unità di Strada è disabilitata.";
+export const EMPORIO_DISABLED_MESSAGE =
+  "Il modulo Emporio Solidale è disabilitato.";
+export const UNITA_STRADA_DISABLED_MESSAGE =
+  "La gestione Unità di Strada è disabilitata.";
 
 export const MODULO_BY_ROUTE: Record<string, string> = {
   "/beneficiari": "CENTRO_ASCOLTO",
@@ -12,6 +14,7 @@ export const MODULO_BY_ROUTE: Record<string, string> = {
   "/turni": "CENTRO_ASCOLTO",
   "/centri-ascolto": "CENTRO_ASCOLTO",
   "/preparazione-consegne": "MAGAZZINO_SOLIDALE",
+  "/richieste-magazzino": "MAGAZZINO_SOLIDALE",
   "/scarichi": "SCARICHI",
   "/lotti": "LOTTI",
   "/carico-merce": "LOTTI",

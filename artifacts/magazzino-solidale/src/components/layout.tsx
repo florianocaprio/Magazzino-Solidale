@@ -166,6 +166,15 @@ export const NAV_ITEMS: NavItem[] = [
     moduloCodice: "MAGAZZINO_SOLIDALE",
     permission: "magazzino.view",
   },
+  {
+    key: "richiesteMagazzino",
+    url: "/richieste-magazzino",
+    icon: ClipboardList,
+    groupKey: "magazzino",
+    area: ["sociale", "magazzino"],
+    moduloCodice: "MAGAZZINO_SOLIDALE",
+    permission: "richieste_magazzino.view",
+  },
 
   {
     key: "centriAscolto",
@@ -658,9 +667,11 @@ function NavMenuLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
       >
         <item.icon className="h-4 w-4" />
         <span>
-          {item.groupKey === "mensa"
-            ? t(`mensa.nav.${item.key}`)
-            : t(`nav.items.${item.key}`)}
+          {item.key === "richiesteMagazzino"
+            ? t("richiesteMagazzino.title")
+            : item.groupKey === "mensa"
+              ? t(`mensa.nav.${item.key}`)
+              : t(`nav.items.${item.key}`)}
         </span>
       </Link>
     </SidebarMenuButton>
@@ -739,7 +750,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
     return (
       isNavItemEnabledByAccess(item, hasArea, hasPermission) &&
-      isNavItemEnabledByCapabilities(item, mapsCapabilities?.layers.length ?? 0)
+      isNavItemEnabledByCapabilities(
+        item,
+        mapsCapabilities?.layers.length ?? 0,
+      ) &&
+      (item.key !== "richiesteMagazzino" ||
+        hasArea("magazzino") ||
+        isModuloAttivo("CENTRO_ASCOLTO"))
     );
   }).filter((item) => isNavItemEnabledByModules(item, isModuloAttivo));
 

@@ -45,8 +45,315 @@ tags:
   - name: configurazione-ambiente
   - name: super-admin
   - name: mensa
+  - name: richieste-magazzino
 
 paths:
+  /richieste-magazzino:
+    get:
+      operationId: listRichiesteMagazzino
+      tags: [richieste-magazzino]
+      summary: Coda territoriale M5A, richiede richieste_magazzino.view e MAGAZZINO_SOLIDALE
+      parameters:
+        - {
+            name: page,
+            in: query,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 30 },
+          }
+        - {
+            name: stato,
+            in: query,
+            schema:
+              {
+                type: string,
+                enum: [aperte, inviata, presa_in_carico, chiusa, annullata],
+              },
+          }
+        - {
+            name: priorita,
+            in: query,
+            schema: { type: string, enum: [bassa, normale, alta, urgente] },
+          }
+        - {
+            name: areaOperativaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: centroAscoltoId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: tipoDestinatario,
+            in: query,
+            schema: { type: string, enum: [beneficiario, ente, magazzino] },
+          }
+        - {
+            name: beneficiarioId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: enteDestinatarioId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: magazzinoDestinatarioId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: interventoId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: sorgente,
+            in: query,
+            schema:
+              {
+                type: string,
+                enum: [beneficiario, intervento_sociale, operativa],
+              },
+          }
+        - {
+            name: dataDa,
+            in: query,
+            schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' },
+          }
+        - {
+            name: dataA,
+            in: query,
+            schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' },
+          }
+        - {
+            name: ricerca,
+            in: query,
+            schema: { type: string, minLength: 2, maxLength: 80 },
+          }
+      responses:
+        "200":
+          {
+            description: Pagina filtrata nello scope prima del conteggio,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      { $ref: "#/components/schemas/RichiesteMagazzinoPage" },
+                  },
+              },
+          }
+        "400": { $ref: "#/components/responses/RichiestaMagazzino400" }
+        "401": { $ref: "#/components/responses/RichiestaMagazzino401" }
+        "403": { $ref: "#/components/responses/RichiestaMagazzino403" }
+    post:
+      operationId: createRichiestaMagazzino
+      tags: [richieste-magazzino]
+      summary: Invia bisogno senza prenotazione, richiede create e scope del destinatario
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    { $ref: "#/components/schemas/RichiestaMagazzinoCreate" },
+                },
+            },
+        }
+      responses:
+        "201":
+          {
+            description: "Risultato del comando, anche replay",
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        $ref: "#/components/schemas/RichiestaMagazzinoCommandResult",
+                      },
+                  },
+              },
+          }
+        "400": { $ref: "#/components/responses/RichiestaMagazzino400" }
+        "401": { $ref: "#/components/responses/RichiestaMagazzino401" }
+        "403": { $ref: "#/components/responses/RichiestaMagazzino403" }
+        "404": { $ref: "#/components/responses/RichiestaMagazzino404" }
+        "409": { $ref: "#/components/responses/RichiestaMagazzino409" }
+  /richieste-magazzino/{id}:
+    get:
+      operationId: getRichiestaMagazzino
+      tags: [richieste-magazzino]
+      summary: Dettaglio operativo minimizzato, richiede view e scope
+      parameters: [{ $ref: "#/components/parameters/RichiestaMagazzinoId" }]
+      responses:
+        "200":
+          {
+            description: "Richiesta",
+            content:
+              {
+                application/json:
+                  {
+                    schema: { $ref: "#/components/schemas/RichiestaMagazzino" },
+                  },
+              },
+          }
+        "401": { $ref: "#/components/responses/RichiestaMagazzino401" }
+        "403": { $ref: "#/components/responses/RichiestaMagazzino403" }
+        "404": { $ref: "#/components/responses/RichiestaMagazzino404" }
+    patch:
+      operationId: updateRichiestaMagazzino
+      tags: [richieste-magazzino]
+      summary: Modifica contenuto solo in inviata, richiede update e Centro
+      parameters: [{ $ref: "#/components/parameters/RichiestaMagazzinoId" }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    { $ref: "#/components/schemas/RichiestaMagazzinoUpdate" },
+                },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: "Risultato comando",
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        $ref: "#/components/schemas/RichiestaMagazzinoCommandResult",
+                      },
+                  },
+              },
+          }
+        "400": { $ref: "#/components/responses/RichiestaMagazzino400" }
+        "401": { $ref: "#/components/responses/RichiestaMagazzino401" }
+        "403": { $ref: "#/components/responses/RichiestaMagazzino403" }
+        "404": { $ref: "#/components/responses/RichiestaMagazzino404" }
+        "409": { $ref: "#/components/responses/RichiestaMagazzino409" }
+  /richieste-magazzino/{id}/presa-in-carico:
+    post:
+      operationId: takeRichiestaMagazzino
+      tags: [richieste-magazzino]
+      summary: inviata → presa_in_carico, richiede take e Area Magazzino
+      parameters: [{ $ref: "#/components/parameters/RichiestaMagazzinoId" }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    {
+                      $ref: "#/components/schemas/RichiestaMagazzinoVersionCommand",
+                    },
+                },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: "Risultato comando",
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        $ref: "#/components/schemas/RichiestaMagazzinoCommandResult",
+                      },
+                  },
+              },
+          }
+        "400": { $ref: "#/components/responses/RichiestaMagazzino400" }
+        "401": { $ref: "#/components/responses/RichiestaMagazzino401" }
+        "403": { $ref: "#/components/responses/RichiestaMagazzino403" }
+        "404": { $ref: "#/components/responses/RichiestaMagazzino404" }
+        "409": { $ref: "#/components/responses/RichiestaMagazzino409" }
+  /richieste-magazzino/{id}/annulla:
+    post:
+      operationId: cancelRichiestaMagazzino
+      tags: [richieste-magazzino]
+      summary: Annulla con motivo, richiede cancel e fase/ruolo consentiti
+      parameters: [{ $ref: "#/components/parameters/RichiestaMagazzinoId" }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    { $ref: "#/components/schemas/RichiestaMagazzinoCancel" },
+                },
+            },
+        }
+      responses:
+        "200":
+          {
+            description: "Risultato comando",
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        $ref: "#/components/schemas/RichiestaMagazzinoCommandResult",
+                      },
+                  },
+              },
+          }
+        "400": { $ref: "#/components/responses/RichiestaMagazzino400" }
+        "401": { $ref: "#/components/responses/RichiestaMagazzino401" }
+        "403": { $ref: "#/components/responses/RichiestaMagazzino403" }
+        "404": { $ref: "#/components/responses/RichiestaMagazzino404" }
+        "409": { $ref: "#/components/responses/RichiestaMagazzino409" }
+  /richieste-magazzino/{id}/storico:
+    get:
+      operationId: getRichiestaMagazzinoStorico
+      tags: [richieste-magazzino]
+      summary: Audit minimizzato, richiede view e scope
+      parameters: [{ $ref: "#/components/parameters/RichiestaMagazzinoId" }]
+      responses:
+        "200":
+          {
+            description: "Eventi",
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: array,
+                        items:
+                          {
+                            $ref: "#/components/schemas/RichiestaMagazzinoEvent",
+                          },
+                      },
+                  },
+              },
+          }
+        "401": { $ref: "#/components/responses/RichiestaMagazzino401" }
+        "403": { $ref: "#/components/responses/RichiestaMagazzino403" }
+        "404": { $ref: "#/components/responses/RichiestaMagazzino404" }
+
   /healthz:
     get:
       operationId: healthCheck
@@ -9714,6 +10021,13 @@ paths:
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
   parameters:
+    RichiestaMagazzinoId:
+      {
+        name: id,
+        in: path,
+        required: true,
+        schema: { type: integer, minimum: 1 },
+      }
     FseMagazzinoId:
       name: magazzinoId
       in: query
@@ -9860,6 +10174,66 @@ components:
       description: Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
       schema: { type: string, format: date }
   responses:
+    RichiestaMagazzino400:
+      {
+        description: Input non valido,
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  { $ref: "#/components/schemas/RichiestaMagazzinoError" },
+              },
+          },
+      }
+    RichiestaMagazzino401:
+      {
+        description: Sessione assente,
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  { $ref: "#/components/schemas/RichiestaMagazzinoError" },
+              },
+          },
+      }
+    RichiestaMagazzino403:
+      {
+        description: Permesso o scope non disponibile,
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  { $ref: "#/components/schemas/RichiestaMagazzinoError" },
+              },
+          },
+      }
+    RichiestaMagazzino404:
+      {
+        description: Richiesta inesistente o fuori scope,
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  { $ref: "#/components/schemas/RichiestaMagazzinoError" },
+              },
+          },
+      }
+    RichiestaMagazzino409:
+      {
+        description: "Conflitto di versione, unicità o idempotenza",
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  { $ref: "#/components/schemas/RichiestaMagazzinoError" },
+              },
+          },
+      }
     FseBadRequest:
       description: Richiesta FSE+ non valida
       content:
@@ -9956,6 +10330,173 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/BeneficiariFseError" }
   schemas:
+    RichiestaMagazzinoError:
+      type: object
+      required: [error]
+      properties:
+        code: { type: string }
+        error: { type: string }
+        correlationId: { type: string, format: uuid }
+    RichiestaMagazzinoCommandResult:
+      type: object
+      required: [id, codice, stato, versione]
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        stato:
+          { type: string, enum: [inviata, presa_in_carico, chiusa, annullata] }
+        versione: { type: integer }
+    RichiestaMagazzinoCreate:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, tipoDestinatario, sorgente, bisogno]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        tipoDestinatario:
+          { type: string, enum: [beneficiario, ente, magazzino] }
+        beneficiarioId: { type: integer, minimum: 1 }
+        enteDestinatarioId: { type: integer, minimum: 1 }
+        magazzinoDestinatarioId: { type: integer, minimum: 1 }
+        interventoId: { type: integer, minimum: 1 }
+        areaOperativaId: { type: integer, minimum: 1 }
+        centroAscoltoId: { type: integer, minimum: 1 }
+        sorgente:
+          { type: string, enum: [beneficiario, intervento_sociale, operativa] }
+        bisogno: { type: string, minLength: 1, maxLength: 2000 }
+        noteOperative: { type: [string, "null"], maxLength: 2000 }
+        priorita:
+          {
+            type: string,
+            enum: [bassa, normale, alta, urgente],
+            default: normale,
+          }
+        dataDesiderata:
+          { type: [string, "null"], pattern: '^\d{4}-\d{2}-\d{2}$' }
+        modalitaPreferita:
+          {
+            type: string,
+            enum: [da_definire, ritiro, domicilio],
+            default: da_definire,
+          }
+    RichiestaMagazzinoUpdate:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, versione]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        versione: { type: integer, minimum: 1 }
+        bisogno: { type: string, minLength: 1, maxLength: 2000 }
+        noteOperative: { type: [string, "null"], maxLength: 2000 }
+        priorita: { type: string, enum: [bassa, normale, alta, urgente] }
+        dataDesiderata:
+          { type: [string, "null"], pattern: '^\d{4}-\d{2}-\d{2}$' }
+        modalitaPreferita:
+          { type: string, enum: [da_definire, ritiro, domicilio] }
+    RichiestaMagazzinoVersionCommand:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, versione]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        versione: { type: integer, minimum: 1 }
+    RichiestaMagazzinoCancel:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, versione, motivo]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        versione: { type: integer, minimum: 1 }
+        motivo: { type: string, minLength: 1, maxLength: 500 }
+    RichiestaMagazzino:
+      type: object
+      description: Snapshot operativo; nessun dato del dossier sociale live.
+      required:
+        [
+          id,
+          codice,
+          tipoDestinatario,
+          areaOperativaId,
+          sorgente,
+          destinatarioNomeSnapshot,
+          areaNomeSnapshot,
+          bisogno,
+          priorita,
+          modalitaPreferita,
+          stato,
+          versione,
+          inviatoDa,
+          dataCreazione,
+          dataAggiornamento,
+        ]
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        tipoDestinatario:
+          { type: string, enum: [beneficiario, ente, magazzino] }
+        beneficiarioId: { type: [integer, "null"] }
+        enteDestinatarioId: { type: [integer, "null"] }
+        magazzinoDestinatarioId: { type: [integer, "null"] }
+        areaOperativaId: { type: integer }
+        centroAscoltoId: { type: [integer, "null"] }
+        zonaUdsIdSnapshot:
+          {
+            type: [integer, "null"],
+            description: Contesto tecnico di scope sociale all'invio,
+          }
+        sorgente:
+          { type: string, enum: [beneficiario, intervento_sociale, operativa] }
+        interventoId:
+          {
+            type: [integer, "null"],
+            description: Oscurato senza diritto di lettura Interventi sociali,
+          }
+        destinatarioCodiceSnapshot: { type: [string, "null"] }
+        destinatarioNomeSnapshot: { type: string }
+        numComponentiSnapshot: { type: [integer, "null"] }
+        areaNomeSnapshot: { type: string }
+        centroNomeSnapshot: { type: [string, "null"] }
+        bisogno: { type: string }
+        noteOperative: { type: [string, "null"] }
+        priorita: { type: string, enum: [bassa, normale, alta, urgente] }
+        dataDesiderata:
+          { type: [string, "null"], pattern: '^\d{4}-\d{2}-\d{2}$' }
+        modalitaPreferita:
+          { type: string, enum: [da_definire, ritiro, domicilio] }
+        stato:
+          { type: string, enum: [inviata, presa_in_carico, chiusa, annullata] }
+        versione: { type: integer }
+        inviatoDa: { type: integer }
+        presoInCaricoDa: { type: [integer, "null"] }
+        presoInCaricoCodiceSnapshot: { type: [string, "null"] }
+        presoInCaricoAt: { type: [string, "null"], format: date-time }
+        annullatoDa: { type: [integer, "null"] }
+        annullatoAt: { type: [string, "null"], format: date-time }
+        motivoAnnullamento: { type: [string, "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+    RichiesteMagazzinoPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/RichiestaMagazzino" },
+          }
+        total: { type: integer, minimum: 0 }
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1 }
+    RichiestaMagazzinoEvent:
+      type: object
+      required: [id, azione, registratoAt, actorCodeSnapshot, correlationId]
+      properties:
+        id: { type: integer }
+        azione: { type: string }
+        registratoAt: { type: string, format: date-time }
+        actorCodeSnapshot: { type: string }
+        correlationId: { type: string, format: uuid }
+        motivo: { type: [string, "null"] }
+        changes: { type: [object, "null"], additionalProperties: true }
     BeneficiariFseRowInput:
       type: object
       additionalProperties: true

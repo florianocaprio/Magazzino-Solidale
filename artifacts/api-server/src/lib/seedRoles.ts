@@ -39,6 +39,10 @@ const SOCIAL_OPERATOR_PERMISSIONS = [
   "sociale.interventi.update",
   "sociale.interventi.complete",
   "sociale.interventi.cancel",
+  "richieste_magazzino.view",
+  "richieste_magazzino.create",
+  "richieste_magazzino.update",
+  "richieste_magazzino.cancel",
   "consegne.view",
   "consegne.manage",
   "consegne.complete",
@@ -76,6 +80,9 @@ const LOGISTICA_OPERATOR_PERMISSIONS = [
 ] as const;
 const MAGAZZINO_OPERATOR_PERMISSIONS = [
   "magazzino.view",
+  "richieste_magazzino.view",
+  "richieste_magazzino.take",
+  "richieste_magazzino.cancel",
   "magazzino.fse.view",
   "magazzino.agea.view",
   "magazzino.agea.import",

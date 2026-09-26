@@ -77,6 +77,7 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/lib/use-moduli", () => ({
   EMPORIO_DISABLED_MESSAGE: "Emporio disabilitato",
   UNITA_STRADA_DISABLED_MESSAGE: "UDS disabilitata",
+  useConfigurazioneAmbienteFlags: () => ({ isModuloAttivo: () => true }),
   useModuloFlags: () => ({
     emporioAbilitato: true,
     unitaStradaAbilitata: true,

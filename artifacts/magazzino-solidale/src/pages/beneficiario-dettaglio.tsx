@@ -4,6 +4,7 @@ import { useGetBeneficiario, getGetBeneficiarioQueryKey, getListAccessiEmporioQu
 import { calcolaEta, fasciaEtaDaEta } from "@workspace/api-zod";
 import { useAuth } from "@/lib/auth";
 import { useAuthorizeBeneficiariExport } from "@workspace/api-client-react";
+import { useListRichiesteMagazzino, getListRichiesteMagazzinoQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,7 @@ import { AlertCircle, Calendar, Home, MapPin, Phone, Mail, User, Info, Users, Tr
 import { generateTesseraPdf, buildTesseraLabels } from "@/lib/tessera-pdf";
 import { SchedaExportButtons } from "@/components/scheda-export";
 import { loadTesseraBrandingForPdf } from "@/lib/branding-ambiente";
-import { EMPORIO_DISABLED_MESSAGE, UNITA_STRADA_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
+import { EMPORIO_DISABLED_MESSAGE, UNITA_STRADA_DISABLED_MESSAGE, useModuloFlags, useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { SESSO_OPTIONS } from "@/lib/sesso-options";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -59,8 +60,13 @@ export default function BeneficiarioDettaglio() {
   const updateBeneficiario = useUpdateBeneficiario();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user, hasPermission } = useAuth();
+  const { user, hasArea, hasPermission } = useAuth();
   const canManage = hasPermission("beneficiari.manage");
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  const canViewRequests = hasArea("sociale") && hasPermission("richieste_magazzino.view") && isModuloAttivo("MAGAZZINO_SOLIDALE") && isModuloAttivo("CENTRO_ASCOLTO");
+  const canCreateRequest = canViewRequests && hasPermission("richieste_magazzino.create");
+  const requestParams = { beneficiarioId: numId, stato: "aperte" as const, limit: 30 };
+  const requests = useListRichiesteMagazzino(requestParams, { query: { queryKey: getListRichiesteMagazzinoQueryKey(requestParams), enabled: canViewRequests && Number.isInteger(numId) && numId > 0 } });
   const canViewSensitive = hasPermission("beneficiari.sensitive.view");
   const canExport = hasPermission("beneficiari.export");
   const canViewFse = hasPermission("beneficiari.fse.view");
@@ -267,6 +273,11 @@ export default function BeneficiarioDettaglio() {
       {hasPermission("credito.view") && <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} />}
 
       <BeneficiarioMensaSection beneficiario={b} />
+
+      {canViewRequests && <Card><CardHeader><CardTitle>{t("richiesteMagazzino.title")}</CardTitle></CardHeader><CardContent className="space-y-2">
+        {requests.isLoading ? <p>{t("common.loading")}</p> : requests.isError ? <p role="alert">{t("richiesteMagazzino.loadError")}</p> : requests.data?.items.length ? requests.data.items.map((request) => <p key={request.id}><Link className="underline" href={`/richieste-magazzino?richiestaId=${request.id}`}>{request.codice} — {t(`richiesteMagazzino.${request.stato}`)}</Link></p>) : <p>{t("richiesteMagazzino.empty")}</p>}
+        {canCreateRequest && <Button asChild variant="outline"><Link href={`/richieste-magazzino?beneficiarioId=${numId}`}>{t("richiesteMagazzino.new")}</Link></Button>}
+      </CardContent></Card>}
 
       {canViewEmporioAccess && b.creditoSolidaleAbilitato && (
         <Card>

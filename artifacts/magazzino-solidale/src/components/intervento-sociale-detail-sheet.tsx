@@ -12,6 +12,13 @@ import type {
   Magazzino,
   Prodotto,
 } from "@workspace/api-client-react";
+import {
+  useListRichiesteMagazzino,
+  getListRichiesteMagazzinoQueryKey,
+} from "@workspace/api-client-react";
+import { Link } from "wouter";
+import { useAuth } from "@/lib/auth";
+import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { ExternalLink } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -157,6 +164,24 @@ export function InterventoSocialeDetailSheet({
   onMancataPresentazione,
 }: Props) {
   const { t } = useTranslation();
+  const { hasArea, hasPermission } = useAuth();
+  const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
+  const canViewRequests =
+    hasArea("sociale") &&
+    hasPermission("richieste_magazzino.view") &&
+    isModuloAttivo("MAGAZZINO_SOLIDALE") &&
+    isModuloAttivo("CENTRO_ASCOLTO");
+  const requestParams = {
+    interventoId: intervento?.id,
+    stato: "aperte" as const,
+    limit: 1,
+  };
+  const interventionRequests = useListRichiesteMagazzino(requestParams, {
+    query: {
+      queryKey: getListRichiesteMagazzinoQueryKey(requestParams),
+      enabled: canViewRequests && open && intervento != null,
+    },
+  });
   const [attivita, setAttivita] = useState<InterventoAttivitaInput[]>([]);
   const [materiali, setMateriali] = useState<InterventoMaterialeInput[]>([]);
   const [documenti, setDocumenti] = useState<InterventoDocumentoInput[]>([]);
@@ -324,6 +349,35 @@ export function InterventoSocialeDetailSheet({
                 </Button>
               </div>
             </section>
+
+            {canViewRequests && (
+              <section className="flex flex-wrap items-center gap-3 rounded-lg border p-4">
+                <span className="font-medium">
+                  {t("richiesteMagazzino.title")}
+                </span>
+                {interventionRequests.data?.items[0] ? (
+                  <Button asChild size="sm" variant="outline">
+                    <Link
+                      href={`/richieste-magazzino?richiestaId=${interventionRequests.data.items[0].id}`}
+                    >
+                      {t("richiesteMagazzino.openExisting")}
+                    </Link>
+                  </Button>
+                ) : hasPermission("richieste_magazzino.create") &&
+                  !interventionRequests.isLoading &&
+                  !interventionRequests.isError ? (
+                  <Button asChild size="sm" variant="outline">
+                    <Link
+                      href={`/richieste-magazzino?interventoId=${intervento.id}&beneficiarioId=${intervento.beneficiarioId}`}
+                    >
+                      {t("richiesteMagazzino.new")}
+                    </Link>
+                  </Button>
+                ) : interventionRequests.isError ? (
+                  <p role="alert">{t("richiesteMagazzino.loadError")}</p>
+                ) : null}
+              </section>
+            )}
 
             <dl className="divide-y">
               <DetailRow

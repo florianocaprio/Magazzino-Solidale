@@ -9,6 +9,298 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Coda territoriale M5A, richiede richieste_magazzino.view e MAGAZZINO_SOLIDALE
+ */
+export const listRichiesteMagazzinoQueryPageDefault = 1;
+
+export const listRichiesteMagazzinoQueryLimitDefault = 30;
+export const listRichiesteMagazzinoQueryLimitMax = 100;
+
+
+
+
+
+
+
+export const listRichiesteMagazzinoQueryDataDaRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const listRichiesteMagazzinoQueryDataARegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const listRichiesteMagazzinoQueryRicercaMin = 2;
+export const listRichiesteMagazzinoQueryRicercaMax = 80;
+
+
+
+export const ListRichiesteMagazzinoQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).default(listRichiesteMagazzinoQueryPageDefault),
+  "limit": zod.coerce.number().min(1).max(listRichiesteMagazzinoQueryLimitMax).default(listRichiesteMagazzinoQueryLimitDefault),
+  "stato": zod.enum(['aperte', 'inviata', 'presa_in_carico', 'chiusa', 'annullata']).optional(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).optional(),
+  "areaOperativaId": zod.coerce.number().min(1).optional(),
+  "centroAscoltoId": zod.coerce.number().min(1).optional(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente', 'magazzino']).optional(),
+  "beneficiarioId": zod.coerce.number().min(1).optional(),
+  "enteDestinatarioId": zod.coerce.number().min(1).optional(),
+  "magazzinoDestinatarioId": zod.coerce.number().min(1).optional(),
+  "interventoId": zod.coerce.number().min(1).optional(),
+  "sorgente": zod.enum(['beneficiario', 'intervento_sociale', 'operativa']).optional(),
+  "dataDa": zod.coerce.string().regex(listRichiesteMagazzinoQueryDataDaRegExp).optional(),
+  "dataA": zod.coerce.string().regex(listRichiesteMagazzinoQueryDataARegExp).optional(),
+  "ricerca": zod.coerce.string().min(listRichiesteMagazzinoQueryRicercaMin).max(listRichiesteMagazzinoQueryRicercaMax).optional()
+})
+
+export const listRichiesteMagazzinoResponseItemsItemDataDesiderataRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const listRichiesteMagazzinoResponseTotalMin = 0;
+
+
+
+
+
+export const ListRichiesteMagazzinoResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente', 'magazzino']),
+  "beneficiarioId": zod.number().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "magazzinoDestinatarioId": zod.number().nullish(),
+  "areaOperativaId": zod.number(),
+  "centroAscoltoId": zod.number().nullish(),
+  "zonaUdsIdSnapshot": zod.number().nullish().describe('Contesto tecnico di scope sociale all\'invio'),
+  "sorgente": zod.enum(['beneficiario', 'intervento_sociale', 'operativa']),
+  "interventoId": zod.number().nullish().describe('Oscurato senza diritto di lettura Interventi sociali'),
+  "destinatarioCodiceSnapshot": zod.string().nullish(),
+  "destinatarioNomeSnapshot": zod.string(),
+  "numComponentiSnapshot": zod.number().nullish(),
+  "areaNomeSnapshot": zod.string(),
+  "centroNomeSnapshot": zod.string().nullish(),
+  "bisogno": zod.string(),
+  "noteOperative": zod.string().nullish(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataDesiderata": zod.string().regex(listRichiesteMagazzinoResponseItemsItemDataDesiderataRegExp).nullish(),
+  "modalitaPreferita": zod.enum(['da_definire', 'ritiro', 'domicilio']),
+  "stato": zod.enum(['inviata', 'presa_in_carico', 'chiusa', 'annullata']),
+  "versione": zod.number(),
+  "inviatoDa": zod.number(),
+  "presoInCaricoDa": zod.number().nullish(),
+  "presoInCaricoCodiceSnapshot": zod.string().nullish(),
+  "presoInCaricoAt": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "annullatoAt": zod.coerce.date().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+}).describe('Snapshot operativo; nessun dato del dossier sociale live.')),
+  "total": zod.number().min(listRichiesteMagazzinoResponseTotalMin),
+  "page": zod.number().min(1),
+  "limit": zod.number().min(1)
+})
+
+
+/**
+ * @summary Invia bisogno senza prenotazione, richiede create e scope del destinatario
+ */
+export const createRichiestaMagazzinoBodyIdempotencyKeyMax = 120;
+
+
+
+
+
+
+
+export const createRichiestaMagazzinoBodyBisognoMax = 2000;
+
+export const createRichiestaMagazzinoBodyNoteOperativeMax = 2000;
+
+export const createRichiestaMagazzinoBodyPrioritaDefault = `normale`;
+export const createRichiestaMagazzinoBodyDataDesiderataRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createRichiestaMagazzinoBodyModalitaPreferitaDefault = `da_definire`;
+
+export const CreateRichiestaMagazzinoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(createRichiestaMagazzinoBodyIdempotencyKeyMax),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente', 'magazzino']),
+  "beneficiarioId": zod.number().min(1).optional(),
+  "enteDestinatarioId": zod.number().min(1).optional(),
+  "magazzinoDestinatarioId": zod.number().min(1).optional(),
+  "interventoId": zod.number().min(1).optional(),
+  "areaOperativaId": zod.number().min(1).optional(),
+  "centroAscoltoId": zod.number().min(1).optional(),
+  "sorgente": zod.enum(['beneficiario', 'intervento_sociale', 'operativa']),
+  "bisogno": zod.string().min(1).max(createRichiestaMagazzinoBodyBisognoMax),
+  "noteOperative": zod.string().max(createRichiestaMagazzinoBodyNoteOperativeMax).nullish(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).default(createRichiestaMagazzinoBodyPrioritaDefault),
+  "dataDesiderata": zod.string().regex(createRichiestaMagazzinoBodyDataDesiderataRegExp).nullish(),
+  "modalitaPreferita": zod.enum(['da_definire', 'ritiro', 'domicilio']).default(createRichiestaMagazzinoBodyModalitaPreferitaDefault)
+})
+
+
+/**
+ * @summary Dettaglio operativo minimizzato, richiede view e scope
+ */
+
+
+
+export const GetRichiestaMagazzinoParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const getRichiestaMagazzinoResponseDataDesiderataRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const GetRichiestaMagazzinoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "tipoDestinatario": zod.enum(['beneficiario', 'ente', 'magazzino']),
+  "beneficiarioId": zod.number().nullish(),
+  "enteDestinatarioId": zod.number().nullish(),
+  "magazzinoDestinatarioId": zod.number().nullish(),
+  "areaOperativaId": zod.number(),
+  "centroAscoltoId": zod.number().nullish(),
+  "zonaUdsIdSnapshot": zod.number().nullish().describe('Contesto tecnico di scope sociale all\'invio'),
+  "sorgente": zod.enum(['beneficiario', 'intervento_sociale', 'operativa']),
+  "interventoId": zod.number().nullish().describe('Oscurato senza diritto di lettura Interventi sociali'),
+  "destinatarioCodiceSnapshot": zod.string().nullish(),
+  "destinatarioNomeSnapshot": zod.string(),
+  "numComponentiSnapshot": zod.number().nullish(),
+  "areaNomeSnapshot": zod.string(),
+  "centroNomeSnapshot": zod.string().nullish(),
+  "bisogno": zod.string(),
+  "noteOperative": zod.string().nullish(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataDesiderata": zod.string().regex(getRichiestaMagazzinoResponseDataDesiderataRegExp).nullish(),
+  "modalitaPreferita": zod.enum(['da_definire', 'ritiro', 'domicilio']),
+  "stato": zod.enum(['inviata', 'presa_in_carico', 'chiusa', 'annullata']),
+  "versione": zod.number(),
+  "inviatoDa": zod.number(),
+  "presoInCaricoDa": zod.number().nullish(),
+  "presoInCaricoCodiceSnapshot": zod.string().nullish(),
+  "presoInCaricoAt": zod.coerce.date().nullish(),
+  "annullatoDa": zod.number().nullish(),
+  "annullatoAt": zod.coerce.date().nullish(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date()
+}).describe('Snapshot operativo; nessun dato del dossier sociale live.')
+
+
+/**
+ * @summary Modifica contenuto solo in inviata, richiede update e Centro
+ */
+
+
+
+export const UpdateRichiestaMagazzinoParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const updateRichiestaMagazzinoBodyIdempotencyKeyMax = 120;
+
+
+export const updateRichiestaMagazzinoBodyBisognoMax = 2000;
+
+export const updateRichiestaMagazzinoBodyNoteOperativeMax = 2000;
+
+export const updateRichiestaMagazzinoBodyDataDesiderataRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const UpdateRichiestaMagazzinoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(updateRichiestaMagazzinoBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "bisogno": zod.string().min(1).max(updateRichiestaMagazzinoBodyBisognoMax).optional(),
+  "noteOperative": zod.string().max(updateRichiestaMagazzinoBodyNoteOperativeMax).nullish(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).optional(),
+  "dataDesiderata": zod.string().regex(updateRichiestaMagazzinoBodyDataDesiderataRegExp).nullish(),
+  "modalitaPreferita": zod.enum(['da_definire', 'ritiro', 'domicilio']).optional()
+})
+
+export const UpdateRichiestaMagazzinoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "stato": zod.enum(['inviata', 'presa_in_carico', 'chiusa', 'annullata']),
+  "versione": zod.number()
+})
+
+
+/**
+ * @summary inviata → presa_in_carico, richiede take e Area Magazzino
+ */
+
+
+
+export const TakeRichiestaMagazzinoParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const takeRichiestaMagazzinoBodyIdempotencyKeyMax = 120;
+
+
+
+
+export const TakeRichiestaMagazzinoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(takeRichiestaMagazzinoBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1)
+})
+
+export const TakeRichiestaMagazzinoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "stato": zod.enum(['inviata', 'presa_in_carico', 'chiusa', 'annullata']),
+  "versione": zod.number()
+})
+
+
+/**
+ * @summary Annulla con motivo, richiede cancel e fase/ruolo consentiti
+ */
+
+
+
+export const CancelRichiestaMagazzinoParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const cancelRichiestaMagazzinoBodyIdempotencyKeyMax = 120;
+
+
+export const cancelRichiestaMagazzinoBodyMotivoMax = 500;
+
+
+
+export const CancelRichiestaMagazzinoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(cancelRichiestaMagazzinoBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "motivo": zod.string().min(1).max(cancelRichiestaMagazzinoBodyMotivoMax)
+})
+
+export const CancelRichiestaMagazzinoResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "stato": zod.enum(['inviata', 'presa_in_carico', 'chiusa', 'annullata']),
+  "versione": zod.number()
+})
+
+
+/**
+ * @summary Audit minimizzato, richiede view e scope
+ */
+
+
+
+export const GetRichiestaMagazzinoStoricoParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const GetRichiestaMagazzinoStoricoResponseItem = zod.object({
+  "id": zod.number(),
+  "azione": zod.string(),
+  "registratoAt": zod.coerce.date(),
+  "actorCodeSnapshot": zod.string(),
+  "correlationId": zod.string().uuid(),
+  "motivo": zod.string().nullish(),
+  "changes": zod.record(zod.string(), zod.unknown()).nullish()
+})
+export const GetRichiestaMagazzinoStoricoResponse = zod.array(GetRichiestaMagazzinoStoricoResponseItem)
+
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
