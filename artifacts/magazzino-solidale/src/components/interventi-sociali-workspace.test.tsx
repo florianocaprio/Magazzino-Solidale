@@ -227,8 +227,12 @@ describe("InterventiSocialiWorkspace", () => {
     const next = document.querySelector<HTMLButtonElement>(
       'button[aria-label="interventi.calendar.nextMonth"]',
     );
+    const monthHeading = document.querySelector<HTMLHeadingElement>(
+      '[data-testid="interventi-calendar"] h2[aria-live="polite"]',
+    );
+    const currentMonthLabel = monthHeading?.textContent;
     await act(async () => next?.click());
-    expect(document.querySelector(`button[aria-label="${today}"]`)).toBeNull();
+    expect(monthHeading?.textContent).not.toBe(currentMonthLabel);
 
     const calendar = document.querySelector(
       '[data-testid="interventi-calendar"]',
@@ -237,6 +241,7 @@ describe("InterventiSocialiWorkspace", () => {
       calendar?.querySelectorAll<HTMLButtonElement>("button") ?? [],
     ).find((button) => button.textContent?.trim() === "interventi.views.oggi");
     await act(async () => goToday?.click());
+    expect(monthHeading?.textContent).toBe(currentMonthLabel);
     expect(
       document.querySelector(`button[aria-label="${today}"]`),
     ).not.toBeNull();

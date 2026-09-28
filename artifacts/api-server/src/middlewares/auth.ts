@@ -18,8 +18,11 @@ export interface SessionUser {
   ruoloNome: string | null;
   centroAscoltoId: number | null;
   centroAscoltoNome: string | null;
+  centroAscoltoAttivo?: boolean | null;
+  centroAscoltoAreaOperativaId?: number | null;
   areaOperativaId: number | null;
   areaOperativaNome: string | null;
+  areaOperativaAttiva?: boolean | null;
   zonaUdsId: number | null;
   zonaUdsNome: string | null;
   isSuperAdmin: boolean;
@@ -60,8 +63,11 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
       ruoloNome: ruoliTable.nome,
       centroAscoltoId: utentiTable.centroAscoltoId,
       centroAscoltoNome: centriAscoltoTable.nome,
+      centroAscoltoAttivo: centriAscoltoTable.attivo,
+      centroAscoltoAreaOperativaId: centriAscoltoTable.areaOperativaId,
       areaOperativaId: utentiTable.areaOperativaId,
       areaOperativaNome: areeOperativeTable.nome,
+      areaOperativaAttiva: areeOperativeTable.attivo,
       zonaUdsId: utentiTable.zonaUdsId,
       zonaUdsNome: zoneUdsTable.nome,
       isSuperAdmin: utentiTable.isSuperAdmin,
@@ -90,8 +96,11 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
     ruoloNome: row.ruoloNome ?? null,
     centroAscoltoId: row.centroAscoltoId ?? null,
     centroAscoltoNome: row.centroAscoltoNome ?? null,
+    centroAscoltoAttivo: row.centroAscoltoAttivo ?? null,
+    centroAscoltoAreaOperativaId: row.centroAscoltoAreaOperativaId ?? null,
     areaOperativaId: row.areaOperativaId ?? null,
     areaOperativaNome: row.areaOperativaNome ?? null,
+    areaOperativaAttiva: row.areaOperativaAttiva ?? null,
     zonaUdsId: row.zonaUdsId ?? null,
     zonaUdsNome: row.zonaUdsNome ?? null,
     isSuperAdmin: (row.isSuperAdmin ?? false) || row.ruoloNome === SUPER_ADMIN_ROLE_NAME,

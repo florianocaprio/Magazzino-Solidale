@@ -37,6 +37,13 @@ import {
 import { requireModulo } from "../lib/featureFlags";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
+  canReadLinkedM4Document,
+  ceaseLinkedM4Document,
+  guardLinkedM4Mutation,
+  M5bLinkError,
+  m5bLinkedM4ListScope,
+} from "../lib/m5bDocumentLink";
+import {
   inventoryPartyBusinessKey,
   lockInventoryPartyBusinessKeys,
   requireOperationalMagazzino,
@@ -119,6 +126,10 @@ function hasPermission(req: Request, permission: string): boolean {
 }
 
 function sendDocumentCommandError(error: unknown, res: Response): boolean {
+  if (error instanceof M5bLinkError) {
+    res.status(error.status).json({ error: error.message });
+    return true;
+  }
   if (error instanceof CurrentCommandActorError) {
     res.status(error.status).json({ error: error.message });
     return true;
@@ -705,6 +716,9 @@ router.get("/trasferimenti", async (req, res) => {
     return;
   }
   const conditions: SQL[] = [];
+  conditions.push(
+    m5bLinkedM4ListScope(req.user!, "trasferimento", trasferimentiTable.id),
+  );
   if (stato) conditions.push(eq(trasferimentiTable.stato, stato));
   if (isMensaOnly(req)) {
     if (!canManageMensaTransfers(req)) {
@@ -1036,6 +1050,10 @@ router.get("/trasferimenti/:id", async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
+  if (!(await canReadLinkedM4Document(req.user!, "trasferimento", result.id))) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
   const mensaError = await enforceMensaTransfer(req, result.mensaId);
   if (mensaError) {
     res.status(403).json({ error: mensaError });
@@ -1063,6 +1081,10 @@ router.get("/trasferimenti/:id/documento", async (req, res) => {
   const id = Number(req.params.id);
   const result = await getTrasferimentoWithRighe(id);
   if (!result) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (!(await canReadLinkedM4Document(req.user!, "trasferimento", result.id))) {
     res.status(404).json({ error: "Not found" });
     return;
   }
@@ -1223,6 +1245,7 @@ router.patch("/trasferimenti/:id", async (req, res) => {
   try {
     await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, "trasferimento.update", idempotencyKey);
+      await guardLinkedM4Mutation(tx, req, "trasferimento", id);
       const locked = await lockTransfer(tx, id);
       await assertCurrentTransferScope(tx, req, locked, "either");
       const receipt = await findDocumentCommand(tx, {
@@ -1381,6 +1404,7 @@ router.post("/trasferimenti/:id/prepara", async (req, res) => {
   try {
     await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, "trasferimento.prepare", idempotencyKey);
+      await guardLinkedM4Mutation(tx, req, "trasferimento", id);
       const locked = await lockTransfer(tx, id);
       await assertCurrentTransferScope(tx, req, locked, "origin");
       const receipt = await findDocumentCommand(tx, {
@@ -1520,6 +1544,9 @@ router.post("/trasferimenti/:id/annulla", async (req, res) => {
   try {
     await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, "trasferimento.cancel", idempotencyKey);
+      const linked = await guardLinkedM4Mutation(tx, req, "trasferimento", id, {
+        allowHistoricalCancellationReplay: true,
+      });
       const locked = await lockTransfer(tx, id);
       await assertCurrentTransferScope(tx, req, locked, "origin");
       const receipt = await findDocumentCommand(tx, {
@@ -1556,6 +1583,7 @@ router.post("/trasferimenti/:id/annulla", async (req, res) => {
         })
         .where(eq(trasferimentiTable.id, id))
         .returning();
+      await ceaseLinkedM4Document(tx, req, linked, motivo);
       await recordAuditEvent(tx, {
         command: audit,
         azione: "TRASFERIMENTO_ANNULLATO",

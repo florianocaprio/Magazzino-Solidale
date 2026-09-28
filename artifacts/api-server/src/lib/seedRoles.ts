@@ -82,6 +82,7 @@ const MAGAZZINO_OPERATOR_PERMISSIONS = [
   "magazzino.view",
   "richieste_magazzino.view",
   "richieste_magazzino.take",
+  "richieste_magazzino.prepare",
   "richieste_magazzino.cancel",
   "magazzino.fse.view",
   "magazzino.agea.view",

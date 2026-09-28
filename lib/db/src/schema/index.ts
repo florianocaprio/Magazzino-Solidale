@@ -7,6 +7,7 @@ export * from "./movimenti";
 export * from "./auditEventi";
 export * from "./comandiOperativi";
 export * from "./richiesteMagazzino";
+export * from "./richiesteMagazzinoDocumenti";
 export * from "./inventoryAccounting";
 export * from "./ageaImports";
 export * from "./fseImportPratiche";

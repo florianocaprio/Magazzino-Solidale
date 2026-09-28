@@ -75,6 +75,13 @@ import {
 import { requireAllModuli } from "../lib/featureFlags";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
+  assertLinkedM4Identity,
+  canReadLinkedM4Document,
+  ceaseLinkedM4Document,
+  guardLinkedM4Mutation,
+  m5bLinkedM4ListScope,
+} from "../lib/m5bDocumentLink";
+import {
   ConsegnaPlanningError,
   isFasciaConsegna,
   validateConsegnaPlanningTx,
@@ -123,6 +130,7 @@ import {
   validateDocumentCommand,
 } from "../lib/documentCommand";
 import { requireCurrentCommandActor } from "../lib/currentCommandActor";
+import { createBollaDraftTx } from "../lib/bollaDraft";
 import {
   loadTransportReturnDetail,
   reconcileTransportReturnTx,
@@ -750,6 +758,7 @@ router.get("/bolle", requirePermission("bolle.view"), async (req, res) => {
     return;
   }
   const conditions: SQL[] = [];
+  conditions.push(m5bLinkedM4ListScope(req.user!, "bolla", bolleTable.id));
   if (stato) conditions.push(eq(bolleTable.stato, stato));
   if (magazzinoId) {
     const mid = Number(magazzinoId);
@@ -1339,53 +1348,35 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
           );
         }
       }
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtext('bolle.numero_bolla'))`,
-      );
-      const anno = Number(dataBolla.slice(0, 4));
-      const existing = await tx
-        .select({ n: bolleTable.numeroBolla })
-        .from(bolleTable)
-        .where(sql`${bolleTable.numeroBolla} like ${`BOLLA-${anno}-%`}`)
-        .orderBy(desc(bolleTable.id))
-        .limit(1);
-      const lastNum =
-        existing.length > 0 ? Number(existing[0].n.split("-").pop() ?? 0) : 0;
-      const numeroBolla = `BOLLA-${anno}-${String(lastNum + 1).padStart(4, "0")}`;
-      const [created] = await tx
-        .insert(bolleTable)
-        .values({
-          numeroBolla,
-          dataBolla,
-          tipoDestinatario,
-          beneficiarioId: isBeneficiario ? body.beneficiarioId : null,
-          enteDestinatarioId: isEnte ? body.enteDestinatarioId : null,
-          consegnaId: body.consegnaId ?? null,
-          magazzinoId: body.magazzinoId,
-          indirizzoConsegna: body.indirizzoConsegna ?? null,
-          volontarioConsegnaId: body.volontarioConsegnaId ?? null,
-          trasportatoreNome: body.trasportatoreNome ?? null,
-          mezzoId: body.mezzoId ?? null,
-          mezzoAltro: body.mezzoAltro === true,
-          noteConsegna: body.noteConsegna ?? null,
-          stato: "bozza",
-          operatoreId: req.user!.id,
-          // Per il Beneficiario gli snapshot reporting vengono determinati e
-          // validati atomicamente alla consegna. Un Centro legacy senza Area non
-          // può essere congelato da solo (trigger di coerenza Area/Centro).
-          areaOperativaIdSnapshot: isEnte
-            ? lockedMagazzino.areaOperativaId
-            : null,
-          centroAscoltoIdSnapshot: null,
-          // L'anagrafica resta live finché il documento è in bozza. I valori
-          // autorevoli vengono congelati atomicamente dalla conferma.
-          destinatarioNomeSnapshot: null,
-          destinatarioIndirizzoSnapshot: null,
-          destinatarioTelefonoSnapshot: null,
-          destinatarioEmailSnapshot: null,
-          destinatarioSnapshotCongelato: false,
-        })
-        .returning();
+      const created = await createBollaDraftTx(tx, {
+        dataBolla,
+        tipoDestinatario,
+        beneficiarioId: isBeneficiario ? body.beneficiarioId : null,
+        enteDestinatarioId: isEnte ? body.enteDestinatarioId : null,
+        consegnaId: body.consegnaId ?? null,
+        magazzinoId: body.magazzinoId,
+        indirizzoConsegna: body.indirizzoConsegna ?? null,
+        volontarioConsegnaId: body.volontarioConsegnaId ?? null,
+        trasportatoreNome: body.trasportatoreNome ?? null,
+        mezzoId: body.mezzoId ?? null,
+        mezzoAltro: body.mezzoAltro === true,
+        noteConsegna: body.noteConsegna ?? null,
+        operatoreId: req.user!.id,
+        // Per il Beneficiario gli snapshot reporting vengono determinati e
+        // validati atomicamente alla consegna. Un Centro legacy senza Area non
+        // può essere congelato da solo (trigger di coerenza Area/Centro).
+        areaOperativaIdSnapshot: isEnte
+          ? lockedMagazzino.areaOperativaId
+          : null,
+        centroAscoltoIdSnapshot: null,
+        // L'anagrafica resta live finché il documento è in bozza. I valori
+        // autorevoli vengono congelati atomicamente dalla conferma.
+        destinatarioNomeSnapshot: null,
+        destinatarioIndirizzoSnapshot: null,
+        destinatarioTelefonoSnapshot: null,
+        destinatarioEmailSnapshot: null,
+        destinatarioSnapshotCongelato: false,
+      });
       await recordAuditEvent(tx, {
         command: {
           ...audit,
@@ -1442,6 +1433,10 @@ router.get(
       res.status(404).json({ error: "Not found" });
       return;
     }
+    if (!(await canReadLinkedM4Document(req.user!, "bolla", det.id))) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     if (
       !(await canAccessBollaOperativa(
         det,
@@ -1462,6 +1457,10 @@ router.get(
 router.get("/bolle/:id", requirePermission("bolle.view"), async (req, res) => {
   const det = await buildDettaglio(Number(req.params.id));
   if (!det) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (!(await canReadLinkedM4Document(req.user!, "bolla", det.id))) {
     res.status(404).json({ error: "Not found" });
     return;
   }
@@ -1544,7 +1543,9 @@ router.patch(
     try {
       const replay = await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        const linked = await guardLinkedM4Mutation(tx, req, "bolla", bollaId);
         const current = await lockBolla(tx, bollaId);
+        await assertLinkedM4Identity(tx, linked, current, body);
         if (!(await canAccessBollaOperativaTx(tx, current, caller, cid, zid))) {
           throw new BollaActionError(
             403,
@@ -1694,10 +1695,12 @@ router.patch(
     try {
       row = await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        const linked = await guardLinkedM4Mutation(tx, req, "bolla", bollaId);
         if (bolla.consegnaId != null) {
           await lockConsegnaBollaRelation(tx, bolla.consegnaId);
         }
         const current = await lockBolla(tx, bollaId);
+        await assertLinkedM4Identity(tx, linked, current, body);
         if (current.consegnaId !== bolla.consegnaId) {
           throw new DocumentCommandError(
             409,
@@ -2011,6 +2014,7 @@ router.post(
     try {
       const replay = await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        await guardLinkedM4Mutation(tx, req, "bolla", bollaId);
         const current = await lockBolla(tx, bollaId);
         if (
           !(await canAccessBollaOperativaTx(
@@ -2126,6 +2130,7 @@ router.post(
     try {
       const result = await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        await guardLinkedM4Mutation(tx, req, "bolla", bollaId);
         const current = await lockBolla(tx, bollaId);
         if (
           !(await canAccessBollaOperativaTx(
@@ -2286,6 +2291,7 @@ router.delete(
     try {
       const replay = await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        await guardLinkedM4Mutation(tx, req, "bolla", bollaId);
         const current = await lockBolla(tx, bollaId);
         if (
           !(await canAccessBollaOperativaTx(
@@ -2343,6 +2349,7 @@ router.delete(
     try {
       await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        await guardLinkedM4Mutation(tx, req, "bolla", bollaId);
         const current = await lockBolla(tx, bollaId);
         if (
           !(await canAccessBollaOperativaTx(
@@ -2493,6 +2500,7 @@ router.post(
       });
       await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        await guardLinkedM4Mutation(tx, req, "bolla", bollaId);
         const current = await lockBolla(tx, bollaId);
         if (
           !(await canAccessBollaOperativaTx(
@@ -3897,6 +3905,9 @@ router.post(
       });
       await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        const linked = await guardLinkedM4Mutation(tx, req, "bolla", bollaId, {
+          allowHistoricalCancellationReplay: true,
+        });
         const current = await lockBolla(tx, bollaId);
         if (
           !(await canAccessBollaOperativaTx(
@@ -4016,6 +4027,7 @@ router.post(
           })
           .where(eq(bolleTable.id, bollaId))
           .returning();
+        await ceaseLinkedM4Document(tx, req, linked, motivo);
         await storeDocumentCommand(tx, {
           tipoComando,
           idempotencyKey,

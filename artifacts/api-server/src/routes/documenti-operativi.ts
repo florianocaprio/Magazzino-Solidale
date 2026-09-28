@@ -16,6 +16,10 @@ import {
 } from "../lib/centroScope";
 import { buildDettaglio, canAccessBollaOperativa } from "./bolle";
 import { getTrasferimentoWithRighe } from "./trasferimenti";
+import {
+  canReadLinkedM4Document,
+  m5bLinkedM4ListScope,
+} from "../lib/m5bDocumentLink";
 
 const router: IRouter = Router();
 
@@ -223,6 +227,7 @@ async function queryDocumentRows(
       LEFT JOIN enti_destinatari ed ON ed.id = b.ente_destinatario_id
       LEFT JOIN magazzini m ON m.id = b.magazzino_id
       WHERE ${access.canReadBolle}
+        AND ${m5bLinkedM4ListScope(req.user!, "bolla", sql`b.id`)}
         AND (${centroId}::integer IS NULL OR b.tipo_destinatario = 'ente' OR ben.centro_ascolto_id = ${centroId})
         AND (${areaId}::integer IS NULL OR COALESCE(ben.area_operativa_id, b.area_operativa_id_snapshot) = ${areaId})
         AND (${zonaId}::integer IS NULL OR (b.tipo_destinatario = 'ente' AND ${areaId}::integer IS NOT NULL) OR (b.tipo_destinatario = 'beneficiario' AND ben.zona_uds_id = ${zonaId}))
@@ -248,6 +253,7 @@ async function queryDocumentRows(
       LEFT JOIN magazzini mo ON mo.id = t.magazzino_origine_id
       LEFT JOIN magazzini md ON md.id = t.magazzino_destino_id
       WHERE ${access.canReadTransfers} AND t.mensa_id IS NULL
+        AND ${m5bLinkedM4ListScope(req.user!, "trasferimento", sql`t.id`)}
     ), filtrati AS (
       SELECT * FROM documenti
       WHERE ${warehouseScope}
@@ -398,6 +404,10 @@ router.get("/documenti-operativi/:tipo/:id", async (req, res) => {
       res.status(404).json({ error: "Documento non trovato" });
       return;
     }
+    if (!(await canReadLinkedM4Document(req.user!, "bolla", id))) {
+      res.status(404).json({ error: "Documento non trovato" });
+      return;
+    }
     if (
       !(await canAccessBollaOperativa(
         detail,
@@ -423,6 +433,10 @@ router.get("/documenti-operativi/:tipo/:id", async (req, res) => {
     }
     const detail = await getTrasferimentoWithRighe(id);
     if (!detail || detail.mensaId != null) {
+      res.status(404).json({ error: "Documento non trovato" });
+      return;
+    }
+    if (!(await canReadLinkedM4Document(req.user!, "trasferimento", id))) {
       res.status(404).json({ error: "Documento non trovato" });
       return;
     }

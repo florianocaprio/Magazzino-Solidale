@@ -162,115 +162,119 @@ export async function normalizeTransferRows(
  * generiche e Mensa mantengono soltanto RBAC/scope e validazione dell'origine.
  * Spedizione FEFO e ricezione restano nel medesimo workflow /trasferimenti.
  */
+export async function createTransferRequestTx(
+  tx: TransferTransaction,
+  input: TransferRequestInput,
+  codice: string,
+): Promise<TransferRequestResult> {
+  if (input.command) {
+    await lockDocumentCommand(
+      tx,
+      "trasferimento.create",
+      input.command.idempotencyKey,
+    );
+    const receipt = await loadDocumentCommand(tx, {
+      tipoComando: "trasferimento.create",
+      idempotencyKey: input.command.idempotencyKey,
+    });
+    if (receipt) {
+      const [existing] = await tx
+        .select()
+        .from(trasferimentiTable)
+        .where(eq(trasferimentiTable.id, receipt.aggregatoId))
+        .for("update");
+      if (!existing) {
+        throw new TransferRequestError(
+          409,
+          "La ricevuta idempotente non corrisponde più al Trasferimento",
+        );
+      }
+      await input.authorizeCurrent?.(tx, existing);
+      validateDocumentCommand(receipt, {
+        tipoComando: "trasferimento.create",
+        idempotencyKey: input.command.idempotencyKey,
+        requestHash: input.command.requestHash,
+        actorUserId: input.command.actorUserId,
+        aggregatoTipo: "trasferimento",
+      });
+      return { ...existing, idempotentReplay: true };
+    }
+    await requireOperationalMagazzino(tx, input.magazzinoOrigineId);
+    await requireOperationalMagazzino(tx, input.magazzinoDestinoId);
+  }
+  await input.beforeCreate?.(tx);
+  const normalizedRows = await normalizeTransferRows(tx, input.righe);
+  const [created] = await tx
+    .insert(trasferimentiTable)
+    .values({
+      codice,
+      magazzinoOrigineId: input.magazzinoOrigineId,
+      magazzinoDestinoId: input.magazzinoDestinoId,
+      dataRichiesta: input.dataRichiesta,
+      trasportatoreVolontarioId: input.trasportatoreVolontarioId ?? null,
+      trasportatoreNome: input.trasportatoreNome ?? null,
+      note: input.note ?? null,
+      operatoreId: input.audit ? auditUserId(input.audit) : input.operatoreId,
+      mensaId: input.mensaId ?? null,
+      idempotencyKey: input.idempotencyKey ?? null,
+    })
+    .returning();
+  if (input.audit) {
+    await recordAuditEvent(tx, {
+      command: input.audit,
+      azione: "TRASFERIMENTO_CREATO",
+      entitaTipo: "trasferimento",
+      entitaId: created.id,
+      documentoTipo: "trasferimento",
+      documentoId: created.id,
+      magazzinoIdSnapshot: created.magazzinoOrigineId,
+      dataOperativa: created.dataRichiesta,
+      changes: auditFields({ statoNuovo: created.stato }, ["statoNuovo"]),
+      metadata: auditFields(
+        {
+          magazzinoOrigineId: created.magazzinoOrigineId,
+          magazzinoDestinoId: created.magazzinoDestinoId,
+          numeroRighe: normalizedRows.length,
+        },
+        ["magazzinoOrigineId", "magazzinoDestinoId", "numeroRighe"],
+      ),
+    });
+  }
+  await tx.insert(trasferimentoRigheTable).values(
+    normalizedRows.map((row) => ({
+      trasferimentoId: created.id,
+      prodottoId: row.prodottoId,
+      lottoId: row.lottoId ?? null,
+      quantita: row.quantita,
+      unitaMisura: row.unitaMisura,
+      note: row.note ?? null,
+    })),
+  );
+  await input.afterCreate?.(tx, created);
+  if (input.command) {
+    await storeDocumentCommand(tx, {
+      tipoComando: "trasferimento.create",
+      idempotencyKey: input.command.idempotencyKey,
+      requestHash: input.command.requestHash,
+      aggregatoTipo: "trasferimento",
+      aggregatoId: created.id,
+      versioneRisultante: created.versione,
+      resultSnapshot: {
+        id: created.id,
+        codice: created.codice,
+        stato: created.stato,
+        versione: created.versione,
+      },
+      actorUserId: input.command.actorUserId,
+    });
+  }
+  return { ...created, idempotentReplay: false };
+}
+
 export async function createTransferRequest(
   input: TransferRequestInput,
 ): Promise<TransferRequestResult> {
   return withDocumentCodeRetry("TRASM", (codice) =>
-    db.transaction(async (tx) => {
-      if (input.command) {
-        await lockDocumentCommand(
-          tx,
-          "trasferimento.create",
-          input.command.idempotencyKey,
-        );
-        const receipt = await loadDocumentCommand(tx, {
-          tipoComando: "trasferimento.create",
-          idempotencyKey: input.command.idempotencyKey,
-        });
-        if (receipt) {
-          const [existing] = await tx
-            .select()
-            .from(trasferimentiTable)
-            .where(eq(trasferimentiTable.id, receipt.aggregatoId))
-            .for("update");
-          if (!existing) {
-            throw new TransferRequestError(
-              409,
-              "La ricevuta idempotente non corrisponde più al Trasferimento",
-            );
-          }
-          await input.authorizeCurrent?.(tx, existing);
-          validateDocumentCommand(receipt, {
-            tipoComando: "trasferimento.create",
-            idempotencyKey: input.command.idempotencyKey,
-            requestHash: input.command.requestHash,
-            actorUserId: input.command.actorUserId,
-            aggregatoTipo: "trasferimento",
-          });
-          return { ...existing, idempotentReplay: true };
-        }
-        await requireOperationalMagazzino(tx, input.magazzinoOrigineId);
-        await requireOperationalMagazzino(tx, input.magazzinoDestinoId);
-      }
-      await input.beforeCreate?.(tx);
-      const normalizedRows = await normalizeTransferRows(tx, input.righe);
-      const [created] = await tx
-        .insert(trasferimentiTable)
-        .values({
-          codice,
-          magazzinoOrigineId: input.magazzinoOrigineId,
-          magazzinoDestinoId: input.magazzinoDestinoId,
-          dataRichiesta: input.dataRichiesta,
-          trasportatoreVolontarioId: input.trasportatoreVolontarioId ?? null,
-          trasportatoreNome: input.trasportatoreNome ?? null,
-          note: input.note ?? null,
-          operatoreId: input.audit
-            ? auditUserId(input.audit)
-            : input.operatoreId,
-          mensaId: input.mensaId ?? null,
-          idempotencyKey: input.idempotencyKey ?? null,
-        })
-        .returning();
-      if (input.audit) {
-        await recordAuditEvent(tx, {
-          command: input.audit,
-          azione: "TRASFERIMENTO_CREATO",
-          entitaTipo: "trasferimento",
-          entitaId: created.id,
-          documentoTipo: "trasferimento",
-          documentoId: created.id,
-          magazzinoIdSnapshot: created.magazzinoOrigineId,
-          dataOperativa: created.dataRichiesta,
-          changes: auditFields({ statoNuovo: created.stato }, ["statoNuovo"]),
-          metadata: auditFields(
-            {
-              magazzinoOrigineId: created.magazzinoOrigineId,
-              magazzinoDestinoId: created.magazzinoDestinoId,
-              numeroRighe: normalizedRows.length,
-            },
-            ["magazzinoOrigineId", "magazzinoDestinoId", "numeroRighe"],
-          ),
-        });
-      }
-      await tx.insert(trasferimentoRigheTable).values(
-        normalizedRows.map((row) => ({
-          trasferimentoId: created.id,
-          prodottoId: row.prodottoId,
-          lottoId: row.lottoId ?? null,
-          quantita: row.quantita,
-          unitaMisura: row.unitaMisura,
-          note: row.note ?? null,
-        })),
-      );
-      await input.afterCreate?.(tx, created);
-      if (input.command) {
-        await storeDocumentCommand(tx, {
-          tipoComando: "trasferimento.create",
-          idempotencyKey: input.command.idempotencyKey,
-          requestHash: input.command.requestHash,
-          aggregatoTipo: "trasferimento",
-          aggregatoId: created.id,
-          versioneRisultante: created.versione,
-          resultSnapshot: {
-            id: created.id,
-            codice: created.codice,
-            stato: created.stato,
-            versione: created.versione,
-          },
-          actorUserId: input.command.actorUserId,
-        });
-      }
-      return { ...created, idempotentReplay: false };
-    }),
+    db.transaction((tx) => createTransferRequestTx(tx, input, codice)),
   );
 }

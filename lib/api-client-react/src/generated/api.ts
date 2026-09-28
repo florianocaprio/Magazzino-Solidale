@@ -211,6 +211,7 @@ import type {
   FseReportingPreview,
   FseResolutionInput,
   FseVersionInput,
+  GetDocumentoOperativoRichiesta200,
   GetFseReportingPreviewParams,
   GetInterventiRiepilogoVisteParams,
   GetMapsConsegneParams,
@@ -406,6 +407,9 @@ import type {
   RichiestaMagazzinoCancel,
   RichiestaMagazzinoCommandResult,
   RichiestaMagazzinoCreate,
+  RichiestaMagazzinoDocumenti,
+  RichiestaMagazzinoDocumentoCreate,
+  RichiestaMagazzinoDocumentoResult,
   RichiestaMagazzinoEvent,
   RichiestaMagazzinoUpdate,
   RichiestaMagazzinoVersionCommand,
@@ -1026,6 +1030,237 @@ export function useGetRichiestaMagazzinoStorico<TData = Awaited<ReturnType<typeo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRichiestaMagazzinoStoricoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRichiestaMagazzinoDocumentiUrl = (id: number,) => {
+
+
+
+
+  return `/api/richieste-magazzino/${id}/documenti`
+}
+
+/**
+ * @summary Documento M4 corrente e storico annullati, minimizzati allo scope richiesta
+ */
+export const getRichiestaMagazzinoDocumenti = async (id: number, options?: RequestInit): Promise<RichiestaMagazzinoDocumenti> => {
+
+  return customFetch<RichiestaMagazzinoDocumenti>(getGetRichiestaMagazzinoDocumentiUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRichiestaMagazzinoDocumentiQueryKey = (id: number,) => {
+    return [
+    `/api/richieste-magazzino/${id}/documenti`
+    ] as const;
+    }
+
+
+export const getGetRichiestaMagazzinoDocumentiQueryOptions = <TData = Awaited<ReturnType<typeof getRichiestaMagazzinoDocumenti>>, TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRichiestaMagazzinoDocumenti>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRichiestaMagazzinoDocumentiQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRichiestaMagazzinoDocumenti>>> = ({ signal }) => getRichiestaMagazzinoDocumenti(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRichiestaMagazzinoDocumenti>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRichiestaMagazzinoDocumentiQueryResult = NonNullable<Awaited<ReturnType<typeof getRichiestaMagazzinoDocumenti>>>
+export type GetRichiestaMagazzinoDocumentiQueryError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>
+
+
+/**
+ * @summary Documento M4 corrente e storico annullati, minimizzati allo scope richiesta
+ */
+
+export function useGetRichiestaMagazzinoDocumenti<TData = Awaited<ReturnType<typeof getRichiestaMagazzinoDocumenti>>, TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRichiestaMagazzinoDocumenti>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRichiestaMagazzinoDocumentiQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateRichiestaMagazzinoDocumentoUrl = (id: number,) => {
+
+
+
+
+  return `/api/richieste-magazzino/${id}/documento`
+}
+
+/**
+ * @summary Crea atomicamente documento M4 e relazione per una richiesta presa in carico
+ */
+export const createRichiestaMagazzinoDocumento = async (id: number,
+    richiestaMagazzinoDocumentoCreate: RichiestaMagazzinoDocumentoCreate, options?: RequestInit): Promise<RichiestaMagazzinoDocumentoResult> => {
+
+  return customFetch<RichiestaMagazzinoDocumentoResult>(getCreateRichiestaMagazzinoDocumentoUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      richiestaMagazzinoDocumentoCreate,)
+  }
+);}
+
+
+
+
+export const getCreateRichiestaMagazzinoDocumentoMutationOptions = <TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRichiestaMagazzinoDocumento>>, TError,{id: number;data: BodyType<RichiestaMagazzinoDocumentoCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRichiestaMagazzinoDocumento>>, TError,{id: number;data: BodyType<RichiestaMagazzinoDocumentoCreate>}, TContext> => {
+
+const mutationKey = ['createRichiestaMagazzinoDocumento'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRichiestaMagazzinoDocumento>>, {id: number;data: BodyType<RichiestaMagazzinoDocumentoCreate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createRichiestaMagazzinoDocumento(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateRichiestaMagazzinoDocumentoMutationResult = NonNullable<Awaited<ReturnType<typeof createRichiestaMagazzinoDocumento>>>
+    export type CreateRichiestaMagazzinoDocumentoMutationBody = BodyType<RichiestaMagazzinoDocumentoCreate>
+    export type CreateRichiestaMagazzinoDocumentoMutationError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>
+
+    /**
+ * @summary Crea atomicamente documento M4 e relazione per una richiesta presa in carico
+ */
+export const useCreateRichiestaMagazzinoDocumento = <TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response | RichiestaMagazzino409Response>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRichiestaMagazzinoDocumento>>, TError,{id: number;data: BodyType<RichiestaMagazzinoDocumentoCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createRichiestaMagazzinoDocumento>>,
+        TError,
+        {id: number;data: BodyType<RichiestaMagazzinoDocumentoCreate>},
+        TContext
+      > => {
+      return useMutation(getCreateRichiestaMagazzinoDocumentoMutationOptions(options));
+    }
+
+export const getGetDocumentoOperativoRichiestaUrl = (tipo: 'bolla' | 'trasferimento',
+    id: number,) => {
+
+
+
+
+  return `/api/documenti-operativi/${tipo}/${id}/richiesta`
+}
+
+/**
+ * @summary Riferimento minimizzato alla Richiesta origine del documento M4
+ */
+export const getDocumentoOperativoRichiesta = async (tipo: 'bolla' | 'trasferimento',
+    id: number, options?: RequestInit): Promise<GetDocumentoOperativoRichiesta200> => {
+
+  return customFetch<GetDocumentoOperativoRichiesta200>(getGetDocumentoOperativoRichiestaUrl(tipo,id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDocumentoOperativoRichiestaQueryKey = (tipo: 'bolla' | 'trasferimento',
+    id: number,) => {
+    return [
+    `/api/documenti-operativi/${tipo}/${id}/richiesta`
+    ] as const;
+    }
+
+
+export const getGetDocumentoOperativoRichiestaQueryOptions = <TData = Awaited<ReturnType<typeof getDocumentoOperativoRichiesta>>, TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>>(tipo: 'bolla' | 'trasferimento',
+    id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDocumentoOperativoRichiesta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDocumentoOperativoRichiestaQueryKey(tipo,id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocumentoOperativoRichiesta>>> = ({ signal }) => getDocumentoOperativoRichiesta(tipo,id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(tipo && id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDocumentoOperativoRichiesta>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDocumentoOperativoRichiestaQueryResult = NonNullable<Awaited<ReturnType<typeof getDocumentoOperativoRichiesta>>>
+export type GetDocumentoOperativoRichiestaQueryError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>
+
+
+/**
+ * @summary Riferimento minimizzato alla Richiesta origine del documento M4
+ */
+
+export function useGetDocumentoOperativoRichiesta<TData = Awaited<ReturnType<typeof getDocumentoOperativoRichiesta>>, TError = ErrorType<RichiestaMagazzino400Response | RichiestaMagazzino401Response | RichiestaMagazzino403Response | RichiestaMagazzino404Response>>(
+ tipo: 'bolla' | 'trasferimento',
+    id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDocumentoOperativoRichiesta>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDocumentoOperativoRichiestaQueryOptions(tipo,id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { RichiestaMagazzinoDocumentoSummary } from './richiestaMagazzinoDocumentoSummary';
 import type { RichiestaMagazzinoModalitaPreferita } from './richiestaMagazzinoModalitaPreferita';
 import type { RichiestaMagazzinoPriorita } from './richiestaMagazzinoPriorita';
 import type { RichiestaMagazzinoSorgente } from './richiestaMagazzinoSorgente';
@@ -73,4 +74,6 @@ export interface RichiestaMagazzino {
   motivoAnnullamento?: string | null;
   dataCreazione: Date;
   dataAggiornamento: Date;
+  documentoCorrente?: RichiestaMagazzinoDocumentoSummary | null;
+  documentiPrecedenti?: RichiestaMagazzinoDocumentoSummary[];
 }

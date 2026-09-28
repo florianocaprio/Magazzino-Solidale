@@ -1,4 +1,5 @@
 import type { Response } from "express";
+import { M5bLinkError } from "./m5bDocumentLink";
 import { db } from "@workspace/db";
 import {
   bolleTable,
@@ -69,6 +70,10 @@ export class BollaActionError extends Error {
 }
 
 export function handleBollaActionError(err: unknown, res: Response): boolean {
+  if (err instanceof M5bLinkError) {
+    res.status(err.status).json({ error: err.message });
+    return true;
+  }
   if (err instanceof BeneficiaryReportingScopeError) {
     res.status(403).json({ error: err.message });
     return true;

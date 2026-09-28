@@ -39,7 +39,6 @@ import {
   isDocumentCommandError,
 } from "../lib/documentCommand";
 import {
-  requireCurrentCommandActor,
   CurrentCommandActorError,
 } from "../lib/currentCommandActor";
 import {
@@ -48,6 +47,21 @@ import {
   recordAuditEvent,
 } from "../lib/auditEvent";
 import type { InventoryTransaction } from "../lib/scaricoInventory";
+import {
+  currentM5bDocumentLink,
+  lockM5bRequest,
+  M5bLinkError,
+  requestDocumentSummaries,
+} from "../lib/m5bDocumentLink";
+import { lockInterventionMaterialPath } from "../lib/m5bInterventionDelegation";
+import {
+  canReadM5bRequest as canRead,
+  hasM5bArea as hasArea,
+  hasM5bGrant as hasGrant,
+  m5bRequestScopePredicate,
+  m5bTerritory,
+  requireCurrentM5bActor,
+} from "../lib/m5bRequestAccess";
 
 const router: IRouter = Router();
 router.use("/richieste-magazzino", requireModulo("MAGAZZINO_SOLIDALE"));
@@ -110,7 +124,7 @@ const cancelSchema = z.strictObject({
   motivo: requiredText(500),
 });
 type Create = z.infer<typeof createSchema>;
-type Actor = Awaited<ReturnType<typeof requireCurrentCommandActor>>;
+type Actor = Awaited<ReturnType<typeof requireCurrentM5bActor>>;
 
 class RequestError extends Error {
   constructor(
@@ -135,7 +149,13 @@ const conflict = (message: string) =>
   new RequestError(409, "RICHIESTA_CONFLITTO", message);
 
 function sendError(res: Response, error: unknown, correlationId: string) {
-  if (error instanceof RequestError) {
+  if (error instanceof M5bLinkError) {
+    res.status(error.status).json({
+      code: "RICHIESTA_CONFLITTO",
+      error: error.message,
+      correlationId,
+    });
+  } else if (error instanceof RequestError) {
     res
       .status(error.status)
       .json({ code: error.code, error: error.message, correlationId });
@@ -172,52 +192,9 @@ function databaseCode(error: unknown): string | null {
   return null;
 }
 
-function hasGrant(
-  actor: { isAdmin: boolean; permessi: string[] | null },
-  permission: string,
-) {
-  return actor.isAdmin || (actor.permessi ?? []).includes(permission);
-}
-function hasArea(
-  actor: { isAdmin: boolean; aree: string[] | null },
-  area: string,
-) {
-  return actor.isAdmin || (actor.aree ?? []).includes(area);
-}
-function canRead(
-  actor: {
-    isAdmin: boolean;
-    permessi: string[] | null;
-    aree: string[] | null;
-    areaOperativaId: number | null;
-    centroAscoltoId: number | null;
-    zonaUdsId: number | null;
-  },
-  row: RichiestaMagazzino,
-) {
-  if (!hasGrant(actor, "richieste_magazzino.view")) return false;
-  if (
-    actor.areaOperativaId != null &&
-    actor.areaOperativaId !== row.areaOperativaId
-  )
-    return false;
-  if (
-    actor.centroAscoltoId != null &&
-    actor.centroAscoltoId !== row.centroAscoltoId
-  )
-    return false;
-  if (hasArea(actor, "magazzino")) return true;
-  if (actor.zonaUdsId != null && actor.zonaUdsId !== row.zonaUdsIdSnapshot)
-    return false;
-  return (
-    hasArea(actor, "sociale") &&
-    row.tipoDestinatario === "beneficiario" &&
-    (actor.centroAscoltoId == null ||
-      actor.centroAscoltoId === row.centroAscoltoId)
-  );
-}
 function canSocialWrite(actor: Actor, row: RichiestaMagazzino) {
   return (
+    canRead(actor, row) &&
     hasArea(actor, "sociale") &&
     row.tipoDestinatario === "beneficiario" &&
     (actor.centroAscoltoId == null ||
@@ -263,30 +240,7 @@ function parseId(value: string): number {
   if (!Number.isSafeInteger(id)) throw invalid("ID non valido");
   return id;
 }
-function scopePredicate(req: Request): SQL {
-  const user = actorFromRequest(req);
-  const parts: SQL[] = [];
-  if (user.areaOperativaId != null)
-    parts.push(
-      eq(richiesteMagazzinoTable.areaOperativaId, user.areaOperativaId),
-    );
-  if (user.centroAscoltoId != null)
-    parts.push(
-      eq(richiesteMagazzinoTable.centroAscoltoId, user.centroAscoltoId),
-    );
-  if (!hasArea(user, "magazzino")) {
-    if (!hasArea(user, "sociale")) return sql`false`;
-    parts.push(eq(richiesteMagazzinoTable.tipoDestinatario, "beneficiario"));
-    if (user.centroAscoltoId != null)
-      parts.push(
-        eq(richiesteMagazzinoTable.centroAscoltoId, user.centroAscoltoId),
-      );
-    if (user.zonaUdsId != null)
-      parts.push(eq(richiesteMagazzinoTable.zonaUdsIdSnapshot, user.zonaUdsId));
-  }
-  return and(...parts) ?? sql`true`;
-}
-async function requireLiveSubject(
+export async function requireLiveSubject(
   tx: InventoryTransaction,
   row: RichiestaMagazzino,
 ) {
@@ -379,6 +333,7 @@ async function buildCreate(
   actor: Actor,
   input: Create,
 ) {
+  if (m5bTerritory(actor) === "none") throw denied();
   const social = input.tipoDestinatario === "beneficiario";
   if (social) {
     if (
@@ -662,7 +617,7 @@ router.get(
       const page = integer("page", 1)!;
       const limit = integer("limit", 30)!;
       if (limit > 100) throw invalid("Limite massimo 100");
-      const filters: SQL[] = [scopePredicate(req)];
+      const filters: SQL[] = [m5bRequestScopePredicate(actorFromRequest(req))];
       const state = string("stato");
       if (
         state != null &&
@@ -768,8 +723,23 @@ router.get(
         )
         .limit(limit)
         .offset((page - 1) * limit);
+      const actor = actorFromRequest(req);
+      const documents = await requestDocumentSummaries(
+        rows.map((row) => row.id),
+        {
+          bolla: actor.isAdmin || (actor.permessi ?? []).includes("bolle.view"),
+          trasferimento:
+            actor.isAdmin || (actor.permessi ?? []).includes("magazzino.view"),
+          areaOperativaId: actor.areaOperativaId,
+          centroAscoltoId: actor.centroAscoltoId,
+        },
+      );
       res.json({
-        items: rows.map((row) => view(row, actorFromRequest(req))),
+        items: rows.map((row) => ({
+          ...view(row, actor),
+          documentoCorrente:
+            (documents.get(row.id) ?? []).find((item) => item.corrente) ?? null,
+        })),
         total: totalRow.value,
         page,
         limit,
@@ -829,7 +799,20 @@ router.get(
         .from(richiesteMagazzinoTable)
         .where(eq(richiesteMagazzinoTable.id, id));
       if (!row || !canRead(actorFromRequest(req), row)) throw missing();
-      res.json(view(row, actorFromRequest(req)));
+      const actor = actorFromRequest(req);
+      const documents = await requestDocumentSummaries([id], {
+        bolla: actor.isAdmin || (actor.permessi ?? []).includes("bolle.view"),
+        trasferimento:
+          actor.isAdmin || (actor.permessi ?? []).includes("magazzino.view"),
+        areaOperativaId: actor.areaOperativaId,
+        centroAscoltoId: actor.centroAscoltoId,
+      });
+      const links = documents.get(id) ?? [];
+      res.json({
+        ...view(row, actor),
+        documentoCorrente: links.find((item) => item.corrente) ?? null,
+        documentiPrecedenti: links.filter((item) => !item.corrente),
+      });
     } catch (error) {
       sendError(res, error, correlationId);
     }
@@ -857,7 +840,7 @@ router.post(
       });
       const result = await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
-        const actor = await requireCurrentCommandActor(
+        const actor = await requireCurrentM5bActor(
           tx,
           req.user!.id,
           "richieste_magazzino.create",
@@ -1003,7 +986,7 @@ async function mutate(
     });
     const result = await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, tipoComando, idempotencyKey);
-      const actor = await requireCurrentCommandActor(
+      const actor = await requireCurrentM5bActor(
         tx,
         req.user!.id,
         permission,
@@ -1029,15 +1012,17 @@ async function mutate(
         });
         return receipt.resultSnapshot;
       }
-      if (kind !== "cancel") await requireLiveSubject(tx, before);
-      const [row] = await tx
-        .select()
-        .from(richiesteMagazzinoTable)
-        .where(eq(richiesteMagazzinoTable.id, id))
-        .for("update");
+      if (before.interventoId != null)
+        await lockInterventionMaterialPath(tx, before.interventoId);
+      const row = await lockM5bRequest(tx, id);
       if (!row || !canRead(actor, row)) throw missing();
+      if (kind !== "cancel") await requireLiveSubject(tx, row);
       if (row.versione !== input.versione)
         throw conflict("Versione superata; ricarica la richiesta");
+      if (kind === "cancel" && (await currentM5bDocumentLink(tx, id)))
+        throw conflict(
+          "Annulla prima il documento M4 collegato, se non è ancora uscito",
+        );
       if (kind === "take") {
         if (!hasArea(actor, "magazzino") || row.stato !== "inviata")
           throw conflict("Presa in carico non disponibile");

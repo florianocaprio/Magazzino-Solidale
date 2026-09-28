@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
+import { Link } from "wouter";
 import {
   useListBolle,
   useCreateBolla,
@@ -25,15 +26,20 @@ import {
   useGetImpostazioniStampa,
   useListDocumentiOperativi,
   useGetDocumentoOperativo,
+  useGetDocumentoOperativoRichiesta,
   useGetTrasferimento,
   useAvviaTrasferimento,
   usePreparaTrasferimento,
   useAnnullaTrasferimento,
   useConfermaTrasferimento,
   getDocumentoOperativo,
+  getDocumentoOperativoRichiesta,
+  listBeneficiari,
   exportDocumentiOperativi,
   getListDocumentiOperativiQueryKey,
   getGetDocumentoOperativoQueryKey,
+  getGetDocumentoOperativoRichiestaQueryKey,
+  getListRichiesteMagazzinoQueryKey,
   getGetTrasferimentoQueryKey,
   useListConsegne,
   useGetConsegna,
@@ -156,6 +162,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { TransportReturnPanel } from "@/components/transport-return-panel";
 import i18n from "@/lib/i18n";
+import { shouldFetchBollaBeneficiari } from "@/lib/bolle-beneficiari-query";
 import {
   ModificaTrasferimentoForm,
   NuovoTrasferimentoForm,
@@ -307,11 +314,26 @@ export function CreaiBollaDialog({
     }
   }, [open, lockedBeneficiario, commandIntents]);
   const { data: centri } = useListCentriAscolto();
-  const { data: beneficiari } = useListBeneficiari({
+  const canSearchBeneficiari = open && hasPermission("beneficiari.view");
+  const beneficiariParams = {
     attivo: true,
     ...(centroId !== "all" ? { centroAscoltoId: parseInt(centroId) } : {}),
+  };
+  const { data: beneficiari } = useListBeneficiari(beneficiariParams, {
+    query: {
+      enabled: canSearchBeneficiari,
+      queryKey: getListBeneficiariQueryKey(beneficiariParams),
+    },
   });
-  const { data: allBeneficiari } = useListBeneficiari({ attivo: true });
+  const { data: allBeneficiari } = useListBeneficiari(
+    { attivo: true },
+    {
+      query: {
+        enabled: canSearchBeneficiari,
+        queryKey: getListBeneficiariQueryKey({ attivo: true }),
+      },
+    },
+  );
   const selectedBenef = allBeneficiari?.find(
     (b) => String(b.id) === beneficiarioId,
   );
@@ -865,7 +887,16 @@ function ModificaBollaDialog({
   const [bId, setBId] = useState(String(beneficiarioId));
   const [mId, setMId] = useState(String(magazzinoId));
   const [scanCode, setScanCode] = useState("");
-  const { data: beneficiari } = useListBeneficiari({ attivo: true });
+  const { hasPermission } = useAuth();
+  const { data: beneficiari } = useListBeneficiari(
+    { attivo: true },
+    {
+      query: {
+        enabled: hasPermission("beneficiari.view"),
+        queryKey: getListBeneficiariQueryKey({ attivo: true }),
+      },
+    },
+  );
   const { data: magazzini } = useListMagazzini();
   const updateBolla = useUpdateBolla();
   const queryClient = useQueryClient();
@@ -1408,12 +1439,14 @@ export function BollaDettaglio({
   onClose,
   onCloseLabel,
   hideConsegnaActions,
+  linkedRequest = null,
 }: {
   bollaId: number;
   bollaData?: BollaDettaglioDto;
   onClose?: () => void;
   onCloseLabel?: string;
   hideConsegnaActions?: boolean;
+  linkedRequest?: boolean | null;
 }) {
   const { hasPermission } = useAuth();
   const canManage = hasPermission("bolle.manage");
@@ -1454,7 +1487,15 @@ export function BollaDettaglio({
   );
   const bolla = bollaData ?? fetchedBolla;
   const isLoading = bollaData == null && legacyBollaLoading;
-  const { data: beneficiari } = useListBeneficiari();
+  const { data: beneficiari } = useListBeneficiari(undefined, {
+    query: {
+      enabled: shouldFetchBollaBeneficiari(
+        hasPermission("beneficiari.view"),
+        linkedRequest,
+      ),
+      queryKey: getListBeneficiariQueryKey(),
+    },
+  });
   const bollaCentroId =
     beneficiari?.find((b) => b.id === bolla?.beneficiarioId)?.centroAscoltoId ??
     null;
@@ -1524,6 +1565,13 @@ export function BollaDettaglio({
   );
 
   const invalidateAll = () => {
+    queryClient.invalidateQueries({
+      queryKey: getListRichiesteMagazzinoQueryKey(),
+    });
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        String(query.queryKey[0]).startsWith("/api/richieste-magazzino/"),
+    });
     queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
     queryClient.invalidateQueries({
       queryKey: getGetDocumentoOperativoQueryKey("bolla", bollaId),
@@ -2144,16 +2192,19 @@ export function BollaDettaglio({
         </div>
       </div>
 
-      {isBozza && canManage && bolla.tipoDestinatario === "beneficiario" && (
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1.5 h-8"
-          onClick={() => setEditOpen(true)}
-        >
-          <Pencil className="h-3.5 w-3.5" /> {t("bolle.modificaIntestazione")}
-        </Button>
-      )}
+      {isBozza &&
+        canManage &&
+        linkedRequest === false &&
+        bolla.tipoDestinatario === "beneficiario" && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 h-8"
+            onClick={() => setEditOpen(true)}
+          >
+            <Pencil className="h-3.5 w-3.5" /> {t("bolle.modificaIntestazione")}
+          </Button>
+        )}
 
       <Separator />
 
@@ -3032,6 +3083,13 @@ function TrasferimentoDettaglioComune({
 
   const invalidate = () => {
     queryClient.invalidateQueries({
+      queryKey: getListRichiesteMagazzinoQueryKey(),
+    });
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        String(query.queryKey[0]).startsWith("/api/richieste-magazzino/"),
+    });
+    queryClient.invalidateQueries({
       queryKey: getGetTrasferimentoQueryKey(trasferimentoId),
     });
     queryClient.invalidateQueries({
@@ -3399,6 +3457,22 @@ function DocumentoOperativoDettaglioComune({
       },
     },
   );
+  const { data: sourceRequest } = useGetDocumentoOperativoRichiesta(
+    selection.tipo,
+    selection.id,
+    {
+      query: {
+        enabled: hasPermission("richieste_magazzino.view"),
+        queryKey: [
+          ...getGetDocumentoOperativoRichiestaQueryKey(
+            selection.tipo,
+            selection.id,
+          ),
+          user?.id ?? null,
+        ],
+      },
+    },
+  );
 
   if (isLoading) return <Skeleton className="mt-5 h-48 w-full" />;
   if (isError || !data || data.tipoAggregato !== selection.tipo)
@@ -3410,22 +3484,34 @@ function DocumentoOperativoDettaglioComune({
       </p>
     );
 
-  if (data.tipoAggregato === "bolla")
-    return (
-      <BollaDettaglio
-        bollaId={selection.id}
-        bollaData={data.dettaglio as BollaDettaglioDto}
-        onClose={onClose}
-      />
-    );
-
   return (
-    <TrasferimentoDettaglioComune
-      trasferimentoId={selection.id}
-      trasferimentoData={data.dettaglio as Trasferimento}
-      onClose={onClose}
-      onDraftDirtyChange={onDraftDirtyChange}
-    />
+    <div className="space-y-3">
+      {sourceRequest?.richiesta && (
+        <p className="text-sm">
+          <Link className="underline" href={sourceRequest.richiesta.percorso}>
+            {t("richiesteMagazzino.sourceRequest")}:{" "}
+            {sourceRequest.richiesta.codice}
+          </Link>
+        </p>
+      )}
+      {data.tipoAggregato === "bolla" ? (
+        <BollaDettaglio
+          bollaId={selection.id}
+          bollaData={data.dettaglio as BollaDettaglioDto}
+          onClose={onClose}
+          linkedRequest={
+            sourceRequest === undefined ? null : sourceRequest.richiesta != null
+          }
+        />
+      ) : (
+        <TrasferimentoDettaglioComune
+          trasferimentoId={selection.id}
+          trasferimentoData={data.dettaglio as Trasferimento}
+          onClose={onClose}
+          onDraftDirtyChange={onDraftDirtyChange}
+        />
+      )}
+    </div>
   );
 }
 
@@ -3631,12 +3717,6 @@ export default function Bolle() {
   });
   const { data: magazzini } = useListMagazzini();
   const { data: areeOperative } = useListAreeOperative();
-  const { data: beneficiari } = useListBeneficiari(undefined, {
-    query: {
-      enabled: canViewBolle,
-      queryKey: getListBeneficiariQueryKey(),
-    },
-  });
   const { data: impostazioni } = useGetImpostazioniStampa();
   const consegnaBolla = useConsegnaBolla();
   const { toast } = useToast();
@@ -3663,6 +3743,14 @@ export default function Bolle() {
       const documento = await getDocumentoOperativo("bolla", bollaId);
       if (documento.tipoAggregato !== "bolla")
         throw new Error("tipo documento non coerente");
+      // Il PDF legacy può usare il Centro della directory; un documento M5B
+      // collegato usa soltanto il DTO autorizzato e non carica la directory.
+      let beneficiari: BeneficiarioLite[] | undefined;
+      if (hasPermission("richieste_magazzino.view")) {
+        const origine = await getDocumentoOperativoRichiesta("bolla", bollaId);
+        if (!origine.richiesta && hasPermission("beneficiari.view"))
+          beneficiari = await listBeneficiari();
+      }
       await generateBollaPdfFromData(documento.dettaglio as BollaDettaglioDto, {
         beneficiari,
         centri,

@@ -262,7 +262,12 @@ describe("POST /carichi — Magazzino 2.0A", () => {
     const movements = await db
       .select()
       .from(movimentiTable)
-      .where(eq(movimentiTable.entitaOrigineId, response.body.id));
+      .where(
+        and(
+          eq(movimentiTable.entitaOrigineTipo, "carico_magazzino"),
+          eq(movimentiTable.entitaOrigineId, response.body.id),
+        ),
+      );
     expect(movements).toHaveLength(2);
     expect(
       movements.every(
@@ -323,7 +328,12 @@ describe("POST /carichi — Magazzino 2.0A", () => {
     const movements = await db
       .select()
       .from(movimentiTable)
-      .where(eq(movimentiTable.entitaOrigineId, first.body.id));
+      .where(
+        and(
+          eq(movimentiTable.entitaOrigineTipo, "carico_magazzino"),
+          eq(movimentiTable.entitaOrigineId, first.body.id),
+        ),
+      );
     expect(movements).toHaveLength(1);
     const auditEvents = await db
       .select()
@@ -365,7 +375,13 @@ describe("POST /carichi — Magazzino 2.0A", () => {
     const [movement] = await db
       .select()
       .from(movimentiTable)
-      .where(eq(movimentiTable.entitaOrigineId, response.body.id));
+      .where(
+        and(
+          eq(movimentiTable.entitaOrigineTipo, "carico_magazzino"),
+          eq(movimentiTable.entitaOrigineId, response.body.id),
+          eq(movimentiTable.magazzinoId, magazzinoId),
+        ),
+      );
     const [audit] = await db
       .select()
       .from(auditEventiTable)

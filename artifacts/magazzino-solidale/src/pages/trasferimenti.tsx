@@ -88,7 +88,7 @@ import {
   useUnsavedChangesGuard,
 } from "@/hooks/use-unsaved-changes-guard";
 
-interface RigaDraft {
+export interface RigaDraft {
   key: string;
   prodottoId: string;
   quantita: string;
@@ -96,7 +96,7 @@ interface RigaDraft {
   lottoId: string;
 }
 
-function newRiga(): RigaDraft {
+export function newRiga(): RigaDraft {
   return {
     key: Math.random().toString(36).slice(2),
     prodottoId: "",

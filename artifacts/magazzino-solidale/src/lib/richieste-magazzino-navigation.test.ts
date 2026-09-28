@@ -53,6 +53,10 @@ describe("M5A — unica coda e ingresso autorizzato", () => {
         "take",
         "cancelReason",
         "notesVisible",
+        "prepareDocument",
+        "openDocument",
+        "previousDocuments",
+        "sourceRequest",
       ] as const) {
         expect(labels[key].trim().length).toBeGreaterThan(0);
       }

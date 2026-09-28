@@ -51,7 +51,12 @@ describe("Consegne: paginazione, RBAC e scope storico", () => {
     }
     await db.update(consegneTable).set({ codice: "CON-RICERCA-UNIVOCA" }).where(eq(consegneTable.id, ids[117]));
 
-    const app = globalApp(["consegne.view", "consegne.export"]);
+    const app = makeScopedApp(consegneRouter, {
+      id: 1,
+      centroAscoltoId: centro.id,
+      areaOperativaId: null,
+      permessi: ["consegne.view", "consegne.export"],
+    });
     const first = await request(app).get("/consegne?page=1&pageSize=25");
     expect(first.status).toBe(200);
     expect(first.body).toMatchObject({ page: 1, pageSize: 25, total: 205, totalPages: 9 });

@@ -54,6 +54,7 @@ import fseImportazioniRouter from "./fse-importazioni";
 import fseRouter from "./fse";
 import mapsRouter from "./maps";
 import richiesteMagazzinoRouter from "./richieste-magazzino";
+import richiesteMagazzinoDocumentiRouter from "./richieste-magazzino-documenti";
 import authRouter from "./auth";
 import utentiRouter from "./utenti";
 import ruoliRouter from "./ruoli";
@@ -131,6 +132,7 @@ router.use(fseImportazioniRouter);
 router.use(fseRouter);
 router.use(mapsRouter);
 router.use(richiesteMagazzinoRouter);
+router.use(richiesteMagazzinoDocumentiRouter);
 
 // Admin-only management endpoints.
 router.use(areeRouter);

@@ -7,6 +7,7 @@ import {
   updateRichiestaMagazzino,
   takeRichiestaMagazzino,
   cancelRichiestaMagazzino,
+  createRichiestaMagazzinoDocumento,
   getListRichiesteMagazzinoQueryKey,
   useGetRichiestaMagazzino,
   getGetRichiestaMagazzinoQueryKey,
@@ -14,12 +15,21 @@ import {
   getListBeneficiariQueryKey,
   useGetRichiestaMagazzinoStorico,
   useListBeneficiari,
+  useListMagazzini,
+  getListMagazziniQueryKey,
+  useListProdotti,
+  getListProdottiQueryKey,
   useListRichiesteMagazzino,
   type RichiestaMagazzino,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { useCommandIntentRegistry } from "@/lib/command-intent";
+import { RigheEditor, newRiga, type RigaDraft } from "@/pages/trasferimenti";
+import {
+  transferRowsForPayload,
+  transferRowsHaveRequiredLots,
+} from "@/lib/trasferimento-draft";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -63,6 +73,8 @@ export default function RichiesteMagazzino() {
   const canTake =
     hasArea("magazzino") && hasPermission("richieste_magazzino.take");
   const canCancel = hasPermission("richieste_magazzino.cancel");
+  const canPrepare =
+    hasArea("magazzino") && hasPermission("richieste_magazzino.prepare");
   const contextBeneficiaryId = queryId("beneficiarioId");
   const contextInterventionId = queryId("interventoId");
   const contextRequestId = queryId("richiestaId");
@@ -90,6 +102,8 @@ export default function RichiesteMagazzino() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [warehouseId, setWarehouseId] = useState("");
+  const [transferRows, setTransferRows] = useState<RigaDraft[]>([newRiga()]);
   const listParams = useMemo(
     () => ({
       page,
@@ -99,7 +113,13 @@ export default function RichiesteMagazzino() {
     }),
     [page, status, contextBeneficiaryId],
   );
-  const list = useListRichiesteMagazzino(listParams);
+  const list = useListRichiesteMagazzino(listParams, {
+    query: {
+      queryKey: getListRichiesteMagazzinoQueryKey(listParams),
+      staleTime: 0,
+      refetchOnWindowFocus: "always",
+    },
+  });
   const interventionParams = {
     stato: "aperte" as const,
     interventoId: contextInterventionId ?? undefined,
@@ -115,12 +135,16 @@ export default function RichiesteMagazzino() {
     query: {
       queryKey: getGetRichiestaMagazzinoQueryKey(selectedId ?? 0),
       enabled: selectedId != null,
+      staleTime: 0,
+      refetchOnWindowFocus: "always",
     },
   });
   const history = useGetRichiestaMagazzinoStorico(selectedId ?? 0, {
     query: {
       queryKey: getGetRichiestaMagazzinoStoricoQueryKey(selectedId ?? 0),
       enabled: selectedId != null,
+      staleTime: 0,
+      refetchOnWindowFocus: "always",
     },
   });
   const beneficiaryParams = {
@@ -145,12 +169,36 @@ export default function RichiesteMagazzino() {
     },
   });
   const row = detail.data;
+  const warehouses = useListMagazzini({
+    query: { enabled: canPrepare, queryKey: getListMagazziniQueryKey() },
+  });
+  const products = useListProdotti(undefined, {
+    query: { enabled: canPrepare, queryKey: getListProdottiQueryKey() },
+  });
+  const chosenWarehouse = warehouses.data?.find(
+    (item) => item.id === Number(warehouseId),
+  );
+  const transferInput = transferRows.filter(
+    (item) => item.prodottoId && item.quantita,
+  );
+  const transferReady =
+    row?.tipoDestinatario !== "magazzino" ||
+    (transferInput.length > 0 &&
+      transferInput.length === transferRows.length &&
+      transferRowsHaveRequiredLots(transferInput, products.data));
 
   const refresh = async (id?: number) => {
     await queryClient.invalidateQueries({
       queryKey: getListRichiesteMagazzinoQueryKey(),
     });
-    if (id != null) await detail.refetch();
+    if (id != null) {
+      await queryClient.invalidateQueries({
+        queryKey: getGetRichiestaMagazzinoQueryKey(id),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: getGetRichiestaMagazzinoStoricoQueryKey(id),
+      });
+    }
   };
 
   const execute = async (
@@ -170,7 +218,22 @@ export default function RichiesteMagazzino() {
     } catch (cause) {
       intents.fail(slot, cause);
       setError(message(cause, t("richiesteMagazzino.commandError")));
-      if ((cause as { status?: number })?.status === 409)
+      const status = (cause as { status?: number })?.status;
+      if (status === 403 || status === 404) {
+        if (selectedId != null) {
+          queryClient.removeQueries({
+            queryKey: getGetRichiestaMagazzinoQueryKey(selectedId),
+          });
+          queryClient.removeQueries({
+            queryKey: getGetRichiestaMagazzinoStoricoQueryKey(selectedId),
+          });
+        }
+        setSelectedId(null);
+        setEdit(false);
+        setWarehouseId("");
+        setTransferRows([newRiga()]);
+        await refresh();
+      } else if (status === 409)
         await refresh(selectedId ?? undefined);
       return false;
     } finally {
@@ -272,6 +335,28 @@ export default function RichiesteMagazzino() {
       (body) => cancelRichiestaMagazzino(row.id, body),
     );
     if (ok) setCancelReason("");
+  };
+
+  const prepareDocument = async () => {
+    if (!row || !chosenWarehouse || !transferReady) return;
+    const payload = {
+      versione: row.versione,
+      magazzinoId: chosenWarehouse.id,
+      ...(row.tipoDestinatario === "magazzino"
+        ? { righe: transferRowsForPayload(transferInput) }
+        : {}),
+    };
+    const ok = await execute(
+      `richiesta:${row.id}:documento`,
+      payload,
+      payload,
+      (body) => createRichiestaMagazzinoDocumento(row.id, body),
+    );
+    if (ok) {
+      setWarehouseId("");
+      setTransferRows([newRiga()]);
+      setConfirmation(t("richiesteMagazzino.documentCreated"));
+    }
   };
 
   return (
@@ -549,6 +634,14 @@ export default function RichiesteMagazzino() {
                   <span className="ml-2 text-xs">
                     {t(`richiesteMagazzino.${request.stato}`)}
                   </span>
+                  {request.documentoCorrente && (
+                    <span className="ml-2 text-xs">
+                      {request.documentoCorrente.codice} ·{" "}
+                      {t(
+                        `richiesteMagazzino.progress.${request.documentoCorrente.avanzamento}`,
+                      )}
+                    </span>
+                  )}
                   <p className="line-clamp-2 text-sm">{request.bisogno}</p>
                   <p className="text-xs text-muted-foreground">
                     {request.areaNomeSnapshot} ·{" "}
@@ -612,6 +705,126 @@ export default function RichiesteMagazzino() {
                   {t(`richiesteMagazzino.${row.modalitaPreferita}`)} ·{" "}
                   {t("richiesteMagazzino.version")} {row.versione}
                 </p>
+                {row.documentoCorrente ? (
+                  <section className="rounded border p-3 space-y-2">
+                    <h2 className="font-medium">
+                      {t("richiesteMagazzino.currentDocument")}
+                    </h2>
+                    <p>
+                      {row.documentoCorrente.codice} ·{" "}
+                      {t(
+                        `richiesteMagazzino.progress.${row.documentoCorrente.avanzamento}`,
+                      )}
+                    </p>
+                    {row.documentoCorrente.percorsoDocumento && (
+                      <Link
+                        className="underline"
+                        href={row.documentoCorrente.percorsoDocumento}
+                      >
+                        {t("richiesteMagazzino.openDocument")}
+                      </Link>
+                    )}
+                  </section>
+                ) : row.stato === "presa_in_carico" &&
+                  canPrepare &&
+                  hasPermission(
+                    row.tipoDestinatario === "magazzino"
+                      ? "magazzino.transfers.create"
+                      : "bolle.manage",
+                  ) &&
+                  isModuloAttivo(
+                    row.tipoDestinatario === "magazzino"
+                      ? "TRASFERIMENTI"
+                      : "BOLLE",
+                  ) ? (
+                  <section
+                    className="rounded border p-3 space-y-3"
+                    data-testid="m5b-prepare-document"
+                  >
+                    <h2 className="font-medium">
+                      {t("richiesteMagazzino.prepareDocument")}
+                    </h2>
+                    <p className="text-sm">
+                      {t("richiesteMagazzino.recipient")}:{" "}
+                      {row.destinatarioNomeSnapshot} ·{" "}
+                      {t(
+                        `richiesteMagazzino.recipientType.${row.tipoDestinatario}`,
+                      )}
+                    </p>
+                    <div className="grid gap-2">
+                      <Label htmlFor="rm-warehouse">
+                        {t("richiesteMagazzino.fulfilmentWarehouse")}
+                      </Label>
+                      <select
+                        id="rm-warehouse"
+                        className="rounded border p-2"
+                        value={warehouseId}
+                        onChange={(event) => setWarehouseId(event.target.value)}
+                      >
+                        <option value="">
+                          {t("richiesteMagazzino.chooseWarehouse")}
+                        </option>
+                        {warehouses.data
+                          ?.filter(
+                            (item) =>
+                              item.stato === "attivo" &&
+                              item.areaOperativaId === row.areaOperativaId &&
+                              item.id !== row.magazzinoDestinatarioId &&
+                              (row.centroAscoltoId == null ||
+                                item.centroAscoltoId == null ||
+                                item.centroAscoltoId === row.centroAscoltoId),
+                          )
+                          .map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.nome}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    {row.tipoDestinatario === "magazzino" &&
+                      chosenWarehouse && (
+                        <RigheEditor
+                          magazzinoId={chosenWarehouse.id}
+                          areaOperativaId={row.areaOperativaId}
+                          righe={transferRows}
+                          setRighe={setTransferRows}
+                        />
+                      )}
+                    <Button
+                      disabled={pending || !chosenWarehouse || !transferReady}
+                      onClick={prepareDocument}
+                    >
+                      {t("richiesteMagazzino.prepareDocument")}
+                    </Button>
+                  </section>
+                ) : row.stato === "presa_in_carico" ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t("richiesteMagazzino.toPrepare")}
+                  </p>
+                ) : null}
+                {row.documentiPrecedenti?.length ? (
+                  <section className="rounded border p-3 space-y-2">
+                    <h2 className="font-medium">
+                      {t("richiesteMagazzino.previousDocuments")}
+                    </h2>
+                    {row.documentiPrecedenti.map((document) => (
+                      <p key={document.relazioneId} className="text-sm">
+                        {document.codice} ·{" "}
+                        {t(
+                          `richiesteMagazzino.progress.${document.avanzamento}`,
+                        )}{" "}
+                        {document.percorsoDocumento && (
+                          <Link
+                            className="underline"
+                            href={document.percorsoDocumento}
+                          >
+                            {t("richiesteMagazzino.openDocument")}
+                          </Link>
+                        )}
+                      </p>
+                    ))}
+                  </section>
+                ) : null}
                 {row.interventoId != null &&
                   hasArea("sociale") &&
                   hasPermission("sociale.interventi.view") &&
@@ -637,6 +850,7 @@ export default function RichiesteMagazzino() {
                     </Button>
                   )}
                   {canCancel &&
+                    !row.documentoCorrente &&
                     ((row.stato === "inviata" &&
                       row.tipoDestinatario === "beneficiario" &&
                       hasArea("sociale") &&

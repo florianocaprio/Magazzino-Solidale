@@ -91,6 +91,11 @@ import {
   InventoryDecimalError,
   nonNegativeInventoryDecimal,
 } from "../lib/inventoryDecimal";
+import {
+  lockInterventionMaterialPath,
+  M5bDelegationError,
+  rejectLegacyMaterialIncreaseAfterDelegation,
+} from "../lib/m5bInterventionDelegation";
 
 const router: IRouter = Router();
 
@@ -1279,6 +1284,11 @@ async function replaceOperativita(
       });
       deltasByWarehouse.set(next.magazzinoId, rows);
     }
+    await rejectLegacyMaterialIncreaseAfterDelegation(
+      tx,
+      interventoId,
+      deltasByWarehouse.size > 0,
+    );
     await tx
       .delete(interventiMaterialiTable)
       .where(eq(interventiMaterialiTable.interventoId, interventoId));
@@ -1897,6 +1907,10 @@ function sendRouteError(
   error: unknown,
   res: { status: (status: number) => { json: (body: unknown) => void } },
 ) {
+  if (error instanceof M5bDelegationError) {
+    res.status(error.status).json({ error: error.message });
+    return true;
+  }
   if (error instanceof BeneficiaryReportingScopeError) {
     res.status(403).json({ error: error.message });
     return true;
@@ -3346,6 +3360,7 @@ router.post("/interventi/:id/salva-operativita", async (req, res) => {
     );
     const now = new Date();
     const updated = await db.transaction(async (tx) => {
+      if (hasOwn(body, "materiali")) await lockInterventionMaterialPath(tx, id);
       const [current] = await tx
         .select()
         .from(interventiTable)
@@ -3469,6 +3484,7 @@ router.post("/interventi/:id/concludi", async (req, res) => {
         : req.user!.id;
     }
     const result = await db.transaction(async (tx) => {
+      if (hasOwn(body, "materiali")) await lockInterventionMaterialPath(tx, id);
       const [current] = await tx
         .select()
         .from(interventiTable)

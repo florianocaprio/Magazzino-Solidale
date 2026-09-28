@@ -5,6 +5,108 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+export interface RichiestaMagazzinoOrigine {
+  id: number;
+  codice: string;
+  percorso: string;
+}
+
+export type RichiestaMagazzinoDocumentoSummaryTipoDocumento = typeof RichiestaMagazzinoDocumentoSummaryTipoDocumento[keyof typeof RichiestaMagazzinoDocumentoSummaryTipoDocumento];
+
+
+export const RichiestaMagazzinoDocumentoSummaryTipoDocumento = {
+  bolla: 'bolla',
+  trasferimento: 'trasferimento',
+} as const;
+
+export type RichiestaMagazzinoDocumentoSummaryAvanzamento = typeof RichiestaMagazzinoDocumentoSummaryAvanzamento[keyof typeof RichiestaMagazzinoDocumentoSummaryAvanzamento];
+
+
+export const RichiestaMagazzinoDocumentoSummaryAvanzamento = {
+  in_preparazione: 'in_preparazione',
+  pronta: 'pronta',
+  in_viaggio: 'in_viaggio',
+  rientro_atteso: 'rientro_atteso',
+  esito_registrato: 'esito_registrato',
+  rientrato: 'rientrato',
+  annullato: 'annullato',
+  non_disponibile: 'non_disponibile',
+  stato_non_riconosciuto: 'stato_non_riconosciuto',
+} as const;
+
+export interface RichiestaMagazzinoDocumentoSummary {
+  relazioneId: number;
+  tipoDocumento: RichiestaMagazzinoDocumentoSummaryTipoDocumento;
+  /** @nullable */
+  codice?: string | null;
+  /** @nullable */
+  statoDocumento?: string | null;
+  avanzamento: RichiestaMagazzinoDocumentoSummaryAvanzamento;
+  corrente: boolean;
+  /** @nullable */
+  versioneDocumento?: number | null;
+  /** @nullable */
+  percorsoDocumento?: string | null;
+  creatoAt: string;
+  /** @nullable */
+  cessatoAt?: string | null;
+  /** @nullable */
+  eventoCessazione?: string | null;
+}
+
+export interface RichiestaMagazzinoDocumenti {
+  corrente: RichiestaMagazzinoDocumentoSummary | null;
+  precedenti: RichiestaMagazzinoDocumentoSummary[];
+}
+
+export type RichiestaMagazzinoDocumentoCreateRigheItem = {
+  /** @minimum 1 */
+  prodottoId: number;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  lottoId?: number | null;
+  quantita: string | number;
+  /** @nullable */
+  unitaMisura?: string | null;
+  /** @nullable */
+  note?: string | null;
+};
+
+export interface RichiestaMagazzinoDocumentoCreate {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  /** @minimum 1 */
+  versione: number;
+  /** @minimum 1 */
+  magazzinoId: number;
+  righe?: RichiestaMagazzinoDocumentoCreateRigheItem[];
+}
+
+export type RichiestaMagazzinoDocumentoResultTipoDocumento = typeof RichiestaMagazzinoDocumentoResultTipoDocumento[keyof typeof RichiestaMagazzinoDocumentoResultTipoDocumento];
+
+
+export const RichiestaMagazzinoDocumentoResultTipoDocumento = {
+  bolla: 'bolla',
+  trasferimento: 'trasferimento',
+} as const;
+
+export interface RichiestaMagazzinoDocumentoResult {
+  richiestaId: number;
+  codiceRichiesta: string;
+  versioneRichiesta: number;
+  tipoDocumento: RichiestaMagazzinoDocumentoResultTipoDocumento;
+  documentoId: number;
+  codiceDocumento: string;
+  versioneDocumento: number;
+  percorsoDocumento: string;
+  replay: boolean;
+}
+
 export interface RichiestaMagazzinoError {
   code?: string;
   error: string;
@@ -284,6 +386,8 @@ export interface RichiestaMagazzino {
   motivoAnnullamento?: string | null;
   dataCreazione: string;
   dataAggiornamento: string;
+  documentoCorrente?: RichiestaMagazzinoDocumentoSummary | null;
+  documentiPrecedenti?: RichiestaMagazzinoDocumentoSummary[];
 }
 
 export interface RichiesteMagazzinoPage {
@@ -9964,6 +10068,10 @@ export const ListRichiesteMagazzinoSorgente = {
   intervento_sociale: 'intervento_sociale',
   operativa: 'operativa',
 } as const;
+
+export type GetDocumentoOperativoRichiesta200 = {
+  richiesta: RichiestaMagazzinoOrigine | null;
+};
 
 export type ListProdottiParams = {
 categoria?: string;

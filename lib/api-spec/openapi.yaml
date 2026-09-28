@@ -353,6 +353,94 @@ paths:
         "401": { $ref: "#/components/responses/RichiestaMagazzino401" }
         "403": { $ref: "#/components/responses/RichiestaMagazzino403" }
         "404": { $ref: "#/components/responses/RichiestaMagazzino404" }
+  /richieste-magazzino/{id}/documenti:
+    get:
+      operationId: getRichiestaMagazzinoDocumenti
+      tags: [richieste-magazzino]
+      summary: Documento M4 corrente e storico annullati, minimizzati allo scope richiesta
+      parameters: [{ $ref: "#/components/parameters/RichiestaMagazzinoId" }]
+      responses:
+        "200":
+          description: Riepilogo documenti della richiesta
+          content:
+            application/json:
+              schema:
+                { $ref: "#/components/schemas/RichiestaMagazzinoDocumenti" }
+        "400": { $ref: "#/components/responses/RichiestaMagazzino400" }
+        "401": { $ref: "#/components/responses/RichiestaMagazzino401" }
+        "403": { $ref: "#/components/responses/RichiestaMagazzino403" }
+        "404": { $ref: "#/components/responses/RichiestaMagazzino404" }
+  /richieste-magazzino/{id}/documento:
+    post:
+      operationId: createRichiestaMagazzinoDocumento
+      tags: [richieste-magazzino]
+      summary: Crea atomicamente documento M4 e relazione per una richiesta presa in carico
+      parameters: [{ $ref: "#/components/parameters/RichiestaMagazzinoId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              { $ref: "#/components/schemas/RichiestaMagazzinoDocumentoCreate" }
+      responses:
+        "201":
+          description: Documento creato
+          content:
+            application/json:
+              schema:
+                {
+                  $ref: "#/components/schemas/RichiestaMagazzinoDocumentoResult",
+                }
+        "200":
+          description: Replay del medesimo comando
+          content:
+            application/json:
+              schema:
+                {
+                  $ref: "#/components/schemas/RichiestaMagazzinoDocumentoResult",
+                }
+        "400": { $ref: "#/components/responses/RichiestaMagazzino400" }
+        "401": { $ref: "#/components/responses/RichiestaMagazzino401" }
+        "403": { $ref: "#/components/responses/RichiestaMagazzino403" }
+        "404": { $ref: "#/components/responses/RichiestaMagazzino404" }
+        "409": { $ref: "#/components/responses/RichiestaMagazzino409" }
+  /documenti-operativi/{tipo}/{id}/richiesta:
+    get:
+      operationId: getDocumentoOperativoRichiesta
+      tags: [richieste-magazzino]
+      summary: Riferimento minimizzato alla Richiesta origine del documento M4
+      parameters:
+        - {
+            name: tipo,
+            in: path,
+            required: true,
+            schema: { type: string, enum: [bolla, trasferimento] },
+          }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: integer, minimum: 1 },
+          }
+      responses:
+        "200":
+          description: Riferimento alla richiesta se collegata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [richiesta]
+                properties:
+                  richiesta:
+                    oneOf:
+                      - {
+                          $ref: "#/components/schemas/RichiestaMagazzinoOrigine",
+                        }
+                      - { type: "null" }
+        "400": { $ref: "#/components/responses/RichiestaMagazzino400" }
+        "401": { $ref: "#/components/responses/RichiestaMagazzino401" }
+        "403": { $ref: "#/components/responses/RichiestaMagazzino403" }
+        "404": { $ref: "#/components/responses/RichiestaMagazzino404" }
 
   /healthz:
     get:
@@ -10330,6 +10418,106 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/BeneficiariFseError" }
   schemas:
+    RichiestaMagazzinoOrigine:
+      type: object
+      required: [id, codice, percorso]
+      properties:
+        id: { type: integer }
+        codice: { type: string }
+        percorso: { type: string }
+    RichiestaMagazzinoDocumentoSummary:
+      type: object
+      required: [relazioneId, tipoDocumento, corrente, avanzamento, creatoAt]
+      properties:
+        relazioneId: { type: integer }
+        tipoDocumento: { type: string, enum: [bolla, trasferimento] }
+        codice: { type: [string, "null"] }
+        statoDocumento: { type: [string, "null"] }
+        avanzamento:
+          type: string
+          enum:
+            [
+              in_preparazione,
+              pronta,
+              in_viaggio,
+              rientro_atteso,
+              esito_registrato,
+              rientrato,
+              annullato,
+              non_disponibile,
+              stato_non_riconosciuto,
+            ]
+        corrente: { type: boolean }
+        versioneDocumento: { type: [integer, "null"] }
+        percorsoDocumento: { type: [string, "null"] }
+        creatoAt: { type: string, format: date-time }
+        cessatoAt: { type: [string, "null"], format: date-time }
+        eventoCessazione: { type: [string, "null"] }
+    RichiestaMagazzinoDocumenti:
+      type: object
+      required: [corrente, precedenti]
+      properties:
+        corrente:
+          oneOf:
+            - {
+                $ref: "#/components/schemas/RichiestaMagazzinoDocumentoSummary",
+              }
+            - { type: "null" }
+        precedenti:
+          type: array
+          items:
+            { $ref: "#/components/schemas/RichiestaMagazzinoDocumentoSummary" }
+    RichiestaMagazzinoDocumentoCreate:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey, versione, magazzinoId]
+      properties:
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        versione: { type: integer, minimum: 1 }
+        magazzinoId: { type: integer, minimum: 1 }
+        righe:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [prodottoId, quantita]
+            properties:
+              prodottoId: { type: integer, minimum: 1 }
+              lottoId: { type: [integer, "null"], minimum: 1 }
+              quantita:
+                {
+                  oneOf:
+                    [
+                      { type: string, minLength: 1 },
+                      { type: number, exclusiveMinimum: 0 },
+                    ],
+                }
+              unitaMisura: { type: [string, "null"] }
+              note: { type: [string, "null"] }
+    RichiestaMagazzinoDocumentoResult:
+      type: object
+      required:
+        [
+          richiestaId,
+          codiceRichiesta,
+          versioneRichiesta,
+          tipoDocumento,
+          documentoId,
+          codiceDocumento,
+          versioneDocumento,
+          percorsoDocumento,
+          replay,
+        ]
+      properties:
+        richiestaId: { type: integer }
+        codiceRichiesta: { type: string }
+        versioneRichiesta: { type: integer }
+        tipoDocumento: { type: string, enum: [bolla, trasferimento] }
+        documentoId: { type: integer }
+        codiceDocumento: { type: string }
+        versioneDocumento: { type: integer }
+        percorsoDocumento: { type: string }
+        replay: { type: boolean }
     RichiestaMagazzinoError:
       type: object
       required: [error]
@@ -10474,6 +10662,16 @@ components:
         motivoAnnullamento: { type: [string, "null"] }
         dataCreazione: { type: string, format: date-time }
         dataAggiornamento: { type: string, format: date-time }
+        documentoCorrente:
+          oneOf:
+            - {
+                $ref: "#/components/schemas/RichiestaMagazzinoDocumentoSummary",
+              }
+            - { type: "null" }
+        documentiPrecedenti:
+          type: array
+          items:
+            { $ref: "#/components/schemas/RichiestaMagazzinoDocumentoSummary" }
     RichiesteMagazzinoPage:
       type: object
       required: [items, total, page, limit]

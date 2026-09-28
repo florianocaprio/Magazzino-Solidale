@@ -87,7 +87,33 @@ export const ListRichiesteMagazzinoResponse = zod.object({
   "annullatoAt": zod.coerce.date().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
   "dataCreazione": zod.coerce.date(),
-  "dataAggiornamento": zod.coerce.date()
+  "dataAggiornamento": zod.coerce.date(),
+  "documentoCorrente": zod.union([zod.object({
+  "relazioneId": zod.number(),
+  "tipoDocumento": zod.enum(['bolla', 'trasferimento']),
+  "codice": zod.string().nullish(),
+  "statoDocumento": zod.string().nullish(),
+  "avanzamento": zod.enum(['in_preparazione', 'pronta', 'in_viaggio', 'rientro_atteso', 'esito_registrato', 'rientrato', 'annullato', 'non_disponibile', 'stato_non_riconosciuto']),
+  "corrente": zod.boolean(),
+  "versioneDocumento": zod.number().nullish(),
+  "percorsoDocumento": zod.string().nullish(),
+  "creatoAt": zod.coerce.date(),
+  "cessatoAt": zod.coerce.date().nullish(),
+  "eventoCessazione": zod.string().nullish()
+}),zod.null()]).optional(),
+  "documentiPrecedenti": zod.array(zod.object({
+  "relazioneId": zod.number(),
+  "tipoDocumento": zod.enum(['bolla', 'trasferimento']),
+  "codice": zod.string().nullish(),
+  "statoDocumento": zod.string().nullish(),
+  "avanzamento": zod.enum(['in_preparazione', 'pronta', 'in_viaggio', 'rientro_atteso', 'esito_registrato', 'rientrato', 'annullato', 'non_disponibile', 'stato_non_riconosciuto']),
+  "corrente": zod.boolean(),
+  "versioneDocumento": zod.number().nullish(),
+  "percorsoDocumento": zod.string().nullish(),
+  "creatoAt": zod.coerce.date(),
+  "cessatoAt": zod.coerce.date().nullish(),
+  "eventoCessazione": zod.string().nullish()
+})).optional()
 }).describe('Snapshot operativo; nessun dato del dossier sociale live.')),
   "total": zod.number().min(listRichiesteMagazzinoResponseTotalMin),
   "page": zod.number().min(1),
@@ -177,7 +203,33 @@ export const GetRichiestaMagazzinoResponse = zod.object({
   "annullatoAt": zod.coerce.date().nullish(),
   "motivoAnnullamento": zod.string().nullish(),
   "dataCreazione": zod.coerce.date(),
-  "dataAggiornamento": zod.coerce.date()
+  "dataAggiornamento": zod.coerce.date(),
+  "documentoCorrente": zod.union([zod.object({
+  "relazioneId": zod.number(),
+  "tipoDocumento": zod.enum(['bolla', 'trasferimento']),
+  "codice": zod.string().nullish(),
+  "statoDocumento": zod.string().nullish(),
+  "avanzamento": zod.enum(['in_preparazione', 'pronta', 'in_viaggio', 'rientro_atteso', 'esito_registrato', 'rientrato', 'annullato', 'non_disponibile', 'stato_non_riconosciuto']),
+  "corrente": zod.boolean(),
+  "versioneDocumento": zod.number().nullish(),
+  "percorsoDocumento": zod.string().nullish(),
+  "creatoAt": zod.coerce.date(),
+  "cessatoAt": zod.coerce.date().nullish(),
+  "eventoCessazione": zod.string().nullish()
+}),zod.null()]).optional(),
+  "documentiPrecedenti": zod.array(zod.object({
+  "relazioneId": zod.number(),
+  "tipoDocumento": zod.enum(['bolla', 'trasferimento']),
+  "codice": zod.string().nullish(),
+  "statoDocumento": zod.string().nullish(),
+  "avanzamento": zod.enum(['in_preparazione', 'pronta', 'in_viaggio', 'rientro_atteso', 'esito_registrato', 'rientrato', 'annullato', 'non_disponibile', 'stato_non_riconosciuto']),
+  "corrente": zod.boolean(),
+  "versioneDocumento": zod.number().nullish(),
+  "percorsoDocumento": zod.string().nullish(),
+  "creatoAt": zod.coerce.date(),
+  "cessatoAt": zod.coerce.date().nullish(),
+  "eventoCessazione": zod.string().nullish()
+})).optional()
 }).describe('Snapshot operativo; nessun dato del dossier sociale live.')
 
 
@@ -298,6 +350,113 @@ export const GetRichiestaMagazzinoStoricoResponseItem = zod.object({
   "changes": zod.record(zod.string(), zod.unknown()).nullish()
 })
 export const GetRichiestaMagazzinoStoricoResponse = zod.array(GetRichiestaMagazzinoStoricoResponseItem)
+
+
+/**
+ * @summary Documento M4 corrente e storico annullati, minimizzati allo scope richiesta
+ */
+
+
+
+export const GetRichiestaMagazzinoDocumentiParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const GetRichiestaMagazzinoDocumentiResponse = zod.object({
+  "corrente": zod.union([zod.object({
+  "relazioneId": zod.number(),
+  "tipoDocumento": zod.enum(['bolla', 'trasferimento']),
+  "codice": zod.string().nullish(),
+  "statoDocumento": zod.string().nullish(),
+  "avanzamento": zod.enum(['in_preparazione', 'pronta', 'in_viaggio', 'rientro_atteso', 'esito_registrato', 'rientrato', 'annullato', 'non_disponibile', 'stato_non_riconosciuto']),
+  "corrente": zod.boolean(),
+  "versioneDocumento": zod.number().nullish(),
+  "percorsoDocumento": zod.string().nullish(),
+  "creatoAt": zod.coerce.date(),
+  "cessatoAt": zod.coerce.date().nullish(),
+  "eventoCessazione": zod.string().nullish()
+}),zod.null()]),
+  "precedenti": zod.array(zod.object({
+  "relazioneId": zod.number(),
+  "tipoDocumento": zod.enum(['bolla', 'trasferimento']),
+  "codice": zod.string().nullish(),
+  "statoDocumento": zod.string().nullish(),
+  "avanzamento": zod.enum(['in_preparazione', 'pronta', 'in_viaggio', 'rientro_atteso', 'esito_registrato', 'rientrato', 'annullato', 'non_disponibile', 'stato_non_riconosciuto']),
+  "corrente": zod.boolean(),
+  "versioneDocumento": zod.number().nullish(),
+  "percorsoDocumento": zod.string().nullish(),
+  "creatoAt": zod.coerce.date(),
+  "cessatoAt": zod.coerce.date().nullish(),
+  "eventoCessazione": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Crea atomicamente documento M4 e relazione per una richiesta presa in carico
+ */
+
+
+
+export const CreateRichiestaMagazzinoDocumentoParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const createRichiestaMagazzinoDocumentoBodyIdempotencyKeyMax = 120;
+
+
+
+
+
+
+export const createRichiestaMagazzinoDocumentoBodyRigheItemQuantitaTwoExclusiveMin = 0;
+
+
+
+export const CreateRichiestaMagazzinoDocumentoBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(createRichiestaMagazzinoDocumentoBodyIdempotencyKeyMax),
+  "versione": zod.number().min(1),
+  "magazzinoId": zod.number().min(1),
+  "righe": zod.array(zod.object({
+  "prodottoId": zod.number().min(1),
+  "lottoId": zod.number().min(1).nullish(),
+  "quantita": zod.union([zod.string().min(1),zod.number().gt(createRichiestaMagazzinoDocumentoBodyRigheItemQuantitaTwoExclusiveMin)]),
+  "unitaMisura": zod.string().nullish(),
+  "note": zod.string().nullish()
+})).optional()
+})
+
+export const CreateRichiestaMagazzinoDocumentoResponse = zod.object({
+  "richiestaId": zod.number(),
+  "codiceRichiesta": zod.string(),
+  "versioneRichiesta": zod.number(),
+  "tipoDocumento": zod.enum(['bolla', 'trasferimento']),
+  "documentoId": zod.number(),
+  "codiceDocumento": zod.string(),
+  "versioneDocumento": zod.number(),
+  "percorsoDocumento": zod.string(),
+  "replay": zod.boolean()
+})
+
+
+/**
+ * @summary Riferimento minimizzato alla Richiesta origine del documento M4
+ */
+
+
+
+export const GetDocumentoOperativoRichiestaParams = zod.object({
+  "tipo": zod.enum(['bolla', 'trasferimento']),
+  "id": zod.coerce.number().min(1)
+})
+
+export const GetDocumentoOperativoRichiestaResponse = zod.object({
+  "richiesta": zod.union([zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "percorso": zod.string()
+}),zod.null()])
+})
 
 
 /**

@@ -129,6 +129,10 @@ export const RICHIESTE_MAGAZZINO_PERMISSIONS = [
     label: "Richieste al Magazzino: presa in carico",
   },
   {
+    key: "richieste_magazzino.prepare",
+    label: "Richieste al Magazzino: preparazione documento M4",
+  },
+  {
     key: "richieste_magazzino.cancel",
     label: "Richieste al Magazzino: annullamento",
   },
@@ -331,6 +335,7 @@ export const AREA_PERMISSION_MAP = {
     "richieste_magazzino.view",
     "richieste_magazzino.create",
     "richieste_magazzino.take",
+    "richieste_magazzino.prepare",
     "richieste_magazzino.cancel",
     ...permissionKeys(BOLLE_PERMISSIONS),
     "maps.operational",
