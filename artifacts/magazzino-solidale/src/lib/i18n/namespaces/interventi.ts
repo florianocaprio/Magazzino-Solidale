@@ -94,8 +94,8 @@ const fase53BEn = {
   },
   form: {
     actions: {
-      da_pianificare: "New intervention to plan",
-      pianificato: "New planned intervention",
+      da_pianificare: "Record an intervention to plan",
+      pianificato: "Plan a new intervention",
       gia_effettuato: "Record an intervention already carried out",
     },
     titles: {
@@ -317,8 +317,8 @@ const fase53B = {
     },
     form: {
       actions: {
-        da_pianificare: "Nuovo intervento da pianificare",
-        pianificato: "Nuovo intervento pianificato",
+        da_pianificare: "Registra intervento da pianificare",
+        pianificato: "Pianifica nuovo intervento",
         gia_effettuato: "Registra intervento già effettuato",
       },
       titles: {
@@ -482,8 +482,8 @@ const fase53B = {
     form: {
       ...fase53BEn.form,
       actions: {
-        da_pianificare: "Nueva intervención por planificar",
-        pianificato: "Nueva intervención planificada",
+        da_pianificare: "Registrar intervención por planificar",
+        pianificato: "Planificar nueva intervención",
         gia_effettuato: "Registrar intervención ya realizada",
       },
     },
@@ -529,8 +529,8 @@ const fase53B = {
     form: {
       ...fase53BEn.form,
       actions: {
-        da_pianificare: "Nouvelle intervention à planifier",
-        pianificato: "Nouvelle intervention planifiée",
+        da_pianificare: "Enregistrer une intervention à planifier",
+        pianificato: "Planifier une nouvelle intervention",
         gia_effettuato: "Enregistrer une intervention déjà réalisée",
       },
     },
@@ -575,8 +575,8 @@ const fase53B = {
     form: {
       ...fase53BEn.form,
       actions: {
-        da_pianificare: "Neue zu planende Maßnahme",
-        pianificato: "Neue geplante Maßnahme",
+        da_pianificare: "Zu planende Maßnahme erfassen",
+        pianificato: "Neue Maßnahme planen",
         gia_effettuato: "Bereits erfolgte Maßnahme erfassen",
       },
     },
@@ -620,8 +620,8 @@ const fase53B = {
     form: {
       ...fase53BEn.form,
       actions: {
-        da_pianificare: "تدخل جديد للتخطيط",
-        pianificato: "تدخل مخطط جديد",
+        da_pianificare: "تسجيل تدخل للتخطيط",
+        pianificato: "تخطيط تدخل جديد",
         gia_effettuato: "تسجيل تدخل تم تنفيذه",
       },
     },

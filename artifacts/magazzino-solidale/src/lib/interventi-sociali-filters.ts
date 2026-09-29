@@ -129,7 +129,8 @@ export function serializeInterventiSocialiFilters(
   if (filters.priorita) params.set("priorita", filters.priorita);
   if (filters.operatoreId) params.set("operatore", filters.operatoreId);
   if (filters.centroAscoltoId) params.set("centro", filters.centroAscoltoId);
-  if (filters.areaOperativaId) params.set("areaOperativa", filters.areaOperativaId);
+  if (filters.areaOperativaId)
+    params.set("areaOperativa", filters.areaOperativaId);
   if (filters.stato) params.set("stato", filters.stato);
   if (filters.ambitoLegacy !== "tutti")
     params.set("legacy", filters.ambitoLegacy);
@@ -153,5 +154,24 @@ export function clearInterventiSocialiFilters(
     modo: filters.modo,
     mese: filters.mese,
     giorno: filters.giorno,
+  };
+}
+
+export function focusInterventiSocialiFilters(
+  filters: InterventiSocialiFilters,
+  vista: "da_pianificare" | "pianificati",
+): InterventiSocialiFilters {
+  return {
+    ...filters,
+    vista,
+    modo: "elenco",
+    ricerca: "",
+    tipo: "",
+    priorita: "",
+    operatoreId: "",
+    stato: "",
+    ambitoLegacy: "tutti",
+    da: "",
+    a: "",
   };
 }

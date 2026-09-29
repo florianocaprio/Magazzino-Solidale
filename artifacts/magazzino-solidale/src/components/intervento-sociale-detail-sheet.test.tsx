@@ -105,6 +105,35 @@ describe("InterventoSocialeDetailSheet", () => {
     root = createRoot(container);
   });
 
+  it("M5C1-R1: da pianificare mostra Appuntamento e invio Richiesta esplicito", async () => {
+    requestMock.visible = true;
+    await act(async () => {
+      root.render(
+        <InterventoSocialeDetailSheet
+          open
+          intervento={{
+            ...intervento,
+            stato: "da_pianificare",
+            ambito: "sociale",
+            ambitoLegacy: false,
+          }}
+          operativita={{ ...operativita, stato: "da_pianificare" }}
+          onOpenChange={vi.fn()}
+          {...callbacks}
+        />,
+      );
+    });
+    expect(document.body.textContent).toContain(
+      "interventi.operational.appointment",
+    );
+    expect(document.body.textContent).toContain("interventi.operational.plan");
+    expect(
+      document.querySelector(
+        'a[href="/richieste-magazzino?interventoId=20&beneficiarioId=10"]',
+      ),
+    ).not.toBeNull();
+  });
+
   it("M5C1: pianificazione espone invio esplicito, materiali legacy solo storici", async () => {
     requestMock.visible = true;
     await act(async () => {

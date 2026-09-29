@@ -15,6 +15,7 @@ export default defineConfig({
       "src/lib/**/*.test.{ts,tsx}",
       "src/hooks/**/*.test.tsx",
       "src/components/**/*.test.tsx",
+      "src/pages/**/*.test.tsx",
     ],
   },
 });

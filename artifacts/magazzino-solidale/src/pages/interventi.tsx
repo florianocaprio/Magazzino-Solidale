@@ -60,6 +60,7 @@ import { monthRange, todayEuropeRome } from "@/lib/europe-rome";
 import { invalidateInterventiSociali } from "@/lib/interventi-sociali-cache";
 import {
   clearInterventiSocialiFilters,
+  focusInterventiSocialiFilters,
   parseInterventiSocialiFilters,
   serializeInterventiSocialiFilters,
   type InterventiSocialiFilters,
@@ -153,11 +154,21 @@ export default function Interventi() {
 
   const setFilters = (next: InterventiSocialiFilters) => {
     setFiltersState(next);
-    window.history.pushState(
-      null,
-      "",
-      `${window.location.pathname}${serializeInterventiSocialiFilters(next)}`,
+    const params = new URLSearchParams(serializeInterventiSocialiFilters(next));
+    if (selectedInterventoId != null) {
+      params.set("interventoId", String(selectedInterventoId));
+    }
+    window.history.pushState(null, "", `${window.location.pathname}?${params}`);
+  };
+
+  const openIntervento = (id: number, nextFilters = filters) => {
+    setFiltersState(nextFilters);
+    setSelectedInterventoId(id);
+    const params = new URLSearchParams(
+      serializeInterventiSocialiFilters(nextFilters),
     );
+    params.set("interventoId", String(id));
+    window.history.pushState(null, "", `${window.location.pathname}?${params}`);
   };
 
   const interval = useMemo(() => calendarInterval(filters), [filters]);
@@ -295,10 +306,24 @@ export default function Interventi() {
     createIntervento.mutate(
       { data },
       {
-        onSuccess: async () => {
+        onSuccess: async (created) => {
+          setFormOpen(false);
+          if (
+            created.stato === "da_pianificare" ||
+            created.stato === "pianificato"
+          ) {
+            openIntervento(
+              created.id,
+              focusInterventiSocialiFilters(
+                filters,
+                created.stato === "da_pianificare"
+                  ? "da_pianificare"
+                  : "pianificati",
+              ),
+            );
+          }
           await invalidateInterventiSociali(queryClient);
           toast({ title: t("interventi.toastRegistered") });
-          setFormOpen(false);
         },
         onError: (error) => {
           const candidate = error as {
@@ -357,6 +382,10 @@ export default function Interventi() {
           stato: "pianificato",
           dataOraPianificata: input.dataOraPianificata,
         });
+        openIntervento(
+          selectedInterventoId,
+          focusInterventiSocialiFilters(filters, "pianificati"),
+        );
       }
       await refreshOperational(t("interventi.operational.appointmentSaved"));
     } catch (error) {
@@ -429,10 +458,24 @@ export default function Interventi() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => openForm("da_pianificare")}>
-                {t("interventi.form.actions.da_pianificare")}
+                <span>
+                  <span className="block">
+                    {t("interventi.form.actions.da_pianificare")}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {t("interventi.form.descriptions.da_pianificare")}
+                  </span>
+                </span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => openForm("pianificato")}>
-                {t("interventi.form.actions.pianificato")}
+                <span>
+                  <span className="block">
+                    {t("interventi.form.actions.pianificato")}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {t("interventi.form.descriptions.pianificato")}
+                  </span>
+                </span>
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => openForm("gia_effettuato")}>
                 {t("interventi.form.actions.gia_effettuato")}
@@ -457,9 +500,7 @@ export default function Interventi() {
         isError={interventiQuery.isError || !interval.valid}
         onFiltersChange={setFilters}
         onReset={() => setFilters(clearInterventiSocialiFilters(filters))}
-        onOpenIntervento={(intervento) =>
-          setSelectedInterventoId(intervento.id)
-        }
+        onOpenIntervento={(intervento) => openIntervento(intervento.id)}
       />
 
       <InterventoSocialeFormSheet

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clearInterventiSocialiFilters,
+  focusInterventiSocialiFilters,
   parseInterventiSocialiFilters,
   serializeInterventiSocialiFilters,
 } from "./interventi-sociali-filters";
@@ -42,5 +43,34 @@ describe("filtri URL degli interventi Sociali", () => {
       ricerca: "",
       priorita: "",
     });
+  });
+
+  it("porta il nuovo intervento nella vista coerente conservando Area e Centro", () => {
+    const filters = parseInterventiSocialiFilters(
+      "?vista=annullati&modo=calendario&q=rossi&tipo=colloquio&priorita=urgente&operatore=4&centro=12&areaOperativa=3&stato=annullato&legacy=legacy&da=2026-09-01&a=2026-09-30",
+      reference,
+    );
+    const focused = focusInterventiSocialiFilters(filters, "da_pianificare");
+    expect(focused).toMatchObject({
+      vista: "da_pianificare",
+      modo: "elenco",
+      areaOperativaId: "3",
+      centroAscoltoId: "12",
+      ricerca: "",
+      tipo: "",
+      priorita: "",
+      operatoreId: "",
+      stato: "",
+      ambitoLegacy: "tutti",
+      da: "",
+      a: "",
+    });
+    expect(focusInterventiSocialiFilters(filters, "pianificati")).toMatchObject(
+      {
+        vista: "pianificati",
+        areaOperativaId: "3",
+        centroAscoltoId: "12",
+      },
+    );
   });
 });
