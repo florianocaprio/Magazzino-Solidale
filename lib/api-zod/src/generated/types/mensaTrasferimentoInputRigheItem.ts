@@ -14,4 +14,9 @@ export type MensaTrasferimentoInputRigheItem = {
   unitaMisura?: string;
   /** @nullable */
   note?: string | null;
+  /**
+     * Lotto fisico selezionato; obbligatorio se il Prodotto lo richiede.
+     * @nullable
+     */
+  lottoId?: number | null;
 };

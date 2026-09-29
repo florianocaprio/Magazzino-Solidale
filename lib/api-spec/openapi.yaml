@@ -5767,6 +5767,22 @@ paths:
       tags: [bolle]
       parameters:
         - { name: attivo, in: query, schema: { type: boolean, default: true } }
+        - {
+            name: search,
+            in: query,
+            schema: { type: string, minLength: 2, maxLength: 100 },
+            description: "Ricerca case-insensitive su denominazione, indirizzo, telefono ed email",
+          }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 50 },
+          }
+        - {
+            name: offset,
+            in: query,
+            schema: { type: integer, minimum: 0, default: 0 },
+          }
       responses:
         "200":
           description: Enti esterni accessibili
@@ -6052,6 +6068,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BollaDettaglio"
+
+  /bolle/{id}/volontari-candidati:
+    get:
+      operationId: listBollaVolontariCandidati
+      tags: [bolle]
+      summary: Volontari approvati e operativi proponibili per la Bolla
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Candidati minimi senza dati personali di contatto
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VolontarioBollaCandidato" }
 
   /bolle/{id}/righe:
     get:
@@ -9691,6 +9723,46 @@ paths:
                 {
                   type: array,
                   items: { $ref: "#/components/schemas/MensaGiacenza" },
+                }
+
+  /mensa/logistica/lotti:
+    get:
+      operationId: listLottiMensa
+      tags: [mensa]
+      description: Lotti fisici realmente trasferibili per Mensa, Magazzino origine e Prodotto autorizzati.
+      parameters:
+        - {
+            name: mensaId,
+            in: query,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: magazzinoId,
+            in: query,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: prodottoId,
+            in: query,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: dataRichiesta,
+            in: query,
+            schema: { type: string, format: date },
+          }
+      responses:
+        "200":
+          description: Lotti non scaduti con disponibilità reale positiva, ordinati FEFO
+          content:
+            application/json:
+              schema:
+                {
+                  type: array,
+                  items: { $ref: "#/components/schemas/MensaLottoDisponibile" },
                 }
 
   /mensa/trasferimenti:
@@ -18957,6 +19029,15 @@ components:
           dataCreazione,
         ]
 
+    VolontarioBollaCandidato:
+      type: object
+      required: [id, nome, cognome, tipoVolontario]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        cognome: { type: string }
+        tipoVolontario: { type: string, enum: [PERMANENTE, TEMPORANEO] }
+
     BollaDettaglio:
       type: object
       properties:
@@ -20951,6 +21032,7 @@ components:
           giacenzaDistribuibile,
           impegnato,
           disponibileReale,
+          lottoFisicoObbligatorio,
         ]
       properties:
         prodottoId: { type: integer }
@@ -20969,6 +21051,27 @@ components:
         impegnato: { type: number }
         impegnatoPreciso:
           $ref: "#/components/schemas/QuantitaContabile"
+        disponibileReale: { type: number }
+        lottoFisicoObbligatorio: { type: boolean }
+        disponibileRealePrecisa:
+          $ref: "#/components/schemas/QuantitaContabile"
+
+    MensaLottoDisponibile:
+      type: object
+      required:
+        [
+          id,
+          codiceLotto,
+          dataScadenza,
+          quantitaResidua,
+          disponibileReale,
+          disponibileRealePrecisa,
+        ]
+      properties:
+        id: { type: integer }
+        codiceLotto: { type: ["string", "null"] }
+        dataScadenza: { type: ["string", "null"], format: date }
+        quantitaResidua: { type: number }
         disponibileReale: { type: number }
         disponibileRealePrecisa:
           $ref: "#/components/schemas/QuantitaContabile"
@@ -21155,6 +21258,9 @@ components:
                   l'unità canonica del Prodotto; il server persiste sempre
                   prodotti.unita_misura.
               note: { type: ["string", "null"] }
+              lottoId:
+                type: ["integer", "null"]
+                description: Lotto fisico selezionato; obbligatorio se il Prodotto lo richiede.
 
     MensaQuantitaPerProdotto:
       type: object

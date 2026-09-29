@@ -90,8 +90,15 @@ test("M5C1 Centro: Intervento pianificato, prefill, invio esplicito, nessuna Bol
     dataDesiderata: "2026-10-01",
     stato: "inviata",
   });
-  await page.goto(`/interventi?interventoId=${intervention.id}`);
+  await expect(page).toHaveURL(
+    new RegExp(`/interventi\\?.*interventoId=${intervention.id}`),
+  );
+  await expect(
+    page.getByRole("dialog", { name: /dettaglio intervento/i }),
+  ).toBeVisible();
   const afterSection = page.getByTestId("intervento-richiesta-magazzino");
+  await expect(afterSection).toContainText(request.codice);
+  await expect(afterSection).toContainText(/inviata/i);
   await expect(
     afterSection.getByRole("link", { name: "Apri richiesta" }),
   ).toBeVisible();
@@ -291,11 +298,22 @@ test("M5C1-R1: creazione da vista Annullati, dettaglio e pianificazione continui
   await expect(
     page.locator('[role="tab"]').filter({ hasText: /^Pianificati/i }),
   ).toHaveAttribute("aria-selected", "true");
+  await detail.getByLabel("Data pianificata").fill("2026-10-16");
+  await detail.getByLabel("Ora pianificata").fill("11:45");
+  await detail.getByRole("button", { name: "Aggiorna appuntamento" }).click();
+  await expect
+    .poll(async () => {
+      const response = await page.request.get(`/api/interventi/${created.id}`);
+      return (await response.json()).dataOraPianificata;
+    })
+    .toBe("2026-10-16T09:45:00.000Z");
+  await page.reload();
+  await expect(detail).toBeVisible();
   await detail.getByRole("button", { name: "Close" }).click();
   await expect(detail).not.toBeVisible();
   await expect(row).toBeVisible();
   await expect(row).toContainText("M5C1-E2E-B1");
-  await expect(row).toContainText("15/10/2026 10:30");
+  await expect(row).toContainText("16/10/2026 11:45");
   await expect.poll(() => count(/Da pianificare/i)).toBe(beforeToPlan - 1);
   await expect.poll(() => count(/^Pianificati/i)).toBe(beforePlanned + 1);
   await page.getByRole("tab", { name: /Da pianificare/i }).click();
@@ -314,7 +332,7 @@ test("M5C1-R1: creazione da vista Annullati, dettaglio e pianificazione continui
     String(created.beneficiarioId),
   );
   await expect(page.locator("#rm-priority")).toHaveValue("normale");
-  await expect(page.locator("#rm-date")).toHaveValue("2026-10-15");
+  await expect(page.locator("#rm-date")).toHaveValue("2026-10-16");
   await expect(
     page.locator("#rm-warehouse, #rm-product, #rm-quantity, #rm-lot"),
   ).toHaveCount(0);
@@ -330,11 +348,14 @@ test("M5C1-R1: creazione da vista Annullati, dettaglio e pianificazione continui
   );
   await page.getByRole("button", { name: "Invia al Magazzino" }).click();
   expect((await requestResponse).status()).toBe(201);
+  await expect(page).toHaveURL(
+    new RegExp(`/interventi\\?.*interventoId=${created.id}`),
+  );
+  await expect(detail).toBeVisible();
   const afterSubmit = await page.request.get(
     `/api/richieste-magazzino?interventoId=${created.id}&stato=aperte`,
   );
   expect((await afterSubmit.json()).items).toHaveLength(1);
-  await page.goto(`/interventi?vista=pianificati&interventoId=${created.id}`);
   await expect(
     page.getByTestId("intervento-richiesta-magazzino").getByRole("link", {
       name: "Apri richiesta",

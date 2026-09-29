@@ -6,6 +6,7 @@ import {
   defaultEmporioPermissions,
   defaultMensaRolePermissions,
   defaultSocialOperatorPermissions,
+  defaultMagazzinoOperatorPermissions,
   roleAreasAfterEmporioSeed,
 } from "../src/lib/seedRoles";
 
@@ -55,6 +56,21 @@ describe("M5C1 — ruolo Operatore Sociale standard", () => {
     expect(result).not.toContain("bolle.manage");
     expect(result).not.toContain("bolle.deliver");
     expect(result).not.toContain("bolle.cancel");
+  });
+});
+
+describe("M5C1-R2 — ownership Enti Esterni", () => {
+  it("mantiene manage al Sociale e lo rimuove dal solo ruolo Magazzino canonico", () => {
+    expect(defaultSocialOperatorPermissions([])).toContain(
+      "enti-destinatari.manage",
+    );
+    const warehouse = defaultMagazzinoOperatorPermissions([
+      "enti-destinatari.manage",
+      "permesso.custom",
+    ]);
+    expect(warehouse).toContain("enti-destinatari.view");
+    expect(warehouse).toContain("permesso.custom");
+    expect(warehouse).not.toContain("enti-destinatari.manage");
   });
 });
 

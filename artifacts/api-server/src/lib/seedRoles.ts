@@ -116,8 +116,18 @@ const MAGAZZINO_OPERATOR_PERMISSIONS = [
   "bolle.deliver",
   "bolle.cancel",
   "enti-destinatari.view",
-  "enti-destinatari.manage",
 ] as const;
+
+export function defaultMagazzinoOperatorPermissions(
+  current: string[] | null | undefined,
+): string[] {
+  return mergePermissions(
+    (current ?? []).filter(
+      (permission) => permission !== "enti-destinatari.manage",
+    ),
+    MAGAZZINO_OPERATOR_PERMISSIONS,
+  );
+}
 
 function mergePermissions(
   current: string[] | null | undefined,
@@ -317,7 +327,7 @@ export async function seedRoles(): Promise<void> {
       nome: MAGAZZINO_ROLE_NAME,
       descrizione: "Operatore del Magazzino Solidale",
       aree: ["magazzino"],
-      permessi: [...MAGAZZINO_OPERATOR_PERMISSIONS],
+      permessi: defaultMagazzinoOperatorPermissions([]),
       isAdmin: false,
     });
     logger.info("Seeded Magazzino operator role");
@@ -328,10 +338,7 @@ export async function seedRoles(): Promise<void> {
         aree: magazzinoRole.aree.includes("magazzino")
           ? magazzinoRole.aree
           : [...magazzinoRole.aree, "magazzino"],
-        permessi: mergePermissions(
-          magazzinoRole.permessi,
-          MAGAZZINO_OPERATOR_PERMISSIONS,
-        ),
+        permessi: defaultMagazzinoOperatorPermissions(magazzinoRole.permessi),
       })
       .where(eq(ruoliTable.id, magazzinoRole.id));
   }

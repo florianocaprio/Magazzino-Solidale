@@ -11,6 +11,7 @@ export const UNITA_STRADA_DISABLED_MESSAGE =
 export const MODULO_BY_ROUTE: Record<string, string> = {
   "/beneficiari": "CENTRO_ASCOLTO",
   "/interventi": "CENTRO_ASCOLTO",
+  "/enti-esterni": "CENTRO_ASCOLTO",
   "/turni": "CENTRO_ASCOLTO",
   "/centri-ascolto": "CENTRO_ASCOLTO",
   "/preparazione-consegne": "MAGAZZINO_SOLIDALE",

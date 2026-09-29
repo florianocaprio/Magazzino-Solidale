@@ -5,6 +5,7 @@ import {
   getSearchMensaBeneficiariQueryKey,
   getListMensaAbilitazioniQueryKey,
   getListGiacenzeMensaQueryKey,
+  getListLottiMensaQueryKey,
   getListConsumiMensaQueryKey,
   useAutorizzaEccezioneMensa,
   useAvviaTrasferimento,
@@ -22,6 +23,7 @@ import {
   useListConsumiMensa,
   useListGiornateMensa,
   useListGiacenzeMensa,
+  useListLottiMensa,
   useListMagazziniMensa,
   useListMensaAbilitazioni,
   useListMense,
@@ -1232,6 +1234,7 @@ function TrasferimentiView() {
   const [mensaId, setMensaId] = useState("");
   const [originId, setOriginId] = useState("");
   const [productId, setProductId] = useState("");
+  const [lottoId, setLottoId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const stockParams = { magazzinoId: Number(originId) };
   const stock = useListGiacenzeMensa(stockParams, {
@@ -1243,6 +1246,29 @@ function TrasferimentiView() {
   const selectedProduct = stock.data?.find(
     (item) => item.prodottoId === Number(productId),
   );
+  const lotParams = {
+    mensaId: Number(mensaId),
+    magazzinoId: Number(originId),
+    prodottoId: Number(productId),
+    dataRichiesta: todayEuropeRome(),
+  };
+  const lots = useListLottiMensa(lotParams, {
+    query: {
+      queryKey: getListLottiMensaQueryKey(lotParams),
+      enabled:
+        Number(mensaId) > 0 &&
+        Number(originId) > 0 &&
+        Number(productId) > 0 &&
+        !!selectedProduct?.lottoFisicoObbligatorio,
+    },
+  });
+  const selectedLot = lots.data?.find((item) => item.id === Number(lottoId));
+  const maxQuantity = selectedLot
+    ? Math.min(
+        selectedProduct?.disponibileReale ?? 0,
+        selectedLot.disponibileReale,
+      )
+    : (selectedProduct?.disponibileReale ?? 0);
   const create = useCreateTrasferimentoMensa();
   const start = useAvviaTrasferimento();
   const prepare = usePreparaTrasferimento();
@@ -1254,15 +1280,22 @@ function TrasferimentiView() {
   const submit = () => {
     const product = selectedProduct;
     if (!product) return;
+    if (product.lottoFisicoObbligatorio && !selectedLot) {
+      toast({
+        title: "Seleziona il lotto fisico da trasferire",
+        variant: "destructive",
+      });
+      return;
+    }
     const requestedQuantity = Number(quantity);
     if (
       !Number.isFinite(requestedQuantity) ||
       requestedQuantity <= 0 ||
-      requestedQuantity > product.disponibileReale
+      requestedQuantity > maxQuantity
     ) {
       toast({
         title: "Quantità non disponibile",
-        description: `Il disponibile reale è ${product.disponibileReale} ${product.unitaMisura}`,
+        description: `Il disponibile reale è ${maxQuantity} ${product.unitaMisura}`,
         variant: "destructive",
       });
       return;
@@ -1277,6 +1310,7 @@ function TrasferimentiView() {
           prodottoId: product.prodottoId,
           quantita: String(requestedQuantity),
           unitaMisura: product.unitaMisura,
+          ...(selectedLot ? { lottoId: selectedLot.id } : {}),
         },
       ],
     };
@@ -1291,6 +1325,9 @@ function TrasferimentiView() {
         onSuccess: () => {
           commandIntents.complete(slot);
           refresh();
+          queryClient.invalidateQueries({
+            queryKey: getListLottiMensaQueryKey(),
+          });
         },
         onError: (error) => {
           commandIntents.fail(slot, error);
@@ -1323,6 +1360,12 @@ function TrasferimentiView() {
         onSuccess: () => {
           commandIntents.complete(slot);
           refresh();
+          queryClient.invalidateQueries({
+            queryKey: getListGiacenzeMensaQueryKey(stockParams),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getListLottiMensaQueryKey(),
+          });
         },
         onError: (error) => {
           commandIntents.fail(slot, error);
@@ -1348,6 +1391,9 @@ function TrasferimentiView() {
           refresh();
           queryClient.invalidateQueries({
             queryKey: getListGiacenzeMensaQueryKey(stockParams),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getListLottiMensaQueryKey(),
           });
           toast({ title: t("trasferimenti.toastPronto") });
         },
@@ -1381,6 +1427,9 @@ function TrasferimentiView() {
           refresh();
           queryClient.invalidateQueries({
             queryKey: getListGiacenzeMensaQueryKey(stockParams),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getListLottiMensaQueryKey(),
           });
           toast({ title: t("trasferimenti.toastAnnullato") });
         },
@@ -1426,8 +1475,16 @@ function TrasferimentiView() {
           <CardTitle>Nuovo rifornimento</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
-          <Select value={mensaId} onValueChange={setMensaId}>
-            <SelectTrigger>
+          <Select
+            value={mensaId}
+            onValueChange={(value) => {
+              setMensaId(value);
+              setOriginId("");
+              setProductId("");
+              setLottoId("");
+            }}
+          >
+            <SelectTrigger aria-label="Mensa destinazione">
               <SelectValue placeholder="Mensa destinazione" />
             </SelectTrigger>
             <SelectContent>
@@ -1443,9 +1500,10 @@ function TrasferimentiView() {
             onValueChange={(value) => {
               setOriginId(value);
               setProductId("");
+              setLottoId("");
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label="Magazzino origine">
               <SelectValue placeholder="Magazzino origine" />
             </SelectTrigger>
             <SelectContent>
@@ -1462,8 +1520,14 @@ function TrasferimentiView() {
                 ))}
             </SelectContent>
           </Select>
-          <Select value={productId} onValueChange={setProductId}>
-            <SelectTrigger>
+          <Select
+            value={productId}
+            onValueChange={(value) => {
+              setProductId(value);
+              setLottoId("");
+            }}
+          >
+            <SelectTrigger aria-label="Prodotto disponibile">
               <SelectValue placeholder="Prodotto disponibile" />
             </SelectTrigger>
             <SelectContent>
@@ -1479,11 +1543,44 @@ function TrasferimentiView() {
               ))}
             </SelectContent>
           </Select>
+          {selectedProduct?.lottoFisicoObbligatorio && (
+            <div className="space-y-2" data-testid="mensa-lotto-field">
+              <Label htmlFor="mensa-lotto">Lotto</Label>
+              <Select value={lottoId} onValueChange={setLottoId}>
+                <SelectTrigger id="mensa-lotto" aria-label="Lotto">
+                  <SelectValue placeholder="Seleziona lotto fisico" />
+                </SelectTrigger>
+                <SelectContent>
+                  {lots.data?.map((lot) => (
+                    <SelectItem key={lot.id} value={String(lot.id)}>
+                      {lot.codiceLotto ?? `#${lot.id}`} ·{" "}
+                      {lot.dataScadenza
+                        ? `scad. ${new Date(`${lot.dataScadenza}T12:00:00Z`).toLocaleDateString("it-IT")}`
+                        : "senza scadenza"}{" "}
+                      · disponibile {lot.disponibileReale}{" "}
+                      {selectedProduct.unitaMisura}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!selectedLot && (
+                <p className="text-sm text-muted-foreground">
+                  Seleziona il lotto fisico da trasferire
+                </p>
+              )}
+              {lots.isError && (
+                <p role="alert" className="text-sm text-destructive">
+                  Impossibile caricare i lotti disponibili
+                </p>
+              )}
+            </div>
+          )}
           <Input
             type="number"
+            aria-label="Quantità"
             min="0.01"
             step="0.000001"
-            max={selectedProduct?.disponibileReale}
+            max={maxQuantity}
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
           />
@@ -1493,8 +1590,9 @@ function TrasferimentiView() {
               !originId ||
               !productId ||
               !selectedProduct ||
+              (selectedProduct.lottoFisicoObbligatorio && !selectedLot) ||
               Number(quantity) <= 0 ||
-              Number(quantity) > selectedProduct.disponibileReale ||
+              Number(quantity) > maxQuantity ||
               create.isPending
             }
             onClick={submit}

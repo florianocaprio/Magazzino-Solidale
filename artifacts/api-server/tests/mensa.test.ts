@@ -23,6 +23,7 @@ import {
   menseTable,
   pool,
   prodottiTable,
+  prenotazioniMagazzinoTable,
   scarichiTable,
   scaricoRigheTable,
   tessereBeneficiariTable,
@@ -309,6 +310,12 @@ afterEach(async () => {
     await db
       .delete(auditConfigurazioniTable)
       .where(inArray(auditConfigurazioniTable.utenteId, ids.users));
+  if (ids.transfers.length)
+    await db
+      .delete(prenotazioniMagazzinoTable)
+      .where(
+        inArray(prenotazioniMagazzinoTable.trasferimentoId, ids.transfers),
+      );
   if (ids.transfers.length)
     await db
       .delete(trasferimentoRigheTable)
@@ -1213,6 +1220,215 @@ describe("Modulo Mensa", () => {
       });
     expect(received.status).toBe(200);
     expect(received.body.stato).toBe("completato");
+  });
+
+  it("R2-04: propone solo lotti trasferibili e conserva il lotto scelto fino alla prenotazione M4", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const [required, otherProduct, optional] = await db
+      .insert(prodottiTable)
+      .values([
+        {
+          codice: `MLR-${rnd()}`,
+          nome: "Biscotti con lotto",
+          tipoProdotto: "alimentare",
+          unitaMisura: "cf",
+          lottoFisicoObbligatorio: true,
+        },
+        {
+          codice: `MLO-${rnd()}`,
+          nome: "Altro prodotto",
+          tipoProdotto: "alimentare",
+          unitaMisura: "cf",
+        },
+        {
+          codice: `MLN-${rnd()}`,
+          nome: "Prodotto senza lotto obbligatorio",
+          tipoProdotto: "alimentare",
+          unitaMisura: "cf",
+        },
+      ])
+      .returning({ id: prodottiTable.id });
+    ids.products.push(required.id, otherProduct.id, optional.id);
+    const today = dataServizioMensa();
+    const [lotA, lotB, expired, wrongProduct, wrongWarehouse] = await db
+      .insert(lottiTable)
+      .values([
+        {
+          prodottoId: required.id,
+          magazzinoId: fixture.warehouseIds[1],
+          codiceLotto: `LOT-A-${rnd()}`,
+          dataCarico: today,
+          dataScadenza: shiftDate(today, 20),
+          quantitaCaricata: "10",
+          quantitaResidua: "10",
+        },
+        {
+          prodottoId: required.id,
+          magazzinoId: fixture.warehouseIds[1],
+          codiceLotto: `LOT-B-${rnd()}`,
+          dataCarico: today,
+          dataScadenza: shiftDate(today, 40),
+          quantitaCaricata: "58",
+          quantitaResidua: "58",
+        },
+        {
+          prodottoId: required.id,
+          magazzinoId: fixture.warehouseIds[1],
+          codiceLotto: `LOT-EX-${rnd()}`,
+          dataCarico: today,
+          dataScadenza: "2020-01-01",
+          quantitaCaricata: "5",
+          quantitaResidua: "5",
+        },
+        {
+          prodottoId: otherProduct.id,
+          magazzinoId: fixture.warehouseIds[1],
+          codiceLotto: `LOT-OTHER-${rnd()}`,
+          dataCarico: today,
+          dataScadenza: shiftDate(today, 40),
+          quantitaCaricata: "5",
+          quantitaResidua: "5",
+        },
+        {
+          prodottoId: required.id,
+          magazzinoId: fixture.warehouseIds[0],
+          codiceLotto: `LOT-WH-${rnd()}`,
+          dataCarico: today,
+          dataScadenza: shiftDate(today, 40),
+          quantitaCaricata: "5",
+          quantitaResidua: "5",
+        },
+      ])
+      .returning({ id: lottiTable.id });
+    ids.lots.push(
+      lotA.id,
+      lotB.id,
+      expired.id,
+      wrongProduct.id,
+      wrongWarehouse.id,
+    );
+    const stock = await request(app).get(
+      `/mensa/logistica/giacenze?magazzinoId=${fixture.warehouseIds[1]}`,
+    );
+    expect(stock.status).toBe(200);
+    expect(stock.body).toContainEqual(
+      expect.objectContaining({
+        prodottoId: required.id,
+        lottoFisicoObbligatorio: true,
+        disponibileReale: 68,
+      }),
+    );
+    const lotUrl = `/mensa/logistica/lotti?mensaId=${fixture.mensaA}&magazzinoId=${fixture.warehouseIds[1]}&prodottoId=${required.id}`;
+    const available = await request(app).get(lotUrl);
+    expect(available.status, available.text).toBe(200);
+    expect(available.body.map((lot: { id: number }) => lot.id)).toEqual([
+      lotA.id,
+      lotB.id,
+    ]);
+    expect(
+      available.body.map(
+        (lot: { disponibileReale: number }) => lot.disponibileReale,
+      ),
+    ).toEqual([10, 58]);
+    const scoped = await request(app).get(
+      `/mensa/logistica/lotti?mensaId=${fixture.mensaA}&magazzinoId=${fixture.warehouseIds[2]}&prodottoId=${required.id}`,
+    );
+    expect(scoped.status).toBe(403);
+    const body = (
+      lottoId: number | null,
+      quantita: number,
+      idempotencyKey = `mensa-lot-${rnd()}`,
+    ) => ({
+      mensaId: fixture.mensaA,
+      magazzinoOrigineId: fixture.warehouseIds[1],
+      dataRichiesta: today,
+      idempotencyKey,
+      righe: [
+        { prodottoId: required.id, lottoId, quantita, unitaMisura: "cf" },
+      ],
+    });
+    const missing = await request(app)
+      .post("/mensa/trasferimenti")
+      .send(body(null, 1));
+    expect(missing.status).toBe(400);
+    expect(missing.body.error).toMatch(/lotto fisico.*obbligatorio/i);
+    for (const [lottoId, status] of [
+      [expired.id, 409],
+      [wrongProduct.id, 400],
+      [wrongWarehouse.id, 400],
+    ] as const) {
+      const rejected = await request(app)
+        .post("/mensa/trasferimenti")
+        .send(body(lottoId, 1));
+      expect(rejected.status, rejected.text).toBe(status);
+    }
+    const excessive = await request(app)
+      .post("/mensa/trasferimenti")
+      .send(body(lotA.id, 23));
+    expect(excessive.status).toBe(409);
+    expect(excessive.body.error).toMatch(
+      /disponibilit[aà] reale insufficiente/i,
+    );
+    const key = `mensa-lot-replay-${rnd()}`;
+    const validBody = body(lotA.id, 10, key);
+    const created = await request(app)
+      .post("/mensa/trasferimenti")
+      .send(validBody);
+    expect(created.status, created.text).toBe(201);
+    ids.transfers.push(created.body.id);
+    const replay = await request(app)
+      .post("/mensa/trasferimenti")
+      .send(validBody);
+    expect(replay.status, replay.text).toBe(200);
+    expect(replay.body).toMatchObject({
+      id: created.body.id,
+      idempotentReplay: true,
+    });
+    const mismatch = await request(app)
+      .post("/mensa/trasferimenti")
+      .send(body(lotB.id, 10, key));
+    expect(mismatch.status).toBe(409);
+    const [savedRow] = await db
+      .select({ lottoId: trasferimentoRigheTable.lottoId })
+      .from(trasferimentoRigheTable)
+      .where(eq(trasferimentoRigheTable.trasferimentoId, created.body.id));
+    expect(savedRow.lottoId).toBe(lotA.id);
+    const [transfer] = await db
+      .select({ versione: trasferimentiTable.versione })
+      .from(trasferimentiTable)
+      .where(eq(trasferimentiTable.id, created.body.id));
+    const prepared = await request(app)
+      .post(`/trasferimenti/${created.body.id}/prepara`)
+      .send({
+        versione: transfer.versione,
+        idempotencyKey: `mensa-prepare-${rnd()}`,
+      });
+    expect(prepared.status, prepared.text).toBe(200);
+    const reservations = await db
+      .select({
+        lottoId: prenotazioniMagazzinoTable.lottoId,
+        quantita: prenotazioniMagazzinoTable.quantita,
+      })
+      .from(prenotazioniMagazzinoTable)
+      .where(eq(prenotazioniMagazzinoTable.trasferimentoId, created.body.id));
+    expect(reservations).toHaveLength(1);
+    expect(reservations[0].lottoId).toBe(lotA.id);
+    expect(Number(reservations[0].quantita)).toBe(10);
+    const afterPrepare = await request(app).get(lotUrl);
+    expect(afterPrepare.status).toBe(200);
+    expect(afterPrepare.body.map((lot: { id: number }) => lot.id)).toEqual([
+      lotB.id,
+    ]);
+    const optionalResponse = await request(app)
+      .post("/mensa/trasferimenti")
+      .send({
+        ...body(null, 1),
+        idempotencyKey: `mensa-optional-${rnd()}`,
+        righe: [{ prodottoId: optional.id, quantita: 1, unitaMisura: "cf" }],
+      });
+    expect(optionalResponse.status, optionalResponse.text).toBe(201);
+    ids.transfers.push(optionalResponse.body.id);
   });
 
   it("crea atomicamente Mensa e magazzino dedicato con Area, Centro e codice automatico", async () => {

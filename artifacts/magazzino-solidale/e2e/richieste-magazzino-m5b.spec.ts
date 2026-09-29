@@ -79,7 +79,7 @@ test("M5B: richiesta Centro → presa Magazzino → Bolla → annullamento M4 �
       .locator("#rm-warehouse")
       .selectOption({ label: "TEST-M5B Deposito A1" });
     await prepare.getByRole("button").last().click();
-    await expect(warehousePage.getByText("Documento corrente")).toBeVisible();
+    await expect(warehousePage).toHaveURL(/\/bolle\?bollaId=\d+/);
 
     const firstDetail = await warehousePage.request.get(
       `/api/richieste-magazzino/${request.id}`,
@@ -124,7 +124,6 @@ test("M5B: richiesta Centro → presa Magazzino → Bolla → annullamento M4 �
       if (new URL(entry.url()).pathname.startsWith("/api/"))
         bollaRequests.push(entry.url());
     });
-    await warehousePage.getByRole("link", { name: "Apri documento" }).click();
     await expect(warehousePage).toHaveURL(new RegExp(`bollaId=${firstId}`));
     await expect(
       warehousePage.getByText(first.documentoCorrente.codice).first(),
@@ -210,7 +209,7 @@ test("M5B: richiesta Centro → presa Magazzino → Bolla → annullamento M4 �
       .locator("#rm-warehouse")
       .selectOption({ label: "TEST-M5B Deposito A1" });
     await replacement.getByRole("button").last().click();
-    await expect(warehousePage.getByText("Documento corrente")).toBeVisible();
+    await expect(warehousePage).toHaveURL(/\/bolle\?bollaId=\d+/);
     const secondDetail = await warehousePage.request.get(
       `/api/richieste-magazzino/${request.id}`,
     );

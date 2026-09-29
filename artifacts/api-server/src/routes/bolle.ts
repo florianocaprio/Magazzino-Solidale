@@ -16,6 +16,9 @@ import {
   speseEmporioTable,
   movimentiTable,
   entiDestinatariTable,
+  richiesteMagazzinoTable,
+  richiesteMagazzinoDocumentiTable,
+  interventiTable,
 } from "@workspace/db";
 import {
   eq,
@@ -47,6 +50,11 @@ import {
   canUseBeneficiario,
   visibleMagazzinoIds,
 } from "../lib/centroScope";
+import {
+  operationalStateForVolunteer,
+  operationalStatesForRows,
+} from "../lib/volontariOperational";
+import { todayRome } from "../lib/volontariDomain";
 import {
   calcolaDisponibilitaMagazzino,
   parseDbNumber,
@@ -222,6 +230,45 @@ async function canUseVolontarioConsegna(
   if (!volontario.attivo || volontario.statoApprovazione !== "approvato")
     return false;
   return canAccessCentro(volontario.centroAscoltoId, centroBeneficiario);
+}
+
+async function bollaVolunteerReference(
+  bollaId: number,
+  consegnaId: number | null,
+): Promise<{ linked: boolean; date: string | null }> {
+  const [consegna] =
+    consegnaId == null
+      ? []
+      : await db
+          .select({ dataPrevista: consegneTable.dataPrevista })
+          .from(consegneTable)
+          .where(eq(consegneTable.id, consegnaId));
+  const [origin] = await db
+    .select({
+      dataDesiderata: richiesteMagazzinoTable.dataDesiderata,
+      dataIntervento: interventiTable.dataOraPianificata,
+    })
+    .from(richiesteMagazzinoDocumentiTable)
+    .innerJoin(
+      richiesteMagazzinoTable,
+      eq(
+        richiesteMagazzinoDocumentiTable.richiestaId,
+        richiesteMagazzinoTable.id,
+      ),
+    )
+    .leftJoin(
+      interventiTable,
+      eq(richiesteMagazzinoTable.interventoId, interventiTable.id),
+    )
+    .where(eq(richiesteMagazzinoDocumentiTable.bollaId, bollaId));
+  return {
+    linked: origin != null,
+    date:
+      consegna?.dataPrevista ??
+      (origin?.dataIntervento ? todayRome(origin.dataIntervento) : null) ??
+      origin?.dataDesiderata ??
+      null,
+  };
 }
 
 export async function buildDettaglio(id: number) {
@@ -1519,6 +1566,89 @@ router.get("/bolle/:id", requirePermission("bolle.view"), async (req, res) => {
   res.json(det);
 });
 
+// Minimal candidate projection for warehouse staff: no volunteer directory PII.
+router.get(
+  "/bolle/:id/volontari-candidati",
+  requirePermission("bolle.manage"),
+  async (req, res) => {
+    if (!req.user?.isAdmin && !req.user?.aree.includes("magazzino")) {
+      res.status(403).json({ error: "Area Magazzino richiesta" });
+      return;
+    }
+    const bollaId = Number(req.params.id);
+    const det =
+      Number.isSafeInteger(bollaId) && bollaId > 0
+        ? await buildDettaglio(bollaId)
+        : null;
+    if (!det || !(await canReadLinkedM4Document(req.user!, "bolla", det.id))) {
+      res.status(404).json({ error: "Bolla non trovata" });
+      return;
+    }
+    if (
+      !(await canAccessBollaOperativa(
+        det,
+        callerCentroId(req),
+        callerAreaOperativaId(req),
+        callerZonaUdsId(req),
+      ))
+    ) {
+      res.status(403).json({ error: "Bolla non accessibile" });
+      return;
+    }
+    if (det.tipoDestinatario !== "beneficiario" || det.beneficiarioId == null) {
+      res.json([]);
+      return;
+    }
+    const riferimento = (await bollaVolunteerReference(bollaId, det.consegnaId))
+      .date;
+    const centroId = await beneficiarioCentroId(det.beneficiarioId);
+    const rows = await db
+      .select({
+        id: volontariTable.id,
+        nome: volontariTable.nome,
+        cognome: volontariTable.cognome,
+        centroAscoltoId: volontariTable.centroAscoltoId,
+        tipoVolontario: volontariTable.tipoVolontario,
+        statoApprovazione: volontariTable.statoApprovazione,
+        attivo: volontariTable.attivo,
+      })
+      .from(volontariTable)
+      .where(
+        and(
+          centroId == null
+            ? undefined
+            : or(
+                eq(volontariTable.centroAscoltoId, centroId),
+                isNull(volontariTable.centroAscoltoId),
+              ),
+          riferimento == null
+            ? eq(volontariTable.tipoVolontario, "PERMANENTE")
+            : undefined,
+        ),
+      )
+      .orderBy(asc(volontariTable.cognome), asc(volontariTable.nome))
+      .limit(200);
+    // Without a trusted date, only permanent volunteers are proposed; the
+    // final service-day decision remains with Centro / Pianificazione Consegne.
+    const states = await operationalStatesForRows(
+      db,
+      rows,
+      riferimento ?? todayRome(),
+      centroId,
+    );
+    res.json(
+      rows
+        .filter((row) => states.get(row.id)?.operativo)
+        .map((row) => ({
+          id: row.id,
+          nome: row.nome,
+          cognome: row.cognome,
+          tipoVolontario: row.tipoVolontario,
+        })),
+    );
+  },
+);
+
 // ─── UPDATE (magazzino/beneficiario/volontario) ──────────────────────────────
 
 router.patch(
@@ -1693,6 +1823,39 @@ router.patch(
         error: "Volontario non accessibile per il centro della bolla",
       });
       return;
+    }
+    if (
+      bolla.tipoDestinatario === "beneficiario" &&
+      body.volontarioConsegnaId != null
+    ) {
+      const reference = await bollaVolunteerReference(
+        bollaId,
+        bolla.consegnaId,
+      );
+      if (reference.linked) {
+        const candidate = await db
+          .select({ tipoVolontario: volontariTable.tipoVolontario })
+          .from(volontariTable)
+          .where(eq(volontariTable.id, body.volontarioConsegnaId));
+        if (!reference.date && candidate[0]?.tipoVolontario === "TEMPORANEO") {
+          res
+            .status(403)
+            .json({ error: "Volontario temporaneo senza data di riferimento" });
+          return;
+        }
+        const state = await operationalStateForVolunteer(
+          db,
+          body.volontarioConsegnaId,
+          reference.date ?? todayRome(),
+          await beneficiarioCentroId(bolla.beneficiarioId!),
+        );
+        if (!state?.operativo) {
+          res
+            .status(403)
+            .json({ error: "Volontario non operativo alla data della Bolla" });
+          return;
+        }
+      }
     }
 
     // cambio magazzino: consentito solo in bozza (nessuno scarico ancora effettuato).

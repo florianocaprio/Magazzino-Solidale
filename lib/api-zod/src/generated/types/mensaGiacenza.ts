@@ -21,5 +21,6 @@ export interface MensaGiacenza {
   impegnato: number;
   impegnatoPreciso?: QuantitaContabile;
   disponibileReale: number;
+  lottoFisicoObbligatorio: boolean;
   disponibileRealePrecisa?: QuantitaContabile;
 }

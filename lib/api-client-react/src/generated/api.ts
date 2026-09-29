@@ -292,6 +292,7 @@ import type {
   ListInterventiOperatoriParams,
   ListInterventiParams,
   ListLottiLogiciParams,
+  ListLottiMensaParams,
   ListLottiParams,
   ListMensaAbilitazioniParams,
   ListMenseParams,
@@ -350,6 +351,7 @@ import type {
   MensaGiacenza,
   MensaGiornata,
   MensaInput,
+  MensaLottoDisponibile,
   MensaMagazzinoSummary,
   MensaPastiPage,
   MensaPasto,
@@ -485,6 +487,7 @@ import type {
   VolontariRegisterGenerateInput,
   Volontario,
   VolontarioActionResult,
+  VolontarioBollaCandidato,
   VolontarioBulkInsuranceConfirmInput,
   VolontarioBulkInsuranceInput,
   VolontarioIdentifier,
@@ -17295,6 +17298,83 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getUpdateBollaMutationOptions(options));
     }
 
+export const getListBollaVolontariCandidatiUrl = (id: number,) => {
+
+
+
+
+  return `/api/bolle/${id}/volontari-candidati`
+}
+
+/**
+ * @summary Volontari approvati e operativi proponibili per la Bolla
+ */
+export const listBollaVolontariCandidati = async (id: number, options?: RequestInit): Promise<VolontarioBollaCandidato[]> => {
+
+  return customFetch<VolontarioBollaCandidato[]>(getListBollaVolontariCandidatiUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBollaVolontariCandidatiQueryKey = (id: number,) => {
+    return [
+    `/api/bolle/${id}/volontari-candidati`
+    ] as const;
+    }
+
+
+export const getListBollaVolontariCandidatiQueryOptions = <TData = Awaited<ReturnType<typeof listBollaVolontariCandidati>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBollaVolontariCandidati>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBollaVolontariCandidatiQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBollaVolontariCandidati>>> = ({ signal }) => listBollaVolontariCandidati(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBollaVolontariCandidati>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBollaVolontariCandidatiQueryResult = NonNullable<Awaited<ReturnType<typeof listBollaVolontariCandidati>>>
+export type ListBollaVolontariCandidatiQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Volontari approvati e operativi proponibili per la Bolla
+ */
+
+export function useListBollaVolontariCandidati<TData = Awaited<ReturnType<typeof listBollaVolontariCandidati>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBollaVolontariCandidati>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBollaVolontariCandidatiQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListBollaRigheUrl = (id: number,) => {
 
 
@@ -29674,6 +29754,87 @@ export function useListGiacenzeMensa<TData = Awaited<ReturnType<typeof listGiace
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListGiacenzeMensaQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListLottiMensaUrl = (params: ListLottiMensaParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mensa/logistica/lotti?${stringifiedParams}` : `/api/mensa/logistica/lotti`
+}
+
+/**
+ * Lotti fisici realmente trasferibili per Mensa, Magazzino origine e Prodotto autorizzati.
+ */
+export const listLottiMensa = async (params: ListLottiMensaParams, options?: RequestInit): Promise<MensaLottoDisponibile[]> => {
+
+  return customFetch<MensaLottoDisponibile[]>(getListLottiMensaUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListLottiMensaQueryKey = (params?: ListLottiMensaParams,) => {
+    return [
+    `/api/mensa/logistica/lotti`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListLottiMensaQueryOptions = <TData = Awaited<ReturnType<typeof listLottiMensa>>, TError = ErrorType<unknown>>(params: ListLottiMensaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLottiMensa>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListLottiMensaQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listLottiMensa>>> = ({ signal }) => listLottiMensa(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listLottiMensa>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListLottiMensaQueryResult = NonNullable<Awaited<ReturnType<typeof listLottiMensa>>>
+export type ListLottiMensaQueryError = ErrorType<unknown>
+
+
+
+export function useListLottiMensa<TData = Awaited<ReturnType<typeof listLottiMensa>>, TError = ErrorType<unknown>>(
+ params: ListLottiMensaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLottiMensa>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListLottiMensaQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

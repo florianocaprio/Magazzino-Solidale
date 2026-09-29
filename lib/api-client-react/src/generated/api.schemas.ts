@@ -7428,6 +7428,21 @@ export interface Bolla {
   dataCreazione: string;
 }
 
+export type VolontarioBollaCandidatoTipoVolontario = typeof VolontarioBollaCandidatoTipoVolontario[keyof typeof VolontarioBollaCandidatoTipoVolontario];
+
+
+export const VolontarioBollaCandidatoTipoVolontario = {
+  PERMANENTE: 'PERMANENTE',
+  TEMPORANEO: 'TEMPORANEO',
+} as const;
+
+export interface VolontarioBollaCandidato {
+  id: number;
+  nome: string;
+  cognome: string;
+  tipoVolontario: VolontarioBollaCandidatoTipoVolontario;
+}
+
 export interface BollaRigaInput {
   /**
      * @minLength 1
@@ -9223,7 +9238,19 @@ export interface MensaGiacenza {
   impegnato: number;
   impegnatoPreciso?: QuantitaContabile;
   disponibileReale: number;
+  lottoFisicoObbligatorio: boolean;
   disponibileRealePrecisa?: QuantitaContabile;
+}
+
+export interface MensaLottoDisponibile {
+  id: number;
+  /** @nullable */
+  codiceLotto: string | null;
+  /** @nullable */
+  dataScadenza: string | null;
+  quantitaResidua: number;
+  disponibileReale: number;
+  disponibileRealePrecisa: QuantitaContabile;
 }
 
 export type MensaConsumoInputTipoServizio = typeof MensaConsumoInputTipoServizio[keyof typeof MensaConsumoInputTipoServizio];
@@ -9420,6 +9447,11 @@ export type MensaTrasferimentoInputRigheItem = {
   unitaMisura?: string;
   /** @nullable */
   note?: string | null;
+  /**
+     * Lotto fisico selezionato; obbligatorio se il Prodotto lo richiede.
+     * @nullable
+     */
+  lottoId?: number | null;
 };
 
 export interface MensaTrasferimentoInput {
@@ -10860,6 +10892,21 @@ limit?: LimitParamParameter;
 
 export type ListEntiDestinatariParams = {
 attivo?: boolean;
+/**
+ * Ricerca case-insensitive su denominazione, indirizzo, telefono ed email
+ * @minLength 2
+ * @maxLength 100
+ */
+search?: string;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * @minimum 0
+ */
+offset?: number;
 };
 
 export type ListDocumentiOperativiParams = {
@@ -11623,6 +11670,13 @@ pageSize?: number;
 
 export type ListGiacenzeMensaParams = {
 magazzinoId: number;
+};
+
+export type ListLottiMensaParams = {
+mensaId: number;
+magazzinoId: number;
+prodottoId: number;
+dataRichiesta?: string;
 };
 
 export type ListTrasferimentiMensaParams = {

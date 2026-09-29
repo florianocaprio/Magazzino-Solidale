@@ -27,6 +27,10 @@ import {
   useListDocumentiOperativi,
   useGetDocumentoOperativo,
   useGetDocumentoOperativoRichiesta,
+  useGetRichiestaMagazzino,
+  getGetRichiestaMagazzinoQueryKey,
+  useListBollaVolontariCandidati,
+  getListBollaVolontariCandidatiQueryKey,
   useGetTrasferimento,
   useAvviaTrasferimento,
   usePreparaTrasferimento,
@@ -47,9 +51,8 @@ import {
   useSegnalaRitiroNonEffettuato,
   useConvertiBollaInConsegna,
   useListEntiDestinatari,
-  useListAreeOperative,
-  useCreateEnteDestinatario,
   getListEntiDestinatariQueryKey,
+  useListAreeOperative,
   getBolla,
   getListBolleQueryKey,
   getListBeneficiariQueryKey,
@@ -111,6 +114,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
+import { EnteDestinatarioCombobox } from "@/components/ente-destinatario-combobox";
+import {
+  bollaErrorMessage,
+  invalidateBollaViews,
+} from "@/lib/bolla-query-invalidation";
 import { RouteActions } from "@/components/maps/route-actions";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -279,8 +287,13 @@ export function CreaiBollaDialog({
     "beneficiario" | "ente"
   >("beneficiario");
   const [enteId, setEnteId] = useState("");
-  const [newEnteNome, setNewEnteNome] = useState("");
-  const [newEnteIndirizzo, setNewEnteIndirizzo] = useState("");
+  const [selectedEnte, setSelectedEnte] = useState<{
+    denominazione: string;
+    areaOperativaId: number;
+  } | null>(null);
+  const [enteSearch, setEnteSearch] = useState("");
+  const [debouncedEnteSearch, setDebouncedEnteSearch] = useState("");
+  const [createError, setCreateError] = useState("");
   const [magazzinoId, setMagazzinoId] = useState("");
   const [centroId, setCentroId] = useState("all");
   const [trasportatore, setTrasportatore] = useState("");
@@ -307,12 +320,19 @@ export function CreaiBollaDialog({
       if (!lockedBeneficiario) setBeneficiarioId("");
       setTipoDestinatario("beneficiario");
       setEnteId("");
-      setNewEnteNome("");
-      setNewEnteIndirizzo("");
-      commandIntents.discard("ente:create");
+      setSelectedEnte(null);
+      setEnteSearch("");
+      setCreateError("");
       commandIntents.discard("bolla:create");
     }
   }, [open, lockedBeneficiario, commandIntents]);
+  useEffect(() => {
+    const timeout = window.setTimeout(
+      () => setDebouncedEnteSearch(enteSearch.trim()),
+      275,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [enteSearch]);
   const { data: centri } = useListCentriAscolto();
   const canSearchBeneficiari = open && hasPermission("beneficiari.view");
   const beneficiariParams = {
@@ -342,8 +362,24 @@ export function CreaiBollaDialog({
       ? { centroAscoltoId: selectedBenef.centroAscoltoId }
       : undefined;
   const { data: magazzini } = useListMagazzini();
-  const { data: enti } = useListEntiDestinatari();
-  const createEnte = useCreateEnteDestinatario();
+  const enteParams = {
+    limit: 50,
+    ...(debouncedEnteSearch.length >= 2 ? { search: debouncedEnteSearch } : {}),
+  };
+  const enteSearchReady =
+    enteSearch.trim().length === 0 ||
+    (enteSearch.trim().length >= 2 &&
+      debouncedEnteSearch === enteSearch.trim());
+  const { data: enti } = useListEntiDestinatari(enteParams, {
+    query: {
+      queryKey: getListEntiDestinatariQueryKey(enteParams),
+      enabled: open && tipoDestinatario === "ente" && enteSearchReady,
+    },
+  });
+  const { data: areeEnti } = useListAreeOperative();
+  const enteAreaNames = new Map(
+    areeEnti?.map((area) => [area.id, area.nome]) ?? [],
+  );
   const { data: volontari } = useListVolontari(volontariParams, {
     query: {
       queryKey: getListVolontariQueryKey(volontariParams),
@@ -430,8 +466,6 @@ export function CreaiBollaDialog({
       (beneficiarioDirty ||
         tipoDestinatario !== "beneficiario" ||
         !!enteId ||
-        !!newEnteNome ||
-        !!newEnteIndirizzo ||
         !!magazzinoId ||
         centroId !== initialCentroId ||
         !!scanCode ||
@@ -440,52 +474,39 @@ export function CreaiBollaDialog({
         mezzo !== initialMezzo),
   );
   const requestClose = () => {
-    if (createBolla.isPending || createEnte.isPending) return;
+    if (createBolla.isPending) return;
     unsavedGuard.requestClose(onClose);
   };
 
-  const onCreateEnte = () => {
-    const magazzino = magazzini?.find(
+  const onSubmit = () => {
+    setCreateError("");
+    if (tipoDestinatario === "beneficiario" && !beneficiarioId) {
+      setCreateError(t("bolle.beneficiarioPlaceholder"));
+      return;
+    }
+    if (tipoDestinatario === "ente" && !enteId) {
+      setCreateError(t("entiEsterni.missingEntity"));
+      return;
+    }
+    if (!magazzinoId) {
+      setCreateError(t("entiEsterni.missingWarehouse"));
+      return;
+    }
+    const chosenWarehouse = magazzini?.find(
       (item) => String(item.id) === magazzinoId,
     );
     if (
-      !magazzino?.areaOperativaId ||
-      !newEnteNome.trim() ||
-      !newEnteIndirizzo.trim()
-    )
+      tipoDestinatario === "ente" &&
+      selectedEnte &&
+      chosenWarehouse?.areaOperativaId !== selectedEnte.areaOperativaId
+    ) {
+      setCreateError(t("entiEsterni.areaMismatch"));
       return;
-    const slot = "ente:create";
-    const enteInput = {
-      denominazione: newEnteNome.trim(),
-      indirizzo: newEnteIndirizzo.trim(),
-      areaOperativaId: magazzino.areaOperativaId,
-    };
-    createEnte.mutate(
-      {
-        data: commandIntents.prepare(slot, enteInput, enteInput),
-      },
-      {
-        onSuccess: (created) => {
-          commandIntents.complete(slot);
-          queryClient.invalidateQueries({
-            queryKey: getListEntiDestinatariQueryKey(),
-          });
-          setEnteId(String(created.id));
-          setNewEnteNome("");
-          setNewEnteIndirizzo("");
-        },
-        onError: (error) => commandIntents.fail(slot, error),
-      },
-    );
-  };
-
-  const onSubmit = () => {
-    if (
-      (tipoDestinatario === "beneficiario" ? !beneficiarioId : !enteId) ||
-      !magazzinoId ||
-      trasportatoreMissing
-    )
+    }
+    if (trasportatoreMissing) {
+      setCreateError(t("bolle.trasportatoreObbligatorioDomicilio"));
       return;
+    }
     const data: {
       tipoDestinatario: "beneficiario" | "ente";
       beneficiarioId?: number;
@@ -530,9 +551,10 @@ export function CreaiBollaDialog({
         },
         onError: (error) => {
           commandIntents.fail(slot, error);
+          setCreateError(bollaErrorMessage(error, t("bolle.createError")));
           toast({
             title: t("bolle.error"),
-            description: t("bolle.createError"),
+            description: bollaErrorMessage(error, t("bolle.createError")),
             variant: "destructive",
           });
         },
@@ -666,22 +688,25 @@ export function CreaiBollaDialog({
               <Label>
                 {t("bolle.destinatarioEnte", { defaultValue: "Ente esterno" })}
               </Label>
-              <Select value={enteId} onValueChange={setEnteId}>
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={t("bolle.entePlaceholder", {
-                      defaultValue: "Seleziona Ente",
-                    })}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {enti?.map((ente) => (
-                    <SelectItem key={ente.id} value={String(ente.id)}>
-                      {ente.denominazione}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <EnteDestinatarioCombobox
+                items={enteSearchReady ? (enti ?? []) : []}
+                value={enteId}
+                onChange={(ente) => {
+                  setEnteId(String(ente.id));
+                  setSelectedEnte(ente);
+                  setCreateError("");
+                  if (
+                    magazzinoId &&
+                    magazzini?.find((item) => String(item.id) === magazzinoId)
+                      ?.areaOperativaId !== ente.areaOperativaId
+                  )
+                    setMagazzinoId("");
+                }}
+                searchValue={enteSearch}
+                onSearchChange={setEnteSearch}
+                areaNames={enteAreaNames}
+                selectedLabel={selectedEnte?.denominazione}
+              />
             </div>
           )}
           <div className="space-y-2">
@@ -693,7 +718,12 @@ export function CreaiBollaDialog({
               <SelectContent>
                 {magazzini
                   ?.filter(
-                    (m) => m.stato === "attivo" && m.areaOperativaId != null,
+                    (m) =>
+                      m.stato === "attivo" &&
+                      m.areaOperativaId != null &&
+                      (tipoDestinatario !== "ente" ||
+                        !selectedEnte ||
+                        m.areaOperativaId === selectedEnte.areaOperativaId),
                   )
                   .map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>
@@ -703,39 +733,6 @@ export function CreaiBollaDialog({
               </SelectContent>
             </Select>
           </div>
-          {tipoDestinatario === "ente" &&
-            hasPermission("enti-destinatari.manage") && (
-              <div className="rounded-md border p-3 space-y-2">
-                <Label>
-                  {t("bolle.nuovoEnte", { defaultValue: "Nuovo Ente" })}
-                </Label>
-                <Input
-                  value={newEnteNome}
-                  onChange={(e) => setNewEnteNome(e.target.value)}
-                  placeholder={t("bolle.enteNome", {
-                    defaultValue: "Denominazione",
-                  })}
-                />
-                <Input
-                  value={newEnteIndirizzo}
-                  onChange={(e) => setNewEnteIndirizzo(e.target.value)}
-                  placeholder={t("common.address")}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onCreateEnte}
-                  disabled={
-                    !magazzinoId ||
-                    !newEnteNome.trim() ||
-                    !newEnteIndirizzo.trim() ||
-                    createEnte.isPending
-                  }
-                >
-                  {t("bolle.creaEnte", { defaultValue: "Crea Ente" })}
-                </Button>
-              </div>
-            )}
           {consegnaSource && (
             <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               {t("bolle.daPianificazioneInfo", {
@@ -836,6 +833,11 @@ export function CreaiBollaDialog({
             </p>
           )}
         </div>
+        {createError && (
+          <p role="alert" className="text-sm text-destructive">
+            {createError}
+          </p>
+        )}
         <DialogFooter>
           <Button
             variant="outline"
@@ -847,14 +849,7 @@ export function CreaiBollaDialog({
           <Button
             className="min-h-[44px]"
             onClick={onSubmit}
-            disabled={
-              (tipoDestinatario === "beneficiario"
-                ? !beneficiarioId
-                : !enteId) ||
-              !magazzinoId ||
-              trasportatoreMissing ||
-              createBolla.isPending
-            }
+            disabled={createBolla.isPending}
           >
             {t("bolle.createBolla")}
           </Button>
@@ -954,10 +949,7 @@ function ModificaBollaDialog({
       {
         onSuccess: () => {
           commandIntents.complete(updateHeaderSlot);
-          queryClient.invalidateQueries({
-            queryKey: getGetBollaQueryKey(bollaId),
-          });
-          queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
+          void invalidateBollaViews(queryClient, bollaId);
           queryClient.invalidateQueries({
             queryKey: getListGiacenzeQueryKey(
               magazzinoAreaId == null
@@ -1218,14 +1210,9 @@ function AggiungiProdottoDialog({
         }),
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           commandIntents.complete(addRowSlot);
-          queryClient.invalidateQueries({
-            queryKey: getGetBollaQueryKey(bollaId),
-          });
-          queryClient.invalidateQueries({
-            queryKey: getListGiacenzeQueryKey(giacenzeParams),
-          });
+          await invalidateBollaViews(queryClient, bollaId);
           toast({ title: t("bolle.prodottoAggiunto") });
           // mantieni il dialog aperto per aggiungere altri prodotti: resetta i campi
           setProdottoId("");
@@ -1440,6 +1427,7 @@ export function BollaDettaglio({
   onCloseLabel,
   hideConsegnaActions,
   linkedRequest = null,
+  linkedRequestId,
 }: {
   bollaId: number;
   bollaData?: BollaDettaglioDto;
@@ -1447,6 +1435,7 @@ export function BollaDettaglio({
   onCloseLabel?: string;
   hideConsegnaActions?: boolean;
   linkedRequest?: boolean | null;
+  linkedRequestId?: number;
 }) {
   const { user, hasPermission } = useAuth();
   const canManage = authUserCanOperateBolle(user, "bolle.manage");
@@ -1499,15 +1488,25 @@ export function BollaDettaglio({
       queryKey: getListBeneficiariQueryKey(),
     },
   });
+  const { data: requestContext } = useGetRichiestaMagazzino(
+    linkedRequestId ?? 0,
+    {
+      query: {
+        enabled:
+          linkedRequestId != null && hasPermission("richieste_magazzino.view"),
+        queryKey: getGetRichiestaMagazzinoQueryKey(linkedRequestId ?? 0),
+      },
+    },
+  );
   const bollaCentroId =
     beneficiari?.find((b) => b.id === bolla?.beneficiarioId)?.centroAscoltoId ??
+    requestContext?.centroAscoltoId ??
     null;
-  const volontariDettaglioParams =
-    bollaCentroId != null ? { centroAscoltoId: bollaCentroId } : undefined;
-  const { data: volontari } = useListVolontari(volontariDettaglioParams, {
+  const { data: volontari } = useListBollaVolontariCandidati(bollaId, {
     query: {
-      queryKey: getListVolontariQueryKey(volontariDettaglioParams),
-      enabled: bolla != null && beneficiari != null,
+      queryKey: getListBollaVolontariCandidatiQueryKey(bollaId),
+      enabled:
+        bolla != null && bolla.tipoDestinatario === "beneficiario" && canManage,
     },
   });
   const volontarioAssegnato =
@@ -1517,7 +1516,9 @@ export function BollaDettaglio({
   const incaricatoAssegnato =
     bolla?.volontarioConsegnaId != null
       ? (bolla.volontarioNome ??
-        (volontarioAssegnato ? volontarioLabel(volontarioAssegnato) : null) ??
+        (volontarioAssegnato
+          ? `${volontarioAssegnato.cognome} ${volontarioAssegnato.nome}`
+          : null) ??
         String(bolla.volontarioConsegnaId))
       : (bolla?.trasportatoreNome?.trim() ?? null);
   const richiedeNomeIncaricato =
@@ -1567,25 +1568,8 @@ export function BollaDettaglio({
       centroBeneficiarioIds.has(c.beneficiarioId),
   );
 
-  const invalidateAll = () => {
-    queryClient.invalidateQueries({
-      queryKey: getListRichiesteMagazzinoQueryKey(),
-    });
-    queryClient.invalidateQueries({
-      predicate: (query) =>
-        String(query.queryKey[0]).startsWith("/api/richieste-magazzino/"),
-    });
-    queryClient.invalidateQueries({ queryKey: getGetBollaQueryKey(bollaId) });
-    queryClient.invalidateQueries({
-      queryKey: getGetDocumentoOperativoQueryKey("bolla", bollaId),
-    });
-    queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
-    queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
-  };
-
-  const errMsg = (err: unknown, fallback: string) =>
-    (err as { response?: { data?: { error?: string } } })?.response?.data
-      ?.error ?? fallback;
+  const invalidateAll = () => void invalidateBollaViews(queryClient, bollaId);
+  const errMsg = bollaErrorMessage;
 
   const onDeleteRiga = (rigaId: number) => {
     if (!bolla) return;
@@ -1998,9 +1982,7 @@ export function BollaDettaglio({
       {
         onSuccess: () => {
           commandIntents.complete(slot);
-          queryClient.invalidateQueries({
-            queryKey: getGetBollaQueryKey(bollaId),
-          });
+          invalidateAll();
           toast({ title: t("bolle.consegnaAggiornata") });
         },
         onError: (err) => {
@@ -2032,9 +2014,7 @@ export function BollaDettaglio({
       {
         onSuccess: () => {
           commandIntents.complete(slot);
-          queryClient.invalidateQueries({
-            queryKey: getGetBollaQueryKey(bollaId),
-          });
+          invalidateAll();
         },
         onError: (err) => {
           commandIntents.fail(slot, err);
@@ -2249,13 +2229,11 @@ export function BollaDettaglio({
                   <SelectItem value="__centro__">
                     {t("bolle.consegnaPressoCentro")}
                   </SelectItem>
-                  {volontari
-                    ?.filter((v) => v.operativo)
-                    .map((v) => (
-                      <SelectItem key={v.id} value={String(v.id)}>
-                        {volontarioLabel(v)}
-                      </SelectItem>
-                    ))}
+                  {volontari?.map((v) => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {v.cognome} {v.nome}
+                    </SelectItem>
+                  ))}
                   <SelectItem value="__altro__">
                     {t("bolle.altroRitiro")}
                   </SelectItem>
@@ -3505,6 +3483,7 @@ function DocumentoOperativoDettaglioComune({
           linkedRequest={
             sourceRequest === undefined ? null : sourceRequest.richiesta != null
           }
+          linkedRequestId={sourceRequest?.richiesta?.id}
         />
       ) : (
         <TrasferimentoDettaglioComune

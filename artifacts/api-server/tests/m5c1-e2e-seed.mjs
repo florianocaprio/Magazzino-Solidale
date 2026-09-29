@@ -7,8 +7,11 @@ assert.ok(process.env.DATABASE_URL);
 const target = new URL(process.env.DATABASE_URL);
 assert.equal(target.protocol, "postgresql:");
 assert.equal(target.hostname, "127.0.0.1");
-assert.equal(target.port, "53824");
-assert.equal(target.pathname, "/m5c1_fresh");
+assert.equal(target.port, process.env.M5C1_E2E_EXPECTED_PORT ?? "53824");
+const expectedDatabase = process.env.M5C1_E2E_EXPECTED_DATABASE ?? "m5c1_fresh";
+const expectedLedger = Number(process.env.M5C1_E2E_EXPECTED_LEDGER ?? "45");
+assert.ok(/^m5c1_[a-z0-9_]+$/.test(expectedDatabase));
+assert.equal(target.pathname, `/${expectedDatabase}`);
 assert.equal(process.env.M5C1_TEST_DISPOSABLE_DB, "verified");
 assert.ok(process.env.M5C1_E2E_PASSWORD);
 const client = await pool.connect();
@@ -19,7 +22,10 @@ try {
     SELECT current_database() AS database,
       (SELECT count(*)::integer FROM app_meta.schema_migrations) AS migrations
   `);
-  assert.deepEqual(identity, { database: "m5c1_fresh", migrations: 45 });
+  assert.deepEqual(identity, {
+    database: expectedDatabase,
+    migrations: expectedLedger,
+  });
   const hash = await bcrypt.hash(process.env.M5C1_E2E_PASSWORD, 10);
   await client.query("BEGIN");
   const {

@@ -10081,9 +10081,22 @@ export const StornaSpesaEmporioBody = zod.object({
 
 
 export const listEntiDestinatariQueryAttivoDefault = true;
+export const listEntiDestinatariQuerySearchMin = 2;
+export const listEntiDestinatariQuerySearchMax = 100;
+
+export const listEntiDestinatariQueryLimitDefault = 50;
+export const listEntiDestinatariQueryLimitMax = 100;
+
+export const listEntiDestinatariQueryOffsetDefault = 0;
+export const listEntiDestinatariQueryOffsetMin = 0;
+
+
 
 export const ListEntiDestinatariQueryParams = zod.object({
-  "attivo": zod.coerce.boolean().default(listEntiDestinatariQueryAttivoDefault)
+  "attivo": zod.coerce.boolean().default(listEntiDestinatariQueryAttivoDefault),
+  "search": zod.coerce.string().min(listEntiDestinatariQuerySearchMin).max(listEntiDestinatariQuerySearchMax).optional().describe('Ricerca case-insensitive su denominazione, indirizzo, telefono ed email'),
+  "limit": zod.coerce.number().min(1).max(listEntiDestinatariQueryLimitMax).default(listEntiDestinatariQueryLimitDefault),
+  "offset": zod.coerce.number().min(listEntiDestinatariQueryOffsetMin).default(listEntiDestinatariQueryOffsetDefault)
 })
 
 export const listEntiDestinatariResponseDenominazioneMax = 200;
@@ -10652,6 +10665,22 @@ export const UpdateBollaResponse = zod.object({
   "versioneBolla": zod.number().min(1).optional()
 }))
 })
+
+
+/**
+ * @summary Volontari approvati e operativi proponibili per la Bolla
+ */
+export const ListBollaVolontariCandidatiParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListBollaVolontariCandidatiResponseItem = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "cognome": zod.string(),
+  "tipoVolontario": zod.enum(['PERMANENTE', 'TEMPORANEO'])
+})
+export const ListBollaVolontariCandidatiResponse = zod.array(ListBollaVolontariCandidatiResponseItem)
 
 
 /**
@@ -15774,9 +15803,34 @@ export const ListGiacenzeMensaResponseItem = zod.object({
   "impegnato": zod.number(),
   "impegnatoPreciso": zod.string().regex(listGiacenzeMensaResponseImpegnatoPrecisoRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "disponibileReale": zod.number(),
+  "lottoFisicoObbligatorio": zod.boolean(),
   "disponibileRealePrecisa": zod.string().regex(listGiacenzeMensaResponseDisponibileRealePrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
 })
 export const ListGiacenzeMensaResponse = zod.array(ListGiacenzeMensaResponseItem)
+
+
+/**
+ * Lotti fisici realmente trasferibili per Mensa, Magazzino origine e Prodotto autorizzati.
+ */
+export const ListLottiMensaQueryParams = zod.object({
+  "mensaId": zod.coerce.number(),
+  "magazzinoId": zod.coerce.number(),
+  "prodottoId": zod.coerce.number(),
+  "dataRichiesta": zod.date().optional()
+})
+
+export const listLottiMensaResponseDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+
+
+export const ListLottiMensaResponseItem = zod.object({
+  "id": zod.number(),
+  "codiceLotto": zod.string().nullable(),
+  "dataScadenza": zod.coerce.date().nullable(),
+  "quantitaResidua": zod.number(),
+  "disponibileReale": zod.number(),
+  "disponibileRealePrecisa": zod.string().regex(listLottiMensaResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
+})
+export const ListLottiMensaResponse = zod.array(ListLottiMensaResponseItem)
 
 
 /**
@@ -15817,7 +15871,8 @@ export const CreateTrasferimentoMensaBody = zod.object({
   "prodottoId": zod.number(),
   "quantita": zod.string().regex(createTrasferimentoMensaBodyRigheItemQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "unitaMisura": zod.string().optional().describe('Campo legacy opzionale. Se valorizzato deve coincidere con l\'unità canonica del Prodotto; il server persiste sempre prodotti.unita_misura.'),
-  "note": zod.string().nullish()
+  "note": zod.string().nullish(),
+  "lottoId": zod.number().nullish().describe('Lotto fisico selezionato; obbligatorio se il Prodotto lo richiede.')
 })).min(1)
 })
 

@@ -24,6 +24,7 @@ import {
   mensaPastiTable,
   menseTable,
   prodottiTable,
+  prenotazioniMagazzinoTable,
   tessereBeneficiariTable,
   trasferimentiTable,
   utentiTable,
@@ -42,6 +43,7 @@ import {
   lt,
   lte,
   or,
+  sum,
   sql,
   type SQL,
 } from "drizzle-orm";
@@ -94,6 +96,14 @@ import {
   createTransferRequest,
   TransferRequestError,
 } from "../lib/transferWorkflow";
+import {
+  committedQuantityForLot,
+  PRENOTAZIONE_ATTIVA,
+} from "../lib/inventoryReservations";
+import {
+  isLottoDistribuibile,
+  lottoDistribuibileCondition,
+} from "../lib/lottoPolicy";
 import {
   InventoryDecimal,
   InventoryDecimalError,
@@ -2404,6 +2414,7 @@ router.get(
           codice: prodottiTable.codice,
           nome: prodottiTable.nome,
           unitaMisura: prodottiTable.unitaMisura,
+          lottoFisicoObbligatorio: prodottiTable.lottoFisicoObbligatorio,
           giacenzaFisica: sql<string>`sum(${lottiTable.quantitaResidua})`,
           giacenzaDistribuibile: sql<string>`coalesce(sum(${lottiTable.quantitaResidua}) filter (where ${lottiTable.dataScadenza} is null or ${lottiTable.dataScadenza} >= ${today}), 0)`,
         })
@@ -2451,6 +2462,91 @@ router.get(
             impegnatoPreciso: impegnatoPreciso.toDb(),
             disponibileReale: Number(disponibileRealePreciso.toCanonical()),
             disponibileRealePrecisa: disponibileRealePreciso.toDb(),
+          };
+        }),
+      );
+    } catch (error) {
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.get(
+  "/mensa/logistica/lotti",
+  requireMensaPermissionOrLegacy("mensa.transfers.request"),
+  async (req, res) => {
+    try {
+      const mensaId = positiveInt(req.query.mensaId, "mensaId");
+      const magazzinoId = positiveInt(req.query.magazzinoId, "magazzinoId");
+      const prodottoId = positiveInt(req.query.prodottoId, "prodottoId");
+      const dataRichiesta = dateOnly(
+        req.query.dataRichiesta,
+        "La data richiesta",
+      );
+      const dataOperativa = dataServizioMensa();
+      const riferimento =
+        dataRichiesta && dataRichiesta > dataOperativa
+          ? dataRichiesta
+          : dataOperativa;
+      const mensa = await requireMensa(mensaId, req, true);
+      if (mensa.mensa.magazzinoId === magazzinoId)
+        throw new MensaError(
+          400,
+          "Origine e destinazione devono essere diverse",
+        );
+      await requireMensaLogisticsWarehouse(magazzinoId, req);
+      const [prodotto] = await db
+        .select({ id: prodottiTable.id, attivo: prodottiTable.attivo })
+        .from(prodottiTable)
+        .where(eq(prodottiTable.id, prodottoId));
+      if (!prodotto?.attivo)
+        throw new MensaError(400, "Prodotto non disponibile");
+      const rows = await db
+        .select({
+          id: lottiTable.id,
+          codiceLotto: lottiTable.codiceLotto,
+          dataScadenza: lottiTable.dataScadenza,
+          quantitaResidua: lottiTable.quantitaResidua,
+          impegnato: sum(prenotazioniMagazzinoTable.quantita),
+        })
+        .from(lottiTable)
+        .leftJoin(
+          prenotazioniMagazzinoTable,
+          and(
+            eq(prenotazioniMagazzinoTable.lottoId, lottiTable.id),
+            eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
+          ),
+        )
+        .where(
+          and(
+            eq(lottiTable.magazzinoId, magazzinoId),
+            eq(lottiTable.prodottoId, prodottoId),
+            gt(lottiTable.quantitaResidua, "0"),
+            lottoDistribuibileCondition(riferimento),
+          ),
+        )
+        .groupBy(lottiTable.id)
+        .having(
+          sql`${lottiTable.quantitaResidua} > coalesce(sum(${prenotazioniMagazzinoTable.quantita}), 0)`,
+        )
+        .orderBy(
+          sql`${lottiTable.dataScadenza} asc nulls last`,
+          asc(lottiTable.id),
+        )
+        .limit(200);
+      res.json(
+        rows.map((row) => {
+          const available = InventoryDecimal.parse(
+            row.quantitaResidua,
+          ).subtract(InventoryDecimal.parse(row.impegnato ?? "0"));
+          return {
+            id: row.id,
+            codiceLotto: row.codiceLotto,
+            dataScadenza: row.dataScadenza,
+            quantitaResidua: Number(row.quantitaResidua),
+            disponibileReale: Number(available.toCanonical()),
+            disponibileRealePrecisa: available.toDb(),
           };
         }),
       );
@@ -2517,6 +2613,7 @@ router.post(
               ? null
               : text(row.unitaMisura, "L'unità di misura", 20),
           note: optionalText(row.note, "Le note", 1000),
+          lottoId: optionalPositiveInt(row.lottoId, "lottoId"),
         };
       });
       const trasportatoreNome = optionalText(
@@ -2551,8 +2648,8 @@ router.post(
         },
         authorizeCurrent: (tx, transfer) =>
           assertMensaTransferScopeTx(tx, req, transfer, mensaId, false),
-        beforeCreate: (tx) =>
-          assertMensaTransferScopeTx(
+        beforeCreate: async (tx) => {
+          await assertMensaTransferScopeTx(
             tx,
             req,
             {
@@ -2562,7 +2659,55 @@ router.post(
             },
             mensaId,
             true,
-          ),
+          );
+          // La richiesta non prenota merce: questa è una verifica iniziale.
+          // M4 rivalida e prenota il lotto in modo transazionale in Prepara.
+          const requestedByLot = new Map<number, InventoryDecimal>();
+          for (const row of normalized) {
+            if (row.lottoId == null) continue;
+            const previous =
+              requestedByLot.get(row.lottoId) ?? InventoryDecimal.zero();
+            requestedByLot.set(
+              row.lottoId,
+              previous.add(InventoryDecimal.parse(row.quantita)),
+            );
+          }
+          const riferimento =
+            dataRichiesta > dataServizioMensa()
+              ? dataRichiesta
+              : dataServizioMensa();
+          for (const [lottoId, requested] of requestedByLot) {
+            const [lotto] = await tx
+              .select()
+              .from(lottiTable)
+              .where(eq(lottiTable.id, lottoId))
+              .for("share");
+            if (
+              !lotto ||
+              lotto.magazzinoId !== origineId ||
+              normalized.some(
+                (row) =>
+                  row.lottoId === lottoId &&
+                  row.prodottoId !== lotto.prodottoId,
+              )
+            ) {
+              throw new MensaError(
+                400,
+                "Il lotto selezionato non appartiene al prodotto o al magazzino origine",
+              );
+            }
+            if (!isLottoDistribuibile(lotto.dataScadenza, riferimento))
+              throw new MensaError(409, "Il lotto selezionato è scaduto");
+            const available = InventoryDecimal.parse(
+              lotto.quantitaResidua,
+            ).subtract(await committedQuantityForLot(tx, lottoId));
+            if (available.compare(requested) < 0)
+              throw new MensaError(
+                409,
+                `Disponibilità reale insufficiente nel lotto ${lotto.codiceLotto ?? `#${lottoId}`}: disponibili ${available.isNegative() ? "0" : available.toCanonical()}, richiesti ${requested.toCanonical()}`,
+              );
+          }
+        },
         righe: normalized,
         afterCreate: async (tx, transfer) => {
           await tx.insert(auditConfigurazioniTable).values(

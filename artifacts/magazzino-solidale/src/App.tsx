@@ -70,6 +70,7 @@ const BeneficiarioDettaglio = lazy(
   () => import("@/pages/beneficiario-dettaglio"),
 );
 const Interventi = lazy(() => import("@/pages/interventi"));
+const EntiEsterni = lazy(() => import("@/pages/enti-esterni"));
 const RichiesteMagazzino = lazy(() => import("@/pages/richieste-magazzino"));
 const Consegne = lazy(() => import("@/pages/consegne"));
 const Bolle = lazy(() => import("@/pages/bolle"));
@@ -558,6 +559,17 @@ function AppRoutes() {
                 <RequireModulo codice="CENTRO_ASCOLTO">
                   <RequirePermission permission="sociale.interventi.view">
                     <Interventi />
+                  </RequirePermission>
+                </RequireModulo>
+              </Guard>
+            )}
+          </Route>
+          <Route path="/enti-esterni">
+            {() => (
+              <Guard area="sociale">
+                <RequireModulo codice="CENTRO_ASCOLTO">
+                  <RequirePermission permission="enti-destinatari.view">
+                    <EntiEsterni />
                   </RequirePermission>
                 </RequireModulo>
               </Guard>

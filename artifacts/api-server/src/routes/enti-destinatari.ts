@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import { db, entiDestinatariTable } from "@workspace/db";
 import { requirePermission } from "../middlewares/auth";
-import { requireAllModuli } from "../lib/featureFlags";
+import { isModuloAttivo } from "../lib/featureFlags";
 import {
   callerAreaOperativaId,
   canAccessAreaOperativa,
@@ -24,10 +24,37 @@ import {
 } from "../lib/documentCommand";
 
 const router: IRouter = Router();
-router.use(
-  "/enti-destinatari",
-  requireAllModuli(["MAGAZZINO_SOLIDALE", "BOLLE"]),
-);
+router.use("/enti-destinatari", async (req, res, next) => {
+  const actor = req.user;
+  const social = actor?.isAdmin || actor?.aree?.includes("sociale");
+  const warehouse = actor?.isAdmin || actor?.aree?.includes("magazzino");
+  if (!actor || (!social && !warehouse)) {
+    res.status(403).json({ error: "Area non autorizzata" });
+    return;
+  }
+  const socialActive = social && (await isModuloAttivo("CENTRO_ASCOLTO"));
+  const warehouseActive =
+    warehouse &&
+    (await isModuloAttivo("MAGAZZINO_SOLIDALE")) &&
+    (await isModuloAttivo("BOLLE"));
+  if (
+    !(req.method === "GET" ? socialActive || warehouseActive : socialActive)
+  ) {
+    res.status(403).json({ error: "Modulo non disponibile" });
+    return;
+  }
+  if (req.method !== "GET" && !social) {
+    res
+      .status(403)
+      .json({ error: "Solo il Centro di Ascolto può gestire gli Enti" });
+    return;
+  }
+  if (!actor.isAdmin && callerAreaOperativaId(req) == null) {
+    res.status(403).json({ error: "Area Operativa non assegnata" });
+    return;
+  }
+  next();
+});
 
 const cleanText = (value: unknown, max: number): string | null => {
   if (value == null) return null;
@@ -42,15 +69,48 @@ router.get(
   async (req, res) => {
     const activeOnly = req.query.attivo !== "false";
     const area = callerAreaOperativaId(req);
+    const search =
+      typeof req.query.search === "string" ? req.query.search.trim() : "";
+    const limit = req.query.limit == null ? 50 : Number(req.query.limit);
+    const offset = req.query.offset == null ? 0 : Number(req.query.offset);
+    if (
+      search.length > 100 ||
+      (search.length > 0 && search.length < 2) ||
+      !Number.isSafeInteger(limit) ||
+      limit < 1 ||
+      limit > 100 ||
+      !Number.isSafeInteger(offset) ||
+      offset < 0
+    ) {
+      res.status(400).json({ error: "Parametri di ricerca non validi" });
+      return;
+    }
     const conditions = [];
     if (area != null)
       conditions.push(eq(entiDestinatariTable.areaOperativaId, area));
     if (activeOnly) conditions.push(eq(entiDestinatariTable.attivo, true));
+    if (search) {
+      const escaped = search.replace(/[\\%_]/g, "\\$&");
+      const pattern = `%${escaped}%`;
+      conditions.push(
+        or(
+          ilike(entiDestinatariTable.denominazione, pattern),
+          ilike(entiDestinatariTable.indirizzo, pattern),
+          ilike(entiDestinatariTable.telefono, pattern),
+          ilike(entiDestinatariTable.email, pattern),
+        ),
+      );
+    }
     const rows = await db
       .select()
       .from(entiDestinatariTable)
       .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(asc(entiDestinatariTable.denominazione));
+      .orderBy(
+        asc(entiDestinatariTable.denominazione),
+        asc(entiDestinatariTable.id),
+      )
+      .limit(limit)
+      .offset(offset);
     res.json(rows);
   },
 );

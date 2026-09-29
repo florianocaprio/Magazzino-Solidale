@@ -162,15 +162,8 @@ async function loadDemoFixtures(page: Page): Promise<DemoFixtures> {
 }
 
 async function openCreateBollaDialog(page: Page) {
-  const beneficiariesLoaded = page.waitForResponse(
-    (response) =>
-      response.request().method() === "GET" &&
-      response.url().includes("/api/beneficiari") &&
-      response.ok(),
-  );
   await page.goto("/bolle");
   await expect(page.getByRole("heading", { name: /bolle/i })).toBeVisible();
-  await beneficiariesLoaded;
   await page.getByRole("button", { name: /^nuovo$/i }).click();
   const choice = page.getByRole("dialog", {
     name: /nuovo documento operativo/i,
@@ -271,9 +264,7 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
         return committed?.status;
       })
       .toBe(201);
-    await expect(
-      page.getByText("Impossibile creare la bolla", { exact: true }),
-    ).toBeVisible();
+    await expect(dialog.getByRole("alert")).toHaveText("Failed to fetch");
     await expect(createButton).toBeEnabled();
     await page.unroute("**/api/bolle");
 
@@ -365,10 +356,21 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
       dialog.getByRole("combobox").first(),
       "Ente esterno",
     );
-    await selectOption(
-      page,
-      dialog.getByRole("combobox").nth(1),
-      ente.denominazione,
+    await expect(dialog.getByText("Nuovo Ente")).toHaveCount(0);
+    await dialog.getByRole("button", { name: /crea bolla/i }).click();
+    await expect(dialog.getByRole("alert")).toContainText("Seleziona un Ente");
+    const entePicker = dialog.locator('button[role="combobox"]').nth(1);
+    await expect(entePicker).toContainText(/seleziona ente/i);
+    await entePicker.click();
+    await page
+      .getByPlaceholder(/denominazione|indirizzo|telefono|email/i)
+      .fill(ente.denominazione);
+    await page
+      .getByRole("option", { name: new RegExp(ente.denominazione) })
+      .click();
+    await dialog.getByRole("button", { name: /crea bolla/i }).click();
+    await expect(dialog.getByRole("alert")).toContainText(
+      "Seleziona il Magazzino",
     );
     await selectOption(
       page,

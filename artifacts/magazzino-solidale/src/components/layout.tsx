@@ -208,6 +208,15 @@ export const NAV_ITEMS: NavItem[] = [
     permission: "sociale.interventi.view",
   },
   {
+    key: "entiEsterni",
+    url: "/enti-esterni",
+    icon: Building2,
+    groupKey: "sociale",
+    area: "sociale",
+    moduloCodice: "CENTRO_ASCOLTO",
+    permission: "enti-destinatari.view",
+  },
+  {
     key: "consegne",
     url: "/consegne",
     icon: Truck,

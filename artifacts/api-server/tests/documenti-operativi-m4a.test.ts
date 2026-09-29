@@ -24,6 +24,7 @@ import {
   pool,
   prenotazioniMagazzinoTable,
   trasferimentiTable,
+  volontariTable,
 } from "@workspace/db";
 import bolleRouter from "../src/routes/bolle";
 import documentiRouter from "../src/routes/documenti-operativi";
@@ -40,6 +41,7 @@ import {
   createMagazzinoRec,
   createProdotto,
   createUtente,
+  createVolontario,
   createZona,
   insertTrasferimento,
   makeScopedApp,
@@ -520,6 +522,235 @@ describe("M4A — destinatario Ente e facciata documentale", () => {
     } finally {
       areaId = originalAreaId;
     }
+  });
+
+  it("R2: il Magazzino legge ma non scrive Enti, anche con grant manage legacy", async () => {
+    const router = express.Router();
+    router.use(entiRouter);
+    const warehouseOnly = makeScopedApp(router, {
+      id: operatoreId,
+      centroAscoltoId: null,
+      areaOperativaId: areaId,
+      aree: ["magazzino"],
+      permessi: ["enti-destinatari.view", "enti-destinatari.manage"],
+    });
+    const socialOnly = makeScopedApp(router, {
+      id: operatoreId,
+      centroAscoltoId: null,
+      areaOperativaId: areaId,
+      aree: ["sociale"],
+      permessi: ["enti-destinatari.view", "enti-destinatari.manage"],
+    });
+    const payload = {
+      idempotencyKey: commandKey("r2-social-ente"),
+      denominazione: "Centro R2",
+      indirizzo: "Via Centro 1",
+      areaOperativaId: areaId,
+    };
+    expect(
+      (await request(warehouseOnly).post("/enti-destinatari").send(payload))
+        .status,
+    ).toBe(403);
+    const created = await request(socialOnly)
+      .post("/enti-destinatari")
+      .send(payload);
+    expect(created.status, created.text).toBe(201);
+    scope.enteDestinatarioIds.push(created.body.id);
+    expect(
+      (await request(warehouseOnly).get("/enti-destinatari")).body,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: created.body.id }),
+      ]),
+    );
+    expect(
+      (
+        await request(warehouseOnly)
+          .patch(`/enti-destinatari/${created.body.id}`)
+          .send({
+            idempotencyKey: commandKey("r2-warehouse-patch"),
+            versione: 1,
+            attivo: false,
+          })
+      ).status,
+    ).toBe(403);
+    const disabled = await request(socialOnly)
+      .patch(`/enti-destinatari/${created.body.id}`)
+      .send({
+        idempotencyKey: commandKey("r2-social-patch"),
+        versione: 1,
+        attivo: false,
+      });
+    expect(disabled.status, disabled.text).toBe(200);
+    expect(disabled.body.attivo).toBe(false);
+  });
+
+  it("R2: ricerca Enti case-insensitive, limitata e ordinata, inclusi inattivi su richiesta", async () => {
+    const [first, second, inactive] = await db
+      .insert(entiDestinatariTable)
+      .values([
+        {
+          denominazione: "Zeta Casa",
+          indirizzo: "Via Roma 1",
+          telefono: "061234",
+          areaOperativaId: areaId,
+        },
+        {
+          denominazione: "Alfa Casa",
+          indirizzo: "Via Roma 2",
+          email: "ALFA@example.test",
+          areaOperativaId: areaId,
+        },
+        {
+          denominazione: "Beta Casa",
+          indirizzo: "Via Roma 3",
+          areaOperativaId: areaId,
+          attivo: false,
+        },
+      ])
+      .returning();
+    scope.enteDestinatarioIds.push(first.id, second.id, inactive.id);
+    const found = await request(app()).get(
+      "/enti-destinatari?search=casa&limit=2",
+    );
+    expect(found.status).toBe(200);
+    expect(found.body.map((item: { id: number }) => item.id)).toEqual([
+      second.id,
+      first.id,
+    ]);
+    const email = await request(app()).get(
+      "/enti-destinatari?search=alfa@EXAMPLE",
+    );
+    expect(email.body.map((item: { id: number }) => item.id)).toEqual([
+      second.id,
+    ]);
+    const active = await request(app()).get("/enti-destinatari?search=beta");
+    expect(active.body).toEqual([]);
+    const all = await request(app()).get(
+      "/enti-destinatari?search=beta&attivo=false",
+    );
+    expect(all.body.map((item: { id: number }) => item.id)).toEqual([
+      inactive.id,
+    ]);
+    expect(
+      (await request(app()).get("/enti-destinatari?search=a")).status,
+    ).toBe(400);
+  });
+
+  it("R2: Bolla espone solo volontari validi senza richiedere la directory Logistica", async () => {
+    const centro = await createCentroRec(scope, { areaOperativaId: areaId });
+    const beneficiarioId = await createBeneficiario(scope, centro.id);
+    const permanent = await createVolontario(scope, centro.id);
+    const temporary = await createVolontario(scope, centro.id);
+    await db
+      .update(volontariTable)
+      .set({ tipoVolontario: "TEMPORANEO" })
+      .where(eq(volontariTable.id, temporary));
+    const created = await request(app())
+      .post("/bolle")
+      .send({
+        idempotencyKey: commandKey("r2-bolla-volunteer"),
+        tipoDestinatario: "beneficiario",
+        beneficiarioId,
+        magazzinoId,
+      });
+    expect(created.status, created.text).toBe(201);
+    scope.bollaIds.push(created.body.id);
+    const warehouseOnly = makeScopedApp(bolleRouter, {
+      id: operatoreId,
+      centroAscoltoId: null,
+      areaOperativaId: areaId,
+      aree: ["magazzino"],
+      permessi: ["bolle.view", "bolle.manage"],
+    });
+    const candidates = await request(warehouseOnly).get(
+      `/bolle/${created.body.id}/volontari-candidati`,
+    );
+    expect(candidates.status, candidates.text).toBe(200);
+    expect(candidates.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: permanent,
+          tipoVolontario: "PERMANENTE",
+        }),
+      ]),
+    );
+    expect(
+      candidates.body.some((item: { id: number }) => item.id === temporary),
+    ).toBe(false);
+    expect(candidates.body[0]).not.toHaveProperty("telefono");
+    const assigned = await request(warehouseOnly)
+      .patch(`/bolle/${created.body.id}`)
+      .send({
+        idempotencyKey: commandKey("r2-assign-volunteer"),
+        versione: created.body.versione,
+        volontarioConsegnaId: permanent,
+        trasportatoreNome: null,
+      });
+    expect(assigned.status, assigned.text).toBe(200);
+    expect(assigned.body.volontarioConsegnaId).toBe(permanent);
+    const reopened = await request(warehouseOnly).get(
+      `/bolle/${created.body.id}`,
+    );
+    expect(reopened.body.volontarioConsegnaId).toBe(permanent);
+  });
+
+  it("R2: due prodotti successivi persistono nella Bolla e nella facciata documentale", async () => {
+    const centro = await createCentroRec(scope, { areaOperativaId: areaId });
+    const beneficiary = await createBeneficiario(scope, centro.id);
+    const secondProduct = await createProdotto(scope);
+    const secondLot = await createLotto(scope, {
+      prodottoId: secondProduct,
+      magazzinoId,
+      quantita: 10,
+    });
+    const created = await request(app())
+      .post("/bolle")
+      .send({
+        idempotencyKey: commandKey("r2-bolla-two-lines"),
+        tipoDestinatario: "beneficiario",
+        beneficiarioId: beneficiary,
+        magazzinoId,
+      });
+    expect(created.status, created.text).toBe(201);
+    scope.bollaIds.push(created.body.id);
+    let version = created.body.versione;
+    for (const [product, lot] of [
+      [prodottoId, lottoId],
+      [secondProduct, secondLot],
+    ]) {
+      const added = await request(app())
+        .post(`/bolle/${created.body.id}/righe`)
+        .send({
+          idempotencyKey: commandKey(`r2-bolla-line-${product}`),
+          versione: version,
+          prodottoId: product,
+          lottoId: lot,
+          quantita: "2",
+          unitaMisura: "kg",
+        });
+      expect(added.status, added.text).toBe(201);
+      version = added.body.versioneBolla;
+      const facade = await request(app()).get(
+        `/documenti-operativi/bolla/${created.body.id}`,
+      );
+      expect(facade.status, facade.text).toBe(200);
+      expect(facade.body.dettaglio.righe).toHaveLength(
+        product === prodottoId ? 1 : 2,
+      );
+    }
+    const canonical = await request(app()).get(`/bolle/${created.body.id}`);
+    expect(canonical.body.righe).toHaveLength(2);
+    expect(
+      (
+        await db
+          .select()
+          .from(bollaRigheTable)
+          .where(eq(bollaRigheTable.bollaId, created.body.id))
+      )
+        .map((row) => row.prodottoId)
+        .sort(),
+    ).toEqual([prodottoId, secondProduct].sort());
   });
 
   it("separa i rami autorizzativi prima di conteggio e paginazione", async () => {

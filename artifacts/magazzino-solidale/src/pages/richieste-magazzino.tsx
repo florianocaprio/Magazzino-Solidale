@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -25,7 +25,10 @@ import {
   type RichiestaMagazzino,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
-import { interventionRequestPrefill } from "@/lib/m5c1-request-prefill";
+import {
+  interventionRequestPrefill,
+  interventionReturnUrl,
+} from "@/lib/m5c1-request-prefill";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { useCommandIntentRegistry } from "@/lib/command-intent";
 import { RigheEditor, newRiga, type RigaDraft } from "@/pages/trasferimenti";
@@ -65,6 +68,7 @@ export default function RichiesteMagazzino() {
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const queryClient = useQueryClient();
   const intents = useCommandIntentRegistry();
+  const [, navigate] = useLocation();
   const canSocial =
     hasArea("sociale") &&
     isModuloAttivo("CENTRO_ASCOLTO") &&
@@ -221,20 +225,20 @@ export default function RichiesteMagazzino() {
     }
   };
 
-  const execute = async (
+  const execute = async <T,>(
     slot: string,
     semantic: Record<string, unknown>,
     payload: Record<string, unknown>,
-    call: (body: any) => Promise<unknown>,
-  ) => {
+    call: (body: any) => Promise<T>,
+  ): Promise<T | null> => {
     setError("");
     setPending(true);
     const intent = intents.prepare(slot, semantic, payload);
     try {
-      await call(intent);
+      const result = await call(intent);
       intents.complete(slot);
       await refresh(selectedId ?? undefined);
-      return true;
+      return result;
     } catch (cause) {
       intents.fail(slot, cause);
       setError(message(cause, t("richiesteMagazzino.commandError")));
@@ -254,7 +258,7 @@ export default function RichiesteMagazzino() {
         setTransferRows([newRiga()]);
         await refresh();
       } else if (status === 409) await refresh(selectedId ?? undefined);
-      return false;
+      return null;
     } finally {
       setPending(false);
     }
@@ -300,6 +304,12 @@ export default function RichiesteMagazzino() {
       setConfirmation(t("richiesteMagazzino.sent"));
       setBisogno("");
       setNote("");
+      if (contextInterventionId && contextIntervention.data) {
+        await queryClient.invalidateQueries({
+          queryKey: getGetInterventoQueryKey(contextInterventionId),
+        });
+        navigate(interventionReturnUrl(contextIntervention.data));
+      }
     }
   };
 
@@ -379,6 +389,7 @@ export default function RichiesteMagazzino() {
       setWarehouseId("");
       setTransferRows([newRiga()]);
       setConfirmation(t("richiesteMagazzino.documentCreated"));
+      if (ok.percorsoDocumento) navigate(ok.percorsoDocumento);
     }
   };
 
@@ -770,7 +781,9 @@ export default function RichiesteMagazzino() {
                     data-testid="m5b-prepare-document"
                   >
                     <h2 className="font-medium">
-                      {t("richiesteMagazzino.prepareDocument")}
+                      {row.tipoDestinatario === "magazzino"
+                        ? t("richiesteMagazzino.prepareDocument")
+                        : t("richiesteMagazzino.chooseWarehouseCreateBolla")}
                     </h2>
                     <p className="text-sm">
                       {t("richiesteMagazzino.recipient")}:{" "}
@@ -822,7 +835,9 @@ export default function RichiesteMagazzino() {
                       disabled={pending || !chosenWarehouse || !transferReady}
                       onClick={prepareDocument}
                     >
-                      {t("richiesteMagazzino.prepareDocument")}
+                      {row.tipoDestinatario === "magazzino"
+                        ? t("richiesteMagazzino.prepareDocument")
+                        : t("richiesteMagazzino.createBolla")}
                     </Button>
                   </section>
                 ) : row.stato === "presa_in_carico" ? (
