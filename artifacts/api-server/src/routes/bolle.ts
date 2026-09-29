@@ -79,6 +79,7 @@ import {
   canReadLinkedM4Document,
   ceaseLinkedM4Document,
   guardLinkedM4Mutation,
+  guardLinkedM4OperationalAccess,
   m5bLinkedM4ListScope,
 } from "../lib/m5bDocumentLink";
 import {
@@ -2717,6 +2718,13 @@ router.post(
     try {
       await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        await guardLinkedM4OperationalAccess(
+          tx,
+          req.user!.id,
+          "bolla",
+          bollaId,
+          "bolle.deliver",
+        );
         const [beforeLock] = await tx
           .select({ consegnaId: bolleTable.consegnaId })
           .from(bolleTable)
@@ -2897,6 +2905,13 @@ router.post(
     try {
       await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        await guardLinkedM4OperationalAccess(
+          tx,
+          req.user!.id,
+          "bolla",
+          bollaId,
+          "bolle.deliver",
+        );
         const current = await lockBolla(tx, bollaId);
         await assertBollaTransportAccessTx(tx, req, current, "bolle.deliver");
         const receipt = await findDocumentCommand(tx, {
@@ -2982,6 +2997,10 @@ router.get(
       res.status(404).json({ error: "Bolla non trovata" });
       return;
     }
+    if (!(await canReadLinkedM4Document(req.user!, "bolla", id))) {
+      res.status(404).json({ error: "Bolla non trovata" });
+      return;
+    }
     if (
       !(await canAccessBollaOperativa(
         bolla,
@@ -3060,6 +3079,13 @@ router.post(
     try {
       await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        await guardLinkedM4OperationalAccess(
+          tx,
+          req.user!.id,
+          "bolla",
+          bollaId,
+          "magazzino.stock.receive",
+        );
         const current = await lockBolla(tx, bollaId);
         await assertBollaTransportAccessTx(
           tx,
@@ -3276,6 +3302,13 @@ router.post(
     }
     try {
       const recorded = await db.transaction(async (tx) => {
+        await guardLinkedM4OperationalAccess(
+          tx,
+          req.user!.id,
+          "bolla",
+          bollaId,
+          "bolle.deliver",
+        );
         const current = await lockBolla(tx, bollaId);
         if (current.consegnaId != null)
           throw new BollaActionError(
@@ -3469,6 +3502,13 @@ router.post(
       let expectedConsegnaId = bolla.consegnaId;
       for (let attempt = 0; attempt < 3 && result == null; attempt += 1) {
         const outcome: ConversionOutcome = await db.transaction(async (tx) => {
+          await guardLinkedM4OperationalAccess(
+            tx,
+            req.user!.id,
+            "bolla",
+            bollaId,
+            "bolle.deliver",
+          );
           if (expectedConsegnaId != null) {
             await lockConsegnaBollaRelation(tx, expectedConsegnaId);
           }
@@ -3744,6 +3784,13 @@ router.post(
     try {
       await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        await guardLinkedM4OperationalAccess(
+          tx,
+          req.user!.id,
+          "bolla",
+          bollaId,
+          "bolle.reverse.admin",
+        );
         const current = await lockBolla(tx, bollaId);
         if (
           !(await canAccessBollaOperativaTx(

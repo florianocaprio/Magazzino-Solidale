@@ -528,7 +528,12 @@ describe("POST /carichi — Magazzino 2.0A", () => {
       await db
         .select()
         .from(movimentiTable)
-        .where(eq(movimentiTable.entitaOrigineId, first.body.id)),
+        .where(
+          and(
+            eq(movimentiTable.entitaOrigineTipo, "carico_magazzino"),
+            eq(movimentiTable.entitaOrigineId, first.body.id),
+          ),
+        ),
     ).toHaveLength(1);
   });
 

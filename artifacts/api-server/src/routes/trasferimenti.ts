@@ -40,6 +40,7 @@ import {
   canReadLinkedM4Document,
   ceaseLinkedM4Document,
   guardLinkedM4Mutation,
+  guardLinkedM4OperationalAccess,
   M5bLinkError,
   m5bLinkedM4ListScope,
 } from "../lib/m5bDocumentLink";
@@ -1677,6 +1678,13 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
     });
     await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, "trasferimento.dispatch", idempotencyKey);
+      await guardLinkedM4OperationalAccess(
+        tx,
+        req.user!.id,
+        "trasferimento",
+        id,
+        "magazzino.transfers.dispatch",
+      );
       const locked = await lockTransfer(tx, id);
       await assertCurrentTransferScope(tx, req, locked, "origin");
       const receipt = await findDocumentCommand(tx, {
@@ -1921,6 +1929,13 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
     });
     await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, "trasferimento.receive", idempotencyKey);
+      await guardLinkedM4OperationalAccess(
+        tx,
+        req.user!.id,
+        "trasferimento",
+        id,
+        "magazzino.transfers.receive",
+      );
       const locked = await lockTransfer(tx, id);
       await assertCurrentTransferScope(tx, req, locked, "destination");
       const receipt = await findDocumentCommand(tx, {
@@ -2238,6 +2253,13 @@ router.post("/trasferimenti/:id/mancato-arrivo", async (req, res) => {
   try {
     await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+      await guardLinkedM4OperationalAccess(
+        tx,
+        req.user!.id,
+        "trasferimento",
+        id,
+        "magazzino.transfers.dispatch",
+      );
       const locked = await lockTransfer(tx, id);
       const actor = await requireCurrentCommandActor(
         tx,
@@ -2326,6 +2348,10 @@ router.get("/trasferimenti/:id/rientro", async (req, res) => {
     res.status(404).json({ error: "Trasferimento non trovato" });
     return;
   }
+  if (!(await canReadLinkedM4Document(req.user!, "trasferimento", id))) {
+    res.status(404).json({ error: "Trasferimento non trovato" });
+    return;
+  }
   const visibleIds = await visibleMagazzinoIds(
     callerCentroId(req),
     callerAreaOperativaId(req),
@@ -2397,6 +2423,13 @@ router.post("/trasferimenti/:id/rientro", async (req, res) => {
   try {
     await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+      await guardLinkedM4OperationalAccess(
+        tx,
+        req.user!.id,
+        "trasferimento",
+        id,
+        "magazzino.stock.receive",
+      );
       const locked = await lockTransfer(tx, id);
       const actor = await requireCurrentCommandActor(
         tx,

@@ -1,6 +1,10 @@
 # M5B — raccordo Richiesta Magazzino → documento M4
 
-Stato: sviluppo nel working tree sulla base `cfb53127ecc3a31756aedf8db1e5aefc62a7f346`; **non ancora collaudato formalmente né applicato al Docker/DB persistenti**. Le prove manuali TM-01…TM-30 del Word sono criteri di accettazione proposti, non esiti acquisiti. Floriano ha riferito una verifica manuale M5A positiva; `docs/M5A-test-report.md` documenta invece il precedente collaudo automatico parziale e i blocchi host WEB/E2E. Queste evidenze restano distinte.
+Stato corrente: M5B è pubblicata sul branch dedicato alla SHA `ddd7a613234d2ae5c53c85d96bdc5ec53cc088aa`. Secondo il passaggio di consegne R3, il Docker locale è stato aggiornato alla migration 44 e Floriano ha riferito uno smoke/manuale iniziale positivo. La correzione delle guardie post-preparazione M5B-R3 è invece **solo nel working tree**, non pubblicata né applicata al Docker persistente; attende un `##test` separato. I rapporti `M5B-test-*` registrano le evidenze storiche delle rispettive sessioni, non attestano automaticamente il candidato R3. Le prove manuali TM-01…TM-30 del Word restano criteri di accettazione; non si inferisce da questo documento la loro esecuzione completa.
+
+R3 preserva la policy M4 per documenti non collegati. Per Bolle e Trasferimenti collegati, i comandi successivi a “Pronta” richiedono il grant M4 specifico e la visibilità territoriale corrente della richiesta M5B; non richiedono indiscriminatamente `richieste_magazzino.prepare`. Anche rientri in lettura e il percorso condiviso Consegne applicano la guardia. Dettaglio e prove di sviluppo sono in `docs/M5B-R3-guardie-post-preparazione.md`.
+
+Le sezioni seguenti conservano la scheda tecnica redatta nella fase di sviluppo iniziale M5B; riferimenti a verifiche “future” o a migration “non applicata in questa fase” descrivono quella fase storica. Lo stato attuale è quello indicato sopra.
 
 ## Decisioni e responsabilità
 

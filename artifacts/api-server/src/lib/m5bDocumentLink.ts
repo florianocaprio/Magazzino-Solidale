@@ -1,5 +1,15 @@
 import type { Request } from "express";
-import { and, eq, exists, inArray, notExists, or, sql, type Column, type SQL } from "drizzle-orm";
+import {
+  and,
+  eq,
+  exists,
+  inArray,
+  notExists,
+  or,
+  sql,
+  type Column,
+  type SQL,
+} from "drizzle-orm";
 import {
   bolleTable,
   db,
@@ -287,6 +297,28 @@ export async function guardLinkedM4Mutation(
   }
   if (richiesta.stato !== "presa_in_carico")
     throw new M5bLinkError(409, "Richiesta non più preparabile");
+  return { richiesta, link, actor };
+}
+
+/** M4 grant plus the current M5 request scope for linked operational commands. */
+export async function guardLinkedM4OperationalAccess(
+  tx: InventoryTransaction,
+  userId: number,
+  tipo: M5bDocumentType,
+  documentoId: number,
+  permission: string,
+) {
+  const observed = await linkedM5bDocument(tx, tipo, documentoId);
+  if (!observed) return null;
+  const actor = await requireCurrentM5bActor(tx, userId, permission);
+  const richiesta = await lockM5bRequest(tx, observed.richiestaId);
+  if (!canReadM5bRequest(actor, richiesta))
+    throw new M5bLinkError(404, "Documento non trovato nel perimetro");
+  const link = await linkedM5bDocument(tx, tipo, documentoId);
+  if (!link || link.id !== observed.id)
+    throw new M5bLinkError(409, "Collegamento documento cambiato; ricarica");
+  if (!link.corrente)
+    throw new M5bLinkError(409, "Collegamento documento cessato; ricarica");
   return { richiesta, link, actor };
 }
 

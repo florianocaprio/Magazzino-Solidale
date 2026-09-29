@@ -1,5 +1,8 @@
 import type { Response } from "express";
-import { M5bLinkError } from "./m5bDocumentLink";
+import {
+  guardLinkedM4OperationalAccess,
+  M5bLinkError,
+} from "./m5bDocumentLink";
 import { db } from "@workspace/db";
 import {
   bolleTable,
@@ -786,6 +789,13 @@ export async function completeBollaDelivery(opts: {
         opts.documentCommand.idempotencyKey,
       );
     }
+    await guardLinkedM4OperationalAccess(
+      tx,
+      auditUserId(opts.audit),
+      "bolla",
+      opts.bollaId,
+      opts.requiredPermission ?? "bolle.deliver",
+    );
     if (opts.expectedConsegna) {
       await lockConsegnaBollaRelation(tx, opts.expectedConsegna.id);
     }

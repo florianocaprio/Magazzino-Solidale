@@ -45,6 +45,10 @@ import {
   handleBollaActionError,
 } from "../lib/bollaDelivery";
 import {
+  guardLinkedM4OperationalAccess,
+  m5bLinkedM4ListScope,
+} from "../lib/m5bDocumentLink";
+import {
   auditContextFromRequest,
   auditFields,
   recordAuditEvent,
@@ -265,7 +269,10 @@ async function canAccessAssociatedBollaTx(
 }
 
 /** Ritorna, per ogni consegnaId, la bolla collegata più rilevante (non annullata). */
-async function bollePerConsegne(consegnaIds: number[]) {
+async function bollePerConsegne(
+  consegnaIds: number[],
+  actor: NonNullable<Request["user"]>,
+) {
   const map = new Map<
     number,
     { id: number; numeroBolla: string; stato: string; versione: number }
@@ -280,7 +287,12 @@ async function bollePerConsegne(consegnaIds: number[]) {
       consegnaId: bolleTable.consegnaId,
     })
     .from(bolleTable)
-    .where(inArray(bolleTable.consegnaId, consegnaIds));
+    .where(
+      and(
+        inArray(bolleTable.consegnaId, consegnaIds),
+        m5bLinkedM4ListScope(actor, "bolla", bolleTable.id),
+      ),
+    );
   for (const r of rows) {
     if (r.consegnaId == null || r.stato === "annullato") continue;
     const current = map.get(r.consegnaId);
@@ -508,7 +520,10 @@ async function loadConsegne(req: Request, options: ConsegneListOptions) {
     }),
   );
 
-  const bolle = await bollePerConsegne(rows.map((r) => r.c.id));
+  const bolle = await bollePerConsegne(
+    rows.map((r) => r.c.id),
+    req.user!,
+  );
   const effectiveCentroIds = [
     ...new Set(
       rows
@@ -986,6 +1001,29 @@ router.post(
     try {
       await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        const observedIds = await tx
+          .select({ id: bolleTable.id })
+          .from(bolleTable)
+          .where(
+            and(
+              eq(bolleTable.consegnaId, consegnaId),
+              ne(bolleTable.stato, "annullato"),
+            ),
+          );
+        const guardedIds = [
+          ...new Set([
+            ...observedIds.map((row) => row.id),
+            ...(requestedBollaId == null ? [] : [requestedBollaId]),
+          ]),
+        ].sort((left, right) => left - right);
+        for (const id of guardedIds)
+          await guardLinkedM4OperationalAccess(
+            tx,
+            req.user!.id,
+            "bolla",
+            id,
+            "consegne.manage",
+          );
         await lockConsegnaBollaRelation(tx, consegnaId);
         const linkedIds = await tx
           .select({ id: bolleTable.id })
@@ -997,6 +1035,11 @@ router.post(
             ),
           )
           .orderBy(asc(bolleTable.id));
+        if (linkedIds.some((row) => !guardedIds.includes(row.id)))
+          throw new BollaActionError(
+            409,
+            "Associazione Bolla cambiata; ricarica",
+          );
         const idsToLock = [
           ...new Set([
             ...linkedIds.map((row) => row.id),
@@ -1238,7 +1281,7 @@ router.post(
       throw error;
     }
 
-    res.json(await dettaglioConsegna(consegnaId));
+    res.json(await dettaglioConsegna(consegnaId, req.user!));
   },
 );
 
@@ -1351,7 +1394,10 @@ router.post(
 );
 
 /** Costruisce la rappresentazione della consegna con info bolla (per le risposte delle azioni). */
-async function dettaglioConsegna(id: number) {
+async function dettaglioConsegna(
+  id: number,
+  actor: NonNullable<Request["user"]>,
+) {
   const [r] = await db
     .select({
       c: consegneTable,
@@ -1376,7 +1422,7 @@ async function dettaglioConsegna(id: number) {
     .leftJoin(volontariTable, eq(consegneTable.volontarioId, volontariTable.id))
     .where(eq(consegneTable.id, id));
   if (!r) return null;
-  const bolla = (await bollePerConsegne([id])).get(id) ?? null;
+  const bolla = (await bollePerConsegne([id], actor)).get(id) ?? null;
   return {
     id: r.c.id,
     codice: r.c.codice,
