@@ -142,6 +142,18 @@ import {
 const router: IRouter = Router();
 
 router.use("/bolle", requireAllModuli(["MAGAZZINO_SOLIDALE", "BOLLE"]));
+router.use("/bolle", (req, res, next) => {
+  if (
+    req.method === "GET" ||
+    req.method === "HEAD" ||
+    req.user?.isAdmin ||
+    req.user?.aree.includes("magazzino")
+  ) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: "Operazioni Bolla riservate al Magazzino" });
+});
 
 // stati che consentono ancora modifiche
 const STATI_MODIFICABILI = ["bozza"];
@@ -928,6 +940,10 @@ router.get("/bolle", requirePermission("bolle.view"), async (req, res) => {
 // ─── CREATE ──────────────────────────────────────────────────────────────────
 
 router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
+  if (!req.user?.isAdmin && !req.user?.aree.includes("magazzino")) {
+    res.status(403).json({ error: "Creazione Bolla riservata al Magazzino" });
+    return;
+  }
   const body = { ...req.body };
   let idempotencyKey: string;
   try {
@@ -1070,6 +1086,17 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
   try {
     const replay = await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+      const actor = await requireCurrentCommandActor(
+        tx,
+        req.user!.id,
+        "bolle.manage",
+      );
+      if (!actor.isAdmin && !actor.aree.includes("magazzino")) {
+        throw new BollaActionError(
+          403,
+          "Creazione Bolla riservata al Magazzino",
+        );
+      }
       const receipt = await loadDocumentCommand(tx, {
         tipoComando,
         idempotencyKey,
@@ -1195,6 +1222,17 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
   try {
     result = await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+      const actor = await requireCurrentCommandActor(
+        tx,
+        req.user!.id,
+        "bolle.manage",
+      );
+      if (!actor.isAdmin && !actor.aree.includes("magazzino")) {
+        throw new BollaActionError(
+          403,
+          "Creazione Bolla riservata al Magazzino",
+        );
+      }
       const receipt = await loadDocumentCommand(tx, {
         tipoComando,
         idempotencyKey,

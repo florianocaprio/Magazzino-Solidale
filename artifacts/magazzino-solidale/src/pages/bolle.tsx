@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth";
+import { authUserCanOperateBolle, useAuth } from "@/lib/auth";
 import { Link } from "wouter";
 import {
   useListBolle,
@@ -1448,12 +1448,15 @@ export function BollaDettaglio({
   hideConsegnaActions?: boolean;
   linkedRequest?: boolean | null;
 }) {
-  const { hasPermission } = useAuth();
-  const canManage = hasPermission("bolle.manage");
-  const canDeliver = hasPermission("bolle.deliver");
-  const canCancel = hasPermission("bolle.cancel");
-  const canReverseAdmin = hasPermission("bolle.reverse.admin");
-  const canReceiveReturn = hasPermission("magazzino.stock.receive");
+  const { user, hasPermission } = useAuth();
+  const canManage = authUserCanOperateBolle(user, "bolle.manage");
+  const canDeliver = authUserCanOperateBolle(user, "bolle.deliver");
+  const canCancel = authUserCanOperateBolle(user, "bolle.cancel");
+  const canReverseAdmin = authUserCanOperateBolle(user, "bolle.reverse.admin");
+  const canReceiveReturn = authUserCanOperateBolle(
+    user,
+    "magazzino.stock.receive",
+  );
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [annullaOpen, setAnnullaOpen] = useState(false);
@@ -3520,8 +3523,8 @@ export default function Bolle() {
   const queryClient = useQueryClient();
   const canViewBolle = hasPermission("bolle.view");
   const canViewTransfers = hasPermission("magazzino.view");
-  const canManage = hasPermission("bolle.manage");
-  const canDeliver = hasPermission("bolle.deliver");
+  const canManage = authUserCanOperateBolle(user, "bolle.manage");
+  const canDeliver = authUserCanOperateBolle(user, "bolle.deliver");
   const canCreateTransfer = hasPermission("magazzino.transfers.create");
   const canCreateBolla = canViewBolle && canManage;
   const canCreateVisibleTransfer = canViewTransfers && canCreateTransfer;

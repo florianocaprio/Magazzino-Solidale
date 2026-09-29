@@ -55,9 +55,12 @@ describe("hardening UI Magazzino", () => {
     expect(trasferimenti).toContain(
       'hasPermission("magazzino.transfers.receive")',
     );
-    expect(bolle).toContain('hasPermission("bolle.manage")');
-    expect(bolle).toContain('hasPermission("bolle.deliver")');
-    expect(bolle).toContain('hasPermission("bolle.cancel")');
+    expect(bolle).toContain('authUserCanOperateBolle(user, "bolle.manage")');
+    expect(bolle).toContain('authUserCanOperateBolle(user, "bolle.deliver")');
+    expect(bolle).toContain('authUserCanOperateBolle(user, "bolle.cancel")');
+    const auth = await source("./auth.tsx");
+    expect(auth).toContain('user.aree?.includes("magazzino")');
+    expect(auth).toContain("authUserHasPermission(user, permission)");
   });
 
   it("esclude Magazzini inattivi dai selettori delle nuove operazioni", async () => {

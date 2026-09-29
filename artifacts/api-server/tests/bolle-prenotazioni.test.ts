@@ -1294,11 +1294,17 @@ describe("Bolle — inserimento righe con scope operativo", () => {
     });
   });
 
-  it("consente a un operatore Sociale con bolle.manage la propria Bolla senza permettere probe su altri magazzini", async () => {
+  it("nega mutazioni Bolla al solo Sociale con grant legacy e conserva lo scope del ruolo misto", async () => {
     const socialApp = makeScopedApp(bolleRouter, {
       id: operatoreId,
       centroAscoltoId: centroA,
       aree: ["sociale"],
+      permessi: ["bolle.manage"],
+    });
+    const mixedApp = makeScopedApp(bolleRouter, {
+      id: operatoreId,
+      centroAscoltoId: centroA,
+      aree: ["sociale", "magazzino"],
       permessi: ["bolle.manage"],
     });
     const lottoA = await createLotto(scope, {
@@ -1334,10 +1340,30 @@ describe("Bolle — inserimento righe con scope operativo", () => {
             }),
           )
       ).status,
-    ).toBe(201);
+    ).toBe(403);
     expect(
       (
         await request(socialApp)
+          .post(`/bolle/${altrui}/righe`)
+          .send({ prodottoId: prod, lottoId: lottoB, quantita: 1 })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(mixedApp)
+          .post(`/bolle/${propria}/righe`)
+          .send(
+            await bollaCommandBody(propria, {
+              prodottoId: prod,
+              lottoId: lottoA,
+              quantita: 1,
+            }),
+          )
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await request(mixedApp)
           .post(`/bolle/${altrui}/righe`)
           .send({ prodottoId: prod, lottoId: lottoB, quantita: 1 })
       ).status,

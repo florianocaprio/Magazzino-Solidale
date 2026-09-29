@@ -7,19 +7,24 @@ import type {
 } from "@workspace/api-client-react";
 import { InterventoSocialeDetailSheet } from "./intervento-sociale-detail-sheet";
 
+const requestMock = vi.hoisted(() => ({ visible: false, items: [] as any[] }));
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
 vi.mock("@/lib/auth", () => ({
-  useAuth: () => ({ hasArea: () => false, hasPermission: () => false }),
+  useAuth: () => ({
+    hasArea: () => requestMock.visible,
+    hasPermission: () => requestMock.visible,
+  }),
 }));
 vi.mock("@/lib/use-moduli", () => ({
   useConfigurazioneAmbienteFlags: () => ({ isModuloAttivo: () => true }),
 }));
 vi.mock("@workspace/api-client-react", () => ({
   useListRichiesteMagazzino: () => ({
-    data: null,
+    data: { items: requestMock.items },
     isLoading: false,
     isError: false,
   }),
@@ -90,12 +95,111 @@ describe("InterventoSocialeDetailSheet", () => {
   let root: Root;
 
   beforeEach(() => {
+    requestMock.visible = false;
+    requestMock.items = [];
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
+  });
+
+  it("M5C1: pianificazione espone invio esplicito, materiali legacy solo storici", async () => {
+    requestMock.visible = true;
+    await act(async () => {
+      root.render(
+        <InterventoSocialeDetailSheet
+          open
+          intervento={{
+            ...intervento,
+            stato: "pianificato",
+            ambito: "sociale",
+            ambitoLegacy: false,
+          }}
+          operativita={{
+            ...operativita,
+            stato: "pianificato",
+            materiali: [
+              {
+                id: 3,
+                interventoId: 20,
+                prodottoId: 7,
+                descrizioneSnapshot: "Kit precedente",
+                unitaMisuraSnapshot: "pz",
+                quantitaPrevista: 2,
+                quantitaConsegnata: 0,
+                statoPreparazione: "da_preparare",
+                magazzinoId: 4,
+                note: null,
+                dataCreazione: "2026-08-14T09:00:00Z",
+                dataAggiornamento: "2026-08-14T09:00:00Z",
+              },
+            ],
+          }}
+          onOpenChange={vi.fn()}
+          {...callbacks}
+        />,
+      );
+    });
+    expect(
+      document.querySelector('[data-testid="intervento-richiesta-magazzino"]'),
+    ).not.toBeNull();
+    expect(
+      document.querySelector(
+        'a[href="/richieste-magazzino?interventoId=20&beneficiarioId=10"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      document.querySelector('[data-testid="legacy-intervento-materiali"]')
+        ?.textContent,
+    ).toContain("Kit precedente");
+    expect(document.body.textContent).not.toContain(
+      "interventi.operational.addMaterial",
+    );
+    expect(document.body.textContent).not.toContain(
+      "interventi.operational.catalogProduct",
+    );
+  });
+
+  it("M5C1: richiesta aperta mostra codice, avanzamento e non offre un secondo invio", async () => {
+    requestMock.visible = true;
+    requestMock.items = [
+      {
+        id: 8,
+        codice: "RM-8",
+        stato: "presa_in_carico",
+        documentoCorrente: { codice: "B-8", avanzamento: "pronta" },
+      },
+    ];
+    await act(async () => {
+      root.render(
+        <InterventoSocialeDetailSheet
+          open
+          intervento={{
+            ...intervento,
+            stato: "pianificato",
+            ambito: "sociale",
+            ambitoLegacy: false,
+          }}
+          operativita={{ ...operativita, stato: "pianificato" }}
+          onOpenChange={vi.fn()}
+          {...callbacks}
+        />,
+      );
+    });
+    const section = document.querySelector(
+      '[data-testid="intervento-richiesta-magazzino"]',
+    );
+    expect(section?.textContent).toContain("RM-8");
+    expect(section?.textContent).toContain("B-8");
+    expect(section?.textContent).toContain(
+      "richiesteMagazzino.progress.pronta",
+    );
+    expect(
+      document.querySelector('a[href="/richieste-magazzino?richiestaId=8"]'),
+    ).not.toBeNull();
+    expect(document.querySelector('a[href*="interventoId=20"]')).toBeNull();
   });
 
   afterEach(async () => {

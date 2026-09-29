@@ -86,6 +86,8 @@ function app(
   return server;
 }
 
+const inventoryApp = () => app({ aree: ["sociale", "magazzino"] });
+
 async function createIntervento(
   input: {
     beneficiarioId?: number;
@@ -577,7 +579,7 @@ describe("audit hardening Centro di Ascolto", () => {
       [999_999_999, 400],
     ] as const) {
       const row = await createIntervento({ stato: "in_corso" });
-      const response = await request(app())
+      const response = await request(inventoryApp())
         .post(`/interventi/${row.id}/salva-operativita`)
         .send({
           versione: await versione(row.id),
@@ -609,22 +611,22 @@ describe("audit hardening Centro di Ascolto", () => {
         },
       ],
     });
-    const first = await request(app())
+    const first = await request(inventoryApp())
       .post(`/interventi/${row.id}/salva-operativita`)
       .send(payload(2, await versione(row.id)));
     expect(first.status).toBe(200);
     expect(await totaleMovimenti(row.id)).toBe(2);
-    const second = await request(app())
+    const second = await request(inventoryApp())
       .post(`/interventi/${row.id}/salva-operativita`)
       .send(payload(2, first.body.versione));
     expect(second.status).toBe(200);
     expect(await totaleMovimenti(row.id)).toBe(2);
-    const third = await request(app())
+    const third = await request(inventoryApp())
       .post(`/interventi/${row.id}/salva-operativita`)
       .send(payload(3, second.body.versione));
     expect(third.status).toBe(200);
     expect(await totaleMovimenti(row.id)).toBe(3);
-    const decrease = await request(app())
+    const decrease = await request(inventoryApp())
       .post(`/interventi/${row.id}/salva-operativita`)
       .send(payload(2, third.body.versione));
     expect(decrease.status).toBe(409);
@@ -632,10 +634,10 @@ describe("audit hardening Centro di Ascolto", () => {
 
     const concurrentVersion = await versione(row.id);
     const concurrent = await Promise.all([
-      request(app())
+      request(inventoryApp())
         .post(`/interventi/${row.id}/salva-operativita`)
         .send(payload(4, concurrentVersion)),
-      request(app())
+      request(inventoryApp())
         .post(`/interventi/${row.id}/salva-operativita`)
         .send(payload(4, concurrentVersion)),
     ]);
@@ -648,7 +650,7 @@ describe("audit hardening Centro di Ascolto", () => {
       .select()
       .from(interventiMaterialiTable)
       .where(eq(interventiMaterialiTable.interventoId, row.id));
-    const insufficient = await request(app())
+    const insufficient = await request(inventoryApp())
       .post(`/interventi/${row.id}/salva-operativita`)
       .send(payload(100, await versione(row.id)));
     expect(insufficient.status).toBe(400);
@@ -767,7 +769,7 @@ describe("audit hardening Centro di Ascolto", () => {
     expect(await totaleMovimenti(withOperationalSuccessor.id)).toBe(0);
 
     const withUpdate = await createIntervento({ stato: "in_corso" });
-    const allowed = await request(app())
+    const allowed = await request(inventoryApp())
       .post(`/interventi/${withUpdate.id}/concludi`)
       .send({
         versione: await versione(withUpdate.id),

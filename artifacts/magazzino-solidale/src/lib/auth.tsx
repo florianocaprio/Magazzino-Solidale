@@ -48,6 +48,17 @@ export function authUserHasPermission(
   return user.isAdmin || (user.permessi ?? []).includes(permission);
 }
 
+export function authUserCanOperateBolle(
+  user: AuthAccessUser | null | undefined,
+  permission: string,
+): boolean {
+  return Boolean(
+    user &&
+    (user.isAdmin || user.aree?.includes("magazzino")) &&
+    authUserHasPermission(user, permission),
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useGetCurrentUser({

@@ -35,6 +35,7 @@ interface Props {
   magazzini: Magazzino[];
   readOnly?: boolean;
   showActivities?: boolean;
+  showMaterials?: boolean;
   onAttivitaChange: (value: InterventoAttivitaInput[]) => void;
   onMaterialiChange: (value: InterventoMaterialeInput[]) => void;
   onDocumentiChange: (value: InterventoDocumentoInput[]) => void;
@@ -70,6 +71,7 @@ export function InterventoSocialeOperativitaEditor({
   magazzini,
   readOnly = false,
   showActivities = true,
+  showMaterials = true,
   onAttivitaChange,
   onMaterialiChange,
   onDocumentiChange,
@@ -213,243 +215,250 @@ export function InterventoSocialeOperativitaEditor({
         </section>
       )}
 
-      <section className="space-y-3" aria-labelledby="materiali-title">
-        <div className="flex items-center justify-between gap-3">
-          <h3 id="materiali-title" className="font-semibold">
-            {t("interventi.operational.materials")}
-          </h3>
-          {!readOnly && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                onMaterialiChange([
-                  ...materiali,
-                  {
-                    prodottoId: null,
-                    descrizioneSnapshot: "",
-                    unitaMisuraSnapshot: "pz",
-                    quantitaPrevista: 0,
-                    quantitaConsegnata: 0,
-                    statoPreparazione: "da_preparare",
-                    magazzinoId: null,
-                    note: "",
-                  },
-                ])
-              }
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {t("interventi.operational.addMaterial")}
-            </Button>
-          )}
-        </div>
-        {materiali.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {t("interventi.operational.noMaterials")}
-          </p>
-        ) : (
-          materiali.map((item, index) => (
-            <div key={index} className="space-y-3 rounded-lg border p-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Select
-                  value={item.prodottoId ? String(item.prodottoId) : "generic"}
-                  disabled={readOnly}
-                  onValueChange={(value) => {
-                    const product = prodotti.find(
-                      (candidate) => String(candidate.id) === value,
-                    );
-                    onMaterialiChange(
-                      replaceAt(materiali, index, {
-                        ...item,
-                        prodottoId: product?.id ?? null,
-                        descrizioneSnapshot:
-                          product?.nome ?? item.descrizioneSnapshot ?? "",
-                        unitaMisuraSnapshot:
-                          product?.unitaMisura ??
-                          item.unitaMisuraSnapshot ??
-                          "pz",
-                      }),
-                    );
-                  }}
-                >
-                  <SelectTrigger
-                    aria-label={t("interventi.operational.catalogProduct")}
+      {showMaterials && (
+        <section className="space-y-3" aria-labelledby="materiali-title">
+          <div className="flex items-center justify-between gap-3">
+            <h3 id="materiali-title" className="font-semibold">
+              {t("interventi.operational.materials")}
+            </h3>
+            {!readOnly && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  onMaterialiChange([
+                    ...materiali,
+                    {
+                      prodottoId: null,
+                      descrizioneSnapshot: "",
+                      unitaMisuraSnapshot: "pz",
+                      quantitaPrevista: 0,
+                      quantitaConsegnata: 0,
+                      statoPreparazione: "da_preparare",
+                      magazzinoId: null,
+                      note: "",
+                    },
+                  ])
+                }
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {t("interventi.operational.addMaterial")}
+              </Button>
+            )}
+          </div>
+          {materiali.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {t("interventi.operational.noMaterials")}
+            </p>
+          ) : (
+            materiali.map((item, index) => (
+              <div key={index} className="space-y-3 rounded-lg border p-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Select
+                    value={
+                      item.prodottoId ? String(item.prodottoId) : "generic"
+                    }
+                    disabled={readOnly}
+                    onValueChange={(value) => {
+                      const product = prodotti.find(
+                        (candidate) => String(candidate.id) === value,
+                      );
+                      onMaterialiChange(
+                        replaceAt(materiali, index, {
+                          ...item,
+                          prodottoId: product?.id ?? null,
+                          descrizioneSnapshot:
+                            product?.nome ?? item.descrizioneSnapshot ?? "",
+                          unitaMisuraSnapshot:
+                            product?.unitaMisura ??
+                            item.unitaMisuraSnapshot ??
+                            "pz",
+                        }),
+                      );
+                    }}
                   >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="generic">
-                      {t("interventi.operational.genericMaterial")}
-                    </SelectItem>
-                    {prodotti
-                      .filter((product) => product.attivo)
-                      .map((product) => (
-                        <SelectItem key={product.id} value={String(product.id)}>
-                          {product.nome} · {product.unitaMisura}
+                    <SelectTrigger
+                      aria-label={t("interventi.operational.catalogProduct")}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="generic">
+                        {t("interventi.operational.genericMaterial")}
+                      </SelectItem>
+                      {prodotti
+                        .filter((product) => product.attivo)
+                        .map((product) => (
+                          <SelectItem
+                            key={product.id}
+                            value={String(product.id)}
+                          >
+                            {product.nome} · {product.unitaMisura}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={item.magazzinoId ? String(item.magazzinoId) : "none"}
+                    disabled={readOnly}
+                    onValueChange={(value) =>
+                      onMaterialiChange(
+                        replaceAt(materiali, index, {
+                          ...item,
+                          magazzinoId: value === "none" ? null : Number(value),
+                        }),
+                      )
+                    }
+                  >
+                    <SelectTrigger
+                      aria-label={t("interventi.operational.warehouse")}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">–</SelectItem>
+                      {magazzini.map((magazzino) => (
+                        <SelectItem
+                          key={magazzino.id}
+                          value={String(magazzino.id)}
+                        >
+                          {magazzino.nome}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={item.magazzinoId ? String(item.magazzinoId) : "none"}
-                  disabled={readOnly}
-                  onValueChange={(value) =>
-                    onMaterialiChange(
-                      replaceAt(materiali, index, {
-                        ...item,
-                        magazzinoId: value === "none" ? null : Number(value),
-                      }),
-                    )
-                  }
-                >
-                  <SelectTrigger
-                    aria-label={t("interventi.operational.warehouse")}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">–</SelectItem>
-                    {magazzini.map((magazzino) => (
-                      <SelectItem
-                        key={magazzino.id}
-                        value={String(magazzino.id)}
-                      >
-                        {magazzino.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {!item.prodottoId && (
-                <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
-                  <Input
-                    value={item.descrizioneSnapshot ?? ""}
-                    readOnly={readOnly}
-                    placeholder={t(
-                      "interventi.operational.materialDescription",
-                    )}
-                    onChange={(event) =>
-                      onMaterialiChange(
-                        replaceAt(materiali, index, {
-                          ...item,
-                          descrizioneSnapshot: event.target.value,
-                        }),
-                      )
-                    }
-                  />
-                  <Input
-                    value={item.unitaMisuraSnapshot ?? ""}
-                    readOnly={readOnly}
-                    placeholder={t("interventi.operational.unit")}
-                    onChange={(event) =>
-                      onMaterialiChange(
-                        replaceAt(materiali, index, {
-                          ...item,
-                          unitaMisuraSnapshot: event.target.value,
-                        }),
-                      )
-                    }
-                  />
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="space-y-1 text-sm">
-                  <span>{t("interventi.operational.plannedQuantity")}</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    readOnly={readOnly}
-                    value={item.quantitaPrevista ?? 0}
-                    onChange={(event) =>
+                {!item.prodottoId && (
+                  <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
+                    <Input
+                      value={item.descrizioneSnapshot ?? ""}
+                      readOnly={readOnly}
+                      placeholder={t(
+                        "interventi.operational.materialDescription",
+                      )}
+                      onChange={(event) =>
+                        onMaterialiChange(
+                          replaceAt(materiali, index, {
+                            ...item,
+                            descrizioneSnapshot: event.target.value,
+                          }),
+                        )
+                      }
+                    />
+                    <Input
+                      value={item.unitaMisuraSnapshot ?? ""}
+                      readOnly={readOnly}
+                      placeholder={t("interventi.operational.unit")}
+                      onChange={(event) =>
+                        onMaterialiChange(
+                          replaceAt(materiali, index, {
+                            ...item,
+                            unitaMisuraSnapshot: event.target.value,
+                          }),
+                        )
+                      }
+                    />
+                  </div>
+                )}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="space-y-1 text-sm">
+                    <span>{t("interventi.operational.plannedQuantity")}</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      readOnly={readOnly}
+                      value={item.quantitaPrevista ?? 0}
+                      onChange={(event) =>
+                        onMaterialiChange(
+                          replaceAt(materiali, index, {
+                            ...item,
+                            quantitaPrevista: Number(event.target.value),
+                          }),
+                        )
+                      }
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span>{t("interventi.operational.deliveredQuantity")}</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      readOnly={readOnly}
+                      value={item.quantitaConsegnata ?? 0}
+                      onChange={(event) =>
+                        onMaterialiChange(
+                          replaceAt(materiali, index, {
+                            ...item,
+                            quantitaConsegnata: Number(event.target.value),
+                          }),
+                        )
+                      }
+                    />
+                  </label>
+                  <Select
+                    value={item.statoPreparazione ?? "da_preparare"}
+                    disabled={readOnly}
+                    onValueChange={(value) =>
                       onMaterialiChange(
                         replaceAt(materiali, index, {
                           ...item,
-                          quantitaPrevista: Number(event.target.value),
+                          statoPreparazione: value as InterventoMaterialeStato,
                         }),
                       )
                     }
-                  />
-                </label>
-                <label className="space-y-1 text-sm">
-                  <span>{t("interventi.operational.deliveredQuantity")}</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    readOnly={readOnly}
-                    value={item.quantitaConsegnata ?? 0}
-                    onChange={(event) =>
-                      onMaterialiChange(
-                        replaceAt(materiali, index, {
-                          ...item,
-                          quantitaConsegnata: Number(event.target.value),
-                        }),
-                      )
-                    }
-                  />
-                </label>
-                <Select
-                  value={item.statoPreparazione ?? "da_preparare"}
-                  disabled={readOnly}
-                  onValueChange={(value) =>
+                  >
+                    <SelectTrigger
+                      aria-label={t("interventi.operational.preparationState")}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MATERIAL_STATUSES.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {t(`interventi.operational.materialStates.${status}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Input
+                  value={item.note ?? ""}
+                  readOnly={readOnly}
+                  placeholder={t("interventi.note")}
+                  onChange={(event) =>
                     onMaterialiChange(
                       replaceAt(materiali, index, {
                         ...item,
-                        statoPreparazione: value as InterventoMaterialeStato,
+                        note: event.target.value,
                       }),
                     )
                   }
-                >
-                  <SelectTrigger
-                    aria-label={t("interventi.operational.preparationState")}
+                />
+                {!readOnly && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      onMaterialiChange(
+                        materiali.filter(
+                          (_, candidateIndex) => candidateIndex !== index,
+                        ),
+                      )
+                    }
                   >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MATERIAL_STATUSES.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {t(`interventi.operational.materialStates.${status}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {t("common.delete")}
+                  </Button>
+                )}
               </div>
-              <Input
-                value={item.note ?? ""}
-                readOnly={readOnly}
-                placeholder={t("interventi.note")}
-                onChange={(event) =>
-                  onMaterialiChange(
-                    replaceAt(materiali, index, {
-                      ...item,
-                      note: event.target.value,
-                    }),
-                  )
-                }
-              />
-              {!readOnly && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() =>
-                    onMaterialiChange(
-                      materiali.filter(
-                        (_, candidateIndex) => candidateIndex !== index,
-                      ),
-                    )
-                  }
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {t("common.delete")}
-                </Button>
-              )}
-            </div>
-          ))
-        )}
-      </section>
+            ))
+          )}
+        </section>
+      )}
 
       <section className="space-y-3" aria-labelledby="documenti-title">
         <div className="flex items-center justify-between gap-3">

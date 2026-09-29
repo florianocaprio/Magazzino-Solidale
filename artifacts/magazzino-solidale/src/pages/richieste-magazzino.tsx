@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -13,6 +13,8 @@ import {
   getGetRichiestaMagazzinoQueryKey,
   getGetRichiestaMagazzinoStoricoQueryKey,
   getListBeneficiariQueryKey,
+  useGetIntervento,
+  getGetInterventoQueryKey,
   useGetRichiestaMagazzinoStorico,
   useListBeneficiari,
   useListMagazzini,
@@ -23,6 +25,7 @@ import {
   type RichiestaMagazzino,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
+import { interventionRequestPrefill } from "@/lib/m5c1-request-prefill";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
 import { useCommandIntentRegistry } from "@/lib/command-intent";
 import { RigheEditor, newRiga, type RigaDraft } from "@/pages/trasferimenti";
@@ -78,6 +81,7 @@ export default function RichiesteMagazzino() {
   const contextBeneficiaryId = queryId("beneficiarioId");
   const contextInterventionId = queryId("interventoId");
   const contextRequestId = queryId("richiestaId");
+  const contextLoaded = useRef<number | null>(null);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<"aperte" | "annullata">("aperte");
   const [selectedId, setSelectedId] = useState<number | null>(contextRequestId);
@@ -104,6 +108,22 @@ export default function RichiesteMagazzino() {
   const [confirmation, setConfirmation] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [transferRows, setTransferRows] = useState<RigaDraft[]>([newRiga()]);
+  const contextIntervention = useGetIntervento(contextInterventionId ?? 0, {
+    query: {
+      queryKey: getGetInterventoQueryKey(contextInterventionId ?? 0),
+      enabled: contextInterventionId != null && canSocial,
+    },
+  });
+  useEffect(() => {
+    const intervention = contextIntervention.data;
+    if (!intervention || contextLoaded.current === intervention.id) return;
+    contextLoaded.current = intervention.id;
+    const defaults = interventionRequestPrefill(intervention);
+    setBeneficiaryId(defaults.beneficiarioId);
+    setPriority(defaults.priorita);
+    setDesiredDate(defaults.dataDesiderata);
+    setModality(defaults.modalitaPreferita);
+  }, [contextIntervention.data]);
   const listParams = useMemo(
     () => ({
       page,
@@ -233,8 +253,7 @@ export default function RichiesteMagazzino() {
         setWarehouseId("");
         setTransferRows([newRiga()]);
         await refresh();
-      } else if (status === 409)
-        await refresh(selectedId ?? undefined);
+      } else if (status === 409) await refresh(selectedId ?? undefined);
       return false;
     } finally {
       setPending(false);
@@ -245,6 +264,10 @@ export default function RichiesteMagazzino() {
     event.preventDefault();
     if (!beneficiaryId || !bisogno.trim()) {
       setError(t("richiesteMagazzino.required"));
+      return;
+    }
+    if (contextInterventionId && !contextIntervention.data) {
+      setError(t("richiesteMagazzino.interventionLoadError"));
       return;
     }
     if (
@@ -404,9 +427,12 @@ export default function RichiesteMagazzino() {
             <CardTitle>{t("richiesteMagazzino.new")}</CardTitle>
           </CardHeader>
           <CardContent>
-            {contextInterventionId && activeForIntervention.isLoading ? (
+            {contextInterventionId &&
+            (activeForIntervention.isLoading ||
+              contextIntervention.isLoading) ? (
               <p>{t("common.loading")}</p>
-            ) : contextInterventionId && activeForIntervention.isError ? (
+            ) : contextInterventionId &&
+              (activeForIntervention.isError || contextIntervention.isError) ? (
               <p role="alert">{t("richiesteMagazzino.loadError")}</p>
             ) : activeForIntervention.data?.items[0] ? (
               <p>
@@ -457,13 +483,15 @@ export default function RichiesteMagazzino() {
                 ) : (
                   <p>
                     {t("richiesteMagazzino.beneficiary")} #{beneficiaryId}{" "}
-                    <Button
-                      type="button"
-                      variant="link"
-                      onClick={() => setBeneficiaryId(null)}
-                    >
-                      {t("common.edit")}
-                    </Button>
+                    {!contextInterventionId && (
+                      <Button
+                        type="button"
+                        variant="link"
+                        onClick={() => setBeneficiaryId(null)}
+                      >
+                        {t("common.edit")}
+                      </Button>
+                    )}
                   </p>
                 )}
                 {existingForPerson.data?.items.length ? (

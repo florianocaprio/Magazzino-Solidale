@@ -21,7 +21,7 @@ import {
   zoneUdsTable,
   operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
 
 const rnd = () => Math.random().toString(36).slice(2, 10);
@@ -441,7 +441,7 @@ describe("gestione operativa degli interventi Sociali", () => {
       stato: "in_corso",
       avvio: new Date("2026-08-20T08:00:00Z"),
     });
-    const response = await request(makeApp())
+    const response = await request(makeApp({ aree: ["sociale", "magazzino"] }))
       .post(`/interventi/${id}/salva-operativita`)
       .send({
         versione: await versioneIntervento(id),
@@ -519,7 +519,7 @@ describe("gestione operativa degli interventi Sociali", () => {
       auditEventoId: null,
     });
 
-    const invalid = await request(makeApp())
+    const invalid = await request(makeApp({ aree: ["sociale", "magazzino"] }))
       .post(`/interventi/${id}/salva-operativita`)
       .send({
         versione: response.body.versione,
@@ -537,6 +537,77 @@ describe("gestione operativa degli interventi Sociali", () => {
       .from(interventiMaterialiTable)
       .where(eq(interventiMaterialiTable.interventoId, id));
     expect(materials).toHaveLength(2);
+  });
+
+  it("M5C1: il solo Sociale non registra nuovi materiali catalogati né scarichi", async () => {
+    const id = await createIntervento({ stato: "in_corso", avvio: new Date() });
+    const response = await request(makeApp())
+      .post(`/interventi/${id}/salva-operativita`)
+      .send({
+        versione: await versioneIntervento(id),
+        materiali: [
+          {
+            prodottoId,
+            magazzinoId,
+            quantitaPrevista: 1,
+            quantitaConsegnata: 1,
+          },
+        ],
+      });
+    expect(response.status).toBe(403);
+    expect(
+      await db
+        .select()
+        .from(interventiMaterialiTable)
+        .where(eq(interventiMaterialiTable.interventoId, id)),
+    ).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(
+          and(
+            eq(movimentiTable.dominioOrigine, "SOCIALE"),
+            like(movimentiTable.entitaOrigineTipo, "intervento_materiali_%"),
+            eq(movimentiTable.entitaOrigineId, id),
+          ),
+        ),
+    ).toHaveLength(0);
+  });
+
+  it("M5C1: concludi con materiale catalogato è negato ma senza materiali resta possibile", async () => {
+    const id = await createIntervento({
+      stato: "in_corso",
+      avvio: new Date("2026-08-20T08:00:00Z"),
+    });
+    const version = await versioneIntervento(id);
+    const denied = await request(makeApp())
+      .post(`/interventi/${id}/concludi`)
+      .send({
+        versione: version,
+        conferma: true,
+        dataOraConclusione: "2026-08-20T09:00:00Z",
+        risultato: "Concluso",
+        materiali: [
+          {
+            prodottoId,
+            magazzinoId,
+            quantitaPrevista: 1,
+            quantitaConsegnata: 1,
+          },
+        ],
+      });
+    expect(denied.status).toBe(403);
+    const allowed = await request(makeApp())
+      .post(`/interventi/${id}/concludi`)
+      .send({
+        versione: version,
+        conferma: true,
+        dataOraConclusione: "2026-08-20T09:00:00Z",
+        risultato: "Concluso senza materiale",
+      });
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.intervento.stato).toBe("concluso");
   });
 
   it("non distribuisce materiali Sociali quando il prodotto ha soltanto lotti scaduti", async () => {
@@ -564,7 +635,7 @@ describe("gestione operativa degli interventi Sociali", () => {
     ids.lotti.push(lottoScaduto.id);
     const id = await createIntervento({ stato: "in_corso", avvio: new Date() });
 
-    const response = await request(makeApp())
+    const response = await request(makeApp({ aree: ["sociale", "magazzino"] }))
       .post(`/interventi/${id}/salva-operativita`)
       .send({
         versione: await versioneIntervento(id),

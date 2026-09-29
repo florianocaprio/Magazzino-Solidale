@@ -4,13 +4,10 @@ import type {
   InterventoAttivitaInput,
   InterventoConclusioneInput,
   InterventoDocumentoInput,
-  InterventoMaterialeInput,
   InterventoOperatore,
   InterventoOperativita,
   InterventoPriorita,
   InterventoStoricoStato,
-  Magazzino,
-  Prodotto,
 } from "@workspace/api-client-react";
 import {
   useListRichiesteMagazzino,
@@ -77,8 +74,6 @@ interface Props {
   bisogni?: BisognoPianificato[];
   tipi?: TipoOption[];
   operatori?: InterventoOperatore[];
-  prodotti?: Prodotto[];
-  magazzini?: Magazzino[];
   isLoading?: boolean;
   isPending?: boolean;
   canUpdate?: boolean;
@@ -120,16 +115,6 @@ function payloadRows(operativita: InterventoOperativita) {
       descrizione: item.descrizione,
       risultato: item.risultato,
     })),
-    materiali: operativita.materiali.map<InterventoMaterialeInput>((item) => ({
-      prodottoId: item.prodottoId,
-      descrizioneSnapshot: item.descrizioneSnapshot,
-      unitaMisuraSnapshot: item.unitaMisuraSnapshot,
-      quantitaPrevista: item.quantitaPrevista,
-      quantitaConsegnata: item.quantitaConsegnata,
-      statoPreparazione: item.statoPreparazione,
-      magazzinoId: item.magazzinoId,
-      note: item.note,
-    })),
     documenti: operativita.documenti.map<InterventoDocumentoInput>((item) => ({
       tipoDescrizione: item.tipoDescrizione,
       stato: item.stato,
@@ -147,8 +132,6 @@ export function InterventoSocialeDetailSheet({
   bisogni = [],
   tipi = [],
   operatori = [],
-  prodotti = [],
-  magazzini = [],
   isLoading = false,
   isPending = false,
   canUpdate = true,
@@ -183,7 +166,6 @@ export function InterventoSocialeDetailSheet({
     },
   });
   const [attivita, setAttivita] = useState<InterventoAttivitaInput[]>([]);
-  const [materiali, setMateriali] = useState<InterventoMaterialeInput[]>([]);
   const [documenti, setDocumenti] = useState<InterventoDocumentoInput[]>([]);
   const [risultato, setRisultato] = useState("");
   const [esito, setEsito] = useState("");
@@ -202,9 +184,6 @@ export function InterventoSocialeDetailSheet({
     useState<InterventoPriorita>("normale");
   const [successivoSede, setSuccessivoSede] = useState("");
   const [successivoOperatoreId, setSuccessivoOperatoreId] = useState("");
-  const [successivoMateriali, setSuccessivoMateriali] = useState<
-    InterventoMaterialeInput[]
-  >([]);
   const [successivoDocumenti, setSuccessivoDocumenti] = useState<
     InterventoDocumentoInput[]
   >([]);
@@ -231,7 +210,6 @@ export function InterventoSocialeDetailSheet({
     if (!opening && loadedKey.current === key) return;
     const rows = payloadRows(operativita);
     setAttivita(rows.attivita);
-    setMateriali(rows.materiali);
     setDocumenti(rows.documenti);
     setRisultato(operativita.risultato ?? "");
     setEsito(operativita.esito ?? "");
@@ -249,7 +227,6 @@ export function InterventoSocialeDetailSheet({
     setSuccessivoOperatoreId(
       intervento.operatoreId ? String(intervento.operatoreId) : "",
     );
-    setSuccessivoMateriali([]);
     setSuccessivoDocumenti([]);
     const planned = intervento.dataOraPianificata;
     setPianificazioneData(
@@ -276,7 +253,6 @@ export function InterventoSocialeDetailSheet({
       esito: esito || null,
       note: note || null,
       attivita,
-      materiali,
       documenti,
       conferma: true,
     };
@@ -297,7 +273,6 @@ export function InterventoSocialeDetailSheet({
             : null,
         sede: successivoSede || null,
         operatoreId: Number(successivoOperatoreId),
-        materiali: successivoMateriali,
         documenti: successivoDocumenti,
       };
     }
@@ -349,35 +324,6 @@ export function InterventoSocialeDetailSheet({
                 </Button>
               </div>
             </section>
-
-            {canViewRequests && (
-              <section className="flex flex-wrap items-center gap-3 rounded-lg border p-4">
-                <span className="font-medium">
-                  {t("richiesteMagazzino.title")}
-                </span>
-                {interventionRequests.data?.items[0] ? (
-                  <Button asChild size="sm" variant="outline">
-                    <Link
-                      href={`/richieste-magazzino?richiestaId=${interventionRequests.data.items[0].id}`}
-                    >
-                      {t("richiesteMagazzino.openExisting")}
-                    </Link>
-                  </Button>
-                ) : hasPermission("richieste_magazzino.create") &&
-                  !interventionRequests.isLoading &&
-                  !interventionRequests.isError ? (
-                  <Button asChild size="sm" variant="outline">
-                    <Link
-                      href={`/richieste-magazzino?interventoId=${intervento.id}&beneficiarioId=${intervento.beneficiarioId}`}
-                    >
-                      {t("richiesteMagazzino.new")}
-                    </Link>
-                  </Button>
-                ) : interventionRequests.isError ? (
-                  <p role="alert">{t("richiesteMagazzino.loadError")}</p>
-                ) : null}
-              </section>
-            )}
 
             <dl className="divide-y">
               <DetailRow
@@ -530,19 +476,98 @@ export function InterventoSocialeDetailSheet({
                 </section>
               )}
 
+            {canViewRequests && (
+              <section
+                className="space-y-2 rounded-lg border p-4"
+                data-testid="intervento-richiesta-magazzino"
+              >
+                <h3 className="font-semibold">
+                  {t("richiesteMagazzino.interventionSection")}
+                </h3>
+                {interventionRequests.data?.items[0] ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span>
+                      {interventionRequests.data.items[0].codice} —{" "}
+                      {t(
+                        `richiesteMagazzino.${interventionRequests.data.items[0].stato}`,
+                      )}
+                    </span>
+                    {interventionRequests.data.items[0].documentoCorrente && (
+                      <span className="text-sm text-muted-foreground">
+                        {interventionRequests.data.items[0].documentoCorrente
+                          ?.codice ??
+                          t("richiesteMagazzino.currentDocument")}{" "}
+                        ·{" "}
+                        {t(
+                          `richiesteMagazzino.progress.${interventionRequests.data.items[0].documentoCorrente?.avanzamento}`,
+                        )}
+                      </span>
+                    )}
+                    <Button asChild size="sm" variant="outline">
+                      <Link
+                        href={`/richieste-magazzino?richiestaId=${interventionRequests.data.items[0].id}`}
+                      >
+                        {t("richiesteMagazzino.openExisting")}
+                      </Link>
+                    </Button>
+                  </div>
+                ) : hasPermission("richieste_magazzino.create") &&
+                  !interventionRequests.isLoading &&
+                  !interventionRequests.isError ? (
+                  <Button asChild size="sm" variant="outline">
+                    <Link
+                      href={`/richieste-magazzino?interventoId=${intervento.id}&beneficiarioId=${intervento.beneficiarioId}`}
+                    >
+                      {t("richiesteMagazzino.sendFromIntervention")}
+                    </Link>
+                  </Button>
+                ) : interventionRequests.isError ? (
+                  <p role="alert">{t("richiesteMagazzino.loadError")}</p>
+                ) : null}
+              </section>
+            )}
+
             <InterventoSocialeOperativitaEditor
               attivita={attivita}
-              materiali={materiali}
+              materiali={[]}
               documenti={documenti}
               tipi={tipi}
-              prodotti={prodotti}
-              magazzini={magazzini}
+              prodotti={[]}
+              magazzini={[]}
               readOnly={terminal || !canUpdate}
               showActivities={intervento.stato === "in_corso" || terminal}
+              showMaterials={false}
               onAttivitaChange={setAttivita}
-              onMaterialiChange={setMateriali}
+              onMaterialiChange={() => undefined}
               onDocumentiChange={setDocumenti}
             />
+
+            {operativita.materiali.length > 0 && (
+              <section
+                className="space-y-2 rounded-lg border p-4"
+                data-testid="legacy-intervento-materiali"
+              >
+                <h3 className="font-semibold">
+                  {t("richiesteMagazzino.legacyMaterials")}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {t("richiesteMagazzino.legacyMaterialsDescription")}
+                </p>
+                <ul className="space-y-2">
+                  {operativita.materiali.map((item) => (
+                    <li key={item.id} className="rounded border p-2 text-sm">
+                      {item.descrizioneSnapshot} · {item.quantitaPrevista}{" "}
+                      {item.unitaMisuraSnapshot} ·{" "}
+                      {t(
+                        `interventi.operational.materialStates.${item.statoPreparazione}`,
+                      )}
+                      {item.quantitaConsegnata > 0 &&
+                        ` · ${t("interventi.operational.deliveredQuantity")}: ${item.quantitaConsegnata}`}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             <section className="space-y-3">
               <h3 className="font-semibold">
@@ -709,14 +734,15 @@ export function InterventoSocialeDetailSheet({
                     </div>
                     <InterventoSocialeOperativitaEditor
                       attivita={[]}
-                      materiali={successivoMateriali}
+                      materiali={[]}
                       documenti={successivoDocumenti}
                       tipi={tipi}
-                      prodotti={prodotti}
-                      magazzini={magazzini}
+                      prodotti={[]}
+                      magazzini={[]}
                       showActivities={false}
+                      showMaterials={false}
                       onAttivitaChange={() => undefined}
-                      onMaterialiChange={setSuccessivoMateriali}
+                      onMaterialiChange={() => undefined}
                       onDocumentiChange={setSuccessivoDocumenti}
                     />
                   </div>

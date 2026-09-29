@@ -66,6 +66,7 @@ function makeApp(
     userId?: number;
     areaOperativaId?: number;
     centroId?: number;
+    aree?: string[];
   } = {},
 ): Express {
   const app = express();
@@ -89,7 +90,7 @@ function makeApp(
       areaOperativaId: options.areaOperativaId ?? roma,
       centroAscoltoId: options.centroId ?? centroRoma,
       zonaUdsId: null,
-      aree: ["sociale"],
+      aree: options.aree ?? ["sociale"],
       permessi: ["sociale.interventi.view", "sociale.interventi.update"],
       isAdmin: false,
       isSuperAdmin: false,
@@ -230,8 +231,16 @@ beforeAll(async () => {
   const warehouses = await db
     .insert(magazziniTable)
     .values([
-      { codice: `PREP-M1-${rnd()}`, nome: "Magazzino Uno", areaOperativaId: roma },
-      { codice: `PREP-M2-${rnd()}`, nome: "Magazzino Due", areaOperativaId: roma },
+      {
+        codice: `PREP-M1-${rnd()}`,
+        nome: "Magazzino Uno",
+        areaOperativaId: roma,
+      },
+      {
+        codice: `PREP-M2-${rnd()}`,
+        nome: "Magazzino Due",
+        areaOperativaId: roma,
+      },
     ])
     .returning({ id: magazziniTable.id });
   [magazzinoRoma, altroMagazzinoRoma] = warehouses.map((row) => row.id);
@@ -365,7 +374,9 @@ afterAll(async () => {
   await db
     .delete(centriAscoltoTable)
     .where(inArray(centriAscoltoTable.id, ids.centri));
-  await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, ids.areaOperativa));
+  await db
+    .delete(areeOperativeTable)
+    .where(inArray(areeOperativeTable.id, ids.areaOperativa));
   await pool.end();
 });
 
@@ -426,6 +437,34 @@ describe("materiale da preparare per gli interventi Sociali", () => {
     expect(tooLong.status).toBe(400);
   });
 
+  it("M5C1: il solo Sociale consulta lo storico ma non marca pronto", async () => {
+    const before = await request(makeApp()).get(
+      "/interventi/materiale-da-preparare?periodo=7",
+    );
+    expect(before.status).toBe(200);
+    const detail = before.body.gruppi
+      .flatMap(
+        (group: { interventi: Array<{ interventoId: number }> }) =>
+          group.interventi,
+      )
+      .find(
+        (item: { interventoId: number }) =>
+          item.interventoId === primaryInterventoId,
+      );
+    expect(detail).toBeDefined();
+    const denied = await request(makeApp())
+      .patch(
+        `/interventi/${detail.interventoId}/materiali/${detail.materialeId}`,
+      )
+      .send({ statoPreparazione: "pronto", versione: detail.versione });
+    expect(denied.status).toBe(403);
+    const [after] = await db
+      .select()
+      .from(interventiMaterialiTable)
+      .where(eq(interventiMaterialiTable.id, detail.materialeId));
+    expect(after.statoPreparazione).not.toBe("pronto");
+  });
+
   it("aggiorna pronto con versione, ricalcola l'aggregazione e non crea movimenti", async () => {
     const before = await request(makeApp()).get(
       "/interventi/materiale-da-preparare?periodo=7",
@@ -442,14 +481,16 @@ describe("materiale da preparare per gli interventi Sociali", () => {
     const [movementCountBefore] = await db
       .select({ count: sql<number>`count(*)` })
       .from(movimentiTable);
-    const changed = await request(makeApp())
+    const changed = await request(makeApp({ aree: ["sociale", "magazzino"] }))
       .patch(
         `/interventi/${primaryInterventoId}/materiali/${detail.materialeId}`,
       )
       .send({ statoPreparazione: "pronto", versione: detail.versione });
     expect(changed.status).toBe(200);
     expect(changed.body.statoPreparazione).toBe("pronto");
-    const concurrent = await request(makeApp())
+    const concurrent = await request(
+      makeApp({ aree: ["sociale", "magazzino"] }),
+    )
       .patch(
         `/interventi/${primaryInterventoId}/materiali/${detail.materialeId}`,
       )
@@ -500,7 +541,7 @@ describe("materiale da preparare per gli interventi Sociali", () => {
         : primaryInterventoId;
     expect(
       (
-        await request(makeApp())
+        await request(makeApp({ aree: ["sociale", "magazzino"] }))
           .patch(
             `/interventi/${wrongInterventoId}/materiali/${detail.materialeId}`,
           )

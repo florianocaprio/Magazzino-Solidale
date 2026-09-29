@@ -5,6 +5,7 @@ import { areaGuard } from "../src/middlewares/auth";
 import {
   defaultEmporioPermissions,
   defaultMensaRolePermissions,
+  defaultSocialOperatorPermissions,
   roleAreasAfterEmporioSeed,
 } from "../src/lib/seedRoles";
 
@@ -39,6 +40,23 @@ function appWithAreas(aree: string[]): Express {
   }
   return app;
 }
+
+describe("M5C1 — ruolo Operatore Sociale standard", () => {
+  it("rimuove solo i grant Bolla di scrittura e conserva lettura/custom", () => {
+    const result = defaultSocialOperatorPermissions([
+      "bolle.manage",
+      "bolle.deliver",
+      "bolle.cancel",
+      "bolle.view",
+      "permesso.custom",
+    ]);
+    expect(result).toContain("bolle.view");
+    expect(result).toContain("permesso.custom");
+    expect(result).not.toContain("bolle.manage");
+    expect(result).not.toContain("bolle.deliver");
+    expect(result).not.toContain("bolle.cancel");
+  });
+});
 
 describe("permessi del ruolo Emporio standard", () => {
   it("usa le API dedicate senza ereditare beneficiari.view", () => {

@@ -30,7 +30,7 @@ import {
   type Volontario,
   type Mezzo,
 } from "@workspace/api-client-react";
-import { useAuth } from "@/lib/auth";
+import { authUserCanOperateBolle, useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -167,6 +167,8 @@ export default function Consegne() {
   const canCreateVolontario = hasPermission("logistica.volontari.manage");
   const canCreateMezzo = hasPermission("logistica.mezzi.manage");
   const canManage = hasPermission("consegne.manage");
+  const canCreateBolla =
+    canManage && authUserCanOperateBolle(user, "bolle.manage");
   const canComplete = hasPermission("consegne.complete");
   const canCancel = hasPermission("consegne.cancel");
   const canExport = hasPermission("consegne.export");
@@ -1202,7 +1204,7 @@ export default function Consegne() {
                       )}
                       {c.stato === "pianificata" &&
                         c.bollaId == null &&
-                        canManage && (
+                        canCreateBolla && (
                           <Button
                             className="min-h-11 gap-2"
                             variant="outline"
@@ -1525,15 +1527,17 @@ export default function Consegne() {
                           ) : canManage ? (
                             <>
                               {c.bollaId == null ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="gap-1"
-                                  onClick={() => setCreatingBollaFor(c)}
-                                >
-                                  <Plus className="h-3.5 w-3.5" />{" "}
-                                  {t("consegne.btnCreaBolla")}
-                                </Button>
+                                canCreateBolla && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-1"
+                                    onClick={() => setCreatingBollaFor(c)}
+                                  >
+                                    <Plus className="h-3.5 w-3.5" />{" "}
+                                    {t("consegne.btnCreaBolla")}
+                                  </Button>
+                                )
                               ) : (
                                 <Button
                                   size="sm"
@@ -1783,25 +1787,27 @@ export default function Consegne() {
         </SheetContent>
       </Sheet>
 
-      <CreaiBollaDialog
-        open={creatingBollaFor !== null}
-        onClose={() => setCreatingBollaFor(null)}
-        consegnaId={creatingBollaFor?.id}
-        lockedBeneficiario={
-          creatingBollaFor
-            ? {
-                id: creatingBollaFor.beneficiarioId,
-                nome: creatingBollaFor.beneficiarioNome ?? "",
-              }
-            : null
-        }
-        onCreated={(bollaId) => {
-          queryClient.invalidateQueries({
-            queryKey: getListConsegneQueryKey(),
-          });
-          if (bollaId != null) setViewingBollaId(bollaId);
-        }}
-      />
+      {canCreateBolla && (
+        <CreaiBollaDialog
+          open={creatingBollaFor !== null}
+          onClose={() => setCreatingBollaFor(null)}
+          consegnaId={creatingBollaFor?.id}
+          lockedBeneficiario={
+            creatingBollaFor
+              ? {
+                  id: creatingBollaFor.beneficiarioId,
+                  nome: creatingBollaFor.beneficiarioNome ?? "",
+                }
+              : null
+          }
+          onCreated={(bollaId) => {
+            queryClient.invalidateQueries({
+              queryKey: getListConsegneQueryKey(),
+            });
+            if (bollaId != null) setViewingBollaId(bollaId);
+          }}
+        />
+      )}
 
       <Sheet
         open={viewingBollaId !== null}

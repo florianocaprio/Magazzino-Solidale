@@ -49,14 +49,27 @@ const SOCIAL_OPERATOR_PERMISSIONS = [
   "consegne.cancel",
   "consegne.export",
   "bolle.view",
-  "bolle.manage",
-  "bolle.deliver",
-  "bolle.cancel",
   "enti-destinatari.view",
   "enti-destinatari.manage",
   "logistica.turni.view",
   "logistica.turni.manage",
 ] as const;
+const SOCIAL_OPERATOR_DENIED_BOLLA_PERMISSIONS = new Set([
+  "bolle.manage",
+  "bolle.deliver",
+  "bolle.cancel",
+]);
+
+export function defaultSocialOperatorPermissions(
+  current: string[] | null | undefined,
+): string[] {
+  return mergePermissions(
+    (current ?? []).filter(
+      (permission) => !SOCIAL_OPERATOR_DENIED_BOLLA_PERMISSIONS.has(permission),
+    ),
+    SOCIAL_OPERATOR_PERMISSIONS,
+  );
+}
 const UDS_OPERATOR_PERMISSIONS = [
   "beneficiari.view",
   "beneficiari.manage",
@@ -231,7 +244,7 @@ export async function seedRoles(): Promise<void> {
       nome: OPERATOR_ROLE_NAME,
       descrizione: "Operatore delle attività generali e sociali",
       aree: ["generale", "sociale"],
-      permessi: [...SOCIAL_OPERATOR_PERMISSIONS],
+      permessi: defaultSocialOperatorPermissions([]),
       isAdmin: false,
     });
     logger.info("Seeded operator role");
@@ -240,10 +253,7 @@ export async function seedRoles(): Promise<void> {
       .update(ruoliTable)
       .set({
         aree: mergePermissions(operatorRole.aree, ["generale", "sociale"]),
-        permessi: mergePermissions(
-          operatorRole.permessi,
-          SOCIAL_OPERATOR_PERMISSIONS,
-        ),
+        permessi: defaultSocialOperatorPermissions(operatorRole.permessi),
       })
       .where(eq(ruoliTable.id, operatorRole.id));
   }

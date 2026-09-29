@@ -226,6 +226,17 @@ function hasSocialInterventoPermission(
   return Boolean(req.user?.isAdmin || req.user?.permessi?.includes(permission));
 }
 
+function canManageLegacyInventoryMaterials(
+  req: Request,
+  ambito: string | null,
+): boolean {
+  return Boolean(
+    req.user?.isAdmin ||
+    req.user?.aree.includes("magazzino") ||
+    (ambito === "uds" && req.user?.aree.includes("uds")),
+  );
+}
+
 function requireSocialInterventoPermission(
   req: Request,
   permission: SocialInterventoPermission,
@@ -1088,6 +1099,18 @@ async function replaceOperativita(
       .from(interventiMaterialiTable)
       .where(eq(interventiMaterialiTable.interventoId, interventoId))
       .for("update");
+    if (
+      !canManageLegacyInventoryMaterials(req, intervento.ambito) &&
+      (materialiPrecedenti.some((item) => item.prodottoId != null) ||
+        materialiInput.some(
+          (item) => item.prodottoId != null || item.magazzinoId != null,
+        ))
+    ) {
+      throw new RouteError(
+        403,
+        "I materiali catalogati sono gestiti dal Magazzino tramite Richiesta",
+      );
+    }
     const prodottoIds = [
       ...new Set(
         materialiInput
@@ -3217,6 +3240,12 @@ router.patch("/interventi/:id/materiali/:materialeId", async (req, res) => {
         .where(eq(interventiTable.id, id))
         .for("update");
       if (!intervento) throw new RouteError(404, "Intervento non trovato");
+      if (!canManageLegacyInventoryMaterials(req, intervento.ambito)) {
+        throw new RouteError(
+          403,
+          "Preparazione materiali riservata al Magazzino",
+        );
+      }
       if (!["pianificato", "in_corso"].includes(intervento.stato))
         throw new RouteError(
           409,

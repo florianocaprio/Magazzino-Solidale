@@ -84,13 +84,13 @@ function app(permissions = grants, userId = operatorId) {
   });
 }
 
-function socialApp() {
+function socialApp(warehouse = false) {
   return makeScopedApp(interventiRouter, {
     id: operatorId,
     username: `m5b-${suffix}`,
     centroAscoltoId: centreId,
     areaOperativaId: areaId,
-    aree: ["sociale"],
+    aree: warehouse ? ["sociale", "magazzino"] : ["sociale"],
     permessi: [
       "sociale.interventi.view",
       "sociale.interventi.update",
@@ -311,6 +311,22 @@ afterAll(async () => {
 });
 
 describe("M5B — documento unico e transazione PostgreSQL", () => {
+  it("M5C1: un attore solo Sociale con grant Bolla legacy non crea una Bolla diretta", async () => {
+    const socialBolle = makeScopedApp(bolleRouter, {
+      id: operatorId,
+      centroAscoltoId: centreId,
+      areaOperativaId: areaId,
+      aree: ["sociale"],
+      permessi: ["bolle.view", "bolle.manage", "bolle.deliver", "bolle.cancel"],
+    });
+    const before = await db.select({ id: bolleTable.id }).from(bolleTable);
+    const response = await request(socialBolle).post("/bolle").send({});
+    expect(response.status).toBe(403);
+    expect(
+      await db.select({ id: bolleTable.id }).from(bolleTable),
+    ).toHaveLength(before.length);
+  });
+
   it("ATOM-COMMIT: un errore deferred alla ricevuta finale rollbacka ogni effetto nei due rami", async () => {
     for (const kind of ["beneficiario", "magazzino"] as const) {
       const intervention =
@@ -1870,7 +1886,7 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
         .select()
         .from(interventiTable)
         .where(eq(interventiTable.id, intervention.id));
-      return request(socialApp())
+      return request(socialApp(true))
         .post(`/interventi/${intervention.id}/salva-operativita`)
         .send({
           versione: current.dataAggiornamento?.toISOString() ?? null,
@@ -1975,7 +1991,7 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
     const before = await db.execute(sql`SELECT
       (SELECT count(*)::integer FROM movimenti) AS movimenti,
       (SELECT count(*)::integer FROM operazioni_distribuzione_magazzino) AS distribuzioni`);
-    const denied = await request(socialApp())
+    const denied = await request(socialApp(true))
       .post(`/interventi/${intervention.id}/concludi`)
       .send({
         versione: current.dataAggiornamento?.toISOString() ?? null,
@@ -2267,7 +2283,7 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
         .select()
         .from(interventiTable)
         .where(eq(interventiTable.id, interventionId));
-      return request(socialApp())
+      return request(socialApp(true))
         .post(`/interventi/${interventionId}/salva-operativita`)
         .send({
           versione: current.dataAggiornamento?.toISOString() ?? null,
