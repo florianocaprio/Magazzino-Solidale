@@ -1,0 +1,3650 @@
+import { useState, useEffect } from "react";
+import { authUserCanOperateBolle, useAuth } from "@/lib/auth";
+import { Link } from "wouter";
+import {
+  useListBolle,
+  useCreateBolla,
+  useGetBolla,
+  useAddBollaRiga,
+  useDeleteBollaRiga,
+  useConfermaBolla,
+  useConsegnaBolla,
+  useAffidaBolla,
+  useSegnalaMancataConsegnaBolla,
+  useSegnalaMancatoArrivoTrasferimento,
+  useAnnullaBolla,
+  useStornaAmministrativamenteBolla,
+  useUpdateBolla,
+  useListBeneficiari,
+  useListCentriAscolto,
+  useListMagazzini,
+  useListGiacenze,
+  useListLotti,
+  useListProdotti,
+  useListVolontari,
+  useListMezzi,
+  useGetImpostazioniStampa,
+  useListDocumentiOperativi,
+  useGetDocumentoOperativo,
+  useGetDocumentoOperativoRichiesta,
+  useGetRichiestaMagazzino,
+  getGetRichiestaMagazzinoQueryKey,
+  useListBollaVolontariCandidati,
+  getListBollaVolontariCandidatiQueryKey,
+  useGetTrasferimento,
+  useAvviaTrasferimento,
+  usePreparaTrasferimento,
+  useAnnullaTrasferimento,
+  useConfermaTrasferimento,
+  getDocumentoOperativo,
+  getDocumentoOperativoRichiesta,
+  listBeneficiari,
+  exportDocumentiOperativi,
+  getListDocumentiOperativiQueryKey,
+  getGetDocumentoOperativoQueryKey,
+  getGetDocumentoOperativoRichiestaQueryKey,
+  getListRichiesteMagazzinoQueryKey,
+  getGetTrasferimentoQueryKey,
+  useListConsegne,
+  useGetConsegna,
+  useAssociaBolla,
+  useSegnalaRitiroNonEffettuato,
+  useConvertiBollaInConsegna,
+  useListEntiDestinatari,
+  getListEntiDestinatariQueryKey,
+  useListAreeOperative,
+  getBolla,
+  getListBolleQueryKey,
+  getListBeneficiariQueryKey,
+  getListCentriAscoltoQueryKey,
+  getGetBollaQueryKey,
+  getListGiacenzeQueryKey,
+  getListConsegneQueryKey,
+  getGetConsegnaQueryKey,
+  getListVolontariQueryKey,
+  type ConversioneConsegnaInputFasciaOraria,
+  type BollaDettaglio as BollaDettaglioDto,
+  type Trasferimento,
+  type ListDocumentiOperativiParams,
+  type ExportDocumentiOperativiParams,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
+import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
+import { EnteDestinatarioCombobox } from "@/components/ente-destinatario-combobox";
+import {
+  bollaErrorMessage,
+  invalidateBollaViews,
+} from "@/lib/bolla-query-invalidation";
+import {
+  AUTO_FEFO_LOT,
+  bollaAddProductInput,
+  selectedPhysicalLot,
+} from "@/lib/bolla-add-product";
+import { RouteActions } from "@/components/maps/route-actions";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { volontarioLabel } from "@/lib/volontari-label";
+import {
+  Plus,
+  FileText,
+  Trash2,
+  PackagePlus,
+  CheckCircle,
+  Truck,
+  ChevronRight,
+  XCircle,
+  Pencil,
+  User,
+  Download,
+  ArrowRight,
+  ArrowLeft,
+  ArrowRightLeft,
+  ScanLine,
+  CalendarClock,
+  AlertTriangle,
+  House,
+  Play,
+  CheckCircle2,
+} from "lucide-react";
+import { format } from "date-fns";
+import { it } from "date-fns/locale";
+import { generateBollaPdf, type BollaTemplate } from "@/lib/bolla-pdf";
+import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
+import {
+  UnsavedChangesDialog,
+  useUnsavedChangesGuard,
+} from "@/hooks/use-unsaved-changes-guard";
+import { loadDocumentBrandingForPdf } from "@/lib/branding-ambiente";
+import { useCommandIntentRegistry } from "@/lib/command-intent";
+import { administrativeReversalReady } from "@/lib/bolla-admin-reversal";
+import {
+  DEFAULT_DOCUMENTO_FILTERS,
+  documentListScopeChanged,
+  documentiOperativiQuery,
+  normalizeDocumentFiltersForAccess,
+  readDocumentiOperativiUrl,
+  writeDocumentiOperativiUrl,
+  type DocumentoOperativoFilters,
+  type DocumentoOperativoSelection,
+} from "@/lib/documenti-operativi-url";
+import { useTranslation } from "react-i18next";
+import { TransportReturnPanel } from "@/components/transport-return-panel";
+import i18n from "@/lib/i18n";
+import { shouldFetchBollaBeneficiari } from "@/lib/bolle-beneficiari-query";
+import {
+  ModificaTrasferimentoForm,
+  NuovoTrasferimentoForm,
+} from "@/pages/trasferimenti";
+
+export function statoBadge(stato: string) {
+  if (stato === "in_trasporto")
+    return (
+      <Badge className="bg-amber-500 text-white">
+        {i18n.t("transportReturn.inDelivery")}
+      </Badge>
+    );
+  if (stato === "rientro_atteso")
+    return (
+      <Badge className="bg-amber-100 text-amber-900">
+        {i18n.t("transportReturn.awaitingReturn")}
+      </Badge>
+    );
+  if (stato === "rientrato")
+    return (
+      <Badge variant="secondary">{i18n.t("transportReturn.returned")}</Badge>
+    );
+  if (stato === "consegnato")
+    return (
+      <Badge className="bg-green-500 text-white">
+        {i18n.t("bolle.statoConsegnato")}
+      </Badge>
+    );
+  if (stato === "confermato")
+    return (
+      <Badge className="border-blue-300 text-blue-700 bg-blue-50">
+        {i18n.t("transportReturn.ready")}
+      </Badge>
+    );
+  if (stato === "annullato")
+    return (
+      <Badge variant="destructive">{i18n.t("bolle.statoAnnullato")}</Badge>
+    );
+  return <Badge variant="secondary">{i18n.t("bolle.statoBozza")}</Badge>;
+}
+
+// ─── Helper download PDF bolla (riusabile da bolle + consegne) ───────────────
+
+type CentroLite = {
+  id: number;
+  nome: string;
+  indirizzo?: string | null;
+  comune?: string | null;
+  logoUrl?: string | null;
+};
+export type BeneficiarioLite = { id: number; centroAscoltoId?: number | null };
+type BollaPdfOptions = {
+  beneficiari?: BeneficiarioLite[];
+  centri?: CentroLite[];
+  footer?: string | null;
+  template?: BollaTemplate;
+};
+
+export async function generateBollaPdfFromData(
+  bolla: BollaDettaglioDto,
+  opts: BollaPdfOptions,
+): Promise<void> {
+  const benef = opts.beneficiari?.find((b) => b.id === bolla.beneficiarioId);
+  const centro = benef?.centroAscoltoId
+    ? opts.centri?.find((c) => c.id === benef.centroAscoltoId)
+    : undefined;
+  const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
+  await generateBollaPdf({
+    bolla,
+    centro: centro
+      ? {
+          nome: centro.nome,
+          indirizzo: centro.indirizzo,
+          comune: centro.comune,
+          logoUrl: centro.logoUrl,
+        }
+      : null,
+    footer: opts.footer ?? null,
+    template: opts.template ?? "standard",
+    associationLogoDataUrl: logoDataUrl,
+    branding,
+  });
+}
+
+export async function downloadBollaPdf(
+  bollaId: number,
+  opts: BollaPdfOptions,
+): Promise<void> {
+  const bolla = await getBolla(bollaId);
+  if (!bolla) throw new Error("bolla non trovata");
+  await generateBollaPdfFromData(bolla, opts);
+}
+
+// ─── Form crea bolla ─────────────────────────────────────────────────────────
+
+export function CreaiBollaDialog({
+  open,
+  onClose,
+  consegnaId,
+  lockedBeneficiario,
+  onCreated,
+  initialMagazzinoId,
+  initialAreaId,
+  initialCentroId: contextCentroId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  consegnaId?: number;
+  lockedBeneficiario?: { id: number; nome: string } | null;
+  onCreated?: (
+    bollaId?: number,
+    context?: import("@/lib/documenti-operativi-url").CreatedBollaContext,
+  ) => void;
+  initialMagazzinoId?: string;
+  initialAreaId?: string;
+  initialCentroId?: string;
+}) {
+  const { user, hasPermission } = useAuth();
+  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const isCentroLocked = lockedCentroId != null;
+  const [beneficiarioId, setBeneficiarioId] = useState("");
+  const [tipoDestinatario, setTipoDestinatario] = useState<
+    "beneficiario" | "ente"
+  >("beneficiario");
+  const [enteId, setEnteId] = useState("");
+  const [selectedEnte, setSelectedEnte] = useState<{
+    denominazione: string;
+    areaOperativaId: number;
+  } | null>(null);
+  const [enteSearch, setEnteSearch] = useState("");
+  const [debouncedEnteSearch, setDebouncedEnteSearch] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [magazzinoId, setMagazzinoId] = useState("");
+  const [centroId, setCentroId] = useState("all");
+  const [trasportatore, setTrasportatore] = useState("");
+  const [trasportatoreAltro, setTrasportatoreAltro] = useState("");
+  const [mezzo, setMezzo] = useState("");
+  const [scanCode, setScanCode] = useState("");
+  const commandIntents = useCommandIntentRegistry();
+  useEffect(() => {
+    if (open) {
+      if (initialMagazzinoId && initialMagazzinoId !== "all")
+        setMagazzinoId(initialMagazzinoId);
+      if (!isCentroLocked && contextCentroId) setCentroId(contextCentroId);
+    }
+  }, [open, initialMagazzinoId, contextCentroId, isCentroLocked]);
+  useEffect(() => {
+    if (isCentroLocked && lockedCentroId != null) {
+      setCentroId(String(lockedCentroId));
+    }
+  }, [isCentroLocked, lockedCentroId]);
+  useEffect(() => {
+    if (open && lockedBeneficiario)
+      setBeneficiarioId(String(lockedBeneficiario.id));
+  }, [open, lockedBeneficiario]);
+  useEffect(() => {
+    if (!open) {
+      setMagazzinoId("");
+      setTrasportatore("");
+      setTrasportatoreAltro("");
+      setMezzo("");
+      setScanCode("");
+      if (!lockedBeneficiario) setBeneficiarioId("");
+      setTipoDestinatario("beneficiario");
+      setEnteId("");
+      setSelectedEnte(null);
+      setEnteSearch("");
+      setCreateError("");
+      commandIntents.discard("bolla:create");
+    }
+  }, [open, lockedBeneficiario, commandIntents]);
+  useEffect(() => {
+    const timeout = window.setTimeout(
+      () => setDebouncedEnteSearch(enteSearch.trim()),
+      275,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [enteSearch]);
+  const { data: centri } = useListCentriAscolto();
+  const canSearchBeneficiari = open && hasPermission("beneficiari.view");
+  const beneficiariParams = {
+    attivo: true,
+    ...(centroId !== "all" ? { centroAscoltoId: parseInt(centroId) } : {}),
+  };
+  const { data: beneficiari } = useListBeneficiari(beneficiariParams, {
+    query: {
+      enabled: canSearchBeneficiari,
+      queryKey: getListBeneficiariQueryKey(beneficiariParams),
+    },
+  });
+  const { data: allBeneficiari } = useListBeneficiari(
+    { attivo: true },
+    {
+      query: {
+        enabled: canSearchBeneficiari,
+        queryKey: getListBeneficiariQueryKey({ attivo: true }),
+      },
+    },
+  );
+  const selectedBenef = allBeneficiari?.find(
+    (b) => String(b.id) === beneficiarioId,
+  );
+  const volontariParams =
+    selectedBenef?.centroAscoltoId != null
+      ? { centroAscoltoId: selectedBenef.centroAscoltoId }
+      : undefined;
+  const { data: magazzini } = useListMagazzini();
+  const enteParams = {
+    limit: 50,
+    ...(debouncedEnteSearch.length >= 2 ? { search: debouncedEnteSearch } : {}),
+  };
+  const enteSearchReady =
+    enteSearch.trim().length === 0 ||
+    (enteSearch.trim().length >= 2 &&
+      debouncedEnteSearch === enteSearch.trim());
+  const { data: enti } = useListEntiDestinatari(enteParams, {
+    query: {
+      queryKey: getListEntiDestinatariQueryKey(enteParams),
+      enabled: open && tipoDestinatario === "ente" && enteSearchReady,
+    },
+  });
+  const { data: areeEnti } = useListAreeOperative();
+  const enteAreaNames = new Map(
+    areeEnti?.map((area) => [area.id, area.nome]) ?? [],
+  );
+  const { data: volontari } = useListVolontari(volontariParams, {
+    query: {
+      queryKey: getListVolontariQueryKey(volontariParams),
+      enabled: selectedBenef != null,
+    },
+  });
+  const { data: mezzi } = useListMezzi();
+  const { data: consegnaSource } = useGetConsegna(consegnaId ?? 0, {
+    query: {
+      enabled: consegnaId != null,
+      queryKey: getGetConsegnaQueryKey(consegnaId ?? 0),
+    },
+  });
+  const createBolla = useCreateBolla();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { t } = useTranslation();
+
+  const handleScan = () => {
+    const code = scanCode.trim();
+    if (!code) return;
+    const b = allBeneficiari?.find(
+      (x) => x.codice.toLowerCase() === code.toLowerCase(),
+    );
+    if (!b) {
+      toast({ title: t("bolle.scanNotFound"), variant: "destructive" });
+      return;
+    }
+    setCentroId(
+      isCentroLocked && lockedCentroId != null
+        ? String(lockedCentroId)
+        : b.centroAscoltoId
+          ? String(b.centroAscoltoId)
+          : "all",
+    );
+    setBeneficiarioId(String(b.id));
+    setScanCode("");
+    toast({ title: t("bolle.scanFound", { name: `${b.cognome} ${b.nome}` }) });
+  };
+
+  useEffect(() => {
+    if (!open || !consegnaSource) return;
+    if (consegnaSource.volontarioId != null) {
+      setTrasportatore(String(consegnaSource.volontarioId));
+      setTrasportatoreAltro("");
+    } else if (consegnaSource.volontarioAltro) {
+      setTrasportatore("__altro__");
+      setTrasportatoreAltro(consegnaSource.volontarioAltro);
+    }
+    if (consegnaSource.mezzoId != null)
+      setMezzo(String(consegnaSource.mezzoId));
+    else if (consegnaSource.mezzoAltro) setMezzo("altro");
+  }, [open, consegnaSource]);
+  // Il trasportatore (un volontario del centro) si indica SOLO per i beneficiari con
+  // consegna a domicilio. Negli altri casi vale il ritiro presso il magazzino.
+  // Mezzo e conteggio del carico vivono ora sulla pianificazione consegne, non sulla bolla.
+  const requiresTrasportatore =
+    tipoDestinatario === "beneficiario" &&
+    selectedBenef?.consegnaDomicilio === true;
+  const trasportatoreMissing =
+    requiresTrasportatore &&
+    (!trasportatore ||
+      (trasportatore === "__altro__" && !trasportatoreAltro.trim()));
+  const initialCentroId =
+    isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "all";
+  const initialTrasportatore =
+    consegnaSource?.volontarioId != null
+      ? String(consegnaSource.volontarioId)
+      : consegnaSource?.volontarioAltro
+        ? "__altro__"
+        : "";
+  const initialTrasportatoreAltro = consegnaSource?.volontarioAltro ?? "";
+  const initialMezzo =
+    consegnaSource?.mezzoId != null
+      ? String(consegnaSource.mezzoId)
+      : consegnaSource?.mezzoAltro
+        ? "altro"
+        : "";
+  const beneficiarioDirty = lockedBeneficiario
+    ? !!beneficiarioId && beneficiarioId !== String(lockedBeneficiario.id)
+    : !!beneficiarioId;
+  const unsavedGuard = useUnsavedChangesGuard(
+    open &&
+      (beneficiarioDirty ||
+        tipoDestinatario !== "beneficiario" ||
+        !!enteId ||
+        !!magazzinoId ||
+        centroId !== initialCentroId ||
+        !!scanCode ||
+        trasportatore !== initialTrasportatore ||
+        trasportatoreAltro !== initialTrasportatoreAltro ||
+        mezzo !== initialMezzo),
+  );
+  const requestClose = () => {
+    if (createBolla.isPending) return;
+    unsavedGuard.requestClose(onClose);
+  };
+
+  const onSubmit = () => {
+    setCreateError("");
+    if (tipoDestinatario === "beneficiario" && !beneficiarioId) {
+      setCreateError(t("bolle.beneficiarioPlaceholder"));
+      return;
+    }
+    if (tipoDestinatario === "ente" && !enteId) {
+      setCreateError(t("entiEsterni.missingEntity"));
+      return;
+    }
+    if (!magazzinoId) {
+      setCreateError(t("entiEsterni.missingWarehouse"));
+      return;
+    }
+    const chosenWarehouse = magazzini?.find(
+      (item) => String(item.id) === magazzinoId,
+    );
+    if (!chosenWarehouse) {
+      setCreateError(t("entiEsterni.missingWarehouse"));
+      return;
+    }
+    if (
+      tipoDestinatario === "ente" &&
+      selectedEnte &&
+      chosenWarehouse?.areaOperativaId !== selectedEnte.areaOperativaId
+    ) {
+      setCreateError(t("entiEsterni.areaMismatch"));
+      return;
+    }
+    if (trasportatoreMissing) {
+      setCreateError(t("bolle.trasportatoreObbligatorioDomicilio"));
+      return;
+    }
+    const data: {
+      tipoDestinatario: "beneficiario" | "ente";
+      beneficiarioId?: number;
+      enteDestinatarioId?: number;
+      magazzinoId: number;
+      consegnaId?: number;
+      volontarioConsegnaId?: number;
+      mezzoId?: number;
+      mezzoAltro?: boolean;
+      trasportatoreNome?: string;
+    } = { tipoDestinatario, magazzinoId: parseInt(magazzinoId) };
+    if (tipoDestinatario === "beneficiario")
+      data.beneficiarioId = parseInt(beneficiarioId);
+    else data.enteDestinatarioId = parseInt(enteId);
+    if (tipoDestinatario === "beneficiario" && consegnaId != null)
+      data.consegnaId = consegnaId;
+    if (requiresTrasportatore && trasportatore) {
+      if (trasportatore === "__altro__")
+        data.trasportatoreNome = trasportatoreAltro.trim();
+      else data.volontarioConsegnaId = parseInt(trasportatore);
+      if (mezzo === "altro") data.mezzoAltro = true;
+      else if (mezzo) data.mezzoId = parseInt(mezzo);
+    }
+    const slot = "bolla:create";
+    createBolla.mutate(
+      { data: commandIntents.prepare(slot, data, data) },
+      {
+        onSuccess: (created) => {
+          commandIntents.complete(slot);
+          queryClient.invalidateQueries({ queryKey: getListBolleQueryKey() });
+          queryClient.invalidateQueries({
+            queryKey: getListDocumentiOperativiQueryKey(),
+          });
+          toast({ title: t("bolle.bollaCreata") });
+          setBeneficiarioId("");
+          setMagazzinoId("");
+          setCentroId(
+            isCentroLocked && lockedCentroId != null
+              ? String(lockedCentroId)
+              : "all",
+          );
+          setTrasportatore("");
+          onCreated?.((created as { id?: number } | undefined)?.id, {
+            magazzinoId: chosenWarehouse!.id,
+            areaOperativaId: chosenWarehouse!.areaOperativaId ?? null,
+            centroAscoltoId: selectedBenef?.centroAscoltoId ?? null,
+            tipoDestinatario,
+            dataDocumento: (created as { dataBolla?: string }).dataBolla,
+            numero: (created as { numeroBolla?: string }).numeroBolla,
+            magazzinoNome: chosenWarehouse.nome,
+          });
+          onClose();
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          setCreateError(bollaErrorMessage(error, t("bolle.createError")));
+          toast({
+            title: t("bolle.error"),
+            description: bollaErrorMessage(error, t("bolle.createError")),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) requestClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("bolle.createTitle")}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          {!lockedBeneficiario && (
+            <div className="space-y-2">
+              <Label>
+                {t("bolle.tipoDestinatario", { defaultValue: "Destinatario" })}
+              </Label>
+              <Select
+                value={tipoDestinatario}
+                onValueChange={(value) =>
+                  setTipoDestinatario(value as "beneficiario" | "ente")
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="beneficiario">
+                    {t("bolle.destinatarioBeneficiario", {
+                      defaultValue: "Beneficiario",
+                    })}
+                  </SelectItem>
+                  <SelectItem value="ente">
+                    {t("bolle.destinatarioEnte", {
+                      defaultValue: "Ente esterno",
+                    })}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {tipoDestinatario === "beneficiario" &&
+            (lockedBeneficiario ? (
+              <div className="space-y-2">
+                <Label>{t("bolle.beneficiarioLabel")}</Label>
+                <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
+                  {lockedBeneficiario.nome}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>{t("bolle.scanLabel")}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      autoFocus
+                      placeholder={t("bolle.scanPlaceholder")}
+                      value={scanCode}
+                      onChange={(e) => setScanCode(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleScan();
+                        }
+                      }}
+                      className="font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleScan}
+                      disabled={!scanCode.trim()}
+                    >
+                      <ScanLine className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("bolle.centroFilterLabel")}</Label>
+                  <Select
+                    value={centroId}
+                    onValueChange={(v) => {
+                      setCentroId(v);
+                      setBeneficiarioId("");
+                    }}
+                    disabled={isCentroLocked}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={t("bolle.allCentriPlaceholder")}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">
+                        {t("bolle.allBeneficiari")}
+                      </SelectItem>
+                      {centri?.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("bolle.beneficiarioLabel")}</Label>
+                  <BeneficiarioCombobox
+                    items={(beneficiari ?? []).map((b) => ({
+                      id: b.id,
+                      nome: b.nome,
+                      cognome: b.cognome,
+                      codice: b.codice,
+                    }))}
+                    value={beneficiarioId}
+                    onChange={setBeneficiarioId}
+                    placeholder={t("bolle.beneficiarioPlaceholder")}
+                    emptyText={t("bolle.noBeneficiarioForCentro")}
+                  />
+                </div>
+              </>
+            ))}
+          {tipoDestinatario === "ente" && (
+            <div className="space-y-2">
+              <Label>
+                {t("bolle.destinatarioEnte", { defaultValue: "Ente esterno" })}
+              </Label>
+              <EnteDestinatarioCombobox
+                items={enteSearchReady ? (enti ?? []) : []}
+                value={enteId}
+                onChange={(ente) => {
+                  setEnteId(String(ente.id));
+                  setSelectedEnte(ente);
+                  setCreateError("");
+                  if (
+                    magazzinoId &&
+                    magazzini?.find((item) => String(item.id) === magazzinoId)
+                      ?.areaOperativaId !== ente.areaOperativaId
+                  )
+                    setMagazzinoId("");
+                }}
+                searchValue={enteSearch}
+                onSearchChange={setEnteSearch}
+                areaNames={enteAreaNames}
+                selectedLabel={selectedEnte?.denominazione}
+              />
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label>{t("bolle.magazzinoUscitaLabel")}</Label>
+            <Select value={magazzinoId} onValueChange={setMagazzinoId}>
+              <SelectTrigger aria-label={t("bolle.magazzinoUscitaLabel")}>
+                <SelectValue placeholder={t("bolle.magazzinoPlaceholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                {magazzini
+                  ?.filter(
+                    (m) =>
+                      m.stato === "attivo" &&
+                      m.areaOperativaId != null &&
+                      (!initialAreaId ||
+                        initialAreaId === "all" ||
+                        String(m.areaOperativaId) === initialAreaId) &&
+                      (tipoDestinatario !== "ente" ||
+                        !selectedEnte ||
+                        m.areaOperativaId === selectedEnte.areaOperativaId),
+                  )
+                  .map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.nome}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {consegnaSource && (
+            <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              {t("bolle.daPianificazioneInfo", {
+                defaultValue:
+                  "Volontario e mezzo sono precompilati dalla pianificazione collegata, se presenti.",
+              })}
+            </div>
+          )}
+          {requiresTrasportatore ? (
+            <div className="space-y-2">
+              <Label>{t("bolle.trasportatoreLabel")}</Label>
+              <Select
+                value={trasportatore}
+                onValueChange={(v) => {
+                  setTrasportatore(v);
+                  setTrasportatoreAltro("");
+                  setMezzo("");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={t("bolle.trasportatorePlaceholder")}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {volontari
+                    ?.filter((v) => v.operativo)
+                    .map((v) => (
+                      <SelectItem key={v.id} value={String(v.id)}>
+                        {volontarioLabel(v)}
+                      </SelectItem>
+                    ))}
+                  <SelectItem value="__altro__">
+                    {t("consegne.volontarioAltro", { defaultValue: "Altro" })}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {trasportatore === "__altro__" && (
+                <Input
+                  value={trasportatoreAltro}
+                  onChange={(e) => setTrasportatoreAltro(e.target.value)}
+                  placeholder={t("consegne.volontarioAltroPlaceholder", {
+                    defaultValue: "Es. familiare delegato, vicino di casa...",
+                  })}
+                />
+              )}
+              {trasportatoreMissing && (
+                <p className="text-sm text-destructive">
+                  {t("bolle.trasportatoreObbligatorioDomicilio")}
+                </p>
+              )}
+              {trasportatore && (
+                <div className="space-y-2 pt-2">
+                  <Label>{t("bolle.mezzoLabel")}</Label>
+                  <Select
+                    value={mezzo || "0"}
+                    onValueChange={(v) => setMezzo(v === "0" ? "" : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("bolle.mezzoPlaceholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">{t("common.none")}</SelectItem>
+                      {mezzi
+                        ?.filter((m) => {
+                          if (
+                            m.stato !== "disponibile" ||
+                            (m.statoApprovazione ?? "approvato") !== "approvato"
+                          )
+                            return false;
+                          if (m.effectiveCentroId == null) return true;
+                          const benefCentro =
+                            allBeneficiari?.find(
+                              (b) => String(b.id) === beneficiarioId,
+                            )?.centroAscoltoId ?? null;
+                          return (
+                            benefCentro != null &&
+                            m.effectiveCentroId === benefCentro
+                          );
+                        })
+                        .map((m) => (
+                          <SelectItem key={m.id} value={String(m.id)}>
+                            {m.codice}
+                            {m.targa ? ` (${m.targa})` : ""} — {m.tipo}
+                          </SelectItem>
+                        ))}
+                      <SelectItem value="altro">
+                        {t("bolle.mezzoAltro")}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {t("bolle.ritiroMagazzinoInfo")}
+            </p>
+          )}
+        </div>
+        {createError && (
+          <p role="alert" className="text-sm text-destructive">
+            {createError}
+          </p>
+        )}
+        <DialogFooter>
+          <Button
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={requestClose}
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button
+            className="min-h-[44px]"
+            onClick={onSubmit}
+            disabled={createBolla.isPending}
+          >
+            {t("bolle.createBolla")}
+          </Button>
+        </DialogFooter>
+        <UnsavedChangesDialog guard={unsavedGuard} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Dialog modifica intestazione (beneficiario / magazzino) ────────────────
+
+function ModificaBollaDialog({
+  open,
+  onClose,
+  bollaId,
+  versione,
+  beneficiarioId,
+  magazzinoId,
+  hasRighe,
+}: {
+  open: boolean;
+  onClose: () => void;
+  bollaId: number;
+  versione: number;
+  beneficiarioId: number;
+  magazzinoId: number;
+  hasRighe: boolean;
+}) {
+  const [bId, setBId] = useState(String(beneficiarioId));
+  const [mId, setMId] = useState(String(magazzinoId));
+  const [scanCode, setScanCode] = useState("");
+  const { hasPermission } = useAuth();
+  const { data: beneficiari } = useListBeneficiari(
+    { attivo: true },
+    {
+      query: {
+        enabled: hasPermission("beneficiari.view"),
+        queryKey: getListBeneficiariQueryKey({ attivo: true }),
+      },
+    },
+  );
+  const { data: magazzini } = useListMagazzini();
+  const updateBolla = useUpdateBolla();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { t } = useTranslation();
+  const commandIntents = useCommandIntentRegistry();
+  const updateHeaderSlot = `bolla:${bollaId}:update-header`;
+
+  const requestClose = () => {
+    if (updateBolla.isPending) return;
+    commandIntents.discard(updateHeaderSlot);
+    onClose();
+  };
+
+  const handleScan = () => {
+    const code = scanCode.trim();
+    if (!code) return;
+    if (!beneficiari) {
+      toast({ title: t("common.loading") });
+      return;
+    }
+    const b = beneficiari.find(
+      (x) => x.codice.toLowerCase() === code.toLowerCase(),
+    );
+    if (!b) {
+      toast({ title: t("bolle.scanNotFound"), variant: "destructive" });
+      return;
+    }
+    setBId(String(b.id));
+    setScanCode("");
+    toast({ title: t("bolle.scanFound", { name: `${b.cognome} ${b.nome}` }) });
+  };
+
+  const magazzinoCambiato = parseInt(mId) !== magazzinoId;
+  const magazzinoAreaId =
+    magazzini?.find((m) => m.id === parseInt(mId))?.areaOperativaId ?? null;
+
+  const onSubmit = () => {
+    if (magazzinoCambiato && hasRighe) {
+      const ok = window.confirm(t("bolle.cambioMagazzinoConfirm"));
+      if (!ok) return;
+    }
+    const semanticInput = {
+      beneficiarioId: parseInt(bId),
+      magazzinoId: parseInt(mId),
+    };
+    updateBolla.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(updateHeaderSlot, semanticInput, {
+          ...semanticInput,
+          versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(updateHeaderSlot);
+          void invalidateBollaViews(queryClient, bollaId);
+          queryClient.invalidateQueries({
+            queryKey: getListGiacenzeQueryKey(
+              magazzinoAreaId == null
+                ? undefined
+                : {
+                    areaOperativaId: magazzinoAreaId,
+                    magazzinoId: parseInt(mId),
+                  },
+            ),
+          });
+          toast({ title: t("bolle.bollaAggiornata") });
+          onClose();
+        },
+        onError: (err: unknown) => {
+          commandIntents.fail(updateHeaderSlot, err);
+          const msg =
+            (err as { response?: { data?: { error?: string } } })?.response
+              ?.data?.error ?? t("bolle.updateError");
+          toast({
+            title: t("bolle.error"),
+            description: msg,
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) requestClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("bolle.modificaTitle")}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>{t("bolle.scanLabel")}</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder={t("bolle.scanPlaceholder")}
+                value={scanCode}
+                onChange={(e) => setScanCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleScan();
+                  }
+                }}
+                className="font-mono"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleScan}
+                disabled={!scanCode.trim()}
+              >
+                <ScanLine className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>{t("bolle.beneficiarioLabel")}</Label>
+            <Select value={bId} onValueChange={setBId}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {beneficiari?.map((b) => (
+                  <SelectItem key={b.id} value={String(b.id)}>
+                    {b.cognome} {b.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>{t("bolle.magazzinoUscitaLabel")}</Label>
+            <Select value={mId} onValueChange={setMId}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {magazzini
+                  ?.filter(
+                    (m) => m.stato === "attivo" && m.areaOperativaId != null,
+                  )
+                  .map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.nome}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            {magazzinoCambiato && hasRighe && (
+              <p className="text-xs text-amber-600">
+                {t("bolle.cambioMagazzinoWarning")}
+              </p>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={requestClose}>
+            {t("common.close")}
+          </Button>
+          <Button onClick={onSubmit} disabled={updateBolla.isPending}>
+            {t("common.save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Dialog aggiungi prodotto ────────────────────────────────────────────────
+
+function AggiungiProdottoDialog({
+  open,
+  onClose,
+  bollaId,
+  magazzinoId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  bollaId: number;
+  magazzinoId: number;
+}) {
+  const [prodottoId, setProdottoId] = useState("");
+  const [lottoId, setLottoId] = useState("");
+  const [quantita, setQuantita] = useState("");
+  const [scanProdotto, setScanProdotto] = useState("");
+
+  const { data: magazzini } = useListMagazzini();
+  const areaOperativaId =
+    magazzini?.find((m) => m.id === magazzinoId)?.areaOperativaId ?? 0;
+  const giacenzeParams = { areaOperativaId, magazzinoId };
+  const { data: giacenze } = useListGiacenze(giacenzeParams, {
+    query: {
+      enabled: open && areaOperativaId > 0,
+      queryKey: getListGiacenzeQueryKey(giacenzeParams),
+    },
+  });
+  const { data: prodotti } = useListProdotti();
+  const { data: lotti } = useListLotti({
+    magazzinoId,
+    prodottoId: prodottoId ? parseInt(prodottoId) : undefined,
+  });
+  const { data: bollaCorrente } = useGetBolla(bollaId, {
+    query: { enabled: open, queryKey: getGetBollaQueryKey(bollaId) },
+  });
+
+  const addRiga = useAddBollaRiga();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { t } = useTranslation();
+  const commandIntents = useCommandIntentRegistry();
+  const addRowSlot = `bolla:${bollaId}:add-row`;
+
+  const requestClose = () => {
+    if (addRiga.isPending) return;
+    commandIntents.discard(addRowSlot);
+    onClose();
+  };
+
+  const handleScanProdotto = (codeOverride?: string) => {
+    const code = (codeOverride ?? scanProdotto).trim();
+    if (!code) return;
+    if (!prodotti) {
+      toast({ title: t("common.loading") });
+      return;
+    }
+    const lc = code.toLowerCase();
+    const p = prodotti.find(
+      (x) =>
+        (x.codiceBarre && x.codiceBarre.toLowerCase() === lc) ||
+        x.codice.toLowerCase() === lc,
+    );
+    if (!p) {
+      toast({ title: t("bolle.scanProdottoNotFound"), variant: "destructive" });
+      return;
+    }
+    const g = giacenze?.find((x) => x.prodottoId === p.id);
+    if (!g || g.disponibileReale <= 0) {
+      toast({
+        title: t("bolle.scanProdottoNoStock", { name: p.nome }),
+        variant: "destructive",
+      });
+      return;
+    }
+    setProdottoId(String(p.id));
+    setLottoId("");
+    setQuantita("");
+    setScanProdotto("");
+    toast({ title: t("bolle.scanProdottoFound", { name: p.nome }) });
+  };
+
+  const giacenzaSelezionata = giacenze?.find(
+    (g) => g.prodottoId === parseInt(prodottoId),
+  );
+  const prodottoSelezionato = prodotti?.find(
+    (p) => p.id === parseInt(prodottoId),
+  );
+  const unitaMisura = prodottoSelezionato?.unitaMisura;
+  const lottoObbligatorio = Boolean(
+    prodottoSelezionato?.lottoFisicoObbligatorio,
+  );
+  const lottiDisponibili =
+    lotti?.filter(
+      (l) => l.magazzinoId === magazzinoId && l.quantitaResidua > 0,
+    ) ?? [];
+
+  // quantità già inserita in questa bolla: va sottratta solo in bozza
+  // (le bolle confermate hanno prenotazioni bloccate e non sono modificabili)
+  const isBozza = bollaCorrente?.stato === "bozza";
+  const giaInBollaProdotto =
+    isBozza && prodottoId
+      ? (bollaCorrente?.righe ?? [])
+          .filter((r) => r.prodottoId === parseInt(prodottoId))
+          .reduce((acc, r) => acc + r.quantita, 0)
+      : 0;
+  const giaInBollaLotto = (lid: number) =>
+    isBozza
+      ? (bollaCorrente?.righe ?? [])
+          .filter((r) => r.lottoId === lid)
+          .reduce((acc, r) => acc + r.quantita, 0)
+      : 0;
+
+  // limite massimo: lotto specifico oppure giacenza totale, al netto di quanto già in bolla
+  const lottoSelezionato = lottiDisponibili.find(
+    (l) => l.id === parseInt(lottoId),
+  );
+  const maxBase = lottoSelezionato
+    ? lottoSelezionato.quantitaResidua
+    : (giacenzaSelezionata?.disponibileReale ?? 0);
+  const giaUsato = lottoSelezionato
+    ? giaInBollaLotto(lottoSelezionato.id)
+    : giaInBollaProdotto;
+  const maxDisponibile = Math.max(
+    0,
+    Math.round((maxBase - giaUsato) * 100) / 100,
+  );
+  const quantitaNum = parseFloat(quantita || "0");
+  const eccedeDisponibilita = quantitaNum > maxDisponibile;
+
+  const onSubmit = () => {
+    if (
+      !prodottoId ||
+      !quantita ||
+      !prodottoSelezionato ||
+      !unitaMisura ||
+      (lottoObbligatorio && !lottoId) ||
+      eccedeDisponibilita ||
+      !bollaCorrente
+    )
+      return;
+    const semanticInput = bollaAddProductInput(
+      prodottoSelezionato,
+      lottoId,
+      quantita,
+    );
+    addRiga.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(addRowSlot, semanticInput, {
+          ...semanticInput,
+          versione: bollaCorrente.versione,
+        }),
+      },
+      {
+        onSuccess: async () => {
+          commandIntents.complete(addRowSlot);
+          await invalidateBollaViews(queryClient, bollaId);
+          toast({ title: t("bolle.prodottoAggiunto") });
+          // mantieni il dialog aperto per aggiungere altri prodotti: resetta i campi
+          setProdottoId("");
+          setLottoId("");
+          setQuantita("");
+        },
+        onError: (err: unknown) => {
+          commandIntents.fail(addRowSlot, err);
+          const msg = bollaErrorMessage(err, t("bolle.addError"));
+          toast({
+            title: t("bolle.error"),
+            description: msg,
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) requestClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("bolle.addProdottoTitle")}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>{t("bolle.scanProdottoLabel")}</Label>
+            <div className="flex gap-2">
+              <Input
+                value={scanProdotto}
+                onChange={(e) => setScanProdotto(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleScanProdotto();
+                  }
+                }}
+                placeholder={t("bolle.scanProdottoPlaceholder")}
+                autoFocus
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => handleScanProdotto()}
+                disabled={!scanProdotto.trim()}
+              >
+                {t("bolle.scanProdottoButton")}
+              </Button>
+              <BarcodeScannerButton
+                onScan={(v) => {
+                  setScanProdotto(v);
+                  handleScanProdotto(v);
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("bolle.prodottoDisponibileLabel")}</Label>
+            <Select
+              value={prodottoId}
+              onValueChange={(v) => {
+                setProdottoId(v);
+                setLottoId("");
+                setQuantita("");
+              }}
+            >
+              <SelectTrigger aria-label={t("bolle.prodottoDisponibileLabel")}>
+                <SelectValue placeholder={t("bolle.prodottoPlaceholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                {giacenze && giacenze.length > 0 ? (
+                  giacenze.map((g) => (
+                    <SelectItem key={g.prodottoId} value={String(g.prodottoId)}>
+                      {g.prodottoNome} — {Math.max(0, g.disponibileReale)}{" "}
+                      {g.unitaMisura} {t("bolle.disponibili")}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                    {t("bolle.noProdottoInMagazzino")}
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {prodottoId && (lottiDisponibili.length > 0 || lottoObbligatorio) && (
+            <div className="space-y-2">
+              <Label>
+                {lottoObbligatorio
+                  ? t("bolle.lottoFisicoRequired")
+                  : t("bolle.lottoLabel")}
+              </Label>
+              <Select
+                value={
+                  lottoId || (lottoObbligatorio ? undefined : AUTO_FEFO_LOT)
+                }
+                onValueChange={(v) => {
+                  setLottoId(selectedPhysicalLot(v));
+                  setQuantita("");
+                }}
+              >
+                <SelectTrigger aria-label={t("bolle.lottoLabel")}>
+                  <SelectValue placeholder={t("bolle.lottoPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {!lottoObbligatorio && (
+                    <SelectItem value={AUTO_FEFO_LOT}>
+                      {t("bolle.lottoAutomaticoFefo", {
+                        defaultValue: "Automatico (FEFO)",
+                      })}
+                    </SelectItem>
+                  )}
+                  {lottiDisponibili.map((l) => (
+                    <SelectItem key={l.id} value={String(l.id)}>
+                      {l.codiceLotto ?? `${t("bolle.lottoPrefix")}${l.id}`}
+                      {l.dataScadenza
+                        ? ` — ${t("bolle.scadAbbr")} ${l.dataScadenza}`
+                        : ""}
+                      {` — ${l.quantitaResidua} ${t("bolle.dispAbbr")}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {lottoObbligatorio && !lottoId
+                  ? t("bolle.selezionaLottoFisico", {
+                      defaultValue: "Seleziona il lotto fisico",
+                    })
+                  : t("bolle.lottoHint")}
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>{t("common.quantity")}</Label>
+              <Input
+                type="number"
+                aria-label={t("common.quantity")}
+                min="0.01"
+                step="0.000001"
+                max={maxDisponibile || undefined}
+                value={quantita}
+                onChange={(e) => setQuantita(e.target.value)}
+                placeholder={t("bolle.quantitaPlaceholder")}
+                className={
+                  eccedeDisponibilita
+                    ? "border-destructive focus-visible:ring-destructive"
+                    : ""
+                }
+              />
+              {prodottoId && (
+                <p
+                  className={`text-xs ${eccedeDisponibilita ? "text-destructive font-medium" : "text-muted-foreground"}`}
+                >
+                  {eccedeDisponibilita
+                    ? t("bolle.massimoDisponibile", { max: maxDisponibile })
+                    : t("bolle.disponibileQta", {
+                        max: maxDisponibile,
+                        um: giacenzaSelezionata?.unitaMisura ?? "",
+                      })}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>{t("bolle.unitaMisuraLabel")}</Label>
+              <p
+                className="flex h-10 items-center rounded-md border px-3 text-sm"
+                aria-label={t("bolle.unitaMisuraLabel")}
+              >
+                {unitaMisura ?? "–"}
+              </p>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={requestClose}>
+            {t("common.close")}
+          </Button>
+          <Button
+            onClick={onSubmit}
+            disabled={
+              !prodottoId ||
+              !quantita ||
+              !unitaMisura ||
+              (lottoObbligatorio && !lottoId) ||
+              eccedeDisponibilita ||
+              addRiga.isPending
+            }
+          >
+            {t("common.add")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Dettaglio bolla ─────────────────────────────────────────────────────────
+
+export function BollaDettaglio({
+  bollaId,
+  bollaData,
+  onClose,
+  onCloseLabel,
+  hideConsegnaActions,
+  linkedRequest = null,
+  linkedRequestId,
+  onDraftDirtyChange,
+}: {
+  bollaId: number;
+  bollaData?: BollaDettaglioDto;
+  onClose?: () => void;
+  onCloseLabel?: string;
+  hideConsegnaActions?: boolean;
+  linkedRequest?: boolean | null;
+  linkedRequestId?: number;
+  onDraftDirtyChange?: (dirty: boolean) => void;
+}) {
+  const { user, hasPermission } = useAuth();
+  const canManage = authUserCanOperateBolle(user, "bolle.manage");
+  const canDeliver = authUserCanOperateBolle(user, "bolle.deliver");
+  const canCancel = authUserCanOperateBolle(user, "bolle.cancel");
+  const canReverseAdmin = authUserCanOperateBolle(user, "bolle.reverse.admin");
+  const canReceiveReturn = authUserCanOperateBolle(
+    user,
+    "magazzino.stock.receive",
+  );
+  const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [annullaOpen, setAnnullaOpen] = useState(false);
+  const [annullaMotivo, setAnnullaMotivo] = useState("");
+  const [stornoOpen, setStornoOpen] = useState(false);
+  const [stornoRigaIds, setStornoRigaIds] = useState<number[]>([]);
+  const [stornoMotivo, setStornoMotivo] = useState("");
+  const [stornoConferma, setStornoConferma] = useState("");
+  const [assegnaOpen, setAssegnaOpen] = useState(false);
+  const [ritiroOpen, setRitiroOpen] = useState(false);
+  const [ritiroMotivo, setRitiroMotivo] = useState("");
+  const [mancataOpen, setMancataOpen] = useState(false);
+  const [mancataMotivo, setMancataMotivo] = useState("");
+  const [affidaOpen, setAffidaOpen] = useState(false);
+  const [affidaTrasportatore, setAffidaTrasportatore] = useState("");
+  const [conversioneOpen, setConversioneOpen] = useState(false);
+  const [conversioneIndirizzo, setConversioneIndirizzo] = useState("");
+  const [conversioneData, setConversioneData] = useState("");
+  const [conversioneFascia, setConversioneFascia] =
+    useState<Exclude<ConversioneConsegnaInputFasciaOraria, null>>("Mattina");
+  const [conversioneNote, setConversioneNote] = useState("");
+  const [printing, setPrinting] = useState(false);
+  useEffect(() => {
+    onDraftDirtyChange?.(
+      addOpen ||
+        editOpen ||
+        annullaOpen ||
+        stornoOpen ||
+        assegnaOpen ||
+        ritiroOpen ||
+        mancataOpen ||
+        affidaOpen ||
+        conversioneOpen,
+    );
+    return () => onDraftDirtyChange?.(false);
+  }, [
+    addOpen,
+    editOpen,
+    annullaOpen,
+    stornoOpen,
+    assegnaOpen,
+    ritiroOpen,
+    mancataOpen,
+    affidaOpen,
+    conversioneOpen,
+    onDraftDirtyChange,
+  ]);
+  const { data: fetchedBolla, isLoading: legacyBollaLoading } = useGetBolla(
+    bollaId,
+    {
+      query: {
+        enabled: bollaData == null,
+        queryKey: getGetBollaQueryKey(bollaId),
+      },
+    },
+  );
+  const bolla = bollaData ?? fetchedBolla;
+  const isLoading = bollaData == null && legacyBollaLoading;
+  const { data: beneficiari } = useListBeneficiari(undefined, {
+    query: {
+      enabled: shouldFetchBollaBeneficiari(
+        hasPermission("beneficiari.view"),
+        linkedRequest,
+      ),
+      queryKey: getListBeneficiariQueryKey(),
+    },
+  });
+  const { data: requestContext } = useGetRichiestaMagazzino(
+    linkedRequestId ?? 0,
+    {
+      query: {
+        enabled:
+          linkedRequestId != null && hasPermission("richieste_magazzino.view"),
+        queryKey: getGetRichiestaMagazzinoQueryKey(linkedRequestId ?? 0),
+      },
+    },
+  );
+  const isCentroHandoffBolla =
+    bolla?.tipoDestinatario === "beneficiario" &&
+    (linkedRequest === true || linkedRequestId != null);
+  const bollaCentroId =
+    beneficiari?.find((b) => b.id === bolla?.beneficiarioId)?.centroAscoltoId ??
+    requestContext?.centroAscoltoId ??
+    null;
+  const { data: volontari } = useListBollaVolontariCandidati(bollaId, {
+    query: {
+      queryKey: getListBollaVolontariCandidatiQueryKey(bollaId),
+      enabled:
+        bolla != null && bolla.tipoDestinatario === "beneficiario" && canManage,
+    },
+  });
+  const volontarioAssegnato =
+    bolla?.volontarioConsegnaId != null
+      ? volontari?.find((v) => v.id === bolla.volontarioConsegnaId)
+      : undefined;
+  const incaricatoAssegnato =
+    bolla?.volontarioConsegnaId != null
+      ? (bolla.volontarioNome ??
+        (volontarioAssegnato
+          ? `${volontarioAssegnato.cognome} ${volontarioAssegnato.nome}`
+          : null) ??
+        String(bolla.volontarioConsegnaId))
+      : (bolla?.trasportatoreNome?.trim() ?? null);
+  const richiedeNomeIncaricato =
+    bolla?.volontarioConsegnaId == null && !bolla?.trasportatoreNome?.trim();
+  const { data: centri } = useListCentriAscolto();
+  const { data: impostazioni, isLoading: impostazioniLoading } =
+    useGetImpostazioniStampa();
+  const deleteRiga = useDeleteBollaRiga();
+  const confermaBolla = useConfermaBolla();
+  const consegnaBolla = useConsegnaBolla();
+  const affidaBolla = useAffidaBolla();
+  const segnalaMancataConsegna = useSegnalaMancataConsegnaBolla();
+  const annullaBolla = useAnnullaBolla();
+  const stornaAmministrativamente = useStornaAmministrativamenteBolla();
+  const updateBolla = useUpdateBolla();
+  const associaBolla = useAssociaBolla();
+  const segnalaRitiro = useSegnalaRitiroNonEffettuato();
+  const convertiConsegna = useConvertiBollaInConsegna();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { t } = useTranslation();
+  const commandIntents = useCommandIntentRegistry();
+  const cancellationSlot = `bolla:${bollaId}:cancel`;
+  const administrativeReversalSlot = `bolla:${bollaId}:reverse-admin`;
+
+  const consegneParams =
+    bollaCentroId != null
+      ? { centroAscoltoId: bollaCentroId, page: 1, pageSize: 100 }
+      : { page: 1, pageSize: 100 };
+  const { data: consegnePianificabili } = useListConsegne(consegneParams, {
+    query: {
+      enabled: assegnaOpen && beneficiari != null,
+      queryKey: getListConsegneQueryKey(consegneParams),
+    },
+  });
+  // Beneficiari del centro della bolla (gestisce anche il caso centro nullo,
+  // dato che Consegna non espone centroAscoltoId): filtra le consegne lato client.
+  const centroBeneficiarioIds = new Set(
+    (beneficiari ?? [])
+      .filter((b) => (b.centroAscoltoId ?? null) === bollaCentroId)
+      .map((b) => b.id),
+  );
+  const pianificabili = (consegnePianificabili?.items ?? []).filter(
+    (c) =>
+      c.stato === "pianificata" &&
+      c.bollaId == null &&
+      centroBeneficiarioIds.has(c.beneficiarioId),
+  );
+
+  const invalidateAll = () => void invalidateBollaViews(queryClient, bollaId);
+  const errMsg = bollaErrorMessage;
+
+  const onDeleteRiga = (rigaId: number) => {
+    if (!bolla) return;
+    const slot = `bolla:${bollaId}:delete-row:${rigaId}`;
+    deleteRiga.mutate(
+      {
+        id: bollaId,
+        rigaId,
+        data: commandIntents.prepare(
+          slot,
+          { rigaId },
+          {
+            versione: bolla.versione,
+          },
+        ),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidateAll();
+          toast({ title: t("bolle.prodottoRimosso") });
+        },
+        onError: (err) => {
+          commandIntents.fail(slot, err);
+          toast({
+            title: t("bolle.error"),
+            description: errMsg(err, t("bolle.rimuoviError")),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onConferma = () => {
+    if (!bolla) return;
+    const slot = `bolla:${bollaId}:confirm`;
+    confermaBolla.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(slot, {}, { versione: bolla.versione }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidateAll();
+          toast({
+            title: t("bolle.bollaConfermataTitle"),
+            description: t("bolle.bollaConfermataDesc"),
+          });
+        },
+        onError: (err) => {
+          commandIntents.fail(slot, err);
+          toast({
+            title: t("bolle.error"),
+            description: errMsg(err, t("bolle.confermaError")),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onConsegna = () => {
+    if (!bolla) return;
+    const slot = `bolla:${bollaId}:deliver`;
+    const semanticInput = { confermaRicezione: true };
+    consegnaBolla.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(slot, semanticInput, {
+          ...semanticInput,
+          versione: bolla.versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidateAll();
+          toast({
+            title: t("bolle.bollaConsegnataTitle"),
+            description: t("bolle.bollaConsegnataDesc"),
+          });
+        },
+        onError: (err) => {
+          commandIntents.fail(slot, err);
+          toast({
+            title: t("bolle.error"),
+            description: errMsg(err, t("bolle.consegnaError")),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onAffida = () => {
+    if (!bolla || (richiedeNomeIncaricato && !affidaTrasportatore.trim()))
+      return;
+    const slot = `bolla:${bollaId}:entrust`;
+    const semantic = richiedeNomeIncaricato
+      ? { trasportatoreNome: affidaTrasportatore.trim() }
+      : {};
+    affidaBolla.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(slot, semantic, {
+          ...semantic,
+          versione: bolla.versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          setAffidaOpen(false);
+          invalidateAll();
+          toast({ title: t("transportReturn.actionSaved") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("transportReturn.actionError"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onMancataConsegna = () => {
+    if (!bolla || !mancataMotivo.trim()) return;
+    const slot = `bolla:${bollaId}:missing-delivery`;
+    const semantic = { motivo: mancataMotivo.trim() };
+    segnalaMancataConsegna.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(slot, semantic, {
+          ...semantic,
+          versione: bolla.versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          setMancataOpen(false);
+          invalidateAll();
+          toast({ title: t("transportReturn.actionSaved") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("transportReturn.actionError"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onAnnulla = () => {
+    if (!bolla) return;
+    const semanticInput = { motivo: annullaMotivo.trim() };
+    annullaBolla.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(cancellationSlot, semanticInput, {
+          ...semanticInput,
+          versione: bolla.versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(cancellationSlot);
+          invalidateAll();
+          queryClient.invalidateQueries({
+            queryKey: getListConsegneQueryKey(),
+          });
+          toast({
+            title: t("bolle.bollaAnnullataTitle"),
+            description: t("bolle.bollaAnnullataDesc"),
+          });
+          setAnnullaOpen(false);
+          setAnnullaMotivo("");
+        },
+        onError: (err) => {
+          commandIntents.fail(cancellationSlot, err);
+          toast({
+            title: t("bolle.error"),
+            description: errMsg(err, t("bolle.annullaError")),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const closeCancellation = () => {
+    commandIntents.discard(cancellationSlot);
+    setAnnullaOpen(false);
+    setAnnullaMotivo("");
+  };
+
+  const clearAdministrativeReversal = () => {
+    setStornoRigaIds([]);
+    setStornoMotivo("");
+    setStornoConferma("");
+  };
+
+  const closeAdministrativeReversal = () => {
+    commandIntents.discard(administrativeReversalSlot);
+    clearAdministrativeReversal();
+    setStornoOpen(false);
+  };
+
+  const onAdministrativeReversal = () => {
+    if (!bolla) return;
+    if (
+      !administrativeReversalReady({
+        canReverseAdmin,
+        documentStatus: bolla.stato,
+        selectedRowIds: stornoRigaIds,
+        reason: stornoMotivo,
+        confirmation: stornoConferma,
+        documentNumber: bolla.numeroBolla,
+      })
+    )
+      return;
+    const semanticInput = {
+      motivo: stornoMotivo.trim(),
+      rigaIds: [...stornoRigaIds].sort((left, right) => left - right),
+    };
+    stornaAmministrativamente.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(
+          administrativeReversalSlot,
+          semanticInput,
+          { ...semanticInput, versione: bolla.versione },
+        ),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(administrativeReversalSlot);
+          clearAdministrativeReversal();
+          setStornoOpen(false);
+          invalidateAll();
+          toast({
+            title: t("bolle.stornoAmministrativoCompletato", {
+              defaultValue: "Rettifica amministrativa registrata",
+            }),
+          });
+        },
+        onError: (error) => {
+          commandIntents.fail(administrativeReversalSlot, error);
+          toast({
+            title: t("bolle.error"),
+            description: errMsg(
+              error,
+              t("bolle.stornoAmministrativoErrore", {
+                defaultValue: "Impossibile registrare la rettifica",
+              }),
+            ),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onRitiroNonEffettuato = () => {
+    segnalaRitiro.mutate(
+      { id: bollaId, data: { motivo: ritiroMotivo.trim() || null } },
+      {
+        onSuccess: () => {
+          invalidateAll();
+          setRitiroOpen(false);
+          setRitiroMotivo("");
+          toast({ title: t("maps.missedRecorded") });
+        },
+        onError: (error) =>
+          toast({
+            title: t("bolle.error"),
+            description: errMsg(error, t("maps.missedError")),
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+
+  const openConversione = () => {
+    setConversioneIndirizzo(bolla?.beneficiarioIndirizzo?.trim() ?? "");
+    setConversioneData(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Europe/Rome",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date()),
+    );
+    setConversioneFascia("Mattina");
+    setConversioneNote("");
+    setConversioneOpen(true);
+  };
+
+  const onConvertiConsegna = () => {
+    if (!conversioneIndirizzo.trim() || !conversioneData) return;
+    convertiConsegna.mutate(
+      {
+        id: bollaId,
+        data: {
+          indirizzoConsegna: conversioneIndirizzo.trim(),
+          dataPrevista: conversioneData,
+          fasciaOraria: conversioneFascia,
+          noteOperative: conversioneNote.trim() || null,
+        },
+      },
+      {
+        onSuccess: (result) => {
+          invalidateAll();
+          queryClient.invalidateQueries({
+            queryKey: getListConsegneQueryKey(),
+          });
+          setConversioneOpen(false);
+          toast({
+            title: result.created
+              ? t("maps.deliveryCreated")
+              : t("maps.deliveryExisting"),
+          });
+        },
+        onError: (error) =>
+          toast({
+            title: t("bolle.error"),
+            description: errMsg(error, t("maps.conversionError")),
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+
+  const onAssegna = (consegnaId: number) => {
+    if (!bolla) return;
+    const slot = `bolla:${bollaId}:associa-consegna:${consegnaId}`;
+    const semanticInput = {
+      bollaId,
+      versione: bolla.versione,
+      consegnaId,
+    };
+    associaBolla.mutate(
+      {
+        id: consegnaId,
+        data: commandIntents.prepare(slot, semanticInput, {
+          bollaId,
+          versione: bolla.versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidateAll();
+          queryClient.invalidateQueries({
+            queryKey: getListConsegneQueryKey(),
+          });
+          setAssegnaOpen(false);
+          toast({
+            title: t("bolle.bollaAssegnataTitle"),
+            description: t("bolle.bollaAssegnataDesc"),
+          });
+        },
+        onError: (err) => {
+          commandIntents.fail(slot, err);
+          toast({
+            title: t("bolle.error"),
+            description: errMsg(err, t("bolle.assegnaError")),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onChangeVolontario = (value: string) => {
+    if (!bolla) return;
+    const data =
+      value === "__centro__"
+        ? {
+            volontarioConsegnaId: null,
+            trasportatoreNome: null,
+            noteConsegna: "Consegna presso il centro",
+          }
+        : value === "__altro__"
+          ? {
+              volontarioConsegnaId: null,
+              trasportatoreNome: "Ritiro presso il magazzino",
+              noteConsegna: null,
+            }
+          : {
+              volontarioConsegnaId: parseInt(value),
+              trasportatoreNome: null,
+              noteConsegna: null,
+            };
+    const slot = `bolla:${bollaId}:update-delivery`;
+    updateBolla.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(slot, data, {
+          ...data,
+          versione: bolla.versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidateAll();
+          toast({ title: t("bolle.consegnaAggiornata") });
+        },
+        onError: (err) => {
+          commandIntents.fail(slot, err);
+          toast({
+            title: t("bolle.error"),
+            description: errMsg(err, t("bolle.aggiornaError")),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onChangeTrasportatoreNome = (value: string) => {
+    if (!bolla) return;
+    const slot = `bolla:${bollaId}:update-delivery`;
+    const semanticInput = {
+      trasportatoreNome: value.trim() || "Ritiro presso il magazzino",
+    };
+    updateBolla.mutate(
+      {
+        id: bollaId,
+        data: commandIntents.prepare(slot, semanticInput, {
+          ...semanticInput,
+          versione: bolla.versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidateAll();
+        },
+        onError: (err) => {
+          commandIntents.fail(slot, err);
+          toast({
+            title: t("bolle.error"),
+            description: errMsg(err, t("bolle.aggiornaError")),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const consegnaValue = bolla?.volontarioConsegnaId
+    ? String(bolla.volontarioConsegnaId)
+    : bolla?.trasportatoreNome
+      ? "__altro__"
+      : bolla?.noteConsegna
+        ? "__centro__"
+        : "";
+
+  const handleDownloadPdf = async () => {
+    if (!bolla) return;
+    setPrinting(true);
+    try {
+      const benef = beneficiari?.find((b) => b.id === bolla.beneficiarioId);
+      const centro = benef?.centroAscoltoId
+        ? centri?.find((c) => c.id === benef.centroAscoltoId)
+        : undefined;
+      const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
+      await generateBollaPdf({
+        bolla,
+        centro: centro
+          ? {
+              nome: centro.nome,
+              indirizzo: centro.indirizzo,
+              comune: centro.comune,
+              logoUrl: centro.logoUrl,
+            }
+          : null,
+        footer: impostazioni?.footerBolla ?? null,
+        template: (impostazioni?.templateBolla as BollaTemplate) ?? "standard",
+        associationLogoDataUrl: logoDataUrl,
+        branding,
+      });
+    } catch {
+      toast({
+        title: t("bolle.error"),
+        description: t("bolle.pdfError"),
+        variant: "destructive",
+      });
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 mt-4">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
+  if (!bolla)
+    return (
+      <p className="text-muted-foreground mt-4">{t("bolle.bollaNonTrovata")}</p>
+    );
+
+  const isBozza = bolla.stato === "bozza";
+  const isConfermato = bolla.stato === "confermato";
+  const isConsegnato = bolla.stato === "consegnato";
+  const isInTrasporto = bolla.stato === "in_trasporto";
+  const isAnnullato = bolla.stato === "annullato";
+  const stornoAmministrativoReady = administrativeReversalReady({
+    canReverseAdmin,
+    documentStatus: bolla.stato,
+    selectedRowIds: stornoRigaIds,
+    reason: stornoMotivo,
+    confirmation: stornoConferma,
+    documentNumber: bolla.numeroBolla,
+  });
+  const modificabile = isBozza && canManage; // le prenotazioni si ricalcolano solo confermando una bozza
+  const centroBolla =
+    bollaCentroId != null
+      ? centri?.find((c) => c.id === bollaCentroId)
+      : undefined;
+
+  return (
+    <div className="mt-4 space-y-5">
+      {/* Header info */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-3">
+          {centroBolla?.logoUrl && (
+            <img
+              src={centroBolla.logoUrl}
+              alt={`Logo ${centroBolla.nome}`}
+              className="h-14 w-20 shrink-0 rounded border bg-white object-contain p-1"
+              onError={(event) => {
+                event.currentTarget.style.display = "none";
+              }}
+            />
+          )}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-semibold text-lg">
+                {bolla.numeroBolla}
+              </span>
+              {statoBadge(bolla.stato)}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {format(new Date(bolla.dataBolla), "dd MMMM yyyy", {
+                locale: it,
+              })}
+            </p>
+            {centroBolla && (
+              <p className="text-sm font-medium">{centroBolla.nome}</p>
+            )}
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5 h-8 shrink-0"
+          onClick={handleDownloadPdf}
+          disabled={printing || impostazioniLoading}
+        >
+          <Download className="h-3.5 w-3.5" /> {t("bolle.scaricaPdf")}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs uppercase tracking-wide mb-0.5">
+            {bolla.tipoDestinatario === "ente"
+              ? t("bolle.destinatarioEnte", { defaultValue: "Ente esterno" })
+              : t("bolle.beneficiarioLabel")}
+          </p>
+          <p className="font-medium">
+            {bolla.tipoDestinatario === "ente"
+              ? bolla.enteDestinatarioNome
+              : (bolla.beneficiarioNome ?? "—")}
+          </p>
+          {bolla.tipoDestinatario === "ente" &&
+            bolla.enteDestinatarioIndirizzo && (
+              <p className="text-xs text-muted-foreground">
+                {bolla.enteDestinatarioIndirizzo}
+              </p>
+            )}
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs uppercase tracking-wide mb-0.5">
+            {t("bolle.magazzinoLabel")}
+          </p>
+          <p className="font-medium">{bolla.magazzinoNome ?? "—"}</p>
+        </div>
+      </div>
+
+      {isBozza &&
+        canManage &&
+        linkedRequest === false &&
+        bolla.tipoDestinatario === "beneficiario" && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 h-8"
+            onClick={() => setEditOpen(true)}
+          >
+            <Pencil className="h-3.5 w-3.5" /> {t("bolle.modificaIntestazione")}
+          </Button>
+        )}
+
+      <Separator />
+
+      {/* Consegna: volontario o presso centro */}
+      {!isAnnullato && (
+        <div className="space-y-2">
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+            <User className="h-3.5 w-3.5" /> {t("bolle.chiEffettuaConsegna")}
+          </Label>
+          {bolla.daPianificazione && (
+            <p className="text-xs text-muted-foreground">
+              {t("bolle.daPianificazioneDettaglio", {
+                defaultValue:
+                  "Dati ripresi dalla pianificazione collegata; puoi modificarli se necessario.",
+              })}
+            </p>
+          )}
+          {isConsegnato ||
+          isInTrasporto ||
+          bolla.stato === "rientro_atteso" ||
+          bolla.stato === "rientrato" ? (
+            <p className="text-sm font-medium">
+              {bolla.volontarioNome ??
+                bolla.trasportatoreNome ??
+                bolla.noteConsegna ??
+                "—"}
+            </p>
+          ) : (
+            <>
+              <Select
+                value={consegnaValue}
+                onValueChange={onChangeVolontario}
+                disabled={updateBolla.isPending}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("bolle.consegnaPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__centro__">
+                    {t("bolle.consegnaPressoCentro")}
+                  </SelectItem>
+                  {volontari?.map((v) => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {v.cognome} {v.nome}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="__altro__">
+                    {t("bolle.altroRitiro")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {consegnaValue === "__altro__" && (
+                <Input
+                  className="mt-2"
+                  defaultValue={bolla.trasportatoreNome ?? ""}
+                  placeholder={t("bolle.trasportatoreNomePlaceholder")}
+                  onBlur={(e) => onChangeTrasportatoreNome(e.target.value)}
+                  disabled={updateBolla.isPending}
+                />
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      <Separator />
+
+      {/* Righe prodotti */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm">
+            {t("bolle.prodottiNellaBolla")}
+          </h3>
+          {modificabile && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 h-8"
+              onClick={() => setAddOpen(true)}
+            >
+              <PackagePlus className="h-4 w-4" />
+              {t("bolle.aggiungiProdotto")}
+            </Button>
+          )}
+        </div>
+
+        {bolla.righe.length === 0 ? (
+          <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center">
+            <PackagePlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              {t("bolle.nessunProdotto")}
+            </p>
+            {modificabile && (
+              <Button
+                size="sm"
+                className="mt-3 gap-1.5"
+                onClick={() => setAddOpen(true)}
+              >
+                <Plus className="h-4 w-4" /> {t("bolle.aggiungiPrimoProdotto")}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="text-xs">
+                    {t("bolle.thProdotto")}
+                  </TableHead>
+                  <TableHead className="text-xs">
+                    {t("bolle.thLotto")}
+                  </TableHead>
+                  <TableHead className="text-xs text-right">
+                    {t("common.quantity")}
+                  </TableHead>
+                  {modificabile && <TableHead className="w-10" />}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bolla.righe.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium text-sm">
+                      {r.prodottoNome ??
+                        t("bolle.prodottoFallback", { id: r.prodottoId })}
+                      {r.fsePlus && (
+                        <span
+                          className="ml-1 font-bold text-primary"
+                          title={t("bolle.fsePlusTitle")}
+                        >
+                          *
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {r.codiceLotto ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {r.quantita} {r.unitaMisura}
+                    </TableCell>
+                    {modificabile && (
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          onClick={() => onDeleteRiga(r.id)}
+                          disabled={deleteRiga.isPending}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {bolla.righe.some((r) => r.fsePlus) && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {t("bolle.fsePlusLegend")}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Azioni stato */}
+      {!isAnnullato && (
+        <>
+          <Separator />
+          <div className="space-y-2">
+            {isBozza && canDeliver && (
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800 mb-3">
+                <strong>{t("bolle.confermaInfoTitle")}</strong>
+                {t("bolle.confermaInfoText")}
+              </div>
+            )}
+            {isConfermato && (
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800 mb-3">
+                {isCentroHandoffBolla ? (
+                  <>
+                    <strong>{t("bolle.prontaCentroTitle")}</strong>
+                    <p>
+                      {bolla.consegnaId == null
+                        ? t("bolle.prontaCentroAttesa")
+                        : t("bolle.prontaCentroPianificata", {
+                            date: bolla.consegnaDataPrevista ?? "–",
+                            fascia: bolla.consegnaFasciaOraria ?? "–",
+                            volontario: bolla.consegnaVolontarioNome ?? "–",
+                          })}
+                    </p>
+                    {bolla.consegnaId != null &&
+                      hasPermission("consegne.view") && (
+                        <a
+                          className="underline"
+                          href={`/consegne?tab=consegne&consegnaId=${bolla.consegnaId}`}
+                        >
+                          {t("bolle.apriConsegnaCentro")}
+                        </a>
+                      )}
+                  </>
+                ) : (
+                  <>
+                    <strong>{t("bolle.prontaTitle")}</strong>
+                    {t("bolle.prontaText")}
+                  </>
+                )}
+              </div>
+            )}
+            {bolla.tipoDestinatario === "beneficiario" &&
+              bolla.ritiroNonEffettuatoAt && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  <div className="flex items-center gap-2 font-medium">
+                    <AlertTriangle className="h-4 w-4" />
+                    {t("maps.missedPickup")}
+                  </div>
+                  {bolla.ritiroNonEffettuatoMotivo && (
+                    <p className="mt-1">{bolla.ritiroNonEffettuatoMotivo}</p>
+                  )}
+                </div>
+              )}
+            {isBozza && (
+              <Button
+                className="w-full gap-2"
+                onClick={onConferma}
+                disabled={bolla.righe.length === 0 || confermaBolla.isPending}
+              >
+                <CheckCircle className="h-4 w-4" />
+                {confermaBolla.isPending
+                  ? t("bolle.confermaInCorso")
+                  : t("bolle.confermaBolla")}
+              </Button>
+            )}
+            {(isConfermato || isInTrasporto) &&
+              canDeliver &&
+              !hideConsegnaActions &&
+              !isCentroHandoffBolla && (
+                <>
+                  {!bolla.ritiroNonEffettuatoAt && (
+                    <Button
+                      className="w-full gap-2 bg-green-600 hover:bg-green-700"
+                      onClick={onConsegna}
+                      disabled={consegnaBolla.isPending}
+                    >
+                      <Truck className="h-4 w-4" />
+                      {consegnaBolla.isPending
+                        ? t("bolle.registrazione")
+                        : isInTrasporto
+                          ? t("transportReturn.confirmDelivery")
+                          : t("bolle.segnaConsegnata")}
+                    </Button>
+                  )}
+                  {isConfermato && !bolla.ritiroNonEffettuatoAt && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        setAffidaTrasportatore("");
+                        setAffidaOpen(true);
+                      }}
+                      disabled={affidaBolla.isPending}
+                    >
+                      {t("transportReturn.entrust")}
+                    </Button>
+                  )}
+                  {isInTrasporto && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setMancataOpen(true)}
+                    >
+                      {t("transportReturn.missingDelivery")}
+                    </Button>
+                  )}
+                  {isConfermato &&
+                    bolla.tipoDestinatario === "beneficiario" &&
+                    bolla.consegnaId == null &&
+                    !bolla.ritiroNonEffettuatoAt && (
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2 border-amber-300 text-amber-800"
+                        onClick={() => setRitiroOpen(true)}
+                      >
+                        <AlertTriangle className="h-4 w-4" />
+                        {t("maps.reportMissedPickup")}
+                      </Button>
+                    )}
+                  {isConfermato &&
+                    bolla.tipoDestinatario === "beneficiario" &&
+                    bolla.consegnaId == null &&
+                    bolla.ritiroNonEffettuatoAt && (
+                      <Button
+                        className="w-full gap-2"
+                        onClick={openConversione}
+                      >
+                        <House className="h-4 w-4" />
+                        {t("maps.convertDelivery")}
+                      </Button>
+                    )}
+                  {isConfermato && bolla.consegnaId != null && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      {t("bolle.giaAssegnata")}
+                    </p>
+                  )}
+                  {bolla.consegnaId != null && (
+                    <RouteActions
+                      consegnaId={bolla.consegnaId}
+                      available={Boolean(bolla.indirizzoConsegna)}
+                      className="justify-center"
+                    />
+                  )}
+                  {isConfermato &&
+                    bolla.tipoDestinatario === "beneficiario" &&
+                    !bolla.ritiroNonEffettuatoAt && (
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => setAssegnaOpen(true)}
+                      >
+                        <CalendarClock className="h-4 w-4" />
+                        {t("bolle.assegnaPianificazione")}
+                      </Button>
+                    )}
+                </>
+              )}
+            {/* Annulla */}
+            {canCancel && (isBozza || isConfermato) && (
+              <Button
+                variant="outline"
+                className="w-full gap-2 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5"
+                onClick={() => setAnnullaOpen(true)}
+                disabled={annullaBolla.isPending}
+              >
+                <XCircle className="h-4 w-4" />
+                {t("bolle.annullaBolla")}
+              </Button>
+            )}
+            {isConsegnato && canReverseAdmin && (
+              <Button
+                variant="outline"
+                className="w-full gap-2 border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                onClick={() => setStornoOpen(true)}
+                disabled={stornaAmministrativamente.isPending}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                {t("bolle.stornoAmministrativo", {
+                  defaultValue: "Rettifica amministrativa",
+                })}
+              </Button>
+            )}
+          </div>
+          {(bolla.stato === "rientro_atteso" ||
+            bolla.stato === "rientrato") && (
+            <TransportReturnPanel
+              owner="bolla"
+              id={bollaId}
+              version={bolla.versione}
+              documentNumber={bolla.numeroBolla}
+              canReceive={canReceiveReturn}
+              onComplete={invalidateAll}
+            />
+          )}
+        </>
+      )}
+
+      <Dialog open={affidaOpen} onOpenChange={setAffidaOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("transportReturn.entrust")}</DialogTitle>
+          </DialogHeader>
+          {richiedeNomeIncaricato ? (
+            <>
+              <Label htmlFor="bolla-affida-trasportatore">
+                {t("transportReturn.assignee")}
+              </Label>
+              <Input
+                id="bolla-affida-trasportatore"
+                value={affidaTrasportatore}
+                maxLength={120}
+                onChange={(event) => setAffidaTrasportatore(event.target.value)}
+              />
+            </>
+          ) : (
+            <p className="text-sm" data-testid="bolla-affida-assignee">
+              {t("transportReturn.assignedAssignee", {
+                name: incaricatoAssegnato,
+              })}
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              onClick={onAffida}
+              disabled={
+                (richiedeNomeIncaricato && !affidaTrasportatore.trim()) ||
+                affidaBolla.isPending
+              }
+            >
+              {t("transportReturn.confirmEntrust")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mancataOpen} onOpenChange={setMancataOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("transportReturn.missingDelivery")}</DialogTitle>
+          </DialogHeader>
+          <Label htmlFor="bolla-mancata-motivo">
+            {t("transportReturn.reason")}
+          </Label>
+          <Input
+            id="bolla-mancata-motivo"
+            value={mancataMotivo}
+            maxLength={500}
+            onChange={(event) => setMancataMotivo(event.target.value)}
+          />
+          <DialogFooter>
+            <Button
+              onClick={onMancataConsegna}
+              disabled={
+                !mancataMotivo.trim() || segnalaMancataConsegna.isPending
+              }
+            >
+              {t("transportReturn.submitReason")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {isConsegnato && (
+        <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800">
+          {t("bolle.consegnaCompletata")}
+        </div>
+      )}
+
+      {isAnnullato && (
+        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">
+          {t("bolle.bollaAnnullataInfo")}
+        </div>
+      )}
+
+      {onClose && (
+        <>
+          <Separator />
+          <Button variant="outline" className="w-full gap-2" onClick={onClose}>
+            <ArrowLeft className="h-4 w-4" />{" "}
+            {onCloseLabel ?? t("bolle.tornaAlleBolle")}
+          </Button>
+        </>
+      )}
+
+      {addOpen && bolla.magazzinoId && (
+        <AggiungiProdottoDialog
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          bollaId={bollaId}
+          magazzinoId={bolla.magazzinoId}
+        />
+      )}
+
+      {editOpen &&
+        bolla.tipoDestinatario === "beneficiario" &&
+        bolla.beneficiarioId != null && (
+          <ModificaBollaDialog
+            open={editOpen}
+            onClose={() => setEditOpen(false)}
+            bollaId={bollaId}
+            versione={bolla.versione}
+            beneficiarioId={bolla.beneficiarioId}
+            magazzinoId={bolla.magazzinoId}
+            hasRighe={bolla.righe.length > 0}
+          />
+        )}
+
+      <AlertDialog
+        open={annullaOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !annullaBolla.isPending) closeCancellation();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("bolle.annullareTitle", { numero: bolla.numeroBolla })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isConsegnato
+                ? t("bolle.annullaDescConsegnato")
+                : isConfermato
+                  ? t("bolle.annullaDescConfermato")
+                  : t("bolle.annullaDescBozza")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="annulla-bolla-motivo">
+              {t("bolle.motivoAnnullamento", {
+                defaultValue: "Motivo dell'annullamento",
+              })}
+            </Label>
+            <Input
+              id="annulla-bolla-motivo"
+              value={annullaMotivo}
+              maxLength={500}
+              onChange={(event) => setAnnullaMotivo(event.target.value)}
+              placeholder={t("bolle.motivoAnnullamentoPlaceholder", {
+                defaultValue: "Indica il motivo",
+              })}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={closeCancellation}
+              disabled={annullaBolla.isPending}
+            >
+              {t("bolle.noMantieni")}
+            </AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={onAnnulla}
+              disabled={!annullaMotivo.trim() || annullaBolla.isPending}
+            >
+              {t("bolle.siAnnulla")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog
+        open={stornoOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !stornaAmministrativamente.isPending)
+            closeAdministrativeReversal();
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {t("bolle.stornoAmministrativoTitle", {
+                defaultValue: "Rettifica amministrativa della bolla",
+              })}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {t("bolle.stornoAmministrativoDescription", {
+                defaultValue:
+                  "Seleziona le righe da rettificare. L'operazione è append-only e non equivale al normale annullamento.",
+              })}
+            </p>
+            <div className="max-h-52 space-y-2 overflow-y-auto rounded-md border p-2">
+              {bolla.righe.map((riga) => {
+                const residuo = riga.quantitaNetta ?? riga.quantita;
+                const selectable = residuo > 0;
+                const selected = stornoRigaIds.includes(riga.id);
+                return (
+                  <label
+                    key={riga.id}
+                    className="flex min-h-11 items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/40"
+                  >
+                    <Checkbox
+                      checked={selected}
+                      disabled={!selectable}
+                      onCheckedChange={(checked) =>
+                        setStornoRigaIds((current) =>
+                          checked === true
+                            ? [...new Set([...current, riga.id])]
+                            : current.filter((id) => id !== riga.id),
+                        )
+                      }
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">
+                        {riga.prodottoNome ??
+                          t("bolle.prodottoFallback", {
+                            id: riga.prodottoId,
+                          })}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {residuo} {riga.unitaMisura}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="storno-amministrativo-motivo">
+                {t("bolle.stornoAmministrativoMotivo", {
+                  defaultValue: "Motivo obbligatorio",
+                })}
+              </Label>
+              <Input
+                id="storno-amministrativo-motivo"
+                value={stornoMotivo}
+                maxLength={500}
+                onChange={(event) => setStornoMotivo(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+              <Label htmlFor="storno-amministrativo-conferma">
+                {t("bolle.stornoAmministrativoConferma", {
+                  defaultValue:
+                    "Per confermare, digita esattamente il numero bolla {{numero}}",
+                  numero: bolla.numeroBolla,
+                })}
+              </Label>
+              <Input
+                id="storno-amministrativo-conferma"
+                value={stornoConferma}
+                onChange={(event) => setStornoConferma(event.target.value)}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeAdministrativeReversal}
+              disabled={stornaAmministrativamente.isPending}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={onAdministrativeReversal}
+              disabled={
+                !stornoAmministrativoReady ||
+                stornaAmministrativamente.isPending
+              }
+            >
+              {t("bolle.stornoAmministrativoConfirm", {
+                defaultValue: "Registra rettifica",
+              })}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={assegnaOpen} onOpenChange={setAssegnaOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("bolle.assegnaPianificazioneTitle")}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {t("bolle.assegnaPianificazioneDesc")}
+          </p>
+          <div className="max-h-[50vh] overflow-y-auto space-y-2">
+            {pianificabili.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                {t("bolle.nessunaPianificata")}
+              </p>
+            ) : (
+              pianificabili.map((c) => {
+                const assegnabile = c.beneficiarioId === bolla.beneficiarioId;
+                return (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">
+                        {c.beneficiarioNome ?? c.codice}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {c.codice} ·{" "}
+                        {format(new Date(c.dataPrevista), "dd/MM/yyyy", {
+                          locale: it,
+                        })}
+                        {c.fasciaOraria ? ` · ${c.fasciaOraria}` : ""}
+                      </p>
+                    </div>
+                    {assegnabile ? (
+                      <Button
+                        size="sm"
+                        onClick={() => onAssegna(c.id)}
+                        disabled={associaBolla.isPending}
+                      >
+                        {t("bolle.assegna")}
+                      </Button>
+                    ) : (
+                      <Badge variant="secondary" className="shrink-0">
+                        {t("bolle.altroBeneficiario")}
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssegnaOpen(false)}>
+              {t("bolle.tornaIndietro")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={ritiroOpen} onOpenChange={setRitiroOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("maps.reportMissedPickup")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="ritiro-motivo">{t("maps.optionalReason")}</Label>
+            <Input
+              id="ritiro-motivo"
+              value={ritiroMotivo}
+              maxLength={500}
+              onChange={(event) => setRitiroMotivo(event.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRitiroOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={onRitiroNonEffettuato}
+              disabled={segnalaRitiro.isPending}
+            >
+              {t("common.confirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={conversioneOpen} onOpenChange={setConversioneOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("maps.convertDelivery")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="conversione-indirizzo">
+                {t("common.address")}
+              </Label>
+              <Input
+                id="conversione-indirizzo"
+                value={conversioneIndirizzo}
+                maxLength={200}
+                onChange={(event) =>
+                  setConversioneIndirizzo(event.target.value)
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="conversione-data">{t("common.date")}</Label>
+                <Input
+                  id="conversione-data"
+                  type="date"
+                  value={conversioneData}
+                  onChange={(event) => setConversioneData(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="conversione-fascia">
+                  {t("consegne.colFasciaOraria")}
+                </Label>
+                <Select
+                  value={conversioneFascia}
+                  onValueChange={(value) =>
+                    setConversioneFascia(
+                      value as Exclude<
+                        ConversioneConsegnaInputFasciaOraria,
+                        null
+                      >,
+                    )
+                  }
+                >
+                  <SelectTrigger id="conversione-fascia">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Mattina">
+                      {t("consegne.fasciaMattina")}
+                    </SelectItem>
+                    <SelectItem value="Pomeriggio">
+                      {t("consegne.fasciaPomeriggio")}
+                    </SelectItem>
+                    <SelectItem value="Sera">
+                      {t("consegne.fasciaSera")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="conversione-note">{t("common.notes")}</Label>
+              <Input
+                id="conversione-note"
+                value={conversioneNote}
+                onChange={(event) => setConversioneNote(event.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConversioneOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={onConvertiConsegna}
+              disabled={
+                !conversioneIndirizzo.trim() ||
+                !conversioneData ||
+                convertiConsegna.isPending
+              }
+            >
+              {t("common.confirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── Pagina principale ───────────────────────────────────────────────────────
+
+export function trasferimentoStatoBadge(stato: string) {
+  if (stato === "rientro_atteso")
+    return (
+      <Badge className="bg-amber-100 text-amber-900">
+        {i18n.t("transportReturn.awaitingReturn")}
+      </Badge>
+    );
+  if (stato === "rientrato")
+    return (
+      <Badge variant="secondary">{i18n.t("transportReturn.returned")}</Badge>
+    );
+  if (stato === "completato")
+    return (
+      <Badge className="bg-green-500 text-white">
+        {i18n.t("trasferimenti.statusCompletato")}
+      </Badge>
+    );
+  if (stato === "in_transito")
+    return (
+      <Badge className="bg-amber-500 text-white">
+        {i18n.t("trasferimenti.statusInTransito")}
+      </Badge>
+    );
+  if (stato === "annullato")
+    return (
+      <Badge variant="destructive">{i18n.t("bolle.statoAnnullato")}</Badge>
+    );
+  if (stato === "preparato")
+    return (
+      <Badge variant="secondary">
+        {i18n.t("trasferimenti.statusPreparato")}
+      </Badge>
+    );
+  return (
+    <Badge variant="secondary">{i18n.t("trasferimenti.statusRichiesto")}</Badge>
+  );
+}
+
+function TrasferimentoDettaglioComune({
+  trasferimentoId,
+  trasferimentoData,
+  onClose,
+  onDraftDirtyChange,
+}: {
+  trasferimentoId: number;
+  trasferimentoData?: Trasferimento;
+  onClose: () => void;
+  onDraftDirtyChange?: (dirty: boolean) => void;
+}) {
+  const { hasPermission } = useAuth();
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: fetchedTrasferimento, isLoading: legacyTransferLoading } =
+    useGetTrasferimento(trasferimentoId, {
+      query: {
+        enabled: trasferimentoData == null,
+        queryKey: getGetTrasferimentoQueryKey(trasferimentoId),
+      },
+    });
+  const trasferimento = trasferimentoData ?? fetchedTrasferimento;
+  const isLoading = trasferimentoData == null && legacyTransferLoading;
+  const [editing, setEditing] = useState(false);
+  const [mancatoOpen, setMancatoOpen] = useState(false);
+  const [mancatoMotivo, setMancatoMotivo] = useState("");
+  const avvia = useAvviaTrasferimento();
+  const prepara = usePreparaTrasferimento();
+  const annulla = useAnnullaTrasferimento();
+  const ricevi = useConfermaTrasferimento();
+  const segnalaMancatoArrivo = useSegnalaMancatoArrivoTrasferimento();
+  const commandIntents = useCommandIntentRegistry();
+  const canEdit = hasPermission("magazzino.transfers.create");
+  const canPrepare =
+    hasPermission("magazzino.transfers.prepare") ||
+    hasPermission("mensa.transfers.prepare");
+  const canCancel =
+    hasPermission("magazzino.transfers.cancel") ||
+    hasPermission("mensa.transfers.cancel");
+  const canDispatch = hasPermission("magazzino.transfers.dispatch");
+  const canReceive = hasPermission("magazzino.transfers.receive");
+  const canReceiveReturn = hasPermission("magazzino.stock.receive");
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({
+      queryKey: getListRichiesteMagazzinoQueryKey(),
+    });
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        String(query.queryKey[0]).startsWith("/api/richieste-magazzino/"),
+    });
+    queryClient.invalidateQueries({
+      queryKey: getGetTrasferimentoQueryKey(trasferimentoId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: getGetDocumentoOperativoQueryKey(
+        "trasferimento",
+        trasferimentoId,
+      ),
+    });
+    queryClient.invalidateQueries({
+      queryKey: getListDocumentiOperativiQueryKey(),
+    });
+    queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() });
+  };
+
+  if (isLoading) return <Skeleton className="mt-5 h-48 w-full" />;
+  if (!trasferimento)
+    return (
+      <p className="mt-5 text-muted-foreground">
+        {t("trasferimenti.notFound", {
+          defaultValue: "Trasferimento non trovato",
+        })}
+      </p>
+    );
+
+  const avviabile = trasferimento.stato === "preparato";
+  const onPrepara = () => {
+    const slot = `trasferimento:${trasferimento.id}:prepare`;
+    prepara.mutate(
+      {
+        id: trasferimento.id,
+        data: commandIntents.prepare(
+          slot,
+          {},
+          { versione: trasferimento.versione },
+        ),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidate();
+          toast({ title: t("trasferimenti.toastPronto") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
+            description: t("trasferimenti.errorUpdate"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+  const onAnnulla = () => {
+    const motivo = window.prompt(t("trasferimenti.motivoAnnullamento"))?.trim();
+    if (!motivo) return;
+    const slot = `trasferimento:${trasferimento.id}:cancel`;
+    annulla.mutate(
+      {
+        id: trasferimento.id,
+        data: commandIntents.prepare(
+          slot,
+          { motivo },
+          { versione: trasferimento.versione, motivo },
+        ),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidate();
+          toast({ title: t("trasferimenti.toastAnnullato") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
+            description: t("trasferimenti.errorUpdate"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+  const onAvvia = () => {
+    const slot = `trasferimento:${trasferimento.id}:start`;
+    avvia.mutate(
+      {
+        id: trasferimento.id,
+        data: commandIntents.prepare(
+          slot,
+          {},
+          {
+            versione: trasferimento.versione,
+          },
+        ),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidate();
+          toast({ title: t("trasferimenti.toastAvviato") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
+            description: t("trasferimenti.errorUpdate"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+  const onRicevi = () => {
+    const slot = `trasferimento:${trasferimento.id}:receive`;
+    ricevi.mutate(
+      {
+        id: trasferimento.id,
+        data: commandIntents.prepare(
+          slot,
+          {},
+          {
+            versione: trasferimento.versione,
+            dataConferma: new Date().toISOString(),
+          },
+        ),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          invalidate();
+          toast({ title: t("trasferimenti.toastRicezioneConfermata") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("trasferimenti.errorTitle"),
+            description: t("trasferimenti.errorUpdate"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onMancatoArrivo = () => {
+    if (!mancatoMotivo.trim()) return;
+    const slot = `trasferimento:${trasferimento.id}:missing-arrival`;
+    const semantic = { motivo: mancatoMotivo.trim() };
+    segnalaMancatoArrivo.mutate(
+      {
+        id: trasferimento.id,
+        data: commandIntents.prepare(slot, semantic, {
+          ...semantic,
+          versione: trasferimento.versione,
+        }),
+      },
+      {
+        onSuccess: () => {
+          commandIntents.complete(slot);
+          setMancatoOpen(false);
+          invalidate();
+          toast({ title: t("transportReturn.actionSaved") });
+        },
+        onError: (error) => {
+          commandIntents.fail(slot, error);
+          toast({
+            title: t("transportReturn.actionError"),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="mt-5 space-y-5">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="font-mono text-lg font-semibold">
+            {trasferimento.codice}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {format(new Date(trasferimento.dataRichiesta), "dd MMMM yyyy", {
+              locale: it,
+            })}
+          </p>
+        </div>
+        {trasferimentoStatoBadge(trasferimento.stato)}
+      </div>
+      <div className="flex items-center gap-2 rounded-lg border p-3 text-sm font-medium">
+        <span>{trasferimento.magazzinoOrigineNome}</span>
+        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        <span>{trasferimento.magazzinoDestinoNome}</span>
+      </div>
+      <div className="space-y-2">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+          {t("common.details")}
+        </p>
+        {(trasferimento.righe ?? []).map((riga) => (
+          <div
+            key={riga.id}
+            className="flex justify-between gap-3 border-b py-2 text-sm"
+          >
+            <div>
+              <span>{riga.prodottoNome}</span>
+              {(riga.ripartizioniLotto ?? []).map((split, index) => (
+                <p
+                  key={`${split.lottoId}-${index}`}
+                  className="text-xs text-muted-foreground"
+                >
+                  {t("trasferimenti.ripartizioneLotto", {
+                    lotto: split.codiceLotto ?? `#${split.lottoId}`,
+                    quantita: split.quantita,
+                  })}
+                </p>
+              ))}
+            </div>
+            <span className="font-medium">
+              {riga.quantita} {riga.unitaMisura}
+            </span>
+          </div>
+        ))}
+      </div>
+      {trasferimento.note && (
+        <p className="rounded-md bg-muted p-3 text-sm">{trasferimento.note}</p>
+      )}
+      {trasferimento.motivoAnnullamento && (
+        <p className="rounded-md bg-muted p-3 text-sm">
+          {t("trasferimenti.motivoAnnullamento")}:{" "}
+          {trasferimento.motivoAnnullamento}
+        </p>
+      )}
+      <div className="flex flex-wrap justify-end gap-2">
+        {trasferimento.stato === "richiesto" && canEdit && (
+          <Button variant="outline" onClick={() => setEditing(true)}>
+            <Pencil className="mr-1.5 h-4 w-4" />
+            {t("common.edit")}
+          </Button>
+        )}
+        {trasferimento.stato === "richiesto" && canPrepare && (
+          <Button
+            variant="outline"
+            onClick={onPrepara}
+            disabled={prepara.isPending}
+          >
+            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+            {t("trasferimenti.segnaPronto")}
+          </Button>
+        )}
+        {avviabile && canDispatch && (
+          <Button
+            variant="outline"
+            onClick={onAvvia}
+            disabled={avvia.isPending}
+          >
+            <Play className="mr-1.5 h-4 w-4" />
+            {t("trasferimenti.avvia")}
+          </Button>
+        )}
+        {(trasferimento.stato === "richiesto" ||
+          trasferimento.stato === "preparato") &&
+          canCancel && (
+            <Button
+              variant="outline"
+              onClick={onAnnulla}
+              disabled={annulla.isPending}
+            >
+              {t("trasferimenti.annulla")}
+            </Button>
+          )}
+        {trasferimento.stato === "in_transito" && canReceive && (
+          <Button onClick={onRicevi} disabled={ricevi.isPending}>
+            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+            {t("trasferimenti.confermaRic")}
+          </Button>
+        )}
+        {trasferimento.stato === "in_transito" && canDispatch && (
+          <Button variant="outline" onClick={() => setMancatoOpen(true)}>
+            {t("transportReturn.missingArrival")}
+          </Button>
+        )}
+        <Button variant="ghost" onClick={onClose}>
+          {t("common.close")}
+        </Button>
+      </div>
+      {(trasferimento.stato === "rientro_atteso" ||
+        trasferimento.stato === "rientrato") && (
+        <TransportReturnPanel
+          owner="trasferimento"
+          id={trasferimento.id}
+          version={trasferimento.versione}
+          documentNumber={trasferimento.codice}
+          canReceive={canReceiveReturn}
+          onComplete={invalidate}
+        />
+      )}
+      <Dialog open={mancatoOpen} onOpenChange={setMancatoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("transportReturn.missingArrival")}</DialogTitle>
+          </DialogHeader>
+          <Label htmlFor="trasferimento-mancato-motivo">
+            {t("transportReturn.reason")}
+          </Label>
+          <Input
+            id="trasferimento-mancato-motivo"
+            value={mancatoMotivo}
+            maxLength={500}
+            onChange={(event) => setMancatoMotivo(event.target.value)}
+          />
+          <DialogFooter>
+            <Button
+              onClick={onMancatoArrivo}
+              disabled={!mancatoMotivo.trim() || segnalaMancatoArrivo.isPending}
+            >
+              {t("transportReturn.submitReason")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {editing && (
+        <ModificaTrasferimentoForm
+          key={trasferimento.id}
+          trasferimento={trasferimento}
+          open
+          onDirtyChange={onDraftDirtyChange}
+          onClose={() => {
+            setEditing(false);
+            invalidate();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+export function DocumentoOperativoDettaglioComune({
+  selection,
+  onClose,
+  onDraftDirtyChange,
+  onBackToRequest,
+}: {
+  selection: DocumentoOperativoSelection;
+  onClose: () => void;
+  onDraftDirtyChange: (dirty: boolean) => void;
+  onBackToRequest?: () => void;
+}) {
+  const { user, hasPermission } = useAuth();
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [accessDenied, setAccessDenied] = useState(false);
+  useEffect(
+    () =>
+      queryClient.getMutationCache().subscribe((event) => {
+        if (event.type !== "updated" || event.mutation.state.status !== "error")
+          return;
+        const error = event.mutation.state.error as {
+          status?: number;
+          response?: { status?: number };
+        } | null;
+        const status = error?.status ?? error?.response?.status;
+        if (status === 403 || status === 404) {
+          setAccessDenied(true);
+          onDraftDirtyChange(false);
+          void queryClient.invalidateQueries({
+            queryKey: getGetDocumentoOperativoQueryKey(
+              selection.tipo,
+              selection.id,
+            ),
+          });
+        }
+      }),
+    [queryClient, selection.tipo, selection.id, onDraftDirtyChange],
+  );
+  useEffect(() => {
+    setAccessDenied(false);
+  }, [selection.tipo, selection.id]);
+  const { data, isLoading, isError } = useGetDocumentoOperativo(
+    selection.tipo,
+    selection.id,
+    {
+      query: {
+        staleTime: 0,
+        refetchOnWindowFocus: "always",
+        queryKey: [
+          ...getGetDocumentoOperativoQueryKey(selection.tipo, selection.id),
+          {
+            userId: user?.id ?? null,
+            centroAscoltoId: user?.centroAscoltoId ?? null,
+            areaOperativaId: user?.areaOperativaId ?? null,
+            zonaUdsId: user?.zonaUdsId ?? null,
+            canViewBolle: hasPermission("bolle.view"),
+            canViewTransfers: hasPermission("magazzino.view"),
+          },
+        ],
+      },
+    },
+  );
+  const { data: sourceRequest } = useGetDocumentoOperativoRichiesta(
+    selection.tipo,
+    selection.id,
+    {
+      query: {
+        enabled: hasPermission("richieste_magazzino.view"),
+        queryKey: [
+          ...getGetDocumentoOperativoRichiestaQueryKey(
+            selection.tipo,
+            selection.id,
+          ),
+          user?.id ?? null,
+        ],
+      },
+    },
+  );
+
+  if (isLoading) return <Skeleton className="mt-5 h-48 w-full" />;
+  if (accessDenied || isError || !data || data.tipoAggregato !== selection.tipo)
+    return (
+      <p className="mt-5 text-muted-foreground">
+        {t("bolle.documentoNonTrovato", {
+          defaultValue: "Documento non trovato o non accessibile",
+        })}
+      </p>
+    );
+
+  return (
+    <div className="space-y-3">
+      {onBackToRequest ? (
+        <Button variant="outline" onClick={onBackToRequest}>
+          {t("richiesteMagazzino.backToRequest")}
+        </Button>
+      ) : (
+        sourceRequest?.richiesta && (
+          <p className="text-sm">
+            <Link className="underline" href={sourceRequest.richiesta.percorso}>
+              {t("richiesteMagazzino.sourceRequest")}:{" "}
+              {sourceRequest.richiesta.codice}
+            </Link>
+          </p>
+        )
+      )}
+      {data.tipoAggregato === "bolla" ? (
+        <BollaDettaglio
+          bollaId={selection.id}
+          bollaData={data.dettaglio as BollaDettaglioDto}
+          onClose={onClose}
+          onCloseLabel={
+            onBackToRequest ? t("richiesteMagazzino.backToRequest") : undefined
+          }
+          linkedRequest={
+            sourceRequest === undefined ? null : sourceRequest.richiesta != null
+          }
+          linkedRequestId={sourceRequest?.richiesta?.id}
+          onDraftDirtyChange={onDraftDirtyChange}
+        />
+      ) : (
+        <TrasferimentoDettaglioComune
+          trasferimentoId={selection.id}
+          trasferimentoData={data.dettaglio as Trasferimento}
+          onClose={onClose}
+          onDraftDirtyChange={onDraftDirtyChange}
+        />
+      )}
+    </div>
+  );
+}

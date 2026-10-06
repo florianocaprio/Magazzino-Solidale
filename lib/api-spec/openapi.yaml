@@ -5910,7 +5910,7 @@ paths:
               {
                 type: string,
                 enum: [dataDocumento, dataCreazione, numero],
-                default: dataDocumento,
+                default: dataCreazione,
               },
           }
         - {
@@ -5980,7 +5980,7 @@ paths:
               {
                 type: string,
                 enum: [dataDocumento, dataCreazione, numero],
-                default: dataDocumento,
+                default: dataCreazione,
               },
           }
         - {

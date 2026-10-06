@@ -25,6 +25,21 @@ import {
   type RichiestaMagazzino,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
+import { invalidateRequestWorkflowViews } from "@/lib/bolla-query-invalidation";
+import { DocumentoOperativoDettaglioComune } from "@/components/documento-operativo";
+import {
+  parseDocumentoSelection,
+  documentoSelectionValue,
+  type DocumentoOperativoSelection,
+} from "@/lib/documenti-operativi-url";
+import {
+  linkedDocumentSelection,
+  requestAllowsDocument,
+} from "@/lib/richiesta-documento-navigation";
+import {
+  useUnsavedChangesGuard,
+  UnsavedChangesDialog,
+} from "@/hooks/use-unsaved-changes-guard";
 import {
   interventionRequestPrefill,
   interventionReturnUrl,
@@ -112,8 +127,29 @@ export default function RichiesteMagazzino() {
   const contextInterventionId = queryId("interventoId");
   const contextRequestId = queryId("richiestaId");
   const contextLoaded = useRef<number | null>(null);
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState<"aperte" | "annullata">("aperte");
+  const listSearch = new URLSearchParams(search);
+  const status = (
+    ["chiusa", "annullata"].includes(listSearch.get("vista") ?? "")
+      ? listSearch.get("vista")
+      : "aperte"
+  ) as "aperte" | "chiusa" | "annullata";
+  const rawPage = Number(listSearch.get("page"));
+  const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+  const setPage = (value: number) => {
+    const params = new URLSearchParams(window.location.search);
+    if (value === 1) params.delete("page");
+    else params.set("page", String(value));
+    navigate(`${window.location.pathname}?${params.toString()}`);
+  };
+  const setStatus = (value: typeof status) =>
+    navigationGuard.requestClose(() => {
+      const params = new URLSearchParams(window.location.search);
+      params.set("vista", value);
+      params.delete("page");
+      params.delete("richiestaId");
+      params.delete("documento");
+      navigate(`${window.location.pathname}?${params.toString()}`);
+    });
   const [selectedId, setSelectedId] = useState<number | null>(contextRequestId);
   const [creating, setCreating] = useState(
     Boolean(contextBeneficiaryId || contextInterventionId),
@@ -140,6 +176,36 @@ export default function RichiesteMagazzino() {
   const [confirmation, setConfirmation] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [transferRows, setTransferRows] = useState<RigaDraft[]>([newRiga()]);
+  const [documentDirty, setDocumentDirty] = useState(false);
+  const documentSelection = parseDocumentoSelection(
+    new URLSearchParams(search).get("documento"),
+  );
+  const dirty = documentDirty || edit || !!warehouseId || cancelOpen;
+  const navigationGuard = useUnsavedChangesGuard(dirty);
+  const safeLocation = useRef(
+    window.location.pathname + window.location.search,
+  );
+  useEffect(() => {
+    safeLocation.current = window.location.pathname + window.location.search;
+  }, [search]);
+  useEffect(() => {
+    const onBack = () => {
+      if (dirty && !window.confirm(t("common.unsavedChangesDesc"))) {
+        navigate(safeLocation.current, { replace: true });
+      }
+    };
+    window.addEventListener("popstate", onBack);
+    return () => window.removeEventListener("popstate", onBack);
+  }, [dirty, navigate, t]);
+  const openDocument = (selection: DocumentoOperativoSelection | null) =>
+    navigationGuard.requestClose(() => {
+      const params = new URLSearchParams(window.location.search);
+      if (selection)
+        params.set("documento", documentoSelectionValue(selection));
+      else params.delete("documento");
+      setDocumentDirty(false);
+      navigate(`${window.location.pathname}?${params.toString()}`);
+    });
   useEffect(() => {
     setSelectedId(queryId("richiestaId"));
     setEdit(false);
@@ -150,9 +216,10 @@ export default function RichiesteMagazzino() {
     setCancelNote("");
     setWarehouseId("");
     setTransferRows([newRiga()]);
-  }, [search]);
+  }, [contextRequestId]);
   const selectRequest = (id: number | null) => {
     const params = new URLSearchParams(window.location.search);
+    params.delete("documento");
     if (id == null) params.delete("richiestaId");
     else params.set("richiestaId", String(id));
     setSelectedId(id);
@@ -220,6 +287,28 @@ export default function RichiesteMagazzino() {
       refetchOnWindowFocus: "always",
     },
   });
+  useEffect(() => {
+    const failure = detail.error as {
+      status?: number;
+      response?: { status?: number };
+    } | null;
+    const code = failure?.status ?? failure?.response?.status;
+    if (
+      selectedId != null &&
+      detail.isError &&
+      (code === 403 || code === 404)
+    ) {
+      const deniedId = selectedId;
+      selectRequest(null);
+      queryClient.removeQueries({
+        queryKey: getGetRichiestaMagazzinoQueryKey(deniedId),
+      });
+      queryClient.removeQueries({
+        queryKey: getGetRichiestaMagazzinoStoricoQueryKey(deniedId),
+      });
+      setError(t("richiesteMagazzino.loadError"));
+    }
+  }, [detail.isError, detail.error, selectedId, queryClient, t]);
   const beneficiaryParams = {
     search: beneficiarySearch || undefined,
     limit: 30,
@@ -241,7 +330,14 @@ export default function RichiesteMagazzino() {
       enabled: creating && beneficiaryId != null,
     },
   });
-  const row = detail.data;
+  const row = detail.isError ? undefined : detail.data;
+  const allowedDocument =
+    documentSelection &&
+    row &&
+    requestAllowsDocument(documentSelection, [
+      ...(row.documentoCorrente ? [row.documentoCorrente] : []),
+      ...(row.documentiPrecedenti ?? []),
+    ]);
   const activeRequest =
     row?.stato === "inviata" || row?.stato === "presa_in_carico";
   const preExit =
@@ -289,6 +385,7 @@ export default function RichiesteMagazzino() {
       transferRowsHaveRequiredLots(transferInput, products.data));
 
   const refresh = async (id?: number) => {
+    await invalidateRequestWorkflowViews(queryClient);
     await queryClient.invalidateQueries({
       queryKey: getListRichiesteMagazzinoQueryKey(),
     });
@@ -475,7 +572,13 @@ export default function RichiesteMagazzino() {
       setWarehouseId("");
       setTransferRows([newRiga()]);
       setConfirmation(t("richiesteMagazzino.documentCreated"));
-      if (ok.percorsoDocumento) navigate(ok.percorsoDocumento);
+      setDocumentDirty(false);
+      const params = new URLSearchParams(window.location.search);
+      params.set(
+        "documento",
+        documentoSelectionValue({ tipo: ok.tipoDocumento, id: ok.documentoId }),
+      );
+      navigate(`${window.location.pathname}?${params.toString()}`);
     }
   };
 
@@ -718,16 +821,22 @@ export default function RichiesteMagazzino() {
               variant={status === "aperte" ? "default" : "outline"}
               onClick={() => {
                 setStatus("aperte");
-                setPage(1);
               }}
             >
               {t("richiesteMagazzino.open")}
             </Button>
             <Button
+              variant={status === "chiusa" ? "default" : "outline"}
+              onClick={() => {
+                setStatus("chiusa");
+              }}
+            >
+              {t("richiesteMagazzino.closed")}
+            </Button>
+            <Button
               variant={status === "annullata" ? "default" : "outline"}
               onClick={() => {
                 setStatus("annullata");
-                setPage(1);
               }}
             >
               {t("richiesteMagazzino.cancelled")}
@@ -807,7 +916,7 @@ export default function RichiesteMagazzino() {
         <Sheet
           open
           onOpenChange={(open) => {
-            if (!open) selectRequest(null);
+            if (!open) navigationGuard.requestClose(() => selectRequest(null));
           }}
         >
           <SheetContent
@@ -835,6 +944,18 @@ export default function RichiesteMagazzino() {
               {confirmation && <p role="status">{confirmation}</p>}
               {detail.isError ? (
                 <p role="alert">{t("richiesteMagazzino.loadError")}</p>
+              ) : row && documentSelection ? (
+                allowedDocument ? (
+                  <DocumentoOperativoDettaglioComune
+                    key={documentoSelectionValue(documentSelection)}
+                    selection={documentSelection}
+                    onClose={() => openDocument(null)}
+                    onBackToRequest={() => openDocument(null)}
+                    onDraftDirtyChange={setDocumentDirty}
+                  />
+                ) : (
+                  <p role="alert">{t("bolle.documentoNonTrovato")}</p>
+                )
               ) : row ? (
                 <>
                   <p>
@@ -871,12 +992,19 @@ export default function RichiesteMagazzino() {
                         )}
                       </p>
                       {row.documentoCorrente.percorsoDocumento && (
-                        <Link
+                        <Button
+                          variant="link"
                           className="underline"
-                          href={row.documentoCorrente.percorsoDocumento}
+                          onClick={() =>
+                            openDocument(
+                              linkedDocumentSelection(
+                                row.documentoCorrente?.percorsoDocumento,
+                              ),
+                            )
+                          }
                         >
                           {t("richiesteMagazzino.openDocument")}
-                        </Link>
+                        </Button>
                       )}
                     </section>
                   ) : row.stato === "presa_in_carico" &&
@@ -966,12 +1094,19 @@ export default function RichiesteMagazzino() {
                             `richiesteMagazzino.progress.${document.avanzamento}`,
                           )}{" "}
                           {document.percorsoDocumento && (
-                            <Link
+                            <Button
+                              variant="link"
                               className="underline"
-                              href={document.percorsoDocumento}
+                              onClick={() =>
+                                openDocument(
+                                  linkedDocumentSelection(
+                                    document.percorsoDocumento,
+                                  ),
+                                )
+                              }
                             >
                               {t("richiesteMagazzino.openDocument")}
-                            </Link>
+                            </Button>
                           )}
                         </p>
                       ))}
@@ -1101,7 +1236,7 @@ export default function RichiesteMagazzino() {
                 <p>{t("common.loading")}</p>
               )}
             </div>
-            {row && (
+            {row && !documentSelection && (
               <footer className="shrink-0 border-t bg-background p-4">
                 <div className="flex flex-wrap gap-2">
                   {row.stato === "inviata" && canEdit && (
@@ -1142,12 +1277,19 @@ export default function RichiesteMagazzino() {
                 {activeRequest &&
                   !preExit &&
                   row.documentoCorrente?.percorsoDocumento && (
-                    <Link
+                    <Button
+                      variant="link"
                       className="underline"
-                      href={row.documentoCorrente.percorsoDocumento}
+                      onClick={() =>
+                        openDocument(
+                          linkedDocumentSelection(
+                            row.documentoCorrente?.percorsoDocumento,
+                          ),
+                        )
+                      }
                     >
                       {t("richiesteMagazzino.openDocument")}
-                    </Link>
+                    </Button>
                   )}
               </footer>
             )}
@@ -1219,6 +1361,7 @@ export default function RichiesteMagazzino() {
           </SheetContent>
         </Sheet>
       )}
+      <UnsavedChangesDialog guard={navigationGuard} />
     </div>
   );
 }

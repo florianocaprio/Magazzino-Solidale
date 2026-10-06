@@ -38,11 +38,62 @@ export const DEFAULT_DOCUMENTO_FILTERS: DocumentoOperativoFilters = {
   dataDa: "",
   dataA: "",
   ricerca: "",
-  sortBy: "dataDocumento",
+  sortBy: "dataCreazione",
   sortDirection: "desc",
 };
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+export type CreatedBollaContext = {
+  magazzinoId: number;
+  areaOperativaId: number | null;
+  centroAscoltoId: number | null;
+  tipoDestinatario: "beneficiario" | "ente";
+  dataDocumento?: string;
+  numero?: string;
+  magazzinoNome?: string;
+};
+
+/** Keep/narrow territorial filters; never silently switch to a global scope. */
+export function filtersAfterDocumentCreation(
+  previous: DocumentoOperativoFilters,
+  created: CreatedBollaContext,
+): DocumentoOperativoFilters {
+  return {
+    ...previous,
+    tipoAggregato: "bolla",
+    destinatario: created.tipoDestinatario,
+    stato: previous.stato === "bozza" ? "bozza" : "all",
+    ricerca: [created.numero, created.magazzinoNome].some((value) =>
+      value
+        ?.toLocaleLowerCase()
+        .includes(previous.ricerca.trim().toLocaleLowerCase()),
+    )
+      ? previous.ricerca
+      : "",
+    dataDa:
+      created.dataDocumento && previous.dataDa <= created.dataDocumento
+        ? previous.dataDa
+        : "",
+    dataA:
+      created.dataDocumento && previous.dataA >= created.dataDocumento
+        ? previous.dataA
+        : "",
+    magazzinoId: String(created.magazzinoId),
+    areaOperativaId:
+      created.areaOperativaId == null
+        ? previous.areaOperativaId
+        : String(created.areaOperativaId),
+    centroAscoltoId:
+      created.tipoDestinatario === "ente"
+        ? "all"
+        : created.centroAscoltoId == null
+          ? previous.centroAscoltoId
+          : String(created.centroAscoltoId),
+    sortBy: "dataCreazione",
+    sortDirection: "desc",
+  };
+}
 
 function enumValue<T extends string>(
   value: string | null,
@@ -123,7 +174,7 @@ export function readDocumentiOperativiUrl(search: string): {
       sortBy: enumValue(
         params.get("sortBy"),
         ["dataDocumento", "dataCreazione", "numero"] as const,
-        "dataDocumento",
+        "dataCreazione",
       ),
       sortDirection: enumValue(
         params.get("sortDirection"),
@@ -177,7 +228,7 @@ export function writeDocumentiOperativiUrl(
   if (filters.dataDa) params.set("dataDa", filters.dataDa);
   if (filters.dataA) params.set("dataA", filters.dataA);
   if (filters.ricerca.trim()) params.set("ricerca", filters.ricerca.trim());
-  if (filters.sortBy !== "dataDocumento") params.set("sortBy", filters.sortBy);
+  if (filters.sortBy !== "dataCreazione") params.set("sortBy", filters.sortBy);
   if (filters.sortDirection !== "desc")
     params.set("sortDirection", filters.sortDirection);
   if (page > 1) params.set("page", String(page));
@@ -206,13 +257,24 @@ export function normalizeDocumentFiltersForAccess(
 
   const validStates =
     tipoAggregato === "bolla"
-      ? new Set(["all", "bozza", "confermato", "consegnato", "annullato"])
+      ? new Set([
+          "all",
+          "bozza",
+          "confermato",
+          "in_trasporto",
+          "rientro_atteso",
+          "rientrato",
+          "consegnato",
+          "annullato",
+        ])
       : tipoAggregato === "trasferimento"
         ? new Set([
             "all",
             "richiesto",
             "preparato",
             "in_transito",
+            "rientro_atteso",
+            "rientrato",
             "completato",
             "annullato",
           ])
@@ -224,6 +286,9 @@ export function normalizeDocumentFiltersForAccess(
             "richiesto",
             "preparato",
             "in_transito",
+            "in_trasporto",
+            "rientro_atteso",
+            "rientrato",
             "completato",
             "annullato",
           ]);
@@ -277,7 +342,10 @@ export function documentiOperativiQuery(
     (filters.centroAscoltoId !== "all"
       ? Number(filters.centroAscoltoId)
       : null);
-  if (centroId != null) query.centroAscoltoId = centroId;
+  // Ente has no recipient Centre. Backend still enforces the caller's scope;
+  // applying a beneficiary-only list filter would hide this authorized document.
+  if (centroId != null && filters.destinatario !== "ente")
+    query.centroAscoltoId = centroId;
   if (filters.dataDa) query.dataDa = filters.dataDa;
   if (filters.dataA) query.dataA = filters.dataA;
   if (filters.ricerca.trim()) query.ricerca = filters.ricerca.trim();

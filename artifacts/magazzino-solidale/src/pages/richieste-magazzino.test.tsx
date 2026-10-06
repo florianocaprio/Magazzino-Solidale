@@ -12,6 +12,7 @@ const mock = vi.hoisted(() => ({
   row: {} as any,
   take: vi.fn(),
   cancel: vi.fn(),
+  list: vi.fn(),
 }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -25,6 +26,14 @@ vi.mock("@/lib/use-moduli", () => ({
 vi.mock("@/pages/trasferimenti", () => ({
   RigheEditor: () => null,
   newRiga: () => ({}),
+}));
+vi.mock("@/components/documento-operativo", () => ({
+  DocumentoOperativoDettaglioComune: ({ selection, onBackToRequest }: any) => (
+    <div data-testid="contextual-document">
+      {selection.tipo}:{selection.id}
+      <button onClick={onBackToRequest}>back-to-request</button>
+    </div>
+  ),
 }));
 vi.mock("@workspace/api-client-react", () => ({
   createRichiestaMagazzino: vi.fn(),
@@ -45,17 +54,22 @@ vi.mock("@workspace/api-client-react", () => ({
     data: [{ id: 4, nome: "Magazzino", areaOperativaId: 1, stato: "attivo" }],
   }),
   useListProdotti: () => ({ data: [] }),
-  useListRichiesteMagazzino: (params: any) =>
-    useQuery({
+  useListRichiesteMagazzino: (params: any) => {
+    mock.list(params);
+    return useQuery({
       queryKey: ["requests", params],
-      queryFn: async () => ({
-        items:
-          mock.row.stato === "annullata" && params.stato === "aperte"
-            ? []
-            : [{ ...mock.row }],
-        total: 1,
-      }),
-    }),
+      queryFn: async () => {
+        const visible =
+          params.stato === "aperte"
+            ? ["inviata", "presa_in_carico"].includes(mock.row.stato)
+            : mock.row.stato === params.stato;
+        return {
+          items: visible ? [{ ...mock.row }] : [],
+          total: visible ? (params.page === 3 ? 61 : 1) : 0,
+        };
+      },
+    });
+  },
   useGetRichiestaMagazzino: (id: number) =>
     useQuery({
       queryKey: ["request", id],
@@ -159,6 +173,39 @@ async function input(id: string, value: string) {
   });
 }
 describe("M5C2-A-R1 Sheet richieste", () => {
+  it("separa le tre viste, preserva il deep-link e azzera la pagina al cambio vista", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/richieste-magazzino?filter=keep&page=3&vista=chiusa",
+    );
+    mock.row.stato = "chiusa";
+    await mount();
+    expect(host.textContent).toContain("RM-TEST");
+    expect(host.textContent).toContain("3 · 61");
+    expect(mock.list).toHaveBeenCalledWith(
+      expect.objectContaining({ stato: "chiusa", page: 3 }),
+    );
+    await click("richiesteMagazzino.cancelled");
+    expect(window.location.search).toContain("vista=annullata");
+    expect(window.location.search).toContain("filter=keep");
+    expect(window.location.search).not.toContain("page=");
+    expect(host.textContent).not.toContain("RM-TEST");
+    expect(host.textContent).toContain("1 · 0");
+    expect(mock.list).toHaveBeenCalledWith(
+      expect.objectContaining({ stato: "annullata", page: 1 }),
+    );
+    mock.row.stato = "annullata";
+    await client.invalidateQueries({ queryKey: ["requests"] });
+    await settle();
+    expect(host.textContent).toContain("RM-TEST");
+    expect(host.textContent).toContain("1 · 1");
+    await click("richiesteMagazzino.open");
+    expect(host.textContent).not.toContain("RM-TEST");
+    expect(mock.list).toHaveBeenCalledWith(
+      expect.objectContaining({ stato: "aperte", page: 1 }),
+    );
+  });
   it("apre dalla riga e chiude preservando gli altri parametri URL", async () => {
     await mount();
     await open();
@@ -201,7 +248,7 @@ describe("M5C2-A-R1 Sheet richieste", () => {
       tipoDocumento: "bolla",
       statoDocumento: "in_trasporto",
       avanzamento: "in_viaggio",
-      percorsoDocumento: "/bolle?id=1",
+      percorsoDocumento: "/bolle?documento=bolla%3A1",
     };
     await mount();
     await open();
@@ -211,6 +258,15 @@ describe("M5C2-A-R1 Sheet richieste", () => {
         b.textContent?.includes("richiesteMagazzino.cancelRequest"),
       ),
     ).toBe(false);
-    expect(sheet().querySelector('a[href="/bolle?id=1"]')).toBeTruthy();
+    await click("richiesteMagazzino.openDocument", sheet());
+    expect(window.location.pathname).toBe("/richieste-magazzino");
+    expect(new URLSearchParams(window.location.search).get("documento")).toBe(
+      "bolla:1",
+    );
+    expect(
+      sheet().querySelector('[data-testid="contextual-document"]')?.textContent,
+    ).toContain("bolla:1");
+    await click("back-to-request", sheet());
+    expect(sheet().textContent).toContain("richiesteMagazzino.cancelAfterExit");
   });
 });

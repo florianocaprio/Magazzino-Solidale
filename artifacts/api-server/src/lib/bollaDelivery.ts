@@ -1,4 +1,5 @@
 import type { Response } from "express";
+import { closeDeliveredRequestTx } from "./m5RequestClosure";
 import {
   guardLinkedM4OperationalAccess,
   M5bLinkError,
@@ -15,7 +16,6 @@ import {
   movimentiTable,
   prenotazioniMagazzinoTable,
   prodottiTable,
-  richiesteMagazzinoTable,
 } from "@workspace/db";
 import { and, asc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
@@ -837,6 +837,24 @@ export async function completeBollaDelivery(opts: {
         aggregatoTipo: "bolla",
         aggregatoId: opts.bollaId,
       });
+      if (linkedRequest) {
+        if (
+          current.consegnaId !== (opts.expectedConsegna?.id ?? null) ||
+          (opts.expectedConsegna &&
+            current.beneficiarioId !== opts.expectedConsegna.beneficiarioId)
+        ) {
+          throw new BollaActionError(
+            409,
+            "Associazione Consegna cambiata; ricaricare i dati",
+          );
+        }
+        await closeDeliveredRequestTx(
+          tx,
+          linkedRequest.richiesta.id,
+          current.id,
+          opts.audit,
+        );
+      }
       replay = true;
       return;
     }
@@ -891,6 +909,17 @@ export async function completeBollaDelivery(opts: {
         throw new BollaActionError(400, "La bolla risulta già consegnata");
       }
       alreadyConsegnata = true;
+      if (linkedRequest) {
+        // Terminal reconciliation is request-only: do not resync Consegna/Intervento,
+        // replay stock, or rewrite the original command receipt.
+        await closeDeliveredRequestTx(
+          tx,
+          linkedRequest.richiesta.id,
+          current.id,
+          opts.audit,
+        );
+        return;
+      }
       await recordAuditEvent(tx, {
         command: opts.audit,
         azione: "CONSEGNA_LEGACY_RICONCILIATA",
@@ -909,8 +938,7 @@ export async function completeBollaDelivery(opts: {
       });
       if (isBeneficiario) {
         await syncConsegnaDaBollaTx(tx, current, lockedConsegna);
-        if (linkedRequest?.richiesta.interventoId == null)
-          await syncInterventoBollaTx(tx, opts.bollaId);
+        await syncInterventoBollaTx(tx, opts.bollaId);
       }
       if (opts.documentCommand) {
         await storeDocumentCommand(tx, {
@@ -1051,33 +1079,13 @@ export async function completeBollaDelivery(opts: {
       if (linkedRequest?.richiesta.interventoId == null)
         await syncInterventoBollaTx(tx, opts.bollaId);
     }
-    if (linkedRequest?.richiesta.stato === "presa_in_carico") {
-      const richiesta = linkedRequest.richiesta;
-      await tx
-        .update(richiesteMagazzinoTable)
-        .set({
-          stato: "chiusa",
-          versione: richiesta.versione + 1,
-          dataAggiornamento: new Date(),
-        })
-        .where(eq(richiesteMagazzinoTable.id, richiesta.id));
-      await recordAuditEvent(tx, {
-        command: opts.audit,
-        azione: "richiesta_magazzino.chiusa_da_consegna",
-        entitaTipo: "richiesta_magazzino",
-        entitaId: richiesta.id,
-        areaOperativaIdSnapshot: richiesta.areaOperativaId,
-        centroAscoltoIdSnapshot: richiesta.centroAscoltoId,
-        changes: auditFields(
-          { statoPrecedente: richiesta.stato, statoNuovo: "chiusa" },
-          ["statoPrecedente", "statoNuovo"],
-        ),
-        metadata: auditFields(
-          { bollaId: opts.bollaId, consegnaId: opts.expectedConsegna?.id },
-          ["bollaId", "consegnaId"],
-        ),
-      });
-    }
+    if (linkedRequest)
+      await closeDeliveredRequestTx(
+        tx,
+        linkedRequest.richiesta.id,
+        opts.bollaId,
+        opts.audit,
+      );
     if (opts.documentCommand) {
       const resultingVersion = updated?.versione ?? current.versione + 1;
       await storeDocumentCommand(tx, {

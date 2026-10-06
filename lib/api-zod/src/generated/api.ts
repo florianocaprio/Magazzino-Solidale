@@ -10421,7 +10421,7 @@ export const UpdateEnteDestinatarioResponse = zod.object({
 
 export const listDocumentiOperativiQueryRicercaMax = 120;
 
-export const listDocumentiOperativiQuerySortByDefault = `dataDocumento`;
+export const listDocumentiOperativiQuerySortByDefault = `dataCreazione`;
 export const listDocumentiOperativiQuerySortDirectionDefault = `desc`;
 export const listDocumentiOperativiQueryPageDefault = 1;
 
@@ -10483,7 +10483,7 @@ export const ListDocumentiOperativiResponse = zod.object({
 
 export const exportDocumentiOperativiQueryRicercaMax = 120;
 
-export const exportDocumentiOperativiQuerySortByDefault = `dataDocumento`;
+export const exportDocumentiOperativiQuerySortByDefault = `dataCreazione`;
 export const exportDocumentiOperativiQuerySortDirectionDefault = `desc`;
 
 export const ExportDocumentiOperativiQueryParams = zod.object({

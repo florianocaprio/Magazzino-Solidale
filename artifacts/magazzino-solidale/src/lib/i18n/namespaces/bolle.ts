@@ -176,6 +176,9 @@ export const bolle = {
     centroLabel: "Centro di Ascolto",
     allMagazzini: "Tutti i magazzini",
     allStati: "Tutti gli stati",
+    latestInserted: "Ultime inserite",
+    creationFiltersAligned:
+      "Vista allineata al nuovo documento e al suo contesto territoriale.",
     azzeraFiltri: "Azzera filtri",
     noDocFiltri: "Nessun documento corrisponde ai filtri selezionati.",
     noBolle:
@@ -358,6 +361,9 @@ export const bolle = {
     centroLabel: "Centro de Escucha",
     allMagazzini: "Todos los almacenes",
     allStati: "Todos los estados",
+    latestInserted: "Últimas incorporadas",
+    creationFiltersAligned:
+      "Vista alineada con el nuevo documento y su ámbito territorial.",
     azzeraFiltri: "Restablecer filtros",
     noDocFiltri: "Ningún documento coincide con los filtros seleccionados.",
     noBolle:
@@ -547,6 +553,9 @@ export const bolle = {
     centroLabel: "Listening Centre",
     allMagazzini: "All warehouses",
     allStati: "All statuses",
+    latestInserted: "Latest added",
+    creationFiltersAligned:
+      "View aligned with the new document and its territorial context.",
     azzeraFiltri: "Reset filters",
     noDocFiltri: "No document matches the selected filters.",
     noBolle:
@@ -730,6 +739,9 @@ export const bolle = {
     centroLabel: "Centre d'écoute",
     allMagazzini: "Tous les entrepôts",
     allStati: "Tous les statuts",
+    latestInserted: "Dernières ajoutées",
+    creationFiltersAligned:
+      "Vue alignée sur le nouveau document et son périmètre territorial.",
     azzeraFiltri: "Réinitialiser les filtres",
     noDocFiltri: "Aucun document ne correspond aux filtres sélectionnés.",
     noBolle:
@@ -913,6 +925,9 @@ export const bolle = {
     centroLabel: "Anlaufstelle",
     allMagazzini: "Alle Lager",
     allStati: "Alle Status",
+    latestInserted: "Zuletzt hinzugefügt",
+    creationFiltersAligned:
+      "Ansicht an das neue Dokument und seinen Gebietsbereich angepasst.",
     azzeraFiltri: "Filter zurücksetzen",
     noDocFiltri: "Kein Dokument entspricht den ausgewählten Filtern.",
     noBolle:
@@ -1090,6 +1105,8 @@ export const bolle = {
     centroLabel: "مركز الاستماع",
     allMagazzini: "جميع المستودعات",
     allStati: "جميع الحالات",
+    latestInserted: "أحدث الإضافات",
+    creationFiltersAligned: "تمت مواءمة العرض مع المستند الجديد ونطاقه.",
     azzeraFiltri: "إعادة تعيين عوامل التصفية",
     noDocFiltri: "لا يوجد مستند يطابق عوامل التصفية المحددة.",
     noBolle:

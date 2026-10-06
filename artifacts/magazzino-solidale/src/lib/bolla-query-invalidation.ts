@@ -10,6 +10,30 @@ import {
   getListBollePronteDaPianificareQueryKey,
 } from "@workspace/api-client-react";
 
+/** Cross-workflow reads; use stock=true only for inventory/reservation effects. */
+export async function invalidateRequestWorkflowViews(
+  queryClient: QueryClient,
+  stock = false,
+): Promise<void> {
+  const prefixes = [
+    "/api/richieste-magazzino",
+    "/api/documenti-operativi",
+    "/api/bolle",
+    "/api/trasferimenti",
+    "/api/consegne",
+    "/api/interventi",
+  ];
+  if (stock) prefixes.push("/api/giacenze");
+  await queryClient.invalidateQueries({
+    predicate: (query) =>
+      prefixes.some(
+        (prefix) =>
+          String(query.queryKey[0]) === prefix ||
+          String(query.queryKey[0]).startsWith(prefix + "/"),
+      ),
+  });
+}
+
 /** The linked document detail, not GET /bolle/:id, feeds the operational UI. */
 export async function invalidateBollaViews(
   queryClient: QueryClient,

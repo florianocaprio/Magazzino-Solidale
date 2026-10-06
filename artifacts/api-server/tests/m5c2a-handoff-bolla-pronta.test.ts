@@ -1,16 +1,24 @@
 /* @vitest-environment node */
 import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { inspectRequestClosure } from "../src/lib/m5RequestClosure";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import express from "express";
 import request from "supertest";
 import {
+  auditEventiTable,
   bolleTable,
   bollaRigheTable,
   consegneTable,
   db,
   interventiTable,
   lottiTable,
+  magazziniTable,
   movimentiTable,
   pool,
   prenotazioniMagazzinoTable,
@@ -137,6 +145,49 @@ async function linkedBolla(stato: "bozza" | "confermato" = "bozza") {
   };
 }
 
+async function deliveredLegacyRequest() {
+  const ready = await linkedBolla("confermato");
+  const planned = await request(app)
+    .post(`/consegne/da-bolla/${ready.bollaId}`)
+    .send({
+      versione: ready.versione,
+      idempotencyKey: randomUUID(),
+      tipoConsegna: "domicilio",
+      dataPrevista: "2026-10-15",
+      fasciaOraria: "Mattina",
+      indirizzoConsegna: "Via Test 1",
+    });
+  expect(planned.status, planned.text).toBe(201);
+  const [bolla] = await db
+    .select()
+    .from(bolleTable)
+    .where(eq(bolleTable.id, ready.bollaId));
+  const completed = await request(app)
+    .post(`/consegne/${planned.body.id}/completa`)
+    .send({ versione: bolla.versione, idempotencyKey: randomUUID() });
+  expect(completed.status, completed.text).toBe(200);
+  await db
+    .update(richiesteMagazzinoTable)
+    .set({ stato: "presa_in_carico" })
+    .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+  return { ...ready, consegnaId: planned.body.id };
+}
+
+const inspectClosure = (richiestaId: number) =>
+  db.transaction((tx) => inspectRequestClosure(tx, richiestaId));
+
+const closureAudit = (richiestaId: number) =>
+  db
+    .select({ id: auditEventiTable.id })
+    .from(auditEventiTable)
+    .where(
+      and(
+        eq(auditEventiTable.entitaTipo, "richiesta_magazzino"),
+        eq(auditEventiTable.entitaId, richiestaId),
+        eq(auditEventiTable.azione, "richiesta_magazzino.chiusa_da_consegna"),
+      ),
+    );
+
 beforeAll(async () => {
   if (process.env.M5C2A_TEST_DISPOSABLE_DB !== "verified")
     throw new Error("M5C2A requires verified disposable PostgreSQL");
@@ -155,7 +206,7 @@ beforeAll(async () => {
   lottoId = await createLotto(scope, {
     prodottoId,
     magazzinoId,
-    quantita: 30,
+    quantita: 150,
     dataScadenza: "2098-01-01",
   });
   const [role] = await db
@@ -476,6 +527,331 @@ describe("M5C2-A — handoff Bolla pronta", () => {
       )[0].stato,
     ).toBe("effettuata");
   }, 60_000);
+
+  it("R2: dry-run senza scritture, apply esplicito request-only, conflitto e replay senza doppio stock", async () => {
+    const ready = await linkedBolla("confermato");
+    const planned = await request(app)
+      .post(`/consegne/da-bolla/${ready.bollaId}`)
+      .send({
+        versione: ready.versione,
+        idempotencyKey: randomUUID(),
+        tipoConsegna: "domicilio",
+        dataPrevista: "2026-10-15",
+        fasciaOraria: "Mattina",
+        indirizzoConsegna: "Via Test 1",
+      });
+    expect(planned.status, planned.text).toBe(201);
+    const [bolla] = await db
+      .select()
+      .from(bolleTable)
+      .where(eq(bolleTable.id, ready.bollaId));
+    const body = { versione: bolla.versione, idempotencyKey: randomUUID() };
+    const complete = () =>
+      request(app).post(`/consegne/${planned.body.id}/completa`).send(body);
+    expect((await complete()).status).toBe(200);
+    const snapshot = async () => {
+      const result: Record<string, unknown> = {};
+      for (const name of [
+        "lotti",
+        "movimenti",
+        "prenotazioni_magazzino",
+        "operazioni_distribuzione_magazzino",
+        "bolle",
+        "consegne",
+        "interventi",
+      ]) {
+        result[name] = (
+          await db.execute(
+            sql.raw(
+              `select md5(coalesce(jsonb_agg(to_jsonb(t) order by id)::text,'[]')) as hash from ${name} t`,
+            ),
+          )
+        ).rows;
+      }
+      return result;
+    };
+    const stockBefore = await snapshot();
+    // Represent an old terminal document whose request closure was not persisted.
+    await db
+      .update(richiesteMagazzinoTable)
+      .set({ stato: "presa_in_carico" })
+      .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+    const candidate = await db.transaction((tx) =>
+      inspectRequestClosure(tx, ready.richiestaId),
+    );
+    expect(candidate.esito).toBe("candidata");
+    const directory = await mkdtemp(join(tmpdir(), "m5c2a-r2-plan-"));
+    const cli = promisify(execFile);
+    const target = new URL(process.env.DATABASE_URL!).pathname.slice(1);
+    const args = [
+      "./src/cli/reconcile-delivered-requests.ts",
+      `--target=${target}`,
+      `--ids=${ready.richiestaId}`,
+    ];
+    const env = { ...process.env, M5C2A_R2_DISPOSABLE_DB: "verified" };
+    const run = (extra: string[] = []) =>
+      cli("./node_modules/.bin/tsx", [...args, ...extra], { env });
+    try {
+      const before = await db
+        .select()
+        .from(richiesteMagazzinoTable)
+        .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+      const plan = JSON.parse((await run()).stdout);
+      expect(JSON.parse((await run()).stdout)).toEqual(plan);
+      expect(
+        await db
+          .select()
+          .from(richiesteMagazzinoTable)
+          .where(eq(richiesteMagazzinoTable.id, ready.richiestaId)),
+      ).toEqual(before);
+      expect(await snapshot()).toEqual(stockBefore);
+      const file = join(directory, "plan.json");
+      await writeFile(file, JSON.stringify(plan), { mode: 0o600 });
+      const apply = ["--apply", `--actor=${actorId}`, `--plan=${file}`];
+      await db
+        .update(richiesteMagazzinoTable)
+        .set({ versione: before[0].versione + 1 })
+        .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+      await expect(run(apply)).rejects.toThrow();
+      await writeFile(file, (await run()).stdout, { mode: 0o600 });
+      expect(JSON.parse((await run(apply)).stdout).cases[0].esito).toBe(
+        "coerente",
+      );
+      expect(await closureAudit(ready.richiestaId)).toHaveLength(2);
+      const closed = await db
+        .select()
+        .from(richiesteMagazzinoTable)
+        .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+      await run(apply);
+      expect(await closureAudit(ready.richiestaId)).toHaveLength(2);
+      expect(
+        await db
+          .select()
+          .from(richiesteMagazzinoTable)
+          .where(eq(richiesteMagazzinoTable.id, ready.richiestaId)),
+      ).toEqual(closed);
+      expect(await snapshot()).toEqual(stockBefore);
+      // Replay receipt must also repair a missing closure without rerunning M4.
+      await db
+        .update(richiesteMagazzinoTable)
+        .set({ stato: "presa_in_carico" })
+        .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+      expect((await complete()).status).toBe(200);
+      const afterReplay = await db
+        .select()
+        .from(richiesteMagazzinoTable)
+        .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+      expect(afterReplay[0].stato).toBe("chiusa");
+      expect(await closureAudit(ready.richiestaId)).toHaveLength(2);
+      expect((await complete()).status).toBe(200);
+      expect(await closureAudit(ready.richiestaId)).toHaveLength(2);
+      expect(
+        await db
+          .select()
+          .from(richiesteMagazzinoTable)
+          .where(eq(richiesteMagazzinoTable.id, ready.richiestaId)),
+      ).toEqual(afterReplay);
+      expect(await snapshot()).toEqual(stockBefore);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it("R2: non propone una riconciliazione se l'Area della Richiesta non coincide con quella della Bolla", async () => {
+    const ready = await linkedBolla("confermato");
+    const planned = await request(app)
+      .post(`/consegne/da-bolla/${ready.bollaId}`)
+      .send({
+        versione: ready.versione,
+        idempotencyKey: randomUUID(),
+        tipoConsegna: "domicilio",
+        dataPrevista: "2026-10-15",
+        fasciaOraria: "Mattina",
+        indirizzoConsegna: "Via Test 1",
+      });
+    expect(planned.status, planned.text).toBe(201);
+    const [bolla] = await db
+      .select()
+      .from(bolleTable)
+      .where(eq(bolleTable.id, ready.bollaId));
+    const completed = await request(app)
+      .post(`/consegne/${planned.body.id}/completa`)
+      .send({ versione: bolla.versione, idempotencyKey: randomUUID() });
+    expect(completed.status, completed.text).toBe(200);
+    await db
+      .update(richiesteMagazzinoTable)
+      .set({ stato: "presa_in_carico" })
+      .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+    expect(
+      (
+        await db.transaction((tx) =>
+          inspectRequestClosure(tx, ready.richiestaId),
+        )
+      ).esito,
+    ).toBe("candidata");
+
+    const unrelatedAreaId = await createAreaOperativa(scope);
+    await db
+      .update(richiesteMagazzinoTable)
+      .set({ areaOperativaId: unrelatedAreaId })
+      .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+    const mismatched = await db.transaction((tx) =>
+      inspectRequestClosure(tx, ready.richiestaId),
+    );
+    expect(mismatched.esito).toBe("esclusa");
+    expect(mismatched.motivo).toBe("area_incoerente");
+    const [unchanged] = await db
+      .select()
+      .from(richiesteMagazzinoTable)
+      .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+    expect(unchanged.stato).toBe("presa_in_carico");
+  });
+
+  it("F1-T01: esclude una Bolla il cui Magazzino origine è passato a un'altra Area", async () => {
+    const ready = await deliveredLegacyRequest();
+    const unrelatedAreaId = await createAreaOperativa(scope);
+    await db
+      .update(magazziniTable)
+      .set({ areaOperativaId: unrelatedAreaId })
+      .where(eq(magazziniTable.id, magazzinoId));
+    try {
+      expect(await inspectClosure(ready.richiestaId)).toMatchObject({
+        esito: "esclusa",
+        motivo: "area_incoerente",
+      });
+      const [unchanged] = await db
+        .select()
+        .from(richiesteMagazzinoTable)
+        .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+      expect(unchanged.stato).toBe("presa_in_carico");
+    } finally {
+      await db
+        .update(magazziniTable)
+        .set({ areaOperativaId: areaId })
+        .where(eq(magazziniTable.id, magazzinoId));
+    }
+  });
+
+  it("F1-T03: esclude un Centro diverso da quello del Beneficiario e della Bolla", async () => {
+    const ready = await deliveredLegacyRequest();
+    const otherCentreId = (
+      await createCentroRec(scope, { areaOperativaId: areaId })
+    ).id;
+    await db
+      .update(richiesteMagazzinoTable)
+      .set({ centroAscoltoId: otherCentreId })
+      .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+    expect(await inspectClosure(ready.richiestaId)).toMatchObject({
+      esito: "esclusa",
+      motivo: "centro_incoerente",
+    });
+  });
+
+  it("F1-T04/T05: esclude destinatario differente e link non corrente", async () => {
+    const ready = await deliveredLegacyRequest();
+    const otherBeneficiaryId = await createBeneficiario(scope, centroId, {
+      areaOperativaId: areaId,
+    });
+    await db
+      .update(bolleTable)
+      .set({ beneficiarioId: otherBeneficiaryId })
+      .where(eq(bolleTable.id, ready.bollaId));
+    expect(await inspectClosure(ready.richiestaId)).toMatchObject({
+      esito: "esclusa",
+      motivo: "destinatario_incoerente",
+    });
+    await db
+      .update(bolleTable)
+      .set({ beneficiarioId })
+      .where(eq(bolleTable.id, ready.bollaId));
+    await db
+      .update(richiesteMagazzinoDocumentiTable)
+      .set({
+        corrente: false,
+        cessatoDa: actorId,
+        cessatoAt: new Date(),
+        eventoCessazione: "annullamento_m4",
+        motivoCessazione: "Fixture storica F1",
+      })
+      .where(
+        eq(richiesteMagazzinoDocumentiTable.richiestaId, ready.richiestaId),
+      );
+    expect(await inspectClosure(ready.richiestaId)).toMatchObject({
+      esito: "esclusa",
+      motivo: "documento_corrente_assente_o_ambiguo",
+    });
+  });
+
+  it("F1-T06/T07: non promuove stati M4 non terminali né una Richiesta già chiusa", async () => {
+    const ready = await deliveredLegacyRequest();
+    for (const stato of [
+      "bozza",
+      "confermato",
+      "annullato",
+      "in_trasporto",
+      "rientro_atteso",
+      "rientrato",
+    ]) {
+      await db
+        .update(bolleTable)
+        .set({ stato })
+        .where(eq(bolleTable.id, ready.bollaId));
+      expect(await inspectClosure(ready.richiestaId)).toMatchObject({
+        esito: "esclusa",
+        motivo: "documento_non_consegnato",
+      });
+    }
+    await db
+      .update(bolleTable)
+      .set({ stato: "consegnato" })
+      .where(eq(bolleTable.id, ready.bollaId));
+    await db
+      .update(richiesteMagazzinoTable)
+      .set({ stato: "chiusa" })
+      .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+    expect(await inspectClosure(ready.richiestaId)).toMatchObject({
+      esito: "coerente",
+      motivo: "consegna_documentata",
+    });
+  });
+
+  it("F1-T08: apply rifiuta un piano divenuto territorialmente incoerente anche per un admin globale", async () => {
+    const ready = await deliveredLegacyRequest();
+    const target = new URL(process.env.DATABASE_URL!).pathname.slice(1);
+    const args = [
+      "./src/cli/reconcile-delivered-requests.ts",
+      `--target=${target}`,
+      `--ids=${ready.richiestaId}`,
+    ];
+    const env = { ...process.env, M5C2A_R2_DISPOSABLE_DB: "verified" };
+    const cli = promisify(execFile);
+    const run = (extra: string[] = []) =>
+      cli("./node_modules/.bin/tsx", [...args, ...extra], { env });
+    const plan = JSON.parse((await run()).stdout);
+    expect(plan.cases[0].esito).toBe("candidata");
+    const adminId = await createUtente(scope);
+    const unrelatedAreaId = await createAreaOperativa(scope);
+    const directory = await mkdtemp(join(tmpdir(), "m5c2a-r2-f1-plan-"));
+    try {
+      const planFile = join(directory, "plan.json");
+      await writeFile(planFile, JSON.stringify(plan), { mode: 0o600 });
+      await db
+        .update(richiesteMagazzinoTable)
+        .set({ areaOperativaId: unrelatedAreaId })
+        .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+      await expect(
+        run(["--apply", `--actor=${adminId}`, `--plan=${planFile}`]),
+      ).rejects.toThrow();
+      const [after] = await db
+        .select()
+        .from(richiesteMagazzinoTable)
+        .where(eq(richiesteMagazzinoTable.id, ready.richiestaId));
+      expect(after.stato).toBe("presa_in_carico");
+      expect(await closureAudit(ready.richiestaId)).toHaveLength(1);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 
   it("annullando la Consegna, la Bolla ritorna pianificabile ma il vecchio replay non restituisce una Consegna eliminata", async () => {
     const ready = await linkedBolla("confermato");

@@ -97,7 +97,10 @@ import { ExportButtons } from "@/components/export-buttons";
 import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
 import { BeneficiarioCombobox } from "@/components/beneficiario-combobox";
 import { RouteActions } from "@/components/maps/route-actions";
-import { BollaDettaglio, CreaiBollaDialog } from "@/pages/bolle";
+import {
+  BollaDettaglio,
+  CreaiBollaDialog,
+} from "@/components/documento-operativo";
 import {
   Plus,
   MapPin,

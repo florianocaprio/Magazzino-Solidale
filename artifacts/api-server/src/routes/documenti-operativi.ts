@@ -138,8 +138,8 @@ function parseDocumentFilters(req: Request): DocumentFilters {
         req,
         "sortBy",
         ["dataDocumento", "dataCreazione", "numero"] as const,
-        "dataDocumento",
-      ) ?? "dataDocumento",
+        "dataCreazione",
+      ) ?? "dataCreazione",
     sortDirection:
       enumQuery(req, "sortDirection", ["asc", "desc"] as const, "desc") ??
       "desc",

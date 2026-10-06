@@ -47,7 +47,7 @@ describe("hardening UI Magazzino", () => {
   it("protegge dispatch/ricezione Trasferimenti e le azioni Bolla", async () => {
     const [trasferimenti, bolle] = await Promise.all([
       source("../pages/trasferimenti.tsx"),
-      source("../pages/bolle.tsx"),
+      source("../components/documento-operativo.tsx"),
     ]);
     expect(trasferimenti).toContain(
       'hasPermission("magazzino.transfers.dispatch")',
@@ -67,7 +67,7 @@ describe("hardening UI Magazzino", () => {
     const files = await Promise.all([
       source("../pages/lotti.tsx"),
       source("../pages/trasferimenti.tsx"),
-      source("../pages/bolle.tsx"),
+      source("../components/documento-operativo.tsx"),
       source("../pages/approvvigionamenti.tsx"),
     ]);
     for (const file of files) expect(file).toMatch(/\.stato === "attivo"/);

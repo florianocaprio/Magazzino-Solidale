@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DOCUMENTO_FILTERS,
+  filtersAfterDocumentCreation,
   documentListScopeChanged,
   documentiOperativiQuery,
   normalizeDocumentFiltersForAccess,
@@ -134,7 +135,7 @@ describe("M4A — URL e filtri Documenti operativi", () => {
       areaOperativaId: 3,
       centroAscoltoId: 8,
       ricerca: "PAM",
-      sortBy: "dataDocumento",
+      sortBy: "dataCreazione",
       sortDirection: "asc",
     });
   });
