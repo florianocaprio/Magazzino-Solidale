@@ -81,6 +81,7 @@ import {
   isBeneficiarioActive,
 } from "../lib/beneficiarioPolicy";
 import { requireAllModuli } from "../lib/featureFlags";
+import { cancelBollaBeforeExitTx } from "../lib/m4Cancellation";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
 import {
   assertLinkedM4Identity,
@@ -312,6 +313,24 @@ export async function buildDettaglio(id: number) {
 
   if (!row) return null;
 
+  const [pianificazioneCentro] =
+    row.b.consegnaId == null
+      ? []
+      : await db
+          .select({
+            dataPrevista: consegneTable.dataPrevista,
+            fasciaOraria: consegneTable.fasciaOraria,
+            volontarioAltro: consegneTable.volontarioAltro,
+            volontarioNome: volontariTable.nome,
+            volontarioCognome: volontariTable.cognome,
+          })
+          .from(consegneTable)
+          .leftJoin(
+            volontariTable,
+            eq(consegneTable.volontarioId, volontariTable.id),
+          )
+          .where(eq(consegneTable.id, row.b.consegnaId));
+
   // Dopo la conferma lo snapshot è la sola fonte autorevole, anche quando un
   // campo opzionale era intenzionalmente NULL. Il fallback live è riservato a
   // bozze e documenti legacy privi del marcatore esplicito.
@@ -475,6 +494,13 @@ export async function buildDettaglio(id: number) {
       ? row.b.destinatarioEmailSnapshot
       : (row.enteEmail ?? row.b.destinatarioEmailSnapshot ?? null),
     consegnaId: row.b.consegnaId ?? null,
+    consegnaDataPrevista: pianificazioneCentro?.dataPrevista ?? null,
+    consegnaFasciaOraria: pianificazioneCentro?.fasciaOraria ?? null,
+    consegnaVolontarioNome:
+      pianificazioneCentro?.volontarioNome &&
+      pianificazioneCentro.volontarioCognome
+        ? `${pianificazioneCentro.volontarioCognome} ${pianificazioneCentro.volontarioNome}`
+        : (pianificazioneCentro?.volontarioAltro ?? null),
     daPianificazione: row.b.consegnaId != null,
     magazzinoId: row.b.magazzinoId,
     magazzinoNome: row.magazzinoNome ?? null,
@@ -2190,6 +2216,10 @@ router.post(
       });
       return;
     }
+    if (prod.lottoFisicoObbligatorio && lottoId == null) {
+      res.status(400).json({ error: "Seleziona il lotto fisico del prodotto" });
+      return;
+    }
     let quantitaContabile: InventoryDecimal;
     try {
       quantitaContabile = validateProductOperationalQuantity({
@@ -2919,7 +2949,7 @@ router.post(
     try {
       await db.transaction(async (tx) => {
         await lockDocumentCommand(tx, tipoComando, idempotencyKey);
-        await guardLinkedM4OperationalAccess(
+        const linked = await guardLinkedM4OperationalAccess(
           tx,
           req.user!.id,
           "bolla",
@@ -2950,6 +2980,11 @@ router.post(
           aggregatoId: bollaId,
         });
         if (receipt) return;
+        if (linked?.richiesta.tipoDestinatario === "beneficiario")
+          throw new BollaActionError(
+            409,
+            "La Bolla della Richiesta sociale deve essere pianificata dal Centro",
+          );
         if (current.versione !== expectedVersion)
           throw new DocumentCommandError(
             409,
@@ -3703,7 +3738,7 @@ router.post(
       let expectedConsegnaId = bolla.consegnaId;
       for (let attempt = 0; attempt < 3 && result == null; attempt += 1) {
         const outcome: ConversionOutcome = await db.transaction(async (tx) => {
-          await guardLinkedM4OperationalAccess(
+          const linked = await guardLinkedM4OperationalAccess(
             tx,
             req.user!.id,
             "bolla",
@@ -3714,6 +3749,12 @@ router.post(
             await lockConsegnaBollaRelation(tx, expectedConsegnaId);
           }
           const current = await lockBolla(tx, bollaId);
+          if (linked?.richiesta.tipoDestinatario === "beneficiario") {
+            throw new BollaActionError(
+              409,
+              "La Bolla della Richiesta sociale deve essere pianificata dal Centro",
+            );
+          }
           if (current.consegnaId !== expectedConsegnaId) {
             return {
               kind: "retry-association",
@@ -4186,95 +4227,12 @@ router.post(
             "Versione non aggiornata; ricaricare i dati",
           );
         }
-        if (current.stato === "annullato") {
-          throw new BollaActionError(400, "La bolla è già annullata");
-        }
-        if (
-          current.stato === "consegnato" ||
-          (await scarichiFisiciBolla(tx, bollaId)) > 0
-        ) {
-          throw new BollaActionError(
-            409,
-            "Dopo l'uscita fisica non è consentito il normale annullamento; usare la rettifica amministrativa autorizzata",
-          );
-        }
-
-        await recordAuditEvent(tx, {
-          command: audit,
-          azione: "BOLLA_ANNULLATA",
-          entitaTipo: "bolla",
-          entitaId: current.id,
-          documentoTipo: "bolla",
-          documentoId: current.id,
-          areaOperativaIdSnapshot: current.areaOperativaIdSnapshot,
-          centroAscoltoIdSnapshot: current.centroAscoltoIdSnapshot,
-          magazzinoIdSnapshot: current.magazzinoId,
-          dataOperativa: dataCivileEuropeRome(new Date()),
+        const updated = await cancelBollaBeforeExitTx(tx, current, {
+          actorId: req.user!.id,
           motivo,
-          changes: auditFields(
-            { statoPrecedente: current.stato, statoNuovo: "annullato" },
-            ["statoPrecedente", "statoNuovo"],
-          ),
+          audit,
+          preserveIntervention: linked != null,
         });
-
-        const activePrenotazioni = await tx
-          .select({ id: prenotazioniMagazzinoTable.id })
-          .from(prenotazioniMagazzinoTable)
-          .where(
-            and(
-              eq(prenotazioniMagazzinoTable.bollaId, bollaId),
-              eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
-            ),
-          );
-
-        if (current.stato === "confermato" && activePrenotazioni.length > 0) {
-          await tx
-            .update(prenotazioniMagazzinoTable)
-            .set({ stato: PRENOTAZIONE_RILASCIATA, updatedAt: new Date() })
-            .where(
-              and(
-                eq(prenotazioniMagazzinoTable.bollaId, bollaId),
-                eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
-              ),
-            );
-        }
-
-        // se era consegnata e collegata a una consegna effettuata, riportiamo la
-        // consegna a "pianificata" così i dati restano coerenti dopo lo storno.
-        if (current.stato === "consegnato" && current.consegnaId != null) {
-          await tx
-            .update(consegneTable)
-            .set({ stato: "pianificata", dataEffettuata: null })
-            .where(
-              and(
-                eq(consegneTable.id, current.consegnaId),
-                eq(consegneTable.stato, "effettuata"),
-              ),
-            );
-        }
-
-        const motivoIntervento =
-          typeof req.body?.motivo === "string" && req.body.motivo.trim()
-            ? `Annullamento Bolla ${current.numeroBolla}: ${req.body.motivo.trim()}`
-            : `Annullamento Bolla ${current.numeroBolla}`;
-        if (current.tipoDestinatario === "beneficiario") {
-          await annullaInterventoDaBollaTx(
-            tx,
-            bollaId,
-            req.user!.id,
-            motivoIntervento,
-          );
-        }
-        const [updated] = await tx
-          .update(bolleTable)
-          .set({
-            stato: "annullato",
-            motivoAnnullamento: motivo,
-            operatoreId: req.user!.id,
-            versione: sql`${bolleTable.versione} + 1`,
-          })
-          .where(eq(bolleTable.id, bollaId))
-          .returning();
         await ceaseLinkedM4Document(tx, req, linked, motivo);
         await storeDocumentCommand(tx, {
           tipoComando,

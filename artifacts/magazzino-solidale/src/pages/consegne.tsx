@@ -1,8 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import {
   useListConsegne,
+  useGetConsegna,
+  getGetConsegnaQueryKey,
   exportConsegne,
   useCreateConsegna,
+  useListBollePronteDaPianificare,
+  getListBollePronteDaPianificareQueryKey,
+  usePianificaConsegnaDaBolla,
   useCompletaConsegna,
   useDeleteConsegna,
   useAssociaBolla,
@@ -29,6 +34,7 @@ import {
   type Consegna,
   type Volontario,
   type Mezzo,
+  type BollaProntaDaPianificare,
 } from "@workspace/api-client-react";
 import { authUserCanOperateBolle, useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -123,12 +129,13 @@ import { format, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { volontarioLabel } from "@/lib/volontari-label";
-import { todayEuropeRome } from "@/lib/europe-rome";
+import { civilDateEuropeRome, todayEuropeRome } from "@/lib/europe-rome";
 import {
   UnsavedChangesDialog,
   useUnsavedChangesGuard,
 } from "@/hooks/use-unsaved-changes-guard";
 import { useCommandIntentRegistry } from "@/lib/command-intent";
+import { invalidateBollaViews } from "@/lib/bolla-query-invalidation";
 
 const formSchema = z
   .object({
@@ -176,6 +183,13 @@ export default function Consegne() {
     () => new URLSearchParams(window.location.search),
     [],
   );
+  const linkedConsegnaId = Number(initialSearch.get("consegnaId"));
+  const linkedConsegna = useGetConsegna(linkedConsegnaId, {
+    query: {
+      queryKey: getGetConsegnaQueryKey(linkedConsegnaId),
+      enabled: Number.isSafeInteger(linkedConsegnaId) && linkedConsegnaId > 0,
+    },
+  });
   const [areaOperativaFilter, setAreaOperativaFilter] = useState(
     initialSearch.get("area") ?? "all",
   );
@@ -188,6 +202,15 @@ export default function Consegne() {
   const [search, setSearch] = useState(initialSearch.get("q") ?? "");
   const [page, setPage] = useState(() =>
     Math.max(1, Number(initialSearch.get("page")) || 1),
+  );
+  const [viewTab, setViewTab] = useState<"da-pianificare" | "consegne">(
+    initialSearch.get("tab") === "consegne" ||
+      !(
+        hasPermission("richieste_magazzino.view") &&
+        (user?.isAdmin || user?.aree?.includes("sociale"))
+      )
+      ? "consegne"
+      : "da-pianificare",
   );
   const pageSize = 25;
   const [createCentroId, setCreateCentroId] = useState("all");
@@ -228,6 +251,15 @@ export default function Consegne() {
   if (dataFine) consegneParams.dataFine = dataFine;
   const { data: consegnePage, isLoading } = useListConsegne(consegneParams);
   const consegne = consegnePage?.items ?? [];
+  const canViewReady =
+    hasPermission("richieste_magazzino.view") &&
+    (user?.isAdmin || user?.aree?.includes("sociale"));
+  const readyQueue = useListBollePronteDaPianificare({
+    query: {
+      queryKey: getListBollePronteDaPianificareQueryKey(),
+      enabled: Boolean(canViewReady),
+    },
+  });
   useEffect(() => {
     const params = new URLSearchParams();
     if (areaOperativaFilter !== "all") params.set("area", areaOperativaFilter);
@@ -237,6 +269,7 @@ export default function Consegne() {
     if (dataInizio) params.set("dal", dataInizio);
     if (dataFine) params.set("al", dataFine);
     if (page > 1) params.set("page", String(page));
+    params.set("tab", viewTab);
     const query = params.toString();
     window.history.replaceState(
       null,
@@ -251,6 +284,7 @@ export default function Consegne() {
     page,
     search,
     statoFilter,
+    viewTab,
   ]);
   const { data: beneficiari } = useListBeneficiari({
     attivo: true,
@@ -303,6 +337,8 @@ export default function Consegne() {
     t("consegne.toastErrore");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [planningBolla, setPlanningBolla] =
+    useState<BollaProntaDaPianificare | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [associatingId, setAssociatingId] = useState<number | null>(null);
@@ -340,6 +376,7 @@ export default function Consegne() {
   const { data: bolle } = useListBolle();
 
   const createConsegna = useCreateConsegna();
+  const pianificaDaBolla = usePianificaConsegnaDaBolla();
   const completaConsegna = useCompletaConsegna();
   const deleteConsegna = useDeleteConsegna();
   const associaBolla = useAssociaBolla();
@@ -457,8 +494,36 @@ export default function Consegne() {
   const closePlanningForm = () =>
     unsavedGuard.requestClose(() => {
       setIsFormOpen(false);
+      setPlanningBolla(null);
       form.reset();
     });
+
+  const openReadyPlanning = (ready: BollaProntaDaPianificare) => {
+    setAreaOperativaFilter(String(ready.areaOperativaId));
+    setCreateCentroId(String(ready.centroAscoltoId ?? "all"));
+    form.reset({
+      beneficiarioId: ready.beneficiarioId,
+      magazzinoId: ready.magazzinoId,
+      tipoConsegna:
+        ready.modalitaPreferita === "domicilio" ? "domicilio" : "in_sede",
+      dataPrevista: ready.dataOraPianificata
+        ? civilDateEuropeRome(ready.dataOraPianificata)
+        : (ready.dataDesiderata ?? ""),
+      fasciaOraria: "Mattina",
+      indirizzoConsegna: ready.indirizzoConsegna ?? "",
+      noteOperative: "",
+    });
+    setPlanningBolla(ready);
+    setIsFormOpen(true);
+  };
+  const deepLinkAttempted = useRef(false);
+  useEffect(() => {
+    if (deepLinkAttempted.current || !readyQueue.data) return;
+    deepLinkAttempted.current = true;
+    const bollaId = Number(initialSearch.get("bollaId"));
+    const ready = readyQueue.data.find((item) => item.bollaId === bollaId);
+    if (ready) openReadyPlanning(ready);
+  }, [readyQueue.data]);
 
   const dataPrevistaWatch = form.watch("dataPrevista");
   const fasciaOrariaWatch = form.watch("fasciaOraria");
@@ -515,10 +580,11 @@ export default function Consegne() {
   useEffect(() => {
     if (previousBeneficiarioId.current === selectedBeneficiarioId) return;
     previousBeneficiarioId.current = selectedBeneficiarioId;
+    if (planningBolla) return;
     if (form.getValues("tipoConsegna") === "domicilio") {
       form.setValue("indirizzoConsegna", "", { shouldValidate: true });
     }
-  }, [form, selectedBeneficiarioId]);
+  }, [form, planningBolla, selectedBeneficiarioId]);
   useEffect(() => {
     if (
       form.getValues("tipoConsegna") === "domicilio" &&
@@ -550,6 +616,36 @@ export default function Consegne() {
       }),
     [effectiveConsegnaCentroId, volontari],
   );
+  const [volontarioSuggestionWarning, setVolontarioSuggestionWarning] =
+    useState(false);
+  const suggestedBollaDate = useRef<string | null>(null);
+  useEffect(() => {
+    const suggestedId = planningBolla?.volontarioPropostoId;
+    if (!suggestedId || !validData) {
+      setVolontarioSuggestionWarning(false);
+      return;
+    }
+    if (!volontari) return;
+    const key = `${planningBolla.bollaId}:${dataPrevistaWatch}`;
+    if (suggestedBollaDate.current === key) return;
+    suggestedBollaDate.current = key;
+    const selectedId = form.getValues("volontarioId");
+    if (selectedId && selectedId !== suggestedId) return;
+    if (volontariConsegna.some((item) => item.id === suggestedId)) {
+      form.setValue("volontarioId", suggestedId);
+      setVolontarioSuggestionWarning(false);
+    } else {
+      form.setValue("volontarioId", 0);
+      setVolontarioSuggestionWarning(true);
+    }
+  }, [
+    planningBolla,
+    dataPrevistaWatch,
+    validData,
+    volontari,
+    volontariConsegna,
+    form,
+  ]);
   const mezziConsegna = useMemo(
     () =>
       (mezzi ?? []).filter((m, idx, all) => {
@@ -594,6 +690,59 @@ export default function Consegne() {
     if (!data.volontarioId) delete data.volontarioId;
     if (!data.mezzoId) delete data.mezzoId;
     data.mezzoAltro = !!data.mezzoAltro && !data.mezzoId;
+    if (planningBolla) {
+      const ready = planningBolla;
+      const slot = `bolla:${ready.bollaId}:pianifica-consegna`;
+      const semanticInput = {
+        ...data,
+        bollaId: ready.bollaId,
+        versione: ready.bollaVersione,
+      };
+      pianificaDaBolla.mutate(
+        {
+          bollaId: ready.bollaId,
+          data: commandIntents.prepare(slot, semanticInput, {
+            ...data,
+            tipoConsegna: data.tipoConsegna as "in_sede" | "domicilio",
+            fasciaOraria: data.fasciaOraria as
+              | "Mattina"
+              | "Pomeriggio"
+              | "Sera",
+            versione: ready.bollaVersione,
+          }),
+        },
+        {
+          onSuccess: async () => {
+            commandIntents.complete(slot);
+            await Promise.all([
+              queryClient.invalidateQueries({
+                queryKey: getListBollePronteDaPianificareQueryKey(),
+              }),
+              queryClient.invalidateQueries({
+                queryKey: getListConsegneQueryKey(),
+              }),
+              invalidateBollaViews(queryClient, ready.bollaId),
+            ]);
+            toast({ title: t("consegne.toastConsegnaProgrammata") });
+            form.reset();
+            setPlanningBolla(null);
+            setIsFormOpen(false);
+            setDataInizio("");
+            setDataFine("");
+            setViewTab("consegne");
+          },
+          onError: (error: unknown) => {
+            commandIntents.fail(slot, error);
+            toast({
+              title: t("consegne.toastOpFallita"),
+              description: apiErrorMessage(error),
+              variant: "destructive",
+            });
+          },
+        },
+      );
+      return;
+    }
     createConsegna.mutate(
       { data },
       {
@@ -779,7 +928,9 @@ export default function Consegne() {
 
   const handleCompleta = () => {
     if (!completingId) return;
-    const consegna = consegne.find((item) => item.id === completingId);
+    const consegna =
+      consegne.find((item) => item.id === completingId) ??
+      (linkedConsegna.data?.id === completingId ? linkedConsegna.data : null);
     if (consegna?.bollaId == null || consegna.bollaVersione == null) {
       toast({
         title: t("consegne.toastImpossibileCompletare"),
@@ -807,6 +958,10 @@ export default function Consegne() {
           queryClient.invalidateQueries({
             queryKey: getListConsegneQueryKey(),
           });
+          queryClient.invalidateQueries({
+            queryKey: getGetConsegnaQueryKey(completingId),
+          });
+          void invalidateBollaViews(queryClient, consegna.bollaId!);
           toast({
             title: t("consegne.toastConsegnaRegistrata"),
             description: t("consegne.toastConsegnaRegistrataDesc"),
@@ -818,11 +973,9 @@ export default function Consegne() {
           queryClient.invalidateQueries({
             queryKey: getListConsegneQueryKey(),
           });
-          const msg = (e as { response?: { data?: { error?: string } } })
-            ?.response?.data?.error;
           toast({
             title: t("consegne.toastImpossibileCompletare"),
-            description: msg ?? t("consegne.toastErrore"),
+            description: apiErrorMessage(e),
             variant: "destructive",
           });
           setCompletingId(null);
@@ -939,6 +1092,7 @@ export default function Consegne() {
           {canManage && (
             <Button
               onClick={() => {
+                setPlanningBolla(null);
                 form.reset({
                   beneficiarioId: 0,
                   tipoConsegna: "in_sede",
@@ -957,7 +1111,132 @@ export default function Consegne() {
         </div>
       </div>
 
-      <Card>
+      {canViewReady && (
+        <nav
+          className="flex flex-wrap gap-2"
+          aria-label={t("consegne.handoffTabs")}
+        >
+          <Button
+            type="button"
+            variant={viewTab === "da-pianificare" ? "default" : "outline"}
+            onClick={() => setViewTab("da-pianificare")}
+          >
+            {t("consegne.readyToPlan")}{" "}
+            {readyQueue.data ? `(${readyQueue.data.length})` : ""}
+          </Button>
+          <Button
+            type="button"
+            variant={viewTab === "consegne" ? "default" : "outline"}
+            onClick={() => setViewTab("consegne")}
+          >
+            {t("consegne.plannedDeliveries")}
+          </Button>
+        </nav>
+      )}
+
+      {canViewReady && viewTab === "da-pianificare" && (
+        <Card data-testid="bolle-pronte-da-pianificare">
+          <CardHeader>
+            <h2 className="text-xl font-semibold">
+              {t("consegne.readyToPlan")}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {t("consegne.readyQueueDescription")}
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {readyQueue.isLoading ? (
+              <Skeleton className="h-28 w-full" />
+            ) : readyQueue.isError ? (
+              <p role="alert">{t("consegne.readyQueueError")}</p>
+            ) : readyQueue.data?.length ? (
+              readyQueue.data.map((ready) => (
+                <article
+                  key={ready.bollaId}
+                  className="rounded-lg border p-4"
+                  data-bolla-id={ready.bollaId}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="font-semibold">
+                        {ready.beneficiarioNome} · {ready.beneficiarioCodice}
+                      </p>
+                      <p className="text-sm">
+                        {ready.bollaNumero} · {ready.richiestaCodice}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {ready.centroNome ?? "–"} · {ready.magazzinoNome}
+                      </p>
+                      {ready.dataOraPianificata && (
+                        <p className="text-sm">
+                          {t("consegne.interventionDate")}:{" "}
+                          {civilDateEuropeRome(ready.dataOraPianificata)}
+                        </p>
+                      )}
+                      {ready.dataDesiderata && (
+                        <p className="text-sm">
+                          {t("consegne.desiredDate")}: {ready.dataDesiderata}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge>{t("consegne.readyBolla")}</Badge>
+                      {canManage && (
+                        <Button onClick={() => openReadyPlanning(ready)}>
+                          {t("consegne.planFromBolla")}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="py-6 text-center text-muted-foreground">
+                {t("consegne.noReadyBolle")}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {viewTab === "consegne" && linkedConsegna.data && (
+        <Card data-testid="consegna-collegata">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div>
+              <p className="font-semibold">
+                {linkedConsegna.data.codice} ·{" "}
+                {linkedConsegna.data.beneficiarioNome}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {linkedConsegna.data.dataPrevista} ·{" "}
+                {linkedConsegna.data.fasciaOraria ?? "–"} ·{" "}
+                {linkedConsegna.data.stato}
+              </p>
+            </div>
+            {linkedConsegna.data.bollaId != null && (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  setViewingBollaId(linkedConsegna.data!.bollaId ?? null)
+                }
+              >
+                {t("consegne.btnBolla")}
+              </Button>
+            )}
+            {canComplete &&
+              linkedConsegna.data.stato === "pianificata" &&
+              linkedConsegna.data.bollaId != null && (
+                <Button
+                  onClick={() => setCompletingId(linkedConsegna.data!.id)}
+                >
+                  {t("consegne.dialogCompletaConfirm")}
+                </Button>
+              )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className={viewTab === "consegne" ? undefined : "hidden"}>
         <CardHeader className="py-4 border-b">
           <Button
             type="button"
@@ -1839,7 +2118,11 @@ export default function Consegne() {
       >
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{t("consegne.planDelivery")}</SheetTitle>
+            <SheetTitle>
+              {planningBolla
+                ? t("consegne.planFromBolla")
+                : t("consegne.planDelivery")}
+            </SheetTitle>
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
@@ -1847,7 +2130,20 @@ export default function Consegne() {
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4"
               >
-                {isGlobal && isAreaOperativaGlobal && (
+                {planningBolla && (
+                  <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1">
+                    <p>
+                      {planningBolla.beneficiarioNome} ·{" "}
+                      {planningBolla.beneficiarioCodice}
+                    </p>
+                    <p>
+                      {planningBolla.bollaNumero} ·{" "}
+                      {planningBolla.richiestaCodice}
+                    </p>
+                    <p>{planningBolla.magazzinoNome}</p>
+                  </div>
+                )}
+                {!planningBolla && isGlobal && isAreaOperativaGlobal && (
                   <div className="space-y-2">
                     <Label>{t("consegne.filterAreaOperativa")}</Label>
                     <Select
@@ -1874,58 +2170,64 @@ export default function Consegne() {
                     </Select>
                   </div>
                 )}
-                <div className="space-y-2">
-                  <Label>{t("consegne.centroFilterLabel")}</Label>
-                  <Select
-                    value={createCentroId}
-                    onValueChange={(v) => {
-                      setCreateCentroId(v);
-                      form.setValue("beneficiarioId", 0);
-                    }}
-                    disabled={isCentroLocked || areaOperativaNotChosen}
-                  >
-                    <SelectTrigger aria-label={t("consegne.centroFilterLabel")}>
-                      <SelectValue
-                        placeholder={
-                          areaOperativaNotChosen
-                            ? t("consegne.selectAreaOperativaFirst")
-                            : undefined
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">
-                        {t("consegne.allBeneficiari")}
-                      </SelectItem>
-                      {centriFiltrati.map((c) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          {c.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>{t("consegne.scanLabel")}</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder={t("consegne.scanPlaceholder")}
-                      value={scanCode}
-                      onChange={(e) => setScanCode(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleScan();
-                        }
+                {!planningBolla && (
+                  <div className="space-y-2">
+                    <Label>{t("consegne.centroFilterLabel")}</Label>
+                    <Select
+                      value={createCentroId}
+                      onValueChange={(v) => {
+                        setCreateCentroId(v);
+                        form.setValue("beneficiarioId", 0);
                       }}
-                      className="font-mono"
-                    />
-                    <BarcodeScannerButton
-                      onScan={(value) => handleScan(value)}
-                    />
+                      disabled={isCentroLocked || areaOperativaNotChosen}
+                    >
+                      <SelectTrigger
+                        aria-label={t("consegne.centroFilterLabel")}
+                      >
+                        <SelectValue
+                          placeholder={
+                            areaOperativaNotChosen
+                              ? t("consegne.selectAreaOperativaFirst")
+                              : undefined
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">
+                          {t("consegne.allBeneficiari")}
+                        </SelectItem>
+                        {centriFiltrati.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
+                )}
+
+                {!planningBolla && (
+                  <div className="space-y-2">
+                    <Label>{t("consegne.scanLabel")}</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder={t("consegne.scanPlaceholder")}
+                        value={scanCode}
+                        onChange={(e) => setScanCode(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleScan();
+                          }
+                        }}
+                        className="font-mono"
+                      />
+                      <BarcodeScannerButton
+                        onScan={(value) => handleScan(value)}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <FormField
                   control={form.control}
@@ -1941,6 +2243,7 @@ export default function Consegne() {
                           codice: b.codice,
                         }))}
                         value={field.value ? String(field.value) : ""}
+                        disabled={planningBolla != null}
                         onChange={(id) => {
                           field.onChange(Number(id));
                           if (form.getValues("tipoConsegna") === "domicilio") {
@@ -1953,6 +2256,8 @@ export default function Consegne() {
                         ariaLabel={t("consegne.beneficiario")}
                         emptyText={t("consegne.noBeneficiarioForCentro")}
                         selectedLabelFallback={(() => {
+                          if (planningBolla)
+                            return planningBolla.beneficiarioNome;
                           const sel = allBeneficiari?.find(
                             (b) => b.id === field.value,
                           );
@@ -1985,7 +2290,7 @@ export default function Consegne() {
                         <FormLabel>{t("consegne.formFascia")}</FormLabel>
                         <Select
                           onValueChange={field.onChange}
-                          defaultValue={field.value}
+                          value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger
@@ -2010,6 +2315,11 @@ export default function Consegne() {
                     )}
                   />
                 </div>
+                {volontarioSuggestionWarning && (
+                  <p role="alert" className="text-sm text-amber-700">
+                    {t("consegne.suggestedVolunteerUnavailable")}
+                  </p>
+                )}
 
                 <FormField
                   control={form.control}
@@ -2038,7 +2348,7 @@ export default function Consegne() {
                             form.setValue("mezzoAltro", false);
                           }
                         }}
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger
@@ -2285,38 +2595,45 @@ export default function Consegne() {
                 )}
 
                 <div className="pt-2 border-t">
-                  <FormField
-                    control={form.control}
-                    name="magazzinoId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("consegne.formMagazzino")}</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={
-                            field.value ? String(field.value) : undefined
-                          }
-                        >
-                          <FormControl>
-                            <SelectTrigger
-                              aria-label={t("consegne.formMagazzino")}
-                            >
-                              <SelectValue
-                                placeholder={t("consegne.selectPlaceholder")}
-                              />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {magazzini?.map((m) => (
-                              <SelectItem key={m.id} value={String(m.id)}>
-                                {m.nome}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
+                  {planningBolla ? (
+                    <p className="text-sm">
+                      {t("consegne.formMagazzino")}:{" "}
+                      {planningBolla.magazzinoNome}
+                    </p>
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="magazzinoId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("consegne.formMagazzino")}</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={
+                              field.value ? String(field.value) : undefined
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger
+                                aria-label={t("consegne.formMagazzino")}
+                              >
+                                <SelectValue
+                                  placeholder={t("consegne.selectPlaceholder")}
+                                />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {magazzini?.map((m) => (
+                                <SelectItem key={m.id} value={String(m.id)}>
+                                  {m.nome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
 
                 <div className="pt-6 flex justify-end gap-2">
@@ -2327,7 +2644,12 @@ export default function Consegne() {
                   >
                     {t("common.cancel")}
                   </Button>
-                  <Button type="submit" disabled={createConsegna.isPending}>
+                  <Button
+                    type="submit"
+                    disabled={
+                      createConsegna.isPending || pianificaDaBolla.isPending
+                    }
+                  >
                     {t("common.save")}
                   </Button>
                 </div>

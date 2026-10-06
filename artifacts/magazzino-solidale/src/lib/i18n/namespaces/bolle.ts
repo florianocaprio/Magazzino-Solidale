@@ -72,7 +72,10 @@ export const bolle = {
     disponibili: "disponibili",
     noProdottoInMagazzino: "Nessun prodotto disponibile in questo magazzino",
     lottoLabel: "Lotto (FEFO — opzionale)",
+    lottoFisicoRequired: "Lotto fisico (obbligatorio)",
     lottoPlaceholder: "Automatico (prima scadenza)",
+    lottoAutomaticoFefo: "Automatico (FEFO)",
+    selezionaLottoFisico: "Seleziona il lotto fisico",
     lottoPrefix: "Lotto #",
     scadAbbr: "scad.",
     dispAbbr: "disp.",
@@ -104,6 +107,11 @@ export const bolle = {
     confermaInfoText:
       " — I prodotti verranno impegnati sui lotti in scadenza per primi. Lo scarico fisico avverrà alla consegna.",
     prontaTitle: "Pronta per la consegna.",
+    prontaCentroTitle: "Pronta — Centro di Ascolto",
+    prontaCentroAttesa: "In attesa di pianificazione del Centro di Ascolto.",
+    prontaCentroPianificata:
+      "Consegna pianificata: {{date}} · {{fascia}} · {{volontario}}",
+    apriConsegnaCentro: "Apri pianificazione Consegna",
     prontaText:
       " La merce è impegnata e le righe non sono più modificabili. Segna come consegnata quando il beneficiario ha ricevuto la merce.",
     confermaInCorso: "Conferma in corso...",
@@ -435,7 +443,10 @@ export const bolle = {
     disponibili: "available",
     noProdottoInMagazzino: "No product available in this warehouse",
     lottoLabel: "Lot (FEFO — optional)",
+    lottoFisicoRequired: "Physical lot (required)",
     lottoPlaceholder: "Automatic (earliest expiry)",
+    lottoAutomaticoFefo: "Automatic (FEFO)",
+    selezionaLottoFisico: "Select the physical lot",
     lottoPrefix: "Lot #",
     scadAbbr: "exp.",
     dispAbbr: "avail.",
@@ -466,6 +477,11 @@ export const bolle = {
     confermaInfoText:
       " — Products will be committed on expiring lots first. Physical discharge happens on delivery.",
     prontaTitle: "Ready for delivery.",
+    prontaCentroTitle: "Ready — Listening Centre",
+    prontaCentroAttesa: "Awaiting planning by the Listening Centre.",
+    prontaCentroPianificata:
+      "Delivery planned: {{date}} · {{fascia}} · {{volontario}}",
+    apriConsegnaCentro: "Open delivery plan",
     prontaText:
       " Goods are committed and lines can no longer be changed. Mark as delivered when the beneficiary has received them.",
     confermaInCorso: "Confirming...",

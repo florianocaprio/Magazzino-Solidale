@@ -8,6 +8,7 @@
 import type { InterventoAmbito } from './interventoAmbito';
 import type { InterventoAvviso } from './interventoAvviso';
 import type { InterventoPriorita } from './interventoPriorita';
+import type { InterventoRaccordoMagazzino } from './interventoRaccordoMagazzino';
 import type { InterventoStato } from './interventoStato';
 
 /**
@@ -15,6 +16,7 @@ import type { InterventoStato } from './interventoStato';
  */
 export interface InterventoListItem {
   id: number;
+  raccordoMagazzino?: InterventoRaccordoMagazzino | null;
   beneficiarioId: number;
   /** @nullable */
   beneficiarioNome: string | null;

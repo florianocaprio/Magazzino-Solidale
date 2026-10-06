@@ -34,6 +34,16 @@ const it = {
   next: "Successiva",
   take: "Prendi in carico",
   cancelReason: "Motivo dell'annullamento",
+  cancelRequest: "Annulla richiesta",
+  confirmCancel: "Conferma annullamento",
+  cancelNote: "Nota aggiuntiva (opzionale)",
+  cancelAudit: "L'operazione sarà registrata nello storico.",
+  cancelLinkedDocument:
+    "Verrà annullato anche il documento collegato e saranno rilasciate le eventuali prenotazioni.",
+  cancelAfterExit:
+    "La merce è già uscita o il documento è finale. Apri il documento per gestire mancata consegna / rientro o consultarne l'esito.",
+  cancelledConfirmation:
+    "Richiesta annullata. L'operazione è disponibile nello storico.",
   history: "Storico",
   version: "Versione",
   takenBy: "Presa in carico da",
@@ -82,6 +92,16 @@ const it = {
 };
 const en = {
   ...it,
+  cancelRequest: "Cancel request",
+  confirmCancel: "Confirm cancellation",
+  cancelNote: "Additional note (optional)",
+  cancelAudit: "This operation will be recorded in the history.",
+  cancelLinkedDocument:
+    "The linked document will also be cancelled and any reservations will be released.",
+  cancelAfterExit:
+    "Goods have left or the document is final. Open it to manage failed delivery / returns or view the outcome.",
+  cancelledConfirmation:
+    "Request cancelled. The operation is available in the history.",
   title: "Warehouse requests",
   subtitle: "Needs sent by the Centre; no products are reserved.",
   new: "New request",
@@ -162,6 +182,16 @@ const en = {
 };
 const es = {
   ...it,
+  cancelRequest: "Anular solicitud",
+  confirmCancel: "Confirmar anulación",
+  cancelNote: "Nota adicional (opcional)",
+  cancelAudit: "La operación quedará registrada en el historial.",
+  cancelLinkedDocument:
+    "También se anulará el documento vinculado y se liberarán las reservas.",
+  cancelAfterExit:
+    "La mercancía ha salido o el documento es definitivo. Ábrelo para gestionar la entrega fallida / devolución o consultar el resultado.",
+  cancelledConfirmation:
+    "Solicitud anulada. La operación está disponible en el historial.",
   title: "Solicitudes al almacén",
   subtitle: "Necesidades enviadas por el Centro, sin reserva de productos.",
   new: "Nueva solicitud",
@@ -209,6 +239,16 @@ const es = {
 };
 const fr = {
   ...it,
+  cancelRequest: "Annuler la demande",
+  confirmCancel: "Confirmer l’annulation",
+  cancelNote: "Note supplémentaire (facultative)",
+  cancelAudit: "L’opération sera enregistrée dans l’historique.",
+  cancelLinkedDocument:
+    "Le document lié sera également annulé et les réservations seront libérées.",
+  cancelAfterExit:
+    "La marchandise est sortie ou le document est final. Ouvrez-le pour gérer la livraison échouée / le retour ou consulter le résultat.",
+  cancelledConfirmation:
+    "Demande annulée. L’opération figure dans l’historique.",
   title: "Demandes à l'entrepôt",
   subtitle: "Besoins transmis par le Centre, sans réservation de produits.",
   new: "Nouvelle demande",
@@ -256,6 +296,16 @@ const fr = {
 };
 const de = {
   ...it,
+  cancelRequest: "Anfrage stornieren",
+  confirmCancel: "Stornierung bestätigen",
+  cancelNote: "Zusätzliche Notiz (optional)",
+  cancelAudit: "Der Vorgang wird im Verlauf gespeichert.",
+  cancelLinkedDocument:
+    "Das verknüpfte Dokument wird ebenfalls storniert und Reservierungen werden freigegeben.",
+  cancelAfterExit:
+    "Die Ware hat das Lager verlassen oder das Dokument ist abgeschlossen. Öffnen Sie es für fehlgeschlagene Lieferung / Rückgabe oder das Ergebnis.",
+  cancelledConfirmation:
+    "Anfrage storniert. Der Vorgang ist im Verlauf verfügbar.",
   title: "Anfragen an das Lager",
   subtitle: "Vom Zentrum gemeldete Bedarfe ohne Warenreservierung.",
   new: "Neue Anfrage",
@@ -303,6 +353,14 @@ const de = {
 };
 const ar = {
   ...it,
+  cancelRequest: "إلغاء الطلب",
+  confirmCancel: "تأكيد الإلغاء",
+  cancelNote: "ملاحظة إضافية (اختيارية)",
+  cancelAudit: "سيتم تسجيل العملية في السجل.",
+  cancelLinkedDocument: "سيتم أيضًا إلغاء المستند المرتبط وتحرير الحجوزات.",
+  cancelAfterExit:
+    "غادرت البضاعة أو أصبح المستند نهائيًا. افتحه لإدارة تعذر التسليم / الإرجاع أو عرض النتيجة.",
+  cancelledConfirmation: "تم إلغاء الطلب. العملية متاحة في السجل.",
   title: "طلبات المستودع",
   subtitle: "احتياجات يرسلها المركز دون حجز منتجات.",
   new: "طلب جديد",

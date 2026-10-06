@@ -29,4 +29,5 @@ export interface DocumentoOperativo {
   destinatarioNome?: string | null;
   /** @minimum 1 */
   versione: number;
+  centroHandoff: boolean;
 }

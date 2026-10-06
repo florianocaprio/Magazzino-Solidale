@@ -7,6 +7,7 @@ import {
   getListGiacenzeQueryKey,
   getListRichiesteMagazzinoQueryKey,
   getListConsegneQueryKey,
+  getListBollePronteDaPianificareQueryKey,
 } from "@workspace/api-client-react";
 
 /** The linked document detail, not GET /bolle/:id, feeds the operational UI. */
@@ -32,6 +33,13 @@ export async function invalidateBollaViews(
     }),
     queryClient.invalidateQueries({ queryKey: getListGiacenzeQueryKey() }),
     queryClient.invalidateQueries({ queryKey: getListConsegneQueryKey() }),
+    queryClient.invalidateQueries({
+      queryKey: getListBollePronteDaPianificareQueryKey(),
+    }),
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        String(query.queryKey[0]).startsWith("/api/interventi"),
+    }),
   ]);
 }
 

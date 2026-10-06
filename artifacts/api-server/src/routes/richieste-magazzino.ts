@@ -18,6 +18,8 @@ import {
   areeOperativeTable,
   auditEventiTable,
   beneficiariTable,
+  bolleTable,
+  trasferimentiTable,
   centriAscoltoTable,
   db,
   entiDestinatariTable,
@@ -38,9 +40,7 @@ import {
   validateDocumentCommand,
   isDocumentCommandError,
 } from "../lib/documentCommand";
-import {
-  CurrentCommandActorError,
-} from "../lib/currentCommandActor";
+import { CurrentCommandActorError } from "../lib/currentCommandActor";
 import {
   auditContextFromRequest,
   auditFields,
@@ -49,11 +49,16 @@ import {
 import type { InventoryTransaction } from "../lib/scaricoInventory";
 import {
   currentM5bDocumentLink,
+  ceaseLinkedM4Document,
   lockM5bRequest,
   M5bLinkError,
   requestDocumentSummaries,
 } from "../lib/m5bDocumentLink";
 import { lockInterventionMaterialPath } from "../lib/m5bInterventionDelegation";
+import {
+  cancelBollaBeforeExitTx,
+  cancelTransferBeforeExitTx,
+} from "../lib/m4Cancellation";
 import {
   canReadM5bRequest as canRead,
   hasM5bArea as hasArea,
@@ -122,6 +127,7 @@ const cancelSchema = z.strictObject({
   ...envelope,
   versione: positive,
   motivo: requiredText(500),
+  nota: optionalText(2000),
 });
 type Create = z.infer<typeof createSchema>;
 type Actor = Awaited<ReturnType<typeof requireCurrentM5bActor>>;
@@ -986,11 +992,7 @@ async function mutate(
     });
     const result = await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, tipoComando, idempotencyKey);
-      const actor = await requireCurrentM5bActor(
-        tx,
-        req.user!.id,
-        permission,
-      );
+      const actor = await requireCurrentM5bActor(tx, req.user!.id, permission);
       if (!(await isModuloAttivo("MAGAZZINO_SOLIDALE"))) throw denied();
       const receipt = await loadDocumentCommand(tx, {
         tipoComando,
@@ -1019,10 +1021,6 @@ async function mutate(
       if (kind !== "cancel") await requireLiveSubject(tx, row);
       if (row.versione !== input.versione)
         throw conflict("Versione superata; ricarica la richiesta");
-      if (kind === "cancel" && (await currentM5bDocumentLink(tx, id)))
-        throw conflict(
-          "Annulla prima il documento M4 collegato, se non è ancora uscito",
-        );
       if (kind === "take") {
         if (!hasArea(actor, "magazzino") || row.stato !== "inviata")
           throw conflict("Presa in carico non disponibile");
@@ -1041,12 +1039,58 @@ async function mutate(
         )
           throw denied();
       } else if (row.stato === "presa_in_carico") {
-        if (!hasArea(actor, "magazzino")) throw denied();
+        if (
+          !hasArea(actor, "magazzino") &&
+          !(
+            canSocialWrite(actor, row) &&
+            (await isModuloAttivo("CENTRO_ASCOLTO"))
+          )
+        )
+          throw denied();
       } else throw conflict("Annullamento non disponibile");
       const command = auditContextFromRequest(req, {
         correlationId,
         operationKey: `m5a:${tipoComando}:${idempotencyKey}`,
       });
+      if (kind === "cancel") {
+        const link = await currentM5bDocumentLink(tx, id);
+        if (link) {
+          const options = {
+            actorId: actor.id,
+            motivo: (input as z.infer<typeof cancelSchema>).motivo,
+            audit: { ...command, operationKey: `${command.operationKey}:m4` },
+          };
+          if (link.tipoDocumento === "bolla") {
+            const [document] = await tx
+              .select()
+              .from(bolleTable)
+              .where(eq(bolleTable.id, link.bollaId!))
+              .for("update");
+            if (!document)
+              throw conflict("Documento collegato non disponibile");
+            await cancelBollaBeforeExitTx(tx, document, {
+              ...options,
+              preserveIntervention: true,
+            });
+          } else {
+            const [document] = await tx
+              .select()
+              .from(trasferimentiTable)
+              .where(eq(trasferimentiTable.id, link.trasferimentoId!))
+              .for("update");
+            if (!document)
+              throw conflict("Documento collegato non disponibile");
+            await cancelTransferBeforeExitTx(tx, document, options);
+          }
+          await ceaseLinkedM4Document(
+            tx,
+            req,
+            { richiesta: row, link, actor },
+            options.motivo,
+            { command },
+          );
+        }
+      }
       const changes =
         kind === "update"
           ? Object.fromEntries(
@@ -1103,8 +1147,11 @@ async function mutate(
             versione: updated.versione,
             stato: updated.stato,
             campiModificati: kind === "update" ? Object.keys(changes) : [],
+            ...(kind === "cancel"
+              ? { nota: (input as z.infer<typeof cancelSchema>).nota ?? null }
+              : {}),
           },
-          ["versione", "stato", "campiModificati"],
+          ["versione", "stato", "campiModificati", "nota"],
         ),
       });
       const snapshot = commandResult(updated);

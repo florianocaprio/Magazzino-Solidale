@@ -109,6 +109,35 @@ function LegacyBadge({ legacy }: { legacy: boolean }) {
   ) : null;
 }
 
+function RaccordoMagazzinoBadge({
+  raccordo,
+}: {
+  raccordo: Intervento["raccordoMagazzino"];
+}) {
+  const { t } = useTranslation();
+  if (!raccordo) return null;
+  const key =
+    raccordo.consegnaStato === "effettuata"
+      ? "deliveryDone"
+      : raccordo.consegnaId != null
+        ? "deliveryPlanned"
+        : raccordo.bollaStato === "confermato"
+          ? "readyToPlan"
+          : raccordo.bollaStato === "bozza"
+            ? "preparingBolla"
+            : raccordo.richiestaStato === "presa_in_carico"
+              ? "preparingBolla"
+              : "requestSent";
+  return (
+    <Badge variant="outline" className="mt-1 block w-fit">
+      {t(`interventi.magazzino.${key}`)}
+      {key === "deliveryPlanned" && raccordo.dataPrevista
+        ? ` · ${raccordo.dataPrevista.split("-").reverse().join("/")} ${raccordo.fasciaOraria ?? ""}`
+        : ""}
+    </Badge>
+  );
+}
+
 export function InterventiSocialiWorkspace({
   filters,
   interventi,
@@ -239,6 +268,9 @@ export function InterventiSocialiWorkspace({
                   <TableCell>{intervento.tipoIntervento}</TableCell>
                   <TableCell>
                     <InterventoStatoBadge stato={intervento.stato} />
+                    <RaccordoMagazzinoBadge
+                      raccordo={intervento.raccordoMagazzino}
+                    />
                   </TableCell>
                   <TableCell>
                     <InterventoPriority value={intervento.priorita} />
@@ -306,6 +338,9 @@ export function InterventiSocialiWorkspace({
                 <InterventoStatoBadge stato={intervento.stato} />
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
+                <RaccordoMagazzinoBadge
+                  raccordo={intervento.raccordoMagazzino}
+                />
                 <InterventoPriority value={intervento.priorita} />
                 <InterventoAvvisoBadge avviso={intervento.avviso} />
                 <LegacyBadge legacy={intervento.ambitoLegacy} />
@@ -428,7 +463,9 @@ export function InterventiSocialiWorkspace({
                   })
                 }
               >
-                <SelectTrigger aria-label={t("interventi.filters.areaOperativa")}>
+                <SelectTrigger
+                  aria-label={t("interventi.filters.areaOperativa")}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -448,7 +485,9 @@ export function InterventiSocialiWorkspace({
               onValueChange={(value) =>
                 update("centroAscoltoId", value === "all" ? "" : value)
               }
-              disabled={isCentroLocked || (isGlobal && !filters.areaOperativaId)}
+              disabled={
+                isCentroLocked || (isGlobal && !filters.areaOperativaId)
+              }
             >
               <SelectTrigger aria-label={t("interventi.filters.center")}>
                 <SelectValue />

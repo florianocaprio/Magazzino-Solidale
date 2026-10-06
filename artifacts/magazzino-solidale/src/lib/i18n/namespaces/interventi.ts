@@ -1,4 +1,15 @@
 const fase53BEn = {
+  magazzino: {
+    requestSent: "Request sent",
+    preparingBolla: "In preparation",
+    readyToPlan: "Delivery note ready · Delivery to plan",
+    deliveryPlanned: "Delivery planned",
+    deliveryDone: "Delivery completed",
+    openBolla: "Open delivery note",
+    openDelivery: "Open delivery",
+    planDelivery: "Plan delivery",
+    concludeIntervention: "Conclude intervention",
+  },
   unifiedSubtitle:
     "Plan and consult Social interventions in one operational workspace.",
   newAction: "New intervention",
@@ -220,6 +231,17 @@ const fase53BEn = {
 const fase53B = {
   it: {
     ...fase53BEn,
+    magazzino: {
+      requestSent: "Richiesta inviata",
+      preparingBolla: "In preparazione",
+      readyToPlan: "Bolla pronta · Consegna da pianificare",
+      deliveryPlanned: "Consegna pianificata",
+      deliveryDone: "Consegna effettuata",
+      openBolla: "Apri Bolla",
+      openDelivery: "Apri Consegna",
+      planDelivery: "Pianifica consegna",
+      concludeIntervention: "Concludi intervento",
+    },
     unifiedSubtitle:
       "Pianifica e consulta gli interventi Sociali in un unico spazio operativo.",
     newAction: "Nuovo intervento",

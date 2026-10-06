@@ -103,6 +103,7 @@ import type {
   BollaEmporioInvioManualeInput,
   BollaEmporioStampa,
   BollaInput,
+  BollaProntaDaPianificare,
   BollaRiga,
   BollaRigaInput,
   BollaStornoAmministrativoInput,
@@ -140,6 +141,7 @@ import type {
   ConfigurazioneMatricoleVolontariResponse,
   ConfirmVolontariImport200,
   Consegna,
+  ConsegnaDaBollaInput,
   ConsegnaInput,
   ConsegnaRicezioneInput,
   ConsegnaUpdate,
@@ -14204,6 +14206,155 @@ export function useExportConsegne<TData = Awaited<ReturnType<typeof exportConseg
 
 
 
+
+export const getListBollePronteDaPianificareUrl = () => {
+
+
+
+
+  return `/api/consegne/da-pianificare`
+}
+
+/**
+ * @summary Coda derivata delle Bolle M5 pronte nel perimetro del Centro
+ */
+export const listBollePronteDaPianificare = async ( options?: RequestInit): Promise<BollaProntaDaPianificare[]> => {
+
+  return customFetch<BollaProntaDaPianificare[]>(getListBollePronteDaPianificareUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBollePronteDaPianificareQueryKey = () => {
+    return [
+    `/api/consegne/da-pianificare`
+    ] as const;
+    }
+
+
+export const getListBollePronteDaPianificareQueryOptions = <TData = Awaited<ReturnType<typeof listBollePronteDaPianificare>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBollePronteDaPianificare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBollePronteDaPianificareQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBollePronteDaPianificare>>> = ({ signal }) => listBollePronteDaPianificare({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBollePronteDaPianificare>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBollePronteDaPianificareQueryResult = NonNullable<Awaited<ReturnType<typeof listBollePronteDaPianificare>>>
+export type ListBollePronteDaPianificareQueryError = ErrorType<void>
+
+
+/**
+ * @summary Coda derivata delle Bolle M5 pronte nel perimetro del Centro
+ */
+
+export function useListBollePronteDaPianificare<TData = Awaited<ReturnType<typeof listBollePronteDaPianificare>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBollePronteDaPianificare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBollePronteDaPianificareQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPianificaConsegnaDaBollaUrl = (bollaId: number,) => {
+
+
+
+
+  return `/api/consegne/da-bolla/${bollaId}`
+}
+
+/**
+ * @summary Crea atomicamente la Consegna e associa la Bolla M5 pronta
+ */
+export const pianificaConsegnaDaBolla = async (bollaId: number,
+    consegnaDaBollaInput: ConsegnaDaBollaInput, options?: RequestInit): Promise<Consegna> => {
+
+  return customFetch<Consegna>(getPianificaConsegnaDaBollaUrl(bollaId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      consegnaDaBollaInput,)
+  }
+);}
+
+
+
+
+export const getPianificaConsegnaDaBollaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof pianificaConsegnaDaBolla>>, TError,{bollaId: number;data: BodyType<ConsegnaDaBollaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof pianificaConsegnaDaBolla>>, TError,{bollaId: number;data: BodyType<ConsegnaDaBollaInput>}, TContext> => {
+
+const mutationKey = ['pianificaConsegnaDaBolla'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof pianificaConsegnaDaBolla>>, {bollaId: number;data: BodyType<ConsegnaDaBollaInput>}> = (props) => {
+          const {bollaId,data} = props ?? {};
+
+          return  pianificaConsegnaDaBolla(bollaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PianificaConsegnaDaBollaMutationResult = NonNullable<Awaited<ReturnType<typeof pianificaConsegnaDaBolla>>>
+    export type PianificaConsegnaDaBollaMutationBody = BodyType<ConsegnaDaBollaInput>
+    export type PianificaConsegnaDaBollaMutationError = ErrorType<void>
+
+    /**
+ * @summary Crea atomicamente la Consegna e associa la Bolla M5 pronta
+ */
+export const usePianificaConsegnaDaBolla = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof pianificaConsegnaDaBolla>>, TError,{bollaId: number;data: BodyType<ConsegnaDaBollaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof pianificaConsegnaDaBolla>>,
+        TError,
+        {bollaId: number;data: BodyType<ConsegnaDaBollaInput>},
+        TContext
+      > => {
+      return useMutation(getPianificaConsegnaDaBollaMutationOptions(options));
+    }
 
 export const getGetConsegnaUrl = (id: number,) => {
 

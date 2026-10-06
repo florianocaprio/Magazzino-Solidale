@@ -30,6 +30,7 @@ import requestsRouter from "../src/routes/richieste-magazzino";
 import bolleRouter from "../src/routes/bolle";
 import trasferimentiRouter from "../src/routes/trasferimenti";
 import interventiRouter from "../src/routes/interventi";
+import consegneRouter from "../src/routes/consegne";
 import { lockInterventionMaterialPath } from "../src/lib/m5bInterventionDelegation";
 import {
   createAreaOperativa,
@@ -70,6 +71,22 @@ let originId: number;
 let destinationId: number;
 let productId: number;
 let operatorId: number;
+let centreOperatorId: number;
+
+function centreDeliveryApp() {
+  return makeScopedApp(consegneRouter, {
+    id: centreOperatorId,
+    centroAscoltoId: centreId,
+    areaOperativaId: areaId,
+    aree: ["sociale"],
+    permessi: [
+      "richieste_magazzino.view",
+      "consegne.view",
+      "consegne.manage",
+      "consegne.complete",
+    ],
+  });
+}
 
 function app(permissions = grants, userId = operatorId) {
   const router = express.Router();
@@ -233,15 +250,29 @@ async function withBlockedIntervention(
 }
 
 async function fixture(
-  kind: "beneficiario" | "magazzino",
+  kind: "beneficiario" | "magazzino" | "ente",
   interventoId: number | null = null,
 ) {
+  const entity =
+    kind === "ente"
+      ? (
+          await db
+            .insert(entiDestinatariTable)
+            .values({
+              denominazione: `Ente ritorno ${randomUUID().slice(0, 8)}`,
+              areaOperativaId: areaId,
+              indirizzo: "Via test M5B 1",
+            })
+            .returning()
+        )[0]
+      : null;
   const [row] = await db
     .insert(richiesteMagazzinoTable)
     .values({
       codice: `RM-M5B-${randomUUID().slice(0, 8)}`,
       tipoDestinatario: kind,
       beneficiarioId: kind === "beneficiario" ? beneficiaryId : null,
+      enteDestinatarioId: entity?.id ?? null,
       magazzinoDestinatarioId: kind === "magazzino" ? destinationId : null,
       areaOperativaId: areaId,
       centroAscoltoId: kind === "beneficiario" ? centreId : null,
@@ -304,6 +335,28 @@ beforeAll(async () => {
     .update(utentiTable)
     .set({ areaOperativaId: areaId })
     .where(eq(utentiTable.id, operatorId));
+  // Separate Centre actor: do not promote the warehouse operator for the new handoff.
+  const [centreRole] = await db
+    .insert(ruoliTable)
+    .values({
+      nome: `M5C2 Centro ${suffix}`,
+      aree: ["sociale"],
+      permessi: [
+        "richieste_magazzino.view",
+        "consegne.view",
+        "consegne.manage",
+        "consegne.complete",
+      ],
+    })
+    .returning();
+  centreOperatorId = await createUtente(scope, {
+    ruoloId: centreRole.id,
+    centroId: centreId,
+  });
+  await db
+    .update(utentiTable)
+    .set({ areaOperativaId: areaId })
+    .where(eq(utentiTable.id, centreOperatorId));
 });
 
 afterAll(async () => {
@@ -623,13 +676,14 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
           .send({ ...payload, idempotencyKey: randomUUID(), versione: 2 })
       ).status,
     ).toBe(409);
-    expect(
-      (
-        await request(app())
-          .post(`/richieste-magazzino/${row.id}/annulla`)
-          .send({ idempotencyKey: randomUUID(), versione: 2, motivo: "Test" })
-      ).status,
-    ).toBe(409);
+    // R1: request cancellation now orchestrates M4 (covered in
+    // m5c2a-r1-request-cancel.test.ts). This case keeps testing direct M4
+    // cancellation and replacement while the request remains active.
+    const [activeRequest] = await db
+      .select()
+      .from(richiesteMagazzinoTable)
+      .where(eq(richiesteMagazzinoTable.id, row.id));
+    expect(activeRequest.stato).toBe("presa_in_carico");
     const cancelPayload = {
       idempotencyKey: randomUUID(),
       versione: bolla.versione,
@@ -890,7 +944,7 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
     });
   });
 
-  it("LEDGER-M5B-DIRECT: la consegna M4 collegata scarica una volta e non libera il documento corrente", async () => {
+  it("LEDGER-M5B-DIRECT: il diretto sociale è negato; la pianificazione Centro scarica una volta e conserva il link", async () => {
     const intervention = await interventionFixture();
     const deliveryProductId = await createProdotto(scope, {
       unitaMisura: "pz",
@@ -937,13 +991,35 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
       physical: "20.000000",
       reserved: "6.000000",
     });
+    const deniedDirect = await request(app())
+      .post(`/bolle/${bollaId}/consegna`)
+      .send({
+        idempotencyKey: randomUUID(),
+        versione: confirmed.body.versione,
+      });
+    expect(deniedDirect.status, deniedDirect.text).toBe(409);
+    expect(deniedDirect.body.error).toContain("pianificazione del Centro");
+    const planned = await request(centreDeliveryApp())
+      .post(`/consegne/da-bolla/${bollaId}`)
+      .send({
+        idempotencyKey: randomUUID(),
+        versione: confirmed.body.versione,
+        dataPrevista: "2026-10-08",
+        fasciaOraria: "Mattina",
+        tipoConsegna: "in_sede",
+      });
+    expect(planned.status, planned.text).toBe(201);
+    const [plannedBolla] = await db
+      .select()
+      .from(bolleTable)
+      .where(eq(bolleTable.id, bollaId));
     const command = {
       idempotencyKey: randomUUID(),
-      versione: confirmed.body.versione,
+      versione: plannedBolla.versione,
       confermaRicezione: true,
     };
-    const delivered = await request(app())
-      .post(`/bolle/${bollaId}/consegna`)
+    const delivered = await request(centreDeliveryApp())
+      .post(`/consegne/${planned.body.id}/completa`)
       .send(command);
     expect(delivered.status, delivered.text).toBe(200);
     const afterDelivery = await db.execute(sql`
@@ -963,8 +1039,8 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
       .where(eq(movimentiTable.bollaId, bollaId));
     expect(movements).toHaveLength(1);
     expect(movements[0].quantita).toBe("6.00");
-    const replay = await request(app())
-      .post(`/bolle/${bollaId}/consegna`)
+    const replay = await request(centreDeliveryApp())
+      .post(`/consegne/${planned.body.id}/completa`)
       .send(command);
     expect(replay.status, replay.text).toBe(200);
     expect(
@@ -990,7 +1066,7 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
       .select()
       .from(richiesteMagazzinoTable)
       .where(eq(richiesteMagazzinoTable.id, row.id));
-    expect(currentRequest.stato).toBe("presa_in_carico");
+    expect(currentRequest.stato).toBe("chiusa");
     const secondDocument = await request(app())
       .post(`/richieste-magazzino/${row.id}/documento`)
       .send({
@@ -1097,7 +1173,7 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
     expect(links[0]).toMatchObject({ bollaId, corrente: true });
   });
 
-  it("LEDGER-M5B-RETURN: affidamento e rientro 3 idonee + 1 mancante conservano il collegamento", async () => {
+  it("LEDGER-M5B-RETURN: affidamento Ente e rientro 3 idonee + 1 mancante conservano il collegamento", async () => {
     const deliveryProductId = await createProdotto(scope, {
       unitaMisura: "pz",
       quantitaFrazionabile: false,
@@ -1108,7 +1184,8 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
       quantita: 10,
       dataScadenza: "2098-01-01",
     });
-    const row = await fixture("beneficiario");
+    // Direct physical transport remains valid for Ente; social Beneficiario uses the Centre handoff.
+    const row = await fixture("ente");
     const created = await request(app())
       .post(`/richieste-magazzino/${row.id}/documento`)
       .send({
@@ -1150,7 +1227,7 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
       .send({
         idempotencyKey: randomUUID(),
         versione: entrusted.body.versione,
-        motivo: "Beneficiario assente — test sintetico",
+        motivo: "Ente non disponibile — test sintetico",
       });
     expect(failedDelivery.status, failedDelivery.text).toBe(200);
     const preview = await request(app()).get(`/bolle/${bollaId}/rientro`);

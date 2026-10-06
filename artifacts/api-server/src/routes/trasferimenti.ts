@@ -1560,45 +1560,12 @@ router.post("/trasferimenti/:id/annulla", async (req, res) => {
       });
       if (receipt) return;
       assertExpectedVersion(locked, versione);
-      if (locked.stato !== "richiesto" && locked.stato !== "preparato")
-        throw new TransferRequestError(
-          409,
-          "Annullamento ordinario consentito solo prima della partenza",
-        );
-      await tx
-        .update(prenotazioniMagazzinoTable)
-        .set({ stato: PRENOTAZIONE_RILASCIATA, updatedAt: new Date() })
-        .where(
-          and(
-            eq(prenotazioniMagazzinoTable.trasferimentoId, id),
-            eq(prenotazioniMagazzinoTable.stato, PRENOTAZIONE_ATTIVA),
-          ),
-        );
-      const [updated] = await tx
-        .update(trasferimentiTable)
-        .set({
-          stato: "annullato",
-          motivoAnnullamento: motivo,
-          versione: locked.versione + 1,
-          operatoreId: req.user!.id,
-        })
-        .where(eq(trasferimentiTable.id, id))
-        .returning();
-      await ceaseLinkedM4Document(tx, req, linked, motivo);
-      await recordAuditEvent(tx, {
-        command: audit,
-        azione: "TRASFERIMENTO_ANNULLATO",
-        entitaTipo: "trasferimento",
-        entitaId: id,
-        documentoTipo: "trasferimento",
-        documentoId: id,
-        magazzinoIdSnapshot: locked.magazzinoOrigineId,
-        dataOperativa: dataCivileEuropeRome(new Date()),
-        changes: auditFields(
-          { statoPrecedente: locked.stato, statoNuovo: "annullato", motivo },
-          ["statoPrecedente", "statoNuovo", "motivo"],
-        ),
+      const updated = await cancelTransferBeforeExitTx(tx, locked, {
+        actorId: req.user!.id,
+        motivo,
+        audit,
       });
+      await ceaseLinkedM4Document(tx, req, linked, motivo);
       await storeDocumentCommand(tx, {
         tipoComando: "trasferimento.cancel",
         idempotencyKey,
@@ -2513,3 +2480,4 @@ router.post("/trasferimenti/:id/rientro", async (req, res) => {
 });
 
 export default router;
+import { cancelTransferBeforeExitTx } from "../lib/m4Cancellation";

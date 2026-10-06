@@ -511,6 +511,13 @@ export function InterventoSocialeDetailSheet({
                       </Link>
                     </Button>
                   </div>
+                ) : intervento.raccordoMagazzino ? (
+                  <p className="text-sm">
+                    {intervento.raccordoMagazzino.richiestaCodice} ·{" "}
+                    {t(
+                      `richiesteMagazzino.${intervento.raccordoMagazzino.richiestaStato}`,
+                    )}
+                  </p>
                 ) : hasPermission("richieste_magazzino.create") &&
                   !interventionRequests.isLoading &&
                   !interventionRequests.isError ? (
@@ -524,6 +531,64 @@ export function InterventoSocialeDetailSheet({
                 ) : interventionRequests.isError ? (
                   <p role="alert">{t("richiesteMagazzino.loadError")}</p>
                 ) : null}
+                {intervento.raccordoMagazzino?.bollaId != null && (
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <Badge variant="outline">
+                      {intervento.raccordoMagazzino.bollaNumero} ·{" "}
+                      {intervento.raccordoMagazzino.bollaStato}
+                    </Badge>
+                    {hasPermission("bolle.view") && (
+                      <Button asChild size="sm" variant="outline">
+                        <Link
+                          href={`/bolle?bollaId=${intervento.raccordoMagazzino.bollaId}`}
+                        >
+                          {t("interventi.magazzino.openBolla")}
+                        </Link>
+                      </Button>
+                    )}
+                    {intervento.raccordoMagazzino.consegnaId != null &&
+                      hasPermission("consegne.view") && (
+                        <Button asChild size="sm" variant="outline">
+                          <Link
+                            href={`/consegne?tab=consegne&consegnaId=${intervento.raccordoMagazzino.consegnaId}`}
+                          >
+                            {t("interventi.magazzino.openDelivery")}
+                          </Link>
+                        </Button>
+                      )}
+                    {intervento.raccordoMagazzino.bollaStato === "confermato" &&
+                      intervento.raccordoMagazzino.consegnaId == null &&
+                      hasPermission("consegne.manage") && (
+                        <Button asChild size="sm">
+                          <Link
+                            href={`/consegne?tab=da-pianificare&bollaId=${intervento.raccordoMagazzino.bollaId}`}
+                          >
+                            {t("interventi.magazzino.planDelivery")}
+                          </Link>
+                        </Button>
+                      )}
+                  </div>
+                )}
+                {intervento.raccordoMagazzino?.consegnaStato ===
+                  "effettuata" && (
+                  <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm">
+                    <p>{t("interventi.magazzino.deliveryDone")}</p>
+                    {!terminal && canComplete && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() =>
+                          document
+                            .getElementById("intervento-workflow-actions")
+                            ?.scrollIntoView({ behavior: "smooth" })
+                        }
+                      >
+                        {t("interventi.magazzino.concludeIntervention")}
+                      </Button>
+                    )}
+                  </div>
+                )}
               </section>
             )}
 
@@ -760,7 +825,10 @@ export function InterventoSocialeDetailSheet({
             )}
 
             {!terminal && (canUpdate || canComplete || canCancel) && (
-              <section className="space-y-3 rounded-lg border p-4">
+              <section
+                id="intervento-workflow-actions"
+                className="space-y-3 rounded-lg border p-4"
+              >
                 <h3 className="font-semibold">
                   {t("interventi.operational.actions")}
                 </h3>

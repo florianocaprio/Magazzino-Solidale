@@ -275,6 +275,11 @@ export interface RichiestaMagazzinoCancel {
      * @maxLength 500
      */
   motivo: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  nota?: string | null;
 }
 
 export type RichiestaMagazzinoTipoDestinatario = typeof RichiestaMagazzinoTipoDestinatario[keyof typeof RichiestaMagazzinoTipoDestinatario];
@@ -4149,6 +4154,26 @@ export interface NucleoFamiliare {
   note?: string | null;
 }
 
+export interface InterventoRaccordoMagazzino {
+  richiestaId: number;
+  richiestaCodice: string;
+  richiestaStato: string;
+  /** @nullable */
+  bollaId?: number | null;
+  /** @nullable */
+  bollaNumero?: string | null;
+  /** @nullable */
+  bollaStato?: string | null;
+  /** @nullable */
+  consegnaId?: number | null;
+  /** @nullable */
+  consegnaStato?: string | null;
+  /** @nullable */
+  dataPrevista?: string | null;
+  /** @nullable */
+  fasciaOraria?: string | null;
+}
+
 /**
  * Stato canonico del ciclo di vita dell'intervento.
  */
@@ -4198,6 +4223,7 @@ export interface Intervento {
   nucleoFamiliareSintesi: string | null;
   /** @nullable */
   bollaId?: number | null;
+  raccordoMagazzino?: InterventoRaccordoMagazzino | null;
   /** @nullable */
   operatoreId?: number | null;
   /** @nullable */
@@ -5829,6 +5855,7 @@ export interface InterventoOperatore {
  */
 export interface InterventoListItem {
   id: number;
+  raccordoMagazzino?: InterventoRaccordoMagazzino | null;
   beneficiarioId: number;
   /** @nullable */
   beneficiarioNome: string | null;
@@ -7045,6 +7072,83 @@ export interface AssociaBollaInput {
   idempotencyKey: string;
 }
 
+export interface BollaProntaDaPianificare {
+  richiestaId: number;
+  richiestaCodice: string;
+  /** @nullable */
+  interventoId?: number | null;
+  /** @nullable */
+  interventoStato?: string | null;
+  /** @nullable */
+  dataOraPianificata?: string | null;
+  bollaId: number;
+  bollaNumero: string;
+  bollaVersione: number;
+  beneficiarioId: number;
+  beneficiarioNome: string;
+  beneficiarioCodice: string;
+  areaOperativaId: number;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+  /** @nullable */
+  centroNome?: string | null;
+  magazzinoId: number;
+  magazzinoNome: string;
+  /** @nullable */
+  dataDesiderata?: string | null;
+  modalitaPreferita: string;
+  /** @nullable */
+  indirizzoConsegna?: string | null;
+  /** @nullable */
+  volontarioPropostoId?: number | null;
+}
+
+export type ConsegnaDaBollaInputTipoConsegna = typeof ConsegnaDaBollaInputTipoConsegna[keyof typeof ConsegnaDaBollaInputTipoConsegna];
+
+
+export const ConsegnaDaBollaInputTipoConsegna = {
+  in_sede: 'in_sede',
+  domicilio: 'domicilio',
+} as const;
+
+export type ConsegnaDaBollaInputFasciaOraria = typeof ConsegnaDaBollaInputFasciaOraria[keyof typeof ConsegnaDaBollaInputFasciaOraria];
+
+
+export const ConsegnaDaBollaInputFasciaOraria = {
+  Mattina: 'Mattina',
+  Pomeriggio: 'Pomeriggio',
+  Sera: 'Sera',
+} as const;
+
+export interface ConsegnaDaBollaInput {
+  /** @minimum 1 */
+  versione: number;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
+  tipoConsegna: ConsegnaDaBollaInputTipoConsegna;
+  dataPrevista: string;
+  fasciaOraria: ConsegnaDaBollaInputFasciaOraria;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  indirizzoConsegna?: string | null;
+  /** @nullable */
+  zona?: string | null;
+  /** @nullable */
+  volontarioId?: number | null;
+  /** @nullable */
+  volontarioAltro?: string | null;
+  /** @nullable */
+  mezzoId?: number | null;
+  mezzoAltro?: boolean;
+  /** @nullable */
+  noteOperative?: string | null;
+}
+
 export interface ConsegnaInput {
   beneficiarioId: number;
   tipoConsegna: string;
@@ -7200,6 +7304,7 @@ export interface DocumentoOperativo {
   destinatarioNome?: string | null;
   /** @minimum 1 */
   versione: number;
+  centroHandoff: boolean;
 }
 
 export interface DocumentoOperativoPage {
@@ -7294,6 +7399,12 @@ export interface BollaDettaglio {
   destinatarioSnapshotFonte?: BollaDettaglioDestinatarioSnapshotFonte;
   /** @nullable */
   consegnaId?: number | null;
+  /** @nullable */
+  consegnaDataPrevista?: string | null;
+  /** @nullable */
+  consegnaFasciaOraria?: string | null;
+  /** @nullable */
+  consegnaVolontarioNome?: string | null;
   daPianificazione?: boolean;
   magazzinoId: number;
   /** @nullable */

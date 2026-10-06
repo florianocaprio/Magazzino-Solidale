@@ -4908,6 +4908,47 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ConsegneExport" }
 
+  /consegne/da-pianificare:
+    get:
+      operationId: listBollePronteDaPianificare
+      tags: [consegne]
+      summary: Coda derivata delle Bolle M5 pronte nel perimetro del Centro
+      responses:
+        "200":
+          description: Bolle pronte non ancora pianificate
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BollaProntaDaPianificare" }
+        "403": { description: Coda non autorizzata }
+
+  /consegne/da-bolla/{bollaId}:
+    post:
+      operationId: pianificaConsegnaDaBolla
+      tags: [consegne]
+      summary: Crea atomicamente la Consegna e associa la Bolla M5 pronta
+      parameters:
+        - { name: bollaId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConsegnaDaBollaInput" }
+      responses:
+        "200":
+          description: Replay idempotente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Consegna" }
+        "201":
+          description: Consegna pianificata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Consegna" }
+        "403": { description: Scope non autorizzato }
+        "409": { description: Bolla già pianificata o versione non aggiornata }
+
   /consegne/{id}:
     get:
       operationId: getConsegna
@@ -10667,6 +10708,7 @@ components:
         idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
         versione: { type: integer, minimum: 1 }
         motivo: { type: string, minLength: 1, maxLength: 500 }
+        nota: { type: [string, "null"], maxLength: 2000 }
     RichiestaMagazzino:
       type: object
       description: Snapshot operativo; nessun dato del dossier sociale live.
@@ -16931,6 +16973,21 @@ components:
         codice: { type: string }
       required: [id, nome, codice]
 
+    InterventoRaccordoMagazzino:
+      type: object
+      properties:
+        richiestaId: { type: integer }
+        richiestaCodice: { type: string }
+        richiestaStato: { type: string }
+        bollaId: { type: [integer, "null"] }
+        bollaNumero: { type: [string, "null"] }
+        bollaStato: { type: [string, "null"] }
+        consegnaId: { type: [integer, "null"] }
+        consegnaStato: { type: [string, "null"] }
+        dataPrevista: { type: [string, "null"], format: date }
+        fasciaOraria: { type: [string, "null"] }
+      required: [richiestaId, richiestaCodice, richiestaStato]
+
     Intervento:
       type: object
       properties:
@@ -16946,6 +17003,10 @@ components:
           type: ["string", "null"]
         bollaId:
           type: ["integer", "null"]
+        raccordoMagazzino:
+          anyOf:
+            - $ref: "#/components/schemas/InterventoRaccordoMagazzino"
+            - type: "null"
         operatoreId:
           type: ["integer", "null"]
         operatoreCodice:
@@ -17070,6 +17131,10 @@ components:
       description: Proiezione minimale per liste, calendario e dashboard; non include note o contenuti sociali estesi.
       properties:
         id: { type: integer }
+        raccordoMagazzino:
+          anyOf:
+            - $ref: "#/components/schemas/InterventoRaccordoMagazzino"
+            - type: "null"
         beneficiarioId: { type: integer }
         beneficiarioNome: { type: [string, "null"] }
         beneficiarioCodice: { type: [string, "null"] }
@@ -18778,6 +18843,63 @@ components:
           minLength: 1
           maxLength: 120
 
+    BollaProntaDaPianificare:
+      type: object
+      properties:
+        richiestaId: { type: integer }
+        richiestaCodice: { type: string }
+        interventoId: { type: [integer, "null"] }
+        interventoStato: { type: [string, "null"] }
+        dataOraPianificata: { type: [string, "null"], format: date-time }
+        bollaId: { type: integer }
+        bollaNumero: { type: string }
+        bollaVersione: { type: integer }
+        beneficiarioId: { type: integer }
+        beneficiarioNome: { type: string }
+        beneficiarioCodice: { type: string }
+        areaOperativaId: { type: integer }
+        centroAscoltoId: { type: [integer, "null"] }
+        centroNome: { type: [string, "null"] }
+        magazzinoId: { type: integer }
+        magazzinoNome: { type: string }
+        dataDesiderata: { type: [string, "null"], format: date }
+        modalitaPreferita: { type: string }
+        indirizzoConsegna: { type: [string, "null"] }
+        volontarioPropostoId: { type: [integer, "null"] }
+      required:
+        [
+          richiestaId,
+          richiestaCodice,
+          bollaId,
+          bollaNumero,
+          bollaVersione,
+          beneficiarioId,
+          beneficiarioNome,
+          beneficiarioCodice,
+          areaOperativaId,
+          magazzinoId,
+          magazzinoNome,
+          modalitaPreferita,
+        ]
+
+    ConsegnaDaBollaInput:
+      type: object
+      properties:
+        versione: { type: integer, minimum: 1 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
+        tipoConsegna: { type: string, enum: [in_sede, domicilio] }
+        dataPrevista: { type: string, format: date }
+        fasciaOraria: { type: string, enum: [Mattina, Pomeriggio, Sera] }
+        indirizzoConsegna: { type: [string, "null"], maxLength: 200 }
+        zona: { type: [string, "null"] }
+        volontarioId: { type: [integer, "null"] }
+        volontarioAltro: { type: [string, "null"] }
+        mezzoId: { type: [integer, "null"] }
+        mezzoAltro: { type: boolean }
+        noteOperative: { type: [string, "null"] }
+      required:
+        [versione, idempotencyKey, tipoConsegna, dataPrevista, fasciaOraria]
+
     ConsegnaInput:
       type: object
       properties:
@@ -18898,6 +19020,7 @@ components:
           stato,
           origineId,
           versione,
+          centroHandoff,
         ]
       properties:
         documentoId:
@@ -18916,6 +19039,7 @@ components:
         destinazioneMagazzinoNome: { type: ["string", "null"] }
         destinatarioNome: { type: ["string", "null"] }
         versione: { type: integer, minimum: 1 }
+        centroHandoff: { type: boolean }
 
     DocumentoOperativoPage:
       type: object
@@ -19071,6 +19195,13 @@ components:
           enum: [confermato, legacy_live, null]
         consegnaId:
           type: ["integer", "null"]
+        consegnaDataPrevista:
+          type: ["string", "null"]
+          format: date
+        consegnaFasciaOraria:
+          type: ["string", "null"]
+        consegnaVolontarioNome:
+          type: ["string", "null"]
         daPianificazione:
           type: boolean
         magazzinoId:

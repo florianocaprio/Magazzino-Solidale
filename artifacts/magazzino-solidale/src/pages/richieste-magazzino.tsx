@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -42,6 +42,21 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -59,7 +74,17 @@ const queryId = (name: string): number | null => {
 };
 
 function message(error: unknown, fallback: string) {
-  return (error as { data?: { error?: string } })?.data?.error ?? fallback;
+  const value = error as {
+    data?: { error?: unknown };
+    response?: { data?: { error?: unknown } };
+    message?: unknown;
+  } | null;
+  return (
+    [value?.data?.error, value?.response?.data?.error, value?.message].find(
+      (item): item is string =>
+        typeof item === "string" && item.trim().length > 0,
+    ) ?? fallback
+  );
 }
 
 export default function RichiesteMagazzino() {
@@ -69,6 +94,7 @@ export default function RichiesteMagazzino() {
   const queryClient = useQueryClient();
   const intents = useCommandIntentRegistry();
   const [, navigate] = useLocation();
+  const search = useSearch();
   const canSocial =
     hasArea("sociale") &&
     isModuloAttivo("CENTRO_ASCOLTO") &&
@@ -107,11 +133,34 @@ export default function RichiesteMagazzino() {
   >("da_definire");
   const [edit, setEdit] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelNote, setCancelNote] = useState("");
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [transferRows, setTransferRows] = useState<RigaDraft[]>([newRiga()]);
+  useEffect(() => {
+    setSelectedId(queryId("richiestaId"));
+    setEdit(false);
+    setError("");
+    setConfirmation("");
+    setCancelOpen(false);
+    setCancelReason("");
+    setCancelNote("");
+    setWarehouseId("");
+    setTransferRows([newRiga()]);
+  }, [search]);
+  const selectRequest = (id: number | null) => {
+    const params = new URLSearchParams(window.location.search);
+    if (id == null) params.delete("richiestaId");
+    else params.set("richiestaId", String(id));
+    setSelectedId(id);
+    navigate(
+      `${window.location.pathname}${params.size ? "?" + params.toString() : ""}`,
+      { replace: id == null },
+    );
+  };
   const contextIntervention = useGetIntervento(contextInterventionId ?? 0, {
     query: {
       queryKey: getGetInterventoQueryKey(contextInterventionId ?? 0),
@@ -193,6 +242,34 @@ export default function RichiesteMagazzino() {
     },
   });
   const row = detail.data;
+  const activeRequest =
+    row?.stato === "inviata" || row?.stato === "presa_in_carico";
+  const preExit =
+    !row?.documentoCorrente ||
+    (row.documentoCorrente.tipoDocumento === "bolla"
+      ? ["bozza", "confermato"]
+      : ["richiesto", "preparato"]
+    ).includes(row.documentoCorrente.statoDocumento ?? "");
+  const mayCancel =
+    canCancel &&
+    activeRequest &&
+    preExit &&
+    ((hasArea("sociale") &&
+      row?.tipoDestinatario === "beneficiario" &&
+      isModuloAttivo("CENTRO_ASCOLTO")) ||
+      (row?.stato === "presa_in_carico" && hasArea("magazzino")));
+  const mayPrepare =
+    row?.stato === "presa_in_carico" &&
+    !row.documentoCorrente &&
+    canPrepare &&
+    hasPermission(
+      row.tipoDestinatario === "magazzino"
+        ? "magazzino.transfers.create"
+        : "bolle.manage",
+    ) &&
+    isModuloAttivo(
+      row.tipoDestinatario === "magazzino" ? "TRASFERIMENTI" : "BOLLE",
+    );
   const warehouses = useListMagazzini({
     query: { enabled: canPrepare, queryKey: getListMagazziniQueryKey() },
   });
@@ -252,7 +329,7 @@ export default function RichiesteMagazzino() {
             queryKey: getGetRichiestaMagazzinoStoricoQueryKey(selectedId),
           });
         }
-        setSelectedId(null);
+        selectRequest(null);
         setEdit(false);
         setWarehouseId("");
         setTransferRows([newRiga()]);
@@ -360,14 +437,23 @@ export default function RichiesteMagazzino() {
       setError(t("richiesteMagazzino.reasonRequired"));
       return;
     }
-    const payload = { versione: row.versione, motivo: cancelReason.trim() };
+    const payload = {
+      versione: row.versione,
+      motivo: cancelReason.trim(),
+      nota: cancelNote.trim() || null,
+    };
     const ok = await execute(
       `richiesta:${row.id}:cancel`,
       payload,
       payload,
       (body) => cancelRichiestaMagazzino(row.id, body),
     );
-    if (ok) setCancelReason("");
+    if (ok) {
+      setCancelReason("");
+      setCancelNote("");
+      setCancelOpen(false);
+      setConfirmation(t("richiesteMagazzino.cancelledConfirmation"));
+    }
   };
 
   const prepareDocument = async () => {
@@ -451,7 +537,7 @@ export default function RichiesteMagazzino() {
                   type="button"
                   className="underline"
                   onClick={() => {
-                    setSelectedId(activeForIntervention.data!.items[0].id);
+                    selectRequest(activeForIntervention.data!.items[0].id);
                     setCreating(false);
                   }}
                 >
@@ -514,7 +600,7 @@ export default function RichiesteMagazzino() {
                         key={request.id}
                         className="block underline"
                         onClick={() => {
-                          setSelectedId(request.id);
+                          selectRequest(request.id);
                           setCreating(false);
                         }}
                       >
@@ -661,7 +747,7 @@ export default function RichiesteMagazzino() {
                   key={request.id}
                   className="w-full rounded border p-3 text-start hover:bg-muted"
                   onClick={() => {
-                    setSelectedId(request.id);
+                    selectRequest(request.id);
                     setEdit(false);
                     setCreating(false);
                     setError("");
@@ -681,7 +767,6 @@ export default function RichiesteMagazzino() {
                       )}
                     </span>
                   )}
-                  <p className="line-clamp-2 text-sm">{request.bisogno}</p>
                   <p className="text-xs text-muted-foreground">
                     {request.areaNomeSnapshot} ·{" "}
                     {request.centroNomeSnapshot ?? "—"} ·{" "}
@@ -719,168 +804,305 @@ export default function RichiesteMagazzino() {
         </CardContent>
       </Card>
       {selectedId != null && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{row?.codice ?? t("common.loading")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {detail.isError ? (
-              <p role="alert">{t("richiesteMagazzino.loadError")}</p>
-            ) : row ? (
-              <>
-                <p>
-                  {row.destinatarioNomeSnapshot} · {row.areaNomeSnapshot} ·{" "}
-                  {row.centroNomeSnapshot ?? "—"}
-                </p>
-                <p className="whitespace-pre-wrap">{row.bisogno}</p>
-                {row.noteOperative && (
-                  <p className="whitespace-pre-wrap text-sm">
-                    {row.noteOperative}
+        <Sheet
+          open
+          onOpenChange={(open) => {
+            if (!open) selectRequest(null);
+          }}
+        >
+          <SheetContent
+            side="right"
+            className="flex h-full w-full flex-col gap-0 p-0 sm:max-w-2xl"
+            data-testid="richiesta-sheet"
+          >
+            <SheetHeader className="shrink-0 border-b p-6 pr-12">
+              <SheetTitle>{row?.codice ?? t("common.loading")}</SheetTitle>
+              <SheetDescription>
+                {row?.destinatarioNomeSnapshot ?? t("richiesteMagazzino.title")}
+              </SheetDescription>
+              {row && (
+                <div className="flex flex-wrap gap-2 text-sm">
+                  <Badge>{t(`richiesteMagazzino.${row.stato}`)}</Badge>
+                  <span>{t(`richiesteMagazzino.${row.priorita}`)}</span>
+                  <span>
+                    {row.areaNomeSnapshot} · {row.centroNomeSnapshot ?? "—"}
+                  </span>
+                </div>
+              )}
+            </SheetHeader>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
+              {error && <p role="alert">{error}</p>}
+              {confirmation && <p role="status">{confirmation}</p>}
+              {detail.isError ? (
+                <p role="alert">{t("richiesteMagazzino.loadError")}</p>
+              ) : row ? (
+                <>
+                  <p>
+                    {row.destinatarioNomeSnapshot} · {row.areaNomeSnapshot} ·{" "}
+                    {row.centroNomeSnapshot ?? "—"}
                   </p>
-                )}
-                <p className="text-sm">
-                  {t(`richiesteMagazzino.${row.stato}`)} ·{" "}
-                  {t(`richiesteMagazzino.${row.priorita}`)} ·{" "}
-                  {t(`richiesteMagazzino.${row.modalitaPreferita}`)} ·{" "}
-                  {t("richiesteMagazzino.version")} {row.versione}
-                </p>
-                {row.documentoCorrente ? (
-                  <section className="rounded border p-3 space-y-2">
-                    <h2 className="font-medium">
-                      {t("richiesteMagazzino.currentDocument")}
-                    </h2>
+                  <p className="whitespace-pre-wrap">{row.bisogno}</p>
+                  {row.dataDesiderata && (
                     <p>
-                      {row.documentoCorrente.codice} ·{" "}
-                      {t(
-                        `richiesteMagazzino.progress.${row.documentoCorrente.avanzamento}`,
-                      )}
+                      {t("richiesteMagazzino.desiredDate")}:{" "}
+                      {String(row.dataDesiderata).slice(0, 10)}
                     </p>
-                    {row.documentoCorrente.percorsoDocumento && (
-                      <Link
-                        className="underline"
-                        href={row.documentoCorrente.percorsoDocumento}
-                      >
-                        {t("richiesteMagazzino.openDocument")}
-                      </Link>
+                  )}
+                  {row.noteOperative && (
+                    <p className="whitespace-pre-wrap text-sm">
+                      {row.noteOperative}
+                    </p>
+                  )}
+                  <p className="text-sm">
+                    {t(`richiesteMagazzino.${row.stato}`)} ·{" "}
+                    {t(`richiesteMagazzino.${row.priorita}`)} ·{" "}
+                    {t(`richiesteMagazzino.${row.modalitaPreferita}`)} ·{" "}
+                    {t("richiesteMagazzino.version")} {row.versione}
+                  </p>
+                  {row.documentoCorrente ? (
+                    <section className="rounded border p-3 space-y-2">
+                      <h2 className="font-medium">
+                        {t("richiesteMagazzino.currentDocument")}
+                      </h2>
+                      <p>
+                        {row.documentoCorrente.codice} ·{" "}
+                        {t(
+                          `richiesteMagazzino.progress.${row.documentoCorrente.avanzamento}`,
+                        )}
+                      </p>
+                      {row.documentoCorrente.percorsoDocumento && (
+                        <Link
+                          className="underline"
+                          href={row.documentoCorrente.percorsoDocumento}
+                        >
+                          {t("richiesteMagazzino.openDocument")}
+                        </Link>
+                      )}
+                    </section>
+                  ) : row.stato === "presa_in_carico" &&
+                    canPrepare &&
+                    hasPermission(
+                      row.tipoDestinatario === "magazzino"
+                        ? "magazzino.transfers.create"
+                        : "bolle.manage",
+                    ) &&
+                    isModuloAttivo(
+                      row.tipoDestinatario === "magazzino"
+                        ? "TRASFERIMENTI"
+                        : "BOLLE",
+                    ) ? (
+                    <section
+                      className="rounded border p-3 space-y-3"
+                      data-testid="m5b-prepare-document"
+                    >
+                      <h2 className="font-medium">
+                        {row.tipoDestinatario === "magazzino"
+                          ? t("richiesteMagazzino.prepareDocument")
+                          : t("richiesteMagazzino.chooseWarehouseCreateBolla")}
+                      </h2>
+                      <p className="text-sm">
+                        {t("richiesteMagazzino.recipient")}:{" "}
+                        {row.destinatarioNomeSnapshot} ·{" "}
+                        {t(
+                          `richiesteMagazzino.recipientType.${row.tipoDestinatario}`,
+                        )}
+                      </p>
+                      <div className="grid gap-2">
+                        <Label htmlFor="rm-warehouse">
+                          {t("richiesteMagazzino.fulfilmentWarehouse")}
+                        </Label>
+                        <select
+                          id="rm-warehouse"
+                          className="rounded border p-2"
+                          value={warehouseId}
+                          onChange={(event) =>
+                            setWarehouseId(event.target.value)
+                          }
+                        >
+                          <option value="">
+                            {t("richiesteMagazzino.chooseWarehouse")}
+                          </option>
+                          {warehouses.data
+                            ?.filter(
+                              (item) =>
+                                item.stato === "attivo" &&
+                                item.areaOperativaId === row.areaOperativaId &&
+                                item.id !== row.magazzinoDestinatarioId &&
+                                (row.centroAscoltoId == null ||
+                                  item.centroAscoltoId == null ||
+                                  item.centroAscoltoId === row.centroAscoltoId),
+                            )
+                            .map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.nome}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      {row.tipoDestinatario === "magazzino" &&
+                        chosenWarehouse && (
+                          <RigheEditor
+                            magazzinoId={chosenWarehouse.id}
+                            areaOperativaId={row.areaOperativaId}
+                            righe={transferRows}
+                            setRighe={setTransferRows}
+                          />
+                        )}
+                    </section>
+                  ) : row.stato === "presa_in_carico" ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("richiesteMagazzino.toPrepare")}
+                    </p>
+                  ) : null}
+                  {row.documentiPrecedenti?.length ? (
+                    <section className="rounded border p-3 space-y-2">
+                      <h2 className="font-medium">
+                        {t("richiesteMagazzino.previousDocuments")}
+                      </h2>
+                      {row.documentiPrecedenti.map((document) => (
+                        <p key={document.relazioneId} className="text-sm">
+                          {document.codice} ·{" "}
+                          {t(
+                            `richiesteMagazzino.progress.${document.avanzamento}`,
+                          )}{" "}
+                          {document.percorsoDocumento && (
+                            <Link
+                              className="underline"
+                              href={document.percorsoDocumento}
+                            >
+                              {t("richiesteMagazzino.openDocument")}
+                            </Link>
+                          )}
+                        </p>
+                      ))}
+                    </section>
+                  ) : null}
+                  {row.interventoId != null &&
+                    hasArea("sociale") &&
+                    hasPermission("sociale.interventi.view") &&
+                    isModuloAttivo("CENTRO_ASCOLTO") && (
+                      <p>
+                        <Link
+                          className="underline"
+                          href={`/interventi?interventoId=${row.interventoId}`}
+                        >
+                          {t("richiesteMagazzino.sourceIntervention")}
+                        </Link>
+                      </p>
                     )}
-                  </section>
-                ) : row.stato === "presa_in_carico" &&
-                  canPrepare &&
-                  hasPermission(
-                    row.tipoDestinatario === "magazzino"
-                      ? "magazzino.transfers.create"
-                      : "bolle.manage",
-                  ) &&
-                  isModuloAttivo(
-                    row.tipoDestinatario === "magazzino"
-                      ? "TRASFERIMENTI"
-                      : "BOLLE",
-                  ) ? (
-                  <section
-                    className="rounded border p-3 space-y-3"
-                    data-testid="m5b-prepare-document"
-                  >
-                    <h2 className="font-medium">
-                      {row.tipoDestinatario === "magazzino"
-                        ? t("richiesteMagazzino.prepareDocument")
-                        : t("richiesteMagazzino.chooseWarehouseCreateBolla")}
-                    </h2>
-                    <p className="text-sm">
-                      {t("richiesteMagazzino.recipient")}:{" "}
-                      {row.destinatarioNomeSnapshot} ·{" "}
-                      {t(
-                        `richiesteMagazzino.recipientType.${row.tipoDestinatario}`,
-                      )}
-                    </p>
-                    <div className="grid gap-2">
-                      <Label htmlFor="rm-warehouse">
-                        {t("richiesteMagazzino.fulfilmentWarehouse")}
+                  {edit && (
+                    <form
+                      className="grid gap-3 rounded border p-3"
+                      onSubmit={saveEdit}
+                    >
+                      <Label htmlFor="rm-edit-need">
+                        {t("richiesteMagazzino.need")}
+                      </Label>
+                      <Textarea
+                        id="rm-edit-need"
+                        required
+                        maxLength={2000}
+                        value={bisogno}
+                        onChange={(event) => setBisogno(event.target.value)}
+                      />
+                      <Label htmlFor="rm-edit-notes">
+                        {t("richiesteMagazzino.notes")}
+                      </Label>
+                      <Textarea
+                        id="rm-edit-notes"
+                        maxLength={2000}
+                        value={note}
+                        onChange={(event) => setNote(event.target.value)}
+                      />
+                      <Label htmlFor="rm-edit-priority">
+                        {t("richiesteMagazzino.priority")}
                       </Label>
                       <select
-                        id="rm-warehouse"
+                        id="rm-edit-priority"
                         className="rounded border p-2"
-                        value={warehouseId}
-                        onChange={(event) => setWarehouseId(event.target.value)}
+                        value={priority}
+                        onChange={(event) =>
+                          setPriority(event.target.value as typeof priority)
+                        }
                       >
-                        <option value="">
-                          {t("richiesteMagazzino.chooseWarehouse")}
-                        </option>
-                        {warehouses.data
-                          ?.filter(
-                            (item) =>
-                              item.stato === "attivo" &&
-                              item.areaOperativaId === row.areaOperativaId &&
-                              item.id !== row.magazzinoDestinatarioId &&
-                              (row.centroAscoltoId == null ||
-                                item.centroAscoltoId == null ||
-                                item.centroAscoltoId === row.centroAscoltoId),
-                          )
-                          .map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.nome}
+                        {(["bassa", "normale", "alta", "urgente"] as const).map(
+                          (value) => (
+                            <option key={value} value={value}>
+                              {t(`richiesteMagazzino.${value}`)}
                             </option>
-                          ))}
+                          ),
+                        )}
                       </select>
-                    </div>
-                    {row.tipoDestinatario === "magazzino" &&
-                      chosenWarehouse && (
-                        <RigheEditor
-                          magazzinoId={chosenWarehouse.id}
-                          areaOperativaId={row.areaOperativaId}
-                          righe={transferRows}
-                          setRighe={setTransferRows}
-                        />
-                      )}
-                    <Button
-                      disabled={pending || !chosenWarehouse || !transferReady}
-                      onClick={prepareDocument}
-                    >
-                      {row.tipoDestinatario === "magazzino"
-                        ? t("richiesteMagazzino.prepareDocument")
-                        : t("richiesteMagazzino.createBolla")}
-                    </Button>
-                  </section>
-                ) : row.stato === "presa_in_carico" ? (
-                  <p className="text-sm text-muted-foreground">
-                    {t("richiesteMagazzino.toPrepare")}
-                  </p>
-                ) : null}
-                {row.documentiPrecedenti?.length ? (
-                  <section className="rounded border p-3 space-y-2">
+                      <Label htmlFor="rm-edit-date">
+                        {t("richiesteMagazzino.desiredDate")}
+                      </Label>
+                      <Input
+                        id="rm-edit-date"
+                        type="date"
+                        value={desiredDate}
+                        onChange={(event) => setDesiredDate(event.target.value)}
+                      />
+                      <Label htmlFor="rm-edit-mode">
+                        {t("richiesteMagazzino.modality")}
+                      </Label>
+                      <select
+                        id="rm-edit-mode"
+                        className="rounded border p-2"
+                        value={modality}
+                        onChange={(event) =>
+                          setModality(event.target.value as typeof modality)
+                        }
+                      >
+                        {(["da_definire", "ritiro", "domicilio"] as const).map(
+                          (value) => (
+                            <option key={value} value={value}>
+                              {t(`richiesteMagazzino.${value}`)}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                      <div className="flex gap-2">
+                        <Button type="submit" disabled={pending}>
+                          {t("common.save")}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setEdit(false)}
+                        >
+                          {t("common.cancel")}
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                  <section>
                     <h2 className="font-medium">
-                      {t("richiesteMagazzino.previousDocuments")}
+                      {t("richiesteMagazzino.history")}
                     </h2>
-                    {row.documentiPrecedenti.map((document) => (
-                      <p key={document.relazioneId} className="text-sm">
-                        {document.codice} ·{" "}
-                        {t(
-                          `richiesteMagazzino.progress.${document.avanzamento}`,
-                        )}{" "}
-                        {document.percorsoDocumento && (
-                          <Link
-                            className="underline"
-                            href={document.percorsoDocumento}
-                          >
-                            {t("richiesteMagazzino.openDocument")}
-                          </Link>
+                    {history.data?.map((event) => (
+                      <p key={event.id} className="text-xs">
+                        {event.azione} · {event.actorCodeSnapshot} ·{" "}
+                        {String(event.registratoAt)}
+                        {event.motivo && (
+                          <span className="block whitespace-pre-wrap">
+                            {event.motivo}
+                          </span>
+                        )}
+                        {typeof event.changes?.nota === "string" && (
+                          <span className="block whitespace-pre-wrap">
+                            {event.changes.nota}
+                          </span>
                         )}
                       </p>
                     ))}
                   </section>
-                ) : null}
-                {row.interventoId != null &&
-                  hasArea("sociale") &&
-                  hasPermission("sociale.interventi.view") &&
-                  isModuloAttivo("CENTRO_ASCOLTO") && (
-                    <p>
-                      <Link
-                        className="underline"
-                        href={`/interventi?interventoId=${row.interventoId}`}
-                      >
-                        {t("richiesteMagazzino.sourceIntervention")}
-                      </Link>
-                    </p>
-                  )}
+                </>
+              ) : (
+                <p>{t("common.loading")}</p>
+              )}
+            </div>
+            {row && (
+              <footer className="shrink-0 border-t bg-background p-4">
                 <div className="flex flex-wrap gap-2">
                   {row.stato === "inviata" && canEdit && (
                     <Button variant="outline" onClick={() => beginEdit(row)}>
@@ -892,136 +1114,110 @@ export default function RichiesteMagazzino() {
                       {t("richiesteMagazzino.take")}
                     </Button>
                   )}
-                  {canCancel &&
-                    !row.documentoCorrente &&
-                    ((row.stato === "inviata" &&
-                      row.tipoDestinatario === "beneficiario" &&
-                      hasArea("sociale") &&
-                      isModuloAttivo("CENTRO_ASCOLTO")) ||
-                      (row.stato === "presa_in_carico" &&
-                        hasArea("magazzino"))) && (
-                      <div className="flex flex-wrap gap-2">
-                        <Input
-                          aria-label={t("richiesteMagazzino.cancelReason")}
-                          maxLength={500}
-                          value={cancelReason}
-                          onChange={(event) =>
-                            setCancelReason(event.target.value)
-                          }
-                          placeholder={t("richiesteMagazzino.cancelReason")}
-                        />
-                        <Button
-                          variant="destructive"
-                          disabled={pending || !cancelReason.trim()}
-                          onClick={cancel}
-                        >
-                          {t("common.cancel")}
-                        </Button>
-                      </div>
-                    )}
+                  {mayPrepare && (
+                    <Button
+                      disabled={pending || !chosenWarehouse || !transferReady}
+                      onClick={prepareDocument}
+                    >
+                      {row.tipoDestinatario === "magazzino"
+                        ? t("richiesteMagazzino.prepareDocument")
+                        : t("richiesteMagazzino.createBolla")}
+                    </Button>
+                  )}
+                  {mayCancel && (
+                    <Button
+                      variant="destructive"
+                      disabled={pending}
+                      onClick={() => setCancelOpen(true)}
+                    >
+                      {t("richiesteMagazzino.cancelRequest")}
+                    </Button>
+                  )}
                 </div>
-                {edit && (
-                  <form
-                    className="grid gap-3 rounded border p-3"
-                    onSubmit={saveEdit}
-                  >
-                    <Label htmlFor="rm-edit-need">
-                      {t("richiesteMagazzino.need")}
-                    </Label>
-                    <Textarea
-                      id="rm-edit-need"
-                      required
-                      maxLength={2000}
-                      value={bisogno}
-                      onChange={(event) => setBisogno(event.target.value)}
-                    />
-                    <Label htmlFor="rm-edit-notes">
-                      {t("richiesteMagazzino.notes")}
-                    </Label>
-                    <Textarea
-                      id="rm-edit-notes"
-                      maxLength={2000}
-                      value={note}
-                      onChange={(event) => setNote(event.target.value)}
-                    />
-                    <Label htmlFor="rm-edit-priority">
-                      {t("richiesteMagazzino.priority")}
-                    </Label>
-                    <select
-                      id="rm-edit-priority"
-                      className="rounded border p-2"
-                      value={priority}
-                      onChange={(event) =>
-                        setPriority(event.target.value as typeof priority)
-                      }
-                    >
-                      {(["bassa", "normale", "alta", "urgente"] as const).map(
-                        (value) => (
-                          <option key={value} value={value}>
-                            {t(`richiesteMagazzino.${value}`)}
-                          </option>
-                        ),
-                      )}
-                    </select>
-                    <Label htmlFor="rm-edit-date">
-                      {t("richiesteMagazzino.desiredDate")}
-                    </Label>
-                    <Input
-                      id="rm-edit-date"
-                      type="date"
-                      value={desiredDate}
-                      onChange={(event) => setDesiredDate(event.target.value)}
-                    />
-                    <Label htmlFor="rm-edit-mode">
-                      {t("richiesteMagazzino.modality")}
-                    </Label>
-                    <select
-                      id="rm-edit-mode"
-                      className="rounded border p-2"
-                      value={modality}
-                      onChange={(event) =>
-                        setModality(event.target.value as typeof modality)
-                      }
-                    >
-                      {(["da_definire", "ritiro", "domicilio"] as const).map(
-                        (value) => (
-                          <option key={value} value={value}>
-                            {t(`richiesteMagazzino.${value}`)}
-                          </option>
-                        ),
-                      )}
-                    </select>
-                    <div className="flex gap-2">
-                      <Button type="submit" disabled={pending}>
-                        {t("common.save")}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setEdit(false)}
-                      >
-                        {t("common.cancel")}
-                      </Button>
-                    </div>
-                  </form>
+                {activeRequest && !preExit && (
+                  <p className="mt-2 text-sm">
+                    {t("richiesteMagazzino.cancelAfterExit")}
+                  </p>
                 )}
-                <section>
-                  <h2 className="font-medium">
-                    {t("richiesteMagazzino.history")}
-                  </h2>
-                  {history.data?.map((event) => (
-                    <p key={event.id} className="text-xs">
-                      {event.azione} · {event.actorCodeSnapshot} ·{" "}
-                      {String(event.registratoAt)}
-                    </p>
-                  ))}
-                </section>
-              </>
-            ) : (
-              <p>{t("common.loading")}</p>
+                {activeRequest &&
+                  !preExit &&
+                  row.documentoCorrente?.percorsoDocumento && (
+                    <Link
+                      className="underline"
+                      href={row.documentoCorrente.percorsoDocumento}
+                    >
+                      {t("richiesteMagazzino.openDocument")}
+                    </Link>
+                  )}
+              </footer>
             )}
-          </CardContent>
-        </Card>
+            <Dialog
+              open={cancelOpen}
+              onOpenChange={(open) => {
+                if (!pending) setCancelOpen(open);
+              }}
+            >
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    {t("richiesteMagazzino.cancelRequest")}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {t("richiesteMagazzino.cancelAudit")}
+                  </DialogDescription>
+                </DialogHeader>
+                <form
+                  className="space-y-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void cancel();
+                  }}
+                >
+                  {row?.documentoCorrente && (
+                    <p>{t("richiesteMagazzino.cancelLinkedDocument")}</p>
+                  )}
+                  <Label htmlFor="rm-cancel-reason">
+                    {t("richiesteMagazzino.cancelReason")} *
+                  </Label>
+                  <Textarea
+                    id="rm-cancel-reason"
+                    required
+                    maxLength={500}
+                    value={cancelReason}
+                    onChange={(event) => setCancelReason(event.target.value)}
+                  />
+                  <Label htmlFor="rm-cancel-note">
+                    {t("richiesteMagazzino.cancelNote")}
+                  </Label>
+                  <Textarea
+                    id="rm-cancel-note"
+                    maxLength={2000}
+                    value={cancelNote}
+                    onChange={(event) => setCancelNote(event.target.value)}
+                  />
+                  {error && <p role="alert">{error}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={pending}
+                      onClick={() => setCancelOpen(false)}
+                    >
+                      {t("common.cancel")}
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="destructive"
+                      disabled={pending || !cancelReason.trim()}
+                    >
+                      {t("richiesteMagazzino.confirmCancel")}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </SheetContent>
+        </Sheet>
       )}
     </div>
   );

@@ -221,7 +221,14 @@ async function queryDocumentRows(
           THEN concat_ws(' ', ben.cognome, ben.nome)
           ELSE COALESCE(ed.denominazione, b.destinatario_nome_snapshot)
         END::text AS destinatario_nome,
-        b.versione::integer AS versione
+        b.versione::integer AS versione,
+        EXISTS (
+          SELECT 1 FROM richieste_magazzino_documenti rmd
+          JOIN richieste_magazzino rm ON rm.id = rmd.richiesta_id
+          WHERE rmd.bolla_id = b.id
+            AND rmd.corrente = true
+            AND rm.tipo_destinatario = 'beneficiario'
+        ) AS centro_handoff
       FROM bolle b
       LEFT JOIN beneficiari ben ON ben.id = b.beneficiario_id
       LEFT JOIN enti_destinatari ed ON ed.id = b.ente_destinatario_id
@@ -248,7 +255,8 @@ async function queryDocumentRows(
         mo.nome::text,
         md.nome::text,
         md.nome::text,
-        t.versione::integer
+        t.versione::integer,
+        false::boolean
       FROM trasferimenti t
       LEFT JOIN magazzini mo ON mo.id = t.magazzino_origine_id
       LEFT JOIN magazzini md ON md.id = t.magazzino_destino_id
@@ -301,6 +309,7 @@ function normalizeDocumentRow(row: RawDocumentRow) {
     destinatarioNome:
       row.destinatario_nome == null ? null : String(row.destinatario_nome),
     versione: Number(row.versione),
+    centroHandoff: row.centro_handoff === true,
   };
 }
 

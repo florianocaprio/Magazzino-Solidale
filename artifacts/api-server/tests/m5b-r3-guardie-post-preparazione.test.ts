@@ -10,6 +10,7 @@ import {
   bolleTable,
   centriAscoltoTable,
   consegneTable,
+  entiDestinatariTable,
   db,
   pool,
   richiesteMagazzinoTable,
@@ -80,13 +81,27 @@ async function assignment(
     .where(eq(utentiTable.id, operatorId));
 }
 
-async function fixture(kind: "beneficiario" | "magazzino") {
+async function fixture(kind: "beneficiario" | "magazzino" | "ente") {
+  const entity =
+    kind === "ente"
+      ? (
+          await db
+            .insert(entiDestinatariTable)
+            .values({
+              denominazione: `Ente R3 ${randomUUID().slice(0, 8)}`,
+              indirizzo: "Via test R3 1",
+              areaOperativaId: areaId,
+            })
+            .returning()
+        )[0]
+      : null;
   const [row] = await db
     .insert(richiesteMagazzinoTable)
     .values({
       codice: `RM-R3-${randomUUID().slice(0, 8)}`,
       tipoDestinatario: kind,
       beneficiarioId: kind === "beneficiario" ? beneficiaryId : null,
+      enteDestinatarioId: entity?.id ?? null,
       magazzinoDestinatarioId: kind === "magazzino" ? destinationId : null,
       areaOperativaId: areaId,
       centroAscoltoId: kind === "beneficiario" ? centreId : null,
@@ -105,8 +120,11 @@ async function fixture(kind: "beneficiario" | "magazzino") {
   return row;
 }
 
-async function readyBolla(agent: Awaited<ReturnType<typeof login>>) {
-  const row = await fixture("beneficiario");
+async function readyBolla(
+  agent: Awaited<ReturnType<typeof login>>,
+  kind: "beneficiario" | "ente" = "beneficiario",
+) {
+  const row = await fixture(kind);
   const created = await agent
     .post(`/api/richieste-magazzino/${row.id}/documento`)
     .send({ idempotencyKey: randomUUID(), versione: 1, magazzinoId: originId });
@@ -126,6 +144,25 @@ async function readyBolla(agent: Awaited<ReturnType<typeof login>>) {
   });
   expect(ready.status, ready.text).toBe(200);
   return { richiestaId: row.id, id, versione: ready.body.versione };
+}
+
+async function planBolla(
+  agent: Awaited<ReturnType<typeof login>>,
+  bolla: { id: number; versione: number },
+) {
+  const planned = await agent.post(`/api/consegne/da-bolla/${bolla.id}`).send({
+    ...command(bolla.versione),
+    dataPrevista: "2026-10-08",
+    fasciaOraria: "Mattina",
+    tipoConsegna: "in_sede",
+  });
+  expect(planned.status, planned.text).toBe(201);
+  const detail = await agent.get(`/api/bolle/${bolla.id}`);
+  expect(detail.status, detail.text).toBe(200);
+  return {
+    id: planned.body.id as number,
+    versione: detail.body.versione as number,
+  };
 }
 
 async function readyTransfer(agent: Awaited<ReturnType<typeof login>>) {
@@ -258,9 +295,66 @@ afterAll(async () => {
 });
 
 describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
-  it("R3-B: revoca territoriale nega Bolla, rientro, storno e pianificazione senza effetti; il ripristino consente Affida", async () => {
+  it("R3-SOCIAL-HANDOFF: le guardie territoriali e i grant correnti restano sul nuovo percorso Centro", async () => {
     const agent = await login();
     const bolla = await readyBolla(agent);
+    const before = await digest(bolla.richiestaId, lotId);
+    for (const path of ["affida", "consegna"]) {
+      const response = await agent.post(`/api/bolle/${bolla.id}/${path}`).send({
+        ...command(bolla.versione),
+        trasportatoreNome: "Non deve uscire",
+      });
+      expect(response.status, response.text).toBe(409);
+      expect(response.body.error).toContain("Centro");
+    }
+    expect(await digest(bolla.richiestaId, lotId)).toBe(before);
+    const planning = {
+      ...command(bolla.versione),
+      dataPrevista: "2026-10-08",
+      fasciaOraria: "Mattina",
+      tipoConsegna: "in_sede",
+    };
+    try {
+      for (const assignmentPair of [
+        [null, null],
+        [null, centreId],
+      ] as const) {
+        await assignment(assignmentPair[0], assignmentPair[1]);
+        // No global promotion: missing Area or an incoherent Centre cannot authorize planning.
+        await denied(
+          await agent.post(`/api/consegne/da-bolla/${bolla.id}`).send(planning),
+        );
+      }
+      await assignment(areaId, centreId);
+      for (const missingGrant of [
+        "richieste_magazzino.view",
+        "consegne.manage",
+      ]) {
+        await db
+          .update(ruoliTable)
+          .set({ permessi: grants.filter((g) => g !== missingGrant) })
+          .where(eq(ruoliTable.id, roleId));
+        await denied(
+          await agent.post(`/api/consegne/da-bolla/${bolla.id}`).send(planning),
+        );
+      }
+      expect(await digest(bolla.richiestaId, lotId)).toBe(before);
+    } finally {
+      await assignment(areaId, centreId);
+      await db
+        .update(ruoliTable)
+        .set({ permessi: grants })
+        .where(eq(ruoliTable.id, roleId));
+    }
+    const planned = await planBolla(agent, bolla);
+    expect(planned.id).toBeGreaterThan(0);
+  });
+
+  it("R3-B: revoca territoriale nega Bolla Ente, rientro e storno senza effetti; il ripristino consente Affida", async () => {
+    const agent = await login();
+    const bolla = await readyBolla(agent, "ente");
+    const socialBolla = await readyBolla(agent);
+    const socialBefore = await digest(socialBolla.richiestaId, lotId);
     const before = await digest(bolla.richiestaId, lotId);
     await assignment(null, null);
     try {
@@ -293,10 +387,12 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
             .send({ motivo: "R3" }),
         );
         await denied(
-          await session.post(`/api/bolle/${bolla.id}/converti-consegna`).send({
-            indirizzoConsegna: "Via sintetica 1",
-            dataPrevista: "2026-10-01",
-          }),
+          await session
+            .post(`/api/bolle/${socialBolla.id}/converti-consegna`)
+            .send({
+              indirizzoConsegna: "Via sintetica 1",
+              dataPrevista: "2026-10-01",
+            }),
         );
         await denied(
           await session
@@ -305,6 +401,7 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
         );
       }
       expect(await digest(bolla.richiestaId, lotId)).toBe(before);
+      expect(await digest(socialBolla.richiestaId, lotId)).toBe(socialBefore);
     } finally {
       await assignment(areaId, centreId);
     }
@@ -484,7 +581,7 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
 
   it("R3-G: Area e Centro incoerenti/inattivi e revoca view o grant M4 negano; prepare non è richiesto dopo Pronta", async () => {
     const agent = await login();
-    const bolla = await readyBolla(agent);
+    const bolla = await readyBolla(agent, "ente");
     const transfer = await readyTransfer(agent);
     const url = `/api/bolle/${bolla.id}/affida`;
     const payload = { ...command(bolla.versione), trasportatoreNome: "R3" };
@@ -611,7 +708,7 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
 
   it("R3-ADMIN: admin assegnato resta scoped; solo admin globale esplicito opera senza Area/Centro", async () => {
     const agent = await login();
-    const bolla = await readyBolla(agent);
+    const bolla = await readyBolla(agent, "ente");
     const transfer = await readyTransfer(agent);
     const [otherArea] = await db
       .insert(areeOperativeTable)
@@ -712,20 +809,24 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
     }
   }, 60_000);
 
-  it("R3-D: Consegna diretta e storno collegati rivalidano scope anche sul replay", async () => {
+  it("R3-D: Consegna pianificata dal Centro e storno collegati rivalidano scope anche sul replay", async () => {
     const agent = await login();
     const bolla = await readyBolla(agent);
-    const deliverCommand = command(bolla.versione);
+    const planned = await planBolla(agent, bolla);
+    const deliverCommand = command(planned.versione);
     const delivered = await agent
-      .post(`/api/bolle/${bolla.id}/consegna`)
+      .post(`/api/consegne/${planned.id}/completa`)
       .send(deliverCommand);
     expect(delivered.status, delivered.text).toBe(200);
+    const currentBolla = await agent.get(`/api/bolle/${bolla.id}`);
+    expect(currentBolla.status).toBe(200);
+    expect(currentBolla.body.stato).toBe("consegnato");
     const [line] = await db
       .select({ id: bollaRigheTable.id })
       .from(bollaRigheTable)
       .where(eq(bollaRigheTable.bollaId, bolla.id));
     const reverseCommand = {
-      ...command(delivered.body.versione),
+      ...command(currentBolla.body.versione),
       motivo: "R3 storno",
       rigaIds: [line.id],
     };
@@ -734,7 +835,7 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
     try {
       await denied(
         await agent
-          .post(`/api/bolle/${bolla.id}/consegna`)
+          .post(`/api/consegne/${planned.id}/completa`)
           .send(deliverCommand),
       );
       await denied(
@@ -752,7 +853,7 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
     expect(reversed.status, reversed.text).toBe(200);
   }, 60_000);
 
-  it("R3-PLAN: ritiro non effettuato e conversione collegati restano operativi con scope valido", async () => {
+  it("R3-PLAN: ritiro non effettuato resta operativo; la conversione sociale passa dalla pianificazione Centro", async () => {
     const agent = await login();
     const bolla = await readyBolla(agent);
     const failedPickup = await agent
@@ -766,8 +867,14 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
         indirizzoConsegna: "Via sintetica 1",
         dataPrevista: "2026-10-01",
       });
-    expect(converted.status, converted.text).toBe(201);
-    expect(converted.body.consegnaId).toBeTruthy();
+    expect(converted.status, converted.text).toBe(409);
+    expect(converted.body.error).toContain("pianificata dal Centro");
+    const current = await agent.get(`/api/bolle/${bolla.id}`);
+    const planned = await planBolla(agent, {
+      id: bolla.id,
+      versione: current.body.versione,
+    });
+    expect(planned.id).toBeGreaterThan(0);
   }, 60_000);
 
   it("R3-RACE: revoca prima, comando prima e rollback seguono i lock PostgreSQL correnti", async () => {
@@ -778,7 +885,7 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
     let blockerOpen = false;
     try {
       // A: a committed revocation wins before the command locks the user.
-      const first = await readyBolla(agent);
+      const first = await readyBolla(agent, "ente");
       const firstPayload = {
         ...command(first.versione),
         trasportatoreNome: "R3 race A",
@@ -800,7 +907,7 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
       await assignment(areaId, centreId);
 
       // B: the command holds the actor share lock while request lock delays it.
-      const second = await readyBolla(agent);
+      const second = await readyBolla(agent, "ente");
       const secondPayload = {
         ...command(second.versione),
         trasportatoreNome: "R3 race B",
@@ -839,7 +946,7 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
       expect(await digest(second.richiestaId, lotId)).toBe(afterSecond);
 
       // C: an uncommitted revocation is not interpreted as a real denial.
-      const third = await readyBolla(agent);
+      const third = await readyBolla(agent, "ente");
       const thirdPayload = {
         ...command(third.versione),
         trasportatoreNome: "R3 race C",

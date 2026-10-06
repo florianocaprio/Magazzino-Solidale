@@ -119,6 +119,11 @@ import {
   bollaErrorMessage,
   invalidateBollaViews,
 } from "@/lib/bolla-query-invalidation";
+import {
+  AUTO_FEFO_LOT,
+  bollaAddProductInput,
+  selectedPhysicalLot,
+} from "@/lib/bolla-add-product";
 import { RouteActions } from "@/components/maps/route-actions";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1084,7 +1089,6 @@ function AggiungiProdottoDialog({
   const [prodottoId, setProdottoId] = useState("");
   const [lottoId, setLottoId] = useState("");
   const [quantita, setQuantita] = useState("");
-  const [unitaMisura, setUnitaMisura] = useState("pz");
   const [scanProdotto, setScanProdotto] = useState("");
 
   const { data: magazzini } = useListMagazzini();
@@ -1154,6 +1158,13 @@ function AggiungiProdottoDialog({
   const giacenzaSelezionata = giacenze?.find(
     (g) => g.prodottoId === parseInt(prodottoId),
   );
+  const prodottoSelezionato = prodotti?.find(
+    (p) => p.id === parseInt(prodottoId),
+  );
+  const unitaMisura = prodottoSelezionato?.unitaMisura;
+  const lottoObbligatorio = Boolean(
+    prodottoSelezionato?.lottoFisicoObbligatorio,
+  );
   const lottiDisponibili =
     lotti?.filter(
       (l) => l.magazzinoId === magazzinoId && l.quantitaResidua > 0,
@@ -1193,14 +1204,21 @@ function AggiungiProdottoDialog({
   const eccedeDisponibilita = quantitaNum > maxDisponibile;
 
   const onSubmit = () => {
-    if (!prodottoId || !quantita || eccedeDisponibilita || !bollaCorrente)
+    if (
+      !prodottoId ||
+      !quantita ||
+      !prodottoSelezionato ||
+      !unitaMisura ||
+      (lottoObbligatorio && !lottoId) ||
+      eccedeDisponibilita ||
+      !bollaCorrente
+    )
       return;
-    const semanticInput = {
-      prodottoId: parseInt(prodottoId),
-      lottoId: lottoId ? parseInt(lottoId) : undefined,
+    const semanticInput = bollaAddProductInput(
+      prodottoSelezionato,
+      lottoId,
       quantita,
-      unitaMisura,
-    };
+    );
     addRiga.mutate(
       {
         id: bollaId,
@@ -1218,13 +1236,10 @@ function AggiungiProdottoDialog({
           setProdottoId("");
           setLottoId("");
           setQuantita("");
-          setUnitaMisura("pz");
         },
         onError: (err: unknown) => {
           commandIntents.fail(addRowSlot, err);
-          const msg =
-            (err as { response?: { data?: { error?: string } } })?.response
-              ?.data?.error ?? t("bolle.addError");
+          const msg = bollaErrorMessage(err, t("bolle.addError"));
           toast({
             title: t("bolle.error"),
             description: msg,
@@ -1309,13 +1324,19 @@ function AggiungiProdottoDialog({
             </Select>
           </div>
 
-          {prodottoId && lottiDisponibili.length > 0 && (
+          {prodottoId && (lottiDisponibili.length > 0 || lottoObbligatorio) && (
             <div className="space-y-2">
-              <Label>{t("bolle.lottoLabel")}</Label>
+              <Label>
+                {lottoObbligatorio
+                  ? t("bolle.lottoFisicoRequired")
+                  : t("bolle.lottoLabel")}
+              </Label>
               <Select
-                value={lottoId}
+                value={
+                  lottoId || (lottoObbligatorio ? undefined : AUTO_FEFO_LOT)
+                }
                 onValueChange={(v) => {
-                  setLottoId(v);
+                  setLottoId(selectedPhysicalLot(v));
                   setQuantita("");
                 }}
               >
@@ -1323,6 +1344,13 @@ function AggiungiProdottoDialog({
                   <SelectValue placeholder={t("bolle.lottoPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
+                  {!lottoObbligatorio && (
+                    <SelectItem value={AUTO_FEFO_LOT}>
+                      {t("bolle.lottoAutomaticoFefo", {
+                        defaultValue: "Automatico (FEFO)",
+                      })}
+                    </SelectItem>
+                  )}
                   {lottiDisponibili.map((l) => (
                     <SelectItem key={l.id} value={String(l.id)}>
                       {l.codiceLotto ?? `${t("bolle.lottoPrefix")}${l.id}`}
@@ -1335,7 +1363,11 @@ function AggiungiProdottoDialog({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {t("bolle.lottoHint")}
+                {lottoObbligatorio && !lottoId
+                  ? t("bolle.selezionaLottoFisico", {
+                      defaultValue: "Seleziona il lotto fisico",
+                    })
+                  : t("bolle.lottoHint")}
               </p>
             </div>
           )}
@@ -1373,27 +1405,12 @@ function AggiungiProdottoDialog({
             </div>
             <div className="space-y-2">
               <Label>{t("bolle.unitaMisuraLabel")}</Label>
-              <Select value={unitaMisura} onValueChange={setUnitaMisura}>
-                <SelectTrigger aria-label={t("bolle.unitaMisuraLabel")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[
-                    "pz",
-                    "kg",
-                    "g",
-                    "lt",
-                    "ml",
-                    "conf",
-                    "scatola",
-                    "busta",
-                  ].map((u) => (
-                    <SelectItem key={u} value={u}>
-                      {u}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <p
+                className="flex h-10 items-center rounded-md border px-3 text-sm"
+                aria-label={t("bolle.unitaMisuraLabel")}
+              >
+                {unitaMisura ?? "–"}
+              </p>
             </div>
           </div>
         </div>
@@ -1406,6 +1423,8 @@ function AggiungiProdottoDialog({
             disabled={
               !prodottoId ||
               !quantita ||
+              !unitaMisura ||
+              (lottoObbligatorio && !lottoId) ||
               eccedeDisponibilita ||
               addRiga.isPending
             }
@@ -1498,6 +1517,9 @@ export function BollaDettaglio({
       },
     },
   );
+  const isCentroHandoffBolla =
+    bolla?.tipoDestinatario === "beneficiario" &&
+    (linkedRequest === true || linkedRequestId != null);
   const bollaCentroId =
     beneficiari?.find((b) => b.id === bolla?.beneficiarioId)?.centroAscoltoId ??
     requestContext?.centroAscoltoId ??
@@ -2367,8 +2389,34 @@ export function BollaDettaglio({
             )}
             {isConfermato && (
               <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800 mb-3">
-                <strong>{t("bolle.prontaTitle")}</strong>
-                {t("bolle.prontaText")}
+                {isCentroHandoffBolla ? (
+                  <>
+                    <strong>{t("bolle.prontaCentroTitle")}</strong>
+                    <p>
+                      {bolla.consegnaId == null
+                        ? t("bolle.prontaCentroAttesa")
+                        : t("bolle.prontaCentroPianificata", {
+                            date: bolla.consegnaDataPrevista ?? "–",
+                            fascia: bolla.consegnaFasciaOraria ?? "–",
+                            volontario: bolla.consegnaVolontarioNome ?? "–",
+                          })}
+                    </p>
+                    {bolla.consegnaId != null &&
+                      hasPermission("consegne.view") && (
+                        <a
+                          className="underline"
+                          href={`/consegne?tab=consegne&consegnaId=${bolla.consegnaId}`}
+                        >
+                          {t("bolle.apriConsegnaCentro")}
+                        </a>
+                      )}
+                  </>
+                ) : (
+                  <>
+                    <strong>{t("bolle.prontaTitle")}</strong>
+                    {t("bolle.prontaText")}
+                  </>
+                )}
               </div>
             )}
             {bolla.tipoDestinatario === "beneficiario" &&
@@ -2397,7 +2445,8 @@ export function BollaDettaglio({
             )}
             {(isConfermato || isInTrasporto) &&
               canDeliver &&
-              !hideConsegnaActions && (
+              !hideConsegnaActions &&
+              !isCentroHandoffBolla && (
                 <>
                   {!bolla.ritiroNonEffettuatoAt && (
                     <Button
@@ -3864,6 +3913,7 @@ export default function Bolle() {
           stato: string;
           tipoDestinatario: string;
           versione: number;
+          centroHandoff: boolean;
         };
       }
     | {
@@ -3893,6 +3943,7 @@ export default function Bolle() {
               stato: documento.stato,
               tipoDestinatario: documento.tipoDestinatario,
               versione: documento.versione,
+              centroHandoff: documento.centroHandoff,
             },
           }
         : {
@@ -4384,24 +4435,26 @@ export default function Bolle() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {row.bolla.stato === "confermato" && canDeliver && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 gap-1.5 text-green-700 border-green-300 hover:bg-green-50 hover:text-green-700"
-                              onClick={(e) =>
-                                markConsegnato(
-                                  e,
-                                  row.bolla.id,
-                                  row.bolla.versione,
-                                )
-                              }
-                              disabled={consegnandoBollaId === row.bolla.id}
-                            >
-                              <Truck className="h-3.5 w-3.5" />
-                              {t("bolle.segnaConsegnata")}
-                            </Button>
-                          )}
+                          {row.bolla.stato === "confermato" &&
+                            !row.bolla.centroHandoff &&
+                            canDeliver && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 gap-1.5 text-green-700 border-green-300 hover:bg-green-50 hover:text-green-700"
+                                onClick={(e) =>
+                                  markConsegnato(
+                                    e,
+                                    row.bolla.id,
+                                    row.bolla.versione,
+                                  )
+                                }
+                                disabled={consegnandoBollaId === row.bolla.id}
+                              >
+                                <Truck className="h-3.5 w-3.5" />
+                                {t("bolle.segnaConsegnata")}
+                              </Button>
+                            )}
                           {([
                             "confermato",
                             "in_trasporto",

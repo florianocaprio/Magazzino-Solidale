@@ -33,6 +33,12 @@ export interface BollaDettaglio {
   destinatarioSnapshotFonte?: BollaDettaglioDestinatarioSnapshotFonte;
   /** @nullable */
   consegnaId?: number | null;
+  /** @nullable */
+  consegnaDataPrevista?: Date | null;
+  /** @nullable */
+  consegnaFasciaOraria?: string | null;
+  /** @nullable */
+  consegnaVolontarioNome?: string | null;
   daPianificazione?: boolean;
   magazzinoId: number;
   /** @nullable */

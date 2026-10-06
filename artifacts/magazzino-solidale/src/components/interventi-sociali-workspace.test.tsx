@@ -71,8 +71,10 @@ const counts: InterventiRiepilogoViste = {
 
 function ControlledWorkspace({
   onOpen,
+  rows = [sample],
 }: {
   onOpen: (row: Intervento) => void;
+  rows?: Intervento[];
 }) {
   const [filters, setFilters] = useState<InterventiSocialiFilters>(() =>
     defaultInterventiSocialiFilters(),
@@ -80,7 +82,7 @@ function ControlledWorkspace({
   return (
     <InterventiSocialiWorkspace
       filters={filters}
-      interventi={[sample]}
+      interventi={rows}
       counts={counts}
       areaOperativa={[{ id: 1, nome: "Roma" }]}
       centri={[{ id: 1, nome: "Centro Roma", areaOperativaId: 1 }]}
@@ -127,6 +129,30 @@ describe("InterventiSocialiWorkspace", () => {
     ).toContain("interventi.views.oggi");
     expect(document.body.textContent).toContain("85");
     expect(document.body.textContent).toContain("12");
+  });
+
+  it("mostra Bolla pronta e Consegna da pianificare sulla stessa riga Intervento", async () => {
+    const ready: Intervento = {
+      ...sample,
+      raccordoMagazzino: {
+        richiestaId: 9,
+        richiestaCodice: "RM-9",
+        richiestaStato: "presa_in_carico",
+        bollaId: 11,
+        bollaNumero: "B-11",
+        bollaStato: "confermato",
+        consegnaId: null,
+        consegnaStato: null,
+        dataPrevista: null,
+        fasciaOraria: null,
+      },
+    };
+    await act(async () =>
+      root.render(<ControlledWorkspace onOpen={vi.fn()} rows={[ready]} />),
+    );
+    expect(document.body.textContent).toContain(
+      "interventi.magazzino.readyToPlan",
+    );
   });
 
   it("seleziona una vista, combina e azzera i filtri senza loop", async () => {

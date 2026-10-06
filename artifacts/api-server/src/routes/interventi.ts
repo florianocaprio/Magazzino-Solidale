@@ -10,6 +10,10 @@ import {
   interventiMaterialiTable,
   interventiStoricoStatiTable,
   interventiTable,
+  richiesteMagazzinoTable,
+  richiesteMagazzinoDocumentiTable,
+  bolleTable,
+  consegneTable,
   magazziniTable,
   prodottiTable,
   ruoliTable,
@@ -96,6 +100,12 @@ import {
   M5bDelegationError,
   rejectLegacyMaterialIncreaseAfterDelegation,
 } from "../lib/m5bInterventionDelegation";
+import {
+  hasM5bArea,
+  m5bRequestScopePredicate,
+  requireCurrentM5bActor,
+} from "../lib/m5bRequestAccess";
+import { CurrentCommandActorError } from "../lib/currentCommandActor";
 
 const router: IRouter = Router();
 
@@ -812,6 +822,88 @@ function formatInterventoListItem(
     bisogniPianificatiProssimaScadenza:
       detail.bisogniPianificatiProssimaScadenza,
   };
+}
+
+/** One scoped query for the whole visible page; never fetch social content per row. */
+async function raccordiMagazzinoFor(req: Request, ids: number[]) {
+  const result = new Map<
+    number,
+    {
+      richiestaId: number;
+      richiestaCodice: string;
+      richiestaStato: string;
+      bollaId: number | null;
+      bollaNumero: string | null;
+      bollaStato: string | null;
+      consegnaId: number | null;
+      consegnaStato: string | null;
+      dataPrevista: string | null;
+      fasciaOraria: string | null;
+    }
+  >();
+  if (ids.length === 0 || !req.user) return result;
+  try {
+    return await db.transaction(async (tx) => {
+      const actor = await requireCurrentM5bActor(
+        tx,
+        req.user!.id,
+        "richieste_magazzino.view",
+      );
+      if (!hasM5bArea(actor, "sociale")) return result;
+      const rows = await tx
+        .select({
+          interventoId: richiesteMagazzinoTable.interventoId,
+          richiestaId: richiesteMagazzinoTable.id,
+          richiestaCodice: richiesteMagazzinoTable.codice,
+          richiestaStato: richiesteMagazzinoTable.stato,
+          bollaId: bolleTable.id,
+          bollaNumero: bolleTable.numeroBolla,
+          bollaStato: bolleTable.stato,
+          consegnaId: consegneTable.id,
+          consegnaStato: consegneTable.stato,
+          dataPrevista: consegneTable.dataPrevista,
+          fasciaOraria: consegneTable.fasciaOraria,
+        })
+        .from(richiesteMagazzinoTable)
+        .leftJoin(
+          richiesteMagazzinoDocumentiTable,
+          and(
+            eq(
+              richiesteMagazzinoDocumentiTable.richiestaId,
+              richiesteMagazzinoTable.id,
+            ),
+            eq(richiesteMagazzinoDocumentiTable.corrente, true),
+            eq(richiesteMagazzinoDocumentiTable.tipoDocumento, "bolla"),
+          ),
+        )
+        .leftJoin(
+          bolleTable,
+          eq(richiesteMagazzinoDocumentiTable.bollaId, bolleTable.id),
+        )
+        .leftJoin(consegneTable, eq(bolleTable.consegnaId, consegneTable.id))
+        .where(
+          and(
+            inArray(richiesteMagazzinoTable.interventoId, ids),
+            eq(richiesteMagazzinoTable.sorgente, "intervento_sociale"),
+            m5bRequestScopePredicate(actor),
+          ),
+        )
+        .orderBy(
+          desc(richiesteMagazzinoTable.dataCreazione),
+          desc(richiesteMagazzinoTable.id),
+        );
+      for (const row of rows) {
+        if (row.interventoId != null && !result.has(row.interventoId)) {
+          const { interventoId: _interventoId, ...summary } = row;
+          result.set(row.interventoId, summary);
+        }
+      }
+      return result;
+    });
+  } catch (error) {
+    if (error instanceof CurrentCommandActorError) return result;
+    throw error;
+  }
 }
 
 function requiredText(
@@ -2630,9 +2722,13 @@ router.get("/interventi", async (req, res) => {
 
   const summaries = await summariesFor(rows.map((row) => row.i.id));
   const successori = await successoriFor(rows.map((row) => row.i.id));
+  const raccordi = await raccordiMagazzinoFor(
+    req,
+    rows.map((row) => row.i.id),
+  );
   res.json(
-    rows.map((row) =>
-      (ambito === "uds" ? formatIntervento : formatInterventoListItem)(
+    rows.map((row) => ({
+      ...(ambito === "uds" ? formatIntervento : formatInterventoListItem)(
         row.i,
         summaries.get(row.i.id) ?? emptySummary(),
         row.cognome && row.nome ? `${row.cognome} ${row.nome}` : null,
@@ -2650,7 +2746,8 @@ router.get("/interventi", async (req, res) => {
               .join(" ") || null,
         },
       ),
-    ),
+      raccordoMagazzino: raccordi.get(row.i.id) ?? null,
+    })),
   );
 });
 
@@ -3174,8 +3271,9 @@ router.get("/interventi/:id", async (req, res) => {
     const needs = await orderedBisogni([row.id]);
     const successori = await successoriFor([row.id]);
     const display = await displayDetailsForIntervento(row.id);
-    res.json(
-      formatIntervento(
+    const raccordi = await raccordiMagazzinoFor(req, [row.id]);
+    res.json({
+      ...formatIntervento(
         row,
         summarizeBisogni(needs),
         display?.beneficiarioNome ?? null,
@@ -3183,7 +3281,8 @@ router.get("/interventi/:id", async (req, res) => {
         successori.get(row.id) ?? [],
         display?.details,
       ),
-    );
+      raccordoMagazzino: raccordi.get(row.id) ?? null,
+    });
   } catch (error) {
     if (sendRouteError(error, res)) return;
     throw error;

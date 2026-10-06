@@ -15,6 +15,7 @@ import {
   movimentiTable,
   prenotazioniMagazzinoTable,
   prodottiTable,
+  richiesteMagazzinoTable,
 } from "@workspace/db";
 import { and, asc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
@@ -789,7 +790,7 @@ export async function completeBollaDelivery(opts: {
         opts.documentCommand.idempotencyKey,
       );
     }
-    await guardLinkedM4OperationalAccess(
+    const linkedRequest = await guardLinkedM4OperationalAccess(
       tx,
       auditUserId(opts.audit),
       "bolla",
@@ -800,6 +801,15 @@ export async function completeBollaDelivery(opts: {
       await lockConsegnaBollaRelation(tx, opts.expectedConsegna.id);
     }
     const current = await lockBolla(tx, opts.bollaId);
+    if (
+      linkedRequest?.richiesta.tipoDestinatario === "beneficiario" &&
+      opts.requiredPermission !== "consegne.complete"
+    ) {
+      throw new BollaActionError(
+        409,
+        "La Bolla della Richiesta sociale deve essere consegnata dalla pianificazione del Centro",
+      );
+    }
     const freshActor = await requireCurrentCommandActor(
       tx,
       auditUserId(opts.audit),
@@ -899,7 +909,8 @@ export async function completeBollaDelivery(opts: {
       });
       if (isBeneficiario) {
         await syncConsegnaDaBollaTx(tx, current, lockedConsegna);
-        await syncInterventoBollaTx(tx, opts.bollaId);
+        if (linkedRequest?.richiesta.interventoId == null)
+          await syncInterventoBollaTx(tx, opts.bollaId);
       }
       if (opts.documentCommand) {
         await storeDocumentCommand(tx, {
@@ -1037,7 +1048,35 @@ export async function completeBollaDelivery(opts: {
         },
         lockedConsegna,
       );
-      await syncInterventoBollaTx(tx, opts.bollaId);
+      if (linkedRequest?.richiesta.interventoId == null)
+        await syncInterventoBollaTx(tx, opts.bollaId);
+    }
+    if (linkedRequest?.richiesta.stato === "presa_in_carico") {
+      const richiesta = linkedRequest.richiesta;
+      await tx
+        .update(richiesteMagazzinoTable)
+        .set({
+          stato: "chiusa",
+          versione: richiesta.versione + 1,
+          dataAggiornamento: new Date(),
+        })
+        .where(eq(richiesteMagazzinoTable.id, richiesta.id));
+      await recordAuditEvent(tx, {
+        command: opts.audit,
+        azione: "richiesta_magazzino.chiusa_da_consegna",
+        entitaTipo: "richiesta_magazzino",
+        entitaId: richiesta.id,
+        areaOperativaIdSnapshot: richiesta.areaOperativaId,
+        centroAscoltoIdSnapshot: richiesta.centroAscoltoId,
+        changes: auditFields(
+          { statoPrecedente: richiesta.stato, statoNuovo: "chiusa" },
+          ["statoPrecedente", "statoNuovo"],
+        ),
+        metadata: auditFields(
+          { bollaId: opts.bollaId, consegnaId: opts.expectedConsegna?.id },
+          ["bollaId", "consegnaId"],
+        ),
+      });
     }
     if (opts.documentCommand) {
       const resultingVersion = updated?.versione ?? current.versione + 1;

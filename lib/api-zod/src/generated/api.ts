@@ -314,12 +314,15 @@ export const cancelRichiestaMagazzinoBodyIdempotencyKeyMax = 120;
 
 export const cancelRichiestaMagazzinoBodyMotivoMax = 500;
 
+export const cancelRichiestaMagazzinoBodyNotaMax = 2000;
+
 
 
 export const CancelRichiestaMagazzinoBody = zod.object({
   "idempotencyKey": zod.string().min(1).max(cancelRichiestaMagazzinoBodyIdempotencyKeyMax),
   "versione": zod.number().min(1),
-  "motivo": zod.string().min(1).max(cancelRichiestaMagazzinoBodyMotivoMax)
+  "motivo": zod.string().min(1).max(cancelRichiestaMagazzinoBodyMotivoMax),
+  "nota": zod.string().max(cancelRichiestaMagazzinoBodyNotaMax).nullish()
 })
 
 export const CancelRichiestaMagazzinoResponse = zod.object({
@@ -6255,6 +6258,18 @@ export const GetBeneficiarioResponse = zod.object({
   "beneficiarioCodice": zod.string().nullable(),
   "nucleoFamiliareSintesi": zod.string().nullable(),
   "bollaId": zod.number().nullish(),
+  "raccordoMagazzino": zod.union([zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "richiestaStato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "consegnaStato": zod.string().nullish(),
+  "dataPrevista": zod.coerce.date().nullish(),
+  "fasciaOraria": zod.string().nullish()
+}),zod.null()]).optional(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "operatoreNome": zod.string().nullable(),
@@ -6694,6 +6709,18 @@ export const ListInterventiResponseItem = zod.object({
   "beneficiarioCodice": zod.string().nullable(),
   "nucleoFamiliareSintesi": zod.string().nullable(),
   "bollaId": zod.number().nullish(),
+  "raccordoMagazzino": zod.union([zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "richiestaStato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "consegnaStato": zod.string().nullish(),
+  "dataPrevista": zod.coerce.date().nullish(),
+  "fasciaOraria": zod.string().nullish()
+}),zod.null()]).optional(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "operatoreNome": zod.string().nullable(),
@@ -6909,6 +6936,18 @@ export const GetInterventoResponse = zod.object({
   "beneficiarioCodice": zod.string().nullable(),
   "nucleoFamiliareSintesi": zod.string().nullable(),
   "bollaId": zod.number().nullish(),
+  "raccordoMagazzino": zod.union([zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "richiestaStato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "consegnaStato": zod.string().nullish(),
+  "dataPrevista": zod.coerce.date().nullish(),
+  "fasciaOraria": zod.string().nullish()
+}),zod.null()]).optional(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "operatoreNome": zod.string().nullable(),
@@ -7004,6 +7043,18 @@ export const UpdateInterventoResponse = zod.object({
   "beneficiarioCodice": zod.string().nullable(),
   "nucleoFamiliareSintesi": zod.string().nullable(),
   "bollaId": zod.number().nullish(),
+  "raccordoMagazzino": zod.union([zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "richiestaStato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "consegnaStato": zod.string().nullish(),
+  "dataPrevista": zod.coerce.date().nullish(),
+  "fasciaOraria": zod.string().nullish()
+}),zod.null()]).optional(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "operatoreNome": zod.string().nullable(),
@@ -7158,6 +7209,18 @@ export const AvviaInterventoResponse = zod.object({
   "beneficiarioCodice": zod.string().nullable(),
   "nucleoFamiliareSintesi": zod.string().nullable(),
   "bollaId": zod.number().nullish(),
+  "raccordoMagazzino": zod.union([zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "richiestaStato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "consegnaStato": zod.string().nullish(),
+  "dataPrevista": zod.coerce.date().nullish(),
+  "fasciaOraria": zod.string().nullish()
+}),zod.null()]).optional(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "operatoreNome": zod.string().nullable(),
@@ -7453,6 +7516,18 @@ export const ConcludiInterventoResponse = zod.object({
   "beneficiarioCodice": zod.string().nullable(),
   "nucleoFamiliareSintesi": zod.string().nullable(),
   "bollaId": zod.number().nullish(),
+  "raccordoMagazzino": zod.union([zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "richiestaStato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "consegnaStato": zod.string().nullish(),
+  "dataPrevista": zod.coerce.date().nullish(),
+  "fasciaOraria": zod.string().nullish()
+}),zod.null()]).optional(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "operatoreNome": zod.string().nullable(),
@@ -7543,6 +7618,18 @@ export const ConcludiInterventoResponse = zod.object({
   "beneficiarioCodice": zod.string().nullable(),
   "nucleoFamiliareSintesi": zod.string().nullable(),
   "bollaId": zod.number().nullish(),
+  "raccordoMagazzino": zod.union([zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "richiestaStato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "consegnaStato": zod.string().nullish(),
+  "dataPrevista": zod.coerce.date().nullish(),
+  "fasciaOraria": zod.string().nullish()
+}),zod.null()]).optional(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "operatoreNome": zod.string().nullable(),
@@ -7610,6 +7697,18 @@ export const AnnullaInterventoResponse = zod.object({
   "beneficiarioCodice": zod.string().nullable(),
   "nucleoFamiliareSintesi": zod.string().nullable(),
   "bollaId": zod.number().nullish(),
+  "raccordoMagazzino": zod.union([zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "richiestaStato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "consegnaStato": zod.string().nullish(),
+  "dataPrevista": zod.coerce.date().nullish(),
+  "fasciaOraria": zod.string().nullish()
+}),zod.null()]).optional(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "operatoreNome": zod.string().nullable(),
@@ -7676,6 +7775,18 @@ export const RegistraMancataPresentazioneResponse = zod.object({
   "beneficiarioCodice": zod.string().nullable(),
   "nucleoFamiliareSintesi": zod.string().nullable(),
   "bollaId": zod.number().nullish(),
+  "raccordoMagazzino": zod.union([zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "richiestaStato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "consegnaStato": zod.string().nullish(),
+  "dataPrevista": zod.coerce.date().nullish(),
+  "fasciaOraria": zod.string().nullish()
+}),zod.null()]).optional(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "operatoreNome": zod.string().nullable(),
@@ -7744,6 +7855,18 @@ export const TransitionInterventoResponse = zod.object({
   "beneficiarioCodice": zod.string().nullable(),
   "nucleoFamiliareSintesi": zod.string().nullable(),
   "bollaId": zod.number().nullish(),
+  "raccordoMagazzino": zod.union([zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "richiestaStato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "consegnaStato": zod.string().nullish(),
+  "dataPrevista": zod.coerce.date().nullish(),
+  "fasciaOraria": zod.string().nullish()
+}),zod.null()]).optional(),
   "operatoreId": zod.number().nullish(),
   "operatoreCodice": zod.string().nullish(),
   "operatoreNome": zod.string().nullable(),
@@ -8337,6 +8460,99 @@ export const ExportConsegneResponse = zod.object({
   "dataCreazione": zod.string()
 })),
   "total": zod.number()
+})
+
+
+/**
+ * @summary Coda derivata delle Bolle M5 pronte nel perimetro del Centro
+ */
+export const ListBollePronteDaPianificareResponseItem = zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "interventoId": zod.number().nullish(),
+  "interventoStato": zod.string().nullish(),
+  "dataOraPianificata": zod.coerce.date().nullish(),
+  "bollaId": zod.number(),
+  "bollaNumero": zod.string(),
+  "bollaVersione": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "beneficiarioCodice": zod.string(),
+  "areaOperativaId": zod.number(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroNome": zod.string().nullish(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string(),
+  "dataDesiderata": zod.coerce.date().nullish(),
+  "modalitaPreferita": zod.string(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "volontarioPropostoId": zod.number().nullish()
+})
+export const ListBollePronteDaPianificareResponse = zod.array(ListBollePronteDaPianificareResponseItem)
+
+
+/**
+ * @summary Crea atomicamente la Consegna e associa la Bolla M5 pronta
+ */
+export const PianificaConsegnaDaBollaParams = zod.object({
+  "bollaId": zod.coerce.number()
+})
+
+
+export const pianificaConsegnaDaBollaBodyIdempotencyKeyMax = 120;
+
+export const pianificaConsegnaDaBollaBodyIndirizzoConsegnaMax = 200;
+
+
+
+export const PianificaConsegnaDaBollaBody = zod.object({
+  "versione": zod.number().min(1),
+  "idempotencyKey": zod.string().min(1).max(pianificaConsegnaDaBollaBodyIdempotencyKeyMax),
+  "tipoConsegna": zod.enum(['in_sede', 'domicilio']),
+  "dataPrevista": zod.coerce.date(),
+  "fasciaOraria": zod.enum(['Mattina', 'Pomeriggio', 'Sera']),
+  "indirizzoConsegna": zod.string().max(pianificaConsegnaDaBollaBodyIndirizzoConsegnaMax).nullish(),
+  "zona": zod.string().nullish(),
+  "volontarioId": zod.number().nullish(),
+  "volontarioAltro": zod.string().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "mezzoAltro": zod.boolean().optional(),
+  "noteOperative": zod.string().nullish()
+})
+
+
+
+
+export const PianificaConsegnaDaBollaResponse = zod.object({
+  "id": zod.number(),
+  "codice": zod.string(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "tipoPianificazione": zod.enum(['consegna_pacco', 'accesso_emporio']),
+  "tipoConsegna": zod.string(),
+  "dataPrevista": zod.string(),
+  "fasciaOraria": zod.string().nullish(),
+  "indirizzoConsegna": zod.string().nullish(),
+  "zona": zod.string().nullish(),
+  "magazzinoId": zod.number(),
+  "magazzinoNome": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "volontarioId": zod.number().nullish(),
+  "volontarioNome": zod.string().nullish(),
+  "volontarioOperativo": zod.boolean().nullish(),
+  "volontarioMotivoNonOperativo": zod.string().nullish(),
+  "volontarioAltro": zod.string().nullish(),
+  "mezzoId": zod.number().nullish(),
+  "mezzoAltro": zod.boolean().optional(),
+  "stato": zod.string(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "bollaVersione": zod.number().min(1).nullish(),
+  "noteOperative": zod.string().nullish(),
+  "dataEffettuata": zod.string().nullish(),
+  "dataCreazione": zod.string()
 })
 
 
@@ -10253,7 +10469,8 @@ export const ListDocumentiOperativiResponse = zod.object({
   "destinazioneMagazzinoId": zod.number().nullish(),
   "destinazioneMagazzinoNome": zod.string().nullish(),
   "destinatarioNome": zod.string().nullish(),
-  "versione": zod.number().min(1)
+  "versione": zod.number().min(1),
+  "centroHandoff": zod.boolean()
 })),
   "page": zod.number().min(1),
   "limit": zod.number().min(1),
@@ -10314,6 +10531,9 @@ export const GetDocumentoOperativoResponse = zod.object({
   "destinatarioSnapshotCongelato": zod.boolean(),
   "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
+  "consegnaDataPrevista": zod.coerce.date().nullish(),
+  "consegnaFasciaOraria": zod.string().nullish(),
+  "consegnaVolontarioNome": zod.string().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
@@ -10518,6 +10738,9 @@ export const GetBollaResponse = zod.object({
   "destinatarioSnapshotCongelato": zod.boolean(),
   "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
+  "consegnaDataPrevista": zod.coerce.date().nullish(),
+  "consegnaFasciaOraria": zod.string().nullish(),
+  "consegnaVolontarioNome": zod.string().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
@@ -10613,6 +10836,9 @@ export const UpdateBollaResponse = zod.object({
   "destinatarioSnapshotCongelato": zod.boolean(),
   "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
+  "consegnaDataPrevista": zod.coerce.date().nullish(),
+  "consegnaFasciaOraria": zod.string().nullish(),
+  "consegnaVolontarioNome": zod.string().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
@@ -10800,6 +11026,9 @@ export const ConfermaBollaResponse = zod.object({
   "destinatarioSnapshotCongelato": zod.boolean(),
   "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
+  "consegnaDataPrevista": zod.coerce.date().nullish(),
+  "consegnaFasciaOraria": zod.string().nullish(),
+  "consegnaVolontarioNome": zod.string().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
@@ -10893,6 +11122,9 @@ export const AnnullaBollaResponse = zod.object({
   "destinatarioSnapshotCongelato": zod.boolean(),
   "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
+  "consegnaDataPrevista": zod.coerce.date().nullish(),
+  "consegnaFasciaOraria": zod.string().nullish(),
+  "consegnaVolontarioNome": zod.string().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
@@ -10992,6 +11224,9 @@ export const StornaAmministrativamenteBollaResponse = zod.object({
   "destinatarioSnapshotCongelato": zod.boolean(),
   "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
+  "consegnaDataPrevista": zod.coerce.date().nullish(),
+  "consegnaFasciaOraria": zod.string().nullish(),
+  "consegnaVolontarioNome": zod.string().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
@@ -11084,6 +11319,9 @@ export const ConsegnaBollaResponse = zod.object({
   "destinatarioSnapshotCongelato": zod.boolean(),
   "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
+  "consegnaDataPrevista": zod.coerce.date().nullish(),
+  "consegnaFasciaOraria": zod.string().nullish(),
+  "consegnaVolontarioNome": zod.string().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
@@ -11177,6 +11415,9 @@ export const AffidaBollaResponse = zod.object({
   "destinatarioSnapshotCongelato": zod.boolean(),
   "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
+  "consegnaDataPrevista": zod.coerce.date().nullish(),
+  "consegnaFasciaOraria": zod.string().nullish(),
+  "consegnaVolontarioNome": zod.string().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
@@ -11270,6 +11511,9 @@ export const SegnalaMancataConsegnaBollaResponse = zod.object({
   "destinatarioSnapshotCongelato": zod.boolean(),
   "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
+  "consegnaDataPrevista": zod.coerce.date().nullish(),
+  "consegnaFasciaOraria": zod.string().nullish(),
+  "consegnaVolontarioNome": zod.string().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
@@ -11421,6 +11665,9 @@ export const RegistraRientroBollaResponse = zod.object({
   "destinatarioSnapshotCongelato": zod.boolean(),
   "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
+  "consegnaDataPrevista": zod.coerce.date().nullish(),
+  "consegnaFasciaOraria": zod.string().nullish(),
+  "consegnaVolontarioNome": zod.string().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),
@@ -11509,6 +11756,9 @@ export const SegnalaRitiroNonEffettuatoResponse = zod.object({
   "destinatarioSnapshotCongelato": zod.boolean(),
   "destinatarioSnapshotFonte": zod.union([zod.literal('confermato'),zod.literal('legacy_live'),zod.literal(null)]).nullish(),
   "consegnaId": zod.number().nullish(),
+  "consegnaDataPrevista": zod.coerce.date().nullish(),
+  "consegnaFasciaOraria": zod.string().nullish(),
+  "consegnaVolontarioNome": zod.string().nullish(),
   "daPianificazione": zod.boolean().optional(),
   "magazzinoId": zod.number(),
   "magazzinoNome": zod.string().nullish(),

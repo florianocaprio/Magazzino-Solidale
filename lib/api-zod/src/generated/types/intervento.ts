@@ -8,6 +8,7 @@
 import type { InterventoAmbito } from './interventoAmbito';
 import type { InterventoAvviso } from './interventoAvviso';
 import type { InterventoPriorita } from './interventoPriorita';
+import type { InterventoRaccordoMagazzino } from './interventoRaccordoMagazzino';
 import type { InterventoStato } from './interventoStato';
 
 export interface Intervento {
@@ -21,6 +22,7 @@ export interface Intervento {
   nucleoFamiliareSintesi: string | null;
   /** @nullable */
   bollaId?: number | null;
+  raccordoMagazzino?: InterventoRaccordoMagazzino | null;
   /** @nullable */
   operatoreId?: number | null;
   /** @nullable */

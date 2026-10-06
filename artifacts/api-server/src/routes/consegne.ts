@@ -7,6 +7,9 @@ import {
   volontariTable,
   bolleTable,
   centriAscoltoTable,
+  interventiTable,
+  richiesteMagazzinoDocumentiTable,
+  richiesteMagazzinoTable,
 } from "@workspace/db";
 import {
   eq,
@@ -46,8 +49,16 @@ import {
 } from "../lib/bollaDelivery";
 import {
   guardLinkedM4OperationalAccess,
+  lockM5bRequest,
+  linkedM5bDocument,
   m5bLinkedM4ListScope,
 } from "../lib/m5bDocumentLink";
+import {
+  canReadM5bRequest,
+  hasM5bArea,
+  m5bRequestScopePredicate,
+  requireCurrentM5bActor,
+} from "../lib/m5bRequestAccess";
 import {
   auditContextFromRequest,
   auditFields,
@@ -644,6 +655,313 @@ router.get(
   },
 );
 
+router.get(
+  "/consegne/da-pianificare",
+  requirePermission("consegne.view"),
+  async (req, res) => {
+    try {
+      const items = await db.transaction(async (tx) => {
+        const actor = await requireCurrentM5bActor(
+          tx,
+          req.user!.id,
+          "richieste_magazzino.view",
+        );
+        if (!hasM5bArea(actor, "sociale"))
+          throw new BollaActionError(403, "Coda del Centro non autorizzata");
+        return tx
+          .select({
+            richiestaId: richiesteMagazzinoTable.id,
+            richiestaCodice: richiesteMagazzinoTable.codice,
+            interventoId: richiesteMagazzinoTable.interventoId,
+            interventoStato: interventiTable.stato,
+            dataOraPianificata: interventiTable.dataOraPianificata,
+            bollaId: bolleTable.id,
+            bollaNumero: bolleTable.numeroBolla,
+            bollaVersione: bolleTable.versione,
+            beneficiarioId: beneficiariTable.id,
+            beneficiarioNome: richiesteMagazzinoTable.destinatarioNomeSnapshot,
+            beneficiarioCodice: beneficiariTable.codice,
+            areaOperativaId: richiesteMagazzinoTable.areaOperativaId,
+            centroAscoltoId: richiesteMagazzinoTable.centroAscoltoId,
+            centroNome: centriAscoltoTable.nome,
+            magazzinoId: bolleTable.magazzinoId,
+            magazzinoNome: magazziniTable.nome,
+            dataDesiderata: richiesteMagazzinoTable.dataDesiderata,
+            modalitaPreferita: richiesteMagazzinoTable.modalitaPreferita,
+            indirizzoConsegna: beneficiariTable.domicilio,
+            volontarioPropostoId: bolleTable.volontarioConsegnaId,
+          })
+          .from(richiesteMagazzinoDocumentiTable)
+          .innerJoin(
+            richiesteMagazzinoTable,
+            eq(
+              richiesteMagazzinoDocumentiTable.richiestaId,
+              richiesteMagazzinoTable.id,
+            ),
+          )
+          .innerJoin(
+            bolleTable,
+            eq(richiesteMagazzinoDocumentiTable.bollaId, bolleTable.id),
+          )
+          .innerJoin(
+            beneficiariTable,
+            eq(richiesteMagazzinoTable.beneficiarioId, beneficiariTable.id),
+          )
+          .innerJoin(
+            magazziniTable,
+            eq(bolleTable.magazzinoId, magazziniTable.id),
+          )
+          .leftJoin(
+            centriAscoltoTable,
+            eq(richiesteMagazzinoTable.centroAscoltoId, centriAscoltoTable.id),
+          )
+          .leftJoin(
+            interventiTable,
+            eq(richiesteMagazzinoTable.interventoId, interventiTable.id),
+          )
+          .where(
+            and(
+              eq(richiesteMagazzinoDocumentiTable.corrente, true),
+              eq(richiesteMagazzinoDocumentiTable.tipoDocumento, "bolla"),
+              eq(richiesteMagazzinoTable.tipoDestinatario, "beneficiario"),
+              eq(richiesteMagazzinoTable.stato, "presa_in_carico"),
+              eq(bolleTable.tipoDestinatario, "beneficiario"),
+              eq(bolleTable.stato, "confermato"),
+              isNull(bolleTable.consegnaId),
+              m5bRequestScopePredicate(actor),
+            ),
+          )
+          .orderBy(asc(richiesteMagazzinoTable.dataCreazione));
+      });
+      res.json(items);
+    } catch (error) {
+      if (handleBollaActionError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.post(
+  "/consegne/da-bolla/:bollaId",
+  requirePermission("consegne.manage"),
+  async (req, res) => {
+    const bollaId = Number(req.params.bollaId);
+    if (!Number.isSafeInteger(bollaId) || bollaId <= 0) {
+      res.status(400).json({ error: "Bolla non valida" });
+      return;
+    }
+    let idempotencyKey: string;
+    let expectedVersion: number;
+    try {
+      idempotencyKey = requireIdempotencyKey(req.body?.idempotencyKey);
+      expectedVersion = requireExpectedVersion(req.body?.versione);
+    } catch (error) {
+      if (handleBollaActionError(error, res)) return;
+      throw error;
+    }
+    const body = normalizeConsegnaPayload(req.body);
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(body.dataPrevista ?? "") ||
+      !["in_sede", "domicilio"].includes(body.tipoConsegna) ||
+      !["Mattina", "Pomeriggio", "Sera"].includes(body.fasciaOraria)
+    ) {
+      res.status(400).json({ error: "Data, fascia o modalità non valide" });
+      return;
+    }
+    if (body.volontarioId != null && body.volontarioAltro) {
+      res
+        .status(400)
+        .json({ error: "Indicare un volontario censito oppure Altro" });
+      return;
+    }
+    const planningData = {
+      tipoConsegna: body.tipoConsegna,
+      dataPrevista: body.dataPrevista,
+      fasciaOraria: body.fasciaOraria,
+      indirizzoConsegna: body.indirizzoConsegna ?? null,
+      zona: body.zona ?? null,
+      volontarioId: body.volontarioId ?? null,
+      volontarioAltro: body.volontarioAltro ?? null,
+      mezzoId: body.mezzoId ?? null,
+      mezzoAltro: Boolean(body.mezzoAltro),
+      noteOperative: body.noteOperative ?? null,
+    };
+    const tipoComando = "CONSEGNA_DA_BOLLA_M5";
+    const requestHash = commandRequestHash({
+      bollaId,
+      versione: expectedVersion,
+      ...planningData,
+    });
+    try {
+      const result = await db.transaction(async (tx) => {
+        await lockDocumentCommand(tx, tipoComando, idempotencyKey);
+        const observed = await linkedM5bDocument(tx, "bolla", bollaId);
+        if (!observed)
+          throw new BollaActionError(404, "Bolla della Richiesta non trovata");
+        const actor = await requireCurrentM5bActor(
+          tx,
+          req.user!.id,
+          "consegne.manage",
+        );
+        const richiesta = await lockM5bRequest(tx, observed.richiestaId);
+        if (
+          !hasM5bArea(actor, "sociale") ||
+          !canReadM5bRequest(actor, richiesta)
+        )
+          throw new BollaActionError(404, "Bolla non trovata nel perimetro");
+        const link = await linkedM5bDocument(tx, "bolla", bollaId);
+        if (!link || link.id !== observed.id || !link.corrente)
+          throw new BollaActionError(
+            409,
+            "Collegamento Bolla cambiato; ricarica",
+          );
+        const [bolla] = await tx
+          .select()
+          .from(bolleTable)
+          .where(eq(bolleTable.id, bollaId))
+          .for("update");
+        if (!bolla) throw new BollaActionError(404, "Bolla non trovata");
+        if (
+          richiesta.tipoDestinatario !== "beneficiario" ||
+          richiesta.beneficiarioId == null ||
+          bolla.tipoDestinatario !== "beneficiario" ||
+          bolla.beneficiarioId !== richiesta.beneficiarioId
+        ) {
+          throw new BollaActionError(403, "Bolla non accessibile al Centro");
+        }
+        if (
+          !(await canAccessMagazzino(
+            bolla.magazzinoId,
+            actor.centroAscoltoId,
+            actor.areaOperativaId,
+          ))
+        )
+          throw new BollaActionError(
+            403,
+            "Magazzino non accessibile al Centro",
+          );
+        const receipt = await loadDocumentCommand(tx, {
+          tipoComando,
+          idempotencyKey,
+        });
+        if (receipt) {
+          validateDocumentCommand(receipt, {
+            tipoComando,
+            idempotencyKey,
+            requestHash,
+            actorUserId: req.user!.id,
+            aggregatoTipo: "bolla",
+            aggregatoId: bollaId,
+          });
+          const plannedId = Number(receipt.resultSnapshot.consegnaId);
+          if (bolla.consegnaId !== plannedId) {
+            throw new BollaActionError(
+              409,
+              "La pianificazione precedente è stata annullata; ricarica e pianifica di nuovo",
+            );
+          }
+          return { id: plannedId, replay: true };
+        }
+        if (
+          richiesta.stato !== "presa_in_carico" ||
+          bolla.stato !== "confermato" ||
+          bolla.consegnaId != null ||
+          bolla.versione !== expectedVersion
+        ) {
+          throw new BollaActionError(
+            409,
+            "Bolla non più pronta o versione cambiata; ricarica",
+          );
+        }
+        const [beneficiario] = await tx
+          .select({ attivo: beneficiariTable.attivo })
+          .from(beneficiariTable)
+          .where(eq(beneficiariTable.id, richiesta.beneficiarioId));
+        if (!beneficiario?.attivo)
+          throw new BollaActionError(409, "Beneficiario non più attivo");
+        assertConsegnaAddress(planningData);
+        const planningInput = {
+          beneficiarioId: richiesta.beneficiarioId,
+          dataPrevista: planningData.dataPrevista,
+          fasciaOraria: planningData.fasciaOraria,
+          volontarioId: planningData.volontarioId,
+          mezzoId: planningData.mezzoId,
+          mezzoAltro: planningData.mezzoAltro,
+        };
+        const planning = await lockConsegnaPlanningContextTx(
+          tx,
+          null,
+          planningInput,
+        );
+        await validateConsegnaPlanningTx(tx, planningInput, {
+          context: planning.nuovo ?? undefined,
+        });
+        const [created] = await tx
+          .insert(consegneTable)
+          .values({
+            ...planningData,
+            codice: `CON-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            beneficiarioId: richiesta.beneficiarioId,
+            magazzinoId: bolla.magazzinoId,
+            tipoPianificazione: TIPO_CONSEGNA_PACCO,
+          })
+          .returning();
+        await reconcileConsegnaPlanningTx(
+          tx,
+          null,
+          created,
+          req,
+          planning.nuovo,
+        );
+        await tx
+          .update(bolleTable)
+          .set({
+            consegnaId: created.id,
+            versione: sql`${bolleTable.versione} + 1`,
+          })
+          .where(eq(bolleTable.id, bollaId));
+        await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req, {
+            operationKey: `m5c2a:${tipoComando}:${idempotencyKey}`,
+          }),
+          azione: "CONSEGNA_DA_BOLLA_PIANIFICATA",
+          entitaTipo: "consegna",
+          entitaId: created.id,
+          documentoTipo: "bolla",
+          documentoId: bollaId,
+          areaOperativaIdSnapshot: richiesta.areaOperativaId,
+          centroAscoltoIdSnapshot: richiesta.centroAscoltoId,
+          magazzinoIdSnapshot: bolla.magazzinoId,
+          dataOperativa: created.dataPrevista,
+          metadata: auditFields({ richiestaId: richiesta.id, bollaId }, [
+            "richiestaId",
+            "bollaId",
+          ]),
+        });
+        await storeDocumentCommand(tx, {
+          tipoComando,
+          idempotencyKey,
+          requestHash,
+          aggregatoTipo: "bolla",
+          aggregatoId: bollaId,
+          versioneRichiesta: expectedVersion,
+          versioneRisultante: bolla.versione + 1,
+          resultSnapshot: { consegnaId: created.id },
+          actorUserId: req.user!.id,
+        });
+        return { id: created.id, replay: false };
+      });
+      res
+        .status(result.replay ? 200 : 201)
+        .json(await dettaglioConsegna(result.id, req.user!));
+    } catch (error) {
+      if (handleBollaActionError(error, res) || handlePlanningError(error, res))
+        return;
+      throw error;
+    }
+  },
+);
+
 router.post(
   "/consegne",
   requirePermission("consegne.manage"),
@@ -891,12 +1209,36 @@ router.delete(
     }
     try {
       await db.transaction(async (tx) => {
+        const observedLinks = await tx
+          .select({ id: bolleTable.id })
+          .from(bolleTable)
+          .where(eq(bolleTable.consegnaId, id))
+          .orderBy(asc(bolleTable.id));
+        // Linked M5 commands lock request before the Consegna-Bolla relation.
+        for (const linked of observedLinks) {
+          await guardLinkedM4OperationalAccess(
+            tx,
+            req.user!.id,
+            "bolla",
+            linked.id,
+            "consegne.cancel",
+          );
+        }
         await lockConsegnaBollaRelation(tx, id);
         const linkedIds = await tx
           .select({ id: bolleTable.id })
           .from(bolleTable)
           .where(eq(bolleTable.consegnaId, id))
           .orderBy(asc(bolleTable.id));
+        if (
+          linkedIds.map((row) => row.id).join(",") !==
+          observedLinks.map((row) => row.id).join(",")
+        ) {
+          throw new ConsegnaPlanningError(
+            409,
+            "Bolle collegate cambiate; ricarica",
+          );
+        }
         if (linkedIds.length > 0) {
           await tx
             .select({ id: bolleTable.id })
@@ -940,7 +1282,8 @@ router.delete(
       });
       res.status(204).end();
     } catch (error) {
-      if (handlePlanningError(error, res)) return;
+      if (handleBollaActionError(error, res) || handlePlanningError(error, res))
+        return;
       throw error;
     }
   },
@@ -1016,13 +1359,16 @@ router.post(
             ...(requestedBollaId == null ? [] : [requestedBollaId]),
           ]),
         ].sort((left, right) => left - right);
+        const guardedLinks = [];
         for (const id of guardedIds)
-          await guardLinkedM4OperationalAccess(
-            tx,
-            req.user!.id,
-            "bolla",
-            id,
-            "consegne.manage",
+          guardedLinks.push(
+            await guardLinkedM4OperationalAccess(
+              tx,
+              req.user!.id,
+              "bolla",
+              id,
+              "consegne.manage",
+            ),
           );
         await lockConsegnaBollaRelation(tx, consegnaId);
         const linkedIds = await tx
@@ -1139,6 +1485,17 @@ router.post(
             aggregatoId: consegnaId,
           });
           return;
+        }
+
+        if (
+          guardedLinks.some(
+            (guarded) => guarded?.richiesta.tipoDestinatario === "beneficiario",
+          )
+        ) {
+          throw new BollaActionError(
+            409,
+            "La Bolla della Richiesta sociale si pianifica dal Centro tramite la coda Da pianificare",
+          );
         }
 
         if (lockedConsegna.stato !== "pianificata") {

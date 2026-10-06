@@ -19,4 +19,9 @@ export interface RichiestaMagazzinoCancel {
      * @maxLength 500
      */
   motivo: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  nota?: string | null;
 }

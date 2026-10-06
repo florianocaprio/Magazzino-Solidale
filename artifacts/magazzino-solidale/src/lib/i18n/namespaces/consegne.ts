@@ -3,6 +3,19 @@ export const consegne = {
     title: "Pianificazione Consegne",
     subtitle: "Gestisci le distribuzioni in sede e a domicilio.",
     planDelivery: "Pianifica Consegna",
+    handoffTabs: "Stato pianificazione consegne",
+    readyToPlan: "Da pianificare",
+    plannedDeliveries: "Consegne pianificate",
+    readyQueueDescription:
+      "Bolle pronte in attesa della data e della logistica del Centro.",
+    readyQueueError: "Impossibile caricare le Bolle pronte.",
+    readyBolla: "Bolla pronta",
+    noReadyBolle: "Nessuna Bolla pronta da pianificare.",
+    planFromBolla: "Pianifica consegna",
+    interventionDate: "Data Intervento",
+    desiredDate: "Data desiderata",
+    suggestedVolunteerUnavailable:
+      "Il volontario proposto dalla Bolla non è operativo per la data scelta. Seleziona un altro incaricato.",
     exportTitle: "Consegne",
     beneficiario: "Beneficiario",
     magazzino: "Magazzino",
@@ -67,11 +80,14 @@ export const consegne = {
     mezzoAltro: "Altro (mezzi pubblici/taxi)",
     limiteRaggiunto: "limite turno raggiunto",
     dialogCompletaTitle: "Segna come Consegnato",
-    dialogCompletaDesc: "Confermi che la merce è stata consegnata? La bolla associata verrà chiusa e l'evento sarà registrato negli interventi del beneficiario.",
+    dialogCompletaDesc:
+      "Confermi che la merce è stata consegnata? La bolla associata verrà chiusa e l'evento sarà registrato negli interventi del beneficiario.",
     dialogCompletaConfirm: "Conferma Consegna",
     dialogAssociaTitle: "Associa Bolla alla Consegna",
-    dialogAssociaDesc: "Collega una bolla a questa consegna. Finché la bolla è in bozza risulta \"in preparazione\"; una volta confermata (merce preparata) diventa \"pronta\" e potrai segnare la consegna come consegnata.",
-    noBollaAvailable: "Nessuna bolla disponibile per questo beneficiario. Crea prima una bolla dalla sezione",
+    dialogAssociaDesc:
+      'Collega una bolla a questa consegna. Finché la bolla è in bozza risulta "in preparazione"; una volta confermata (merce preparata) diventa "pronta" e potrai segnare la consegna come consegnata.',
+    noBollaAvailable:
+      "Nessuna bolla disponibile per questo beneficiario. Crea prima una bolla dalla sezione",
     bolleSection: "Bolle",
     selectBollaPlaceholder: "Seleziona una bolla...",
     optPronta: "pronta",
@@ -91,15 +107,18 @@ export const consegne = {
     toastEmailInviata: "Email inviata",
     toastEmailErrore: "Invio email fallito",
     ripianificaTitle: "Ripianifica consegna",
-    ripianificaDesc: "Crea una nuova consegna pianificata con gli stessi dati, ma con una nuova data. Non viene creata alcuna bolla.",
+    ripianificaDesc:
+      "Crea una nuova consegna pianificata con gli stessi dati, ma con una nuova data. Non viene creata alcuna bolla.",
     toastRipianificata: "Consegna ripianificata",
     toastConsegnaRegistrata: "Consegna registrata come consegnata",
-    toastConsegnaRegistrataDesc: "L'evento è stato annotato negli interventi del beneficiario.",
+    toastConsegnaRegistrataDesc:
+      "L'evento è stato annotato negli interventi del beneficiario.",
     toastImpossibileCompletare: "Impossibile completare",
     btnAnnulla: "Annulla",
     toastAnnullata: "Pianificazione annullata",
     annullaTitle: "Annulla pianificazione",
-    annullaDesc: "La consegna pianificata verrà eliminata. Le bolle eventualmente collegate verranno scollegate (non eliminate). Continuare?",
+    annullaDesc:
+      "La consegna pianificata verrà eliminata. Le bolle eventualmente collegate verranno scollegate (non eliminate). Continuare?",
     annullaConfirm: "Annulla pianificazione",
   },
   es: {
@@ -170,11 +189,14 @@ export const consegne = {
     mezzoAltro: "Otro (transporte público/taxi)",
     limiteRaggiunto: "límite de turno alcanzado",
     dialogCompletaTitle: "Marcar como Entregado",
-    dialogCompletaDesc: "¿Confirmas que la mercancía ha sido entregada? El albarán asociado se cerrará y el evento se registrará en las intervenciones del beneficiario.",
+    dialogCompletaDesc:
+      "¿Confirmas que la mercancía ha sido entregada? El albarán asociado se cerrará y el evento se registrará en las intervenciones del beneficiario.",
     dialogCompletaConfirm: "Confirmar Entrega",
     dialogAssociaTitle: "Asociar Albarán a la Entrega",
-    dialogAssociaDesc: "Vincula un albarán a esta entrega. Mientras el albarán esté en borrador aparece como \"en preparación\"; una vez confirmado (mercancía preparada) pasa a \"listo\" y podrás marcar la entrega como entregada.",
-    noBollaAvailable: "No hay albaranes disponibles para este beneficiario. Crea primero un albarán en la sección",
+    dialogAssociaDesc:
+      'Vincula un albarán a esta entrega. Mientras el albarán esté en borrador aparece como "en preparación"; una vez confirmado (mercancía preparada) pasa a "listo" y podrás marcar la entrega como entregada.',
+    noBollaAvailable:
+      "No hay albaranes disponibles para este beneficiario. Crea primero un albarán en la sección",
     bolleSection: "Albaranes",
     selectBollaPlaceholder: "Selecciona un albarán...",
     optPronta: "lista",
@@ -194,21 +216,37 @@ export const consegne = {
     toastEmailInviata: "Email enviado",
     toastEmailErrore: "Error al enviar el email",
     ripianificaTitle: "Replanificar entrega",
-    ripianificaDesc: "Crea una nueva entrega planificada con los mismos datos, pero con una nueva fecha. No se crea ningún albarán.",
+    ripianificaDesc:
+      "Crea una nueva entrega planificada con los mismos datos, pero con una nueva fecha. No se crea ningún albarán.",
     toastRipianificata: "Entrega replanificada",
     toastConsegnaRegistrata: "Entrega registrada como entregada",
-    toastConsegnaRegistrataDesc: "El evento se ha anotado en las intervenciones del beneficiario.",
+    toastConsegnaRegistrataDesc:
+      "El evento se ha anotado en las intervenciones del beneficiario.",
     toastImpossibileCompletare: "No se puede completar",
     btnAnnulla: "Cancelar",
     toastAnnullata: "Planificación cancelada",
     annullaTitle: "Cancelar planificación",
-    annullaDesc: "Se eliminará la entrega planificada. Los albaranes vinculados se desvincularán (no se eliminarán). ¿Continuar?",
+    annullaDesc:
+      "Se eliminará la entrega planificada. Los albaranes vinculados se desvincularán (no se eliminarán). ¿Continuar?",
     annullaConfirm: "Cancelar planificación",
   },
   en: {
     title: "Delivery Planning",
     subtitle: "Manage on-site and home distributions.",
     planDelivery: "Plan Delivery",
+    handoffTabs: "Delivery planning status",
+    readyToPlan: "To plan",
+    plannedDeliveries: "Planned deliveries",
+    readyQueueDescription:
+      "Ready delivery notes awaiting scheduling by the Centre.",
+    readyQueueError: "Could not load ready delivery notes.",
+    readyBolla: "Delivery note ready",
+    noReadyBolle: "No ready delivery notes to plan.",
+    planFromBolla: "Plan delivery",
+    interventionDate: "Intervention date",
+    desiredDate: "Desired date",
+    suggestedVolunteerUnavailable:
+      "The suggested volunteer is not available on this date. Choose another person.",
     exportTitle: "Deliveries",
     beneficiario: "Beneficiary",
     magazzino: "Warehouse",
@@ -273,11 +311,14 @@ export const consegne = {
     mezzoAltro: "Other (public transport/taxi)",
     limiteRaggiunto: "shift limit reached",
     dialogCompletaTitle: "Mark as Delivered",
-    dialogCompletaDesc: "Do you confirm that the goods have been delivered? The associated delivery note will be closed and the event will be recorded in the beneficiary's interventions.",
+    dialogCompletaDesc:
+      "Do you confirm that the goods have been delivered? The associated delivery note will be closed and the event will be recorded in the beneficiary's interventions.",
     dialogCompletaConfirm: "Confirm Delivery",
     dialogAssociaTitle: "Link Delivery Note to Delivery",
-    dialogAssociaDesc: "Link a delivery note to this delivery. While the note is a draft it shows as \"in preparation\"; once confirmed (goods prepared) it becomes \"ready\" and you can mark the delivery as delivered.",
-    noBollaAvailable: "No delivery note available for this beneficiary. First create one in the section",
+    dialogAssociaDesc:
+      'Link a delivery note to this delivery. While the note is a draft it shows as "in preparation"; once confirmed (goods prepared) it becomes "ready" and you can mark the delivery as delivered.',
+    noBollaAvailable:
+      "No delivery note available for this beneficiary. First create one in the section",
     bolleSection: "Delivery Notes",
     selectBollaPlaceholder: "Select a delivery note...",
     optPronta: "ready",
@@ -297,15 +338,18 @@ export const consegne = {
     toastEmailInviata: "Email sent",
     toastEmailErrore: "Failed to send email",
     ripianificaTitle: "Reschedule delivery",
-    ripianificaDesc: "Create a new planned delivery with the same data but a new date. No delivery bill is created.",
+    ripianificaDesc:
+      "Create a new planned delivery with the same data but a new date. No delivery bill is created.",
     toastRipianificata: "Delivery rescheduled",
     toastConsegnaRegistrata: "Delivery recorded as delivered",
-    toastConsegnaRegistrataDesc: "The event has been recorded in the beneficiary's interventions.",
+    toastConsegnaRegistrataDesc:
+      "The event has been recorded in the beneficiary's interventions.",
     toastImpossibileCompletare: "Cannot complete",
     btnAnnulla: "Cancel",
     toastAnnullata: "Planning cancelled",
     annullaTitle: "Cancel planning",
-    annullaDesc: "The planned delivery will be deleted. Any linked delivery notes will be unlinked (not deleted). Continue?",
+    annullaDesc:
+      "The planned delivery will be deleted. Any linked delivery notes will be unlinked (not deleted). Continue?",
     annullaConfirm: "Cancel planning",
   },
   fr: {
@@ -376,11 +420,14 @@ export const consegne = {
     mezzoAltro: "Autre (transports en commun/taxi)",
     limiteRaggiunto: "limite du tour atteint",
     dialogCompletaTitle: "Marquer comme Livré",
-    dialogCompletaDesc: "Confirmez-vous que la marchandise a été livrée ? Le bon de livraison associé sera clôturé et l'événement sera enregistré dans les interventions du bénéficiaire.",
+    dialogCompletaDesc:
+      "Confirmez-vous que la marchandise a été livrée ? Le bon de livraison associé sera clôturé et l'événement sera enregistré dans les interventions du bénéficiaire.",
     dialogCompletaConfirm: "Confirmer la Livraison",
     dialogAssociaTitle: "Associer le Bon de Livraison à la Livraison",
-    dialogAssociaDesc: "Associez un bon de livraison à cette livraison. Tant que le bon est en brouillon, il apparaît comme « en préparation » ; une fois confirmé (marchandise préparée), il devient « prêt » et vous pourrez marquer la livraison comme livrée.",
-    noBollaAvailable: "Aucun bon de livraison disponible pour ce bénéficiaire. Créez-en d'abord un dans la section",
+    dialogAssociaDesc:
+      "Associez un bon de livraison à cette livraison. Tant que le bon est en brouillon, il apparaît comme « en préparation » ; une fois confirmé (marchandise préparée), il devient « prêt » et vous pourrez marquer la livraison comme livrée.",
+    noBollaAvailable:
+      "Aucun bon de livraison disponible pour ce bénéficiaire. Créez-en d'abord un dans la section",
     bolleSection: "Bons de Livraison",
     selectBollaPlaceholder: "Sélectionnez un bon...",
     optPronta: "prêt",
@@ -400,15 +447,18 @@ export const consegne = {
     toastEmailInviata: "Email envoyé",
     toastEmailErrore: "Échec de l'envoi de l'email",
     ripianificaTitle: "Replanifier la livraison",
-    ripianificaDesc: "Créer une nouvelle livraison planifiée avec les mêmes données mais une nouvelle date. Aucun bon n'est créé.",
+    ripianificaDesc:
+      "Créer une nouvelle livraison planifiée avec les mêmes données mais une nouvelle date. Aucun bon n'est créé.",
     toastRipianificata: "Livraison replanifiée",
     toastConsegnaRegistrata: "Livraison enregistrée comme livrée",
-    toastConsegnaRegistrataDesc: "L'événement a été noté dans les interventions du bénéficiaire.",
+    toastConsegnaRegistrataDesc:
+      "L'événement a été noté dans les interventions du bénéficiaire.",
     toastImpossibileCompletare: "Impossible de finaliser",
     btnAnnulla: "Annuler",
     toastAnnullata: "Planification annulée",
     annullaTitle: "Annuler la planification",
-    annullaDesc: "La livraison planifiée sera supprimée. Les bons de livraison liés seront dissociés (non supprimés). Continuer ?",
+    annullaDesc:
+      "La livraison planifiée sera supprimée. Les bons de livraison liés seront dissociés (non supprimés). Continuer ?",
     annullaConfirm: "Annuler la planification",
   },
   de: {
@@ -479,11 +529,14 @@ export const consegne = {
     mezzoAltro: "Andere (öffentl. Verkehrsmittel/Taxi)",
     limiteRaggiunto: "Schichtlimit erreicht",
     dialogCompletaTitle: "Als geliefert markieren",
-    dialogCompletaDesc: "Bestätigen Sie, dass die Ware geliefert wurde? Der zugeordnete Lieferschein wird geschlossen und das Ereignis wird in den Maßnahmen des Begünstigten erfasst.",
+    dialogCompletaDesc:
+      "Bestätigen Sie, dass die Ware geliefert wurde? Der zugeordnete Lieferschein wird geschlossen und das Ereignis wird in den Maßnahmen des Begünstigten erfasst.",
     dialogCompletaConfirm: "Lieferung bestätigen",
     dialogAssociaTitle: "Lieferschein der Lieferung zuordnen",
-    dialogAssociaDesc: "Verknüpfen Sie einen Lieferschein mit dieser Lieferung. Solange der Lieferschein ein Entwurf ist, gilt er als \"in Vorbereitung\"; sobald er bestätigt ist (Ware vorbereitet), wird er \"bereit\" und Sie können die Lieferung als geliefert markieren.",
-    noBollaAvailable: "Kein Lieferschein für diesen Begünstigten verfügbar. Erstellen Sie zuerst einen im Bereich",
+    dialogAssociaDesc:
+      'Verknüpfen Sie einen Lieferschein mit dieser Lieferung. Solange der Lieferschein ein Entwurf ist, gilt er als "in Vorbereitung"; sobald er bestätigt ist (Ware vorbereitet), wird er "bereit" und Sie können die Lieferung als geliefert markieren.',
+    noBollaAvailable:
+      "Kein Lieferschein für diesen Begünstigten verfügbar. Erstellen Sie zuerst einen im Bereich",
     bolleSection: "Lieferscheine",
     selectBollaPlaceholder: "Lieferschein auswählen...",
     optPronta: "bereit",
@@ -503,15 +556,18 @@ export const consegne = {
     toastEmailInviata: "E-Mail gesendet",
     toastEmailErrore: "E-Mail-Versand fehlgeschlagen",
     ripianificaTitle: "Lieferung neu planen",
-    ripianificaDesc: "Erstellt eine neue geplante Lieferung mit denselben Daten, aber einem neuen Datum. Es wird kein Lieferschein erstellt.",
+    ripianificaDesc:
+      "Erstellt eine neue geplante Lieferung mit denselben Daten, aber einem neuen Datum. Es wird kein Lieferschein erstellt.",
     toastRipianificata: "Lieferung neu geplant",
     toastConsegnaRegistrata: "Lieferung als geliefert erfasst",
-    toastConsegnaRegistrataDesc: "Das Ereignis wurde in den Maßnahmen des Begünstigten vermerkt.",
+    toastConsegnaRegistrataDesc:
+      "Das Ereignis wurde in den Maßnahmen des Begünstigten vermerkt.",
     toastImpossibileCompletare: "Abschluss nicht möglich",
     btnAnnulla: "Stornieren",
     toastAnnullata: "Planung storniert",
     annullaTitle: "Planung stornieren",
-    annullaDesc: "Die geplante Lieferung wird gelöscht. Verknüpfte Lieferscheine werden getrennt (nicht gelöscht). Fortfahren?",
+    annullaDesc:
+      "Die geplante Lieferung wird gelöscht. Verknüpfte Lieferscheine werden getrennt (nicht gelöscht). Fortfahren?",
     annullaConfirm: "Planung stornieren",
   },
   ar: {
@@ -582,11 +638,14 @@ export const consegne = {
     mezzoAltro: "أخرى (وسائل النقل العام/سيارة أجرة)",
     limiteRaggiunto: "تم بلوغ حد المناوبة",
     dialogCompletaTitle: "وضع علامة كمُسلَّم",
-    dialogCompletaDesc: "هل تؤكد أنه تم تسليم البضائع؟ سيتم إغلاق إشعار التسليم المرتبط وسيتم تسجيل الحدث في تدخلات المستفيد.",
+    dialogCompletaDesc:
+      "هل تؤكد أنه تم تسليم البضائع؟ سيتم إغلاق إشعار التسليم المرتبط وسيتم تسجيل الحدث في تدخلات المستفيد.",
     dialogCompletaConfirm: "تأكيد التسليم",
     dialogAssociaTitle: "ربط إشعار التسليم بالتسليم",
-    dialogAssociaDesc: "اربط إشعار تسليم بهذا التسليم. ما دام الإشعار مسودة فإنه يظهر بحالة \"قيد التحضير\"؛ وبمجرد تأكيده (تجهيز البضاعة) يصبح \"جاهزًا\" ويمكنك وضع علامة على التسليم كمُسلَّم.",
-    noBollaAvailable: "لا يوجد إشعار تسليم متاح لهذا المستفيد. أنشئ واحدًا أولاً من قسم",
+    dialogAssociaDesc:
+      'اربط إشعار تسليم بهذا التسليم. ما دام الإشعار مسودة فإنه يظهر بحالة "قيد التحضير"؛ وبمجرد تأكيده (تجهيز البضاعة) يصبح "جاهزًا" ويمكنك وضع علامة على التسليم كمُسلَّم.',
+    noBollaAvailable:
+      "لا يوجد إشعار تسليم متاح لهذا المستفيد. أنشئ واحدًا أولاً من قسم",
     bolleSection: "إشعارات التسليم",
     selectBollaPlaceholder: "اختر إشعار تسليم...",
     optPronta: "جاهزة",
@@ -606,7 +665,8 @@ export const consegne = {
     toastEmailInviata: "تم إرسال البريد",
     toastEmailErrore: "فشل إرسال البريد",
     ripianificaTitle: "إعادة جدولة التسليم",
-    ripianificaDesc: "أنشئ تسليمًا مخططًا جديدًا بنفس البيانات ولكن بتاريخ جديد. لا يتم إنشاء أي إذن تسليم.",
+    ripianificaDesc:
+      "أنشئ تسليمًا مخططًا جديدًا بنفس البيانات ولكن بتاريخ جديد. لا يتم إنشاء أي إذن تسليم.",
     toastRipianificata: "تمت إعادة جدولة التسليم",
     toastConsegnaRegistrata: "تم تسجيل التسليم كمُسلَّم",
     toastConsegnaRegistrataDesc: "تم تسجيل الحدث في تدخلات المستفيد.",
@@ -614,7 +674,8 @@ export const consegne = {
     btnAnnulla: "إلغاء",
     toastAnnullata: "تم إلغاء التخطيط",
     annullaTitle: "إلغاء التخطيط",
-    annullaDesc: "سيتم حذف التسليم المخطط. سيتم إلغاء ربط أي إذونات تسليم مرتبطة (دون حذفها). هل تريد المتابعة؟",
+    annullaDesc:
+      "سيتم حذف التسليم المخطط. سيتم إلغاء ربط أي إذونات تسليم مرتبطة (دون حذفها). هل تريد المتابعة؟",
     annullaConfirm: "إلغاء التخطيط",
   },
 } as const;

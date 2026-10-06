@@ -66,7 +66,7 @@ test("M5A: unica coda, campi sociali minimi e 409 senza perdita del bisogno", as
   await expect(page).not.toHaveURL(/Bisogno da conservare/);
 });
 
-test("M5A: coda condivisa, presa in carico e annullamento motivato", async ({
+test("M5C2-A-R1: Sheet, presa in carico e annullamento motivato con nota", async ({
   page,
 }) => {
   await login(page);
@@ -124,18 +124,56 @@ test("M5A: coda condivisa, presa in carico e annullamento motivato", async ({
       body: JSON.stringify(
         path.endsWith("/101")
           ? item
-          : { items: [item], total: 1, page: 1, limit: 30 },
+          : {
+              items:
+                state === "annullata" &&
+                new URL(route.request().url()).searchParams.get("stato") ===
+                  "aperte"
+                  ? []
+                  : [item],
+              total: 1,
+              page: 1,
+              limit: 30,
+            },
       ),
     });
   });
-  await page.goto("/richieste-magazzino");
+  await page.goto("/richieste-magazzino?filter=keep");
   await page.getByRole("button", { name: /RM-00000101/ }).click();
-  await page.getByRole("button", { name: "Prendi in carico" }).click();
-  await expect(page.getByText(/Presa in carico da: MAG-TEST/)).toBeVisible();
+  const sheet = page.getByTestId("richiesta-sheet");
+  await expect(sheet).toBeVisible();
+  await expect(page).toHaveURL(/richiestaId=101/);
+  await sheet.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page).toHaveURL(/\?filter=keep$/);
+  await page.goto("/richieste-magazzino?filter=keep&richiestaId=101");
+  await expect(sheet).toBeVisible();
+  const bounds = await sheet.boundingBox();
+  // Transform animation can introduce subpixel floating-point noise.
+  expect(Math.round(bounds!.width)).toBeLessThanOrEqual(
+    page.viewportSize()!.width,
+  );
+  await sheet.getByRole("button", { name: "Prendi in carico" }).click();
+  await expect(sheet.getByTestId("m5b-prepare-document")).toBeVisible();
+  await sheet
+    .getByRole("button", { name: "Annulla richiesta", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Annulla richiesta",
+    exact: true,
+  });
+  await expect(
+    dialog.getByRole("button", { name: "Conferma annullamento" }),
+  ).toBeDisabled();
   await page
     .getByRole("textbox", { name: "Motivo dell'annullamento" })
     .fill("Necessità cessata");
-  await page.getByRole("button", { name: "Annulla", exact: true }).click();
+  await dialog
+    .getByLabel("Nota aggiuntiva (opzionale)")
+    .fill("Comunicazione del Centro");
+  await dialog
+    .getByRole("button", { name: "Conferma annullamento", exact: true })
+    .click();
+  await expect(sheet.getByText("Annullata", { exact: true })).toBeVisible();
   expect(observed).toHaveLength(2);
   expect(observed[0].path).toMatch(/presa-in-carico$/);
   expect(observed[0].body).toMatchObject({ versione: 1 });
@@ -144,6 +182,7 @@ test("M5A: coda condivisa, presa in carico e annullamento motivato", async ({
   expect(observed[1].body).toMatchObject({
     versione: 2,
     motivo: "Necessità cessata",
+    nota: "Comunicazione del Centro",
   });
   expect(observed[1].body.idempotencyKey).toBeTruthy();
 });

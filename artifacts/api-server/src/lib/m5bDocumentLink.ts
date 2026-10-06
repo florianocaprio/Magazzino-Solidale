@@ -23,6 +23,7 @@ import {
   auditContextFromRequest,
   auditFields,
   recordAuditEvent,
+  type AuditCommandContext,
 } from "./auditEvent";
 import { logicalDocumentProgress, type M5bDocumentType } from "./m5bProgress";
 import { canAccessAreaOperativa, canAccessCentro } from "./centroScope";
@@ -191,7 +192,8 @@ export async function currentM5bDocumentLink(
         eq(richiesteMagazzinoDocumentiTable.richiestaId, richiestaId),
         eq(richiesteMagazzinoDocumentiTable.corrente, true),
       ),
-    );
+    )
+    .for("update");
   return link ?? null;
 }
 
@@ -328,6 +330,7 @@ export async function ceaseLinkedM4Document(
   req: Request,
   guarded: Awaited<ReturnType<typeof guardLinkedM4Mutation>>,
   motivo: string,
+  orchestration?: { command: AuditCommandContext },
 ) {
   if (!guarded) return;
   const { richiesta, link, actor } = guarded;
@@ -349,17 +352,23 @@ export async function ceaseLinkedM4Document(
     .returning({ id: richiesteMagazzinoDocumentiTable.id });
   if (!ceased)
     throw new M5bLinkError(409, "Collegamento già cessato; ricarica");
-  await tx
-    .update(richiesteMagazzinoTable)
-    .set({
-      versione: richiesta.versione + 1,
-      dataAggiornamento: new Date(),
-    })
-    .where(eq(richiesteMagazzinoTable.id, richiesta.id));
+  if (!orchestration)
+    await tx
+      .update(richiesteMagazzinoTable)
+      .set({
+        versione: richiesta.versione + 1,
+        dataAggiornamento: new Date(),
+      })
+      .where(eq(richiesteMagazzinoTable.id, richiesta.id));
   await recordAuditEvent(tx, {
-    command: auditContextFromRequest(req, {
-      operationKey: `m5b:documento-annullato:${link.id}`,
-    }),
+    command: orchestration
+      ? {
+          ...orchestration.command,
+          operationKey: `${orchestration.command.operationKey}:link`,
+        }
+      : auditContextFromRequest(req, {
+          operationKey: `m5b:documento-annullato:${link.id}`,
+        }),
     azione: "richiesta_magazzino.documento_annullato",
     entitaTipo: "richiesta_magazzino",
     entitaId: richiesta.id,
