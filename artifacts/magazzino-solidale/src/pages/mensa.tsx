@@ -12,6 +12,8 @@ import {
   usePreparaTrasferimento,
   useAnnullaTrasferimento,
   useConfermaTrasferimento,
+  useSegnalaMancatoArrivoTrasferimento,
+  useOpenGiornataMensa,
   useCreateAccessoTemporaneoMensa,
   useCreateMensaAbilitazione,
   useCreatePastoMensa,
@@ -49,6 +51,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import i18next from "i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,6 +78,7 @@ import { useAuth } from "@/lib/auth";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
 import { useCommandIntentRegistry } from "@/lib/command-intent";
+import { mensaErrorMessage } from "@/lib/mensa-ui";
 
 export type MensaView =
   | "postazione"
@@ -101,12 +105,10 @@ function pageTotal<T>(data: T[] | { items: T[]; total: number } | undefined) {
 }
 
 function errorMessage(error: unknown): string {
-  const data = (error as { data?: unknown })?.data;
-  if (data && typeof data === "object" && "error" in data) {
-    const value = (data as { error?: unknown }).error;
-    if (typeof value === "string") return value;
-  }
-  return error instanceof Error ? error.message : "Operazione non riuscita";
+  return mensaErrorMessage(
+    error,
+    i18next.t("mensa.actionFailed") || "Operazione non riuscita",
+  );
 }
 
 function PageTitle({ view }: { view: MensaView }) {
@@ -121,29 +123,70 @@ function PageTitle({ view }: { view: MensaView }) {
   );
 }
 
+function MensaQueryFeedback({
+  isLoading,
+  isError,
+  empty,
+}: {
+  isLoading?: boolean;
+  isError?: boolean;
+  empty?: boolean;
+}) {
+  const { t } = useTranslation();
+  if (isError)
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        {t("mensa.loadError")}
+      </p>
+    );
+  if (isLoading) return <p role="status">{t("common.loading")}</p>;
+  if (empty)
+    return <p className="text-sm text-muted-foreground">{t("mensa.empty")}</p>;
+  return null;
+}
+
 function MensaSelect({
   value,
   onChange,
+  historical = false,
 }: {
   value: number | null;
-  onChange: (value: number) => void;
+  onChange: (value: number | null) => void;
+  historical?: boolean;
 }) {
-  const { data: mense = [] } = useListMense({ attiva: true });
+  const { t } = useTranslation();
+  const {
+    data: mense = [],
+    isError,
+    isLoading,
+  } = useListMense(historical ? {} : { attiva: true });
   useEffect(() => {
-    if (value == null && mense[0]) onChange(mense[0].id);
-  }, [mense, onChange, value]);
+    if ((value == null || !mense.some((item) => item.id === value)) && mense[0])
+      onChange(mense[0].id);
+    else if (!isLoading && !isError && !mense.length && value != null)
+      onChange(null);
+  }, [mense, onChange, value, isLoading, isError]);
   return (
     <Select
       value={value?.toString() ?? ""}
       onValueChange={(next) => onChange(Number(next))}
     >
       <SelectTrigger aria-label="Mensa">
-        <SelectValue placeholder="Seleziona Mensa" />
+        <SelectValue
+          placeholder={
+            isError
+              ? t("mensa.loadError")
+              : isLoading
+                ? t("common.loading")
+                : "Seleziona Mensa"
+          }
+        />
       </SelectTrigger>
       <SelectContent>
         {mense.map((mensa) => (
           <SelectItem key={mensa.id} value={String(mensa.id)}>
             {mensa.nome}
+            {!mensa.attiva ? ` — ${t("mensa.inactive")}` : ""}
           </SelectItem>
         ))}
       </SelectContent>
@@ -218,6 +261,16 @@ export function MensaPostazione() {
   const [tipoServizio, setTipoServizio] = useState<"pranzo" | "cena">("pranzo");
   const [code, setCode] = useState("");
   const [access, setAccess] = useState<MensaAccesso | null>(null);
+  const contextRef = useRef("");
+  const context = `${mensaId}:${tipoServizio}`;
+  contextRef.current = context;
+  useEffect(() => {
+    setAccess(null);
+    setCode("");
+    setReason("");
+    setManualSearch("");
+    setTemporaryOpen(false);
+  }, [mensaId, tipoServizio]);
   const [reason, setReason] = useState("");
   const [manualSearch, setManualSearch] = useState("");
   const [temporaryOpen, setTemporaryOpen] = useState(false);
@@ -305,7 +358,7 @@ export function MensaPostazione() {
       },
       {
         onSuccess: (result) => {
-          setAccess(result);
+          if (contextRef.current === context) setAccess(result);
           setCode("");
         },
         onError: (error) =>
@@ -335,22 +388,36 @@ export function MensaPostazione() {
       },
       {
         onSuccess: (result) => {
-          setAccess(result);
+          if (contextRef.current === context) setAccess(result);
           setManualSearch("");
         },
+        onError: (error) =>
+          toast({
+            title: t("mensa.loadError"),
+            description: errorMessage(error),
+            variant: "destructive",
+          }),
       },
     );
   };
 
   const authorize = () => {
-    if (!access || !reason.trim()) return;
+    if (!access || !reason.trim() || exception.isPending) return;
     exception.mutate(
       { id: access.id, data: { motivo: reason.trim() } },
       {
         onSuccess: (result) => {
-          setAccess(result);
-          setReason("");
+          if (contextRef.current === context) {
+            setAccess(result);
+            setReason("");
+          }
         },
+        onError: (error) =>
+          toast({
+            title: t("mensa.actionFailed"),
+            description: errorMessage(error),
+            variant: "destructive",
+          }),
       },
     );
   };
@@ -373,7 +440,7 @@ export function MensaPostazione() {
         {
           onSuccess: () => {
             toast({ title: "Pasto registrato" });
-            readyForNextPerson();
+            if (contextRef.current === context) readyForNextPerson();
           },
           onError: (error) => {
             const message = errorMessage(error);
@@ -403,8 +470,10 @@ export function MensaPostazione() {
   };
 
   const onTemporarySuccess = (result: MensaAccesso) => {
-    setAccess(result);
-    resetTemporaryForm();
+    if (contextRef.current === context) {
+      setAccess(result);
+      resetTemporaryForm();
+    }
   };
 
   const authorizeTemporaryBeneficiary = (
@@ -813,6 +882,8 @@ export function MensaPostazione() {
 }
 
 function PastiView() {
+  const { t } = useTranslation();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
   const [mensaId, setMensaId] = useState<number | null>(null);
@@ -831,6 +902,7 @@ function PastiView() {
     data: date,
   });
   const close = useChiudiGiornataMensa();
+  const openDay = useOpenGiornataMensa();
   const reopen = useRiapriGiornataMensa();
   const data = pageItems(mealsQuery.data);
   const total = pageTotal(mealsQuery.data);
@@ -839,11 +911,19 @@ function PastiView() {
   );
   const refreshDays = () =>
     queryClient.invalidateQueries({ queryKey: ["/api/mensa/giornate"] });
+  const onError = (error: unknown) =>
+    toast({
+      title: t("mensa.actionFailed"),
+      description: errorMessage(error),
+      variant: "destructive",
+    });
+  useEffect(() => setPage(1), [mensaId, date, tipoServizio]);
   return (
     <div className="space-y-6 p-6">
       <PageTitle view="pasti" />
+      <MensaQueryFeedback isError={mealsQuery.isError || days.isError} />
       <div className="grid gap-3 md:grid-cols-3">
-        <MensaSelect value={mensaId} onChange={setMensaId} />
+        <MensaSelect value={mensaId} onChange={setMensaId} historical />
         <Input
           type="date"
           value={date}
@@ -862,6 +942,29 @@ function PastiView() {
           </SelectContent>
         </Select>
       </div>
+      {!serviceDay &&
+        mensaId &&
+        date === todayEuropeRome() &&
+        hasPermission("mensa.service.close") && (
+          <Button
+            disabled={openDay.isPending || close.isPending}
+            onClick={() =>
+              openDay.mutate(
+                { data: { mensaId, dataServizio: date, tipoServizio } },
+                {
+                  onError,
+                  onSuccess: (day) =>
+                    close.mutate(
+                      { id: day.id, data: {} },
+                      { onError, onSuccess: refreshDays },
+                    ),
+                },
+              )
+            }
+          >
+            {t("mensa.closeZeroDay")}
+          </Button>
+        )}
       {serviceDay && (
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -887,7 +990,7 @@ function PastiView() {
                   onClick={() =>
                     close.mutate(
                       { id: serviceDay.id, data: {} },
-                      { onSuccess: refreshDays },
+                      { onSuccess: refreshDays, onError },
                     )
                   }
                 >
@@ -906,7 +1009,7 @@ function PastiView() {
                     if (motivo?.trim())
                       reopen.mutate(
                         { id: serviceDay.id, data: { motivo: motivo.trim() } },
-                        { onSuccess: refreshDays },
+                        { onSuccess: refreshDays, onError },
                       );
                   }}
                 >
@@ -987,6 +1090,14 @@ function PastiView() {
 }
 
 function AbilitazioniView() {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const onError = (error: unknown) =>
+    toast({
+      title: t("mensa.actionFailed"),
+      description: errorMessage(error),
+      variant: "destructive",
+    });
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
   const [searchText, setSearchText] = useState("");
@@ -1020,6 +1131,10 @@ function AbilitazioniView() {
   return (
     <div className="space-y-6 p-6">
       <PageTitle view="abilitazioni" />
+      <MensaQueryFeedback
+        isLoading={search.isLoading}
+        isError={search.isError || history.isError}
+      />
       <Card>
         <CardContent className="space-y-3 p-4">
           <Input
@@ -1074,7 +1189,7 @@ function AbilitazioniView() {
                         mensaPrincipale: true,
                       },
                     },
-                    { onSuccess: refresh },
+                    { onSuccess: refresh, onError },
                   )
                 }
               >
@@ -1083,8 +1198,12 @@ function AbilitazioniView() {
               {hasPermission("mensa.cards.manage") && (
                 <Button
                   variant="outline"
+                  disabled={card.isPending}
                   onClick={() =>
-                    card.mutate({ data: { beneficiarioId: selected.id } })
+                    card.mutate(
+                      { data: { beneficiarioId: selected.id } },
+                      { onSuccess: refresh, onError },
+                    )
                   }
                 >
                   Emetti tessera
@@ -1132,6 +1251,7 @@ function AbilitazioniView() {
                             <Button
                               size="sm"
                               variant="outline"
+                              disabled={status.isPending}
                               onClick={() => {
                                 const motivo = window.prompt(
                                   "Motivo obbligatorio della sospensione",
@@ -1146,7 +1266,7 @@ function AbilitazioniView() {
                                         versione: item.versione,
                                       },
                                     },
-                                    { onSuccess: refresh },
+                                    { onSuccess: refresh, onError },
                                   );
                               }}
                             >
@@ -1156,6 +1276,7 @@ function AbilitazioniView() {
                           {item.stato === "sospesa" && (
                             <Button
                               size="sm"
+                              disabled={status.isPending}
                               onClick={() =>
                                 status.mutate(
                                   {
@@ -1165,7 +1286,7 @@ function AbilitazioniView() {
                                       versione: item.versione,
                                     },
                                   },
-                                  { onSuccess: refresh },
+                                  { onSuccess: refresh, onError },
                                 )
                               }
                             >
@@ -1177,6 +1298,7 @@ function AbilitazioniView() {
                             <Button
                               size="sm"
                               variant="destructive"
+                              disabled={status.isPending}
                               onClick={() => {
                                 const motivo = window.prompt(
                                   "Motivo obbligatorio della revoca",
@@ -1191,7 +1313,7 @@ function AbilitazioniView() {
                                         versione: item.versione,
                                       },
                                     },
-                                    { onSuccess: refresh },
+                                    { onSuccess: refresh, onError },
                                   );
                               }}
                             >
@@ -1235,6 +1357,12 @@ function TrasferimentiView() {
   const [originId, setOriginId] = useState("");
   const [productId, setProductId] = useState("");
   const [lottoId, setLottoId] = useState("");
+  const [lotPage, setLotPage] = useState(1);
+  const [lotSearch, setLotSearch] = useState("");
+  useEffect(() => {
+    setLotPage(1);
+    setLottoId("");
+  }, [mensaId, originId, productId, lotSearch]);
   const [quantity, setQuantity] = useState("1");
   const stockParams = { magazzinoId: Number(originId) };
   const stock = useListGiacenzeMensa(stockParams, {
@@ -1251,6 +1379,9 @@ function TrasferimentiView() {
     magazzinoId: Number(originId),
     prodottoId: Number(productId),
     dataRichiesta: todayEuropeRome(),
+    page: lotPage,
+    pageSize: 50,
+    search: lotSearch || undefined,
   };
   const lots = useListLottiMensa(lotParams, {
     query: {
@@ -1259,10 +1390,11 @@ function TrasferimentiView() {
         Number(mensaId) > 0 &&
         Number(originId) > 0 &&
         Number(productId) > 0 &&
-        !!selectedProduct?.lottoFisicoObbligatorio,
+        !!selectedProduct,
     },
   });
-  const selectedLot = lots.data?.find((item) => item.id === Number(lottoId));
+  const availableLots = pageItems(lots.data);
+  const selectedLot = availableLots.find((item) => item.id === Number(lottoId));
   const maxQuantity = selectedLot
     ? Math.min(
         selectedProduct?.disponibileReale ?? 0,
@@ -1274,6 +1406,7 @@ function TrasferimentiView() {
   const prepare = usePreparaTrasferimento();
   const cancel = useAnnullaTrasferimento();
   const confirm = useConfermaTrasferimento();
+  const missing = useSegnalaMancatoArrivoTrasferimento();
   const commandIntents = useCommandIntentRegistry();
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: ["/api/mensa/trasferimenti"] });
@@ -1470,6 +1603,11 @@ function TrasferimentiView() {
   return (
     <div className="space-y-6 p-6">
       <PageTitle view="trasferimenti" />
+      <MensaQueryFeedback
+        isLoading={list.isLoading}
+        isError={list.isError || stock.isError}
+        empty={list.data != null && !pageItems(list.data).length}
+      />
       <Card>
         <CardHeader>
           <CardTitle>Nuovo rifornimento</CardTitle>
@@ -1543,15 +1681,30 @@ function TrasferimentiView() {
               ))}
             </SelectContent>
           </Select>
-          {selectedProduct?.lottoFisicoObbligatorio && (
+          {selectedProduct && (
             <div className="space-y-2" data-testid="mensa-lotto-field">
               <Label htmlFor="mensa-lotto">Lotto</Label>
-              <Select value={lottoId} onValueChange={setLottoId}>
+              <Input
+                aria-label={t("mensa.searchLot")}
+                value={lotSearch}
+                onChange={(event) => setLotSearch(event.target.value)}
+              />
+              <Select
+                value={lottoId || "fefo"}
+                onValueChange={(value) =>
+                  setLottoId(value === "fefo" ? "" : value)
+                }
+              >
                 <SelectTrigger id="mensa-lotto" aria-label="Lotto">
                   <SelectValue placeholder="Seleziona lotto fisico" />
                 </SelectTrigger>
                 <SelectContent>
-                  {lots.data?.map((lot) => (
+                  {!selectedProduct.lottoFisicoObbligatorio && (
+                    <SelectItem value="fefo">
+                      {t("mensa.automaticFefo")}
+                    </SelectItem>
+                  )}
+                  {availableLots.map((lot) => (
                     <SelectItem key={lot.id} value={String(lot.id)}>
                       {lot.codiceLotto ?? `#${lot.id}`} ·{" "}
                       {lot.dataScadenza
@@ -1563,7 +1716,23 @@ function TrasferimentiView() {
                   ))}
                 </SelectContent>
               </Select>
-              {!selectedLot && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  disabled={lotPage === 1}
+                  onClick={() => setLotPage((page) => page - 1)}
+                >
+                  {t("common.previous")}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={lotPage * 50 >= pageTotal(lots.data)}
+                  onClick={() => setLotPage((page) => page + 1)}
+                >
+                  {t("common.next")}
+                </Button>
+              </div>
+              {selectedProduct.lottoFisicoObbligatorio && !selectedLot && (
                 <p className="text-sm text-muted-foreground">
                   Seleziona il lotto fisico da trasferire
                 </p>
@@ -1578,8 +1747,8 @@ function TrasferimentiView() {
           <Input
             type="number"
             aria-label="Quantità"
-            min="0.01"
-            step="0.000001"
+            min={selectedProduct?.quantitaFrazionabile ? "0.000001" : "1"}
+            step={selectedProduct?.quantitaFrazionabile ? "0.000001" : "1"}
             max={maxQuantity}
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
@@ -1669,8 +1838,53 @@ function TrasferimentiView() {
                     {row.stato === "in_transito" &&
                       (hasPermission("mensa.transfers.receive") ||
                         hasPermission("mensa.transfers.manage")) && (
-                        <Button size="sm" onClick={() => confirmTransfer(row)}>
+                        <Button
+                          size="sm"
+                          disabled={confirm.isPending}
+                          onClick={() => confirmTransfer(row)}
+                        >
                           Conferma
+                        </Button>
+                      )}
+                    {row.stato === "in_transito" &&
+                      hasPermission("mensa.transfers.receive") && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={missing.isPending}
+                          onClick={() => {
+                            const motivo = window
+                              .prompt(t("mensa.missingReason"))
+                              ?.trim();
+                            if (!motivo) return;
+                            const slot = `trasferimento:${row.id}:missing`;
+                            missing.mutate(
+                              {
+                                id: row.id,
+                                data: commandIntents.prepare(
+                                  slot,
+                                  { motivo },
+                                  { versione: row.versione, motivo },
+                                ),
+                              },
+                              {
+                                onSuccess: () => {
+                                  commandIntents.complete(slot);
+                                  refresh();
+                                },
+                                onError: (error) => {
+                                  commandIntents.fail(slot, error);
+                                  toast({
+                                    title: t("mensa.actionFailed"),
+                                    description: errorMessage(error),
+                                    variant: "destructive",
+                                  });
+                                },
+                              },
+                            );
+                          }}
+                        >
+                          {t("mensa.reportMissing")}
                         </Button>
                       )}
                     <Button
@@ -1714,16 +1928,23 @@ function TrasferimentiView() {
 }
 
 function ConsumiView() {
+  const { t } = useTranslation();
+  const commandIntents = useCommandIntentRegistry();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: mense = [] } = useListMense({ attiva: true });
   const [mensaId, setMensaId] = useState<number | null>(null);
   const [date, setDate] = useState(todayEuropeRome());
+  const [historyMensaId, setHistoryMensaId] = useState<number | null>(null);
   const [tipoServizio, setTipoServizio] = useState<"pranzo" | "cena">("pranzo");
   const [causale, setCausale] = useState<"consumo" | "scarto">("consumo");
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [notes, setNotes] = useState("");
+  const [lotId, setLotId] = useState("");
+  const [reason, setReason] = useState("");
+  const [lotPage, setLotPage] = useState(1);
+  const [lotSearch, setLotSearch] = useState("");
   const [page, setPage] = useState(1);
   const warehouseId = mense.find((mensa) => mensa.id === mensaId)?.magazzinoId;
   const stock = useListGiacenzeMensa(
@@ -1738,7 +1959,7 @@ function ConsumiView() {
     },
   );
   const listParams = {
-    mensaId: mensaId ?? undefined,
+    mensaId: historyMensaId ?? undefined,
     data: date,
     page,
     pageSize: 50,
@@ -1751,6 +1972,37 @@ function ConsumiView() {
   const selectedProduct = stock.data?.find(
     (item) => item.prodottoId === Number(productId),
   );
+  const lotParams = {
+    mensaId: mensaId ?? 0,
+    magazzinoId: warehouseId ?? 0,
+    prodottoId: Number(productId),
+    includeExpired: causale === "scarto",
+    page: lotPage,
+    pageSize: 50,
+    search: lotSearch || undefined,
+  };
+  const lots = useListLottiMensa(lotParams, {
+    query: {
+      queryKey: getListLottiMensaQueryKey(lotParams),
+      enabled: !!mensaId && !!warehouseId && !!selectedProduct,
+    },
+  });
+  const availableLots = pageItems(lots.data);
+  const selectedLot = availableLots.find((item) => item.id === Number(lotId));
+  const available =
+    selectedLot?.disponibileReale ??
+    (causale === "scarto"
+      ? Math.max(
+          0,
+          (selectedProduct?.giacenzaFisica ?? 0) -
+            (selectedProduct?.impegnato ?? 0),
+        )
+      : (selectedProduct?.disponibileReale ?? 0));
+  useEffect(() => {
+    setLotId("");
+    setLotPage(1);
+  }, [mensaId, productId, causale, lotSearch]);
+  useEffect(() => setPage(1), [historyMensaId, date]);
   const refresh = () => {
     queryClient.invalidateQueries({
       queryKey: getListConsumiMensaQueryKey(listParams),
@@ -1762,23 +2014,28 @@ function ConsumiView() {
   };
   const submit = () => {
     if (!mensaId || !selectedProduct) return;
+    const slot = "consumo-mensa:create";
+    const payload = {
+      mensaId,
+      dataServizio: todayEuropeRome(),
+      tipoServizio,
+      prodottoId: selectedProduct.prodottoId,
+      quantita: quantity,
+      causale,
+      note: notes.trim() || null,
+      lottoId: selectedLot?.id ?? null,
+      motivo: causale === "scarto" ? reason.trim() : null,
+    };
     create.mutate(
       {
-        data: {
-          mensaId,
-          dataServizio: date,
-          tipoServizio,
-          prodottoId: selectedProduct.prodottoId,
-          quantita: quantity,
-          causale,
-          note: notes.trim() || null,
-          idempotencyKey: requestKey("mensa-consumo"),
-        },
+        data: commandIntents.prepare(slot, payload, payload),
       },
       {
         onSuccess: () => {
+          commandIntents.complete(slot);
           setQuantity("1");
           setNotes("");
+          setReason("");
           refresh();
           toast({
             title:
@@ -1787,18 +2044,24 @@ function ConsumiView() {
                 : "Scarto registrato",
           });
         },
-        onError: (error) =>
+        onError: (error) => {
+          commandIntents.fail(slot, error);
           toast({
             title: "Registrazione non riuscita",
             description: errorMessage(error),
             variant: "destructive",
-          }),
+          });
+        },
       },
     );
   };
   return (
     <div className="space-y-6 p-6">
       <PageTitle view="consumi" />
+      <MensaQueryFeedback
+        isLoading={stock.isLoading}
+        isError={stock.isError || lots.isError}
+      />
       <Card>
         <CardHeader>
           <CardTitle>Nuova registrazione</CardTitle>
@@ -1813,9 +2076,9 @@ function ConsumiView() {
           />
           <Input
             type="date"
-            value={date}
-            max={todayEuropeRome()}
-            onChange={(event) => setDate(event.target.value)}
+            value={todayEuropeRome()}
+            readOnly
+            aria-label={t("mensa.currentDate")}
           />
           <Select
             value={tipoServizio}
@@ -1844,7 +2107,7 @@ function ConsumiView() {
             </SelectContent>
           </Select>
           <Select value={productId} onValueChange={setProductId}>
-            <SelectTrigger>
+            <SelectTrigger aria-label="Prodotto">
               <SelectValue placeholder="Prodotto" />
             </SelectTrigger>
             <SelectContent>
@@ -1861,12 +2124,71 @@ function ConsumiView() {
           </Select>
           <Input
             type="number"
-            min="0.01"
-            step="0.000001"
-            max={selectedProduct?.disponibileReale}
+            min={selectedProduct?.quantitaFrazionabile ? "0.000001" : "1"}
+            step={selectedProduct?.quantitaFrazionabile ? "0.000001" : "1"}
+            max={available}
             value={quantity}
             onChange={(event) => setQuantity(event.target.value)}
           />
+          {selectedProduct && (
+            <div className="space-y-2">
+              <Input
+                aria-label={t("mensa.searchLot")}
+                value={lotSearch}
+                onChange={(event) => setLotSearch(event.target.value)}
+              />
+              <Select
+                value={lotId || "fefo"}
+                onValueChange={(value) =>
+                  setLotId(value === "fefo" ? "" : value)
+                }
+              >
+                <SelectTrigger aria-label={t("mensa.physicalLot")}>
+                  <SelectValue placeholder={t("mensa.physicalLot")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {!selectedProduct.lottoFisicoObbligatorio && (
+                    <SelectItem value="fefo">
+                      {t("mensa.automaticFefo")}
+                    </SelectItem>
+                  )}
+                  {availableLots.map((lot) => (
+                    <SelectItem key={lot.id} value={String(lot.id)}>
+                      {lot.codiceLotto ?? `#${lot.id}`} ·{" "}
+                      {lot.dataScadenza ?? "—"} · {lot.disponibileRealePrecisa}{" "}
+                      {selectedProduct.unitaMisura}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                disabled={lotPage === 1}
+                onClick={() => setLotPage((page) => page - 1)}
+              >
+                {t("common.previous")}
+              </Button>
+              <Button
+                variant="outline"
+                disabled={lotPage * 50 >= pageTotal(lots.data)}
+                onClick={() => setLotPage((page) => page + 1)}
+              >
+                {t("common.next")}
+              </Button>
+            </div>
+          )}
+          {causale === "scarto" && (
+            <>
+              <p>{t("mensa.physicalWasteHint")}</p>
+              <Input
+                required
+                aria-label={t("mensa.wasteReason")}
+                placeholder={t("mensa.wasteReason")}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+              />
+            </>
+          )}
           <Textarea
             className="md:col-span-2"
             value={notes}
@@ -1878,7 +2200,9 @@ function ConsumiView() {
               !mensaId ||
               !selectedProduct ||
               Number(quantity) <= 0 ||
-              Number(quantity) > (selectedProduct?.disponibileReale ?? 0) ||
+              Number(quantity) > available ||
+              (selectedProduct?.lottoFisicoObbligatorio && !selectedLot) ||
+              (causale === "scarto" && !reason.trim()) ||
               create.isPending
             }
             onClick={submit}
@@ -1889,6 +2213,24 @@ function ConsumiView() {
       </Card>
       <Card>
         <CardContent className="p-4">
+          <div className="mb-4 flex gap-3">
+            <MensaSelect
+              value={historyMensaId}
+              onChange={setHistoryMensaId}
+              historical
+            />
+            <Input
+              type="date"
+              aria-label={t("mensa.historyDate")}
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+            />
+          </div>
+          <MensaQueryFeedback
+            isLoading={list.isLoading}
+            isError={list.isError}
+            empty={list.data != null && !rows.length}
+          />
           <Table>
             <TableHeader>
               <TableRow>
@@ -1923,6 +2265,7 @@ function ConsumiView() {
                       <Button
                         size="sm"
                         variant="outline"
+                        disabled={reverse.isPending}
                         onClick={() => {
                           const motivo = window.prompt(
                             "Motivo obbligatorio dello storno",
@@ -1930,7 +2273,15 @@ function ConsumiView() {
                           if (motivo?.trim())
                             reverse.mutate(
                               { id: row.id, data: { motivo: motivo.trim() } },
-                              { onSuccess: refresh },
+                              {
+                                onSuccess: refresh,
+                                onError: (error) =>
+                                  toast({
+                                    title: t("mensa.actionFailed"),
+                                    description: errorMessage(error),
+                                    variant: "destructive",
+                                  }),
+                              },
                             );
                         }}
                       >
@@ -2023,6 +2374,7 @@ function EccezioniView() {
 }
 
 function ReportView() {
+  const { t } = useTranslation();
   const [dal, setDal] = useState(todayEuropeRome());
   const [al, setAl] = useState(todayEuropeRome());
   const [mensaId, setMensaId] = useState<number | null>(null);
@@ -2039,7 +2391,7 @@ function ReportView() {
         ["Pasti temporanei", report.data.pastiTemporanei ?? 0],
         ["Pasti in eccezione", report.data.pastiEccezione ?? 0],
         ["Pasti con override", report.data.pastiOverride ?? 0],
-        ["Media pasti/giorno", report.data.mediaPastiGiorno],
+        ["Media pasti/giorno civile", report.data.mediaPastiGiorno],
       ]
     : [];
   const breakdowns: Array<{
@@ -2067,6 +2419,10 @@ function ReportView() {
   return (
     <div className="space-y-6 p-6">
       <PageTitle view="report" />
+      <MensaQueryFeedback
+        isLoading={report.isLoading}
+        isError={report.isError}
+      />
       <div className="grid gap-3 md:grid-cols-3">
         <Input
           type="date"
@@ -2074,8 +2430,12 @@ function ReportView() {
           onChange={(e) => setDal(e.target.value)}
         />
         <Input type="date" value={al} onChange={(e) => setAl(e.target.value)} />
-        <MensaSelect value={mensaId} onChange={setMensaId} />
+        <MensaSelect value={mensaId} onChange={setMensaId} historical />
       </div>
+      <p className="text-sm text-muted-foreground">
+        {t("mensa.averageDenominator")} ·{" "}
+        {report.data?.denominatoreMedia ?? "—"}
+      </p>
       <div className="grid gap-4 md:grid-cols-3">
         {cards.map(([label, value]) => (
           <Card key={String(label)}>
@@ -2116,6 +2476,30 @@ function ReportView() {
           </Card>
         ))}
       </div>
+      {report.data?.giornate?.map((day) => (
+        <Card key={day.id}>
+          <CardContent className="p-4">
+            <Badge>
+              {day.dataServizio} · {day.tipoServizio} ·{" "}
+              {day.stato === "aperta" && day.riapertaAt
+                ? t("mensa.reopened")
+                : day.stato}
+            </Badge>
+            {day.snapshot && (
+              <p>
+                {t("mensa.previousSnapshot")}: {String(day.snapshot.pasti ?? 0)}{" "}
+                {t("mensa.title.pasti")}
+              </p>
+            )}
+            <p>
+              {t("mensa.closureHistory")}:{" "}
+              {report.data?.chiusurePrecedenti?.filter(
+                (closure) => closure.giornataId === day.id,
+              ).length ?? 0}
+            </p>
+          </CardContent>
+        </Card>
+      ))}
       <div className="grid gap-4 md:grid-cols-2">
         {report.data &&
           [
@@ -2138,7 +2522,7 @@ function ReportView() {
                 ) : (
                   breakdown.rows.map((row) => (
                     <div
-                      key={row.prodottoId}
+                      key={`${row.prodottoId}:${row.unitaMisura}`}
                       className="flex items-center justify-between gap-3"
                     >
                       <span>{row.prodottoNome}</span>

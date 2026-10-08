@@ -5,16 +5,22 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { MensaGiornata } from './mensaGiornata';
 import type { MensaQuantitaPerProdotto } from './mensaQuantitaPerProdotto';
 import type { MensaQuantitaPerUnitaMisura } from './mensaQuantitaPerUnitaMisura';
 import type { MensaReportBeneficiariDistintiPerFasciaEtaItem } from './mensaReportBeneficiariDistintiPerFasciaEtaItem';
 import type { MensaReportBeneficiariDistintiPerSessoItem } from './mensaReportBeneficiariDistintiPerSessoItem';
+import type { MensaReportChiusurePrecedentiItem } from './mensaReportChiusurePrecedentiItem';
 import type { MensaReportDistribuzioneFasciaEtaItem } from './mensaReportDistribuzioneFasciaEtaItem';
 import type { MensaReportDistribuzioneItem } from './mensaReportDistribuzioneItem';
 import type { MensaReportDistribuzioneSessoItem } from './mensaReportDistribuzioneSessoItem';
 import type { MensaReportDistribuzioneTipoServizioItem } from './mensaReportDistribuzioneTipoServizioItem';
 
 export interface MensaReport {
+  chiusurePrecedenti?: MensaReportChiusurePrecedentiItem[];
+  /** Giorni civili inclusivi del periodo */
+  denominatoreMedia?: number;
+  giornate?: MensaGiornata[];
   dal: Date;
   al: Date;
   totalePasti: number;

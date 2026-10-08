@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
 import { authUserCanOperateBolle, useAuth } from "@/lib/auth";
+import {
+  documentAuthContext,
+  useDocumentoAccess,
+} from "@/hooks/use-documento-access";
 import { Link } from "wouter";
 import {
   useListBolle,
@@ -25,7 +29,6 @@ import {
   useListMezzi,
   useGetImpostazioniStampa,
   useListDocumentiOperativi,
-  useGetDocumentoOperativo,
   useGetDocumentoOperativoRichiesta,
   useGetRichiestaMagazzino,
   getGetRichiestaMagazzinoQueryKey,
@@ -1568,16 +1571,21 @@ export function BollaDettaglio({
       queryKey: getListBeneficiariQueryKey(),
     },
   });
-  const { data: requestContext } = useGetRichiestaMagazzino(
-    linkedRequestId ?? 0,
-    {
-      query: {
-        enabled:
-          linkedRequestId != null && hasPermission("richieste_magazzino.view"),
-        queryKey: getGetRichiestaMagazzinoQueryKey(linkedRequestId ?? 0),
-      },
+  const requestContextQuery = useGetRichiestaMagazzino(linkedRequestId ?? 0, {
+    query: {
+      enabled:
+        linkedRequestId != null && hasPermission("richieste_magazzino.view"),
+      queryKey: [
+        ...getGetRichiestaMagazzinoQueryKey(linkedRequestId ?? 0),
+        documentAuthContext(user),
+      ],
+      retry: false,
     },
-  );
+  });
+  const requestContext =
+    requestContextQuery.isError || !hasPermission("richieste_magazzino.view")
+      ? undefined
+      : requestContextQuery.data;
   const isCentroHandoffBolla =
     bolla?.tipoDestinatario === "beneficiario" &&
     (linkedRequest === true || linkedRequestId != null);
@@ -1585,13 +1593,19 @@ export function BollaDettaglio({
     beneficiari?.find((b) => b.id === bolla?.beneficiarioId)?.centroAscoltoId ??
     requestContext?.centroAscoltoId ??
     null;
-  const { data: volontari } = useListBollaVolontariCandidati(bollaId, {
+  const volontariQuery = useListBollaVolontariCandidati(bollaId, {
     query: {
-      queryKey: getListBollaVolontariCandidatiQueryKey(bollaId),
+      queryKey: [
+        ...getListBollaVolontariCandidatiQueryKey(bollaId),
+        documentAuthContext(user),
+      ],
+      retry: false,
       enabled:
         bolla != null && bolla.tipoDestinatario === "beneficiario" && canManage,
     },
   });
+  const volontari =
+    volontariQuery.isError || !canManage ? undefined : volontariQuery.data;
   const volontarioAssegnato =
     bolla?.volontarioConsegnaId != null
       ? volontari?.find((v) => v.id === bolla.volontarioConsegnaId)
@@ -3531,84 +3545,67 @@ export function DocumentoOperativoDettaglioComune({
 }) {
   const { user, hasPermission } = useAuth();
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const [accessDenied, setAccessDenied] = useState(false);
-  useEffect(
-    () =>
-      queryClient.getMutationCache().subscribe((event) => {
-        if (event.type !== "updated" || event.mutation.state.status !== "error")
-          return;
-        const error = event.mutation.state.error as {
-          status?: number;
-          response?: { status?: number };
-        } | null;
-        const status = error?.status ?? error?.response?.status;
-        if (status === 403 || status === 404) {
-          setAccessDenied(true);
-          onDraftDirtyChange(false);
-          void queryClient.invalidateQueries({
-            queryKey: getGetDocumentoOperativoQueryKey(
-              selection.tipo,
-              selection.id,
-            ),
-          });
-        }
-      }),
-    [queryClient, selection.tipo, selection.id, onDraftDirtyChange],
-  );
-  useEffect(() => {
-    setAccessDenied(false);
-  }, [selection.tipo, selection.id]);
-  const { data, isLoading, isError } = useGetDocumentoOperativo(
-    selection.tipo,
-    selection.id,
-    {
-      query: {
-        staleTime: 0,
-        refetchOnWindowFocus: "always",
-        queryKey: [
-          ...getGetDocumentoOperativoQueryKey(selection.tipo, selection.id),
-          {
-            userId: user?.id ?? null,
-            centroAscoltoId: user?.centroAscoltoId ?? null,
-            areaOperativaId: user?.areaOperativaId ?? null,
-            zonaUdsId: user?.zonaUdsId ?? null,
-            canViewBolle: hasPermission("bolle.view"),
-            canViewTransfers: hasPermission("magazzino.view"),
-          },
-        ],
-      },
-    },
-  );
-  const { data: sourceRequest } = useGetDocumentoOperativoRichiesta(
+  const authContext = documentAuthContext(user);
+  const read = useDocumentoAccess(selection, authContext, user != null);
+  const { data, isLoading } = read;
+  const sourceRequestQuery = useGetDocumentoOperativoRichiesta(
     selection.tipo,
     selection.id,
     {
       query: {
         enabled: hasPermission("richieste_magazzino.view"),
+        retry: false,
         queryKey: [
           ...getGetDocumentoOperativoRichiestaQueryKey(
             selection.tipo,
             selection.id,
           ),
-          user?.id ?? null,
+          authContext,
         ],
       },
     },
   );
+  const sourceRequest =
+    sourceRequestQuery.isError || !hasPermission("richieste_magazzino.view")
+      ? undefined
+      : sourceRequestQuery.data;
 
-  if (isLoading) return <Skeleton className="mt-5 h-48 w-full" />;
-  if (accessDenied || isError || !data || data.tipoAggregato !== selection.tipo)
+  if (read.denied)
     return (
-      <p className="mt-5 text-muted-foreground">
-        {t("bolle.documentoNonTrovato", {
-          defaultValue: "Documento non trovato o non accessibile",
-        })}
+      <p role="alert" className="mt-5 text-muted-foreground">
+        {t("bolle.documentoNonTrovato")}
       </p>
+    );
+  if (isLoading) return <Skeleton className="mt-5 h-48 w-full" />;
+  const technicalError = read.technicalError ? (
+    <div role="alert">
+      <p>
+        {t("common.error", { defaultValue: "Errore" })}:{" "}
+        {t("richiesteMagazzino.loadError")}
+      </p>
+      <Button
+        variant="outline"
+        disabled={read.isFetching}
+        onClick={() => void read.refetch()}
+      >
+        {t("common.retry", { defaultValue: "Riprova" })}
+      </Button>
+    </div>
+  ) : null;
+  if (!data || data.tipoAggregato !== selection.tipo)
+    return (
+      technicalError ?? (
+        <p className="mt-5 text-muted-foreground">
+          {t("bolle.documentoNonTrovato", {
+            defaultValue: "Documento non trovato o non accessibile",
+          })}
+        </p>
+      )
     );
 
   return (
     <div className="space-y-3">
+      {technicalError}
       {onBackToRequest ? (
         <Button variant="outline" onClick={onBackToRequest}>
           {t("richiesteMagazzino.backToRequest")}
@@ -3623,28 +3620,62 @@ export function DocumentoOperativoDettaglioComune({
           </p>
         )
       )}
-      {data.tipoAggregato === "bolla" ? (
-        <BollaDettaglio
-          bollaId={selection.id}
-          bollaData={data.dettaglio as BollaDettaglioDto}
-          onClose={onClose}
-          onCloseLabel={
-            onBackToRequest ? t("richiesteMagazzino.backToRequest") : undefined
+      <div
+        key={read.context}
+        inert={read.blocked || undefined}
+        aria-busy={read.isFetching}
+        onClickCapture={(e) => {
+          if (read.blocked) {
+            e.preventDefault();
+            e.stopPropagation();
           }
-          linkedRequest={
-            sourceRequest === undefined ? null : sourceRequest.richiesta != null
+        }}
+        onKeyDownCapture={(e) => {
+          if (read.blocked) {
+            e.preventDefault();
+            e.stopPropagation();
           }
-          linkedRequestId={sourceRequest?.richiesta?.id}
-          onDraftDirtyChange={onDraftDirtyChange}
-        />
-      ) : (
-        <TrasferimentoDettaglioComune
-          trasferimentoId={selection.id}
-          trasferimentoData={data.dettaglio as Trasferimento}
-          onClose={onClose}
-          onDraftDirtyChange={onDraftDirtyChange}
-        />
-      )}
+        }}
+        onSubmitCapture={(e) => {
+          if (read.blocked) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }}
+        onBlurCapture={(e) => {
+          if (read.blocked) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }}
+      >
+        {data.tipoAggregato === "bolla" ? (
+          <BollaDettaglio
+            bollaId={selection.id}
+            bollaData={data.dettaglio as BollaDettaglioDto}
+            onClose={onClose}
+            onCloseLabel={
+              onBackToRequest
+                ? t("richiesteMagazzino.backToRequest")
+                : undefined
+            }
+            linkedRequest={
+              sourceRequest === undefined
+                ? null
+                : sourceRequest.richiesta != null
+            }
+            linkedRequestId={sourceRequest?.richiesta?.id}
+            onDraftDirtyChange={onDraftDirtyChange}
+          />
+        ) : (
+          <TrasferimentoDettaglioComune
+            trasferimentoId={selection.id}
+            trasferimentoData={data.dettaglio as Trasferimento}
+            onClose={onClose}
+            onDraftDirtyChange={onDraftDirtyChange}
+          />
+        )}
+      </div>
     </div>
   );
 }

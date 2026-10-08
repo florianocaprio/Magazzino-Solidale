@@ -82,7 +82,9 @@ afterEach(async () => {
     centroIds.length = 0;
   }
   if (areaOperativaIds.length > 0) {
-    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, areaOperativaIds));
+    await db
+      .delete(areeOperativeTable)
+      .where(inArray(areeOperativeTable.id, areaOperativaIds));
     areaOperativaIds.length = 0;
   }
 });
@@ -124,7 +126,10 @@ describe("Magazzino con tag Mensa", () => {
     const altraAreaOperativaId = await createArea(`Area B ${Date.now()}`);
     const [centro] = await db
       .insert(centriAscoltoTable)
-      .values({ nome: `Centro Mensa ${Date.now()}`, areaOperativaId: altraAreaOperativaId })
+      .values({
+        nome: `Centro Mensa ${Date.now()}`,
+        areaOperativaId: altraAreaOperativaId,
+      })
       .returning({ id: centriAscoltoTable.id });
     centroIds.push(centro.id);
 
@@ -151,7 +156,7 @@ describe("Magazzino con tag Mensa", () => {
     expect(inactive.body.error).toContain("non è attivo");
   });
 
-  it("sincronizza modifiche e disattivazione senza consentire il cambio di tipo", async () => {
+  it("sincronizza anagrafica, non stato del servizio, senza consentire il cambio di tipo", async () => {
     const areaOperativaId = await createArea(`Area Sync ${Date.now()}`);
     const magazzino = await createMensaMagazzino(areaOperativaId);
 
@@ -171,8 +176,24 @@ describe("Magazzino con tag Mensa", () => {
     expect(mensa).toMatchObject({
       nome: "Mensa aggiornata",
       indirizzo: "Via Nuova 2",
-      attiva: false,
+      attiva: true,
     });
+    await db
+      .update(menseTable)
+      .set({ attiva: false })
+      .where(eq(menseTable.id, mensa.id));
+    expect(
+      (
+        await request(app)
+          .patch(`/magazzini/${magazzino.id}`)
+          .send({ nome: "Deposito riattivato", stato: "attivo" })
+      ).status,
+    ).toBe(200);
+    const [stillInactive] = await db
+      .select()
+      .from(menseTable)
+      .where(eq(menseTable.id, mensa.id));
+    expect(stillInactive.attiva).toBe(false);
 
     const retag = await request(app)
       .patch(`/magazzini/${magazzino.id}`)

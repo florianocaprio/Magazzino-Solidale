@@ -17,6 +17,17 @@ export interface MensaConsumoInput {
   quantita: QuantitaContabile;
   causale: MensaConsumoInputCausale;
   /**
+     * Lotto obbligatorio quando richiesto dal Catalogo; negli altri casi FEFO comune.
+     * @nullable
+     */
+  lottoId?: number | null;
+  /**
+     * Obbligatorio per scarto fisico; non rappresenta sfrido culinario.
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
+  /**
      * @maxLength 2000
      * @nullable
      */

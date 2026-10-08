@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
+import { getMigrationStatus } from "../../../lib/db/scripts/migration-runner.mjs";
 
 const password = process.env.E2E_PASSWORD;
 if (!password || process.env.M5C1_TEST_DISPOSABLE_DB !== "verified")
@@ -19,7 +21,31 @@ test.beforeAll(async () => {
   const { rows } = await database.query(
     "SELECT current_database() AS name, (SELECT count(*)::integer FROM app_meta.schema_migrations) AS ledger",
   );
-  expect(rows[0]).toEqual({ name: "m5c1_r2_e2e", ledger: 46 });
+  expect(rows[0].name).toBe("m5c1_r2_e2e");
+  // Questi E2E usano lo schema corrente, non una base storica di upgrade.
+  // Il runner canonico verifica tutte le migration disponibili e i checksum.
+  const status = await getMigrationStatus({
+    databaseUrl: process.env.E2E_DATABASE_URL!,
+    updatesDirectory: fileURLToPath(
+      new URL("../../../lib/db/updates", import.meta.url),
+    ),
+    manifestPath: fileURLToPath(
+      new URL(
+        "../../../lib/db/legacy-migrations-baseline.json",
+        import.meta.url,
+      ),
+    ),
+  });
+  expect(status.totalFiles).toBeGreaterThan(0);
+  expect(status).toMatchObject({
+    initialized: true,
+    appliedFiles: status.totalFiles,
+    pendingFiles: [],
+    checksumMismatches: [],
+    appliedFilesMissing: [],
+    outOfOrderFiles: [],
+  });
+  expect(rows[0].ledger).toBe(status.totalFiles);
 });
 
 test.afterAll(async () => {
@@ -101,16 +127,64 @@ test("R2-02: presa in carico, Bolla aperta, P1/P2 persistenti e volontario con e
     await page
       .getByRole("button", { name: new RegExp(request.codice) })
       .click();
-    await page.getByRole("button", { name: "Prendi in carico" }).click();
-    const prepare = page.getByTestId("m5b-prepare-document");
-    await expect(prepare).toBeVisible();
-    await prepare
-      .locator("#rm-warehouse")
+    const requestSheet = page.getByRole("dialog", {
+      name: request.codice,
+      exact: true,
+    });
+    await expect(requestSheet).toBeVisible();
+    const takenResponse = page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .endsWith(`/api/richieste-magazzino/${request.id}/presa-in-carico`) &&
+        response.request().method() === "POST",
+    );
+    await requestSheet
+      .getByRole("button", { name: "Prendi in carico" })
+      .click();
+    const takeResult = await takenResponse;
+    expect(takeResult.status(), await takeResult.text()).toBe(200);
+    const taken = await page.request.get(
+      `/api/richieste-magazzino/${request.id}`,
+    );
+    expect(taken.status()).toBe(200);
+    expect(await taken.json()).toMatchObject({
+      stato: "presa_in_carico",
+      documentoCorrente: null,
+    });
+    await requestSheet
+      .getByLabel("Magazzino di evasione", { exact: true })
       .selectOption({ label: "M5C1 E2E Deposito" });
-    await prepare.getByRole("button").last().click();
-    await expect(page).toHaveURL(/\/bolle\?bollaId=\d+/);
-    const bollaId = Number(new URL(page.url()).searchParams.get("bollaId"));
+    // M5C2 mantiene preparazione e documento nel medesimo Sheet della richiesta.
+    const createBolla = requestSheet.getByRole("button", {
+      name: "Crea Bolla",
+      exact: true,
+    });
+    await expect(createBolla).toBeVisible();
+    await expect(createBolla).toBeEnabled();
+    const createdResponse = page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .endsWith(`/api/richieste-magazzino/${request.id}/documento`) &&
+        response.request().method() === "POST",
+    );
+    await createBolla.click();
+    const created = await createdResponse;
+    expect(created.status(), await created.text()).toBe(201);
+    const document = await created.json();
+    expect(document).toMatchObject({
+      richiestaId: request.id,
+      tipoDocumento: "bolla",
+    });
+    const bollaId = document.documentoId;
     expect(bollaId).toBeGreaterThan(0);
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === "/richieste-magazzino" &&
+        url.searchParams.get("richiestaId") === String(request.id) &&
+        url.searchParams.get("documento") === `bolla:${bollaId}`,
+    );
     const linked = await page.request.get(
       `/api/richieste-magazzino/${request.id}`,
     );
@@ -118,7 +192,7 @@ test("R2-02: presa in carico, Bolla aperta, P1/P2 persistenti e volontario con e
       `/bolle?bollaId=${bollaId}`,
     );
 
-    const detail = page.getByRole("dialog", { name: /dettaglio bolla/i });
+    let detail = requestSheet;
     await expect(detail).toBeVisible();
     await detail
       .getByRole("button", { name: /aggiungi il primo prodotto/i })
@@ -157,6 +231,7 @@ test("R2-02: presa in carico, Bolla aperta, P1/P2 persistenti e volontario con e
     }
     await page.goto("/bolle");
     await page.goto(`/bolle?bollaId=${bollaId}`);
+    detail = page.getByRole("dialog", { name: /dettaglio bolla/i });
     await expect(detail).toBeVisible();
     for (const name of names)
       await expect(
@@ -224,17 +299,170 @@ test("R2-02: presa in carico, Bolla aperta, P1/P2 persistenti e volontario con e
     await page.getByRole("option", { name: /presso il centro/i }).click();
     await expect(detail).toContainText(/presso il centro/i);
     await delivery.getByRole("combobox").click();
+    const facts = async () => {
+      const { rows } = await database.query(
+        `SELECT to_jsonb(b) AS bolla,
+        (SELECT jsonb_agg(to_jsonb(r) ORDER BY r.id) FROM bolla_righe r WHERE r.bolla_id=b.id) AS righe,
+        (SELECT jsonb_agg(to_jsonb(l) ORDER BY l.id) FROM lotti l JOIN prodotti p ON p.id=l.prodotto_id WHERE p.nome=ANY($2::text[])) AS lotti,
+        (SELECT jsonb_agg(to_jsonb(m) ORDER BY m.id) FROM movimenti m JOIN prodotti p ON p.id=m.prodotto_id WHERE p.nome=ANY($2::text[])) AS movimenti,
+        (SELECT jsonb_object_agg(s.prodotto_id,s.residuo) FROM (SELECT l.prodotto_id,sum(l.quantita_residua) AS residuo FROM lotti l JOIN prodotti p ON p.id=l.prodotto_id WHERE p.nome=ANY($2::text[]) GROUP BY l.prodotto_id) s) AS stock,
+        (SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) FROM prenotazioni_magazzino p WHERE p.bolla_id=b.id) AS prenotazioni,
+        (SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id) FROM audit_eventi a WHERE a.entita_tipo='bolla' AND a.entita_id=b.id AND a.azione LIKE 'BOLLA_%') AS audit_successo
+        FROM bolle b WHERE b.id=$1`,
+        [bollaId, names],
+      );
+      return rows;
+    };
+    const beforeDenied = await facts();
+    const sent: string[] = [];
+    page.on("request", (r) => {
+      if (r.method() === "PATCH" && r.url().endsWith(`/api/bolle/${bollaId}`))
+        sent.push(r.url());
+    });
     const deniedResponse = page.waitForResponse(
       (response) =>
         response.url().endsWith(`/api/bolle/${bollaId}`) &&
         response.request().method() === "PATCH",
+    );
+    const browserRead = page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/documenti-operativi/bolla/${bollaId}`) &&
+        r.request().method() === "GET",
     );
     await page.getByRole("option", { name: `R2${suffix} V${suffix}` }).click();
     const denied = await deniedResponse;
     expect(denied.status(), await denied.text()).toBe(403);
     const message = (await denied.json()).error;
     expect(message).toMatch(/^Volontario (non accessibile|non operativo)/);
-    await expect(page.getByText(message)).toBeVisible();
+    // Il portale visivo è fuori dallo Sheet; lo status live separato va preservato.
+    await expect(
+      page
+        .getByRole("region", {
+          name: "Notifications (F8)",
+          includeHidden: true,
+        })
+        .getByText(message, { exact: true }),
+    ).toBeVisible();
+    const canonical = await page.request.get(
+      `/api/documenti-operativi/bolla/${bollaId}`,
+    );
+    expect(canonical.status(), await canonical.text()).toBe(200);
+    expect((await canonical.json()).dettaglio.id).toBe(bollaId);
+    await expect(
+      page
+        .getByRole("status", { includeHidden: true })
+        .filter({ hasText: message }),
+    ).toContainText(message);
+    expect((await browserRead).status()).toBe(200);
+    expect(sent).toHaveLength(1);
+    expect(await facts()).toEqual(beforeDenied);
+    await expect(
+      detail.getByRole("row", { name: new RegExp(names[0]) }),
+    ).toBeVisible();
+
+    // La stessa Bolla nel contesto Richiesta: stesso ruolo ordinario e diniego reale.
+    await database.query("UPDATE volontari SET attivo=true WHERE id=$1", [
+      volunteerId,
+    ]);
+    await page.goto(
+      `/richieste-magazzino?filter=keep&richiestaId=${request.id}&documento=bolla%3A${bollaId}`,
+    );
+    const contextual = page.getByTestId("richiesta-sheet");
+    await expect(
+      contextual.getByRole("row", { name: new RegExp(names[0]) }),
+    ).toBeVisible();
+    const contextualDelivery = contextual
+      .getByText(/chi effettua la consegna/i)
+      .locator("..");
+    await contextualDelivery.getByRole("combobox").click();
+    await expect(
+      page.getByRole("option", { name: `R2${suffix} V${suffix}` }),
+    ).toBeVisible();
+    await database.query("UPDATE volontari SET attivo=false WHERE id=$1", [
+      volunteerId,
+    ]);
+    const contextualBefore = await facts();
+    const sentBefore = sent.length;
+    const contextualDenied = page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/bolle/${bollaId}`) &&
+        r.request().method() === "PATCH",
+    );
+    const contextualRead = page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/documenti-operativi/bolla/${bollaId}`) &&
+        r.request().method() === "GET",
+    );
+    await page.getByRole("option", { name: `R2${suffix} V${suffix}` }).click();
+    expect((await contextualDenied).status()).toBe(403);
+    expect((await contextualRead).status()).toBe(200);
+    await expect(
+      contextual.getByRole("row", { name: new RegExp(names[0]) }),
+    ).toBeVisible();
+    expect(await facts()).toEqual(contextualBefore);
+    expect(sent.length - sentBefore).toBe(1);
+    expect(new URL(page.url()).pathname).toBe("/richieste-magazzino");
+    expect(new URL(page.url()).searchParams.get("filter")).toBe("keep");
+
+    // Una nuova intenzione consentita funziona, senza ripetere quella negata.
+    const allowed = page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/bolle/${bollaId}`) &&
+        r.request().method() === "PATCH",
+    );
+    await contextualDelivery.getByRole("combobox").click();
+    await page.getByRole("option", { name: /altro.*ritiro/i }).click();
+    expect((await allowed).status()).toBe(200);
+    await page.reload();
+    await expect(
+      contextual.getByRole("row", { name: new RegExp(names[0]) }),
+    ).toBeVisible();
+    const { rows: persistedDelivery } = await database.query(
+      "SELECT volontario_consegna_id,trasportatore_nome FROM bolle WHERE id=$1",
+      [bollaId],
+    );
+    expect(persistedDelivery[0]).toEqual({
+      volontario_consegna_id: null,
+      trasportatore_nome: "Ritiro presso il magazzino",
+    });
+
+    // Revoca territoriale reale sulla sessione ancora aperta, dopo popolamento cache.
+    const { rows: actorScope } = await database.query(
+      "SELECT area_operativa_id,centro_ascolto_id FROM utenti WHERE username='m5c1-e2e-warehouse'",
+    );
+    try {
+      await database.query(
+        "UPDATE utenti SET area_operativa_id=null,centro_ascolto_id=null WHERE username='m5c1-e2e-warehouse'",
+      );
+      const revoked = page.waitForResponse(
+        (r) =>
+          r.url().endsWith(`/api/documenti-operativi/bolla/${bollaId}`) &&
+          r.request().method() === "GET",
+      );
+      await page.evaluate(() =>
+        window.dispatchEvent(new Event("visibilitychange")),
+      );
+      // Il documento collegato fuori perimetro viene minimizzato come 404.
+      expect((await revoked).status()).toBe(404);
+      await expect(
+        contextual.getByRole("row", { name: new RegExp(names[0]) }),
+      ).toHaveCount(0);
+      await expect(
+        contextual.getByRole("button", {
+          name: "Aggiungi prodotto",
+          exact: true,
+        }),
+      ).toHaveCount(0);
+      const deniedAgain = await page.request.get(
+        `/api/documenti-operativi/bolla/${bollaId}`,
+      );
+      expect(deniedAgain.status()).toBe(404);
+    } finally {
+      await database.query(
+        "UPDATE utenti SET area_operativa_id=$1,centro_ascolto_id=$2 WHERE username='m5c1-e2e-warehouse'",
+        [actorScope[0].area_operativa_id, actorScope[0].centro_ascolto_id],
+      );
+    }
   } finally {
     await social.close();
     await warehouse.close();

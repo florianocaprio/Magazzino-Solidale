@@ -4,6 +4,7 @@ import request from "supertest";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   auditConfigurazioniTable,
+  auditEventiTable,
   beneficiariTable,
   centriAscoltoTable,
   areeOperativeTable,
@@ -26,10 +27,16 @@ import {
   prenotazioniMagazzinoTable,
   scarichiTable,
   scaricoRigheTable,
+  bolleTable,
+  bollaRigheTable,
+  rientriTrasportoTable,
+  rientroTrasportoRigheTable,
   tessereBeneficiariTable,
   trasferimentoRigheTable,
   trasferimentiTable,
   utentiTable,
+  utentiMenseTable,
+  ruoliTable,
   zoneUdsTable,
   operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
@@ -52,8 +59,101 @@ import { aggregatiConsumiMensa } from "../src/lib/mensaService";
 import { areaGuard } from "../src/middlewares/auth";
 import { initDbExtensions } from "../src/lib/dbInit";
 import { InventoryDecimal } from "../src/lib/inventoryDecimal";
+import bcrypt from "bcryptjs";
+
+async function realMensaSession(fixture: Fixture) {
+  const password = `M61-${rnd()}-Password!`;
+  await db
+    .update(utentiTable)
+    .set({ passwordHash: await bcrypt.hash(password, 4) })
+    .where(eq(utentiTable.id, fixture.userId));
+  const { default: app } = await import("../src/app");
+  const [user] = await db
+    .select()
+    .from(utentiTable)
+    .where(eq(utentiTable.id, fixture.userId));
+  const session = request.agent(app);
+  expect(
+    (
+      await session
+        .post("/api/auth/login")
+        .send({ username: user.username, password })
+    ).status,
+  ).toBe(200);
+  return session;
+}
+async function realAdminSession(fixture: Fixture) {
+  const [role] = await db
+    .insert(ruoliTable)
+    .values({
+      nome: `M61-admin-${rnd()}`,
+      isAdmin: true,
+      aree: ["mensa", "magazzino", "amministrazione"],
+      permessi: [],
+    })
+    .returning();
+  ids.roles.push(role.id);
+  const [admin] = await db
+    .insert(utentiTable)
+    .values({
+      username: `m61_admin_${rnd()}`,
+      passwordHash: "x",
+      nome: "Admin sintetico",
+      ruoloId: role.id,
+    })
+    .returning();
+  ids.users.push(admin.id);
+  return realMensaSession({ ...fixture, userId: admin.id });
+}
+
+async function m61Stock(
+  fixture: Fixture,
+  quantity = "10",
+  requiredLot = false,
+) {
+  const [product] = await db
+    .insert(prodottiTable)
+    .values({
+      codice: `M61-P-${rnd()}`,
+      nome: "Prodotto M6.1",
+      tipoProdotto: "alimentare",
+      unitaMisura: "kg",
+      quantitaFrazionabile: true,
+      lottoFisicoObbligatorio: requiredLot,
+    })
+    .returning();
+  ids.products.push(product.id);
+  const [lot] = await db
+    .insert(lottiTable)
+    .values({
+      prodottoId: product.id,
+      magazzinoId: fixture.warehouseIds[0],
+      codiceLotto: `M61-L-${rnd()}`,
+      dataCarico: dataServizioMensa(),
+      dataScadenza: "2030-01-01",
+      quantitaCaricata: quantity,
+      quantitaResidua: quantity,
+    })
+    .returning();
+  ids.lots.push(lot.id);
+  return {
+    product,
+    lot,
+    input: {
+      mensaId: fixture.mensaA,
+      prodottoId: product.id,
+      dataServizio: dataServizioMensa(),
+      tipoServizio: "pranzo",
+      causale: "consumo",
+      quantita: "0.3",
+      idempotencyKey: `m61-consume-${rnd()}`,
+    },
+  };
+}
 
 const ids = {
+  roles: [] as number[],
+  bolle: [] as number[],
   users: [] as number[],
   areeOperative: [] as number[],
   centers: [] as number[],
@@ -90,7 +190,18 @@ function makeApp(
 ): Express {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => {
+  app.use(async (req, _res, next) => {
+    // Il territorio del test esiste realmente: M6.1 rilegge l'utente, non
+    // considera il vecchio stub HTTP fonte autorevole delle assegnazioni.
+    await db
+      .update(utentiTable)
+      .set({
+        areaOperativaId:
+          "areaOperativaId" in scope ? scope.areaOperativaId : fixture.romeId,
+        centroAscoltoId: scope.centroAscoltoId ?? null,
+        zonaUdsId: scope.zonaUdsId ?? null,
+      })
+      .where(eq(utentiTable.id, fixture.userId));
     req.user = {
       id: fixture.userId,
       areaOperativaId:
@@ -203,6 +314,28 @@ async function createFixture() {
     ])
     .returning({ id: menseTable.id });
   ids.canteens.push(...canteens.map((row) => row.id));
+  const [role] = await db
+    .insert(ruoliTable)
+    .values({
+      nome: `M61-custom-${rnd()}`,
+      aree: ["mensa", "sociale"],
+      permessi: MENSA_PERMISSIONS.map((item) => item.key),
+    })
+    .returning();
+  ids.roles.push(role.id);
+  await db
+    .update(utentiTable)
+    .set({ ruoloId: role.id, areaOperativaId: rome.id })
+    .where(eq(utentiTable.id, user.id));
+  // Le due Mense Roma sono assegnate esplicitamente: nessuna autorizzazione
+  // implicita dall'Area della fixture storica.
+  await db.insert(utentiMenseTable).values(
+    canteens.slice(0, 2).map((canteen) => ({
+      utenteId: user.id,
+      mensaId: canteen.id,
+      assegnataDa: user.id,
+    })),
+  );
   const [beneficiary] = await db
     .insert(beneficiariTable)
     .values({
@@ -306,10 +439,63 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  // Cleanup anche se un assert fallisce dopo il commit o dopo la ricezione.
+  if (ids.canteens.length) {
+    const consumptions = await db
+      .select()
+      .from(mensaConsumiTable)
+      .where(inArray(mensaConsumiTable.mensaId, ids.canteens));
+    ids.consumptions = [
+      ...new Set([...ids.consumptions, ...consumptions.map((row) => row.id)]),
+    ];
+    ids.issues = [
+      ...new Set([...ids.issues, ...consumptions.map((row) => row.scaricoId)]),
+    ];
+  }
+  if (ids.products.length) {
+    const lots = await db
+      .select({ id: lottiTable.id })
+      .from(lottiTable)
+      .where(inArray(lottiTable.prodottoId, ids.products));
+    ids.lots = [...new Set([...ids.lots, ...lots.map((row) => row.id)])];
+  }
+  if (ids.users.length)
+    await db
+      .update(utentiTable)
+      .set({ centroAscoltoId: null, zonaUdsId: null })
+      .where(inArray(utentiTable.id, ids.users));
+  if (ids.users.length)
+    await db
+      .delete(utentiMenseTable)
+      .where(inArray(utentiMenseTable.utenteId, ids.users));
   if (ids.users.length)
     await db
       .delete(auditConfigurazioniTable)
       .where(inArray(auditConfigurazioniTable.utenteId, ids.users));
+  if (ids.bolle.length) {
+    await db
+      .delete(prenotazioniMagazzinoTable)
+      .where(inArray(prenotazioniMagazzinoTable.bollaId, ids.bolle));
+    await db
+      .delete(bollaRigheTable)
+      .where(inArray(bollaRigheTable.bollaId, ids.bolle));
+    await db
+      .delete(bolleTable)
+      .where(inArray(bolleTable.id, ids.bolle.splice(0)));
+  }
+  if (ids.transfers.length) {
+    await db
+      .delete(rientroTrasportoRigheTable)
+      .where(
+        inArray(rientroTrasportoRigheTable.trasferimentoId, ids.transfers),
+      );
+    await db
+      .delete(rientriTrasportoTable)
+      .where(inArray(rientriTrasportoTable.trasferimentoId, ids.transfers));
+    await db
+      .delete(movimentiTable)
+      .where(inArray(movimentiTable.trasferimentoId, ids.transfers));
+  }
   if (ids.transfers.length)
     await db
       .delete(prenotazioniMagazzinoTable)
@@ -427,6 +613,10 @@ afterEach(async () => {
     await db
       .delete(utentiTable)
       .where(inArray(utentiTable.id, ids.users.splice(0)));
+  if (ids.roles.length)
+    await db
+      .delete(ruoliTable)
+      .where(inArray(ruoliTable.id, ids.roles.splice(0)));
   if (ids.areeOperative.length)
     await db
       .delete(areeOperativeTable)
@@ -438,6 +628,1341 @@ afterAll(async () => {
 });
 
 describe("Modulo Mensa", () => {
+  describe("M61-F4 audit riapertura", () => {
+    async function closedDay() {
+      const fixture = await createFixture();
+      const session = await realMensaSession(fixture);
+      const stock = await m61Stock(fixture);
+      const consumed = await session
+        .post("/api/mensa/consumi")
+        .send(stock.input);
+      expect(consumed.status, consumed.text).toBe(201);
+      const day = await session.post("/api/mensa/giornate").send({
+        mensaId: fixture.mensaA,
+        dataServizio: dataServizioMensa(),
+        tipoServizio: "pranzo",
+      });
+      expect(day.status, day.text).toBe(200);
+      const path = `/api/mensa/giornate/${day.body.id}`;
+      const closed = await session
+        .post(`${path}/chiudi`)
+        .send({ note: "Chiusura F4" });
+      expect(closed.status, closed.text).toBe(200);
+      return { fixture, session, stock, consumed, path, day: closed.body };
+    }
+
+    async function reopenEvents(dayId: number) {
+      return db
+        .select()
+        .from(auditEventiTable)
+        .where(
+          and(
+            eq(auditEventiTable.entitaTipo, "mensa_giornata"),
+            eq(auditEventiTable.entitaId, dayId),
+            eq(auditEventiTable.azione, "MENSA_GIORNATA_RIAPERTA"),
+          ),
+        )
+        .orderBy(auditEventiTable.id);
+    }
+
+    async function inventorySnapshot() {
+      const snapshot: Record<string, unknown> = {};
+      // Confronto dei record completi, non soltanto dei conteggi o delle quantità.
+      for (const table of [
+        "lotti",
+        "movimenti",
+        "prenotazioni_magazzino",
+        "scarichi",
+        "scarico_righe",
+        "trasferimenti",
+        "trasferimento_righe",
+        "bolle",
+        "bolla_righe",
+        "operazioni_distribuzione_magazzino",
+        "mensa_consumi",
+        "mensa_consumi_storni",
+        "mensa_pasti",
+      ]) {
+        snapshot[table] = (
+          await pool.query(
+            `SELECT to_jsonb(t)::text AS record FROM "${table}" t ORDER BY to_jsonb(t)::text`,
+          )
+        ).rows;
+      }
+      return snapshot;
+    }
+
+    it("F4-T1/T2/T3/T7: due riaperture persistono snapshot e attore senza effetti inventariali", async () => {
+      const { fixture, session, path, day } = await closedDay();
+      const [user] = await db
+        .select()
+        .from(utentiTable)
+        .where(eq(utentiTable.id, fixture.userId));
+      let firstEvent:
+        | Awaited<ReturnType<typeof reopenEvents>>[number]
+        | undefined;
+      for (let cycle = 1; cycle <= 2; cycle++) {
+        if (cycle === 2) {
+          const closed = await session
+            .post(`${path}/chiudi`)
+            .send({ note: "Seconda chiusura F4" });
+          expect(closed.status, closed.text).toBe(200);
+        }
+        const before = await inventorySnapshot();
+        const startedAt = Date.now();
+        const motivo = `Riapertura F4 ${cycle}`;
+        const response = await session.post(`${path}/riapri`).send({ motivo });
+        expect(response.status, response.text).toBe(200);
+        const [persisted] = await db
+          .select()
+          .from(mensaGiornateServizioTable)
+          .where(eq(mensaGiornateServizioTable.id, day.id));
+        expect(persisted).toMatchObject({
+          stato: "aperta",
+          riapertaDa: fixture.userId,
+          motivoRiapertura: motivo,
+        });
+        expect(persisted.snapshot).toEqual(day.snapshot);
+        const events = await reopenEvents(day.id);
+        expect(events).toHaveLength(cycle);
+        const event = events[cycle - 1];
+        expect(event).toMatchObject({
+          actorType: "user",
+          actorUserId: fixture.userId,
+          actorCodeSnapshot: user.username,
+          entitaTipo: "mensa_giornata",
+          entitaId: day.id,
+          areaOperativaIdSnapshot: fixture.romeId,
+          magazzinoIdSnapshot: fixture.warehouseIds[0],
+          dataOperativa: day.dataServizio,
+          motivo,
+          metadata: {
+            mensaId: fixture.mensaA,
+            snapshotPrecedente: day.snapshot,
+          },
+        });
+        expect(event.correlationId).toMatch(/^[0-9a-f-]{36}$/);
+        expect(event.registratoAt.getTime()).toBeGreaterThanOrEqual(startedAt);
+        expect(event.registratoAt.getTime()).toBeLessThanOrEqual(Date.now());
+        expect(await inventorySnapshot()).toEqual(before);
+        if (firstEvent) {
+          expect(events[0]).toEqual(firstEvent);
+          expect(event.id).not.toBe(firstEvent.id);
+          expect(event.correlationId).not.toBe(firstEvent.correlationId);
+        } else firstEvent = event;
+      }
+    });
+
+    it("F4-T4: fotografa l'associazione corrente alla riapertura e conserva lo storico", async () => {
+      const { fixture, session, path, day } = await closedDay();
+      const [replacement] = await db
+        .insert(magazziniTable)
+        .values({
+          codice: `F4-${rnd()}`,
+          nome: "Nuova sede F4",
+          areaOperativaId: fixture.romeId,
+          tipoMagazzino: "mensa",
+        })
+        .returning();
+      ids.warehouses.push(replacement.id);
+      // Cambio legittimo, stesso territorio e Magazzino non già associato.
+      await db
+        .update(menseTable)
+        .set({ magazzinoId: replacement.id })
+        .where(eq(menseTable.id, fixture.mensaA));
+      const before = await inventorySnapshot();
+      const response = await session
+        .post(`${path}/riapri`)
+        .send({ motivo: "Cambio sede verificato" });
+      expect(response.status, response.text).toBe(200);
+      const [event] = await reopenEvents(day.id);
+      expect(event.magazzinoIdSnapshot).toBe(replacement.id);
+      expect(event.areaOperativaIdSnapshot).toBe(fixture.romeId);
+      expect(event.metadata?.mensaId).toBe(fixture.mensaA);
+      await db
+        .update(menseTable)
+        .set({ magazzinoId: fixture.warehouseIds[0] })
+        .where(eq(menseTable.id, fixture.mensaA));
+      expect(await reopenEvents(day.id)).toEqual([event]);
+      expect(await inventorySnapshot()).toEqual(before);
+    });
+
+    it.each(["grant", "scope", "assegnazione"])(
+      "F4-T5: revoca %s nella sessione aperta nega riapertura e audit",
+      async (kind) => {
+        const { fixture, session, path, day } = await closedDay();
+        if (kind === "grant") {
+          const [user] = await db
+            .select()
+            .from(utentiTable)
+            .where(eq(utentiTable.id, fixture.userId));
+          await db
+            .update(ruoliTable)
+            .set({
+              permessi: MENSA_PERMISSIONS.map((p) => p.key).filter(
+                (p) => p !== "mensa.service.reopen",
+              ),
+            })
+            .where(eq(ruoliTable.id, user.ruoloId!));
+        } else if (kind === "scope") {
+          await db
+            .update(utentiTable)
+            .set({ areaOperativaId: fixture.milanId })
+            .where(eq(utentiTable.id, fixture.userId));
+        } else {
+          await db
+            .update(utentiMenseTable)
+            .set({
+              attiva: false,
+              revocataDa: fixture.userId,
+              revocataAt: new Date(),
+            })
+            .where(
+              and(
+                eq(utentiMenseTable.utenteId, fixture.userId),
+                eq(utentiMenseTable.mensaId, fixture.mensaA),
+              ),
+            );
+        }
+        const before = await inventorySnapshot();
+        const response = await session
+          .post(`${path}/riapri`)
+          .send({ motivo: "Tentativo non autorizzato" });
+        expect(response.status, response.text).toBe(403);
+        expect(await reopenEvents(day.id)).toEqual([]);
+        const [persisted] = await db
+          .select()
+          .from(mensaGiornateServizioTable)
+          .where(eq(mensaGiornateServizioTable.id, day.id));
+        expect(persisted.stato).toBe("chiusa");
+        expect(persisted.riapertaAt).toBeNull();
+        expect(await inventorySnapshot()).toEqual(before);
+      },
+    );
+
+    it("F4-T6: due invii concorrenti e retry su aperta producono un solo evento", async () => {
+      const { session, path, day } = await closedDay();
+      const before = await inventorySnapshot();
+      const command = { motivo: "Concorrenza F4" };
+      const responses = await Promise.all([
+        session.post(`${path}/riapri`).send(command),
+        session.post(`${path}/riapri`).send(command),
+      ]);
+      expect(responses.map((r) => r.status).sort()).toEqual([200, 409]);
+      expect(responses.find((r) => r.status === 409)?.body.error).toBe(
+        "Solo una giornata chiusa può essere riaperta",
+      );
+      const events = await reopenEvents(day.id);
+      expect(events).toHaveLength(1);
+      const retry = await session.post(`${path}/riapri`).send(command);
+      expect(retry.status, retry.text).toBe(409);
+      expect(retry.body.error).toBe(
+        "Solo una giornata chiusa può essere riaperta",
+      );
+      expect(await reopenEvents(day.id)).toEqual(events);
+      expect(await inventorySnapshot()).toEqual(before);
+    });
+
+    it("F4-T6: errore PostgreSQL nell'audit annulla atomicamente la riapertura", async () => {
+      // La fault injection è circoscritta al solo evento/giornata sintetico.
+      const target = new URL(process.env.DATABASE_URL!);
+      expect(target.hostname).toBe("127.0.0.1");
+      expect(target.port).toBe("58461");
+      expect(target.pathname).toMatch(/^\/(m61_|m5c2a_r2_)/);
+      const { fixture, session, path, day } = await closedDay();
+      const before = await inventorySnapshot();
+      const [beforeDay] = await db
+        .select()
+        .from(mensaGiornateServizioTable)
+        .where(eq(mensaGiornateServizioTable.id, day.id));
+      const beforeAudit = await db
+        .select()
+        .from(auditConfigurazioniTable)
+        .where(eq(auditConfigurazioniTable.chiave, `mensa-giornata:${day.id}`))
+        .orderBy(auditConfigurazioniTable.id);
+      const trigger = `m61_f4_audit_${day.id}`;
+      expect(Number.isSafeInteger(day.id)).toBe(true);
+      try {
+        await pool.query(`CREATE FUNCTION ${trigger}() RETURNS trigger LANGUAGE plpgsql AS $$
+          BEGIN
+            IF NEW.azione = 'MENSA_GIORNATA_RIAPERTA' AND NEW.entita_id = ${day.id}
+            THEN RAISE EXCEPTION 'F4_AUDIT_PERSISTENCE_FAILURE'; END IF;
+            RETURN NEW;
+          END $$`);
+        await pool.query(`CREATE TRIGGER ${trigger} BEFORE INSERT ON audit_eventi
+          FOR EACH ROW EXECUTE FUNCTION ${trigger}()`);
+        const response = await session
+          .post(`${path}/riapri`)
+          .send({ motivo: "Errore audit simulato" });
+        expect(response.status, response.text).toBe(500);
+        expect(await reopenEvents(day.id)).toEqual([]);
+        const [afterDay] = await db
+          .select()
+          .from(mensaGiornateServizioTable)
+          .where(eq(mensaGiornateServizioTable.id, day.id));
+        expect(afterDay).toEqual(beforeDay);
+        expect(
+          await db
+            .select()
+            .from(auditConfigurazioniTable)
+            .where(
+              eq(auditConfigurazioniTable.chiave, `mensa-giornata:${day.id}`),
+            )
+            .orderBy(auditConfigurazioniTable.id),
+        ).toEqual(beforeAudit);
+        expect(await inventorySnapshot()).toEqual(before);
+      } finally {
+        await pool.query(`DROP TRIGGER IF EXISTS ${trigger} ON audit_eventi`);
+        await pool.query(`DROP FUNCTION IF EXISTS ${trigger}()`);
+      }
+      const retry = await session
+        .post(`${path}/riapri`)
+        .send({ motivo: "Persistenza ripristinata" });
+      expect(retry.status, retry.text).toBe(200);
+      const events = await reopenEvents(day.id);
+      expect(events).toHaveLength(1);
+      expect(events[0].magazzinoIdSnapshot).toBe(fixture.warehouseIds[0]);
+      expect(await inventorySnapshot()).toEqual(before);
+    });
+
+    it("F4-T8: audit chiusura, consumo, scarto e storno conserva il contratto M4", async () => {
+      const { fixture, session, stock, consumed, path, day } =
+        await closedDay();
+      const reopened = await session
+        .post(`${path}/riapri`)
+        .send({ motivo: "Verifica audit correlati" });
+      expect(reopened.status, reopened.text).toBe(200);
+      const waste = {
+        ...stock.input,
+        causale: "scarto",
+        quantita: "0.2",
+        motivo: "Merce deteriorata F4",
+        idempotencyKey: `f4-waste-${rnd()}`,
+      };
+      const wasted = await session.post("/api/mensa/consumi").send(waste);
+      expect(wasted.status, wasted.text).toBe(201);
+      expect(
+        (await session.post("/api/mensa/consumi").send(waste)).status,
+      ).toBe(200);
+      const reversalPath = `/api/mensa/consumi/${consumed.body.id}/storno`;
+      const reversed = await session
+        .post(reversalPath)
+        .send({ motivo: "Errore pesatura F4" });
+      expect(reversed.status, reversed.text).toBe(200);
+      expect(
+        (
+          await session
+            .post(reversalPath)
+            .send({ motivo: "Errore pesatura F4" })
+        ).status,
+      ).toBe(200);
+      for (const [key, action, reason] of [
+        [
+          `mensa-consumo:${stock.input.idempotencyKey}`,
+          "SCARICO_MAGAZZINO_CREATO",
+          "Consumo Mensa",
+        ],
+        [
+          `mensa-consumo:${waste.idempotencyKey}`,
+          "SCARICO_MAGAZZINO_CREATO",
+          "Scarto Mensa: Merce deteriorata F4",
+        ],
+        [
+          `mensa-consumo-storno:${consumed.body.id}`,
+          "SCARICO_MAGAZZINO_STORNATO",
+          "Storno consumo Mensa: Errore pesatura F4",
+        ],
+      ]) {
+        const events = await db
+          .select()
+          .from(auditEventiTable)
+          .where(eq(auditEventiTable.operationKey, key));
+        expect(events).toHaveLength(1);
+        expect(events[0]).toMatchObject({
+          azione: action,
+          actorUserId: fixture.userId,
+          magazzinoIdSnapshot: fixture.warehouseIds[0],
+          dataOperativa: day.dataServizio,
+          motivo: reason,
+        });
+        expect(events[0].correlationId).toMatch(/^[0-9a-f-]{36}$/);
+      }
+      const closed = await db
+        .select()
+        .from(auditEventiTable)
+        .where(
+          and(
+            eq(auditEventiTable.entitaTipo, "mensa_giornata"),
+            eq(auditEventiTable.entitaId, day.id),
+            eq(auditEventiTable.azione, "MENSA_GIORNATA_CHIUSA"),
+          ),
+        );
+      expect(closed).toHaveLength(1);
+      expect(closed[0]).toMatchObject({
+        actorUserId: fixture.userId,
+        areaOperativaIdSnapshot: fixture.romeId,
+        magazzinoIdSnapshot: fixture.warehouseIds[0],
+        dataOperativa: day.dataServizio,
+        changes: { mensaId: fixture.mensaA, snapshot: day.snapshot },
+      });
+    });
+
+    it("F4: associazioni assenti, orfane o duplicate sono respinte dai vincoli senza fallback", async () => {
+      const { fixture, day } = await closedDay();
+      for (const [warehouseId, code] of [
+        [null, "23502"],
+        [2147483647, "23503"],
+        [fixture.warehouseIds[1], "23505"],
+      ] as const) {
+        await expect(
+          pool.query("UPDATE mense SET magazzino_id=$1 WHERE id=$2", [
+            warehouseId,
+            fixture.mensaA,
+          ]),
+        ).rejects.toMatchObject({ code });
+      }
+      const [canteen] = await db
+        .select()
+        .from(menseTable)
+        .where(eq(menseTable.id, fixture.mensaA));
+      expect(canteen.magazzinoId).toBe(fixture.warehouseIds[0]);
+      expect(await reopenEvents(day.id)).toEqual([]);
+    });
+  });
+
+  it("M61-D1: revoca concorrente prevale prima del lock autorizzativo corrente", async () => {
+    const fixture = await createFixture(),
+      session = await realMensaSession(fixture);
+    const access = await session.post("/api/mensa/accessi/verifica").send({
+      mensaId: fixture.mensaA,
+      codiceTessera: fixture.cardCode,
+      tipoServizio: "pranzo",
+      idempotencyKey: `revoke-race-${rnd()}`,
+    });
+    expect(access.status).toBe(201);
+    const blocker = await pool.connect();
+    let pending: Promise<request.Response> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      const pid = (await blocker.query("select pg_backend_pid() as pid"))
+        .rows[0].pid;
+      await blocker.query(
+        "select id from utenti_mense where utente_id=$1 for update",
+        [fixture.userId],
+      );
+      pending = session
+        .post("/api/mensa/pasti")
+        .send({
+          accessoMensaId: access.body.id,
+          tipoServizio: "pranzo",
+          idempotencyKey: `revoke-race-meal-${rnd()}`,
+        })
+        .then((response) => response);
+      let observed = false;
+      for (let attempt = 0; attempt < 300; attempt++) {
+        const blocked = await pool.query(
+          "select exists(select 1 from pg_stat_activity where $1=any(pg_blocking_pids(pid))) as waiting",
+          [pid],
+        );
+        if (blocked.rows[0].waiting) {
+          observed = true;
+          break;
+        }
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      expect(observed).toBe(true);
+      await blocker.query(
+        "update utenti_mense set attiva=false,revocata_da=$1,revocata_at=now() where utente_id=$1",
+        [fixture.userId],
+      );
+      await blocker.query("COMMIT");
+      expect((await pending).status).toBe(403);
+      expect(
+        await db
+          .select()
+          .from(mensaPastiTable)
+          .where(eq(mensaPastiTable.accessoMensaId, access.body.id)),
+      ).toEqual([]);
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      await pending;
+    }
+  });
+
+  it.each(["pasto", "consumo", "storno"])(
+    "M61-13: chiusura concorrente con %s produce snapshot e stock coerenti",
+    async (kind) => {
+      const fixture = await createFixture(),
+        session = await realMensaSession(fixture);
+      const { input, lot } = await m61Stock(fixture, "1");
+      const day = await session.post("/api/mensa/giornate").send({
+        mensaId: fixture.mensaA,
+        dataServizio: dataServizioMensa(),
+        tipoServizio: "pranzo",
+      });
+      expect(day.status).toBe(200);
+      let mutate: PromiseLike<request.Response>;
+      if (kind === "pasto") {
+        const access = await session.post("/api/mensa/accessi/verifica").send({
+          mensaId: fixture.mensaA,
+          codiceTessera: fixture.cardCode,
+          tipoServizio: "pranzo",
+          idempotencyKey: `day-access-${rnd()}`,
+        });
+        mutate = session.post("/api/mensa/pasti").send({
+          accessoMensaId: access.body.id,
+          tipoServizio: "pranzo",
+          idempotencyKey: `day-meal-${rnd()}`,
+        });
+      } else if (kind === "consumo")
+        mutate = session
+          .post("/api/mensa/consumi")
+          .send({ ...input, quantita: "1" });
+      else {
+        const consumed = await session
+          .post("/api/mensa/consumi")
+          .send({ ...input, quantita: "1" });
+        expect(consumed.status).toBe(201);
+        mutate = session
+          .post(`/api/mensa/consumi/${consumed.body.id}/storno`)
+          .send({ motivo: "Correzione peso" });
+      }
+      const [closed, mutation] = await Promise.all([
+        session.post(`/api/mensa/giornate/${day.body.id}/chiudi`).send({}),
+        mutate,
+      ]);
+      expect(closed.status, closed.text).toBe(200);
+      expect(kind === "storno" ? [200, 409] : [201, 409]).toContain(
+        mutation.status,
+      );
+      const [stock] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.id, lot.id));
+      if (kind === "pasto") {
+        expect(closed.body.snapshot.pasti).toBe(
+          mutation.status === 201 ? 1 : 0,
+        );
+        expect(Number(stock.quantitaResidua)).toBe(1);
+      } else {
+        const expected =
+          kind === "storno"
+            ? mutation.status === 200
+              ? 1
+              : 0
+            : mutation.status === 201
+              ? 0
+              : 1;
+        expect(Number(stock.quantitaResidua)).toBe(expected);
+        expect(
+          closed.body.snapshot.consumiPerProdotto.reduce(
+            (sum: number, row: { quantita: number }) => sum + row.quantita,
+            0,
+          ),
+        ).toBe(1 - expected);
+      }
+    },
+  );
+
+  it.each(["attiva", "revocata", "temporanea"])(
+    "M61-11: nessuna PII di altra Mensa nella stessa Area, affiliation %s",
+    async (kind) => {
+      const fixture = await createFixture();
+      await db
+        .update(utentiMenseTable)
+        .set({
+          attiva: false,
+          revocataDa: fixture.userId,
+          revocataAt: new Date(),
+        })
+        .where(
+          and(
+            eq(utentiMenseTable.utenteId, fixture.userId),
+            eq(utentiMenseTable.mensaId, fixture.mensaA),
+          ),
+        );
+      // Operatore assegnato soltanto a B; Mario appartiene ad A.
+      if (kind === "revocata")
+        await db
+          .update(mensaAbilitazioniTable)
+          .set({ stato: "revocata" })
+          .where(eq(mensaAbilitazioniTable.id, fixture.eligibilityId));
+      if (kind === "temporanea") {
+        await db
+          .delete(mensaAbilitazioniTable)
+          .where(eq(mensaAbilitazioniTable.id, fixture.eligibilityId));
+        await db.insert(mensaAutorizzazioniTemporaneeTable).values({
+          beneficiarioId: fixture.beneficiaryId,
+          mensaId: fixture.mensaA,
+          dataServizio: dataServizioMensa(),
+          tipoServizio: "pranzo",
+          motivo: "Accesso sintetico",
+          operatoreId: fixture.userId,
+        });
+      }
+      const session = await realMensaSession(fixture);
+      const search = await session.get(
+        "/api/mensa/beneficiari/ricerca?search=Mario",
+      );
+      expect(search.status).toBe(200);
+      expect(search.body).toEqual([]);
+      expect(
+        (
+          await session.get(
+            `/api/mensa/tessere?beneficiarioId=${fixture.beneficiaryId}`,
+          )
+        ).status,
+      ).toBe(403);
+      const scan = await session.post("/api/mensa/accessi/verifica").send({
+        mensaId: fixture.mensaB,
+        codiceTessera: fixture.cardCode,
+        tipoServizio: "pranzo",
+        idempotencyKey: `private-${rnd()}`,
+      });
+      expect(scan.body.beneficiarioNome).toBeNull();
+      expect(scan.body.allergie).toBeNull();
+      expect(scan.body.beneficiarioId).toBeNull();
+      expect(
+        (
+          await session.post("/api/mensa/abilitazioni").send({
+            beneficiarioId: fixture.beneficiaryId,
+            mensaId: fixture.mensaB,
+            dataInizio: dataServizioMensa(),
+          })
+        ).status,
+      ).toBe(403);
+    },
+  );
+
+  it.each(["ricezione", "mancata ricezione"])(
+    "M61-01/04: ciclo M4 reale Mensa, %s idempotente e lineage",
+    async (outcome) => {
+      const fixture = await createFixture();
+      const operator = await realMensaSession(fixture),
+        warehouse = await realAdminSession(fixture);
+      const { product, lot } = await m61Stock(fixture, "1");
+      await db
+        .update(lottiTable)
+        .set({
+          magazzinoId: fixture.warehouseIds[1],
+          lottoLogicoId: ids.logicalLots[0],
+        })
+        .where(eq(lottiTable.id, lot.id));
+      const requested = await operator.post("/api/mensa/trasferimenti").send({
+        mensaId: fixture.mensaA,
+        magazzinoOrigineId: fixture.warehouseIds[1],
+        dataRichiesta: dataServizioMensa(),
+        trasportatoreNome: "Trasporto sintetico",
+        idempotencyKey: `request-${rnd()}`,
+        righe: [{ prodottoId: product.id, quantita: "1" }],
+      });
+      expect(requested.status, requested.text).toBe(201);
+      ids.transfers.push(requested.body.id);
+      const path = `/api/trasferimenti/${requested.body.id}`;
+      const prepared = await warehouse
+        .post(`${path}/prepara`)
+        .send({ versione: 1, idempotencyKey: `prepare-${rnd()}` });
+      expect(prepared.status, prepared.text).toBe(200);
+      expect(
+        (
+          await operator.post(`${path}/avvia`).send({
+            versione: prepared.body.versione,
+            idempotencyKey: `denied-ship-${rnd()}`,
+          })
+        ).status,
+      ).toBe(403);
+      const shipped = await warehouse.post(`${path}/avvia`).send({
+        versione: prepared.body.versione,
+        idempotencyKey: `ship-${rnd()}`,
+      });
+      expect(shipped.status, shipped.text).toBe(200);
+      expect(
+        Number(
+          (
+            await db.select().from(lottiTable).where(eq(lottiTable.id, lot.id))
+          )[0].quantitaResidua,
+        ),
+      ).toBe(0);
+      const command = {
+        versione: shipped.body.versione,
+        idempotencyKey: `outcome-${rnd()}`,
+        ...(outcome === "mancata ricezione"
+          ? { motivo: "Merce non arrivata" }
+          : {}),
+      };
+      const endpoint = outcome === "ricezione" ? "conferma" : "mancato-arrivo";
+      const resolved = await operator.post(`${path}/${endpoint}`).send(command);
+      expect(resolved.status, resolved.text).toBe(200);
+      expect(
+        (await operator.post(`${path}/${endpoint}`).send(command)).status,
+      ).toBe(200);
+      const movements = await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.trasferimentoId, requested.body.id));
+      expect(
+        movements.filter((item) => item.tipoDettaglio === "uscita"),
+      ).toHaveLength(1);
+      if (outcome === "ricezione") {
+        expect(resolved.body.stato).toBe("completato");
+        expect(
+          movements.filter((item) => item.tipoDettaglio === "entrata"),
+        ).toHaveLength(1);
+        const [received] = await db
+          .select()
+          .from(lottiTable)
+          .where(
+            and(
+              eq(lottiTable.prodottoId, product.id),
+              eq(lottiTable.magazzinoId, fixture.warehouseIds[0]),
+            ),
+          );
+        ids.lots.push(received.id);
+        expect(Number(received.quantitaResidua)).toBe(1);
+        expect(received.lottoLogicoId).toBe(ids.logicalLots[0]);
+        expect(movements.map((item) => item.naturaContabile).sort()).toEqual([
+          "TRASFERIMENTO_INTERNO_ENTRATA",
+          "TRASFERIMENTO_INTERNO_USCITA",
+        ]);
+      } else {
+        expect(resolved.body.stato).toBe("rientro_atteso");
+        expect(movements).toHaveLength(1); // La segnalazione non reintegra.
+        expect(
+          (
+            await operator.post(`${path}/rientro`).send({
+              versione: resolved.body.versione,
+              idempotencyKey: `denied-return-${rnd()}`,
+              righe: [],
+            })
+          ).status,
+        ).toBe(403);
+        const body = {
+          versione: resolved.body.versione,
+          idempotencyKey: `return-${rnd()}`,
+          righe: [{ movimentoUscitaId: movements[0].id, idonea: "1" }],
+        };
+        const returned = await warehouse.post(`${path}/rientro`).send(body);
+        expect(returned.status, returned.text).toBe(200);
+        expect(
+          (await warehouse.post(`${path}/rientro`).send(body)).status,
+        ).toBe(200);
+        expect(
+          Number(
+            (
+              await db
+                .select()
+                .from(lottiTable)
+                .where(eq(lottiTable.id, lot.id))
+            )[0].quantitaResidua,
+          ),
+        ).toBe(1);
+        const ledger = await db
+          .select()
+          .from(movimentiTable)
+          .where(eq(movimentiTable.trasferimentoId, requested.body.id));
+        expect(ledger).toHaveLength(2);
+        expect(
+          ledger.some((item) => item.movimentoOrigineId === movements[0].id),
+        ).toBe(true);
+      }
+    },
+  );
+
+  it.each(["consumo", "Bolla", "Trasferimento"])(
+    "M61-03: ultima quantità contesa tra consumo e %s, un solo effetto reale",
+    async (competitor) => {
+      const fixture = await createFixture(),
+        operator = await realMensaSession(fixture),
+        admin = await realAdminSession(fixture);
+      const { product, lot, input } = await m61Stock(fixture, "1");
+      let competing: PromiseLike<request.Response>;
+      if (competitor === "consumo")
+        competing = operator.post("/api/mensa/consumi").send({
+          ...input,
+          quantita: "1",
+          tipoServizio: "cena",
+          idempotencyKey: `competing-${rnd()}`,
+        });
+      else if (competitor === "Bolla") {
+        const [bolla] = await db
+          .insert(bolleTable)
+          .values({
+            numeroBolla: `M61-B-${rnd()}`,
+            dataBolla: dataServizioMensa(),
+            magazzinoId: fixture.warehouseIds[0],
+            beneficiarioId: fixture.beneficiaryId,
+            operatoreId: fixture.userId,
+          })
+          .returning();
+        ids.bolle.push(bolla.id);
+        await db.insert(bollaRigheTable).values({
+          bollaId: bolla.id,
+          prodottoId: product.id,
+          quantita: "1",
+          unitaMisura: "kg",
+          lottoId: lot.id,
+        });
+        competing = admin
+          .post(`/api/bolle/${bolla.id}/conferma`)
+          .send({ versione: 1, idempotencyKey: `competing-${rnd()}` });
+      } else {
+        const transfer = await operator.post("/api/mensa/trasferimenti").send({
+          mensaId: fixture.mensaB,
+          magazzinoOrigineId: fixture.warehouseIds[0],
+          dataRichiesta: dataServizioMensa(),
+          idempotencyKey: `request-${rnd()}`,
+          righe: [{ prodottoId: product.id, quantita: "1" }],
+        });
+        expect(transfer.status, transfer.text).toBe(201);
+        ids.transfers.push(transfer.body.id);
+        competing = admin
+          .post(`/api/trasferimenti/${transfer.body.id}/prepara`)
+          .send({ versione: 1, idempotencyKey: `competing-${rnd()}` });
+      }
+      const [consume, other] = await Promise.all([
+        operator
+          .post("/api/mensa/consumi")
+          .send({ ...input, quantita: "1", lottoId: lot.id }),
+        competing,
+      ]);
+      expect(
+        [consume.status, other.status].filter(
+          (status) => status >= 200 && status < 300,
+        ),
+      ).toHaveLength(1);
+      expect([consume.status, other.status]).toContain(409);
+      const consumed = await db
+        .select()
+        .from(mensaConsumiTable)
+        .where(eq(mensaConsumiTable.prodottoId, product.id));
+      ids.consumptions.push(...consumed.map((item) => item.id));
+      ids.issues.push(...consumed.map((item) => item.scaricoId));
+      const [stock] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.id, lot.id));
+      const reservations = await db
+        .select()
+        .from(prenotazioniMagazzinoTable)
+        .where(
+          and(
+            eq(prenotazioniMagazzinoTable.lottoId, lot.id),
+            eq(prenotazioniMagazzinoTable.stato, "attiva"),
+          ),
+        );
+      const committed = reservations.reduce(
+        (sum, row) => sum.add(InventoryDecimal.parse(row.quantita)),
+        InventoryDecimal.zero(),
+      );
+      expect(
+        InventoryDecimal.parse(stock.quantitaResidua)
+          .subtract(committed)
+          .toCanonical(),
+      ).toBe("0");
+    },
+  );
+
+  it("M61-10: Mensa inattiva non autorizza una nuova persona temporanea", async () => {
+    const fixture = await createFixture();
+    await db
+      .update(menseTable)
+      .set({ attiva: false })
+      .where(eq(menseTable.id, fixture.mensaA));
+    const response = await request(makeApp(fixture))
+      .post("/mensa/accessi/temporaneo")
+      .send({
+        mensaId: fixture.mensaA,
+        tipoServizio: "pranzo",
+        idempotencyKey: `inactive-${rnd()}`,
+        nuovaPersona: {
+          nome: "Persona",
+          cognome: `Inattiva-${rnd()}`,
+          sesso: "ALTRO",
+          fasciaEtaPresunta: "30_64",
+        },
+      });
+    // La negazione precede la creazione della persona e dell'accesso.
+    if (response.body.beneficiarioId)
+      ids.beneficiaries.push(response.body.beneficiarioId);
+    expect(response.status, response.text).toBe(409);
+    expect(response.body.error).toMatch(/Mensa.*non.*attiv/i);
+  });
+
+  it.each(["beneficiario", "tessera"])(
+    "M61-D2: revoca %s tra scan negato ed eccezione non autorizza il pasto",
+    async (kind) => {
+      const fixture = await createFixture(),
+        app = makeApp(fixture);
+      const access = await verify(app, fixture, { mensaId: fixture.mensaB });
+      expect(access.body.motivoEsito).toBe("MENSA_NON_AUTORIZZATA");
+      if (kind === "beneficiario")
+        await db
+          .update(beneficiariTable)
+          .set({ attivo: false })
+          .where(eq(beneficiariTable.id, fixture.beneficiaryId));
+      else
+        await db
+          .update(tessereBeneficiariTable)
+          .set({ stato: "revocata" })
+          .where(eq(tessereBeneficiariTable.id, fixture.cardId));
+      const denied = await request(app)
+        .post(`/mensa/accessi/${access.body.id}/eccezione`)
+        .send({ motivo: "Altro servizio" });
+      expect(denied.status, denied.text).toBe(409);
+      expect(
+        await db
+          .select()
+          .from(mensaEccezioniTable)
+          .where(eq(mensaEccezioniTable.accessoMensaId, access.body.id)),
+      ).toEqual([]);
+    },
+  );
+
+  it.each(["Area", "Centro", "grant"])(
+    "M61-08: revoca %s efficace nella stessa sessione reale",
+    async (kind) => {
+      const fixture = await createFixture();
+      if (kind === "Centro") {
+        const [center] = await db
+          .insert(centriAscoltoTable)
+          .values({
+            nome: `Revoca Centro ${rnd()}`,
+            areaOperativaId: fixture.romeId,
+          })
+          .returning();
+        ids.centers.push(center.id);
+        await db
+          .update(utentiTable)
+          .set({ centroAscoltoId: center.id })
+          .where(eq(utentiTable.id, fixture.userId));
+        await db
+          .update(beneficiariTable)
+          .set({ centroAscoltoId: center.id })
+          .where(eq(beneficiariTable.id, fixture.beneficiaryId));
+        await db
+          .update(magazziniTable)
+          .set({ centroAscoltoId: center.id })
+          .where(eq(magazziniTable.id, fixture.warehouseIds[0]));
+      }
+      const session = await realMensaSession(fixture);
+      const access = await session.post("/api/mensa/accessi/verifica").send({
+        mensaId: fixture.mensaA,
+        codiceTessera: fixture.cardCode,
+        tipoServizio: "pranzo",
+        idempotencyKey: `revoke-${rnd()}`,
+      });
+      expect(access.status).toBe(201);
+      if (kind === "Area")
+        await db
+          .update(utentiTable)
+          .set({ areaOperativaId: null })
+          .where(eq(utentiTable.id, fixture.userId));
+      if (kind === "Centro")
+        await db
+          .update(utentiTable)
+          .set({ centroAscoltoId: null })
+          .where(eq(utentiTable.id, fixture.userId));
+      if (kind === "grant") {
+        const [user] = await db
+          .select()
+          .from(utentiTable)
+          .where(eq(utentiTable.id, fixture.userId));
+        await db
+          .update(ruoliTable)
+          .set({ permessi: ["mensa.view"] })
+          .where(eq(ruoliTable.id, user.ruoloId!));
+      }
+      expect(
+        (
+          await session.post("/api/mensa/pasti").send({
+            accessoMensaId: access.body.id,
+            tipoServizio: "pranzo",
+            idempotencyKey: `revoke-meal-${rnd()}`,
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        await db
+          .select()
+          .from(mensaPastiTable)
+          .where(eq(mensaPastiTable.accessoMensaId, access.body.id)),
+      ).toEqual([]);
+    },
+  );
+
+  it("M61-D1: Admin assegna e revoca esplicitamente con audit; Centro non concede altra Mensa", async () => {
+    const fixture = await createFixture();
+    const [role] = await db
+      .insert(ruoliTable)
+      .values({
+        nome: `M61-admin-${rnd()}`,
+        isAdmin: true,
+        aree: ["mensa", "amministrazione"],
+        permessi: [],
+      })
+      .returning();
+    ids.roles.push(role.id);
+    const [admin] = await db
+      .insert(utentiTable)
+      .values({
+        username: `m61_admin_${rnd()}`,
+        passwordHash: "x",
+        nome: "Admin sintetico",
+        ruoloId: role.id,
+      })
+      .returning();
+    ids.users.push(admin.id);
+    const session = await realMensaSession({ ...fixture, userId: admin.id });
+    const [center] = await db
+      .insert(centriAscoltoTable)
+      .values({ nome: `D1 Centro ${rnd()}`, areaOperativaId: fixture.romeId })
+      .returning();
+    ids.centers.push(center.id);
+    await db
+      .update(utentiTable)
+      .set({ centroAscoltoId: center.id })
+      .where(eq(utentiTable.id, fixture.userId));
+    await db
+      .update(magazziniTable)
+      .set({ centroAscoltoId: center.id })
+      .where(inArray(magazziniTable.id, fixture.warehouseIds.slice(0, 2)));
+    const url = `/api/utenti/${fixture.userId}/mense/${fixture.mensaB}`;
+    const revoke = await session
+      .put(url)
+      .send({ attiva: false, motivo: "Cambio incarico" });
+    expect(revoke.status, revoke.text).toBe(200);
+    expect(revoke.body).toMatchObject({ attiva: false, revocataDa: admin.id });
+    expect(
+      (
+        await session
+          .put(url)
+          .send({ attiva: false, motivo: "Cambio incarico" })
+      ).body.id,
+    ).toBe(revoke.body.id);
+    const operator = await realMensaSession(fixture);
+    expect(
+      (await operator.get("/api/mensa/mense")).body.map(
+        (item: { id: number }) => item.id,
+      ),
+    ).toEqual([fixture.mensaA]);
+    expect(
+      (await operator.get(`/api/mensa/mense/${fixture.mensaMilan}`)).status,
+    ).toBe(403);
+    expect(
+      (
+        await session
+          .put(url)
+          .send({ attiva: true, motivo: "Nuovo incarico esplicito" })
+      ).status,
+    ).toBe(200);
+    expect((await operator.get("/api/mensa/mense")).body).toHaveLength(2);
+    const audit = await db
+      .select()
+      .from(auditEventiTable)
+      .where(
+        and(
+          eq(auditEventiTable.entitaTipo, "utente_mensa"),
+          eq(auditEventiTable.entitaId, revoke.body.id),
+        ),
+      )
+      .orderBy(auditEventiTable.id);
+    expect(audit.map((item) => item.azione)).toEqual([
+      "MENSA_OPERATORE_REVOCATO",
+      "MENSA_OPERATORE_ASSEGNATO",
+    ]);
+    expect(audit.every((item) => item.actorUserId === admin.id)).toBe(true);
+  });
+
+  it("M61-06: risposta persa post-commit e retry concorrenti hanno un solo scarico/ledger/audit", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const { input, product, lot } = await m61Stock(fixture);
+    // Il client non usa la prima risposta e ripete la stessa intenzione.
+    await request(app).post("/mensa/consumi").send(input);
+    const receipts = await Promise.all([
+      request(app).post("/mensa/consumi").send(input),
+      request(app).post("/mensa/consumi").send(input),
+    ]);
+    expect(receipts.map((row) => row.status)).toEqual([200, 200]);
+    expect(receipts[0].body.id).toBe(receipts[1].body.id);
+    const rows = await db
+      .select()
+      .from(mensaConsumiTable)
+      .where(eq(mensaConsumiTable.idempotencyKey, input.idempotencyKey));
+    expect(rows).toHaveLength(1);
+    ids.consumptions.push(rows[0].id);
+    ids.issues.push(rows[0].scaricoId);
+    const [stock] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.id, lot.id));
+    expect(InventoryDecimal.parse(stock.quantitaResidua).toCanonical()).toBe(
+      "9.7",
+    );
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.prodottoId, product.id)),
+    ).toHaveLength(1);
+    expect(
+      await db
+        .select()
+        .from(auditEventiTable)
+        .where(
+          eq(
+            auditEventiTable.operationKey,
+            `mensa-consumo:${input.idempotencyKey}`,
+          ),
+        ),
+    ).toHaveLength(1);
+    expect(
+      (
+        await request(app)
+          .post("/mensa/consumi")
+          .send({ ...input, quantita: "0.4" })
+      ).status,
+    ).toBe(409);
+    const reverse = await Promise.all([
+      request(app)
+        .post(`/mensa/consumi/${rows[0].id}/storno`)
+        .send({ motivo: "Errore pesatura" }),
+      request(app)
+        .post(`/mensa/consumi/${rows[0].id}/storno`)
+        .send({ motivo: "Errore pesatura" }),
+    ]);
+    expect(reverse.map((row) => row.status)).toEqual([200, 200]);
+    expect(
+      await db
+        .select()
+        .from(mensaConsumiStorniTable)
+        .where(eq(mensaConsumiStorniTable.consumoId, rows[0].id)),
+    ).toHaveLength(1);
+  });
+
+  it("M61-07: motivo scarto/lotto/data corrente obbligatori; scarto fisico esatto e rollback", async () => {
+    const fixture = await createFixture(),
+      app = makeApp(fixture);
+    const { input, lot } = await m61Stock(fixture, "10", true);
+    expect((await request(app).post("/mensa/consumi").send(input)).status).toBe(
+      400,
+    );
+    expect(
+      (
+        await request(app)
+          .post("/mensa/consumi")
+          .send({
+            ...input,
+            lottoId: lot.id,
+            dataServizio: shiftDate(dataServizioMensa(), -1),
+          })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post("/mensa/consumi")
+          .send({ ...input, lottoId: lot.id, causale: "scarto" })
+      ).status,
+    ).toBe(400);
+    const waste = await request(app)
+      .post("/mensa/consumi")
+      .send({
+        ...input,
+        lottoId: lot.id,
+        causale: "scarto",
+        motivo: "Deteriorata, eliminazione fisica",
+      });
+    expect(waste.status, waste.text).toBe(201);
+    ids.consumptions.push(waste.body.id);
+    ids.issues.push(waste.body.scaricoId);
+    const movement = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.lottoId, lot.id));
+    expect(movement).toHaveLength(1);
+    expect(movement[0]).toMatchObject({
+      naturaContabile: "SCARTO",
+      lottoId: lot.id,
+      auditEventoId: expect.any(Number),
+    });
+  });
+
+  it("M61-15: oltre 200 lotti, total e ricerca server-side non nascondono partite", async () => {
+    const fixture = await createFixture(),
+      app = makeApp(fixture);
+    const { product, lot } = await m61Stock(fixture);
+    const rows = await db
+      .insert(lottiTable)
+      .values(
+        Array.from({ length: 205 }, (_, index) => ({
+          prodottoId: product.id,
+          magazzinoId: fixture.warehouseIds[1],
+          codiceLotto: `M61-page-${index}`,
+          dataCarico: dataServizioMensa(),
+          dataScadenza: "2030-01-01",
+          quantitaCaricata: "1",
+          quantitaResidua: "1",
+        })),
+      )
+      .returning();
+    ids.lots.push(...rows.map((row) => row.id));
+    const query = `mensaId=${fixture.mensaA}&magazzinoId=${fixture.warehouseIds[1]}&prodottoId=${product.id}&page=5&pageSize=50`;
+    const page = await request(app).get(`/mensa/logistica/lotti?${query}`);
+    expect(page.status, page.text).toBe(200);
+    expect(page.body.total).toBe(205);
+    expect(page.body.items).toHaveLength(5);
+    const search = await request(app).get(
+      `/mensa/logistica/lotti?${query}&search=M61-page-204`,
+    );
+    expect(search.body.total).toBe(1);
+    expect(
+      Number(
+        (await db.select().from(lottiTable).where(eq(lottiTable.id, lot.id)))[0]
+          .quantitaResidua,
+      ),
+    ).toBe(10);
+  });
+  it("M61-D1: assegnazione esplicita, multi-Mensa e revoca nella stessa sessione reale", async () => {
+    const fixture = await createFixture();
+    const session = await realMensaSession(fixture);
+    await db
+      .update(utentiMenseTable)
+      .set({
+        attiva: false,
+        revocataDa: fixture.userId,
+        revocataAt: new Date(),
+      })
+      .where(
+        and(
+          eq(utentiMenseTable.utenteId, fixture.userId),
+          eq(utentiMenseTable.mensaId, fixture.mensaB),
+        ),
+      );
+    expect(
+      (await session.get("/api/mensa/mense")).body.map(
+        (item: { id: number }) => item.id,
+      ),
+    ).toEqual([fixture.mensaA]);
+    expect(
+      (await session.get(`/api/mensa/mense/${fixture.mensaB}`)).status,
+    ).toBe(403);
+    const access = await session.post("/api/mensa/accessi/verifica").send({
+      mensaId: fixture.mensaA,
+      codiceTessera: fixture.cardCode,
+      tipoServizio: "pranzo",
+      idempotencyKey: `m61-${rnd()}`,
+    });
+    expect(access.status, access.text).toBe(201);
+    await db
+      .update(utentiMenseTable)
+      .set({
+        attiva: false,
+        revocataDa: fixture.userId,
+        revocataAt: new Date(),
+      })
+      .where(eq(utentiMenseTable.utenteId, fixture.userId));
+    expect(
+      (
+        await session.post("/api/mensa/pasti").send({
+          accessoMensaId: access.body.id,
+          tipoServizio: "pranzo",
+          idempotencyKey: `m61-meal-${rnd()}`,
+        })
+      ).status,
+    ).toBe(403);
+    expect((await session.get("/api/mensa/accessi")).status).toBe(403);
+    expect((await session.get("/api/mensa/mense")).body).toEqual([]);
+  });
+
+  it.each(["beneficiario", "tessera", "abilitazione"])(
+    "M61-D2: revoca %s dopo scansione prevale sul pasto",
+    async (kind) => {
+      const fixture = await createFixture();
+      const session = await realMensaSession(fixture);
+      const access = await session.post("/api/mensa/accessi/verifica").send({
+        mensaId: fixture.mensaA,
+        codiceTessera: fixture.cardCode,
+        tipoServizio: "pranzo",
+        idempotencyKey: `m61-${rnd()}`,
+      });
+      expect(access.status).toBe(201);
+      if (kind === "beneficiario")
+        await db
+          .update(beneficiariTable)
+          .set({ attivo: false })
+          .where(eq(beneficiariTable.id, fixture.beneficiaryId));
+      if (kind === "tessera")
+        await db
+          .update(tessereBeneficiariTable)
+          .set({ stato: "revocata" })
+          .where(eq(tessereBeneficiariTable.id, fixture.cardId));
+      if (kind === "abilitazione")
+        await db
+          .update(mensaAbilitazioniTable)
+          .set({ stato: "revocata" })
+          .where(eq(mensaAbilitazioniTable.id, fixture.eligibilityId));
+      const denied = await session.post("/api/mensa/pasti").send({
+        accessoMensaId: access.body.id,
+        tipoServizio: "pranzo",
+        idempotencyKey: `m61-meal-${rnd()}`,
+      });
+      expect(denied.status, denied.text).toBe(409);
+      expect(
+        await db
+          .select()
+          .from(mensaPastiTable)
+          .where(eq(mensaPastiTable.accessoMensaId, access.body.id)),
+      ).toEqual([]);
+    },
+  );
+
+  it("M61-D4: chiusura a zero pasti, replay, cena indipendente e snapshot riapertura", async () => {
+    const fixture = await createFixture();
+    const app = makeApp(fixture);
+    const day = await request(app).post("/mensa/giornate").send({
+      mensaId: fixture.mensaA,
+      dataServizio: dataServizioMensa(),
+      tipoServizio: "pranzo",
+    });
+    expect(day.status, day.text).toBe(200);
+    const closed = await request(app)
+      .post(`/mensa/giornate/${day.body.id}/chiudi`)
+      .send({});
+    expect(closed.status, closed.text).toBe(200);
+    expect(closed.body.snapshot.pasti).toBe(0);
+    expect(
+      (
+        await request(app)
+          .post(`/mensa/giornate/${day.body.id}/chiudi`)
+          .send({})
+      ).body,
+    ).toEqual(closed.body);
+    const replay = await request(app).post("/mensa/giornate").send({
+      mensaId: fixture.mensaA,
+      dataServizio: dataServizioMensa(),
+      tipoServizio: "pranzo",
+    });
+    expect(replay.body.id).toBe(day.body.id);
+    expect(replay.body.stato).toBe("chiusa");
+    const reopened = await request(app)
+      .post(`/mensa/giornate/${day.body.id}/riapri`)
+      .send({ motivo: "Verifica servizio" });
+    expect(reopened.body.snapshot).toEqual(closed.body.snapshot);
+    const dinner = await request(app).post("/mensa/giornate").send({
+      mensaId: fixture.mensaA,
+      dataServizio: dataServizioMensa(),
+      tipoServizio: "cena",
+    });
+    expect(dinner.body.stato).toBe("aperta");
+    expect(
+      await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.magazzinoId, fixture.warehouseIds[0])),
+    ).toEqual([]);
+  });
   it("non somma quantità appartenenti a unità di misura eterogenee", () => {
     const result = aggregatiConsumiMensa([
       {
@@ -1547,7 +3072,7 @@ describe("Modulo Mensa", () => {
     expect(after).toHaveLength(before.length);
   });
 
-  it("richiede l'Area agli utenti globali e impedisce override territoriali", async () => {
+  it("M6.1 nega globalità implicita da Area nulla e impedisce override territoriali", async () => {
     const fixture = await createFixture();
     const globalApp = makeApp(fixture, undefined, { areaOperativaId: null });
     expect(
@@ -1556,16 +3081,17 @@ describe("Modulo Mensa", () => {
           .post("/mensa/mense")
           .send({ nome: "Senza area" })
       ).status,
-    ).toBe(400);
+    ).toBe(403);
 
     const created = await request(globalApp).post("/mensa/mense").send({
       nome: "Mensa Milano globale",
       areaOperativaId: fixture.milanId,
     });
-    expect(created.status).toBe(201);
-    ids.canteens.push(created.body.id);
-    ids.warehouses.push(created.body.magazzinoId);
-    expect(created.body.areaOperativaId).toBe(fixture.milanId);
+    expect(created.status).toBe(403);
+    await db
+      .update(utentiTable)
+      .set({ areaOperativaId: fixture.romeId })
+      .where(eq(utentiTable.id, fixture.userId));
 
     const override = await request(makeApp(fixture))
       .post("/mensa/mense")
@@ -2672,8 +4198,10 @@ describe("Modulo Mensa", () => {
         motivo: "Tentativo fuori scope",
         idempotencyKey: `cross-areaOperativa-${rnd()}`,
       });
-    expect(crossAreaOperativa.status).toBe(404);
-    expect(crossAreaOperativa.body.error).toBe("Beneficiario non disponibile");
+    expect(crossAreaOperativa.status).toBe(403);
+    expect(crossAreaOperativa.body.error).toBe(
+      "Beneficiario non accessibile nello scope Mensa",
+    );
   });
 
   it("emette dal Sociale solo tessere opache e soltanto dopo il completamento dell'anagrafica", async () => {
@@ -3251,7 +4779,7 @@ describe("Modulo Mensa", () => {
         idempotencyKey: `future-${rnd()}`,
       });
     expect(response.status).toBe(400);
-    expect(response.body.error).toMatch(/non può essere futura/i);
+    expect(response.body.error).toMatch(/data corrente Europe\/Rome/i);
     const [unchangedLot] = await db
       .select({ quantita: lottiTable.quantitaResidua })
       .from(lottiTable)
@@ -3517,6 +5045,7 @@ describe("Modulo Mensa", () => {
         prodottoId: product.id,
         quantita: 0.5,
         causale: "scarto",
+        motivo: "Merce fisicamente eliminata per deterioramento",
         idempotencyKey: `closed-${rnd()}`,
       });
     expect(afterClose.status).toBe(409);
@@ -3536,6 +5065,7 @@ describe("Modulo Mensa", () => {
         prodottoId: product.id,
         quantita: 0.5,
         causale: "scarto",
+        motivo: "Merce fisicamente eliminata per deterioramento",
         idempotencyKey: `waste-${rnd()}`,
       });
     expect(waste.status).toBe(201);
@@ -3690,7 +5220,7 @@ describe("Modulo Mensa", () => {
     expect(InventoryDecimal.parse(movementA.quantita).toDb()).toBe("2.000000");
     expect(movementA).toMatchObject({
       operatoreId: fixture.userId,
-      auditEventoId: null,
+      auditEventoId: expect.any(Number),
     });
 
     const reversalA = await request(app)
@@ -3778,7 +5308,7 @@ describe("Modulo Mensa", () => {
       finalLedger.every(
         (movement) =>
           movement.operatoreId === fixture.userId &&
-          movement.auditEventoId === null,
+          movement.auditEventoId != null,
       ),
     ).toBe(true);
     expect(

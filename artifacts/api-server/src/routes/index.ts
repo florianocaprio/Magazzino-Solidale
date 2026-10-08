@@ -57,6 +57,7 @@ import richiesteMagazzinoRouter from "./richieste-magazzino";
 import richiesteMagazzinoDocumentiRouter from "./richieste-magazzino-documenti";
 import authRouter from "./auth";
 import utentiRouter from "./utenti";
+import utentiMenseRouter from "./utenti-mense";
 import ruoliRouter from "./ruoli";
 import areeRouter from "./aree";
 import {
@@ -138,5 +139,6 @@ router.use(richiesteMagazzinoDocumentiRouter);
 router.use(areeRouter);
 router.use(ruoliRouter);
 router.use(utentiRouter);
+router.use(utentiMenseRouter);
 
 export default router;

@@ -69,6 +69,7 @@ type DemoFixtures = {
   destination: Magazzino;
   beneficiary: Beneficiario;
   product: Prodotto;
+  lotId: number;
 };
 
 let database: SqlPool;
@@ -152,12 +153,23 @@ async function loadDemoFixtures(page: Page): Promise<DemoFixtures> {
     product,
     "Prodotto demo con almeno 2 unità disponibili non trovato",
   ).toBeTruthy();
+  const lotsResponse = await page.request.get(
+    `/api/lotti?magazzinoId=${origin!.id}&prodottoId=${product!.id}`,
+  );
+  expect(lotsResponse.ok()).toBe(true);
+  const lots = (await lotsResponse.json()) as Array<{
+    id: number;
+    disponibileReale: number;
+  }>;
+  const lot = lots.find((item) => item.disponibileReale >= 2);
+  expect(lot, "Lotto reale del prodotto e del Magazzino origine").toBeTruthy();
 
   return {
     origin: origin!,
     destination: destination!,
     beneficiary: beneficiary!,
     product: product!,
+    lotId: lot!.id,
   };
 }
 
@@ -321,6 +333,7 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
       page.getByRole("row").filter({ hasText: replayed.numeroBolla }),
     ).toBeVisible();
 
+    expect((await page.request.post("/api/auth/logout")).ok()).toBe(true);
     await page.context().clearCookies();
     await login(page);
     const resumed = await openDocument(page, "bolla", replayed.id);
@@ -411,12 +424,14 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
           idempotencyKey: key("ente-ui-row"),
           versione: bolla.versione,
           prodottoId: fixtures.product.id,
+          lottoId: fixtures.lotId,
           quantita: 1,
           unitaMisura: fixtures.product.unitaMisura,
         },
       }),
       201,
     );
+    expect((await page.request.post("/api/auth/logout")).ok()).toBe(true);
     await page.context().clearCookies();
     await login(page);
     const resumed = await openDocument(page, "bolla", bolla.id);
@@ -451,6 +466,7 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
           idempotencyKey: key("confirm-row"),
           versione: draft.versione,
           prodottoId: fixtures.product.id,
+          lottoId: fixtures.lotId,
           quantita: 1,
           unitaMisura: fixtures.product.unitaMisura,
         },
@@ -745,6 +761,7 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
           idempotencyKey: key("ente-bolla-row"),
           versione: bolla.versione,
           prodottoId: fixtures.product.id,
+          lottoId: fixtures.lotId,
           quantita: 1,
           unitaMisura: fixtures.product.unitaMisura,
         },
@@ -1001,6 +1018,7 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
       page.getByRole("row").filter({ hasText: transfer.codice }),
     ).toBeVisible();
 
+    expect((await page.request.post("/api/auth/logout")).ok()).toBe(true);
     await page.context().clearCookies();
     await login(page);
     const resumed = await openDocument(page, "trasferimento", transfer.id);

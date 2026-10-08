@@ -62,6 +62,7 @@ import type {
   AreaOperativa,
   AreaOperativaInput,
   AreaOperativaUpdate,
+  AssegnazioneMensaInput,
   AssociaBollaInput,
   AuditConfigurazione,
   AuthMessageResponse,
@@ -352,7 +353,9 @@ import type {
   MensaEccezioniPage,
   MensaGiacenza,
   MensaGiornata,
+  MensaGiornataInput,
   MensaInput,
+  MensaLottiPage,
   MensaLottoDisponibile,
   MensaMagazzinoSummary,
   MensaPastiPage,
@@ -479,6 +482,7 @@ import type {
   UdsPersonePerZonaReport,
   Utente,
   UtenteInput,
+  UtenteMensa,
   UtenteUpdate,
   VersioneInput,
   VolontariBulkInput,
@@ -29917,6 +29921,151 @@ export function useListGiacenzeMensa<TData = Awaited<ReturnType<typeof listGiace
 
 
 
+export const getListUtenteMenseUrl = (utenteId: number,) => {
+
+
+
+
+  return `/api/utenti/${utenteId}/mense`
+}
+
+/**
+ * Solo amministratori; include revoche conservate. Nessuna assegnazione implicita.
+ */
+export const listUtenteMense = async (utenteId: number, options?: RequestInit): Promise<UtenteMensa[]> => {
+
+  return customFetch<UtenteMensa[]>(getListUtenteMenseUrl(utenteId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListUtenteMenseQueryKey = (utenteId: number,) => {
+    return [
+    `/api/utenti/${utenteId}/mense`
+    ] as const;
+    }
+
+
+export const getListUtenteMenseQueryOptions = <TData = Awaited<ReturnType<typeof listUtenteMense>>, TError = ErrorType<unknown>>(utenteId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUtenteMense>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListUtenteMenseQueryKey(utenteId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUtenteMense>>> = ({ signal }) => listUtenteMense(utenteId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(utenteId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUtenteMense>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListUtenteMenseQueryResult = NonNullable<Awaited<ReturnType<typeof listUtenteMense>>>
+export type ListUtenteMenseQueryError = ErrorType<unknown>
+
+
+
+export function useListUtenteMense<TData = Awaited<ReturnType<typeof listUtenteMense>>, TError = ErrorType<unknown>>(
+ utenteId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUtenteMense>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListUtenteMenseQueryOptions(utenteId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSetUtenteMensaUrl = (utenteId: number,
+    mensaId: number,) => {
+
+
+
+
+  return `/api/utenti/${utenteId}/mense/${mensaId}`
+}
+
+/**
+ * Assegnazione/revoca esplicita con audit, senza hard delete; Area coerente obbligatoria all'assegnazione.
+ */
+export const setUtenteMensa = async (utenteId: number,
+    mensaId: number,
+    assegnazioneMensaInput: AssegnazioneMensaInput, options?: RequestInit): Promise<UtenteMensa> => {
+
+  return customFetch<UtenteMensa>(getSetUtenteMensaUrl(utenteId,mensaId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      assegnazioneMensaInput,)
+  }
+);}
+
+
+
+
+export const getSetUtenteMensaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setUtenteMensa>>, TError,{utenteId: number;mensaId: number;data: BodyType<AssegnazioneMensaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setUtenteMensa>>, TError,{utenteId: number;mensaId: number;data: BodyType<AssegnazioneMensaInput>}, TContext> => {
+
+const mutationKey = ['setUtenteMensa'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setUtenteMensa>>, {utenteId: number;mensaId: number;data: BodyType<AssegnazioneMensaInput>}> = (props) => {
+          const {utenteId,mensaId,data} = props ?? {};
+
+          return  setUtenteMensa(utenteId,mensaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetUtenteMensaMutationResult = NonNullable<Awaited<ReturnType<typeof setUtenteMensa>>>
+    export type SetUtenteMensaMutationBody = BodyType<AssegnazioneMensaInput>
+    export type SetUtenteMensaMutationError = ErrorType<void>
+
+    export const useSetUtenteMensa = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setUtenteMensa>>, TError,{utenteId: number;mensaId: number;data: BodyType<AssegnazioneMensaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setUtenteMensa>>,
+        TError,
+        {utenteId: number;mensaId: number;data: BodyType<AssegnazioneMensaInput>},
+        TContext
+      > => {
+      return useMutation(getSetUtenteMensaMutationOptions(options));
+    }
+
 export const getListLottiMensaUrl = (params: ListLottiMensaParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -29935,9 +30084,9 @@ export const getListLottiMensaUrl = (params: ListLottiMensaParams,) => {
 /**
  * Lotti fisici realmente trasferibili per Mensa, Magazzino origine e Prodotto autorizzati.
  */
-export const listLottiMensa = async (params: ListLottiMensaParams, options?: RequestInit): Promise<MensaLottoDisponibile[]> => {
+export const listLottiMensa = async (params: ListLottiMensaParams, options?: RequestInit): Promise<MensaLottoDisponibile[] | MensaLottiPage> => {
 
-  return customFetch<MensaLottoDisponibile[]>(getListLottiMensaUrl(params),
+  return customFetch<MensaLottoDisponibile[] | MensaLottiPage>(getListLottiMensaUrl(params),
   {
     ...options,
     method: 'GET'
@@ -30351,6 +30500,74 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getStornaConsumoMensaMutationOptions(options));
+    }
+
+export const getOpenGiornataMensaUrl = () => {
+
+
+
+
+  return `/api/mensa/giornate`
+}
+
+/**
+ * Apertura idempotente per data corrente, Mensa e servizio. Permette la successiva chiusura a zero pasti senza movimenti stock.
+ */
+export const openGiornataMensa = async (mensaGiornataInput: MensaGiornataInput, options?: RequestInit): Promise<MensaGiornata> => {
+
+  return customFetch<MensaGiornata>(getOpenGiornataMensaUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mensaGiornataInput,)
+  }
+);}
+
+
+
+
+export const getOpenGiornataMensaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof openGiornataMensa>>, TError,{data: BodyType<MensaGiornataInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof openGiornataMensa>>, TError,{data: BodyType<MensaGiornataInput>}, TContext> => {
+
+const mutationKey = ['openGiornataMensa'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof openGiornataMensa>>, {data: BodyType<MensaGiornataInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  openGiornataMensa(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OpenGiornataMensaMutationResult = NonNullable<Awaited<ReturnType<typeof openGiornataMensa>>>
+    export type OpenGiornataMensaMutationBody = BodyType<MensaGiornataInput>
+    export type OpenGiornataMensaMutationError = ErrorType<unknown>
+
+    export const useOpenGiornataMensa = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof openGiornataMensa>>, TError,{data: BodyType<MensaGiornataInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof openGiornataMensa>>,
+        TError,
+        {data: BodyType<MensaGiornataInput>},
+        TContext
+      > => {
+      return useMutation(getOpenGiornataMensaMutationOptions(options));
     }
 
 export const getListGiornateMensaUrl = (params?: ListGiornateMensaParams,) => {

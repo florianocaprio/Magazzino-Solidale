@@ -9335,6 +9335,60 @@ export interface MensaMagazzinoSummary {
   tipoMagazzino: string;
 }
 
+export interface AssegnazioneMensaInput {
+  attiva: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  motivo: string;
+}
+
+export type MensaGiornataInputTipoServizio = typeof MensaGiornataInputTipoServizio[keyof typeof MensaGiornataInputTipoServizio];
+
+
+export const MensaGiornataInputTipoServizio = {
+  pranzo: 'pranzo',
+  cena: 'cena',
+} as const;
+
+export interface MensaGiornataInput {
+  mensaId: number;
+  dataServizio: string;
+  tipoServizio: MensaGiornataInputTipoServizio;
+}
+
+export interface UtenteMensa {
+  id: number;
+  utenteId: number;
+  mensaId: number;
+  attiva: boolean;
+  assegnataDa: number;
+  assegnataAt: string;
+  /** @nullable */
+  revocataDa?: number | null;
+  /** @nullable */
+  revocataAt?: string | null;
+}
+
+export interface MensaLottoDisponibile {
+  id: number;
+  /** @nullable */
+  codiceLotto: string | null;
+  /** @nullable */
+  dataScadenza: string | null;
+  quantitaResidua: number;
+  disponibileReale: number;
+  disponibileRealePrecisa: QuantitaContabile;
+}
+
+export interface MensaLottiPage {
+  items: MensaLottoDisponibile[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
 export interface MensaGiacenza {
   prodottoId: number;
   codice: string;
@@ -9350,18 +9404,8 @@ export interface MensaGiacenza {
   impegnatoPreciso?: QuantitaContabile;
   disponibileReale: number;
   lottoFisicoObbligatorio: boolean;
+  quantitaFrazionabile?: boolean;
   disponibileRealePrecisa?: QuantitaContabile;
-}
-
-export interface MensaLottoDisponibile {
-  id: number;
-  /** @nullable */
-  codiceLotto: string | null;
-  /** @nullable */
-  dataScadenza: string | null;
-  quantitaResidua: number;
-  disponibileReale: number;
-  disponibileRealePrecisa: QuantitaContabile;
 }
 
 export type MensaConsumoInputTipoServizio = typeof MensaConsumoInputTipoServizio[keyof typeof MensaConsumoInputTipoServizio];
@@ -9387,6 +9431,17 @@ export interface MensaConsumoInput {
   prodottoId: number;
   quantita: QuantitaContabile;
   causale: MensaConsumoInputCausale;
+  /**
+     * Lotto obbligatorio quando richiesto dal Catalogo; negli altri casi FEFO comune.
+     * @nullable
+     */
+  lottoId?: number | null;
+  /**
+     * Obbligatorio per scarto fisico; non rappresenta sfrido culinario.
+     * @maxLength 2000
+     * @nullable
+     */
+  motivo?: string | null;
   /**
      * @maxLength 2000
      * @nullable
@@ -9594,6 +9649,19 @@ export interface MensaQuantitaPerUnitaMisura {
   quantita: number;
 }
 
+/**
+ * @nullable
+ */
+export type MensaReportChiusurePrecedentiItemSnapshot = { [key: string]: unknown } | null;
+
+export type MensaReportChiusurePrecedentiItem = {
+  id: number;
+  giornataId: number;
+  registratoAt: string;
+  /** @nullable */
+  snapshot?: MensaReportChiusurePrecedentiItemSnapshot;
+};
+
 export type MensaReportDistribuzioneSessoItemChiave = typeof MensaReportDistribuzioneSessoItemChiave[keyof typeof MensaReportDistribuzioneSessoItemChiave];
 
 
@@ -9680,6 +9748,10 @@ export type MensaReportDistribuzioneItem = {
 };
 
 export interface MensaReport {
+  chiusurePrecedenti?: MensaReportChiusurePrecedentiItem[];
+  /** Giorni civili inclusivi del periodo */
+  denominatoreMedia?: number;
+  giornate?: MensaGiornata[];
   dal: string;
   al: string;
   totalePasti: number;
@@ -11784,6 +11856,23 @@ magazzinoId: number;
 };
 
 export type ListLottiMensaParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+/**
+ * @maxLength 100
+ */
+search?: string;
+/**
+ * Solo scarto dal proprio Magazzino Mensa, con grant consumo.
+ */
+includeExpired?: boolean;
 mensaId: number;
 magazzinoId: number;
 prodottoId: number;

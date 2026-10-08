@@ -16054,33 +16054,113 @@ export const ListGiacenzeMensaResponseItem = zod.object({
   "impegnatoPreciso": zod.string().regex(listGiacenzeMensaResponseImpegnatoPrecisoRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "disponibileReale": zod.number(),
   "lottoFisicoObbligatorio": zod.boolean(),
+  "quantitaFrazionabile": zod.boolean().optional(),
   "disponibileRealePrecisa": zod.string().regex(listGiacenzeMensaResponseDisponibileRealePrecisaRegExp).optional().describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
 })
 export const ListGiacenzeMensaResponse = zod.array(ListGiacenzeMensaResponseItem)
 
 
 /**
+ * Solo amministratori; include revoche conservate. Nessuna assegnazione implicita.
+ */
+
+
+
+export const ListUtenteMenseParams = zod.object({
+  "utenteId": zod.coerce.number().min(1)
+})
+
+export const ListUtenteMenseResponseItem = zod.object({
+  "id": zod.number(),
+  "utenteId": zod.number(),
+  "mensaId": zod.number(),
+  "attiva": zod.boolean(),
+  "assegnataDa": zod.number(),
+  "assegnataAt": zod.coerce.date(),
+  "revocataDa": zod.number().nullish(),
+  "revocataAt": zod.coerce.date().nullish()
+})
+export const ListUtenteMenseResponse = zod.array(ListUtenteMenseResponseItem)
+
+
+/**
+ * Assegnazione/revoca esplicita con audit, senza hard delete; Area coerente obbligatoria all'assegnazione.
+ */
+
+
+
+
+export const SetUtenteMensaParams = zod.object({
+  "utenteId": zod.coerce.number().min(1),
+  "mensaId": zod.coerce.number().min(1)
+})
+
+export const setUtenteMensaBodyMotivoMax = 500;
+
+
+
+export const SetUtenteMensaBody = zod.object({
+  "attiva": zod.boolean(),
+  "motivo": zod.string().min(1).max(setUtenteMensaBodyMotivoMax)
+})
+
+export const SetUtenteMensaResponse = zod.object({
+  "id": zod.number(),
+  "utenteId": zod.number(),
+  "mensaId": zod.number(),
+  "attiva": zod.boolean(),
+  "assegnataDa": zod.number(),
+  "assegnataAt": zod.coerce.date(),
+  "revocataDa": zod.number().nullish(),
+  "revocataAt": zod.coerce.date().nullish()
+})
+
+
+/**
  * Lotti fisici realmente trasferibili per Mensa, Magazzino origine e Prodotto autorizzati.
  */
+
+export const listLottiMensaQueryPageSizeMax = 200;
+
+export const listLottiMensaQuerySearchMax = 100;
+
+
+
 export const ListLottiMensaQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).optional(),
+  "pageSize": zod.coerce.number().min(1).max(listLottiMensaQueryPageSizeMax).optional(),
+  "search": zod.coerce.string().max(listLottiMensaQuerySearchMax).optional(),
+  "includeExpired": zod.coerce.boolean().optional().describe('Solo scarto dal proprio Magazzino Mensa, con grant consumo.'),
   "mensaId": zod.coerce.number(),
   "magazzinoId": zod.coerce.number(),
   "prodottoId": zod.coerce.number(),
   "dataRichiesta": zod.date().optional()
 })
 
-export const listLottiMensaResponseDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listLottiMensaResponseOneItemDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const listLottiMensaResponseTwoItemsItemDisponibileRealePrecisaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 
-export const ListLottiMensaResponseItem = zod.object({
+export const ListLottiMensaResponse = zod.union([zod.array(zod.object({
   "id": zod.number(),
   "codiceLotto": zod.string().nullable(),
   "dataScadenza": zod.coerce.date().nullable(),
   "quantitaResidua": zod.number(),
   "disponibileReale": zod.number(),
-  "disponibileRealePrecisa": zod.string().regex(listLottiMensaResponseDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
-})
-export const ListLottiMensaResponse = zod.array(ListLottiMensaResponseItem)
+  "disponibileRealePrecisa": zod.string().regex(listLottiMensaResponseOneItemDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
+})),zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "codiceLotto": zod.string().nullable(),
+  "dataScadenza": zod.coerce.date().nullable(),
+  "quantitaResidua": zod.number(),
+  "disponibileReale": zod.number(),
+  "disponibileRealePrecisa": zod.string().regex(listLottiMensaResponseTwoItemsItemDisponibileRealePrecisaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
+})),
+  "page": zod.number(),
+  "pageSize": zod.number(),
+  "total": zod.number()
+})])
 
 
 /**
@@ -16192,6 +16272,8 @@ export const ListConsumiMensaResponse = zod.union([zod.array(zod.object({
 
 
 export const createConsumoMensaBodyQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
+export const createConsumoMensaBodyMotivoMax = 2000;
+
 export const createConsumoMensaBodyNoteMax = 2000;
 
 export const createConsumoMensaBodyIdempotencyKeyMax = 80;
@@ -16205,6 +16287,8 @@ export const CreateConsumoMensaBody = zod.object({
   "prodottoId": zod.number(),
   "quantita": zod.string().regex(createConsumoMensaBodyQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.'),
   "causale": zod.enum(['consumo', 'scarto']),
+  "lottoId": zod.number().nullish().describe('Lotto obbligatorio quando richiesto dal Catalogo; negli altri casi FEFO comune.'),
+  "motivo": zod.string().max(createConsumoMensaBodyMotivoMax).nullish().describe('Obbligatorio per scarto fisico; non rappresenta sfrido culinario.'),
   "note": zod.string().max(createConsumoMensaBodyNoteMax).nullish(),
   "idempotencyKey": zod.string().min(1).max(createConsumoMensaBodyIdempotencyKeyMax)
 })
@@ -16243,6 +16327,34 @@ export const stornaConsumoMensaBodyMotivoMax = 2000;
 
 export const StornaConsumoMensaBody = zod.object({
   "motivo": zod.string().min(1).max(stornaConsumoMensaBodyMotivoMax)
+})
+
+
+/**
+ * Apertura idempotente per data corrente, Mensa e servizio. Permette la successiva chiusura a zero pasti senza movimenti stock.
+ */
+export const OpenGiornataMensaBody = zod.object({
+  "mensaId": zod.number(),
+  "dataServizio": zod.coerce.date(),
+  "tipoServizio": zod.enum(['pranzo', 'cena'])
+})
+
+export const OpenGiornataMensaResponse = zod.object({
+  "id": zod.number(),
+  "mensaId": zod.number(),
+  "mensaNome": zod.string().optional(),
+  "dataServizio": zod.coerce.date(),
+  "tipoServizio": zod.enum(['pranzo', 'cena']),
+  "stato": zod.enum(['aperta', 'chiusa']),
+  "apertaDa": zod.number().nullish(),
+  "apertaAt": zod.coerce.date().optional(),
+  "chiusaDa": zod.number().nullish(),
+  "chiusaAt": zod.coerce.date().nullish(),
+  "riapertaDa": zod.number().nullish(),
+  "riapertaAt": zod.coerce.date().nullish(),
+  "motivoRiapertura": zod.string().nullish(),
+  "noteChiusura": zod.string().nullish(),
+  "snapshot": zod.record(zod.string(), zod.unknown()).nullish()
 })
 
 
@@ -16341,6 +16453,30 @@ export const GetMensaReportQueryParams = zod.object({
 })
 
 export const GetMensaReportResponse = zod.object({
+  "chiusurePrecedenti": zod.array(zod.object({
+  "id": zod.number(),
+  "giornataId": zod.number(),
+  "registratoAt": zod.coerce.date(),
+  "snapshot": zod.record(zod.string(), zod.unknown()).nullish()
+})).optional(),
+  "denominatoreMedia": zod.number().optional().describe('Giorni civili inclusivi del periodo'),
+  "giornate": zod.array(zod.object({
+  "id": zod.number(),
+  "mensaId": zod.number(),
+  "mensaNome": zod.string().optional(),
+  "dataServizio": zod.coerce.date(),
+  "tipoServizio": zod.enum(['pranzo', 'cena']),
+  "stato": zod.enum(['aperta', 'chiusa']),
+  "apertaDa": zod.number().nullish(),
+  "apertaAt": zod.coerce.date().optional(),
+  "chiusaDa": zod.number().nullish(),
+  "chiusaAt": zod.coerce.date().nullish(),
+  "riapertaDa": zod.number().nullish(),
+  "riapertaAt": zod.coerce.date().nullish(),
+  "motivoRiapertura": zod.string().nullish(),
+  "noteChiusura": zod.string().nullish(),
+  "snapshot": zod.record(zod.string(), zod.unknown()).nullish()
+})).optional(),
   "dal": zod.coerce.date(),
   "al": zod.coerce.date(),
   "totalePasti": zod.number(),

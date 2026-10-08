@@ -53,4 +53,5 @@ export * from "./configurazioneAmbiente";
 export * from "./auth";
 export * from "./systemLogs";
 export * from "./mensa";
+export * from "./utentiMense";
 export * from "./mapsGeocodeCache";

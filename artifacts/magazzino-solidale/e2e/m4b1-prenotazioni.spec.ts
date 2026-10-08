@@ -364,6 +364,13 @@ test.describe("M4B.1 — azioni reali del dettaglio Trasferimento", () => {
       [username, role.rows[0].id, mensa.rows[0].area_id],
     );
     expect(user.rows).toHaveLength(1);
+    // M6.1: grant e territorio richiedono anche un'assegnazione esplicita.
+    const assignment = await database.query<{ id: number }>(
+      `INSERT INTO utenti_mense (utente_id, mensa_id, assegnata_da)
+       SELECT $1, $2, id FROM utenti WHERE username='sadmin' RETURNING id`,
+      [user.rows[0].id, mensa.rows[0].id],
+    );
+    expect(assignment.rows).toHaveLength(1);
     const mensaContext = await browser.newContext();
     try {
       const mensaPage = await mensaContext.newPage();

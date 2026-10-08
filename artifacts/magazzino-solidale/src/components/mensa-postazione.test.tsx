@@ -28,6 +28,12 @@ vi.mock("@workspace/api-client-react", () => ({
   useCreateConsumoMensa: () => ({ mutate: vi.fn(), isPending: false }),
   useStornaConsumoMensa: () => ({ mutate: vi.fn(), isPending: false }),
   useChiudiGiornataMensa: () => ({ mutate: vi.fn(), isPending: false }),
+  useOpenGiornataMensa: () => ({ mutate: vi.fn(), isPending: false }),
+  useSegnalaMancatoArrivoTrasferimento: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+  useListLottiMensa: () => ({ data: [] }),
   useRiapriGiornataMensa: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateMensa: () => ({ mutate: vi.fn(), isPending: false }),
   useListMagazziniMensa: () => ({ data: [] }),

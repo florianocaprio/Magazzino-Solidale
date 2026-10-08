@@ -2,6 +2,7 @@ import { beneficiariTable, mensaGiornateServizioTable } from "@workspace/db";
 import { risolviFasciaEta } from "@workspace/api-zod";
 import { and, eq } from "drizzle-orm";
 import type { InventoryTransaction } from "./scaricoInventory";
+import { InventoryDecimal } from "./inventoryDecimal";
 
 export const MENSA_TIPI_SERVIZIO = ["pranzo", "cena"] as const;
 export type MensaTipoServizio = (typeof MENSA_TIPI_SERVIZIO)[number];
@@ -39,34 +40,42 @@ export function aggregatiConsumiMensa(
         prodottoId: number;
         prodottoNome: string;
         unitaMisura: string;
-        quantita: number;
+        quantita: InventoryDecimal;
       }
     >();
-    const perUnit = new Map<string, number>();
+    const perUnit = new Map<string, InventoryDecimal>();
     for (const row of matching) {
-      const quantity = Number(row.quantita);
+      const quantity = InventoryDecimal.parse(row.quantita);
       const productKey = `${row.prodottoId}\u0000${row.unitaMisura}`;
       const product = perProduct.get(productKey) ?? {
         prodottoId: row.prodottoId,
         prodottoNome: row.prodottoNome,
         unitaMisura: row.unitaMisura,
-        quantita: 0,
+        quantita: InventoryDecimal.zero(),
       };
-      product.quantita += quantity;
+      product.quantita = product.quantita.add(quantity);
       perProduct.set(productKey, product);
       perUnit.set(
         row.unitaMisura,
-        (perUnit.get(row.unitaMisura) ?? 0) + quantity,
+        (perUnit.get(row.unitaMisura) ?? InventoryDecimal.zero()).add(quantity),
       );
     }
     return {
-      perProdotto: [...perProduct.values()].sort(
-        (a, b) =>
-          a.prodottoNome.localeCompare(b.prodottoNome, "it") ||
-          a.unitaMisura.localeCompare(b.unitaMisura, "it"),
-      ),
+      perProdotto: [...perProduct.values()]
+        .map((item) => ({
+          ...item,
+          quantita: Number(item.quantita.toCanonical()),
+        }))
+        .sort(
+          (a, b) =>
+            a.prodottoNome.localeCompare(b.prodottoNome, "it") ||
+            a.unitaMisura.localeCompare(b.unitaMisura, "it"),
+        ),
       perUnitaMisura: [...perUnit.entries()]
-        .map(([unitaMisura, quantita]) => ({ unitaMisura, quantita }))
+        .map(([unitaMisura, quantita]) => ({
+          unitaMisura,
+          quantita: Number(quantita.toCanonical()),
+        }))
         .sort((a, b) => a.unitaMisura.localeCompare(b.unitaMisura, "it")),
     };
   };

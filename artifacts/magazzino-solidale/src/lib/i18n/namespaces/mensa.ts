@@ -1,4 +1,32 @@
 const it = {
+  reopened: "Riaperta",
+  previousSnapshot: "Snapshot storico di chiusura",
+  closureHistory: "Chiusure nello storico audit",
+  operatorAssignments: "Mense assegnate all'operatore",
+  assignmentHint:
+    "L'Area/Centro non assegnano automaticamente alcuna Mensa. Salva prima il territorio dell'utente.",
+  assignmentReason: "Motivo dell'assegnazione o revoca",
+  revokedAssignment: "Assegnazione revocata",
+  revokeAssignment: "Revoca",
+  restoreAssignment: "Riattiva assegnazione",
+  assignOperator: "Assegna Mensa",
+  inactive: "Servizio inattivo",
+  loadError: "Caricamento non riuscito",
+  actionFailed: "Operazione non riuscita",
+  closeZeroDay: "Chiudi servizio senza pasti",
+  searchLot: "Cerca lotto fisico",
+  physicalLot: "Lotto fisico",
+  automaticFefo: "Automatico FEFO",
+  reportMissing: "Segnala mancata ricezione",
+  missingReason: "Motivo obbligatorio della mancata ricezione",
+  currentDate: "Data corrente Europe/Rome",
+  historyDate: "Data dello storico consumi",
+  empty: "Nessun record per i filtri selezionati",
+  wasteReason: "Motivo obbligatorio dello scarto",
+  physicalWasteHint:
+    "Scarto = merce fisicamente eliminata. Non registrare lo sfrido culinario già incluso nel consumo.",
+  averageDenominator:
+    "Media per giorno civile dell'intervallo (inclusi i giorni senza pasti)",
   nav: {
     group: "Mensa",
     mensaPostazione: "Postazione Mensa",
@@ -31,6 +59,34 @@ const it = {
 
 const en = {
   ...it,
+  reopened: "Reopened",
+  previousSnapshot: "Historical closure snapshot",
+  closureHistory: "Closures in audit history",
+  operatorAssignments: "Operator canteen assignments",
+  assignmentHint:
+    "Area/centre membership does not assign a canteen. Save the user's territory first.",
+  assignmentReason: "Assignment or revocation reason",
+  revokedAssignment: "Revoked assignment",
+  revokeAssignment: "Revoke",
+  restoreAssignment: "Restore assignment",
+  assignOperator: "Assign canteen",
+  inactive: "Inactive service",
+  loadError: "Unable to load",
+  actionFailed: "Operation failed",
+  closeZeroDay: "Close service with no meals",
+  searchLot: "Search physical lot",
+  physicalLot: "Physical lot",
+  automaticFefo: "Automatic FEFO",
+  reportMissing: "Report missing delivery",
+  missingReason: "Required missing delivery reason",
+  currentDate: "Current Europe/Rome date",
+  historyDate: "Consumption history date",
+  empty: "No records for the selected filters",
+  wasteReason: "Required disposal reason",
+  physicalWasteHint:
+    "Disposal means physically discarded stock. Do not count cooking waste already included in consumption.",
+  averageDenominator:
+    "Average per calendar day in the range (including days without meals)",
   nav: {
     group: "Canteen",
     mensaPostazione: "Canteen station",

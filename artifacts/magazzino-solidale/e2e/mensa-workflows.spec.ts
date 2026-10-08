@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { login, selectOption } from "./helpers";
+import { assertViewportSafe, login, selectOption } from "./helpers";
 
 type Named = { id: number; nome: string };
 type Mensa = Named & { codice: string };
@@ -8,6 +8,166 @@ let r2DatabasePool: { end(): Promise<void> } | undefined;
 
 test.afterAll(async () => {
   await r2DatabasePool?.end();
+});
+
+test("M61 viewport: viste operative Mensa e report senza errori JS o overflow", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await login(page);
+  for (const view of [
+    "postazione",
+    "consumi",
+    "trasferimenti",
+    "pasti",
+    "report",
+  ]) {
+    await page.goto(`/mensa/${view}`);
+    await expect(page.locator("h1")).toContainText(
+      /mensa|pasti|consumi|rifornimenti/i,
+    );
+    await assertViewportSafe(page);
+  }
+  expect(errors).toEqual([]);
+});
+
+test("M61-06: commit consumo con risposta persa e retry UI riusa la stessa intenzione", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop-1440x900",
+    "Il ciclo inventariale mutante è eseguito una volta sul DB effimero",
+  );
+  const url = new URL(process.env.E2E_DATABASE_URL ?? "");
+  if (
+    url.hostname !== "127.0.0.1" ||
+    url.port !== "58461" ||
+    url.pathname !== "/m61_e2e"
+  )
+    throw new Error("Retry M6.1 richiede il DB effimero dedicato");
+  process.env.DATABASE_URL = url.href;
+  const { pool: template } = await import("../../../lib/db/src/index.ts");
+  const PoolConstructor = template.constructor as new (options: {
+    connectionString: string;
+  }) => typeof template;
+  const pool = new PoolConstructor({ connectionString: url.href });
+  try {
+    await login(page);
+    let [mensa] = (await page.request
+      .get("/api/mensa/mense?attiva=true")
+      .then((response) => response.json())) as Array<{
+      id: number;
+      nome: string;
+      magazzinoId: number;
+    }>;
+    if (!mensa) {
+      const [area] = await page.request
+        .get("/api/aree-operative")
+        .then((response) => response.json());
+      const created = await page.request.post("/api/mensa/mense", {
+        data: {
+          codice: "M61-E2E-CONSUMO",
+          nome: "Mensa M61 Consumo",
+          areaOperativaId: area.id,
+        },
+      });
+      expect(created.status()).toBe(201);
+      mensa = await created.json();
+    }
+    const suffix = randomUUID().slice(0, 8);
+    const [product] = (
+      await pool.query<{ id: number }>(
+        "insert into prodotti(codice,nome,tipo_prodotto,unita_misura,quantita_frazionabile) values ($1,$2,'alimentare','kg',true) returning id",
+        [`M61-E2E-${suffix}`, `Consumo M61 ${suffix}`],
+      )
+    ).rows;
+    const [lot] = (
+      await pool.query<{ id: number }>(
+        "insert into lotti(prodotto_id,magazzino_id,codice_lotto,data_carico,data_scadenza,quantita_caricata,quantita_residua) values ($1,$2,$3,current_date,'2030-01-01',1,1) returning id",
+        [product.id, mensa.magazzinoId, `M61-E2E-${suffix}`],
+      )
+    ).rows;
+    await page.goto("/mensa/consumi");
+    await selectOption(
+      page,
+      page.getByRole("combobox", { name: /^mensa$/i }).first(),
+      mensa.nome,
+    );
+    await selectOption(
+      page,
+      page.getByRole("combobox", { name: "Prodotto" }),
+      new RegExp(`Consumo M61 ${suffix}`),
+    );
+    await page.getByRole("spinbutton").fill("0.3");
+    const payloads: Array<{ idempotencyKey: string }> = [];
+    let receiptId: number | undefined;
+    await page.route("**/api/mensa/consumi", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      payloads.push(route.request().postDataJSON());
+      const response = await route.fetch();
+      if (payloads.length === 1) {
+        expect(response.status()).toBe(201);
+        receiptId = (await response.json()).id;
+        await route.abort("failed");
+      } else {
+        expect(response.status()).toBe(200);
+        expect((await response.json()).id).toBe(receiptId);
+        await route.fulfill({ response });
+      }
+    });
+    const button = page.getByRole("button", {
+      name: "Registra consumo",
+      exact: true,
+    });
+    await button.click();
+    await expect(
+      page.getByText("Registrazione non riuscita", { exact: true }),
+    ).toBeVisible();
+    await expect(button).toBeEnabled();
+    await button.click();
+    await expect(
+      page.getByText("Consumo registrato", { exact: true }),
+    ).toBeVisible();
+    expect(payloads).toHaveLength(2);
+    expect(payloads[1]).toEqual(payloads[0]);
+    const stock = (
+      await pool.query(
+        "select quantita_residua::text as q from lotti where id=$1",
+        [lot.id],
+      )
+    ).rows[0];
+    expect(stock.q).toBe("0.700000");
+    expect(
+      (
+        await pool.query(
+          "select count(*)::int as n from mensa_consumi where prodotto_id=$1",
+          [product.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    expect(
+      (
+        await pool.query(
+          "select count(*)::int as n from movimenti where prodotto_id=$1",
+          [product.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    expect(
+      (
+        await pool.query(
+          "select count(*)::int as n from audit_eventi where operation_key=$1",
+          [`mensa-consumo:${payloads[0].idempotencyKey}`],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+  } finally {
+    await pool.end();
+  }
 });
 
 test("Mensa autorizza una persona temporanea, registra il pasto e rende il replay idempotente", async ({
@@ -327,7 +487,11 @@ test("R2-04: rifornimento Mensa sceglie un lotto reale; prodotto non tracciato r
     page.getByRole("combobox", { name: "Prodotto disponibile" }),
     new RegExp(`Pasta R2 ${suffix}`),
   );
-  await expect(page.getByTestId("mensa-lotto-field")).toHaveCount(0);
+  // M6.1: anche il lotto facoltativo è selezionabile, con FEFO di default.
+  await expect(page.getByTestId("mensa-lotto-field")).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Lotto" })).toContainText(
+    "Automatico FEFO",
+  );
   await page.getByRole("spinbutton", { name: "Quantità" }).fill("1");
   const optionalPromise = page.waitForResponse(
     (response) =>

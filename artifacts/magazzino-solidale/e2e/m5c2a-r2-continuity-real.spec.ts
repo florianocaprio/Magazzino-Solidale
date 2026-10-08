@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
+import { getMigrationStatus } from "../../../lib/db/scripts/migration-runner.mjs";
 import { login, selectOption } from "./helpers";
 
 let database: Awaited<typeof import("../../../lib/db/src/index.ts")>["pool"];
@@ -18,7 +20,30 @@ test.beforeAll(async () => {
   const { rows } = await database.query(
     "SELECT current_database() AS name, (SELECT count(*)::integer FROM app_meta.schema_migrations) AS ledger",
   );
-  expect(rows[0]).toEqual({ name: "m5c2a_r2_e2e", ledger: 46 });
+  expect(rows[0].name).toBe("m5c2a_r2_e2e");
+  // Questi flussi richiedono lo schema corrente completo, non una base di upgrade.
+  const status = await getMigrationStatus({
+    databaseUrl: target.toString(),
+    updatesDirectory: fileURLToPath(
+      new URL("../../../lib/db/updates", import.meta.url),
+    ),
+    manifestPath: fileURLToPath(
+      new URL(
+        "../../../lib/db/legacy-migrations-baseline.json",
+        import.meta.url,
+      ),
+    ),
+  });
+  expect(status.totalFiles).toBeGreaterThan(0);
+  expect(status).toMatchObject({
+    initialized: true,
+    appliedFiles: status.totalFiles,
+    pendingFiles: [],
+    checksumMismatches: [],
+    appliedFilesMissing: [],
+    outOfOrderFiles: [],
+  });
+  expect(rows[0].ledger).toBe(status.totalFiles);
 });
 test.afterAll(async () => {
   await database?.end();

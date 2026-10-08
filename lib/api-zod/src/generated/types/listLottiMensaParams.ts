@@ -7,6 +7,23 @@
  */
 
 export type ListLottiMensaParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+pageSize?: number;
+/**
+ * @maxLength 100
+ */
+search?: string;
+/**
+ * Solo scarto dal proprio Magazzino Mensa, con grant consumo.
+ */
+includeExpired?: boolean;
 mensaId: number;
 magazzinoId: number;
 prodottoId: number;

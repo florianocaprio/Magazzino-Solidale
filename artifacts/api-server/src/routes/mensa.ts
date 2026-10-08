@@ -9,6 +9,8 @@ import { createHash } from "node:crypto";
 import {
   auditConfigurazioniTable,
   beneficiariTable,
+  movimentiTable,
+  auditEventiTable,
   centriAscoltoTable,
   areeOperativeTable,
   db,
@@ -109,7 +111,18 @@ import {
   InventoryDecimalError,
   positiveInventoryDecimal,
 } from "../lib/inventoryDecimal";
-import { auditContextFromRequest } from "../lib/auditEvent";
+import {
+  auditContextFromRequest,
+  auditFields,
+  recordAuditEvent,
+} from "../lib/auditEvent";
+import {
+  assertAssignedMensa,
+  currentMensaScope,
+  mensaScopeCondition,
+  MensaScopeError,
+} from "../lib/mensaScope";
+import { lockInventoryLotsInGlobalOrder } from "../lib/inventoryLocks";
 import {
   commandRequestHash,
   isDocumentCommandError,
@@ -121,6 +134,7 @@ import {
 
 const router: IRouter = Router();
 router.use("/mensa", requireModulo("MENSA"));
+router.use("/mensa", currentMensaScope);
 type MensaTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const ABILITAZIONE_STATI = [
@@ -171,7 +185,8 @@ class MensaError extends Error {
 }
 
 function sendMensaError(error: unknown, res: import("express").Response) {
-  if (!(error instanceof MensaError)) return false;
+  if (!(error instanceof MensaError) && !(error instanceof MensaScopeError))
+    return false;
   res.status(error.status).json({ error: error.message });
   return true;
 }
@@ -228,6 +243,41 @@ function databaseErrorCode(error: unknown): unknown {
 
 function consumoCodice(idempotencyKey: string) {
   return `MCON-${createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 20).toUpperCase()}`;
+}
+
+async function assertConsumoReplay(
+  row: typeof mensaConsumiTable.$inferSelect,
+  req: Request,
+) {
+  const [history] = await db
+    .select()
+    .from(auditConfigurazioniTable)
+    .where(
+      and(
+        eq(auditConfigurazioniTable.chiave, `mensa-consumo:${row.id}`),
+        eq(auditConfigurazioniTable.azione, "registrazione"),
+      ),
+    )
+    .limit(1);
+  const metadata = history?.valoreNuovo as Record<string, unknown> | null;
+  const same =
+    row.prodottoId === positiveInt(req.body.prodottoId, "prodottoId") &&
+    row.dataServizio === req.body.dataServizio &&
+    row.tipoServizio === req.body.tipoServizio &&
+    row.causale === req.body.causale &&
+    row.note === optionalText(req.body.note, "Le note", 2000) &&
+    InventoryDecimal.parse(row.quantita).compare(
+      positiveInventoryDecimal(req.body.quantita),
+    ) === 0 &&
+    (metadata?.lottoId ?? null) ===
+      optionalPositiveInt(req.body.lottoId, "lottoId") &&
+    (metadata?.motivo ?? null) ===
+      optionalText(req.body.motivo, "Il motivo", 2000);
+  if (!same)
+    throw new MensaError(
+      409,
+      "Chiave di idempotenza già usata per un consumo diverso",
+    );
 }
 
 function beneficiarioIdsQuery(value: unknown): number[] {
@@ -378,6 +428,161 @@ function auditValues(
   };
 }
 
+function beneficiarioMensaScope(
+  req: Request,
+  column: typeof beneficiariTable.id,
+): SQL {
+  if (req.user?.isAdmin) return sql`true`;
+  // La revoca non rende la persona una directory globale. Prevale la
+  // principale valida oggi, altrimenti l'ultima principale storica; per una
+  // persona solo temporanea si conserva il confine della Mensa autorizzante.
+  // Soltanto le persone mai affiliate restano ricercabili nel territorio per
+  // una prima abilitazione esplicita.
+  const today = dataServizioMensa();
+  return sql`not exists (
+    select 1 from (select coalesce(
+      (select ma.mensa_id from mensa_abilitazioni ma where ma.beneficiario_id = ${column} and ma.mensa_principale
+       order by (ma.stato = 'attiva' and ma.data_inizio <= ${today} and (ma.data_fine is null or ma.data_fine >= ${today})) desc, ma.created_at desc, ma.id desc limit 1),
+      (select mt.mensa_id from mensa_autorizzazioni_temporanee mt where mt.beneficiario_id = ${column} order by mt.created_at desc, mt.id desc limit 1)
+    ) as mensa_id) affiliation
+    where affiliation.mensa_id is not null and not (${mensaScopeCondition(req, sql`affiliation.mensa_id`)})
+  )`;
+}
+
+async function requireBeneficiarioMensa(req: Request, id: number) {
+  const [row] = await db
+    .select({ id: beneficiariTable.id })
+    .from(beneficiariTable)
+    .where(
+      and(
+        eq(beneficiariTable.id, id),
+        beneficiarioMensaScope(req, beneficiariTable.id),
+        eq(beneficiariTable.areaOperativaId, req.user!.areaOperativaId ?? -1),
+        centroScopeFilter(
+          beneficiariTable.centroAscoltoId,
+          callerCentroId(req),
+        ),
+      ),
+    );
+  if (!req.user?.isAdmin && !row)
+    throw new MensaError(403, "Beneficiario non accessibile nello scope Mensa");
+}
+
+async function revalidateMealEntitlement(
+  tx: Tx,
+  req: Request,
+  access: typeof mensaAccessiTable.$inferSelect,
+  day: string,
+  allowNewException = false,
+) {
+  assertAssignedMensa(req, access.mensaId);
+  const [mensa] = await tx
+    .select()
+    .from(menseTable)
+    .where(eq(menseTable.id, access.mensaId))
+    .for("share");
+  const [warehouse] = mensa
+    ? await tx
+        .select()
+        .from(magazziniTable)
+        .where(eq(magazziniTable.id, mensa.magazzinoId))
+        .for("share")
+    : [];
+  const [beneficiary] =
+    access.beneficiarioId == null
+      ? []
+      : await tx
+          .select()
+          .from(beneficiariTable)
+          .where(eq(beneficiariTable.id, access.beneficiarioId))
+          .for("share");
+  if (
+    !mensa?.attiva ||
+    warehouse?.stato !== "attivo" ||
+    warehouse.tipoMagazzino !== "mensa" ||
+    !beneficiary?.attivo ||
+    beneficiary.areaOperativaId !== mensa.areaOperativaId ||
+    !canAccessCentro(beneficiary.centroAscoltoId, callerCentroId(req))
+  )
+    throw new MensaError(
+      409,
+      "Beneficiario o territorio non più autorizzato al pasto",
+    );
+  if (access.tesseraId != null) {
+    const [card] = await tx
+      .select()
+      .from(tessereBeneficiariTable)
+      .where(eq(tessereBeneficiariTable.id, access.tesseraId))
+      .for("share");
+    if (
+      !card ||
+      card.stato !== "attiva" ||
+      (card.dataScadenza != null && card.dataScadenza < day)
+    )
+      throw new MensaError(409, "Tessera non più valida per il pasto");
+  }
+  const eligibilities = await tx
+    .select()
+    .from(mensaAbilitazioniTable)
+    .where(eq(mensaAbilitazioniTable.beneficiarioId, beneficiary.id))
+    .orderBy(desc(mensaAbilitazioniTable.id))
+    .for("share");
+  const current = eligibilities.find(
+    (item) =>
+      item.mensaPrincipale &&
+      item.stato === "attiva" &&
+      item.dataInizio <= day &&
+      (item.dataFine == null || item.dataFine >= day),
+  );
+  if (access.autorizzazioneTemporaneaId != null) {
+    const [temporary] = await tx
+      .select()
+      .from(mensaAutorizzazioniTemporaneeTable)
+      .where(
+        eq(
+          mensaAutorizzazioniTemporaneeTable.id,
+          access.autorizzazioneTemporaneaId,
+        ),
+      )
+      .for("share");
+    if (
+      !temporary ||
+      temporary.dataServizio !== day ||
+      temporary.tipoServizio !== access.tipoServizio ||
+      temporary.mensaId !== access.mensaId ||
+      ["revocata", "sospesa"].includes(eligibilities[0]?.stato ?? "")
+    )
+      throw new MensaError(409, "Autorizzazione temporanea non più valida");
+  } else if (!current)
+    throw new MensaError(409, "Abilitazione non più valida per il pasto");
+  else if (current.mensaId !== access.mensaId) {
+    const [exception] =
+      access.eccezioneId == null
+        ? []
+        : await tx
+            .select()
+            .from(mensaEccezioniTable)
+            .where(eq(mensaEccezioniTable.id, access.eccezioneId))
+            .for("share");
+    const [principal] = await tx
+      .select()
+      .from(menseTable)
+      .where(eq(menseTable.id, current.mensaId));
+    if (
+      principal?.areaOperativaId !== mensa.areaOperativaId ||
+      (!allowNewException &&
+        (!exception ||
+          exception.mensaPrincipaleId !== current.mensaId ||
+          exception.mensaDestinazioneId !== access.mensaId))
+    )
+      throw new MensaError(
+        409,
+        "L'accesso non autorizza un pasto in questa Mensa",
+      );
+  }
+  return current;
+}
+
 function formatMensa(
   row: typeof menseTable.$inferSelect,
   areaOperativaNome?: string | null,
@@ -436,6 +641,7 @@ async function loadMensa(id: number) {
 }
 
 async function requireMensa(id: number, req: Request, active = false) {
+  assertAssignedMensa(req, id);
   const row = await loadMensa(id);
   if (!row) throw new MensaError(404, "Mensa non trovata");
   if (
@@ -472,6 +678,14 @@ async function requireMensaLogisticsWarehouse(
     .from(magazziniTable)
     .where(eq(magazziniTable.id, id));
   if (!warehouse) throw new MensaError(404, "Magazzino non trovato");
+  if (warehouse.tipoMagazzino === "mensa") {
+    const [mensa] = await db
+      .select({ id: menseTable.id })
+      .from(menseTable)
+      .where(eq(menseTable.magazzinoId, id));
+    if (!mensa) throw new MensaError(403, "Mensa non disponibile");
+    assertAssignedMensa(req, mensa.id);
+  }
   const ownAreaOperativa = callerAreaOperativaId(req);
   if (
     (ownAreaOperativa != null &&
@@ -558,7 +772,10 @@ async function loadRiepilogoAbilitazioniBeneficiari(
   beneficiarioIds: number[],
 ) {
   if (beneficiarioIds.length === 0) return [];
-  const conditions: SQL[] = [inArray(beneficiariTable.id, beneficiarioIds)];
+  const conditions: SQL[] = [
+    inArray(beneficiariTable.id, beneficiarioIds),
+    beneficiarioMensaScope(req, beneficiariTable.id),
+  ];
   const scopes = [
     centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req)),
     areaOperativaScopeFilter(
@@ -738,7 +955,7 @@ async function latestEligibility(beneficiarioId: number) {
   return latest ?? null;
 }
 
-async function loadAccessoDto(id: number) {
+async function loadAccessoDto(id: number, req: Request) {
   const [row] = await db
     .select({
       accesso: mensaAccessiTable,
@@ -767,7 +984,23 @@ async function loadAccessoDto(id: number) {
   const outsideMensaArea =
     row.beneficiario != null &&
     row.beneficiario.areaOperativaId !== row.mensa.areaOperativaId;
+  const [visible] = row.beneficiario
+    ? await db
+        .select({ id: beneficiariTable.id })
+        .from(beneficiariTable)
+        .where(
+          and(
+            eq(beneficiariTable.id, row.beneficiario.id),
+            beneficiarioMensaScope(req, beneficiariTable.id),
+            centroScopeFilter(
+              beneficiariTable.centroAscoltoId,
+              callerCentroId(req),
+            ),
+          ),
+        )
+    : [];
   const hidePersonal =
+    !visible ||
     outsideMensaArea ||
     row.accesso.motivoEsito === ACCESSO_MOTIVI.AREA_NON_COMPATIBILE ||
     row.accesso.motivoEsito === ACCESSO_MOTIVI.TESSERA_NON_VALIDA;
@@ -834,6 +1067,7 @@ async function assertMensaTransferScopeTx(
   requestedMensaId: number,
   requireActive: boolean,
 ): Promise<void> {
+  assertAssignedMensa(req, requestedMensaId);
   if (transfer.mensaId == null || transfer.mensaId !== requestedMensaId) {
     throw new MensaError(403, "Replay idempotente non accessibile");
   }
@@ -910,7 +1144,7 @@ router.get(
   requirePermission("mensa.view"),
   async (req, res) => {
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [mensaScopeCondition(req, menseTable.id)];
       const ownAreaOperativa = callerAreaOperativaId(req);
       const requestedAreaOperativa = optionalPositiveInt(
         req.query.areaOperativaId,
@@ -1154,6 +1388,7 @@ router.get(
         .from(beneficiariTable)
         .where(eq(beneficiariTable.id, beneficiarioId));
       if (!beneficiario) throw new MensaError(404, "Beneficiario non trovato");
+      await requireBeneficiarioMensa(req, beneficiarioId);
       const ownAreaOperativa = callerAreaOperativaId(req);
       if (
         ownAreaOperativa != null &&
@@ -1204,6 +1439,7 @@ router.post(
       )
         throw new MensaError(403, "Beneficiario non accessibile");
       const dataScadenza = dateOnly(req.body?.dataScadenza, "La scadenza");
+      await requireBeneficiarioMensa(req, beneficiarioId);
       const motivoSostituzione = optionalText(
         req.body?.motivoSostituzione,
         "Il motivo della sostituzione",
@@ -1261,6 +1497,7 @@ router.post(
         )
         .where(eq(tessereBeneficiariTable.id, id));
       if (!current) throw new MensaError(404, "Tessera non trovata");
+      await requireBeneficiarioMensa(req, current.tessera.beneficiarioId);
       const ownAreaOperativa = callerAreaOperativaId(req);
       if (
         ownAreaOperativa != null &&
@@ -1360,7 +1597,7 @@ router.post(
         .limit(1);
       if (existing[0]) {
         await requireReplayMensaScope(req, existing[0].mensaId, mensaId);
-        const dto = await loadAccessoDto(existing[0].id);
+        const dto = await loadAccessoDto(existing[0].id, req);
         res.json({ ...dto, idempotentReplay: true });
         return;
       }
@@ -1488,7 +1725,7 @@ router.post(
         );
         return row;
       });
-      res.status(201).json(await loadAccessoDto(created.id));
+      res.status(201).json(await loadAccessoDto(created.id, req));
     } catch (error) {
       if (isUniqueViolation(error)) {
         const key =
@@ -1513,7 +1750,7 @@ router.post(
           )
             return;
           res.json({
-            ...(await loadAccessoDto(existing.id)),
+            ...(await loadAccessoDto(existing.id, req)),
             idempotentReplay: true,
           });
           return;
@@ -1549,16 +1786,21 @@ router.post(
       if (replay) {
         await requireReplayMensaScope(req, replay.mensaId, mensaId);
         res.json({
-          ...(await loadAccessoDto(replay.id)),
+          ...(await loadAccessoDto(replay.id, req)),
           idempotentReplay: true,
         });
         return;
       }
-      const mensa = await requireMensa(mensaId, req);
+      const mensa = await requireMensa(mensaId, req, true);
       const nuovaPersona = req.body?.nuovaPersona as
         | Record<string, unknown>
         | undefined;
       const beneficiarioIdInput = req.body?.beneficiarioId;
+      if (beneficiarioIdInput != null)
+        await requireBeneficiarioMensa(
+          req,
+          positiveInt(beneficiarioIdInput, "beneficiarioId"),
+        );
       if (!!nuovaPersona === (beneficiarioIdInput != null)) {
         throw new MensaError(
           400,
@@ -1610,7 +1852,7 @@ router.post(
       };
       const closedAccessId = await db.transaction(createClosedAccessIfNeeded);
       if (closedAccessId != null) {
-        res.status(201).json(await loadAccessoDto(closedAccessId));
+        res.status(201).json(await loadAccessoDto(closedAccessId, req));
         return;
       }
       let duplicates: Awaited<ReturnType<typeof searchBeneficiariDuplicates>> =
@@ -1662,6 +1904,27 @@ router.post(
           telefono: (newPersonValues.telefono as string | null) ?? "",
           dataNascita: (newPersonValues.dataNascita as string | null) ?? "",
         });
+        if (!req.user!.isAdmin && duplicates.length) {
+          const visible = await db
+            .select({ id: beneficiariTable.id })
+            .from(beneficiariTable)
+            .where(
+              and(
+                inArray(
+                  beneficiariTable.id,
+                  duplicates.map((item) => item.id),
+                ),
+                beneficiarioMensaScope(req, beneficiariTable.id),
+                centroScopeFilter(
+                  beneficiariTable.centroAscoltoId,
+                  callerCentroId(req),
+                ),
+              ),
+            );
+          duplicates = duplicates.filter((item) =>
+            visible.some((person) => person.id === item.id),
+          );
+        }
       }
 
       const createdAccessId = await db.transaction(async (tx) => {
@@ -1800,7 +2063,7 @@ router.post(
         });
         return;
       }
-      res.status(201).json(await loadAccessoDto(createdAccessId));
+      res.status(201).json(await loadAccessoDto(createdAccessId, req));
     } catch (error) {
       if (isUniqueViolation(error)) {
         const key =
@@ -1825,7 +2088,7 @@ router.post(
           )
             return;
           res.json({
-            ...(await loadAccessoDto(existing.id)),
+            ...(await loadAccessoDto(existing.id, req)),
             idempotentReplay: true,
           });
           return;
@@ -1864,8 +2127,11 @@ router.post(
             eq(menseTable.magazzinoId, magazziniTable.id),
           )
           .where(eq(mensaAccessiTable.id, accessoId))
-          .for("update");
+          .for("update", { of: mensaAccessiTable });
         if (!row) throw new MensaError(404, "Accesso non trovato");
+        assertAssignedMensa(req, row.destinazione.id);
+        if (row.accesso.beneficiarioId != null)
+          await requireBeneficiarioMensa(req, row.accesso.beneficiarioId);
         if (
           !canAccessAreaOperativa(
             row.destinazione.areaOperativaId,
@@ -1913,17 +2179,20 @@ router.post(
             );
           }
         }
-        const eligibility = await activeEligibility(
-          row.accesso.beneficiarioId,
-          dataServizioMensa(row.accesso.dataOra),
+        const day = dataServizioMensa(row.accesso.dataOra);
+        if (day !== dataServizioMensa())
+          throw new MensaError(
+            409,
+            "L'accesso non appartiene alla giornata corrente",
+          );
+        const eligibility = await revalidateMealEntitlement(
+          tx,
+          req,
+          row.accesso,
+          day,
+          true,
         );
-        if (
-          !eligibility ||
-          !canUseMensaException(
-            eligibility.mensa.areaOperativaId,
-            row.destinazione.areaOperativaId,
-          )
-        )
+        if (!eligibility)
           throw new MensaError(
             403,
             "L'eccezione è consentita solo nella stessa area territoriale",
@@ -1932,7 +2201,7 @@ router.post(
           .insert(mensaEccezioniTable)
           .values({
             beneficiarioId: row.accesso.beneficiarioId,
-            mensaPrincipaleId: eligibility.mensa.id,
+            mensaPrincipaleId: eligibility.mensaId,
             mensaDestinazioneId: row.destinazione.id,
             areaOperativaId: row.destinazione.areaOperativaId,
             motivo,
@@ -1970,7 +2239,7 @@ router.post(
           );
         return access;
       });
-      res.json(await loadAccessoDto(result.id));
+      res.json(await loadAccessoDto(result.id, req));
     } catch (error) {
       if (isUniqueViolation(error)) {
         res.status(409).json({ error: "Eccezione già registrata" });
@@ -1987,7 +2256,7 @@ router.get(
   requirePermission("mensa.view"),
   async (req, res) => {
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [mensaScopeCondition(req, menseTable.id)];
       const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
       if (mensaId != null)
         conditions.push(eq(mensaAccessiTable.mensaId, mensaId));
@@ -2012,7 +2281,7 @@ router.get(
         .limit(paging.requested ? paging.pageSize : 200)
         .offset(paging.requested ? paging.offset : 0);
       const results = await Promise.all(
-        rows.map((row) => loadAccessoDto(row.id)),
+        rows.map((row) => loadAccessoDto(row.id, req)),
       );
       const items = results.filter(Boolean);
       res.json(
@@ -2112,6 +2381,7 @@ router.post(
       )
         throw new MensaError(409, "Il pasto richiede un accesso consentito");
       const beneficiarioId = access.accesso.beneficiarioId;
+      await requireBeneficiarioMensa(req, beneficiarioId);
       const now = new Date();
       const serviceDate = dataServizioMensa(now);
       if (!stessoGiornoServizioMensa(access.accesso.dataOra, now)) {
@@ -2153,6 +2423,7 @@ router.post(
           tipoServizio,
           operatoreId: req.user!.id,
         });
+        await revalidateMealEntitlement(tx, req, access.accesso, serviceDate);
         const snapshot = await snapshotBeneficiarioMensa(
           tx,
           beneficiarioId,
@@ -2237,7 +2508,7 @@ router.get(
   requirePermission("mensa.view"),
   async (req, res) => {
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [mensaScopeCondition(req, menseTable.id)];
       const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
       const data = dateOnly(req.query.data, "La data");
       const tipo =
@@ -2317,7 +2588,9 @@ router.get(
   requirePermission("mensa.view"),
   async (req, res) => {
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [
+        mensaScopeCondition(req, mensaEccezioniTable.mensaDestinazioneId),
+      ];
       const ownAreaOperativa = callerAreaOperativaId(req);
       if (ownAreaOperativa != null)
         conditions.push(
@@ -2402,7 +2675,14 @@ router.get(
 
 router.get(
   "/mensa/logistica/giacenze",
-  requireMensaPermissionOrLegacy("mensa.transfers.request"),
+  (req, res, next) =>
+    hasPermission(req, "mensa.consumption.manage")
+      ? next()
+      : requireMensaPermissionOrLegacy("mensa.transfers.request")(
+          req,
+          res,
+          next,
+        ),
   async (req, res) => {
     try {
       const magazzinoId = positiveInt(req.query.magazzinoId, "magazzinoId");
@@ -2415,6 +2695,7 @@ router.get(
           nome: prodottiTable.nome,
           unitaMisura: prodottiTable.unitaMisura,
           lottoFisicoObbligatorio: prodottiTable.lottoFisicoObbligatorio,
+          quantitaFrazionabile: prodottiTable.quantitaFrazionabile,
           giacenzaFisica: sql<string>`sum(${lottiTable.quantitaResidua})`,
           giacenzaDistribuibile: sql<string>`coalesce(sum(${lottiTable.quantitaResidua}) filter (where ${lottiTable.dataScadenza} is null or ${lottiTable.dataScadenza} >= ${today}), 0)`,
         })
@@ -2474,7 +2755,14 @@ router.get(
 
 router.get(
   "/mensa/logistica/lotti",
-  requireMensaPermissionOrLegacy("mensa.transfers.request"),
+  (req, res, next) =>
+    hasPermission(req, "mensa.consumption.manage")
+      ? next()
+      : requireMensaPermissionOrLegacy("mensa.transfers.request")(
+          req,
+          res,
+          next,
+        ),
   async (req, res) => {
     try {
       const mensaId = positiveInt(req.query.mensaId, "mensaId");
@@ -2490,7 +2778,10 @@ router.get(
           ? dataRichiesta
           : dataOperativa;
       const mensa = await requireMensa(mensaId, req, true);
-      if (mensa.mensa.magazzinoId === magazzinoId)
+      if (
+        mensa.mensa.magazzinoId === magazzinoId &&
+        !hasPermission(req, "mensa.consumption.manage")
+      )
         throw new MensaError(
           400,
           "Origine e destinazione devono essere diverse",
@@ -2502,7 +2793,13 @@ router.get(
         .where(eq(prodottiTable.id, prodottoId));
       if (!prodotto?.attivo)
         throw new MensaError(400, "Prodotto non disponibile");
-      const rows = await db
+      const paging = pagination(req.query);
+      const search = optionalText(req.query.search, "La ricerca lotto", 100);
+      const includeExpired =
+        req.query.includeExpired === "true" &&
+        hasPermission(req, "mensa.consumption.manage") &&
+        mensa.mensa.magazzinoId === magazzinoId;
+      const candidates = db
         .select({
           id: lottiTable.id,
           codiceLotto: lottiTable.codiceLotto,
@@ -2523,32 +2820,49 @@ router.get(
             eq(lottiTable.magazzinoId, magazzinoId),
             eq(lottiTable.prodottoId, prodottoId),
             gt(lottiTable.quantitaResidua, "0"),
-            lottoDistribuibileCondition(riferimento),
+            includeExpired
+              ? sql`true`
+              : lottoDistribuibileCondition(riferimento),
+            search ? ilike(lottiTable.codiceLotto, `%${search}%`) : sql`true`,
           ),
         )
         .groupBy(lottiTable.id)
         .having(
           sql`${lottiTable.quantitaResidua} > coalesce(sum(${prenotazioniMagazzinoTable.quantita}), 0)`,
-        )
+        );
+      const [total] = await db
+        .select({ total: count() })
+        .from(candidates.as("available_lots"));
+      const rows = await candidates
         .orderBy(
           sql`${lottiTable.dataScadenza} asc nulls last`,
           asc(lottiTable.id),
         )
-        .limit(200);
+        .limit(paging.requested ? paging.pageSize : 200)
+        .offset(paging.requested ? paging.offset : 0);
+      const items = rows.map((row) => {
+        const available = InventoryDecimal.parse(row.quantitaResidua).subtract(
+          InventoryDecimal.parse(row.impegnato ?? "0"),
+        );
+        return {
+          id: row.id,
+          codiceLotto: row.codiceLotto,
+          dataScadenza: row.dataScadenza,
+          quantitaResidua: Number(row.quantitaResidua),
+          disponibileReale: Number(available.toCanonical()),
+          disponibileRealePrecisa: available.toDb(),
+        };
+      });
+      res.setHeader("X-Total-Count", total.total);
       res.json(
-        rows.map((row) => {
-          const available = InventoryDecimal.parse(
-            row.quantitaResidua,
-          ).subtract(InventoryDecimal.parse(row.impegnato ?? "0"));
-          return {
-            id: row.id,
-            codiceLotto: row.codiceLotto,
-            dataScadenza: row.dataScadenza,
-            quantitaResidua: Number(row.quantitaResidua),
-            disponibileReale: Number(available.toCanonical()),
-            disponibileRealePrecisa: available.toDb(),
-          };
-        }),
+        paging.requested
+          ? {
+              items,
+              total: total.total,
+              page: paging.page,
+              pageSize: paging.pageSize,
+            }
+          : items,
       );
     } catch (error) {
       if (sendMensaError(error, res)) return;
@@ -2572,7 +2886,7 @@ router.post(
         "La chiave di idempotenza",
         80,
       );
-      const mensa = await requireMensa(mensaId, req);
+      const mensa = await requireMensa(mensaId, req, true);
       if (origineId === mensa.mensa.magazzinoId)
         throw new MensaError(
           400,
@@ -2788,7 +3102,7 @@ router.get(
   "/mensa/trasferimenti",
   requireMensaPermissionOrLegacy("mensa.transfers.request"),
   async (req, res) => {
-    const conditions: SQL[] = [];
+    const conditions: SQL[] = [mensaScopeCondition(req, menseTable.id)];
     const ownAreaOperativa = callerAreaOperativaId(req);
     if (ownAreaOperativa != null)
       conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
@@ -2841,7 +3155,7 @@ router.get(
   requirePermission("mensa.consumption.manage"),
   async (req, res) => {
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [mensaScopeCondition(req, menseTable.id)];
       const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
       const data = dateOnly(req.query.data, "La data servizio");
       if (mensaId != null)
@@ -2924,6 +3238,7 @@ router.post(
         .where(eq(mensaConsumiTable.idempotencyKey, idempotencyKey));
       if (replay) {
         await requireReplayMensaScope(req, replay.mensaId, mensaId);
+        await assertConsumoReplay(replay, req);
         res.json({
           ...replay,
           quantita: Number(replay.quantita),
@@ -2937,10 +3252,10 @@ router.post(
         "La data servizio",
         true,
       )!;
-      if (dataServizio > dataServizioMensa(new Date())) {
+      if (dataServizio !== dataServizioMensa(new Date())) {
         throw new MensaError(
           400,
-          "La data servizio di un consumo o scarto non può essere futura",
+          "Il consumo o scarto ordinario richiede la data corrente Europe/Rome",
         );
       }
       const tipoServizio = canonicalTipoServizio(req.body?.tipoServizio);
@@ -2964,6 +3279,7 @@ router.post(
           unitaMisura: prodottiTable.unitaMisura,
           attivo: prodottiTable.attivo,
           quantitaFrazionabile: prodottiTable.quantitaFrazionabile,
+          lottoFisicoObbligatorio: prodottiTable.lottoFisicoObbligatorio,
           nome: prodottiTable.nome,
         })
         .from(prodottiTable)
@@ -2984,6 +3300,22 @@ router.post(
         throw error;
       }
       const note = optionalText(req.body?.note, "Le note", 2000);
+      const lottoId = optionalPositiveInt(req.body?.lottoId, "lottoId");
+      const motivo = optionalText(
+        req.body?.motivo,
+        "Il motivo dello scarto",
+        2000,
+      );
+      if (causale === "scarto" && !motivo)
+        throw new MensaError(
+          400,
+          "Il motivo dello scarto fisico è obbligatorio",
+        );
+      if (prodotto.lottoFisicoObbligatorio && lottoId == null)
+        throw new MensaError(
+          400,
+          "Il lotto fisico è obbligatorio per questo prodotto",
+        );
       const codice = consumoCodice(idempotencyKey);
       const created = await db.transaction(async (tx) => {
         const giornata = await getOrCreateGiornataMensa(tx, {
@@ -2992,14 +3324,46 @@ router.post(
           tipoServizio,
           operatoreId: req.user!.id,
         });
+        if (lottoId != null) {
+          // Stesso ordine globale del motore comune, anche per il lotto esplicito.
+          await lockInventoryLotsInGlobalOrder(tx, {
+            kind: "warehouse-products",
+            magazzinoId: mensa.mensa.magazzinoId,
+            prodottoIds: [prodottoId],
+          });
+          const [lot] = await tx
+            .select()
+            .from(lottiTable)
+            .where(
+              and(
+                eq(lottiTable.id, lottoId),
+                eq(lottiTable.prodottoId, prodottoId),
+                eq(lottiTable.magazzinoId, mensa.mensa.magazzinoId),
+              ),
+            )
+            .for("update");
+          if (
+            !lot ||
+            (causale === "consumo" &&
+              !isLottoDistribuibile(lot.dataScadenza, dataServizio))
+          )
+            throw new MensaError(
+              400,
+              "Lotto non valido per prodotto, Magazzino o consumo",
+            );
+        }
         const scaricoId = await creaScaricoInventariale(tx, {
+          audit: auditContextFromRequest(req, {
+            operationKey: `mensa-consumo:${idempotencyKey}`,
+          }),
+          lottoPolicy: causale === "scarto" ? "qualsiasi" : "distribuibile",
           codice,
           magazzinoId: mensa.mensa.magazzinoId,
           centroAscoltoId: mensa.magazzino?.centroAscoltoId ?? null,
           dataScarico: dataServizio,
           causale: "altro",
           causaleAltro:
-            causale === "consumo" ? "Consumo Mensa" : "Scarto Mensa",
+            causale === "consumo" ? "Consumo Mensa" : `Scarto Mensa: ${motivo}`,
           note,
           operatoreId: req.user!.id,
           documentoRiferimento: codice,
@@ -3028,6 +3392,7 @@ router.post(
           righe: [
             {
               prodottoId,
+              lottoId,
               quantita: quantita.toDb(),
               unitaMisura: prodotto.unitaMisura,
               note,
@@ -3059,6 +3424,8 @@ router.post(
             causale,
             scaricoId,
             giornataServizioId: giornata.id,
+            lottoId,
+            motivo,
           }),
         );
         return row;
@@ -3079,6 +3446,7 @@ router.post(
           .from(mensaConsumiTable)
           .where(eq(mensaConsumiTable.idempotencyKey, idempotencyKey));
         if (replay) {
+          await assertConsumoReplay(replay, req);
           if (
             !(await sendReplayMensaScope(
               req,
@@ -3118,6 +3486,7 @@ router.post(
         .innerJoin(menseTable, eq(mensaConsumiTable.mensaId, menseTable.id))
         .where(eq(mensaConsumiTable.id, id));
       if (!current) throw new MensaError(404, "Consumo non trovato");
+      assertAssignedMensa(req, current.consumo.mensaId);
       if (
         !canAccessAreaOperativa(
           current.areaOperativaId,
@@ -3128,13 +3497,27 @@ router.post(
       }
       const code = consumoCodice(current.consumo.idempotencyKey);
       await db.transaction(async (tx) => {
+        await tx
+          .select({ id: mensaConsumiTable.id })
+          .from(mensaConsumiTable)
+          .where(eq(mensaConsumiTable.id, id))
+          .for("update");
         const [existing] = await tx
-          .select({ id: mensaConsumiStorniTable.id })
+          .select({
+            id: mensaConsumiStorniTable.id,
+            motivo: mensaConsumiStorniTable.motivo,
+          })
           .from(mensaConsumiStorniTable)
           .where(eq(mensaConsumiStorniTable.consumoId, id))
           .for("update");
-        if (existing)
-          throw new MensaError(409, "Il consumo è già stato stornato");
+        if (existing) {
+          if (existing.motivo !== motivo)
+            throw new MensaError(
+              409,
+              "Lo storno esistente ha un motivo differente",
+            );
+          return;
+        }
         const giornata = await getOrCreateGiornataMensa(tx, {
           mensaId: current.consumo.mensaId,
           dataServizio: current.consumo.dataServizio,
@@ -3142,6 +3525,9 @@ router.post(
           operatoreId: req.user!.id,
         });
         await stornaScaricoInventariale(tx, {
+          audit: auditContextFromRequest(req, {
+            operationKey: `mensa-consumo-storno:${id}`,
+          }),
           documentoRiferimento: code,
           dataMovimento: current.consumo.dataServizio,
           operatoreId: req.user!.id,
@@ -3170,6 +3556,10 @@ router.post(
         res.status(409).json({ error: error.message });
         return;
       }
+      if (error instanceof Error && error.message === "GIORNATA_MENSA_CHIUSA") {
+        res.status(409).json({ error: "La giornata Mensa è chiusa" });
+        return;
+      }
       if (sendMensaError(error, res)) return;
       throw error;
     }
@@ -3181,7 +3571,7 @@ router.get(
   requirePermission("mensa.view"),
   async (req, res) => {
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [mensaScopeCondition(req, menseTable.id)];
       const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
       const data = dateOnly(req.query.data, "La data servizio");
       if (mensaId != null)
@@ -3217,6 +3607,66 @@ router.get(
 );
 
 router.post(
+  "/mensa/giornate",
+  requirePermission("mensa.service.close"),
+  async (req, res) => {
+    try {
+      const mensaId = positiveInt(req.body?.mensaId, "mensaId");
+      const dataServizio = dateOnly(
+        req.body?.dataServizio,
+        "La data servizio",
+        true,
+      )!;
+      if (dataServizio !== dataServizioMensa())
+        throw new MensaError(
+          400,
+          "L'apertura richiede la data corrente Europe/Rome",
+        );
+      await requireMensa(mensaId, req, true);
+      const tipoServizio = canonicalTipoServizio(req.body?.tipoServizio);
+      const result = await db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(mensaGiornateServizioTable)
+          .where(
+            and(
+              eq(mensaGiornateServizioTable.mensaId, mensaId),
+              eq(mensaGiornateServizioTable.dataServizio, dataServizio),
+              eq(mensaGiornateServizioTable.tipoServizio, tipoServizio),
+            ),
+          )
+          .for("update");
+        if (existing) return existing;
+        const day = await getOrCreateGiornataMensa(tx, {
+          mensaId,
+          dataServizio,
+          tipoServizio,
+          operatoreId: req.user!.id,
+        });
+        await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req, {
+            operationKey: `mensa-day-open:${day.id}`,
+          }),
+          azione: "MENSA_GIORNATA_APERTA",
+          entitaTipo: "mensa_giornata",
+          entitaId: day.id,
+          dataOperativa: dataServizio,
+          metadata: auditFields({ mensaId, tipoServizio }, [
+            "mensaId",
+            "tipoServizio",
+          ]),
+        });
+        return day;
+      });
+      res.json(result);
+    } catch (error) {
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
+  },
+);
+
+router.post(
   "/mensa/giornate/:id/chiudi",
   requirePermission("mensa.service.close"),
   async (req, res) => {
@@ -3241,8 +3691,9 @@ router.post(
             eq(menseTable.magazzinoId, magazziniTable.id),
           )
           .where(eq(mensaGiornateServizioTable.id, id))
-          .for("update");
+          .for("update", { of: mensaGiornateServizioTable });
         if (!current) throw new MensaError(404, "Giornata Mensa non trovata");
+        assertAssignedMensa(req, current.giornata.mensaId);
         if (
           !canAccessAreaOperativa(
             current.areaOperativaId,
@@ -3375,11 +3826,29 @@ router.post(
               req,
               `mensa-giornata:${id}`,
               "chiusura",
-              null,
+              current.giornata.snapshot,
               snapshot,
               note,
             ),
           );
+        await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req),
+          azione: "MENSA_GIORNATA_CHIUSA",
+          entitaTipo: "mensa_giornata",
+          entitaId: id,
+          areaOperativaIdSnapshot: current.areaOperativaId,
+          magazzinoIdSnapshot: current.magazzinoId,
+          dataOperativa: current.giornata.dataServizio,
+          motivo: note,
+          changes: auditFields(
+            {
+              snapshotPrecedente: current.giornata.snapshot,
+              snapshot,
+              mensaId: current.giornata.mensaId,
+            },
+            ["snapshotPrecedente", "snapshot", "mensaId"],
+          ),
+        });
         return updated;
       });
       res.json(result);
@@ -3402,6 +3871,7 @@ router.post(
           .select({
             giornata: mensaGiornateServizioTable,
             areaOperativaId: menseTable.areaOperativaId,
+            magazzinoId: menseTable.magazzinoId,
           })
           .from(mensaGiornateServizioTable)
           .innerJoin(
@@ -3409,8 +3879,9 @@ router.post(
             eq(mensaGiornateServizioTable.mensaId, menseTable.id),
           )
           .where(eq(mensaGiornateServizioTable.id, id))
-          .for("update");
+          .for("update", { of: mensaGiornateServizioTable });
         if (!current) throw new MensaError(404, "Giornata Mensa non trovata");
+        assertAssignedMensa(req, current.giornata.mensaId);
         if (
           !canAccessAreaOperativa(
             current.areaOperativaId,
@@ -3456,6 +3927,23 @@ router.post(
               motivo,
             ),
           );
+        await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req),
+          azione: "MENSA_GIORNATA_RIAPERTA",
+          entitaTipo: "mensa_giornata",
+          entitaId: id,
+          areaOperativaIdSnapshot: current.areaOperativaId,
+          magazzinoIdSnapshot: current.magazzinoId,
+          dataOperativa: current.giornata.dataServizio,
+          motivo,
+          metadata: auditFields(
+            {
+              mensaId: current.giornata.mensaId,
+              snapshotPrecedente: current.giornata.snapshot,
+            },
+            ["mensaId", "snapshotPrecedente"],
+          ),
+        });
         return updated;
       });
       res.json(result);
@@ -3476,6 +3964,7 @@ router.get(
       if (al < dal) throw new MensaError(400, "Il periodo non è valido");
       const conditions: SQL[] = [
         gte(mensaPastiTable.dataServizio, dal),
+        mensaScopeCondition(req, menseTable.id),
         lte(mensaPastiTable.dataServizio, al),
       ];
       const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
@@ -3524,6 +4013,7 @@ router.get(
         .innerJoin(menseTable, eq(mensaPastiTable.mensaId, menseTable.id))
         .where(and(...conditions));
       const accessConditions: SQL[] = [
+        mensaScopeCondition(req, menseTable.id),
         gte(mensaAccessiTable.dataOra, intervalloGiornoEuropeRome(dal).start),
         lt(mensaAccessiTable.dataOra, intervalloGiornoEuropeRome(al).end),
       ];
@@ -3570,6 +4060,7 @@ router.get(
           }, new Map()),
         ).map(([chiave, values]) => ({ chiave, totale: values.size }));
       const consumptionConditions: SQL[] = [
+        mensaScopeCondition(req, menseTable.id),
         gte(mensaConsumiTable.dataServizio, dal),
         lte(mensaConsumiTable.dataServizio, al),
         isNull(mensaConsumiStorniTable.id),
@@ -3602,6 +4093,46 @@ router.get(
         )
         .where(and(...consumptionConditions));
       const consumptionBreakdown = aggregatiConsumiMensa(consumption);
+      const giornate = await db
+        .select({ giornata: mensaGiornateServizioTable })
+        .from(mensaGiornateServizioTable)
+        .innerJoin(
+          menseTable,
+          eq(mensaGiornateServizioTable.mensaId, menseTable.id),
+        )
+        .where(
+          and(
+            mensaScopeCondition(req, menseTable.id),
+            gte(mensaGiornateServizioTable.dataServizio, dal),
+            lte(mensaGiornateServizioTable.dataServizio, al),
+            mensaId
+              ? eq(mensaGiornateServizioTable.mensaId, mensaId)
+              : sql`true`,
+            tipo
+              ? eq(mensaGiornateServizioTable.tipoServizio, tipo)
+              : sql`true`,
+          ),
+        );
+      const chiusurePrecedenti = giornate.length
+        ? await db
+            .select({
+              id: auditEventiTable.id,
+              giornataId: auditEventiTable.entitaId,
+              registratoAt: auditEventiTable.registratoAt,
+              snapshot: auditEventiTable.changes,
+            })
+            .from(auditEventiTable)
+            .where(
+              and(
+                eq(auditEventiTable.azione, "MENSA_GIORNATA_CHIUSA"),
+                inArray(
+                  auditEventiTable.entitaId,
+                  giornate.map(({ giornata }) => giornata.id),
+                ),
+              ),
+            )
+            .orderBy(asc(auditEventiTable.id))
+        : [];
       res.json({
         dal,
         al,
@@ -3649,6 +4180,9 @@ router.get(
         ),
         ...consumptionBreakdown,
         mediaPastiGiorno: Number((total / days).toFixed(2)),
+        denominatoreMedia: days,
+        giornate: giornate.map(({ giornata }) => giornata),
+        chiusurePrecedenti,
         distribuzione: distribution,
       });
     } catch (error) {
@@ -3737,7 +4271,14 @@ router.get(
       const search = text(req.query.search, "La ricerca", 120);
       if (search.length < 2)
         throw new MensaError(400, "Inserire almeno 2 caratteri");
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [
+        beneficiarioMensaScope(req, beneficiariTable.id),
+      ];
+      const centerScope = centroScopeFilter(
+        beneficiariTable.centroAscoltoId,
+        callerCentroId(req),
+      );
+      if (centerScope) conditions.push(centerScope);
       const ownAreaOperativa = callerAreaOperativaId(req);
       if (ownAreaOperativa != null)
         conditions.push(eq(beneficiariTable.areaOperativaId, ownAreaOperativa));
@@ -3799,7 +4340,7 @@ router.get(
   requirePermission("mensa.view"),
   async (req, res) => {
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [mensaScopeCondition(req, menseTable.id)];
       const beneficiarioId = optionalPositiveInt(
         req.query.beneficiarioId,
         "beneficiarioId",
@@ -3878,6 +4419,7 @@ router.post(
           400,
           "Beneficiario e Mensa devono appartenere alla stessa area",
         );
+      await requireBeneficiarioMensa(req, beneficiarioId);
       const created = await db.transaction(async (tx) => {
         if (mensaPrincipale) {
           const today = dataServizioMensa();
@@ -3978,6 +4520,9 @@ router.post(
       const expected = expectedVersion(req.body?.versione);
       const current = await loadAbilitazione(id);
       if (!current) throw new MensaError(404, "Abilitazione non trovata");
+      assertAssignedMensa(req, current.abilitazione.mensaId);
+      if (stato === "attiva")
+        await requireMensa(current.abilitazione.mensaId, req, true);
       if (
         !canAccessAreaOperativa(
           current.areaOperativaId,

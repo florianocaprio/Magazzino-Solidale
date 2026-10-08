@@ -1,4 +1,11 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import {
+  assertAssignedMensa,
+  currentMensaScope,
+  mensaScopeCondition,
+  MensaScopeError,
+  assertCurrentMensaAssignment,
+} from "../lib/mensaScope";
 import { db } from "@workspace/db";
 import {
   trasferimentiTable,
@@ -100,6 +107,9 @@ const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+router.use("/trasferimenti", (req, res, next) =>
+  isMensaOnly(req) ? currentMensaScope(req, res, next) : next(),
+);
 
 function isMensaOnly(req: Request): boolean {
   return (
@@ -127,6 +137,10 @@ function hasPermission(req: Request, permission: string): boolean {
 }
 
 function sendDocumentCommandError(error: unknown, res: Response): boolean {
+  if (error instanceof MensaScopeError) {
+    res.status(403).json({ error: error.message });
+    return true;
+  }
   if (error instanceof M5bLinkError) {
     res.status(error.status).json({ error: error.message });
     return true;
@@ -314,6 +328,11 @@ async function enforceMensaTransfer(
   if (!isMensaOnly(req)) return null;
   if (!canManageMensaTransfers(req)) return "Permesso Mensa non consentito";
   if (mensaId == null) return "Trasferimento non associato a una Mensa";
+  try {
+    assertAssignedMensa(req, mensaId);
+  } catch {
+    return "Trasferimento di una Mensa non assegnata";
+  }
   const ownAreaOperativa = callerAreaOperativaId(req);
   if (ownAreaOperativa != null) {
     const [mensa] = await db
@@ -727,6 +746,7 @@ router.get("/trasferimenti", async (req, res) => {
       return;
     }
     conditions.push(sql`${trasferimentiTable.mensaId} is not null`);
+    conditions.push(mensaScopeCondition(req, trasferimentiTable.mensaId));
     const ownAreaOperativa = callerAreaOperativaId(req);
     if (ownAreaOperativa != null) {
       const visibleMense = await db
@@ -2193,7 +2213,17 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
 });
 
 router.post("/trasferimenti/:id/mancato-arrivo", async (req, res) => {
+  const mensaDestination =
+    isMensaOnly(req) &&
+    (hasPermission(req, "mensa.transfers.receive") ||
+      hasPermission(req, "mensa.transfers.manage"));
+  const commandPermission = mensaDestination
+    ? hasPermission(req, "mensa.transfers.receive")
+      ? "mensa.transfers.receive"
+      : "mensa.transfers.manage"
+    : "magazzino.transfers.dispatch";
   if (
+    !mensaDestination &&
     !requireGenericTransferPermission(req, res, "magazzino.transfers.dispatch")
   )
     return;
@@ -2225,15 +2255,29 @@ router.post("/trasferimenti/:id/mancato-arrivo", async (req, res) => {
         req.user!.id,
         "trasferimento",
         id,
-        "magazzino.transfers.dispatch",
+        commandPermission,
       );
       const locked = await lockTransfer(tx, id);
       const actor = await requireCurrentCommandActor(
         tx,
         req.user!.id,
-        "magazzino.transfers.dispatch",
+        commandPermission,
       );
-      await assertCurrentTransferScope(tx, req, locked, "origin", actor);
+      if (mensaDestination) {
+        if (locked.mensaId == null)
+          throw new TransferRequestError(
+            403,
+            "Rifornimento Mensa non disponibile",
+          );
+        await assertCurrentMensaAssignment(tx, req, locked.mensaId);
+      }
+      await assertCurrentTransferScope(
+        tx,
+        req,
+        locked,
+        mensaDestination ? "destination" : "origin",
+        actor,
+      );
       const receipt = await findDocumentCommand(tx, {
         tipoComando,
         idempotencyKey,
@@ -2313,6 +2357,11 @@ router.get("/trasferimenti/:id/rientro", async (req, res) => {
     .where(eq(trasferimentiTable.id, id));
   if (!transfer) {
     res.status(404).json({ error: "Trasferimento non trovato" });
+    return;
+  }
+  const mensaError = await enforceMensaTransfer(req, transfer.mensaId);
+  if (mensaError) {
+    res.status(403).json({ error: mensaError });
     return;
   }
   if (!(await canReadLinkedM4Document(req.user!, "trasferimento", id))) {
