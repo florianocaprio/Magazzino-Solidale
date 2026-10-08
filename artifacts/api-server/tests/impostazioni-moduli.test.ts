@@ -1,10 +1,9 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
 import { eq, inArray } from "drizzle-orm";
 import {
   beneficiariTable,
-  auditConfigurazioniTable,
   centriAscoltoTable,
   areeOperativeTable,
   db,
@@ -14,7 +13,6 @@ import {
   pool,
   prodottiTable,
   zoneUdsTable,
-  utentiTable,
 } from "@workspace/db";
 import beneficiariRouter from "../src/routes/beneficiari";
 import creditoSolidaleRouter from "../src/routes/credito-solidale";
@@ -24,8 +22,13 @@ import politicheCreditoSolidaleRouter from "../src/routes/politiche-credito-soli
 import prodottiRouter from "../src/routes/prodotti";
 import zoneUdsRouter from "../src/routes/zone-uds";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
+import {
+  emporioActorFixture,
+  cleanupEmporioActorFixtures,
+} from "./helpers/emporio-actor";
 
-const EMPORIO_DISABLED_MSG = "Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.";
+const EMPORIO_DISABLED_MSG =
+  "Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.";
 const UDS_DISABLED_MSG = "La gestione Unità di Strada è disabilitata.";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
@@ -37,31 +40,22 @@ const magazzinoIds: number[] = [];
 const politicaIds: number[] = [];
 const prodottoIds: number[] = [];
 const zonaIds: number[] = [];
-let testUserId: number;
 
 function makeApp(isSuperAdmin = false): Express {
   const app = express();
+  let actor: ReturnType<typeof emporioActorFixture> | undefined;
   app.use(express.json());
-  app.use((req, _res, next) => {
-    req.user = {
-      id: testUserId,
-      username: "admin",
-      nome: "Admin",
-      cognome: null,
-      matricola: null,
-      ruoloId: null,
-      ruoloNome: null,
+  app.use(async (req, _res, next) => {
+    actor ??= emporioActorFixture({
       centroAscoltoId: null,
-      centroAscoltoNome: null,
       areaOperativaId: null,
-      areaOperativaNome: null,
       zonaUdsId: null,
-      zonaUdsNome: null,
       isSuperAdmin,
       isAdmin: true,
       aree: [],
-      mustChangePassword: false,
-    };
+      permessi: [],
+    });
+    req.user = await actor;
     next();
   });
   app.use(impostazioniModuliRouter);
@@ -74,13 +68,19 @@ function makeApp(isSuperAdmin = false): Express {
   return app;
 }
 
-async function setModuli(emporioAbilitato: boolean, unitaStradaAbilitata: boolean): Promise<void> {
+async function setModuli(
+  emporioAbilitato: boolean,
+  unitaStradaAbilitata: boolean,
+): Promise<void> {
   await updateModuloAmbiente("EMPORIO_SOLIDALE", emporioAbilitato, null);
   await updateModuloAmbiente("UDS", unitaStradaAbilitata, null);
 }
 
 async function createAreaOperativa(): Promise<number> {
-  const [areaOperativa] = await db.insert(areeOperativeTable).values({ nome: `AreaOperativa ${rnd()}` }).returning({ id: areeOperativeTable.id });
+  const [areaOperativa] = await db
+    .insert(areeOperativeTable)
+    .values({ nome: `AreaOperativa ${rnd()}` })
+    .returning({ id: areeOperativeTable.id });
   areaOperativaIds.push(areaOperativa.id);
   return areaOperativa.id;
 }
@@ -94,34 +94,48 @@ async function createCentro(areaOperativaId: number): Promise<number> {
   return centro.id;
 }
 
-beforeAll(async () => {
-  const [testUser] = await db
-    .insert(utentiTable)
-    .values({ username: `impostazioni_moduli_${rnd()}`, passwordHash: "x", nome: "Test Impostazioni Moduli" })
-    .returning({ id: utentiTable.id });
-  testUserId = testUser.id;
-});
-
 beforeEach(async () => {
   await setModuli(false, true);
 });
 
 afterEach(async () => {
-  if (zonaIds.length > 0) await db.delete(zoneUdsTable).where(inArray(zoneUdsTable.id, zonaIds.splice(0)));
-  if (beneficiarioIds.length > 0) await db.delete(beneficiariTable).where(inArray(beneficiariTable.id, beneficiarioIds.splice(0)));
-  if (politicaIds.length > 0) await db.delete(politicheCreditoSolidaleTable).where(inArray(politicheCreditoSolidaleTable.id, politicaIds.splice(0)));
-  if (prodottoIds.length > 0) await db.delete(prodottiTable).where(inArray(prodottiTable.id, prodottoIds.splice(0)));
-  if (magazzinoIds.length > 0) await db.delete(magazziniTable).where(inArray(magazziniTable.id, magazzinoIds.splice(0)));
-  if (centroIds.length > 0) await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, centroIds.splice(0)));
-  if (areaOperativaIds.length > 0) await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, areaOperativaIds.splice(0)));
-  await db.delete(impostazioniModuliTable).where(eq(impostazioniModuliTable.id, 1));
-  await db.delete(auditConfigurazioniTable).where(eq(auditConfigurazioniTable.utenteId, testUserId));
+  await cleanupEmporioActorFixtures();
+  if (zonaIds.length > 0)
+    await db
+      .delete(zoneUdsTable)
+      .where(inArray(zoneUdsTable.id, zonaIds.splice(0)));
+  if (beneficiarioIds.length > 0)
+    await db
+      .delete(beneficiariTable)
+      .where(inArray(beneficiariTable.id, beneficiarioIds.splice(0)));
+  if (politicaIds.length > 0)
+    await db
+      .delete(politicheCreditoSolidaleTable)
+      .where(inArray(politicheCreditoSolidaleTable.id, politicaIds.splice(0)));
+  if (prodottoIds.length > 0)
+    await db
+      .delete(prodottiTable)
+      .where(inArray(prodottiTable.id, prodottoIds.splice(0)));
+  if (magazzinoIds.length > 0)
+    await db
+      .delete(magazziniTable)
+      .where(inArray(magazziniTable.id, magazzinoIds.splice(0)));
+  if (centroIds.length > 0)
+    await db
+      .delete(centriAscoltoTable)
+      .where(inArray(centriAscoltoTable.id, centroIds.splice(0)));
+  if (areaOperativaIds.length > 0)
+    await db
+      .delete(areeOperativeTable)
+      .where(inArray(areeOperativeTable.id, areaOperativaIds.splice(0)));
+  await db
+    .delete(impostazioniModuliTable)
+    .where(eq(impostazioniModuliTable.id, 1));
   await setModuli(false, true);
 });
 
 afterAll(async () => {
-  await db.delete(auditConfigurazioniTable).where(eq(auditConfigurazioniTable.utenteId, testUserId));
-  await db.delete(utentiTable).where(eq(utentiTable.id, testUserId));
+  await cleanupEmporioActorFixtures();
   await setModuli(true, true);
   await pool.end();
 });
@@ -165,23 +179,36 @@ describe("Impostazioni moduli", () => {
 
     const prodotto = await request(app)
       .post("/prodotti")
-      .send({ nome: `Prodotto ${rnd()}`, tipoProdotto: "alimentare", unitaMisura: "pz", abilitatoEmporio: true });
+      .send({
+        nome: `Prodotto ${rnd()}`,
+        tipoProdotto: "alimentare",
+        unitaMisura: "pz",
+        abilitatoEmporio: true,
+      });
     expect(prodotto.status).toBe(403);
     expect(prodotto.body.error).toBe(EMPORIO_DISABLED_MSG);
 
-    const beneficiario = await request(app)
-      .post("/beneficiari")
-      .send({ nome: "Credito", cognome: rnd(), sesso: "M", areaOperativaId, centroAscoltoId: centroId });
+    const beneficiario = await request(app).post("/beneficiari").send({
+      nome: "Credito",
+      cognome: rnd(),
+      sesso: "M",
+      areaOperativaId,
+      centroAscoltoId: centroId,
+    });
     expect(beneficiario.status).toBe(201);
     beneficiarioIds.push(beneficiario.body.id);
     const beneficiarioCredito = await request(app)
-      .patch(`/credito-solidale/beneficiari/${beneficiario.body.id}/configurazione`)
+      .patch(
+        `/credito-solidale/beneficiari/${beneficiario.body.id}/configurazione`,
+      )
       .send({ creditoSolidaleAbilitato: true });
     expect(beneficiarioCredito.status).toBe(403);
     expect(beneficiarioCredito.body.error).toBe(EMPORIO_DISABLED_MSG);
 
     const beneficiarioQuota = await request(app)
-      .patch(`/credito-solidale/beneficiari/${beneficiario.body.id}/configurazione`)
+      .patch(
+        `/credito-solidale/beneficiari/${beneficiario.body.id}/configurazione`,
+      )
       .send({ creditoSolidaleMensileAssegnato: 40 });
     expect(beneficiarioQuota.status).toBe(403);
     expect(beneficiarioQuota.body.error).toBe(EMPORIO_DISABLED_MSG);
@@ -199,15 +226,13 @@ describe("Impostazioni moduli", () => {
     const centroId = await createCentro(areaOperativaId);
 
     const app = makeApp();
-    const created = await request(app)
-      .post("/beneficiari")
-      .send({
-        nome: "Quota",
-        cognome: rnd(),
-        sesso: "M",
-        areaOperativaId,
-        centroAscoltoId: centroId,
-      });
+    const created = await request(app).post("/beneficiari").send({
+      nome: "Quota",
+      cognome: rnd(),
+      sesso: "M",
+      areaOperativaId,
+      centroAscoltoId: centroId,
+    });
     expect(created.status).toBe(201);
     beneficiarioIds.push(created.body.id);
     const res = await request(app)
@@ -223,7 +248,9 @@ describe("Impostazioni moduli", () => {
     expect(res.body.creditoSolidaleMensileAssegnato).toBe(70);
     expect(res.body.creditoSolidaleMensileManuale).toBe(true);
     expect(res.body.creditoSolidaleMotivoModifica).toBe("Esigenza temporanea");
-    expect(typeof res.body.creditoSolidaleDataUltimaModificaQuota).toBe("string");
+    expect(typeof res.body.creditoSolidaleDataUltimaModificaQuota).toBe(
+      "string",
+    );
   });
 
   it("blocca nuove operazioni UDS quando Unità di Strada è disabilitata", async () => {
@@ -235,17 +262,29 @@ describe("Impostazioni moduli", () => {
       .post("/zone-uds")
       .send({ nome: `Zona ${rnd()}`, areaOperativaId });
     expect(zona.status).toBe(403);
-    expect(zona.body.error).toBe("Modulo UDS non abilitato per questo ambiente");
+    expect(zona.body.error).toBe(
+      "Modulo UDS non abilitato per questo ambiente",
+    );
 
-    const createUds = await request(app)
-      .post("/beneficiari")
-      .send({ nome: "Uds", cognome: rnd(), sesso: "M", uds: true, areaOperativaId });
+    const createUds = await request(app).post("/beneficiari").send({
+      nome: "Uds",
+      cognome: rnd(),
+      sesso: "M",
+      uds: true,
+      areaOperativaId,
+    });
     expect(createUds.status).toBe(403);
     expect(createUds.body.error).toBe(UDS_DISABLED_MSG);
 
     const [beneficiario] = await db
       .insert(beneficiariTable)
-      .values({ codice: `BEN-${rnd()}`, nome: "Patch", cognome: rnd(), sesso: "F", areaOperativaId })
+      .values({
+        codice: `BEN-${rnd()}`,
+        nome: "Patch",
+        cognome: rnd(),
+        sesso: "F",
+        areaOperativaId,
+      })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(beneficiario.id);
 

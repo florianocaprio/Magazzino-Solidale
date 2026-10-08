@@ -29,13 +29,20 @@ import {
   canAccessZonaUds,
   centroScopeFilter,
   areaOperativaScopeFilter,
-} from "../lib/centroScope";
+  zonaUdsScopeFilter,
+} from "../lib/emporioScope";
 import { requireModulo } from "../lib/featureFlags";
 import {
   EMPORIO_DISABLED_MSG,
   isEmporioEnabled,
 } from "../lib/impostazioniModuli";
-import { requirePermission } from "../middlewares/auth";
+import {
+  requirePermission,
+  requireEmporioCommandTx,
+  EmporioScopeError,
+  currentEmporioActor,
+  emporioScopeErrorHandler,
+} from "../lib/emporioScope";
 import {
   UpdateBeneficiarioCreditoInput,
   zodErrorMessage,
@@ -143,7 +150,10 @@ function canAccessBeneficiario(
 ): boolean {
   return (
     canAccessCentro(beneficiario.centroAscoltoId, callerCentroId(req)) &&
-    canAccessAreaOperativa(beneficiario.areaOperativaId, callerAreaOperativaId(req)) &&
+    canAccessAreaOperativa(
+      beneficiario.areaOperativaId,
+      callerAreaOperativaId(req),
+    ) &&
     canAccessZonaUds(beneficiario.zonaUdsId, callerZonaUdsId(req))
   );
 }
@@ -196,7 +206,10 @@ async function findPolicyByBeneficiario(
         and(
           eq(politicheCreditoSolidaleTable.attiva, true),
           isNull(politicheCreditoSolidaleTable.centroAscoltoId),
-          eq(politicheCreditoSolidaleTable.areaOperativaId, beneficiario.areaOperativaId),
+          eq(
+            politicheCreditoSolidaleTable.areaOperativaId,
+            beneficiario.areaOperativaId,
+          ),
         ),
       )
       .orderBy(desc(politicheCreditoSolidaleTable.id))
@@ -382,12 +395,20 @@ type CreaMovimentoInput = {
   note?: string | null;
   motivo?: string | null;
   operatoreId?: number | null;
+  permission?: string;
 };
 
 async function creaMovimentoCreditoSolidaleTx(
   tx: Tx,
   input: CreaMovimentoInput,
 ) {
+  await requireEmporioCommandTx(
+    tx,
+    input.operatoreId ?? null,
+    input.permission ?? "credito.adjust",
+    { beneficiarioId: input.beneficiarioId },
+    false,
+  );
   await tx.execute(
     sql`SELECT id FROM ${beneficiariTable} WHERE ${beneficiariTable.id} = ${input.beneficiarioId} FOR UPDATE`,
   );
@@ -515,11 +536,19 @@ async function buildMonthlyPreview(
   } else if (centroAscoltoId !== undefined) {
     conditions.push(eq(beneficiariTable.centroAscoltoId, centroAscoltoId));
   }
-  const areaOperativaFilter = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativa);
+  const areaOperativaFilter = areaOperativaScopeFilter(
+    beneficiariTable.areaOperativaId,
+    callerAreaOperativa,
+  );
   if (areaOperativaFilter) conditions.push(areaOperativaFilter);
   else if (areaOperativaId !== undefined) {
     conditions.push(eq(beneficiariTable.areaOperativaId, areaOperativaId));
   }
+  const zoneFilter = zonaUdsScopeFilter(
+    beneficiariTable.zonaUdsId,
+    callerZonaUdsId(req),
+  );
+  if (zoneFilter) conditions.push(zoneFilter);
 
   const rows = await db
     .select({
@@ -532,7 +561,10 @@ async function buildMonthlyPreview(
       centriAscoltoTable,
       eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
     )
-    .leftJoin(areeOperativeTable, eq(beneficiariTable.areaOperativaId, areeOperativeTable.id))
+    .leftJoin(
+      areeOperativeTable,
+      eq(beneficiariTable.areaOperativaId, areeOperativeTable.id),
+    )
     .where(and(...conditions))
     .orderBy(beneficiariTable.cognome, beneficiariTable.nome);
 
@@ -703,10 +735,18 @@ router.get(
       if (scoped) conditions.push(scoped);
     } else if (centro.value != null)
       conditions.push(eq(beneficiariTable.centroAscoltoId, centro.value));
-    const areaScoped = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerArea);
+    const areaScoped = areaOperativaScopeFilter(
+      beneficiariTable.areaOperativaId,
+      callerArea,
+    );
     if (areaScoped) conditions.push(areaScoped);
     else if (area.value != null)
       conditions.push(eq(beneficiariTable.areaOperativaId, area.value));
+    const zoneFilter = zonaUdsScopeFilter(
+      beneficiariTable.zonaUdsId,
+      callerZonaUdsId(req),
+    );
+    if (zoneFilter) conditions.push(zoneFilter);
     const where = conditions.length ? and(...conditions) : undefined;
     const [{ total }] = await db
       .select({ total: sql<number>`count(*)::int` })
@@ -724,7 +764,10 @@ router.get(
         centriAscoltoTable,
         eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
       )
-      .leftJoin(areeOperativeTable, eq(beneficiariTable.areaOperativaId, areeOperativeTable.id))
+      .leftJoin(
+        areeOperativeTable,
+        eq(beneficiariTable.areaOperativaId, areeOperativeTable.id),
+      )
       .leftJoin(
         magazziniTable,
         eq(beneficiariTable.magazzinoEmporioPreferitoId, magazziniTable.id),
@@ -809,7 +852,7 @@ router.get(
       conditions.push(eq(creditoSolidaleMovimentiTable.annullato, false));
     if (callerCentro != null) {
       const f = centroScopeFilter(
-        creditoSolidaleMovimentiTable.centroAscoltoId,
+        beneficiariTable.centroAscoltoId,
         callerCentro,
       );
       if (f) conditions.push(f);
@@ -822,15 +865,23 @@ router.get(
       );
     }
     const areaOperativaFilter = areaOperativaScopeFilter(
-      creditoSolidaleMovimentiTable.areaOperativaId,
+      beneficiariTable.areaOperativaId,
       callerAreaOperativa,
     );
     if (areaOperativaFilter) conditions.push(areaOperativaFilter);
     else if (q.areaOperativaId) {
       conditions.push(
-        eq(creditoSolidaleMovimentiTable.areaOperativaId, Number(q.areaOperativaId)),
+        eq(
+          creditoSolidaleMovimentiTable.areaOperativaId,
+          Number(q.areaOperativaId),
+        ),
       );
     }
+    const zoneFilter = zonaUdsScopeFilter(
+      beneficiariTable.zonaUdsId,
+      callerZonaUdsId(req),
+    );
+    if (zoneFilter) conditions.push(zoneFilter);
     const rows = await selectMovimenti(conditions);
     res.json(rows.map(fmtMovimento));
   },
@@ -896,45 +947,50 @@ router.patch(
       res.status(access.status ?? 400).json({ error: access.error });
       return;
     }
-    const existing = access.beneficiario;
     const input = parsed.data;
-    const enabled =
-      input.creditoSolidaleAbilitato ?? existing.creditoSolidaleAbilitato;
-    let stato = input.creditoSolidaleStato ?? existing.creditoSolidaleStato;
-    if (!enabled) stato = "non_abilitato";
-    else if (stato === "non_abilitato") stato = "attivo";
-    if (enabled && existing.centroAscoltoId == null) {
-      res.status(400).json({
-        error:
-          "Associa un Centro di Ascolto prima di abilitare il Credito Solidale.",
-      });
-      return;
-    }
-    const updates: Partial<typeof beneficiariTable.$inferInsert> = {
-      creditoSolidaleAbilitato: enabled,
-      creditoSolidaleStato: stato,
-      dataAggiornamento: new Date(),
-    };
-    if (input.creditoSolidaleNote !== undefined)
-      updates.creditoSolidaleNote = input.creditoSolidaleNote;
-    if (input.creditoSolidaleMensileAssegnato !== undefined) {
-      const assegnato = input.creditoSolidaleMensileAssegnato;
-      updates.creditoSolidaleMensileAssegnato =
-        assegnato == null ? null : decimalString(assegnato);
-      updates.creditoSolidaleMensileManuale =
-        assegnato != null &&
-        input.creditoSolidaleMensileSuggerito != null &&
-        round2(assegnato) !== round2(input.creditoSolidaleMensileSuggerito);
-      updates.creditoSolidaleDataUltimaModificaQuota = new Date();
-    }
-    if (input.creditoSolidaleMotivoModifica !== undefined) {
-      updates.creditoSolidaleMotivoModifica =
-        input.creditoSolidaleMotivoModifica;
-    }
-    if (enabled && !existing.creditoSolidaleAbilitato)
-      updates.creditoSolidaleDataAbilitazione = new Date();
-
     const row = await db.transaction(async (tx) => {
+      const { beneficiary: existing } = await requireEmporioCommandTx(
+        tx,
+        req.user!.id,
+        "credito.quota.manage",
+        { beneficiarioId },
+        false,
+      );
+      const enabled =
+        input.creditoSolidaleAbilitato ?? existing.creditoSolidaleAbilitato;
+      let stato = input.creditoSolidaleStato ?? existing.creditoSolidaleStato;
+      if (!enabled) stato = "non_abilitato";
+      else if (stato === "non_abilitato") stato = "attivo";
+      if (enabled && existing.centroAscoltoId == null) {
+        throw new EmporioScopeError(
+          400,
+          "Associa un Centro di Ascolto prima di abilitare il Credito Solidale.",
+        );
+      }
+      const updates: Partial<typeof beneficiariTable.$inferInsert> = {
+        creditoSolidaleAbilitato: enabled,
+        creditoSolidaleStato: stato,
+        dataAggiornamento: new Date(),
+      };
+      if (input.creditoSolidaleNote !== undefined)
+        updates.creditoSolidaleNote = input.creditoSolidaleNote;
+      if (input.creditoSolidaleMensileAssegnato !== undefined) {
+        const assegnato = input.creditoSolidaleMensileAssegnato;
+        updates.creditoSolidaleMensileAssegnato =
+          assegnato == null ? null : decimalString(assegnato);
+        updates.creditoSolidaleMensileManuale =
+          assegnato != null &&
+          input.creditoSolidaleMensileSuggerito != null &&
+          round2(assegnato) !== round2(input.creditoSolidaleMensileSuggerito);
+        updates.creditoSolidaleDataUltimaModificaQuota = new Date();
+      }
+      if (input.creditoSolidaleMotivoModifica !== undefined) {
+        updates.creditoSolidaleMotivoModifica =
+          input.creditoSolidaleMotivoModifica;
+      }
+      if (enabled && !existing.creditoSolidaleAbilitato)
+        updates.creditoSolidaleDataAbilitazione = new Date();
+
       const [updated] = await tx
         .update(beneficiariTable)
         .set(updates)
@@ -1021,7 +1077,17 @@ router.post(
       return;
     }
 
-    if (await monthlyRechargeExists(b.id, periodoRiferimento)) {
+    const alreadyRecharged = await db.transaction(async (tx) => {
+      await requireEmporioCommandTx(
+        tx,
+        req.user!.id,
+        "credito.adjust",
+        { beneficiarioId: b.id },
+        false,
+      );
+      return monthlyRechargeExists(b.id, periodoRiferimento, tx);
+    });
+    if (alreadyRecharged) {
       const saldo = await getSaldoBeneficiarioResponse(b.id);
       res.json({
         periodoRiferimento,
@@ -1201,6 +1267,13 @@ router.post(
         .limit(1);
       if (!originale)
         return { error: MOVIMENTO_NOT_FOUND_MSG, status: 404 } as const;
+      await requireEmporioCommandTx(
+        tx,
+        req.user!.id,
+        "credito.adjust",
+        { beneficiarioId: originale.beneficiarioId },
+        false,
+      );
       if (originale.annullato)
         return {
           error: "Il movimento è già stato stornato.",
@@ -1289,7 +1362,17 @@ router.post(
     let saltatiGiaRicaricati = preview.totaleGiaRicaricati;
     const note = nullableText(req.body?.note);
     await db.transaction(async (tx) => {
-      for (const riga of preview.righe.filter((r) => r.ricaricabile)) {
+      await currentEmporioActor(tx, req.user!.id, "credito.monthly.execute");
+      for (const riga of preview.righe
+        .filter((r) => r.ricaricabile)
+        .sort((a, b) => a.beneficiarioId - b.beneficiarioId)) {
+        await requireEmporioCommandTx(
+          tx,
+          req.user!.id,
+          "credito.monthly.execute",
+          { beneficiarioId: riga.beneficiarioId },
+          false,
+        );
         const exists = await monthlyRechargeExists(
           riga.beneficiarioId,
           preview.periodoRiferimento,
@@ -1306,6 +1389,7 @@ router.post(
           periodoRiferimento: preview.periodoRiferimento,
           quotaMensileAssegnata: riga.creditoSolidaleMensileAssegnato ?? null,
           origine: "ricarica_mensile",
+          permission: "credito.monthly.execute",
           note,
           operatoreId: req.user?.id ?? null,
         });
@@ -1339,4 +1423,5 @@ router.post(
   },
 );
 
+router.use(emporioScopeErrorHandler);
 export default router;

@@ -15,13 +15,16 @@ import {
   canAccessMagazzino,
   canUseBeneficiario,
   visibleMagazzinoIds,
-} from "../lib/centroScope";
+} from "../lib/emporioScope";
 import {
   EMPORIO_DISABLED_MSG,
   isEmporioEnabled,
 } from "../lib/impostazioniModuli";
 import { requireModulo } from "../lib/featureFlags";
-import { requirePermission } from "../middlewares/auth";
+import {
+  requirePermission,
+  emporioScopeErrorHandler,
+} from "../lib/emporioScope";
 import { resolveSessionRuntimeConfig } from "../lib/sessionConfig";
 import {
   InventoryDecimal,
@@ -158,9 +161,13 @@ router.get(
       beneficiarioId: asInt(q.beneficiarioId),
       magazzinoEmporioId: asInt(q.magazzinoEmporioId),
       centroAscoltoId: callerCentro ?? asInt(q.centroAscoltoId),
-      areaOperativaId: callerAreaOperativa ?? asInt(q.areaOperativaId ?? q.areaId),
+      areaOperativaId:
+        callerAreaOperativa ?? asInt(q.areaOperativaId ?? q.areaId),
       zonaUdsId: callerZona ?? asInt(q.zonaUdsId),
-      visibleMagazzinoIds: await visibleMagazzinoIds(callerCentro, callerAreaOperativa),
+      visibleMagazzinoIds: await visibleMagazzinoIds(
+        callerCentro,
+        callerAreaOperativa,
+      ),
       page,
       limit,
     });
@@ -316,4 +323,5 @@ router.post(
   },
 );
 
+router.use(emporioScopeErrorHandler);
 export default router;

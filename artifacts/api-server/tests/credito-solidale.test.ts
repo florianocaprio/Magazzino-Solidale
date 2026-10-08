@@ -14,6 +14,10 @@ import {
 import creditoSolidaleRouter from "../src/routes/credito-solidale";
 import politicheCreditoSolidaleRouter from "../src/routes/politiche-credito-solidale";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
+import {
+  emporioActorFixture,
+  cleanupEmporioActorFixtures,
+} from "./helpers/emporio-actor";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
@@ -36,7 +40,7 @@ function makeApp(user: {
 }): Express {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => {
+  app.use(async (req, _res, next) => {
     (req as unknown as { user: typeof user & { id: number } }).user = {
       id: 1,
       ...user,
@@ -44,6 +48,7 @@ function makeApp(user: {
       aree: user.aree ?? ["sociale", "uds", "emporio"],
       permessi: user.permessi ?? [],
     };
+    req.user = await emporioActorFixture({ ...req.user!, id: undefined });
     next();
   });
   app.use(politicheCreditoSolidaleRouter);
@@ -114,7 +119,9 @@ async function createBeneficiario(
 }
 
 async function createPolicy(data: Record<string, unknown>): Promise<number> {
-  const res = await request(makeApp({ centroAscoltoId: null, areaOperativaId: null }))
+  const res = await request(
+    makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+  )
     .post("/politiche-credito-solidale")
     .send({
       nome: `Politica ${rnd()}`,
@@ -149,6 +156,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await cleanupEmporioActorFixtures();
   if (policyIdsToReactivate.length > 0) {
     await db
       .update(politicheCreditoSolidaleTable)
@@ -195,7 +203,9 @@ afterAll(async () => {
 
 describe("Politiche Credito Solidale", () => {
   it("valida il giorno di ricarica mensile", async () => {
-    const res = await request(makeApp({ centroAscoltoId: null, areaOperativaId: null }))
+    const res = await request(
+      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+    )
       .post("/politiche-credito-solidale")
       .send({ nome: "Giorno non valido", giornoRicaricaMensile: 29 });
 
@@ -206,7 +216,9 @@ describe("Politiche Credito Solidale", () => {
   });
 
   it("valida il rapporto tra massimo e minimo mensile", async () => {
-    const res = await request(makeApp({ centroAscoltoId: null, areaOperativaId: null }))
+    const res = await request(
+      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+    )
       .post("/politiche-credito-solidale")
       .send({
         nome: "Massimo non valido",
@@ -253,7 +265,11 @@ describe("Politiche Credito Solidale", () => {
     const areaOperativaId = await createAreaOperativa();
     const centroId = await createCentro(areaOperativaId);
     await createPolicy({ nome: "Globale", creditoBaseNucleo: 10 });
-    await createPolicy({ nome: "Area", areaOperativaId, creditoBaseNucleo: 20 });
+    await createPolicy({
+      nome: "Area",
+      areaOperativaId,
+      creditoBaseNucleo: 20,
+    });
     await createPolicy({
       nome: "Centro",
       areaOperativaId,
@@ -264,7 +280,9 @@ describe("Politiche Credito Solidale", () => {
       areaOperativaId,
       centroAscoltoId: centroId,
     });
-    const beneficiarioAreaOperativa = await createBeneficiario({ areaOperativaId });
+    const beneficiarioAreaOperativa = await createBeneficiario({
+      areaOperativaId,
+    });
     const beneficiarioGlobale = await createBeneficiario();
 
     const app = makeApp({ centroAscoltoId: null, areaOperativaId: null });
@@ -391,7 +409,9 @@ describe("Movimenti Credito Solidale", () => {
       creditoSolidaleStato: "attivo",
     });
 
-    const res = await request(makeApp({ centroAscoltoId: null, areaOperativaId: null }))
+    const res = await request(
+      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+    )
       .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
       .send({ variazioneCredito: 25, motivo: "Avvio saldo" });
 
@@ -417,7 +437,9 @@ describe("Movimenti Credito Solidale", () => {
       .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
       .send({ variazioneCredito: 10 });
 
-    const res = await request(makeApp({ centroAscoltoId: null, areaOperativaId: null }))
+    const res = await request(
+      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+    )
       .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
       .send({ variazioneCredito: -15, motivo: "Controllo saldo" });
 

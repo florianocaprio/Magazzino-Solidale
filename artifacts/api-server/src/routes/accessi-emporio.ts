@@ -33,13 +33,18 @@ import {
   magazzinoScopeFilter,
   visibleMagazzinoIds,
   zonaUdsScopeFilter,
-} from "../lib/centroScope";
+} from "../lib/emporioScope";
 import {
   EMPORIO_DISABLED_MSG,
   isEmporioEnabled,
 } from "../lib/impostazioniModuli";
 import { requireModulo } from "../lib/featureFlags";
-import { requirePermission } from "../middlewares/auth";
+import {
+  requirePermission,
+  requireEmporioCommandTx,
+  syncEmporioScope,
+  emporioScopeErrorHandler,
+} from "../lib/emporioScope";
 import { auditEmporioTx } from "../lib/emporioAudit";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
@@ -206,7 +211,11 @@ async function validateMagazzinoEmporio(
     return { error: MSG_MAGAZZINO_EMPORIO, status: 400 };
   }
   if (
-    !(await canAccessMagazzino(id, callerCentroId(req), callerAreaOperativaId(req)))
+    !(await canAccessMagazzino(
+      id,
+      callerCentroId(req),
+      callerAreaOperativaId(req),
+    ))
   ) {
     return {
       error: "Magazzino non accessibile per il tuo profilo",
@@ -215,9 +224,13 @@ async function validateMagazzinoEmporio(
   }
   if (magazzino.stato !== "attivo")
     return { error: "L'Emporio selezionato non è attivo.", status: 400 };
-  if (beneficiario && magazzino.areaOperativaId !== beneficiario.areaOperativaId) {
+  if (
+    beneficiario &&
+    magazzino.areaOperativaId !== beneficiario.areaOperativaId
+  ) {
     return {
-      error: "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario.",
+      error:
+        "L'Emporio deve appartenere alla stessa Area Operativa del Beneficiario.",
       status: 400,
     };
   }
@@ -332,7 +345,10 @@ function selectAccessi(conditions: SQL[] = []) {
       centriAscoltoTable,
       eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
     )
-    .leftJoin(areeOperativeTable, eq(beneficiariTable.areaOperativaId, areeOperativeTable.id))
+    .leftJoin(
+      areeOperativeTable,
+      eq(beneficiariTable.areaOperativaId, areeOperativeTable.id),
+    )
     .leftJoin(
       magazziniTable,
       eq(consegneTable.magazzinoEmporioId, magazziniTable.id),
@@ -419,7 +435,9 @@ router.get(
     }
     const requestedAreaOperativa = q.areaOperativaId ?? q.areaId;
     if (requestedAreaOperativa)
-      conditions.push(eq(beneficiariTable.areaOperativaId, Number(requestedAreaOperativa)));
+      conditions.push(
+        eq(beneficiariTable.areaOperativaId, Number(requestedAreaOperativa)),
+      );
     const areaOperativaFilter = areaOperativaScopeFilter(
       beneficiariTable.areaOperativaId,
       callerAreaOperativaId(req),
@@ -432,7 +450,10 @@ router.get(
     if (zonaFilter) conditions.push(zonaFilter);
     const magazzinoFilter = magazzinoScopeFilter(
       consegneTable.magazzinoEmporioId,
-      await visibleMagazzinoIds(callerCentroId(req), callerAreaOperativaId(req)),
+      await visibleMagazzinoIds(
+        callerCentroId(req),
+        callerAreaOperativaId(req),
+      ),
     );
     if (magazzinoFilter) conditions.push(magazzinoFilter);
 
@@ -451,7 +472,10 @@ router.get(
         centriAscoltoTable,
         eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
       )
-      .leftJoin(areeOperativeTable, eq(beneficiariTable.areaOperativaId, areeOperativeTable.id))
+      .leftJoin(
+        areeOperativeTable,
+        eq(beneficiariTable.areaOperativaId, areeOperativeTable.id),
+      )
       .leftJoin(
         magazziniTable,
         eq(consegneTable.magazzinoEmporioId, magazziniTable.id),
@@ -528,7 +552,10 @@ router.get(
         centriAscoltoTable,
         eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
       )
-      .leftJoin(areeOperativeTable, eq(beneficiariTable.areaOperativaId, areeOperativeTable.id))
+      .leftJoin(
+        areeOperativeTable,
+        eq(beneficiariTable.areaOperativaId, areeOperativeTable.id),
+      )
       .leftJoin(
         magazziniTable,
         eq(beneficiariTable.magazzinoEmporioPreferitoId, magazziniTable.id),
@@ -652,6 +679,12 @@ router.post(
         const civilDay = yyyyMmDd(dataOraInizio);
         await tx.execute(
           sql`SELECT pg_advisory_xact_lock(hashtext('accesso-emporio'), hashtext(${`${beneficiarioId}:${civilDay}`}))`,
+        );
+        await requireEmporioCommandTx(
+          tx,
+          req.user!.id,
+          "emporio.access.manage",
+          { beneficiarioId, magazzinoEmporioId },
         );
         if (await hasDuplicateAccesso(tx, beneficiarioId, dataOraInizio)) {
           throw new Error(MSG_DUPLICATO);
@@ -800,8 +833,18 @@ router.patch(
           .from(consegneTable)
           .where(eq(consegneTable.id, id));
         if (!locked) throw new SpesaAccessoError(404, MSG_ACCESSO_NON_TROVATO);
-        if (!(await canAccessAccessoEmporio(locked, req)))
-          throw new SpesaAccessoError(403, MSG_RISORSA_NON_ACCESSIBILE);
+        for (const resource of [
+          locked,
+          { beneficiarioId, magazzinoEmporioId },
+        ].sort((a, b) => a.beneficiarioId - b.beneficiarioId)) {
+          await requireEmporioCommandTx(
+            tx,
+            req.user!.id,
+            "emporio.access.manage",
+            resource,
+            resource !== locked,
+          );
+        }
         const [linkedSession] = await tx
           .select({ id: sessioniCassaEmporioTable.id })
           .from(sessioniCassaEmporioTable)
@@ -921,8 +964,14 @@ router.patch(
           .from(consegneTable)
           .where(eq(consegneTable.id, id));
         if (!locked) throw new SpesaAccessoError(404, MSG_ACCESSO_NON_TROVATO);
-        if (!(await canAccessAccessoEmporio(locked, req)))
-          throw new SpesaAccessoError(403, MSG_RISORSA_NON_ACCESSIBILE);
+        const { actor } = await requireEmporioCommandTx(
+          tx,
+          req.user!.id,
+          "emporio.access.manage",
+          locked,
+          false,
+        );
+        syncEmporioScope(req, actor);
         const current = locked.statoAccessoEmporio as StatoAccesso;
         if (
           stato !== current &&
@@ -993,4 +1042,5 @@ router.patch(
   },
 );
 
+router.use(emporioScopeErrorHandler);
 export default router;

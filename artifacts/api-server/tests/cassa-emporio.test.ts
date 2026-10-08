@@ -43,6 +43,10 @@ import creditoSolidaleRouter from "../src/routes/credito-solidale";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 import { dataCivileEuropeRome } from "../src/lib/interventiWorkflow";
 import { quantitaNettaMensileProdotto } from "../src/lib/speseEmporio";
+import {
+  emporioActorFixture,
+  cleanupEmporioActorFixtures,
+} from "./helpers/emporio-actor";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
@@ -71,7 +75,7 @@ function makeApp(
 ): Express {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => {
+  app.use(async (req, _res, next) => {
     (
       req as unknown as {
         user: {
@@ -91,6 +95,7 @@ function makeApp(
       permessi: options.permessi ?? [],
       aree: options.aree ?? ["emporio"],
     };
+    req.user = await emporioActorFixture(req.user!);
     next();
   });
   app.use(cassaEmporioRouter);
@@ -380,6 +385,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await cleanupEmporioActorFixtures();
   const currentSpesaIds = spesaIds.splice(0);
   const currentBollaIds = bollaIds.splice(0);
   const currentScaricoIds = scaricoIds.splice(0);
@@ -511,9 +517,11 @@ describe("Cassa Emporio", () => {
       expect((await request(denied).get("/spese-emporio")).status).toBe(403);
     }
 
+    const territory = await createFixture();
     const viewOnly = makeApp({
       isAdmin: false,
       permessi: ["emporio.cassa.view", "emporio.sales.view"],
+      areaOperativaId: territory.areaOperativaId,
     });
     expect(
       (await request(viewOnly).get("/cassa-emporio/sessioni")).status,

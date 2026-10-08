@@ -1,5 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  emporioReadableData,
+  emporioReadDenied,
+  useEmporioSecurity,
+  withEmporioSecurity,
+} from "@/hooks/use-emporio-security";
 import { Link } from "wouter";
 import {
   getGetSpesaEmporioQueryKey,
@@ -19,6 +25,7 @@ import {
   useDeleteSessioneCassaEmporioRiga,
   useForzaAccessoEmporioCassa,
   useGetSessioneCassaEmporio,
+  useGetSpesaEmporio,
   useGetImpostazioniStampa,
   useListAreeOperative,
   useListMagazzini,
@@ -313,7 +320,9 @@ function statusClass(stato: string | null | undefined): string {
   return "bg-muted text-muted-foreground";
 }
 
-export default function EmporioCassa() {
+export default withEmporioSecurity(EmporioCassa);
+
+function EmporioCassa() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -333,9 +342,11 @@ export default function EmporioCassa() {
   const [beneficiarioSearch, setBeneficiarioSearch] = useState("");
   const [selectedBeneficiario, setSelectedBeneficiario] =
     useState<SessioneCassaEmporioRicercaBeneficiarioResult | null>(null);
+  const selectionEpoch = useRef(0);
   const [selectedSessioneId, setSelectedSessioneId] = useState<number | null>(
     null,
   );
+  const security = useEmporioSecurity(selectedSessioneId);
   const [cassaDate, setCassaDate] = useState(todayInput());
   const [areaFilter, setAreaFilter] = useState(ALL);
   const [emporioFilter, setEmporioFilter] = useState(ALL);
@@ -349,7 +360,7 @@ export default function EmporioCassa() {
   const [motivoForzatura, setMotivoForzatura] = useState("");
   const [forzaEmporioId, setForzaEmporioId] = useState("");
   const [chiudiOpen, setChiudiOpen] = useState(false);
-  const [chiusuraSpesa, setChiusuraSpesa] = useState<SpesaEmporio | null>(null);
+  const [checkoutSpesa, setChiusuraSpesa] = useState<SpesaEmporio | null>(null);
   const [emailDraftBolla, setEmailDraftBolla] =
     useState<BollaEmporioEmailResult | null>(null);
   const [autoAccessoOpened, setAutoAccessoOpened] = useState(false);
@@ -369,14 +380,16 @@ export default function EmporioCassa() {
   const areaId = optionalId(areaFilter);
   const emporiFiltrati = useMemo(
     () =>
-      areaId == null ? empori : empori.filter((m) => m.areaOperativaId === areaId),
+      areaId == null
+        ? empori
+        : empori.filter((m) => m.areaOperativaId === areaId),
     [areaId, empori],
   );
   const contestoCassaCompleto = areaFilter !== ALL && emporioFilter !== ALL;
   const contestoSelezioneBloccato =
     selectedBeneficiario != null ||
     selectedSessioneId != null ||
-    chiusuraSpesa != null;
+    checkoutSpesa != null;
 
   useEffect(() => {
     if (emporioFilter === ALL) return;
@@ -410,12 +423,12 @@ export default function EmporioCassa() {
     setSessioniPage(1);
   }, [cassaDate, areaFilter, emporioFilter, sessioneSearch, statoFilter]);
 
-  const { data: beneficiari = [] } = useSearchBeneficiariCassaEmporio(
+  const beneficiariQuery = useSearchBeneficiariCassaEmporio(
     beneficiariSearchParams,
     {
       query: {
-        queryKey: getSearchBeneficiariCassaEmporioQueryKey(
-          beneficiariSearchParams,
+        ...security.readOptions(
+          getSearchBeneficiariCassaEmporioQueryKey(beneficiariSearchParams),
         ),
         enabled:
           emporioAbilitato &&
@@ -424,39 +437,61 @@ export default function EmporioCassa() {
       },
     },
   );
-  const { data: sessioni = [] } = useListSessioniCassaEmporio(
-    sessioniSearchParams,
-    {
-      query: {
-        queryKey: getListSessioniCassaEmporioQueryKey(sessioniSearchParams),
-        refetchInterval: 5000,
-      },
+  const beneficiari = emporioReadableData(beneficiariQuery) ?? [];
+  const sessioniQuery = useListSessioniCassaEmporio(sessioniSearchParams, {
+    query: {
+      ...security.readOptions(
+        getListSessioniCassaEmporioQueryKey(sessioniSearchParams),
+      ),
+      refetchInterval: 5000,
     },
-  );
+  });
+  const sessioni = emporioReadableData(sessioniQuery) ?? [];
   const sessioneQuery = useGetSessioneCassaEmporio(selectedSessioneId ?? 0, {
     query: {
-      queryKey: getGetSessioneCassaEmporioQueryKey(selectedSessioneId ?? 0),
+      ...security.readOptions(
+        getGetSessioneCassaEmporioQueryKey(selectedSessioneId ?? 0),
+      ),
       enabled: selectedSessioneId != null,
       refetchInterval: selectedSessioneId != null ? 2500 : false,
     },
   });
-  const sessione = sessioneQuery.data;
+  const sessione = emporioReadableData(sessioneQuery);
+  const chiusuraSpesaQuery = useGetSpesaEmporio(checkoutSpesa?.id ?? 0, {
+    query: {
+      ...security.readOptions(
+        getGetSpesaEmporioQueryKey(checkoutSpesa?.id ?? 0),
+      ),
+      enabled: checkoutSpesa != null && hasPermission("emporio.sales.view"),
+    },
+  });
+  const chiusuraSpesa = hasPermission("emporio.sales.view")
+    ? emporioReadableData(chiusuraSpesaQuery)
+    : undefined;
+  useEffect(() => {
+    if (
+      !emporioReadDenied(sessioneQuery.error) &&
+      !emporioReadDenied(beneficiariQuery.error)
+    )
+      return;
+    setSelectedBeneficiario(null);
+    setChiusuraSpesa(null);
+    setEmailDraftBolla(null);
+  }, [sessioneQuery.error, beneficiariQuery.error, security.context]);
   const prodottiSearchParams = {
     search: prodottoQuery || undefined,
     magazzinoEmporioId: sessione?.magazzinoEmporioId,
   };
-  const { data: prodotti = [] } = useSearchProdottiCassaEmporio(
-    prodottiSearchParams,
-    {
-      query: {
-        queryKey: getSearchProdottiCassaEmporioQueryKey(prodottiSearchParams),
-        enabled:
-          emporioAbilitato &&
-          sessione != null &&
-          sessioneModificabile(sessione),
-      },
+  const prodottiQuery = useSearchProdottiCassaEmporio(prodottiSearchParams, {
+    query: {
+      ...security.readOptions(
+        getSearchProdottiCassaEmporioQueryKey(prodottiSearchParams),
+      ),
+      enabled:
+        emporioAbilitato && sessione != null && sessioneModificabile(sessione),
     },
-  );
+  });
+  const prodotti = emporioReadableData(prodottiQuery) ?? [];
   const beneficiariVisibili = contestoSelezioneBloccato ? [] : beneficiari;
 
   const invalidate = () => {
@@ -482,9 +517,14 @@ export default function EmporioCassa() {
     refreshSessione();
   };
 
-  const apriSessione = useApriSessioneCassaEmporio({
+  const apriSessione = useApriSessioneCassaEmporio<
+    unknown,
+    { accept: () => boolean }
+  >({
     mutation: {
-      onSuccess: (data) => {
+      onMutate: () => ({ accept: security.isCurrent }),
+      onSuccess: (data, _variables, intent) => {
+        if (!intent?.accept()) return;
         setSelectedSessioneId(data.id);
         if (data.areaOperativaId != null && areaFilter === ALL)
           setAreaFilter(String(data.areaOperativaId));
@@ -512,9 +552,14 @@ export default function EmporioCassa() {
   const updateRiga = useUpdateSessioneCassaEmporioRiga({
     mutation: { onSuccess: refreshSessione, onError },
   });
-  const deleteRiga = useDeleteSessioneCassaEmporioRiga({
+  const deleteRiga = useDeleteSessioneCassaEmporioRiga<
+    unknown,
+    { accept: () => boolean }
+  >({
     mutation: {
-      onSuccess: (data) => {
+      onMutate: () => ({ accept: security.isCurrent }),
+      onSuccess: (data, _variables, intent) => {
+        if (!intent?.accept()) return;
         setSelectedSessioneId(data.id);
         queryClient.setQueryData(
           getGetSessioneCassaEmporioQueryKey(data.id),
@@ -550,9 +595,14 @@ export default function EmporioCassa() {
       onError,
     },
   });
-  const forzaAccesso = useForzaAccessoEmporioCassa({
+  const forzaAccesso = useForzaAccessoEmporioCassa<
+    unknown,
+    { accept: () => boolean }
+  >({
     mutation: {
-      onSuccess: (data) => {
+      onMutate: () => ({ accept: security.isCurrent }),
+      onSuccess: (data, _variables, intent) => {
+        if (!intent?.accept()) return;
         setForzaOpen(false);
         setMotivoForzatura("");
         setForzaEmporioId("");
@@ -569,9 +619,14 @@ export default function EmporioCassa() {
       onError,
     },
   });
-  const chiudi = useChiudiSessioneCassaEmporio({
+  const chiudi = useChiudiSessioneCassaEmporio<
+    unknown,
+    { accept: () => boolean }
+  >({
     mutation: {
-      onSuccess: (data) => {
+      onMutate: () => ({ accept: security.isCurrent }),
+      onSuccess: (data, _variables, intent) => {
+        if (!intent?.accept()) return;
         setChiudiOpen(false);
         setChiusuraSpesa(data.spesa ?? null);
         if (data.sessione?.id) {
@@ -636,7 +691,7 @@ export default function EmporioCassa() {
       beneficiarioSearch: b.beneficiarioCodice,
       magazzinoEmporioId: optionalId(emporioFilter),
       areaOperativaId: areaId ?? b.areaOperativaId ?? undefined,
-    }).catch(() => sessioni);
+    });
     return liveSessioni.find(
       (s) =>
         s.beneficiarioId === b.beneficiarioId &&
@@ -655,8 +710,16 @@ export default function EmporioCassa() {
       return;
     }
     setSelectedBeneficiario(b);
+    const epoch = ++selectionEpoch.current;
     setBeneficiarioSearch(b.beneficiarioCodice);
-    const existing = await findExistingOpenSession(b);
+    let existing: SessioneCassaEmporio | undefined;
+    try {
+      existing = await findExistingOpenSession(b);
+    } catch (error) {
+      onError(error);
+      return;
+    }
+    if (!security.isCurrent() || epoch !== selectionEpoch.current) return;
     if (existing) {
       setSelectedSessioneId(existing.id);
       void queryClient.invalidateQueries({
@@ -710,10 +773,17 @@ export default function EmporioCassa() {
       });
       return;
     }
-    const liveResults = await searchBeneficiariCassaEmporio({
-      search: currentSearch || undefined,
-      ...searchContext,
-    }).catch(() => beneficiari);
+    let liveResults: SessioneCassaEmporioRicercaBeneficiarioResult[];
+    try {
+      liveResults = await searchBeneficiariCassaEmporio({
+        search: currentSearch || undefined,
+        ...searchContext,
+      });
+    } catch (error) {
+      onError(error);
+      return;
+    }
+    if (!security.isCurrent()) return;
     const normalized = normalizeSearchToken(currentSearch);
     const exact =
       liveResults.find(
@@ -738,6 +808,7 @@ export default function EmporioCassa() {
       ...searchContext,
     })
       .then((results) => {
+        if (!security.isCurrent()) return;
         const normalized = normalizeSearchToken(value);
         const exact =
           results.find(
@@ -759,10 +830,17 @@ export default function EmporioCassa() {
     if (!activeSessione || !canEdit) return;
     const currentSearch = value.trim();
     if (!currentSearch) return;
-    const liveResults = await searchProdottiCassaEmporio({
-      search: currentSearch,
-      magazzinoEmporioId: activeSessione.magazzinoEmporioId,
-    }).catch(() => prodotti);
+    let liveResults: SessioneCassaEmporioRicercaProdottoResult[];
+    try {
+      liveResults = await searchProdottiCassaEmporio({
+        search: currentSearch,
+        magazzinoEmporioId: activeSessione.magazzinoEmporioId,
+      });
+    } catch (error) {
+      onError(error);
+      return;
+    }
+    if (!security.isCurrent()) return;
     const normalized = normalizeSearchToken(currentSearch);
     const exact = liveResults.find(
       (p) =>
@@ -793,6 +871,7 @@ export default function EmporioCassa() {
   };
 
   const resetContextSelection = () => {
+    selectionEpoch.current += 1;
     setSelectedBeneficiario(null);
     setSelectedSessioneId(null);
     setChiusuraSpesa(null);
@@ -892,6 +971,7 @@ export default function EmporioCassa() {
         id: spesa.id,
         data: {},
       });
+      if (!security.isCurrent()) return null;
       setEmailDraftBolla(result);
       if (result.spesa) {
         setChiusuraSpesa(result.spesa);
@@ -939,6 +1019,13 @@ export default function EmporioCassa() {
     await copyText(draft.corpo);
     toast({ title: t("cassaEmporio.testoEmailCopiato") });
   };
+
+  if (
+    emporioReadDenied(sessioniQuery.error) ||
+    emporioReadDenied(sessioneQuery.error) ||
+    emporioReadDenied(beneficiariQuery.error)
+  )
+    return <p role="alert">{t("accessiEmporio.accessoNegato")}</p>;
 
   return (
     <div className="space-y-4">
@@ -1334,8 +1421,19 @@ export default function EmporioCassa() {
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">
-                    {t("cassaEmporio.sessioneAperta")}
+                    {activeSessione.statoSessione === "aperta"
+                      ? t("cassaEmporio.sessioneAperta")
+                      : t(`cassaEmporio.${activeSessione.statoSessione}`)}
                   </CardTitle>
+                  {activeSessione.statoSessione === "chiusa" &&
+                    activeSessione.spesaEmporioId != null &&
+                    hasPermission("emporio.sales.view") && (
+                      <Link
+                        href={`/emporio/spese?spesaId=${activeSessione.spesaEmporioId}`}
+                      >
+                        {t("speseEmporio.dettaglio")}
+                      </Link>
+                    )}
                 </CardHeader>
                 <CardContent className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
                   <div>

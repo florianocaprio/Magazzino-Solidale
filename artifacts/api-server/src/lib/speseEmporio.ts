@@ -41,6 +41,7 @@ import {
 import { parseDbNumber } from "./disponibilitaMagazzino";
 import { auditEmporioTx } from "./emporioAudit";
 import { magazzinoScopeFilter } from "./centroScope";
+import { requireEmporioCommandTx } from "./emporioScope";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
 import {
   dateTimeEuropeRomeToUtc,
@@ -552,6 +553,12 @@ export async function chiudiSessioneCassaEmporio(opts: {
     const sessione = await lockSessione(tx, opts.sessioneId);
     if (!sessione)
       throw new SpesaEmporioError(404, "Sessione Cassa Emporio non trovata.");
+    await requireEmporioCommandTx(
+      tx,
+      opts.operatoreId,
+      "emporio.cassa.operate",
+      sessione,
+    );
     if (sessione.versione !== opts.versione) {
       throw new SpesaEmporioError(
         409,
@@ -1012,11 +1019,11 @@ export async function listSpeseEmporio(
     );
   if (params.centroAscoltoId != null)
     conditions.push(
-      eq(speseEmporioTable.centroAscoltoId, params.centroAscoltoId),
+      eq(beneficiariTable.centroAscoltoId, params.centroAscoltoId),
     );
   if (params.areaOperativaId != null)
     conditions.push(
-      eq(speseEmporioTable.areaOperativaId, params.areaOperativaId),
+      eq(beneficiariTable.areaOperativaId, params.areaOperativaId),
     );
   if (params.zonaUdsId != null)
     conditions.push(eq(beneficiariTable.zonaUdsId, params.zonaUdsId));
@@ -1185,6 +1192,13 @@ export async function stornaSpesaEmporio(
       .from(speseEmporioTable)
       .where(eq(speseEmporioTable.id, opts.spesaId));
     if (!spesa) throw new SpesaEmporioError(404, "Spesa Emporio non trovata.");
+    await requireEmporioCommandTx(
+      tx,
+      opts.operatoreId,
+      "emporio.sales.reverse",
+      spesa,
+      false,
+    );
 
     if (opts.idempotencyKey) {
       const [replay] = await tx
@@ -1569,6 +1583,20 @@ export async function registraInvioManualeBollaEmporio(opts: {
       : "Apertura email Bolla avviata nel client mail locale.";
 
   await db.transaction(async (tx) => {
+    const [currentSpesa] = await tx
+      .select()
+      .from(speseEmporioTable)
+      .where(eq(speseEmporioTable.id, opts.spesaId))
+      .for("update");
+    if (!currentSpesa)
+      throw new SpesaEmporioError(404, "Spesa Emporio non trovata.");
+    await requireEmporioCommandTx(
+      tx,
+      opts.operatoreId,
+      "emporio.sales.manage",
+      currentSpesa,
+      false,
+    );
     await tx
       .update(speseEmporioTable)
       .set({

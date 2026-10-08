@@ -40,7 +40,7 @@ import {
   magazzinoScopeFilter,
   visibleMagazzinoIds,
   zonaUdsScopeFilter,
-} from "../lib/centroScope";
+} from "../lib/emporioScope";
 import {
   calcolaDisponibilitaMagazzino,
   parseDbNumber,
@@ -57,7 +57,12 @@ import {
   SpesaEmporioError,
 } from "../lib/speseEmporio";
 import { lottoDistribuibileCondition } from "../lib/lottoPolicy";
-import { requirePermission } from "../middlewares/auth";
+import {
+  requirePermission,
+  requireEmporioCommandTx,
+  syncEmporioScope,
+  emporioScopeErrorHandler,
+} from "../lib/emporioScope";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 import {
   dateTimeEuropeRomeToUtc,
@@ -221,6 +226,12 @@ async function mutateSessioneLocked(
   return db.transaction(async (tx) => {
     const sessione = await lockSessioneTx(tx, id);
     if (!sessione) throw new CassaEmporioError(404, MSG_SESSIONE_NON_TROVATA);
+    await requireEmporioCommandTx(
+      tx,
+      req.user!.id,
+      "emporio.cassa.operate",
+      sessione,
+    );
     assertExpectedVersion(sessione, versione);
     if (!allowedStates.includes(sessione.statoSessione as StatoSessione)) {
       throw new CassaEmporioError(
@@ -852,6 +863,15 @@ router.get(
         eq(consegneTable.beneficiarioId, beneficiario.id),
         inArray(consegneTable.statoAccessoEmporio, [...STATI_ACCESSO_VALIDI]),
       ];
+      const visibleAccessWarehouse = magazzinoScopeFilter(
+        consegneTable.magazzinoEmporioId,
+        await visibleMagazzinoIds(
+          callerCentroId(req),
+          callerAreaOperativaId(req),
+        ),
+      );
+      if (visibleAccessWarehouse)
+        accessoConditions.push(visibleAccessWarehouse);
       if (magazzinoEmporioId != null)
         accessoConditions.push(
           eq(consegneTable.magazzinoEmporioId, magazzinoEmporioId),
@@ -1226,6 +1246,16 @@ router.post(
         ) {
           throw new CassaEmporioError(400, MSG_ACCESSO_NON_VALIDO);
         }
+        const current = await requireEmporioCommandTx(
+          tx,
+          req.user!.id,
+          "emporio.cassa.operate",
+          lockedAccess,
+        );
+        syncEmporioScope(req, current.actor);
+        const saldoCreditoIniziale = parseDbNumber(
+          current.beneficiary.creditoSolidaleSaldo,
+        );
         const lockedBeneficiaryContext =
           await lockAndAuthorizeBeneficiaryReportingContextTx(
             tx,
@@ -1407,6 +1437,16 @@ router.post(
         await tx.execute(
           sql`SELECT pg_advisory_xact_lock(hashtext('sessione-forzata-emporio'), hashtext(${`${beneficiarioId}:${magazzinoEmporioId}`}))`,
         );
+        const current = await requireEmporioCommandTx(
+          tx,
+          req.user!.id,
+          "emporio.cassa.force",
+          { beneficiarioId, magazzinoEmporioId },
+        );
+        syncEmporioScope(req, current.actor);
+        const saldoCreditoIniziale = parseDbNumber(
+          current.beneficiary.creditoSolidaleSaldo,
+        );
         const lockedBeneficiaryContext =
           await lockAndAuthorizeBeneficiaryReportingContextTx(
             tx,
@@ -1558,6 +1598,12 @@ router.post(
       const created = await db.transaction(async (tx) => {
         const locked = await lockSessioneTx(tx, sessione.id);
         if (!locked) throw new CassaEmporioError(404, MSG_SESSIONE_NON_TROVATA);
+        await requireEmporioCommandTx(
+          tx,
+          req.user!.id,
+          "emporio.cassa.operate",
+          locked,
+        );
         assertExpectedVersion(locked, versione);
         if (!["aperta", "pronta_per_chiusura"].includes(locked.statoSessione)) {
           throw new CassaEmporioError(
@@ -1633,6 +1679,12 @@ router.patch(
       const updated = await db.transaction(async (tx) => {
         const locked = await lockSessioneTx(tx, sessione.id);
         if (!locked) throw new CassaEmporioError(404, MSG_SESSIONE_NON_TROVATA);
+        await requireEmporioCommandTx(
+          tx,
+          req.user!.id,
+          "emporio.cassa.operate",
+          locked,
+        );
         assertExpectedVersion(locked, versione);
         if (!["aperta", "pronta_per_chiusura"].includes(locked.statoSessione)) {
           throw new CassaEmporioError(
@@ -1717,6 +1769,12 @@ router.delete(
       const updated = await db.transaction(async (tx) => {
         const locked = await lockSessioneTx(tx, sessione.id);
         if (!locked) throw new CassaEmporioError(404, MSG_SESSIONE_NON_TROVATA);
+        await requireEmporioCommandTx(
+          tx,
+          req.user!.id,
+          "emporio.cassa.operate",
+          locked,
+        );
         assertExpectedVersion(locked, versione);
         if (!["aperta", "pronta_per_chiusura"].includes(locked.statoSessione)) {
           throw new CassaEmporioError(
@@ -2037,4 +2095,5 @@ router.post(
   },
 );
 
+router.use(emporioScopeErrorHandler);
 export default router;

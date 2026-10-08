@@ -99,7 +99,9 @@ test("Cassa Emporio forza un accesso tracciato, calcola credito e chiude la spes
   );
   await productSearch.press("Enter");
   expect((await addLinePromise).status()).toBe(201);
-  await expect(page.getByText("Riso Demo 1kg", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("cell").getByText("Riso Demo 1kg", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText(/credito residuo previsto/i).locator(".."),
   ).toContainText(/49(?:,00)?/);

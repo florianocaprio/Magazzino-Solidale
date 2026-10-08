@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  emporioReadableData,
+  emporioReadDenied,
+  useEmporioSecurity,
+  withEmporioSecurity,
+} from "@/hooks/use-emporio-security";
+import {
   getGetSpesaEmporioQueryKey,
   getListSpeseEmporioQueryKey,
   useGetSpesaEmporio,
@@ -197,7 +203,9 @@ function emailBadgeClass(stato: string): string {
   return "bg-muted text-muted-foreground";
 }
 
-export default function EmporioSpese() {
+export default withEmporioSecurity(EmporioSpese);
+
+function EmporioSpese() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -215,6 +223,7 @@ export default function EmporioSpese() {
   const [centroFilter, setCentroFilter] = useState(ALL);
   const [emporioFilter, setEmporioFilter] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(initialSpesaId);
+  const security = useEmporioSecurity(selectedId);
   const [page, setPage] = useState(1);
   const [emailDraftBolla, setEmailDraftBolla] =
     useState<BollaEmporioEmailResult | null>(null);
@@ -243,13 +252,22 @@ export default function EmporioSpese() {
     page,
     limit: 50,
   };
-  const { data: spese = [] } = useListSpeseEmporio(params);
-  const { data: dettaglio } = useGetSpesaEmporio(selectedId ?? 0, {
+  const speseQuery = useListSpeseEmporio(params, {
+    query: security.readOptions(getListSpeseEmporioQueryKey(params)),
+  });
+  const spese = emporioReadableData(speseQuery) ?? [];
+  const dettaglioQuery = useGetSpesaEmporio(selectedId ?? 0, {
     query: {
       enabled: selectedId != null,
-      queryKey: getGetSpesaEmporioQueryKey(selectedId ?? 0),
+      ...security.readOptions(getGetSpesaEmporioQueryKey(selectedId ?? 0)),
     },
   });
+  const dettaglio = emporioReadableData(dettaglioQuery);
+  useEffect(() => {
+    if (!emporioReadDenied(dettaglioQuery.error)) return;
+    setEmailDraftBolla(null);
+    setStornoOpen(false);
+  }, [dettaglioQuery.error]);
   const registraInvioManualeBolla = useRegistraInvioManualeBollaSpesaEmporio();
   const stornaSpesa = useStornaSpesaEmporio();
 
@@ -305,6 +323,7 @@ export default function EmporioSpese() {
             `${dettaglio.id}-${Date.now()}`,
         },
       });
+      if (!security.isCurrent()) return;
       queryClient.setQueryData(
         getGetSpesaEmporioQueryKey(dettaglio.id),
         result.spesa,
@@ -346,6 +365,7 @@ export default function EmporioSpese() {
         id: spesa.id,
         data: {},
       });
+      if (!security.isCurrent()) return null;
       setEmailDraftBolla(result);
       if (result.spesa)
         queryClient.setQueryData(
@@ -391,6 +411,9 @@ export default function EmporioSpese() {
     await copyText(draft.corpo);
     toast({ title: t("speseEmporio.testoEmailCopiato") });
   };
+
+  if (emporioReadDenied(speseQuery.error))
+    return <p role="alert">{t("accessiEmporio.accessoNegato")}</p>;
 
   return (
     <div className="space-y-4 p-6">

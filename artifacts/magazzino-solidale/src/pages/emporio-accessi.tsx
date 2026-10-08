@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
   getListAccessiEmporioQueryKey,
+  getSearchBeneficiariAccessiEmporioQueryKey,
   useCreateAccessoEmporio,
   useListAccessiEmporio,
   useListCentriAscolto,
@@ -15,6 +16,12 @@ import {
   type BeneficiarioAccessoEmporioSearchResult,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  emporioReadableData,
+  emporioReadDenied,
+  useEmporioSecurity,
+  withEmporioSecurity,
+} from "@/hooks/use-emporio-security";
 import { useTranslation } from "react-i18next";
 import { Edit, Play, Search, UserCheck, UserX, XCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -135,10 +142,13 @@ function statusClass(stato: AccessoEmporioStato | null): string {
   return "bg-muted text-muted-foreground";
 }
 
-export default function EmporioAccessi() {
+export default withEmporioSecurity(EmporioAccessi);
+
+function EmporioAccessi() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const security = useEmporioSecurity();
   const { emporioAbilitato } = useModuloFlags();
   const { hasPermission } = useAuth();
   const canManage = hasPermission("emporio.access.manage");
@@ -176,7 +186,8 @@ export default function EmporioAccessi() {
     dataDa: dataDa || undefined,
     dataA: dataA || undefined,
     centroAscoltoId: centroFilter === ALL ? undefined : Number(centroFilter),
-    areaOperativaId: areaOperativaFilter === ALL ? undefined : Number(areaOperativaFilter),
+    areaOperativaId:
+      areaOperativaFilter === ALL ? undefined : Number(areaOperativaFilter),
     magazzinoEmporioId:
       emporioFilter === ALL ? undefined : Number(emporioFilter),
     statoAccessoEmporio:
@@ -188,7 +199,11 @@ export default function EmporioAccessi() {
     page,
     limit: 50,
   };
-  const { data: accessi, isLoading } = useListAccessiEmporio(params);
+  const accessiQuery = useListAccessiEmporio(params, {
+    query: security.readOptions(getListAccessiEmporioQueryKey(params)),
+  });
+  const accessi = emporioReadableData(accessiQuery),
+    isLoading = accessiQuery.isLoading;
   const { data: centri } = useListCentriAscolto();
   const { data: areaOperativa } = useListAreeOperative();
   const { data: magazzini } = useListMagazzini();
@@ -197,9 +212,30 @@ export default function EmporioAccessi() {
     : form.beneficiarioId
       ? { beneficiarioId: Number(form.beneficiarioId) }
       : undefined;
-  const { data: beneficiari } = useSearchBeneficiariAccessiEmporio(
+  const beneficiariQuery = useSearchBeneficiariAccessiEmporio(
     beneficiarioSearchParams,
+    {
+      query: security.readOptions(
+        getSearchBeneficiariAccessiEmporioQueryKey(beneficiarioSearchParams),
+      ),
+    },
   );
+  const beneficiari = emporioReadableData(beneficiariQuery);
+  useEffect(() => {
+    if (
+      !emporioReadDenied(accessiQuery.error) &&
+      !emporioReadDenied(beneficiariQuery.error)
+    )
+      return;
+    setEditing(null);
+    setAnnullando(null);
+    setBeneficiarioSearch("");
+    setForm((previous) => ({
+      ...previous,
+      beneficiarioId: "",
+      noteAccessoEmporio: "",
+    }));
+  }, [accessiQuery.error, beneficiariQuery.error]);
   const empori = useMemo(
     () =>
       (magazzini ?? []).filter(
@@ -374,6 +410,12 @@ export default function EmporioAccessi() {
       },
     );
   };
+
+  if (
+    emporioReadDenied(accessiQuery.error) ||
+    emporioReadDenied(beneficiariQuery.error)
+  )
+    return <p role="alert">{t("accessiEmporio.accessoNegato")}</p>;
 
   return (
     <div className="p-6 space-y-6">
@@ -717,7 +759,8 @@ export default function EmporioAccessi() {
                         )}
                         {canOperateCassa &&
                           (accesso.statoAccessoEmporio === "pianificato" ||
-                            accesso.statoAccessoEmporio === "confermato") && (
+                            accesso.statoAccessoEmporio === "confermato" ||
+                            accesso.statoAccessoEmporio === "effettuato") && (
                             <Button
                               variant="outline"
                               size="icon"

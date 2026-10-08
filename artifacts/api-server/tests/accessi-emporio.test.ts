@@ -25,6 +25,10 @@ import {
 import accessiEmporioRouter from "../src/routes/accessi-emporio";
 import consegneRouter from "../src/routes/consegne";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
+import {
+  emporioActorFixture,
+  cleanupEmporioActorFixtures,
+} from "./helpers/emporio-actor";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
 const centroRichiestoMsg =
@@ -57,7 +61,7 @@ function makeApp(
 ): Express {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => {
+  app.use(async (req, _res, next) => {
     (
       req as unknown as {
         user: {
@@ -77,6 +81,7 @@ function makeApp(
       permessi: options.permessi ?? [],
       aree: ["emporio"],
     };
+    req.user = await emporioActorFixture(req.user!);
     next();
   });
   app.use(accessiEmporioRouter);
@@ -217,6 +222,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await cleanupEmporioActorFixtures();
   await db
     .delete(auditConfigurazioniTable)
     .where(eq(auditConfigurazioniTable.utenteId, operatorUserId));
@@ -269,6 +275,7 @@ describe("Accessi Emporio", () => {
     const viewOnly = makeApp({
       isAdmin: false,
       permessi: ["emporio.access.view"],
+      areaOperativaId: await createAreaOperativa(),
     });
     expect((await request(viewOnly).get("/accessi-emporio")).status).toBe(200);
     expect(
@@ -315,7 +322,11 @@ describe("Accessi Emporio", () => {
   it("blocca beneficiario senza Centro di Ascolto", async () => {
     const areaOperativaId = await createAreaOperativa();
     const centroId = await createCentro(areaOperativaId);
-    const magazzinoId = await createMagazzino("emporio", areaOperativaId, centroId);
+    const magazzinoId = await createMagazzino(
+      "emporio",
+      areaOperativaId,
+      centroId,
+    );
     const beneficiarioId = await createBeneficiario({
       areaOperativaId,
       centroAscoltoId: null,
@@ -332,7 +343,11 @@ describe("Accessi Emporio", () => {
   it("blocca beneficiario non abilitato al Credito Solidale", async () => {
     const areaOperativaId = await createAreaOperativa();
     const centroId = await createCentro(areaOperativaId);
-    const magazzinoId = await createMagazzino("emporio", areaOperativaId, centroId);
+    const magazzinoId = await createMagazzino(
+      "emporio",
+      areaOperativaId,
+      centroId,
+    );
     const beneficiarioId = await createBeneficiario({
       areaOperativaId,
       centroAscoltoId: centroId,
@@ -350,7 +365,11 @@ describe("Accessi Emporio", () => {
   it("blocca un nuovo accesso per un beneficiario inattivo", async () => {
     const areaOperativaId = await createAreaOperativa();
     const centroId = await createCentro(areaOperativaId);
-    const magazzinoId = await createMagazzino("emporio", areaOperativaId, centroId);
+    const magazzinoId = await createMagazzino(
+      "emporio",
+      areaOperativaId,
+      centroId,
+    );
     const beneficiarioId = await createBeneficiario({
       areaOperativaId,
       centroAscoltoId: centroId,
@@ -368,7 +387,11 @@ describe("Accessi Emporio", () => {
   it("blocca beneficiario con Credito Solidale non attivo", async () => {
     const areaOperativaId = await createAreaOperativa();
     const centroId = await createCentro(areaOperativaId);
-    const magazzinoId = await createMagazzino("emporio", areaOperativaId, centroId);
+    const magazzinoId = await createMagazzino(
+      "emporio",
+      areaOperativaId,
+      centroId,
+    );
     const beneficiarioId = await createBeneficiario({
       areaOperativaId,
       centroAscoltoId: centroId,
@@ -497,8 +520,16 @@ describe("Accessi Emporio", () => {
     const areaOperativaId = await createAreaOperativa();
     const centroAId = await createCentro(areaOperativaId);
     const centroBId = await createCentro(areaOperativaId);
-    const magazzinoAId = await createMagazzino("emporio", areaOperativaId, centroAId);
-    const magazzinoBId = await createMagazzino("emporio", areaOperativaId, centroBId);
+    const magazzinoAId = await createMagazzino(
+      "emporio",
+      areaOperativaId,
+      centroAId,
+    );
+    const magazzinoBId = await createMagazzino(
+      "emporio",
+      areaOperativaId,
+      centroBId,
+    );
     const beneficiarioId = await createBeneficiario({
       areaOperativaId,
       centroAscoltoId: centroAId,

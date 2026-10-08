@@ -49,6 +49,9 @@ vi.mock("@workspace/api-client-react", () => ({
     "beneficiario",
   ],
   getListAccessiEmporioQueryKey: () => ["accessi"],
+  getSearchBeneficiariAccessiEmporioQueryKey: () => ["accessi", "ricerca"],
+  getListCreditoSolidaleBeneficiariQueryKey: () => ["credito", "lista"],
+  getListCreditoSolidaleMovimentiQueryKey: () => ["credito", "movimenti"],
   useCreateCreditoSolidaleRettifica: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -84,7 +87,10 @@ vi.mock("@workspace/api-client-react", () => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
+    getMutationCache: () => ({ subscribe: () => () => {} }),
+  }),
 }));
 
 vi.mock("react-i18next", () => ({
