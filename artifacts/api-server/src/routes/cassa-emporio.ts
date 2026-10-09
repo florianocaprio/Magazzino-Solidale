@@ -69,7 +69,11 @@ import {
   intervalloGiornoEuropeRome,
 } from "../lib/interventiViste";
 import { auditEmporioTx } from "../lib/emporioAudit";
-import { beneficiarioAccessScopeFromRequest } from "../lib/beneficiarioPolicy";
+import { emporioBeneficiarySearchCondition } from "../lib/emporioBeneficiarySearch";
+import {
+  emporioReportingScope as beneficiarioAccessScopeFromRequest,
+  emporioOperationalBeneficiaryCondition,
+} from "../lib/emporioScope";
 import {
   BeneficiaryReportingScopeError,
   lockAndAuthorizeBeneficiaryReportingContextTx,
@@ -715,8 +719,8 @@ router.get(
     );
     const magazzinoEmporioId = asInt(query.magazzinoEmporioId);
     const dateBounds = dayBounds(asText(query.data));
-    if (!q && requestedAreaOperativaId == null && magazzinoEmporioId == null) {
-      res.json([]);
+    if (magazzinoEmporioId == null) {
+      res.status(400).json({ error: "Seleziona prima un Emporio." });
       return;
     }
     let selectedMagazzino: typeof magazziniTable.$inferSelect | null = null;
@@ -737,83 +741,29 @@ router.get(
       }
     }
 
-    const conditions: SQL[] = [
-      eq(beneficiariTable.attivo, true),
-      isNotNull(beneficiariTable.centroAscoltoId),
-      eq(beneficiariTable.creditoSolidaleAbilitato, true),
-      eq(beneficiariTable.creditoSolidaleStato, "attivo"),
-    ];
-    if (q) {
-      const search = `%${q}%`;
-      const normalized = normalizeSearchToken(q);
-      const searchConditions: SQL[] = [
-        ilike(beneficiariTable.nome, search),
-        ilike(beneficiariTable.cognome, search),
-        ilike(
-          sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`,
-          search,
+    const conditions: SQL[] = [emporioOperationalBeneficiaryCondition()];
+    const codiceTessera = String(req.query.codiceTessera ?? "").trim();
+    if (req.query.codiceTessera !== undefined && !codiceTessera) {
+      res.json([]);
+      return;
+    }
+    if (q || codiceTessera) {
+      conditions.push(
+        emporioBeneficiarySearchCondition(
+          codiceTessera || q || "",
+          !!codiceTessera,
         ),
-        ilike(
-          sql<string>`trim(coalesce(${beneficiariTable.nome}, '') || ' ' || coalesce(${beneficiariTable.cognome}, ''))`,
-          search,
-        ),
-        ilike(beneficiariTable.codice, search),
-        ilike(beneficiariTable.codiceFiscale, search),
-      ];
-      const tokens = searchTokens(q);
-      if (tokens.length > 1) {
-        const tokenConditions = tokens.map((token) => {
-          const textSearch = `%${token.length > 5 ? token.slice(0, 5) : token}%`;
-          const exactSearch = `%${token}%`;
-          return or(
-            ilike(beneficiariTable.nome, textSearch),
-            ilike(beneficiariTable.cognome, textSearch),
-            ilike(beneficiariTable.codice, exactSearch),
-            ilike(beneficiariTable.codiceFiscale, exactSearch),
-          )!;
-        });
-        searchConditions.push(and(...tokenConditions)!);
-      }
-      if (normalized) {
-        const normalizedSearch = `%${normalized}%`;
-        searchConditions.push(
-          ilike(
-            sql<string>`regexp_replace(lower(coalesce(${beneficiariTable.codice}, '')), '[^a-z0-9]', '', 'g')`,
-            normalizedSearch,
-          ),
-          ilike(
-            sql<string>`regexp_replace(lower(coalesce(${beneficiariTable.codiceFiscale}, '')), '[^a-z0-9]', '', 'g')`,
-            normalizedSearch,
-          ),
-        );
-      }
-      conditions.push(or(...searchConditions)!);
+      );
     }
     if (magazzinoEmporioId != null) {
-      const accessoEmporioConditions: SQL[] = [
-        eq(consegneTable.tipoPianificazione, TIPO_ACCESSO),
-        eq(consegneTable.beneficiarioId, beneficiariTable.id),
-        eq(consegneTable.magazzinoEmporioId, magazzinoEmporioId),
-        inArray(consegneTable.statoAccessoEmporio, [...STATI_ACCESSO_VALIDI]),
-      ];
-      if (dateBounds != null) {
-        accessoEmporioConditions.push(
-          gte(consegneTable.dataOraInizio, dateBounds.start),
-        );
-        accessoEmporioConditions.push(
-          lt(consegneTable.dataOraInizio, dateBounds.end),
-        );
-      }
       conditions.push(
-        or(
-          eq(beneficiariTable.magazzinoEmporioPreferitoId, magazzinoEmporioId),
-          exists(
-            db
-              .select({ id: consegneTable.id })
-              .from(consegneTable)
-              .where(and(...accessoEmporioConditions)),
-          ),
-        )!,
+        eq(
+          beneficiariTable.areaOperativaId,
+          selectedMagazzino!.areaOperativaId!,
+        ),
+      );
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM ${centriAscoltoTable} c WHERE c.id = ${beneficiariTable.centroAscoltoId} AND c.attivo AND c.area_operativa_id = ${beneficiariTable.areaOperativaId})`,
       );
     } else if (requestedAreaOperativaId != null) {
       conditions.push(
@@ -845,7 +795,7 @@ router.get(
       .from(beneficiariTable)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(asc(beneficiariTable.cognome), asc(beneficiariTable.nome))
-      .limit(50);
+      .limit(30);
     const results = [];
     for (const beneficiario of beneficiari) {
       const [magazzinoPreferito] =
@@ -902,12 +852,14 @@ router.get(
         beneficiarioId: beneficiario.id,
         beneficiarioNome: `${beneficiario.cognome} ${beneficiario.nome}`,
         beneficiarioCodice: beneficiario.codice,
-        beneficiarioCodiceFiscale: beneficiario.codiceFiscale,
         centroAscoltoId: beneficiario.centroAscoltoId,
         areaOperativaId: beneficiario.areaOperativaId,
         magazzinoEmporioPreferitoId: beneficiario.magazzinoEmporioPreferitoId,
         magazzinoEmporioPreferitoNome: magazzinoPreferito?.nome ?? null,
-        saldoCreditoSolidale: parseDbNumber(beneficiario.creditoSolidaleSaldo),
+        saldoCreditoSolidale:
+          req.user?.isAdmin || req.user?.permessi.includes("credito.view")
+            ? parseDbNumber(beneficiario.creditoSolidaleSaldo)
+            : null,
         creditoSolidaleAbilitato: beneficiario.creditoSolidaleAbilitato,
         creditoSolidaleStato: beneficiario.creditoSolidaleStato,
         attivo: beneficiario.attivo,

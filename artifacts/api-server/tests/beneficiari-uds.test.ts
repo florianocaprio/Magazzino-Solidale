@@ -27,6 +27,7 @@ import { calcolaEta, risolviFasciaEta } from "@workspace/api-zod";
 import {
   emporioActorFixture,
   cleanupEmporioActorFixtures,
+  grantEmporioEligibilityFixture,
 } from "./helpers/emporio-actor";
 
 /**
@@ -180,6 +181,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await cleanupEmporioActorFixtures();
   if (beneficiarioIds.length > 0) {
     await db
       .delete(creditoSolidaleMovimentiTable)
@@ -197,7 +199,6 @@ afterEach(async () => {
   }
   await setEmporioEnabled(false);
   await setCentroAscoltoEnabled(true);
-  await cleanupEmporioActorFixtures();
 });
 
 afterAll(async () => {
@@ -538,6 +539,7 @@ describe("Credito Solidale beneficiari", () => {
         });
       expect(created.status).toBe(201);
       beneficiarioIds.push(created.body.id);
+      await grantEmporioEligibilityFixture(created.body.id, areaOperativaA);
       const configured = await request(appAs(areaOperativaA))
         .patch(
           `/credito-solidale/beneficiari/${created.body.id}/configurazione`,
@@ -561,6 +563,7 @@ describe("Credito Solidale beneficiari", () => {
       });
     expect(created.status).toBe(201);
     beneficiarioIds.push(created.body.id);
+    await grantEmporioEligibilityFixture(created.body.id, areaOperativaA);
     const res = await request(appAs(areaOperativaA))
       .patch(`/credito-solidale/beneficiari/${created.body.id}/configurazione`)
       .send({ creditoSolidaleAbilitato: true });
@@ -601,6 +604,7 @@ describe("Credito Solidale beneficiari", () => {
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
 
+    await grantEmporioEligibilityFixture(b.id, areaOperativaA);
     const enabled = await request(appAs(areaOperativaA))
       .patch(`/credito-solidale/beneficiari/${b.id}/configurazione`)
       .send({ creditoSolidaleAbilitato: true });
@@ -630,6 +634,7 @@ describe("Credito Solidale beneficiari", () => {
       })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
+    await grantEmporioEligibilityFixture(b.id, areaOperativaA);
 
     const res = await request(appAs(areaOperativaA))
       .patch(`/credito-solidale/beneficiari/${b.id}/configurazione`)
@@ -657,6 +662,7 @@ describe("Credito Solidale beneficiari", () => {
       .patch(`/beneficiari/${b.id}`)
       .send({ centroAscoltoId: centro });
     expect(assigned.status).toBe(200);
+    await grantEmporioEligibilityFixture(b.id, areaOperativaA);
     const res = await request(appAs(areaOperativaA))
       .patch(`/credito-solidale/beneficiari/${b.id}/configurazione`)
       .send({ creditoSolidaleAbilitato: true });
@@ -696,6 +702,7 @@ describe("Credito Solidale beneficiari", () => {
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
 
+    await grantEmporioEligibilityFixture(b.id, areaOperativaA);
     const res = await request(appAsCentro(centro, areaOperativaA, zona))
       .patch(`/credito-solidale/beneficiari/${b.id}/configurazione`)
       .send({ creditoSolidaleAbilitato: true });

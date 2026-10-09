@@ -17,6 +17,7 @@ import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 import {
   emporioActorFixture,
   cleanupEmporioActorFixtures,
+  grantEmporioEligibilityFixture,
 } from "./helpers/emporio-actor";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
@@ -89,6 +90,16 @@ async function createBeneficiario(
     attivo?: boolean;
   } = {},
 ): Promise<number> {
+  // Le fixture monetarie positive richiedono ora un territorio valido e un
+  // diritto esplicito; i null espliciti restano nei test negativi.
+  const areaOperativaId =
+    opts.areaOperativaId === undefined
+      ? await createAreaOperativa()
+      : opts.areaOperativaId;
+  const centroAscoltoId =
+    opts.centroAscoltoId === undefined && areaOperativaId != null
+      ? await createCentro(areaOperativaId)
+      : opts.centroAscoltoId;
   const [beneficiario] = await db
     .insert(beneficiariTable)
     .values({
@@ -96,8 +107,8 @@ async function createBeneficiario(
       cognome: `Calcolo ${rnd()}`,
       nome: "Credito",
       sesso: "M",
-      areaOperativaId: opts.areaOperativaId ?? null,
-      centroAscoltoId: opts.centroAscoltoId ?? null,
+      areaOperativaId: areaOperativaId ?? null,
+      centroAscoltoId: centroAscoltoId ?? null,
       numComponenti: opts.numComponenti ?? 1,
       numMinori: opts.numMinori ?? 0,
       numAnziani: opts.numAnziani ?? 0,
@@ -115,6 +126,8 @@ async function createBeneficiario(
     })
     .returning({ id: beneficiariTable.id });
   beneficiarioIds.push(beneficiario.id);
+  if (areaOperativaId != null)
+    await grantEmporioEligibilityFixture(beneficiario.id, areaOperativaId);
   return beneficiario.id;
 }
 
@@ -631,10 +644,11 @@ describe("Movimenti Credito Solidale", () => {
     expect(beneficiario.creditoSolidaleSaldo).toBe("10.00");
   });
 
-  it("rispetta lo scoping centro nella lista movimenti", async () => {
+  it("rispetta lo scoping Area nella lista movimenti", async () => {
     const areaOperativaId = await createAreaOperativa();
     const centroA = await createCentro(areaOperativaId);
-    const centroB = await createCentro(areaOperativaId);
+    const altraAreaId = await createAreaOperativa();
+    const centroB = await createCentro(altraAreaId);
     const beneficiarioA = await createBeneficiario({
       areaOperativaId,
       centroAscoltoId: centroA,
@@ -642,13 +656,18 @@ describe("Movimenti Credito Solidale", () => {
       creditoSolidaleStato: "attivo",
     });
     const beneficiarioB = await createBeneficiario({
-      areaOperativaId,
+      areaOperativaId: altraAreaId,
       centroAscoltoId: centroB,
       creditoSolidaleAbilitato: true,
       creditoSolidaleStato: "attivo",
     });
     const forbidden = await request(
-      makeApp({ centroAscoltoId: centroA, areaOperativaId: null }),
+      makeApp({
+        centroAscoltoId: centroA,
+        areaOperativaId,
+        isAdmin: false,
+        permessi: ["credito.adjust", "credito.view"],
+      }),
     )
       .post(`/credito-solidale/beneficiari/${beneficiarioB}/ricarica-manuale`)
       .send({ variazioneCredito: 9 });
@@ -662,7 +681,12 @@ describe("Movimenti Credito Solidale", () => {
       .send({ variazioneCredito: 9 });
 
     const scoped = await request(
-      makeApp({ centroAscoltoId: centroA, areaOperativaId: null }),
+      makeApp({
+        centroAscoltoId: centroA,
+        areaOperativaId,
+        isAdmin: false,
+        permessi: ["credito.adjust", "credito.view"],
+      }),
     ).get("/credito-solidale/movimenti");
 
     expect(scoped.status).toBe(200);

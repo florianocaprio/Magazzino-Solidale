@@ -28,6 +28,7 @@ import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 import {
   emporioActorFixture,
   cleanupEmporioActorFixtures,
+  grantEmporioEligibilityFixture,
 } from "./helpers/emporio-actor";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
@@ -163,6 +164,7 @@ async function createBeneficiario(opts: {
     })
     .returning({ id: beneficiariTable.id });
   beneficiarioIds.push(beneficiario.id);
+  await grantEmporioEligibilityFixture(beneficiario.id, opts.areaOperativaId);
   return beneficiario.id;
 }
 
@@ -516,10 +518,11 @@ describe("Accessi Emporio", () => {
     expect(history.status).toBe(200);
   });
 
-  it("applica insieme scope Beneficiario e Magazzino a lista, dettaglio e modifiche", async () => {
+  it("applica scope Area a Beneficiario e Magazzino per lista, dettaglio e modifiche", async () => {
     const areaOperativaId = await createAreaOperativa();
     const centroAId = await createCentro(areaOperativaId);
-    const centroBId = await createCentro(areaOperativaId);
+    const altraAreaId = await createAreaOperativa();
+    const centroBId = await createCentro(altraAreaId);
     const magazzinoAId = await createMagazzino(
       "emporio",
       areaOperativaId,
@@ -527,7 +530,7 @@ describe("Accessi Emporio", () => {
     );
     const magazzinoBId = await createMagazzino(
       "emporio",
-      areaOperativaId,
+      altraAreaId,
       centroBId,
     );
     const beneficiarioId = await createBeneficiario({
@@ -540,8 +543,12 @@ describe("Accessi Emporio", () => {
       magazzinoEmporioId: magazzinoAId,
       dataOraInizio: "2026-07-20T09:00:00",
     });
+    const altroBeneficiarioId = await createBeneficiario({
+      areaOperativaId: altraAreaId,
+      centroAscoltoId: centroBId,
+    });
     const accessoB = await request(globalApp).post("/accessi-emporio").send({
-      beneficiarioId,
+      beneficiarioId: altroBeneficiarioId,
       magazzinoEmporioId: magazzinoBId,
       dataOraInizio: "2026-07-21T09:00:00",
     });
@@ -744,7 +751,7 @@ describe("Accessi Emporio", () => {
     const fixture = await createEligibleFixture({ codice });
     const bySearch = await request(makeApp())
       .get("/accessi-emporio/beneficiari/ricerca")
-      .query({ search: codice });
+      .query({ search: codice, magazzinoEmporioId: fixture.magazzinoId });
     expect(bySearch.status).toBe(200);
     expect(
       bySearch.body.map((b: { beneficiarioId: number }) => b.beneficiarioId),
@@ -754,7 +761,10 @@ describe("Accessi Emporio", () => {
 
     const byId = await request(makeApp())
       .get("/accessi-emporio/beneficiari/ricerca")
-      .query({ beneficiarioId: fixture.beneficiarioId });
+      .query({
+        beneficiarioId: fixture.beneficiarioId,
+        magazzinoEmporioId: fixture.magazzinoId,
+      });
     expect(byId.status).toBe(200);
     expect(byId.body[0].beneficiarioId).toBe(fixture.beneficiarioId);
   });

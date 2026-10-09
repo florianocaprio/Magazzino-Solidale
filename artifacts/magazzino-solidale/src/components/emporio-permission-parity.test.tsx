@@ -75,6 +75,9 @@ vi.mock("@workspace/api-client-react", () => ({
   useListMagazzini: () => ({
     data: [{ id: 1, nome: "Emporio A", tipoMagazzino: "emporio" }],
   }),
+  useListEmporiOperativi: () => ({
+    data: [{ id: 1, nome: "Emporio A", areaOperativaId: 1 }],
+  }),
   useStornaCreditoSolidaleMovimento: () => ({
     mutate: vi.fn(),
     isPending: false,

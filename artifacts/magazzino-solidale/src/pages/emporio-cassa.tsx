@@ -28,7 +28,7 @@ import {
   useGetSpesaEmporio,
   useGetImpostazioniStampa,
   useListAreeOperative,
-  useListMagazzini,
+  useListEmporiOperativi,
   useListSessioniCassaEmporio,
   usePreparaChiusuraSessioneCassaEmporio,
   useRegistraInvioManualeBollaSpesaEmporio,
@@ -365,18 +365,27 @@ function EmporioCassa() {
     useState<BollaEmporioEmailResult | null>(null);
   const [autoAccessoOpened, setAutoAccessoOpened] = useState(false);
 
-  const beneficiarioQuery = beneficiarioSearch.trim();
+  const [beneficiarioQuery, setBeneficiarioQuery] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setBeneficiarioQuery(beneficiarioSearch.trim()),
+      250,
+    );
+    return () => window.clearTimeout(timer);
+  }, [beneficiarioSearch]);
   const prodottoQuery = prodottoSearch.trim();
 
   const { data: areaOperativa = [] } = useListAreeOperative();
-  const { data: magazzini = [] } = useListMagazzini();
-  const empori = useMemo(
-    () =>
-      magazzini.filter(
-        (m) => m.tipoMagazzino === "emporio" || m.tipoMagazzino === "misto",
-      ),
-    [magazzini],
-  );
+  const emporiQuery = useListEmporiOperativi({
+    query: security.readOptions(["/api/emporio/magazzini"]),
+  });
+  const empori = emporioReadableData(emporiQuery) ?? [];
+  useEffect(() => {
+    if (empori.length === 1 && emporioFilter === ALL) {
+      setAreaFilter(String(empori[0].areaOperativaId));
+      setEmporioFilter(String(empori[0].id));
+    }
+  }, [empori, emporioFilter]);
   const areaId = optionalId(areaFilter);
   const emporiFiltrati = useMemo(
     () =>
@@ -407,6 +416,7 @@ function EmporioCassa() {
   const beneficiariSearchParams = {
     search: beneficiarioQuery || undefined,
     ...searchContext,
+    magazzinoEmporioId: optionalId(emporioFilter) ?? 0,
   };
   const sessioniSearchParams = {
     statoSessione:
@@ -433,6 +443,7 @@ function EmporioCassa() {
         enabled:
           emporioAbilitato &&
           contestoCassaCompleto &&
+          beneficiarioQuery === beneficiarioSearch.trim() &&
           !contestoSelezioneBloccato,
       },
     },
@@ -766,6 +777,7 @@ function EmporioCassa() {
   ) => {
     if (event.key !== "Enter") return;
     const currentSearch = event.currentTarget.value.trim();
+    const epoch = selectionEpoch.current;
     if (!contestoCassaCompleto) {
       toast({
         variant: "destructive",
@@ -775,26 +787,35 @@ function EmporioCassa() {
     }
     let liveResults: SessioneCassaEmporioRicercaBeneficiarioResult[];
     try {
+      const cardResults = await searchBeneficiariCassaEmporio({
+        codiceTessera: currentSearch,
+        ...searchContext,
+        magazzinoEmporioId: optionalId(emporioFilter)!,
+      });
+      if (!security.isCurrent() || epoch !== selectionEpoch.current) return;
+      if (cardResults.length === 1) {
+        void selectBeneficiario(cardResults[0]);
+        return;
+      }
       liveResults = await searchBeneficiariCassaEmporio({
         search: currentSearch || undefined,
         ...searchContext,
+        magazzinoEmporioId: optionalId(emporioFilter)!,
       });
     } catch (error) {
       onError(error);
       return;
     }
-    if (!security.isCurrent()) return;
+    if (!security.isCurrent() || epoch !== selectionEpoch.current) return;
     const normalized = normalizeSearchToken(currentSearch);
-    const exact =
-      liveResults.find(
-        (b) =>
-          normalizeSearchToken(b.beneficiarioCodice) === normalized ||
-          normalizeSearchToken(b.beneficiarioCodiceFiscale) === normalized,
-      ) ?? liveResults[0];
+    const exact = liveResults.find(
+      (b) => normalizeSearchToken(b.beneficiarioCodice) === normalized,
+    );
     if (exact) void selectBeneficiario(exact);
   };
 
   const onBeneficiarioScan = (value: string) => {
+    const epoch = selectionEpoch.current;
     if (!contestoCassaCompleto) {
       toast({
         variant: "destructive",
@@ -804,22 +825,17 @@ function EmporioCassa() {
     }
     setBeneficiarioSearch(value);
     void searchBeneficiariCassaEmporio({
-      search: value.trim() || undefined,
+      codiceTessera: value.trim(),
       ...searchContext,
+      magazzinoEmporioId: optionalId(emporioFilter)!,
     })
       .then((results) => {
-        if (!security.isCurrent()) return;
-        const normalized = normalizeSearchToken(value);
-        const exact =
-          results.find(
-            (b) =>
-              normalizeSearchToken(b.beneficiarioCodice) === normalized ||
-              normalizeSearchToken(b.beneficiarioCodiceFiscale) === normalized,
-          ) ?? results[0];
+        if (!security.isCurrent() || epoch !== selectionEpoch.current) return;
+        const exact = results.length === 1 ? results[0] : undefined;
         if (exact) void selectBeneficiario(exact);
         else
           toast({
-            title: t("cassaEmporio.nessunRisultato"),
+            title: t("emporioServizio.tesseraNonValida"),
             variant: "destructive",
           });
       })
@@ -1164,7 +1180,7 @@ function EmporioCassa() {
                   placeholder={
                     !contestoCassaCompleto
                       ? t("cassaEmporio.selezionaEmporioPrima")
-                      : t("cassaEmporio.cercaBeneficiarioPlaceholder")
+                      : t("emporioServizio.ricercaBeneficiario")
                   }
                   disabled={
                     !emporioAbilitato ||
@@ -1196,10 +1212,12 @@ function EmporioCassa() {
                     <div className="text-muted-foreground">
                       {b.beneficiarioCodice}
                     </div>
-                    <div className="mt-1 text-xs">
-                      {t("cassaEmporio.saldoCreditoDisponibile")}:{" "}
-                      {formatCredito(b.saldoCreditoSolidale)}
-                    </div>
+                    {hasPermission("credito.view") && (
+                      <div className="mt-1 text-xs">
+                        {t("cassaEmporio.saldoCreditoDisponibile")}:{" "}
+                        {formatCredito(b.saldoCreditoSolidale)}
+                      </div>
+                    )}
                   </button>
                 ))}
                 {!contestoCassaCompleto && (
@@ -1240,10 +1258,14 @@ function EmporioCassa() {
                     <div className="text-muted-foreground">
                       {selectedBeneficiario.beneficiarioCodice}
                     </div>
-                    <div>
-                      {t("cassaEmporio.saldoCreditoDisponibile")}:{" "}
-                      {formatCredito(selectedBeneficiario.saldoCreditoSolidale)}
-                    </div>
+                    {hasPermission("credito.view") && (
+                      <div>
+                        {t("cassaEmporio.saldoCreditoDisponibile")}:{" "}
+                        {formatCredito(
+                          selectedBeneficiario.saldoCreditoSolidale,
+                        )}
+                      </div>
+                    )}
                     {selectedBeneficiario.saldoCreditoSolidale === 0 && (
                       <div className="mt-1 text-amber-700">
                         {t("cassaEmporio.saldoZero")}

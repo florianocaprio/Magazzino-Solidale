@@ -36,9 +36,14 @@ const owners: Record<string, string> = {
   createCreditoSolidaleRicaricaManuale: "beneficiario",
   createCreditoSolidaleRettifica: "beneficiario",
   refreshCreditoSolidaleBeneficiario: "beneficiario",
+  updateEmporioAbilitazione: "beneficiario",
 };
 function queryOwner(key: QueryKey) {
   const path = typeof key[0] === "string" ? key[0] : "";
+  const eligibility = path.match(
+    /^\/api\/emporio\/beneficiari\/(\d+)\/abilitazione$/,
+  );
+  if (eligibility) return { kind: "beneficiario", id: Number(eligibility[1]) };
   const match = path.match(
     /^\/api\/(?:accessi-emporio\/(\d+)|cassa-emporio\/sessioni\/(\d+)|spese-emporio\/(\d+)|credito-solidale\/beneficiari\/(\d+))(?:\/|$)/,
   );

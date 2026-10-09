@@ -47,6 +47,7 @@ import { moduli } from "./namespaces/moduli";
 import { superAdmin } from "./namespaces/superAdmin";
 import { emporio } from "./namespaces/emporio";
 import { accessiEmporio } from "./namespaces/accessiEmporio";
+import { emporioServizio } from "./namespaces/emporioServizio";
 import { cassaEmporio } from "./namespaces/cassaEmporio";
 import { creditoSolidale } from "./namespaces/creditoSolidale";
 import { speseEmporio } from "./namespaces/speseEmporio";
@@ -114,6 +115,7 @@ const PAGE_NAMESPACES = {
   superAdmin,
   emporio,
   accessiEmporio,
+  emporioServizio,
   cassaEmporio,
   creditoSolidale,
   speseEmporio,

@@ -25,6 +25,7 @@ import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 import {
   emporioActorFixture,
   cleanupEmporioActorFixtures,
+  grantEmporioEligibilityFixture,
 } from "./helpers/emporio-actor";
 
 const EMPORIO_DISABLED_MSG =
@@ -235,6 +236,7 @@ describe("Impostazioni moduli", () => {
     });
     expect(created.status).toBe(201);
     beneficiarioIds.push(created.body.id);
+    await grantEmporioEligibilityFixture(created.body.id, areaOperativaId);
     const res = await request(app)
       .patch(`/credito-solidale/beneficiari/${created.body.id}/configurazione`)
       .send({

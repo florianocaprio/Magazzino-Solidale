@@ -4,6 +4,7 @@ import {
   centriAscoltoTable,
   consegneTable,
   areeOperativeTable,
+  emporioAbilitazioniTable,
   db,
   magazziniTable,
   sessioniCassaEmporioTable,
@@ -44,11 +45,17 @@ import {
   requireEmporioCommandTx,
   syncEmporioScope,
   emporioScopeErrorHandler,
+  emporioOperationalBeneficiaryCondition,
+  emporioEligibilityState,
+  emporioReportingScope,
 } from "../lib/emporioScope";
 import { auditEmporioTx } from "../lib/emporioAudit";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
-import { beneficiarioAccessScopeFromRequest } from "../lib/beneficiarioPolicy";
+import {
+  emporioBeneficiarySearchCondition,
+  emporioValidCardCondition,
+} from "../lib/emporioBeneficiarySearch";
 import {
   BeneficiaryReportingScopeError,
   lockAndAuthorizeBeneficiaryReportingContextTx,
@@ -496,34 +503,40 @@ router.get(
     if (!(await assertEmporioEnabled(res))) return;
     const q = req.query as Record<string, string | undefined>;
     const search = asText(q.search);
+    const codiceTessera = asText(q.codiceTessera);
+    const warehouseId = asInt(q.magazzinoEmporioId);
+    if (warehouseId == null) {
+      res.status(400).json({ error: "Seleziona prima un Emporio." });
+      return;
+    }
+    const context = await validateMagazzinoEmporio(warehouseId, req);
+    if ("error" in context) {
+      res.status(context.status).json({ error: context.error });
+      return;
+    }
     const beneficiarioId = asInt(q.beneficiarioId);
-    if (!search && beneficiarioId == null) {
+    const includeUnavailable = q.includiNonPianificabili === "true";
+    if (!search && !codiceTessera && beneficiarioId == null) {
       res.json([]);
       return;
     }
 
-    const conditions: SQL[] = [eq(beneficiariTable.attivo, true)];
+    const conditions: SQL[] = [
+      eq(beneficiariTable.areaOperativaId, context.magazzino.areaOperativaId!),
+    ];
+    // Diagnostic results remain within the same authorized Area. POST/PATCH
+    // still revalidate all prerequisites transactionally; this is not a grant.
+    if (!includeUnavailable)
+      conditions.push(emporioOperationalBeneficiaryCondition());
     if (beneficiarioId != null)
       conditions.push(eq(beneficiariTable.id, beneficiarioId));
-    if (search) {
-      const s = `%${search}%`;
+    if (search || codiceTessera)
       conditions.push(
-        or(
-          ilike(beneficiariTable.nome, s),
-          ilike(beneficiariTable.cognome, s),
-          ilike(
-            sql<string>`trim(coalesce(${beneficiariTable.cognome}, '') || ' ' || coalesce(${beneficiariTable.nome}, ''))`,
-            s,
-          ),
-          ilike(
-            sql<string>`trim(coalesce(${beneficiariTable.nome}, '') || ' ' || coalesce(${beneficiariTable.cognome}, ''))`,
-            s,
-          ),
-          ilike(beneficiariTable.codice, s),
-          ilike(beneficiariTable.codiceFiscale, s),
-        )!,
+        emporioBeneficiarySearchCondition(
+          codiceTessera ?? search!,
+          !!codiceTessera,
+        ),
       );
-    }
     const centroFilter = centroScopeFilter(
       beneficiariTable.centroAscoltoId,
       callerCentroId(req),
@@ -543,11 +556,26 @@ router.get(
     const rows = await db
       .select({
         beneficiario: beneficiariTable,
+        emporioStato: emporioEligibilityState(),
+        centroValido: sql<boolean>`coalesce(${centriAscoltoTable.attivo} and ${centriAscoltoTable.areaOperativaId} = ${beneficiariTable.areaOperativaId}, false)`,
+        tesseraCorrispondente: emporioValidCardCondition(
+          codiceTessera ?? search ?? "",
+        ),
         centroAscoltoNome: centriAscoltoTable.nome,
         areaOperativaNome: areeOperativeTable.nome,
         magazzinoEmporioPreferitoNome: magazziniTable.nome,
       })
       .from(beneficiariTable)
+      .leftJoin(
+        emporioAbilitazioniTable,
+        and(
+          eq(emporioAbilitazioniTable.beneficiarioId, beneficiariTable.id),
+          eq(
+            emporioAbilitazioniTable.areaOperativaId,
+            beneficiariTable.areaOperativaId,
+          ),
+        ),
+      )
       .leftJoin(
         centriAscoltoTable,
         eq(beneficiariTable.centroAscoltoId, centriAscoltoTable.id),
@@ -565,29 +593,49 @@ router.get(
       .limit(30);
 
     res.json(
-      rows.map((row) => ({
-        beneficiarioId: row.beneficiario.id,
-        beneficiarioNome: `${row.beneficiario.cognome} ${row.beneficiario.nome}`,
-        beneficiarioCodice: row.beneficiario.codice,
-        beneficiarioCodiceFiscale: row.beneficiario.codiceFiscale,
-        centroAscoltoId: row.beneficiario.centroAscoltoId,
-        centroAscoltoNome: row.centroAscoltoNome,
-        areaOperativaId: row.beneficiario.areaOperativaId,
-        areaOperativaNome: row.areaOperativaNome,
-        creditoSolidaleAbilitato: row.beneficiario.creditoSolidaleAbilitato,
-        creditoSolidaleStato: row.beneficiario.creditoSolidaleStato,
-        saldoCreditoSolidale: Number(
-          row.beneficiario.creditoSolidaleSaldo ?? "0",
-        ),
-        quotaMensileAssegnata:
-          row.beneficiario.creditoSolidaleMensileAssegnato == null
-            ? null
-            : Number(row.beneficiario.creditoSolidaleMensileAssegnato),
-        magazzinoEmporioPreferitoId:
-          row.beneficiario.magazzinoEmporioPreferitoId,
-        magazzinoEmporioPreferitoNome: row.magazzinoEmporioPreferitoNome,
-        attivo: row.beneficiario.attivo,
-      })),
+      rows.map((row) => {
+        const motiviNonPianificabile = [
+          ...(!row.beneficiario.attivo ? ["beneficiario_non_attivo"] : []),
+          ...(!row.centroValido ? ["centro_non_valido"] : []),
+          ...(row.emporioStato !== "attivo"
+            ? [`emporio_${row.emporioStato}`]
+            : []),
+          ...(!row.beneficiario.creditoSolidaleAbilitato
+            ? ["credito_non_abilitato"]
+            : row.beneficiario.creditoSolidaleStato !== "attivo"
+              ? ["credito_non_attivo"]
+              : []),
+        ];
+        return {
+          beneficiarioId: row.beneficiario.id,
+          beneficiarioNome: `${row.beneficiario.cognome} ${row.beneficiario.nome}`,
+          beneficiarioCodice: row.beneficiario.codice,
+          emporioStato: row.emporioStato,
+          pianificabile: motiviNonPianificabile.length === 0,
+          motiviNonPianificabile,
+          tesseraCorrispondente: row.tesseraCorrispondente,
+          centroAscoltoId: row.beneficiario.centroAscoltoId,
+          centroAscoltoNome: row.centroAscoltoNome,
+          areaOperativaId: row.beneficiario.areaOperativaId,
+          areaOperativaNome: row.areaOperativaNome,
+          creditoSolidaleAbilitato: row.beneficiario.creditoSolidaleAbilitato,
+          creditoSolidaleStato: row.beneficiario.creditoSolidaleStato,
+          saldoCreditoSolidale:
+            req.user?.isAdmin || req.user?.permessi.includes("credito.view")
+              ? Number(row.beneficiario.creditoSolidaleSaldo ?? "0")
+              : null,
+          quotaMensileAssegnata:
+            !(
+              req.user?.isAdmin || req.user?.permessi.includes("credito.view")
+            ) || row.beneficiario.creditoSolidaleMensileAssegnato == null
+              ? null
+              : Number(row.beneficiario.creditoSolidaleMensileAssegnato),
+          magazzinoEmporioPreferitoId:
+            row.beneficiario.magazzinoEmporioPreferitoId,
+          magazzinoEmporioPreferitoNome: row.magazzinoEmporioPreferitoNome,
+          attivo: row.beneficiario.attivo,
+        };
+      }),
     );
   },
 );
@@ -969,7 +1017,7 @@ router.patch(
           req.user!.id,
           "emporio.access.manage",
           locked,
-          false,
+          !["annullato", "non_presentato"].includes(stato),
         );
         syncEmporioScope(req, actor);
         const current = locked.statoAccessoEmporio as StatoAccesso;
@@ -988,7 +1036,7 @@ router.patch(
                 await lockAndAuthorizeBeneficiaryReportingContextTx(
                   tx,
                   locked.beneficiarioId,
-                  beneficiarioAccessScopeFromRequest(req),
+                  emporioReportingScope(req),
                 )
               ).snapshot
             : null;

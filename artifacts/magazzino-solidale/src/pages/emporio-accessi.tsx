@@ -7,7 +7,7 @@ import {
   useListAccessiEmporio,
   useListCentriAscolto,
   useListAreeOperative,
-  useListMagazzini,
+  useListEmporiOperativi,
   useSearchBeneficiariAccessiEmporio,
   useUpdateAccessoEmporio,
   useUpdateAccessoEmporioStato,
@@ -54,6 +54,8 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
+import { EmporioBeneficiaryResults } from "@/components/emporio-beneficiary-results";
 import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 import { useAuth } from "@/lib/auth";
 import {
@@ -122,7 +124,9 @@ function isEligible(
   b: BeneficiarioAccessoEmporioSearchResult | null,
 ): string | null {
   if (!b) return null;
+  if (b.pianificabile === false) return "accessiEmporio.nonPianificabile";
   if (!b.attivo) return "accessiEmporio.beneficiarioNonAttivo";
+  if (b.emporioStato !== "attivo") return "emporioServizio.non_abilitato";
   if (b.centroAscoltoId == null) return "accessiEmporio.centroAscoltoRichiesto";
   if (!b.creditoSolidaleAbilitato)
     return "accessiEmporio.creditoSolidaleRichiesto";
@@ -169,6 +173,17 @@ function EmporioAccessi() {
   const [emporioFilter, setEmporioFilter] = useState(ALL);
   const [statoFilter, setStatoFilter] = useState(ALL);
   const [beneficiarioSearch, setBeneficiarioSearch] = useState("");
+  const [listSearch, setListSearch] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [cardSearch, setCardSearch] = useState(false);
+  const [submittedSearch, setSubmittedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setSearchTerm(beneficiarioSearch.trim()),
+      250,
+    );
+    return () => clearTimeout(timer);
+  }, [beneficiarioSearch]);
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [annullando, setAnnullando] = useState<AccessoEmporio | null>(null);
@@ -192,7 +207,7 @@ function EmporioAccessi() {
       emporioFilter === ALL ? undefined : Number(emporioFilter),
     statoAccessoEmporio:
       statoFilter === ALL ? undefined : (statoFilter as AccessoEmporioStato),
-    beneficiarioSearch: beneficiarioSearch.trim() || undefined,
+    beneficiarioSearch: listSearch.trim() || undefined,
     beneficiarioId: initialBeneficiarioId
       ? Number(initialBeneficiarioId)
       : undefined,
@@ -206,21 +221,77 @@ function EmporioAccessi() {
     isLoading = accessiQuery.isLoading;
   const { data: centri } = useListCentriAscolto();
   const { data: areaOperativa } = useListAreeOperative();
-  const { data: magazzini } = useListMagazzini();
-  const beneficiarioSearchParams = beneficiarioSearch.trim()
-    ? { search: beneficiarioSearch.trim() }
-    : form.beneficiarioId
-      ? { beneficiarioId: Number(form.beneficiarioId) }
-      : undefined;
+  const emporiQuery = useListEmporiOperativi({
+    query: security.readOptions(["/api/emporio/magazzini"]),
+  });
+  const empori = emporioReadableData(emporiQuery) ?? [];
+  const beneficiarioSearchParams = {
+    magazzinoEmporioId: Number(form.magazzinoEmporioId),
+    includiNonPianificabili: true,
+    ...(searchTerm
+      ? cardSearch
+        ? { codiceTessera: searchTerm }
+        : { search: searchTerm }
+      : { beneficiarioId: Number(form.beneficiarioId) || undefined }),
+  };
   const beneficiariQuery = useSearchBeneficiariAccessiEmporio(
     beneficiarioSearchParams,
     {
-      query: security.readOptions(
-        getSearchBeneficiariAccessiEmporioQueryKey(beneficiarioSearchParams),
-      ),
+      query: {
+        ...security.readOptions(
+          getSearchBeneficiariAccessiEmporioQueryKey(beneficiarioSearchParams),
+        ),
+        enabled:
+          editing != null &&
+          !!form.magazzinoEmporioId &&
+          !!(searchTerm || form.beneficiarioId) &&
+          beneficiarioSearch.trim() === searchTerm,
+      },
     },
   );
   const beneficiari = emporioReadableData(beneficiariQuery);
+  useEffect(() => {
+    if (
+      (!cardSearch && submittedSearch !== searchTerm) ||
+      !searchTerm ||
+      beneficiarioSearch.trim() !== searchTerm ||
+      !beneficiari ||
+      beneficiariQuery.isFetching
+    )
+      return;
+    const matches = beneficiari.filter(
+      (b) =>
+        b.pianificabile !== false &&
+        (cardSearch ||
+          b.tesseraCorrispondente ||
+          b.beneficiarioCodice === searchTerm),
+    );
+    if (matches.length === 1)
+      setForm((current) => ({
+        ...current,
+        beneficiarioId: String(matches[0].beneficiarioId),
+      }));
+    else if (cardSearch)
+      setForm((current) => ({ ...current, beneficiarioId: "" }));
+  }, [
+    beneficiari,
+    beneficiariQuery.isFetching,
+    cardSearch,
+    submittedSearch,
+    searchTerm,
+    beneficiarioSearch,
+  ]);
+  useEffect(() => {
+    if (
+      editing?.mode === "create" &&
+      empori.length === 1 &&
+      !form.magazzinoEmporioId
+    )
+      setForm((current) => ({
+        ...current,
+        magazzinoEmporioId: String(empori[0].id),
+      }));
+  }, [empori, editing, form.magazzinoEmporioId]);
   useEffect(() => {
     if (
       !emporioReadDenied(accessiQuery.error) &&
@@ -236,19 +307,22 @@ function EmporioAccessi() {
       noteAccessoEmporio: "",
     }));
   }, [accessiQuery.error, beneficiariQuery.error]);
-  const empori = useMemo(
-    () =>
-      (magazzini ?? []).filter(
-        (m) => m.tipoMagazzino === "emporio" || m.tipoMagazzino === "misto",
-      ),
-    [magazzini],
-  );
   const beneficiarioSelezionato = useMemo(
     () =>
-      (beneficiari ?? []).find(
-        (b) => String(b.beneficiarioId) === form.beneficiarioId,
-      ) ?? null,
-    [beneficiari, form.beneficiarioId],
+      (!beneficiariQuery.isFetching &&
+      !beneficiariQuery.isError &&
+      beneficiarioSearch.trim() === searchTerm
+        ? (beneficiari ?? [])
+        : []
+      ).find((b) => String(b.beneficiarioId) === form.beneficiarioId) ?? null,
+    [
+      beneficiari,
+      form.beneficiarioId,
+      beneficiariQuery.isFetching,
+      beneficiariQuery.isError,
+      beneficiarioSearch,
+      searchTerm,
+    ],
   );
   const eligibilityError = isEligible(beneficiarioSelezionato);
 
@@ -283,9 +357,11 @@ function EmporioAccessi() {
   const openCreate = () => {
     setEditing({ mode: "create" });
     setBeneficiarioSearch("");
+    setSearchTerm("");
+    setCardSearch(false);
     setForm({
       beneficiarioId: initialBeneficiarioId,
-      magazzinoEmporioId: "",
+      magazzinoEmporioId: empori.length === 1 ? String(empori[0].id) : "",
       data: todayEuropeRome(),
       oraInizio: nowTime(),
       oraFine: "",
@@ -299,9 +375,9 @@ function EmporioAccessi() {
       : new Date();
     const end = accesso.dataOraFine ? new Date(accesso.dataOraFine) : null;
     setEditing({ mode: "edit", accesso });
-    setBeneficiarioSearch(
-      accesso.beneficiarioCodice ?? accesso.beneficiarioNome ?? "",
-    );
+    setBeneficiarioSearch("");
+    setSearchTerm("");
+    setCardSearch(false);
     setForm({
       beneficiarioId: String(accesso.beneficiarioId),
       magazzinoEmporioId:
@@ -338,10 +414,10 @@ function EmporioAccessi() {
       });
       return;
     }
-    if (eligibilityError) {
+    if (eligibilityError || !beneficiarioSelezionato) {
       toast({
         title: t("accessiEmporio.beneficiario"),
-        description: t(eligibilityError),
+        description: t(eligibilityError ?? "emporioServizio.non_abilitato"),
         variant: "destructive",
       });
       return;
@@ -604,9 +680,9 @@ function EmporioAccessi() {
           </Select>
           <Input
             placeholder={t("accessiEmporio.cercaBeneficiarioPlaceholder")}
-            value={beneficiarioSearch}
+            value={listSearch}
             onChange={(event) => {
-              setBeneficiarioSearch(event.target.value);
+              setListSearch(event.target.value);
               setPage(1);
             }}
           />
@@ -817,83 +893,24 @@ function EmporioAccessi() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {t("accessiEmporio.cercaBeneficiario")}
-              </label>
-              <Input
-                placeholder={t("accessiEmporio.cercaBeneficiarioPlaceholder")}
-                value={beneficiarioSearch}
-                onChange={(event) => setBeneficiarioSearch(event.target.value)}
-                disabled={!emporioAbilitato}
-              />
-            </div>
-            <Select
-              value={form.beneficiarioId || ""}
-              onValueChange={(value) => {
-                const selected = (beneficiari ?? []).find(
-                  (b) => String(b.beneficiarioId) === value,
-                );
-                setForm((current) => ({
-                  ...current,
-                  beneficiarioId: value,
-                  magazzinoEmporioId:
-                    selected?.magazzinoEmporioPreferitoId != null
-                      ? String(selected.magazzinoEmporioPreferitoId)
-                      : current.magazzinoEmporioId,
-                }));
-                if (selected)
-                  setBeneficiarioSearch(
-                    `${selected.beneficiarioNome} ${selected.beneficiarioCodice}`,
-                  );
-              }}
-              disabled={!emporioAbilitato}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("accessiEmporio.beneficiario")} />
-              </SelectTrigger>
-              <SelectContent>
-                {(beneficiari ?? []).map((b) => (
-                  <SelectItem
-                    key={b.beneficiarioId}
-                    value={String(b.beneficiarioId)}
-                  >
-                    {b.beneficiarioNome} · {b.beneficiarioCodice}
-                    {b.centroAscoltoNome ? ` · ${b.centroAscoltoNome}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {beneficiarioSelezionato && (
-              <div className="rounded-md border p-3 text-xs text-muted-foreground">
-                <div className="font-medium text-foreground">
-                  {beneficiarioSelezionato.beneficiarioNome}
-                </div>
-                <div>{beneficiarioSelezionato.beneficiarioCodice}</div>
-                <div>{beneficiarioSelezionato.centroAscoltoNome ?? "-"}</div>
-                <div>
-                  {t(
-                    `creditoSolidale.stato.${beneficiarioSelezionato.creditoSolidaleStato}`,
-                  )}
-                </div>
-              </div>
-            )}
-            {eligibilityError && (
-              <p className="text-sm font-medium text-destructive">
-                {t(eligibilityError)}
-              </p>
-            )}
             <Select
               value={form.magazzinoEmporioId || ""}
-              onValueChange={(value) =>
+              onValueChange={(value) => {
+                setBeneficiarioSearch("");
+                setSearchTerm("");
+                setCardSearch(false);
+                setSubmittedSearch("");
                 setForm((current) => ({
                   ...current,
                   magazzinoEmporioId: value,
-                }))
-              }
-              disabled={!emporioAbilitato}
+                  beneficiarioId: current.magazzinoEmporioId
+                    ? ""
+                    : initialBeneficiarioId,
+                }));
+              }}
+              disabled={!emporioAbilitato || empori.length === 0}
             >
-              <SelectTrigger>
+              <SelectTrigger aria-label={t("accessiEmporio.emporio")}>
                 <SelectValue placeholder={t("accessiEmporio.emporio")} />
               </SelectTrigger>
               <SelectContent>
@@ -904,6 +921,110 @@ function EmporioAccessi() {
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-sm text-muted-foreground">
+              {t(
+                empori.length === 0 && !emporiQuery.isLoading
+                  ? "emporioServizio.nessunEmporio"
+                  : "emporioServizio.scegliEmporio",
+              )}
+            </p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {t("accessiEmporio.cercaBeneficiario")}
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder={t("accessiEmporio.cercaBeneficiarioPlaceholder")}
+                  value={beneficiarioSearch}
+                  onChange={(event) => {
+                    setCardSearch(false);
+                    setSubmittedSearch("");
+                    setBeneficiarioSearch(event.target.value);
+                    setForm((current) => ({ ...current, beneficiarioId: "" }));
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && beneficiarioSearch.trim()) {
+                      event.preventDefault();
+                      setCardSearch(false);
+                      setSubmittedSearch(beneficiarioSearch.trim());
+                      setSearchTerm(beneficiarioSearch.trim());
+                    }
+                  }}
+                  disabled={!emporioAbilitato || !form.magazzinoEmporioId}
+                />
+                <BarcodeScannerButton
+                  disabled={!emporioAbilitato || !form.magazzinoEmporioId}
+                  onScan={(value) => {
+                    setForm((current) => ({ ...current, beneficiarioId: "" }));
+                    setCardSearch(true);
+                    setBeneficiarioSearch(value);
+                    setSearchTerm(value.trim());
+                  }}
+                />
+              </div>
+              {cardSearch &&
+                beneficiari &&
+                !beneficiariQuery.isFetching &&
+                !beneficiari.some((b) => b.tesseraCorrispondente) && (
+                  <p role="alert" className="text-sm text-destructive">
+                    {t("emporioServizio.tesseraNonValida")}
+                  </p>
+                )}
+            </div>
+            <EmporioBeneficiaryResults
+              results={beneficiari ?? []}
+              selectedId={form.beneficiarioId}
+              requested={
+                !!form.magazzinoEmporioId &&
+                !!(beneficiarioSearch.trim() || form.beneficiarioId)
+              }
+              searching={
+                beneficiariQuery.isFetching ||
+                beneficiarioSearch.trim() !== searchTerm
+              }
+              error={beneficiariQuery.isError}
+              canConfigureCredit={
+                canViewBeneficiario &&
+                hasPermission("beneficiari.manage") &&
+                hasPermission("credito.quota.manage")
+              }
+              onSelect={(id) =>
+                setForm((current) => ({
+                  ...current,
+                  beneficiarioId: String(id),
+                }))
+              }
+            />
+            {beneficiarioSelezionato && (
+              <div
+                role="region"
+                aria-label={t("accessiEmporio.beneficiarioSelezionato")}
+                className="rounded-md border p-3 text-xs text-muted-foreground"
+              >
+                <div className="font-medium text-foreground">
+                  {beneficiarioSelezionato.beneficiarioNome}
+                </div>
+                <div>{beneficiarioSelezionato.beneficiarioCodice}</div>
+                <div>{beneficiarioSelezionato.centroAscoltoNome ?? "-"}</div>
+                <div>
+                  {t(
+                    `emporioServizio.${beneficiarioSelezionato.emporioStato ?? "non_abilitato"}`,
+                  )}
+                </div>
+                {hasPermission("credito.view") && (
+                  <div>
+                    {t(
+                      `creditoSolidale.stato.${beneficiarioSelezionato.creditoSolidaleStato}`,
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {eligibilityError && (
+              <p className="text-sm font-medium text-destructive">
+                {t(eligibilityError)}
+              </p>
+            )}
             <div className="grid grid-cols-3 gap-3">
               <Input
                 type="date"
@@ -966,7 +1087,17 @@ function EmporioAccessi() {
             <Button variant="outline" onClick={() => setEditing(null)}>
               {t("common.cancel")}
             </Button>
-            <Button onClick={submit} disabled={!emporioAbilitato || pending}>
+            <Button
+              onClick={submit}
+              disabled={
+                !emporioAbilitato ||
+                pending ||
+                !beneficiarioSelezionato ||
+                !!eligibilityError ||
+                beneficiariQuery.isFetching ||
+                !form.magazzinoEmporioId
+              }
+            >
               {t("common.save")}
             </Button>
           </DialogFooter>

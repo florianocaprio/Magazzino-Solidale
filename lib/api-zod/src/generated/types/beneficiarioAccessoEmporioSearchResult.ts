@@ -5,13 +5,21 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { EmporioStatoEffettivo } from './emporioStatoEffettivo';
 
 export interface BeneficiarioAccessoEmporioSearchResult {
   beneficiarioId: number;
   beneficiarioNome: string;
   beneficiarioCodice: string;
+  /** Corrispondenza esatta di una tessera attualmente valida, mai derivata dal nome. */
+  tesseraCorrispondente?: boolean;
   /** @nullable */
   beneficiarioCodiceFiscale?: string | null;
+  emporioStato?: EmporioStatoEffettivo;
+  /** Prerequisiti correnti verificati nella ricerca; il comando li rivalida sempre. */
+  pianificabile?: boolean;
+  /** Codici operativi senza motivi sociali o dati del dossier. */
+  motiviNonPianificabile?: string[];
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
@@ -22,7 +30,8 @@ export interface BeneficiarioAccessoEmporioSearchResult {
   areaOperativaNome?: string | null;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: string;
-  saldoCreditoSolidale: number;
+  /** @nullable */
+  saldoCreditoSolidale: number | null;
   /** @nullable */
   quotaMensileAssegnata?: number | null;
   /** @nullable */

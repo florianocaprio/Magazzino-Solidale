@@ -7,6 +7,12 @@
  */
 
 export type SearchBeneficiariAccessiEmporioParams = {
+/**
+ * Include risultati operativi minimi non pianificabili della stessa Area autorizzata, con motivi. Non autorizza la creazione di Accessi né l'accesso al dossier sociale.
+ */
+includiNonPianificabili?: boolean;
+magazzinoEmporioId: number;
+codiceTessera?: string;
 search?: string;
 beneficiarioId?: number;
 };

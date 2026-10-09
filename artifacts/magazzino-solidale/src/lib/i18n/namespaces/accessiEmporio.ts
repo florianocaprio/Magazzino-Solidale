@@ -24,6 +24,32 @@ const it = {
   note: "Note",
   motivoAnnullamento: "Motivo annullamento",
   cercaBeneficiario: "Cerca beneficiario",
+  risultatiBeneficiari: "Risultati ricerca beneficiari",
+  beneficiarioSelezionato: "Beneficiario selezionato",
+  iniziaRicerca:
+    "Seleziona l'Emporio e scrivi nome, cognome o codice. I risultati compariranno qui.",
+  selezionaRisultato:
+    "Seleziona il beneficiario dai risultati qui sotto. La ricerca per nome non seleziona automaticamente.",
+  nessunBeneficiario:
+    "Nessun beneficiario trovato nell'Area dell'Emporio accessibile al tuo profilo.",
+  erroreRicerca:
+    "Ricerca non disponibile. Riprova: non è possibile verificare i beneficiari.",
+  nonPianificabile: "Beneficiario trovato, ma non pianificabile.",
+  configuraCredito:
+    "Configura il Credito Solidale da Modifica anagrafica, se autorizzato per questo beneficiario.",
+  motivi: {
+    beneficiario_non_attivo: "Anagrafica non attiva.",
+    centro_non_valido:
+      "Centro di Ascolto mancante, inattivo o non coerente con l'Area.",
+    emporio_non_abilitato: "Abilitazione Emporio mancante nell'Area corrente.",
+    emporio_sospeso: "Abilitazione Emporio sospesa.",
+    emporio_revocato: "Abilitazione Emporio revocata.",
+    emporio_programmato: "Abilitazione Emporio non ancora efficace.",
+    credito_non_abilitato:
+      "Credito Solidale non abilitato: l'abilitazione Emporio da sola non lo attiva.",
+    credito_non_attivo:
+      "Credito Solidale non operativo: configurarlo tramite un operatore autorizzato.",
+  },
   cercaBeneficiarioPlaceholder:
     "Cerca beneficiario per nome, codice o codice a barre",
   tuttiGliEmpori: "Tutti gli empori",

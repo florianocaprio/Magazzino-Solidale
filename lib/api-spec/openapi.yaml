@@ -5170,11 +5170,95 @@ paths:
               schema:
                 $ref: "#/components/schemas/AccessoEmporio"
 
+  /emporio/magazzini:
+    get:
+      operationId: listEmporiOperativi
+      tags: [accessi-emporio]
+      responses:
+        "200":
+          description: Empori attivi autorizzati per Area e grant corrente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmporioOperativo"
+
+  /emporio/abilitazioni/riepilogo-beneficiari:
+    get:
+      operationId: getEmporioAbilitazioniRiepilogoBeneficiari
+      tags: [accessi-emporio]
+      parameters:
+        - name: beneficiarioIds
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Identificativi della pagina corrente, separati da virgola (massimo 100).
+      responses:
+        "200":
+          description: Stati effettivi del servizio Emporio, limitati allo scope della directory Sociale
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmporioAbilitazioneRiepilogoBeneficiario"
+
+  /emporio/beneficiari/{beneficiarioId}/abilitazione:
+    parameters:
+      - name: beneficiarioId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getEmporioAbilitazione
+      tags: [accessi-emporio]
+      responses:
+        "200":
+          description: Stato corrente del diritto Emporio nella propria Area
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmporioAbilitazione"
+    post:
+      operationId: updateEmporioAbilitazione
+      tags: [accessi-emporio]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmporioAbilitazioneInput"
+      responses:
+        "200":
+          description: Abilitazione modificata e storicizzata, nessuna ricarica
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmporioAbilitazione"
+
   /accessi-emporio/beneficiari/ricerca:
     get:
       operationId: searchBeneficiariAccessiEmporio
       tags: [accessi-emporio]
       parameters:
+        - name: includiNonPianificabili
+          in: query
+          description: Include risultati operativi minimi non pianificabili della stessa Area autorizzata, con motivi. Non autorizza la creazione di Accessi né l'accesso al dossier sociale.
+          schema:
+            type: boolean
+            default: false
+        - name: magazzinoEmporioId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: codiceTessera
+          in: query
+          schema:
+            type: string
         - name: search
           in: query
           schema:
@@ -5564,6 +5648,10 @@ paths:
       operationId: searchBeneficiariCassaEmporio
       tags: [cassa-emporio]
       parameters:
+        - name: codiceTessera
+          in: query
+          schema:
+            type: string
         - name: search
           in: query
           schema:
@@ -5582,6 +5670,7 @@ paths:
             type: integer
         - name: magazzinoEmporioId
           in: query
+          required: true
           schema:
             type: integer
       responses:
@@ -18212,6 +18301,62 @@ components:
           type: ["string", "null"]
       required: [statoAccessoEmporio]
 
+    EmporioOperativo:
+      type: object
+      required: [id, nome, areaOperativaId]
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        areaOperativaId:
+          type: integer
+
+    EmporioAbilitazioneRiepilogoBeneficiario:
+      type: object
+      required: [beneficiarioId, areaOperativaId, stato]
+      properties:
+        beneficiarioId:
+          type: integer
+        areaOperativaId:
+          type: [integer, "null"]
+        stato:
+          $ref: "#/components/schemas/EmporioStatoEffettivo"
+
+    EmporioStatoEffettivo:
+      type: string
+      enum: [non_abilitato, attivo, sospeso, revocato, programmato]
+
+    EmporioAbilitazione:
+      type: object
+      required: [beneficiarioId, areaOperativaId, stato]
+      properties:
+        beneficiarioId:
+          type: integer
+        areaOperativaId:
+          type: [integer, "null"]
+        stato:
+          type: string
+          enum: [non_abilitato, attivo, sospeso, revocato]
+        dataEffetto:
+          type: [string, "null"]
+        statoEffettivo:
+          $ref: "#/components/schemas/EmporioStatoEffettivo"
+        motivo:
+          type: [string, "null"]
+
+    EmporioAbilitazioneInput:
+      type: object
+      required: [stato, motivo]
+      properties:
+        stato:
+          type: string
+          enum: [attivo, sospeso, revocato]
+        motivo:
+          type: string
+          minLength: 1
+          maxLength: 1000
+
     BeneficiarioAccessoEmporioSearchResult:
       type: object
       properties:
@@ -18221,8 +18366,21 @@ components:
           type: string
         beneficiarioCodice:
           type: string
+        tesseraCorrispondente:
+          type: boolean
+          description: Corrispondenza esatta di una tessera attualmente valida, mai derivata dal nome.
         beneficiarioCodiceFiscale:
           type: ["string", "null"]
+        emporioStato:
+          $ref: "#/components/schemas/EmporioStatoEffettivo"
+        pianificabile:
+          type: boolean
+          description: Prerequisiti correnti verificati nella ricerca; il comando li rivalida sempre.
+        motiviNonPianificabile:
+          type: array
+          items:
+            type: string
+          description: Codici operativi senza motivi sociali o dati del dossier.
         centroAscoltoId:
           type: ["integer", "null"]
         centroAscoltoNome:
@@ -18236,7 +18394,7 @@ components:
         creditoSolidaleStato:
           type: string
         saldoCreditoSolidale:
-          type: number
+          type: ["number", "null"]
         quotaMensileAssegnata:
           type: ["number", "null"]
         magazzinoEmporioPreferitoId:
@@ -18513,7 +18671,7 @@ components:
         magazzinoEmporioPreferitoNome:
           type: ["string", "null"]
         saldoCreditoSolidale:
-          type: number
+          type: ["number", "null"]
         creditoSolidaleAbilitato:
           type: boolean
         creditoSolidaleStato:

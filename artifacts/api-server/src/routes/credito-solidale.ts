@@ -42,6 +42,8 @@ import {
   EmporioScopeError,
   currentEmporioActor,
   emporioScopeErrorHandler,
+  requireEmporioEligibilityTx,
+  emporioEligibilityCondition,
 } from "../lib/emporioScope";
 import {
   UpdateBeneficiarioCreditoInput,
@@ -407,7 +409,7 @@ async function creaMovimentoCreditoSolidaleTx(
     input.operatoreId ?? null,
     input.permission ?? "credito.adjust",
     { beneficiarioId: input.beneficiarioId },
-    false,
+    true,
   );
   await tx.execute(
     sql`SELECT id FROM ${beneficiariTable} WHERE ${beneficiariTable.id} = ${input.beneficiarioId} FOR UPDATE`,
@@ -525,6 +527,7 @@ async function buildMonthlyPreview(
 
   const conditions: SQL[] = [
     eq(beneficiariTable.creditoSolidaleAbilitato, true),
+    emporioEligibilityCondition(),
     eq(beneficiariTable.creditoSolidaleStato, "attivo"),
     eq(beneficiariTable.attivo, true),
   ];
@@ -958,6 +961,11 @@ router.patch(
       );
       const enabled =
         input.creditoSolidaleAbilitato ?? existing.creditoSolidaleAbilitato;
+      if (enabled || input.creditoSolidaleMensileAssegnato !== undefined) {
+        await requireEmporioEligibilityTx(tx, existing);
+        if (!existing.attivo)
+          throw new EmporioScopeError(400, "Beneficiario non attivo.");
+      }
       let stato = input.creditoSolidaleStato ?? existing.creditoSolidaleStato;
       if (!enabled) stato = "non_abilitato";
       else if (stato === "non_abilitato") stato = "attivo";
@@ -966,6 +974,27 @@ router.patch(
           400,
           "Associa un Centro di Ascolto prima di abilitare il Credito Solidale.",
         );
+      }
+      if (enabled || input.creditoSolidaleMensileAssegnato !== undefined) {
+        const [area] = await tx
+          .select()
+          .from(areeOperativeTable)
+          .where(eq(areeOperativeTable.id, existing.areaOperativaId ?? -1))
+          .for("share");
+        const [center] = await tx
+          .select()
+          .from(centriAscoltoTable)
+          .where(eq(centriAscoltoTable.id, existing.centroAscoltoId ?? -1))
+          .for("share");
+        if (
+          !area?.attivo ||
+          !center?.attivo ||
+          center.areaOperativaId !== existing.areaOperativaId
+        )
+          throw new EmporioScopeError(
+            400,
+            "Area o Centro di Ascolto non disponibile/coerente.",
+          );
       }
       const updates: Partial<typeof beneficiariTable.$inferInsert> = {
         creditoSolidaleAbilitato: enabled,
@@ -1083,7 +1112,7 @@ router.post(
         req.user!.id,
         "credito.adjust",
         { beneficiarioId: b.id },
-        false,
+        true,
       );
       return monthlyRechargeExists(b.id, periodoRiferimento, tx);
     });
@@ -1371,7 +1400,7 @@ router.post(
           req.user!.id,
           "credito.monthly.execute",
           { beneficiarioId: riga.beneficiarioId },
-          false,
+          true,
         );
         const exists = await monthlyRechargeExists(
           riga.beneficiarioId,

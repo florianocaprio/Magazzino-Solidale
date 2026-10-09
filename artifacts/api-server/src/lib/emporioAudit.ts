@@ -3,7 +3,13 @@ import { auditConfigurazioniTable, db } from "@workspace/db";
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type EmporioAuditInput = {
-  entityType: "accesso" | "sessione" | "riga_sessione" | "spesa" | "storno";
+  entityType:
+    | "accesso"
+    | "sessione"
+    | "riga_sessione"
+    | "spesa"
+    | "storno"
+    | "abilitazione";
   entityId: number;
   action: string;
   operatoreId?: number | null;

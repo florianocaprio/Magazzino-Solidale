@@ -6612,12 +6612,83 @@ export interface AccessoEmporioStatoUpdate {
   motivoAnnullamento?: string | null;
 }
 
+export interface EmporioOperativo {
+  id: number;
+  nome: string;
+  areaOperativaId: number;
+}
+
+export type EmporioStatoEffettivo = typeof EmporioStatoEffettivo[keyof typeof EmporioStatoEffettivo];
+
+
+export const EmporioStatoEffettivo = {
+  non_abilitato: 'non_abilitato',
+  attivo: 'attivo',
+  sospeso: 'sospeso',
+  revocato: 'revocato',
+  programmato: 'programmato',
+} as const;
+
+export interface EmporioAbilitazioneRiepilogoBeneficiario {
+  beneficiarioId: number;
+  /** @nullable */
+  areaOperativaId: number | null;
+  stato: EmporioStatoEffettivo;
+}
+
+export type EmporioAbilitazioneStato = typeof EmporioAbilitazioneStato[keyof typeof EmporioAbilitazioneStato];
+
+
+export const EmporioAbilitazioneStato = {
+  non_abilitato: 'non_abilitato',
+  attivo: 'attivo',
+  sospeso: 'sospeso',
+  revocato: 'revocato',
+} as const;
+
+export interface EmporioAbilitazione {
+  beneficiarioId: number;
+  /** @nullable */
+  areaOperativaId: number | null;
+  stato: EmporioAbilitazioneStato;
+  /** @nullable */
+  dataEffetto?: string | null;
+  statoEffettivo?: EmporioStatoEffettivo;
+  /** @nullable */
+  motivo?: string | null;
+}
+
+export type EmporioAbilitazioneInputStato = typeof EmporioAbilitazioneInputStato[keyof typeof EmporioAbilitazioneInputStato];
+
+
+export const EmporioAbilitazioneInputStato = {
+  attivo: 'attivo',
+  sospeso: 'sospeso',
+  revocato: 'revocato',
+} as const;
+
+export interface EmporioAbilitazioneInput {
+  stato: EmporioAbilitazioneInputStato;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  motivo: string;
+}
+
 export interface BeneficiarioAccessoEmporioSearchResult {
   beneficiarioId: number;
   beneficiarioNome: string;
   beneficiarioCodice: string;
+  /** Corrispondenza esatta di una tessera attualmente valida, mai derivata dal nome. */
+  tesseraCorrispondente?: boolean;
   /** @nullable */
   beneficiarioCodiceFiscale?: string | null;
+  emporioStato?: EmporioStatoEffettivo;
+  /** Prerequisiti correnti verificati nella ricerca; il comando li rivalida sempre. */
+  pianificabile?: boolean;
+  /** Codici operativi senza motivi sociali o dati del dossier. */
+  motiviNonPianificabile?: string[];
   /** @nullable */
   centroAscoltoId?: number | null;
   /** @nullable */
@@ -6628,7 +6699,8 @@ export interface BeneficiarioAccessoEmporioSearchResult {
   areaOperativaNome?: string | null;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: string;
-  saldoCreditoSolidale: number;
+  /** @nullable */
+  saldoCreditoSolidale: number | null;
   /** @nullable */
   quotaMensileAssegnata?: number | null;
   /** @nullable */
@@ -6798,7 +6870,8 @@ export interface SessioneCassaEmporioRicercaBeneficiarioResult {
   magazzinoEmporioPreferitoId?: number | null;
   /** @nullable */
   magazzinoEmporioPreferitoNome?: string | null;
-  saldoCreditoSolidale: number;
+  /** @nullable */
+  saldoCreditoSolidale: number | null;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: string;
   attivo: boolean;
@@ -11013,7 +11086,20 @@ limit?: LimitParamParameter;
 beneficiarioId?: number;
 };
 
+export type GetEmporioAbilitazioniRiepilogoBeneficiariParams = {
+/**
+ * Identificativi della pagina corrente, separati da virgola (massimo 100).
+ */
+beneficiarioIds: string;
+};
+
 export type SearchBeneficiariAccessiEmporioParams = {
+/**
+ * Include risultati operativi minimi non pianificabili della stessa Area autorizzata, con motivi. Non autorizza la creazione di Accessi né l'accesso al dossier sociale.
+ */
+includiNonPianificabili?: boolean;
+magazzinoEmporioId: number;
+codiceTessera?: string;
 search?: string;
 beneficiarioId?: number;
 };
@@ -11039,11 +11125,12 @@ limit?: LimitParamParameter;
 };
 
 export type SearchBeneficiariCassaEmporioParams = {
+codiceTessera?: string;
 search?: string;
 data?: string;
 areaOperativaId?: number;
 areaId?: number;
-magazzinoEmporioId?: number;
+magazzinoEmporioId: number;
 };
 
 export type SearchProdottiCassaEmporioParams = {

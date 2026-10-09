@@ -176,6 +176,10 @@ import type {
   DocumentoOperativoPage,
   DownloadFseExportParams,
   EmailSendResult,
+  EmporioAbilitazione,
+  EmporioAbilitazioneInput,
+  EmporioAbilitazioneRiepilogoBeneficiario,
+  EmporioOperativo,
   EnteDestinatario,
   EnteDestinatarioInput,
   EnteDestinatarioUpdate,
@@ -215,6 +219,7 @@ import type {
   FseResolutionInput,
   FseVersionInput,
   GetDocumentoOperativoRichiesta200,
+  GetEmporioAbilitazioniRiepilogoBeneficiariParams,
   GetFseReportingPreviewParams,
   GetInterventiRiepilogoVisteParams,
   GetMapsConsegneParams,
@@ -14994,7 +14999,293 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getCreateAccessoEmporioMutationOptions(options));
     }
 
-export const getSearchBeneficiariAccessiEmporioUrl = (params?: SearchBeneficiariAccessiEmporioParams,) => {
+export const getListEmporiOperativiUrl = () => {
+
+
+
+
+  return `/api/emporio/magazzini`
+}
+
+export const listEmporiOperativi = async ( options?: RequestInit): Promise<EmporioOperativo[]> => {
+
+  return customFetch<EmporioOperativo[]>(getListEmporiOperativiUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEmporiOperativiQueryKey = () => {
+    return [
+    `/api/emporio/magazzini`
+    ] as const;
+    }
+
+
+export const getListEmporiOperativiQueryOptions = <TData = Awaited<ReturnType<typeof listEmporiOperativi>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEmporiOperativi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEmporiOperativiQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEmporiOperativi>>> = ({ signal }) => listEmporiOperativi({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEmporiOperativi>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEmporiOperativiQueryResult = NonNullable<Awaited<ReturnType<typeof listEmporiOperativi>>>
+export type ListEmporiOperativiQueryError = ErrorType<unknown>
+
+
+
+export function useListEmporiOperativi<TData = Awaited<ReturnType<typeof listEmporiOperativi>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEmporiOperativi>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEmporiOperativiQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEmporioAbilitazioniRiepilogoBeneficiariUrl = (params: GetEmporioAbilitazioniRiepilogoBeneficiariParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/emporio/abilitazioni/riepilogo-beneficiari?${stringifiedParams}` : `/api/emporio/abilitazioni/riepilogo-beneficiari`
+}
+
+export const getEmporioAbilitazioniRiepilogoBeneficiari = async (params: GetEmporioAbilitazioniRiepilogoBeneficiariParams, options?: RequestInit): Promise<EmporioAbilitazioneRiepilogoBeneficiario[]> => {
+
+  return customFetch<EmporioAbilitazioneRiepilogoBeneficiario[]>(getGetEmporioAbilitazioniRiepilogoBeneficiariUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey = (params?: GetEmporioAbilitazioniRiepilogoBeneficiariParams,) => {
+    return [
+    `/api/emporio/abilitazioni/riepilogo-beneficiari`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetEmporioAbilitazioniRiepilogoBeneficiariQueryOptions = <TData = Awaited<ReturnType<typeof getEmporioAbilitazioniRiepilogoBeneficiari>>, TError = ErrorType<unknown>>(params: GetEmporioAbilitazioniRiepilogoBeneficiariParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmporioAbilitazioniRiepilogoBeneficiari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmporioAbilitazioniRiepilogoBeneficiari>>> = ({ signal }) => getEmporioAbilitazioniRiepilogoBeneficiari(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmporioAbilitazioniRiepilogoBeneficiari>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmporioAbilitazioniRiepilogoBeneficiariQueryResult = NonNullable<Awaited<ReturnType<typeof getEmporioAbilitazioniRiepilogoBeneficiari>>>
+export type GetEmporioAbilitazioniRiepilogoBeneficiariQueryError = ErrorType<unknown>
+
+
+
+export function useGetEmporioAbilitazioniRiepilogoBeneficiari<TData = Awaited<ReturnType<typeof getEmporioAbilitazioniRiepilogoBeneficiari>>, TError = ErrorType<unknown>>(
+ params: GetEmporioAbilitazioniRiepilogoBeneficiariParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmporioAbilitazioniRiepilogoBeneficiari>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmporioAbilitazioniRiepilogoBeneficiariQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEmporioAbilitazioneUrl = (beneficiarioId: number,) => {
+
+
+
+
+  return `/api/emporio/beneficiari/${beneficiarioId}/abilitazione`
+}
+
+export const getEmporioAbilitazione = async (beneficiarioId: number, options?: RequestInit): Promise<EmporioAbilitazione> => {
+
+  return customFetch<EmporioAbilitazione>(getGetEmporioAbilitazioneUrl(beneficiarioId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmporioAbilitazioneQueryKey = (beneficiarioId: number,) => {
+    return [
+    `/api/emporio/beneficiari/${beneficiarioId}/abilitazione`
+    ] as const;
+    }
+
+
+export const getGetEmporioAbilitazioneQueryOptions = <TData = Awaited<ReturnType<typeof getEmporioAbilitazione>>, TError = ErrorType<unknown>>(beneficiarioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmporioAbilitazione>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmporioAbilitazioneQueryKey(beneficiarioId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmporioAbilitazione>>> = ({ signal }) => getEmporioAbilitazione(beneficiarioId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(beneficiarioId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmporioAbilitazione>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmporioAbilitazioneQueryResult = NonNullable<Awaited<ReturnType<typeof getEmporioAbilitazione>>>
+export type GetEmporioAbilitazioneQueryError = ErrorType<unknown>
+
+
+
+export function useGetEmporioAbilitazione<TData = Awaited<ReturnType<typeof getEmporioAbilitazione>>, TError = ErrorType<unknown>>(
+ beneficiarioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmporioAbilitazione>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmporioAbilitazioneQueryOptions(beneficiarioId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateEmporioAbilitazioneUrl = (beneficiarioId: number,) => {
+
+
+
+
+  return `/api/emporio/beneficiari/${beneficiarioId}/abilitazione`
+}
+
+export const updateEmporioAbilitazione = async (beneficiarioId: number,
+    emporioAbilitazioneInput: EmporioAbilitazioneInput, options?: RequestInit): Promise<EmporioAbilitazione> => {
+
+  return customFetch<EmporioAbilitazione>(getUpdateEmporioAbilitazioneUrl(beneficiarioId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      emporioAbilitazioneInput,)
+  }
+);}
+
+
+
+
+export const getUpdateEmporioAbilitazioneMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEmporioAbilitazione>>, TError,{beneficiarioId: number;data: BodyType<EmporioAbilitazioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEmporioAbilitazione>>, TError,{beneficiarioId: number;data: BodyType<EmporioAbilitazioneInput>}, TContext> => {
+
+const mutationKey = ['updateEmporioAbilitazione'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEmporioAbilitazione>>, {beneficiarioId: number;data: BodyType<EmporioAbilitazioneInput>}> = (props) => {
+          const {beneficiarioId,data} = props ?? {};
+
+          return  updateEmporioAbilitazione(beneficiarioId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateEmporioAbilitazioneMutationResult = NonNullable<Awaited<ReturnType<typeof updateEmporioAbilitazione>>>
+    export type UpdateEmporioAbilitazioneMutationBody = BodyType<EmporioAbilitazioneInput>
+    export type UpdateEmporioAbilitazioneMutationError = ErrorType<unknown>
+
+    export const useUpdateEmporioAbilitazione = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEmporioAbilitazione>>, TError,{beneficiarioId: number;data: BodyType<EmporioAbilitazioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateEmporioAbilitazione>>,
+        TError,
+        {beneficiarioId: number;data: BodyType<EmporioAbilitazioneInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateEmporioAbilitazioneMutationOptions(options));
+    }
+
+export const getSearchBeneficiariAccessiEmporioUrl = (params: SearchBeneficiariAccessiEmporioParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -15009,7 +15300,7 @@ export const getSearchBeneficiariAccessiEmporioUrl = (params?: SearchBeneficiari
   return stringifiedParams.length > 0 ? `/api/accessi-emporio/beneficiari/ricerca?${stringifiedParams}` : `/api/accessi-emporio/beneficiari/ricerca`
 }
 
-export const searchBeneficiariAccessiEmporio = async (params?: SearchBeneficiariAccessiEmporioParams, options?: RequestInit): Promise<BeneficiarioAccessoEmporioSearchResult[]> => {
+export const searchBeneficiariAccessiEmporio = async (params: SearchBeneficiariAccessiEmporioParams, options?: RequestInit): Promise<BeneficiarioAccessoEmporioSearchResult[]> => {
 
   return customFetch<BeneficiarioAccessoEmporioSearchResult[]>(getSearchBeneficiariAccessiEmporioUrl(params),
   {
@@ -15031,7 +15322,7 @@ export const getSearchBeneficiariAccessiEmporioQueryKey = (params?: SearchBenefi
     }
 
 
-export const getSearchBeneficiariAccessiEmporioQueryOptions = <TData = Awaited<ReturnType<typeof searchBeneficiariAccessiEmporio>>, TError = ErrorType<unknown>>(params?: SearchBeneficiariAccessiEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchBeneficiariAccessiEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getSearchBeneficiariAccessiEmporioQueryOptions = <TData = Awaited<ReturnType<typeof searchBeneficiariAccessiEmporio>>, TError = ErrorType<unknown>>(params: SearchBeneficiariAccessiEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchBeneficiariAccessiEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -15055,7 +15346,7 @@ export type SearchBeneficiariAccessiEmporioQueryError = ErrorType<unknown>
 
 
 export function useSearchBeneficiariAccessiEmporio<TData = Awaited<ReturnType<typeof searchBeneficiariAccessiEmporio>>, TError = ErrorType<unknown>>(
- params?: SearchBeneficiariAccessiEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchBeneficiariAccessiEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params: SearchBeneficiariAccessiEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchBeneficiariAccessiEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -16087,7 +16378,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getChiudiSessioneCassaEmporioMutationOptions(options));
     }
 
-export const getSearchBeneficiariCassaEmporioUrl = (params?: SearchBeneficiariCassaEmporioParams,) => {
+export const getSearchBeneficiariCassaEmporioUrl = (params: SearchBeneficiariCassaEmporioParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -16102,7 +16393,7 @@ export const getSearchBeneficiariCassaEmporioUrl = (params?: SearchBeneficiariCa
   return stringifiedParams.length > 0 ? `/api/cassa-emporio/beneficiari/ricerca?${stringifiedParams}` : `/api/cassa-emporio/beneficiari/ricerca`
 }
 
-export const searchBeneficiariCassaEmporio = async (params?: SearchBeneficiariCassaEmporioParams, options?: RequestInit): Promise<SessioneCassaEmporioRicercaBeneficiarioResult[]> => {
+export const searchBeneficiariCassaEmporio = async (params: SearchBeneficiariCassaEmporioParams, options?: RequestInit): Promise<SessioneCassaEmporioRicercaBeneficiarioResult[]> => {
 
   return customFetch<SessioneCassaEmporioRicercaBeneficiarioResult[]>(getSearchBeneficiariCassaEmporioUrl(params),
   {
@@ -16124,7 +16415,7 @@ export const getSearchBeneficiariCassaEmporioQueryKey = (params?: SearchBenefici
     }
 
 
-export const getSearchBeneficiariCassaEmporioQueryOptions = <TData = Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError = ErrorType<unknown>>(params?: SearchBeneficiariCassaEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getSearchBeneficiariCassaEmporioQueryOptions = <TData = Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError = ErrorType<unknown>>(params: SearchBeneficiariCassaEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -16148,7 +16439,7 @@ export type SearchBeneficiariCassaEmporioQueryError = ErrorType<unknown>
 
 
 export function useSearchBeneficiariCassaEmporio<TData = Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError = ErrorType<unknown>>(
- params?: SearchBeneficiariCassaEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params: SearchBeneficiariCassaEmporioParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchBeneficiariCassaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 

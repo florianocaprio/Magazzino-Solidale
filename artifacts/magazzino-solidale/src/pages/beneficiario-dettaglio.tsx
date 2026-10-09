@@ -36,6 +36,8 @@ import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { fasciaEtaLabel, fasciaEtaOrigineLabel } from "@/lib/fascia-eta";
 import { InterventoStatoBadge, interventoDataLabel } from "@/components/intervento-workflow";
 import { BeneficiarioMensaSection } from "@/components/beneficiario-mensa-card";
+import { BeneficiarioEmporioSection, useBeneficiarioEmporio } from "@/components/beneficiario-emporio-card";
+import { emporioReadableData } from "@/hooks/use-emporio-security";
 import { BeneficiarioFseCard } from "@/components/beneficiario-fse-card";
 
 const NONE_VALUE = "__none__";
@@ -55,6 +57,7 @@ export default function BeneficiarioDettaglio() {
   const { t } = useTranslation();
   const { id } = useParams();
   const numId = Number(id);
+  const emporioEligibility = emporioReadableData(useBeneficiarioEmporio(numId));
   const { data: b, isLoading } = useGetBeneficiario(numId, { query: { enabled: !!id, queryKey: getGetBeneficiarioQueryKey(numId) } });
   const { data: centri } = useListCentriAscolto();
   const updateBeneficiario = useUpdateBeneficiario();
@@ -272,6 +275,7 @@ export default function BeneficiarioDettaglio() {
 
       {hasPermission("credito.view") && <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} />}
 
+      <BeneficiarioEmporioSection key={b.id} beneficiario={b} />
       <BeneficiarioMensaSection beneficiario={b} />
 
       {canViewRequests && <Card><CardHeader><CardTitle>{t("richiesteMagazzino.title")}</CardTitle></CardHeader><CardContent className="space-y-2">
@@ -296,7 +300,7 @@ export default function BeneficiarioDettaglio() {
               <div className="text-xs text-muted-foreground">{t("accessiEmporio.ultimoAccesso")}</div>
               <div className="font-medium">{ultimoAccesso?.dataOraInizio ? new Date(ultimoAccesso.dataOraInizio).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" }) : "-"}</div>
             </div>
-            {canManageEmporioAccess && <Button asChild className="gap-2">
+            {canManageEmporioAccess && b.attivo && b.creditoSolidaleStato === "attivo" && emporioEligibility?.statoEffettivo === "attivo" && <Button asChild className="gap-2">
               <Link href={`/emporio/accessi?beneficiarioId=${b.id}`}>{t("accessiEmporio.pianificaDaBeneficiario")}</Link>
             </Button>}
           </CardContent>
@@ -610,6 +614,7 @@ function CreditoSolidaleQuotaPanel({
   const updateCredito = useUpdateCreditoSolidaleBeneficiarioConfigurazione();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const servizio = emporioReadableData(useBeneficiarioEmporio(b.id));
   const { data } = useCalcolaCreditoSolidaleBeneficiario(b.id, {
     query: { queryKey: getCalcolaCreditoSolidaleBeneficiarioQueryKey(b.id), enabled: enabled && emporioAbilitato },
   });
@@ -631,7 +636,7 @@ function CreditoSolidaleQuotaPanel({
   const isManuale = assignedNumber != null && suggested != null
     ? Math.round(assignedNumber * 100) !== Math.round(suggested * 100)
     : b.creditoSolidaleMensileManuale;
-  const disabled = !emporioAbilitato || updateCredito.isPending;
+  const disabled = !emporioAbilitato || servizio?.stato !== "attivo" || updateCredito.isPending;
 
   const onSave = () => {
     updateCredito.mutate(
@@ -704,10 +709,11 @@ function CreditoSolidaleSaldoPanel({
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const canAdjust = hasPermission("credito.adjust");
+  const servizio = emporioReadableData(useBeneficiarioEmporio(b.id));
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const visible = b.creditoSolidaleAbilitato || b.creditoSolidaleStato !== "non_abilitato" || (b.creditoSolidaleSaldo ?? 0) > 0 || b.creditoSolidaleMensileAssegnato != null;
-  const canOperate = canAdjust && emporioAbilitato && b.attivo && b.creditoSolidaleAbilitato && b.creditoSolidaleStato === "attivo";
+  const canOperate = canAdjust && emporioAbilitato && servizio?.statoEffettivo === "attivo" && b.attivo && b.creditoSolidaleAbilitato && b.creditoSolidaleStato === "attivo";
   const { data: saldo } = useGetCreditoSolidaleBeneficiarioSaldo(b.id, {
     query: { queryKey: getGetCreditoSolidaleBeneficiarioSaldoQueryKey(b.id), enabled: visible },
   });
@@ -895,7 +901,8 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
   const { toast } = useToast();
   const editSchema = useMemo(() => makeEditSchema(t), [t]);
   const { user, hasPermission } = useAuth();
-  const canManageCredito = hasPermission("credito.quota.manage");
+  const servizio = emporioReadableData(useBeneficiarioEmporio(b.id));
+  const canManageCredito = hasPermission("credito.quota.manage") && servizio?.stato === "attivo";
   const isAreaOperativaGlobal = user?.areaOperativaId == null;
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
@@ -1232,6 +1239,7 @@ export function EditBeneficiarioSheet({ b, onClose, onSaved }: { b: Beneficiario
                 <CreditoSolidaleQuotaPanel b={b} enabled={creditoSolidaleAbilitato} emporioAbilitato={emporioAbilitato} />
               </div>}
 
+              <BeneficiarioEmporioSection key={b.id} beneficiario={b} />
               <BeneficiarioMensaSection beneficiario={b} compact />
 
               <div className="rounded-md border p-3 space-y-3">

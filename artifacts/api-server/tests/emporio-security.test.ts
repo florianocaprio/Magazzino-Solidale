@@ -15,6 +15,7 @@ import {
   ruoliTable,
   utentiTable,
   zoneUdsTable,
+  emporioAbilitazioniTable,
 } from "@workspace/db";
 import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
 
@@ -96,6 +97,13 @@ async function fixture() {
     })
     .returning();
   const { default: app } = await import("../src/app");
+  await db.insert(emporioAbilitazioniTable).values({
+    beneficiarioId: beneficiary.id,
+    areaOperativaId: area.id,
+    operatoreId: user.id,
+    stato: "attivo",
+    motivo: "Diritto esplicito fixture positiva F1",
+  });
   fixtureUsers.push(user.id);
   fixtureRoles.push(role.id);
   const agent = request.agent(app);
@@ -240,6 +248,10 @@ afterAll(async () => {
         [areaIds],
       )
     ).rows.map((r) => r.id);
+    await client.query(
+      "delete from emporio_abilitazioni where beneficiario_id=ANY($1::int[])",
+      [beneficiaries],
+    );
     const warehouses = (
       await client.query(
         "select id from magazzini where area_operativa_id=ANY($1::int[])",
@@ -635,7 +647,10 @@ describe("M6.2-A — confini, replay e transazioni", () => {
       .where(eq(utentiTable.id, f.user.id));
     const own = await f.agent
       .get("/api/cassa-emporio/beneficiari/ricerca")
-      .query({ search: f.beneficiary.codice });
+      .query({
+        search: f.beneficiary.codice,
+        magazzinoEmporioId: f.warehouse.id,
+      });
     expect(own.status).toBe(200);
     expect(
       own.body.map((r: { beneficiarioId: number }) => r.beneficiarioId),
@@ -645,6 +660,7 @@ describe("M6.2-A — confini, replay e transazioni", () => {
       .query({
         search: other.beneficiary.codice,
         areaOperativaId: other.area.id,
+        magazzinoEmporioId: f.warehouse.id,
       });
     expect(foreign.status).toBe(200);
     expect(foreign.body).toEqual([]);
@@ -680,7 +696,7 @@ describe("M6.2-A — confini, replay e transazioni", () => {
       expect((await f.agent.get("/api/accessi-emporio")).status).toBe(403);
     },
   );
-  it("A07/A12: Zona limita lista, saldo, movimenti e preview batch", async () => {
+  it("A07/A12/F1: Emporio usa Area, non Zona; storico leggibile ma batch richiede diritto esplicito", async () => {
     const f = await fixture();
     const [zone] = await db
       .insert(zoneUdsTable)
@@ -707,10 +723,12 @@ describe("M6.2-A — confini, replay e transazioni", () => {
       .where(eq(utentiTable.id, f.user.id));
     const list = await f.agent.get("/api/credito-solidale/beneficiari");
     expect(list.status).toBe(200);
-    expect(list.body.map((r: { id: number }) => r.id)).toEqual([
-      f.beneficiary.id,
-    ]);
-    expect(list.headers["x-total-count"]).toBe("1");
+    expect(
+      list.body
+        .map((r: { id: number }) => r.id)
+        .sort((a: number, b: number) => a - b),
+    ).toEqual([f.beneficiary.id, other.id].sort((a, b) => a - b));
+    expect(list.headers["x-total-count"]).toBe("2");
     const preview = await f.agent
       .post("/api/credito-solidale/ricariche-mensili/preview")
       .send({ periodoRiferimento: "2026-11" });
@@ -727,14 +745,14 @@ describe("M6.2-A — confini, replay e transazioni", () => {
             `/api/credito-solidale/beneficiari/${other.id}/${suffix}`,
           )
         ).status,
-      ).toBe(403);
+      ).toBe(200);
     const movements = await f.agent
       .get("/api/credito-solidale/movimenti")
       .query({ beneficiarioId: other.id });
     expect(movements.status).toBe(200);
     expect(movements.body).toEqual([]);
   });
-  it("A08: Magazzino di altro Centro, anche stessa Area, non è accessibile", async () => {
+  it("A08/F1: altro Centro stessa Area consentito; altra Area resta negata", async () => {
     const f = await fixture();
     const [center] = await db
       .insert(centriAscoltoTable)
@@ -750,7 +768,7 @@ describe("M6.2-A — confini, replay e transazioni", () => {
         centroAscoltoId: center.id,
       })
       .returning();
-    const before = await deniedFacts();
+    const before = await facts();
     expect(
       (
         await f.agent.post("/api/accessi-emporio").send({
@@ -759,15 +777,25 @@ describe("M6.2-A — confini, replay e transazioni", () => {
           dataOraInizio: "2026-10-21T10:00:00Z",
         })
       ).status,
-    ).toBe(403);
+    ).toBe(201);
     expect(
       (
         await f.agent
           .get("/api/cassa-emporio/prodotti/ricerca")
           .query({ search: "x", magazzinoEmporioId: wh.id })
       ).status,
+    ).toBe(200);
+    expect(await facts()).toEqual(before);
+    const foreign = await fixture();
+    expect(
+      (
+        await f.agent.post("/api/accessi-emporio").send({
+          beneficiarioId: f.beneficiary.id,
+          magazzinoEmporioId: foreign.warehouse.id,
+          dataOraInizio: "2026-10-22T10:00:00Z",
+        })
+      ).status,
     ).toBe(403);
-    expect(await deniedFacts()).toEqual(before);
   });
   it("A09: Spesa segue autorizzazione del Beneficiario corrente, snapshot storico intatto", async () => {
     const f = await fixture(),

@@ -6,8 +6,9 @@ import {
   db,
   magazziniTable,
   zoneUdsTable,
+  emporioAbilitazioniTable,
 } from "@workspace/db";
-import { and, eq, isNull, or, type Column, type SQL } from "drizzle-orm";
+import { and, eq, sql, type Column, type SQL } from "drizzle-orm";
 import type { InventoryTransaction } from "./scaricoInventory";
 import {
   CurrentCommandActorError,
@@ -17,13 +18,67 @@ import type { PermissionKey } from "./permissions";
 import { requirePermission as preliminaryPermission } from "../middlewares/auth";
 export {
   andScoped,
-  callerCentroId,
   callerAreaOperativaId,
-  callerZonaUdsId,
   magazzinoScopeFilter,
   zonaUdsScopeFilter,
   canAccessZonaUds,
 } from "./centroScope";
+
+// Confine operativo Emporio: Area, non Centro/Zona. Nessun cambiamento
+// alle policy sociali generali o alle assegnazioni Mensa.
+export const callerCentroId = (_req: Request): null => null;
+export const callerZonaUdsId = (_req: Request): null => null;
+export const emporioReportingScope = (req: Request) => ({
+  areaOperativaId: req.user?.areaOperativaId ?? null,
+  centroAscoltoId: null,
+  zonaUdsId: null,
+});
+export function emporioEligibilityState() {
+  return sql<
+    "non_abilitato" | "attivo" | "sospeso" | "revocato" | "programmato"
+  >`case
+    when ${emporioAbilitazioniTable.id} is null then 'non_abilitato'
+    when ${emporioAbilitazioniTable.stato} = 'attivo' and ${emporioAbilitazioniTable.dataEffetto} > now() then 'programmato'
+    else ${emporioAbilitazioniTable.stato} end`;
+}
+export function emporioEligibilityCondition() {
+  return sql`exists (select 1 from ${emporioAbilitazioniTable}
+    where ${emporioAbilitazioniTable.beneficiarioId} = ${beneficiariTable.id}
+    and ${emporioAbilitazioniTable.areaOperativaId} = ${beneficiariTable.areaOperativaId}
+    and ${emporioEligibilityState()} = 'attivo')`;
+}
+export function emporioOperationalBeneficiaryCondition() {
+  return and(
+    eq(beneficiariTable.attivo, true),
+    emporioEligibilityCondition(),
+    eq(beneficiariTable.creditoSolidaleAbilitato, true),
+    eq(beneficiariTable.creditoSolidaleStato, "attivo"),
+    sql`exists(select 1 from ${centriAscoltoTable} c where c.id=${beneficiariTable.centroAscoltoId} and c.attivo and c.area_operativa_id=${beneficiariTable.areaOperativaId})`,
+  )!;
+}
+export async function requireEmporioEligibilityTx(
+  tx: InventoryTransaction,
+  beneficiary: typeof beneficiariTable.$inferSelect,
+) {
+  const [right] = await tx
+    .select({ statoEffettivo: emporioEligibilityState() })
+    .from(emporioAbilitazioniTable)
+    .where(
+      and(
+        eq(emporioAbilitazioniTable.beneficiarioId, beneficiary.id),
+        eq(
+          emporioAbilitazioniTable.areaOperativaId,
+          beneficiary.areaOperativaId ?? -1,
+        ),
+      ),
+    )
+    .for("share");
+  if (right?.statoEffettivo !== "attivo")
+    throw new EmporioScopeError(
+      400,
+      "Beneficiario non abilitato al servizio Emporio nella sua Area.",
+    );
+}
 
 export class EmporioScopeError extends Error {
   constructor(
@@ -161,22 +216,13 @@ export function canReadEmporioBeneficiary(
   },
   actor: Pick<Actor, "areaOperativaId" | "centroAscoltoId" | "zonaUdsId">,
 ) {
-  return (
-    canAccessAreaOperativa(resource.areaOperativaId, actor.areaOperativaId) &&
-    canAccessCentro(resource.centroAscoltoId, actor.centroAscoltoId) &&
-    (actor.zonaUdsId == null || resource.zonaUdsId === actor.zonaUdsId)
+  return canAccessAreaOperativa(
+    resource.areaOperativaId,
+    actor.areaOperativaId,
   );
 }
 function warehouseCondition(centroId: number | null, areaId: number | null) {
-  return and(
-    areaOperativaScopeFilter(magazziniTable.areaOperativaId, areaId),
-    centroId == null
-      ? undefined
-      : or(
-          eq(magazziniTable.centroAscoltoId, centroId),
-          isNull(magazziniTable.centroAscoltoId),
-        ),
-  );
+  return areaOperativaScopeFilter(magazziniTable.areaOperativaId, areaId);
 }
 export async function visibleMagazzinoIds(
   centroId: number | null,
@@ -248,6 +294,7 @@ export async function requireEmporioCommandTx(
       "Beneficiario non accessibile per il tuo profilo.",
     );
   if (operational) {
+    await requireEmporioEligibilityTx(tx, beneficiary);
     const [area] =
       beneficiary.areaOperativaId == null
         ? []
@@ -285,13 +332,7 @@ export async function requireEmporioCommandTx(
       .for("share");
     if (
       !warehouse ||
-      !canAccessAreaOperativa(
-        warehouse.areaOperativaId,
-        actor.areaOperativaId,
-      ) ||
-      (actor.centroAscoltoId != null &&
-        warehouse.centroAscoltoId != null &&
-        warehouse.centroAscoltoId !== actor.centroAscoltoId)
+      !canAccessAreaOperativa(warehouse.areaOperativaId, actor.areaOperativaId)
     )
       throw new EmporioScopeError(
         403,

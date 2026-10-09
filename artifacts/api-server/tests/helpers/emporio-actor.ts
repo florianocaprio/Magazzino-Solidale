@@ -3,6 +3,7 @@ import {
   db,
   ruoliTable,
   utentiTable,
+  emporioAbilitazioniTable,
 } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { loadSessionUser } from "../../src/middlewares/auth";
@@ -10,6 +11,10 @@ const users = new Set<number>(),
   roles: number[] = [],
   createdUsers: number[] = [];
 export async function cleanupEmporioActorFixtures() {
+  if (users.size)
+    await db
+      .delete(emporioAbilitazioniTable)
+      .where(inArray(emporioAbilitazioniTable.operatoreId, [...users]));
   if (users.size)
     await db
       .update(utentiTable)
@@ -31,6 +36,28 @@ export async function cleanupEmporioActorFixtures() {
       .where(inArray(utentiTable.id, createdUsers.splice(0)));
   }
   users.clear();
+}
+
+/** Solo setup positivo esplicito dei test: non deriva diritti da credito, Centro
+ * o preferenza. I casi negativi F1 non chiamano questo helper. */
+export async function grantEmporioEligibilityFixture(
+  beneficiarioId: number,
+  areaOperativaId: number,
+) {
+  const actor = await emporioActorFixture({
+    isAdmin: true,
+    aree: ["sociale"],
+    permessi: [],
+    areaOperativaId: null,
+    centroAscoltoId: null,
+  });
+  await db.insert(emporioAbilitazioniTable).values({
+    beneficiarioId,
+    areaOperativaId,
+    operatoreId: actor.id,
+    stato: "attivo",
+    motivo: "Diritto esplicito fixture positiva",
+  });
 }
 
 /** Fixture DB reale: req.user non può sostituire l'autorità persistita M6.2-A.

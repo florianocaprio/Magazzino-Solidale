@@ -46,6 +46,7 @@ import { quantitaNettaMensileProdotto } from "../src/lib/speseEmporio";
 import {
   emporioActorFixture,
   cleanupEmporioActorFixtures,
+  grantEmporioEligibilityFixture,
 } from "./helpers/emporio-actor";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
@@ -181,6 +182,7 @@ async function createBeneficiario(opts: {
     })
     .returning({ id: beneficiariTable.id });
   beneficiarioIds.push(beneficiario.id);
+  await grantEmporioEligibilityFixture(beneficiario.id, opts.areaOperativaId);
   return beneficiario.id;
 }
 
@@ -841,7 +843,11 @@ describe("Cassa Emporio", () => {
     const fixture = await createFixture({ codiceBeneficiario: codice });
     const res = await request(makeApp())
       .get("/cassa-emporio/beneficiari/ricerca")
-      .query({ search: codice, areaOperativaId: fixture.areaOperativaId });
+      .query({
+        search: codice,
+        areaOperativaId: fixture.areaOperativaId,
+        magazzinoEmporioId: fixture.magazzinoId,
+      });
     expect(res.status).toBe(200);
     expect(res.body[0].beneficiarioId).toBe(fixture.beneficiarioId);
     expect(res.body[0].accessi.map((a: { id: number }) => a.id)).toContain(
@@ -851,8 +857,9 @@ describe("Cassa Emporio", () => {
     const scanned = await request(makeApp())
       .get("/cassa-emporio/beneficiari/ricerca")
       .query({
-        search: codice.replace(/[^a-zA-Z0-9]/g, ""),
+        search: codice,
         areaOperativaId: fixture.areaOperativaId,
+        magazzinoEmporioId: fixture.magazzinoId,
       });
     expect(scanned.status).toBe(200);
     expect(
@@ -863,7 +870,11 @@ describe("Cassa Emporio", () => {
   it("mostra beneficiari accreditati anche senza Accesso Emporio pianificato", async () => {
     const areaOperativaId = await createAreaOperativa();
     const centroId = await createCentro(areaOperativaId);
-    await createMagazzino("emporio", areaOperativaId, centroId);
+    const magazzinoEmporioId = await createMagazzino(
+      "emporio",
+      areaOperativaId,
+      centroId,
+    );
     const suffix = rnd();
     const popescuCognome = `Popescu${suffix}`;
     const popescuId = await createBeneficiario({
@@ -883,7 +894,7 @@ describe("Cassa Emporio", () => {
 
     const byArea = await request(makeApp())
       .get("/cassa-emporio/beneficiari/ricerca")
-      .query({ areaOperativaId });
+      .query({ areaOperativaId, magazzinoEmporioId });
     expect(byArea.status).toBe(200);
     expect(
       byArea.body.map((b: { beneficiarioId: number }) => b.beneficiarioId),
@@ -891,7 +902,7 @@ describe("Cassa Emporio", () => {
 
     const byName = await request(makeApp())
       .get("/cassa-emporio/beneficiari/ricerca")
-      .query({ search: `${popescuCognome} Pavel` });
+      .query({ search: `${popescuCognome} Pavel`, magazzinoEmporioId });
     expect(byName.status).toBe(200);
     expect(
       byName.body.map((b: { beneficiarioId: number }) => b.beneficiarioId),
@@ -902,7 +913,7 @@ describe("Cassa Emporio", () => {
     expect(popescuRow.accessi).toEqual([]);
   });
 
-  it("ricerca in Cassa i beneficiari accreditati sull'Emporio selezionato anche se l'anagrafica è di un'altra Area", async () => {
+  it("non cerca in Cassa beneficiari di altra Area anche con Emporio preferito locale", async () => {
     const romaId = await createAreaOperativa();
     const centroRomaId = await createCentro(romaId);
     const emporioRomaId = await createMagazzino(
@@ -925,7 +936,7 @@ describe("Cassa Emporio", () => {
     const res = await request(makeApp())
       .get("/cassa-emporio/beneficiari/ricerca")
       .query({
-        search: "Galli Luciana",
+        search: "Galli Lucia",
         areaOperativaId: romaId,
         magazzinoEmporioId: emporioRomaId,
       });
@@ -933,7 +944,7 @@ describe("Cassa Emporio", () => {
     expect(res.status).toBe(200);
     expect(
       res.body.map((b: { beneficiarioId: number }) => b.beneficiarioId),
-    ).toContain(galliId);
+    ).not.toContain(galliId);
   });
 
   it("non mostra beneficiari Cassa senza Area o Emporio e scarta beneficiari non eleggibili", async () => {
@@ -952,22 +963,20 @@ describe("Cassa Emporio", () => {
     const noArea = await request(makeApp()).get(
       "/cassa-emporio/beneficiari/ricerca",
     );
-    expect(noArea.status).toBe(200);
-    expect(noArea.body).toHaveLength(0);
+    expect(noArea.status).toBe(400);
 
     const searchWithoutArea = await request(makeApp())
       .get("/cassa-emporio/beneficiari/ricerca")
       .query({ search: "Cassa" });
-    expect(searchWithoutArea.status).toBe(200);
-    expect(
-      searchWithoutArea.body.map(
-        (b: { beneficiarioId: number }) => b.beneficiarioId,
-      ),
-    ).toContain(fixture.beneficiarioId);
+    expect(searchWithoutArea.status).toBe(400);
 
     const byArea = await request(makeApp())
       .get("/cassa-emporio/beneficiari/ricerca")
-      .query({ data: "2026-07-15", areaOperativaId: fixture.areaOperativaId });
+      .query({
+        data: "2026-07-15",
+        areaOperativaId: fixture.areaOperativaId,
+        magazzinoEmporioId: fixture.magazzinoId,
+      });
     expect(byArea.status).toBe(200);
     const ids = byArea.body.map(
       (b: { beneficiarioId: number }) => b.beneficiarioId,
@@ -2253,10 +2262,11 @@ describe("Cassa Emporio", () => {
     expect(crediti).toHaveLength(0);
   });
 
-  it("applica insieme scope Beneficiario e Magazzino a Sessioni, Spese, Bolla, email e storno", async () => {
+  it("applica scope Area a Sessioni, Spese, Bolla, email e storno", async () => {
     const areaOperativaId = await createAreaOperativa();
     const centroAId = await createCentro(areaOperativaId);
-    const centroBId = await createCentro(areaOperativaId);
+    const altraAreaId = await createAreaOperativa();
+    const centroBId = await createCentro(altraAreaId);
     const magazzinoAId = await createMagazzino(
       "emporio",
       areaOperativaId,
@@ -2264,7 +2274,7 @@ describe("Cassa Emporio", () => {
     );
     const magazzinoBId = await createMagazzino(
       "emporio",
-      areaOperativaId,
+      altraAreaId,
       centroBId,
     );
     const beneficiarioId = await createBeneficiario({
@@ -2277,8 +2287,13 @@ describe("Cassa Emporio", () => {
       magazzinoId: magazzinoAId,
       dataOraInizio: "2026-07-15T09:00:00",
     });
+    const altroBeneficiarioId = await createBeneficiario({
+      areaOperativaId: altraAreaId,
+      centroAscoltoId: centroBId,
+      saldo: "50.00",
+    });
     const accessoBId = await createAccesso({
-      beneficiarioId,
+      beneficiarioId: altroBeneficiarioId,
       magazzinoId: magazzinoBId,
       dataOraInizio: "2026-07-16T09:00:00",
     });

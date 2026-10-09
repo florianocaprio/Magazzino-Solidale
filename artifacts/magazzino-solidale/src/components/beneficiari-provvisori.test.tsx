@@ -5,15 +5,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   listBeneficiari: vi.fn(),
   getMensaRiepilogo: vi.fn(),
+  getEmporioRiepilogo: vi.fn(),
   areas: new Set<string>(),
   permissions: new Set<string>(),
   mensaAbilitato: true,
-  user: { id: 1, areaOperativaId: 1 as number | null, centroAscoltoId: 2 as number | null },
-  centri: [] as Array<{ id: number; nome: string; areaOperativaId: number | null }>,
+  user: {
+    id: 1,
+    areaOperativaId: 1 as number | null,
+    centroAscoltoId: 2 as number | null,
+  },
+  centri: [] as Array<{
+    id: number;
+    nome: string;
+    areaOperativaId: number | null;
+  }>,
   areaOperativa: [] as Array<{ id: number; nome: string }>,
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
+  useGetEmporioAbilitazioniRiepilogoBeneficiari: (
+    params: unknown,
+    options: unknown,
+  ) => mocks.getEmporioRiepilogo(params, options),
+  getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey: (params: unknown) => [
+    "emporio-riepilogo",
+    params,
+  ],
   useListBeneficiari: (params: unknown) => mocks.listBeneficiari(params),
   useCreateBeneficiario: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateMensaAbilitazione: () => ({
@@ -27,13 +44,18 @@ vi.mock("@workspace/api-client-react", () => ({
   ) => mocks.getMensaRiepilogo(params, options),
   useDeleteBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateBeneficiarioStato: () => ({ mutate: vi.fn(), isPending: false }),
-  useAuthorizeBeneficiariExport: () => ({ mutateAsync: vi.fn().mockResolvedValue({ autorizzato: true }) }),
+  useAuthorizeBeneficiariExport: () => ({
+    mutateAsync: vi.fn().mockResolvedValue({ autorizzato: true }),
+  }),
   getMensaAbilitazioniRiepilogoBeneficiari: vi.fn().mockResolvedValue([]),
   useUpdateBeneficiario: () => ({ mutate: vi.fn(), isPending: false }),
   useBulkBeneficiari: () => ({ mutate: vi.fn(), isPending: false }),
   usePreviewBeneficiariFse: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useImportBeneficiariFse: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  usePreflightBeneficiariFseExport: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  usePreflightBeneficiariFseExport: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
   useExportBeneficiariFse: () => ({ mutateAsync: vi.fn(), isPending: false }),
   listBeneficiari: vi.fn().mockResolvedValue([]),
   useListCentriAscolto: () => ({ data: mocks.centri }),
@@ -57,6 +79,13 @@ vi.mock("@workspace/api-client-react", () => ({
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
+vi.mock("@/hooks/use-emporio-security", () => ({
+  useEmporioSecurity: () => ({
+    readOptions: (queryKey: unknown) => ({ queryKey }),
+  }),
+  emporioReadableData: (query: { data?: unknown; isError?: boolean }) =>
+    query.isError ? undefined : query.data,
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -70,7 +99,9 @@ vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
     user: mocks.user,
     hasArea: (area: string) => mocks.areas.has(area),
-    hasPermission: (permission: string) => permission.startsWith("beneficiari.") || mocks.permissions.has(permission),
+    hasPermission: (permission: string) =>
+      permission.startsWith("beneficiari.") ||
+      mocks.permissions.has(permission),
   }),
 }));
 
@@ -136,6 +167,11 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
       isLoading: false,
       isError: false,
     });
+    mocks.getEmporioRiepilogo.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+    });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -146,6 +182,81 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     container.remove();
     document.body.innerHTML = "";
     vi.clearAllMocks();
+  });
+
+  it.each(["non_abilitato", "attivo", "sospeso", "revocato", "programmato"])(
+    "B05/B14/B15: colonna Emporio usa lo stato server %s, non il credito",
+    async (stato) => {
+      mocks.getEmporioRiepilogo.mockReturnValue({
+        data: [{ beneficiarioId: 10, stato }],
+        isLoading: false,
+        isError: false,
+      });
+      await act(async () => root.render(<Beneficiari />));
+      expect(container.querySelector("thead")?.textContent).toContain(
+        "emporioServizio.colonna",
+      );
+      expect(container.querySelector("tbody")?.textContent).toContain(
+        `emporioServizio.${stato}`,
+      );
+      expect(mocks.getEmporioRiepilogo).toHaveBeenCalledWith(
+        { beneficiarioIds: "10" },
+        expect.objectContaining({
+          query: expect.objectContaining({ enabled: true }),
+        }),
+      );
+    },
+  );
+
+  it("B16/B17: Mensa ed Emporio sono colonne indipendenti", async () => {
+    mocks.permissions.add("mensa.view");
+    mocks.getMensaRiepilogo.mockReturnValue({
+      data: [{ beneficiarioId: 10, stato: "attiva" }],
+      isLoading: false,
+    });
+    mocks.getEmporioRiepilogo.mockReturnValue({
+      data: [{ beneficiarioId: 10, stato: "non_abilitato" }],
+      isLoading: false,
+    });
+    await act(async () => root.render(<Beneficiari />));
+    expect(container.querySelector("tbody")?.textContent).toContain("ATTIVA");
+    expect(container.querySelector("tbody")?.textContent).toContain(
+      "emporioServizio.non_abilitato",
+    );
+    mocks.getMensaRiepilogo.mockReturnValue({
+      data: [{ beneficiarioId: 10, stato: "non_abilitato" }],
+      isLoading: false,
+    });
+    mocks.getEmporioRiepilogo.mockReturnValue({
+      data: [{ beneficiarioId: 10, stato: "attivo" }],
+      isLoading: false,
+    });
+    await act(async () => root.render(<Beneficiari />));
+    expect(container.querySelector("tbody")?.textContent).toContain(
+      "NON ABILITATO",
+    );
+    expect(container.querySelector("tbody")?.textContent).toContain(
+      "emporioServizio.attivo",
+    );
+  });
+
+  it("riepilogo in errore o ancora in caricamento non inventa NON ABILITATO", async () => {
+    mocks.getEmporioRiepilogo.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    await act(async () => root.render(<Beneficiari />));
+    expect(container.querySelector("tbody")?.textContent).not.toContain(
+      "emporioServizio.non_abilitato",
+    );
+    mocks.getEmporioRiepilogo.mockReturnValue({
+      data: [{ beneficiarioId: 10, stato: "attivo" }],
+      isError: true,
+    });
+    await act(async () => root.render(<Beneficiari />));
+    expect(container.querySelector("tbody")?.textContent).not.toContain(
+      "emporioServizio.attivo",
+    );
   });
 
   it("mostra il badge Provvisoria e il filtro dedicato", async () => {
@@ -163,14 +274,17 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
 
   it("mostra sempre l'Area obbligatoria nella creazione Sociale di un Admin globale", async () => {
     mocks.user = { id: 1, areaOperativaId: null, centroAscoltoId: null };
-    mocks.areaOperativa = [{ id: 1, nome: "Area A" }, { id: 2, nome: "Area B" }];
+    mocks.areaOperativa = [
+      { id: 1, nome: "Area A" },
+      { id: 2, nome: "Area B" },
+    ];
     mocks.centri = [
       { id: 10, nome: "Centro A", areaOperativaId: 1 },
       { id: 20, nome: "Centro B", areaOperativaId: 2 },
     ];
     await act(async () => root.render(<Beneficiari />));
-    const newButton = Array.from(document.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("beneficiari.newBeneficiario"),
+    const newButton = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("beneficiari.newBeneficiario"),
     );
     await act(async () => newButton?.click());
 
@@ -338,20 +452,21 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     expect(document.body.textContent).toContain("NON ABILITATO");
   });
 
-  it("naviga pagina 1, pagina 2, ritorna e resetta a pagina 1 quando cambia ricerca", async () => {
-    const pageRows = (page: number) => Array.from({ length: 50 }, (_, index) => ({
-      id: page * 100 + index,
-      codice: `BEN-${page}-${index}`,
-      cognome: `Cognome ${page}-${index}`,
-      nome: "Persona",
-      statoAnagrafica: "completa",
-      priorita: "media",
-      numComponenti: 1,
-      consegnaDomicilio: false,
-      uds: false,
-      attivo: true,
-      versione: 1,
-    }));
+  it("B19: naviga pagina 1, pagina 2, ritorna e resetta a pagina 1 con riepilogo Emporio limitato agli ID correnti", async () => {
+    const pageRows = (page: number) =>
+      Array.from({ length: 50 }, (_, index) => ({
+        id: page * 100 + index,
+        codice: `BEN-${page}-${index}`,
+        cognome: `Cognome ${page}-${index}`,
+        nome: "Persona",
+        statoAnagrafica: "completa",
+        priorita: "media",
+        numComponenti: 1,
+        consegnaDomicilio: false,
+        uds: false,
+        attivo: true,
+        versione: 1,
+      }));
     mocks.mensaAbilitato = false;
     mocks.listBeneficiari.mockImplementation((params: { page?: number }) => ({
       data: pageRows(params.page ?? 1),
@@ -359,23 +474,64 @@ describe("Lista Beneficiari - anagrafiche provvisorie", () => {
     }));
 
     await act(async () => root.render(<Beneficiari />));
-    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, limit: 50 }));
+    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, limit: 50 }),
+    );
+    expect(mocks.getEmporioRiepilogo).toHaveBeenLastCalledWith(
+      {
+        beneficiarioIds: pageRows(1)
+          .map((b) => b.id)
+          .join(","),
+      },
+      expect.anything(),
+    );
 
-    const next = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Successiva");
+    const next = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Successiva",
+    );
     await act(async () => next?.click());
-    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, limit: 50 }));
+    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 2, limit: 50 }),
+    );
+    expect(mocks.getEmporioRiepilogo).toHaveBeenLastCalledWith(
+      {
+        beneficiarioIds: pageRows(2)
+          .map((b) => b.id)
+          .join(","),
+      },
+      expect.anything(),
+    );
 
-    const previous = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Precedente");
+    const previous = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Precedente",
+    );
     await act(async () => previous?.click());
-    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, limit: 50 }));
+    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, limit: 50 }),
+    );
+    expect(mocks.getEmporioRiepilogo).toHaveBeenLastCalledWith(
+      {
+        beneficiarioIds: pageRows(1)
+          .map((b) => b.id)
+          .join(","),
+      },
+      expect.anything(),
+    );
 
     await act(async () => next?.click());
-    const search = document.querySelector<HTMLInputElement>('input[placeholder="beneficiari.searchPlaceholder"]');
+    const search = document.querySelector<HTMLInputElement>(
+      'input[placeholder="beneficiari.searchPlaceholder"]',
+    );
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
       setter?.call(search, "Rossi");
       search?.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, search: "Rossi" }));
+    expect(mocks.listBeneficiari).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, search: "Rossi" }),
+    );
   });
 });

@@ -292,6 +292,10 @@ export const APPROVVIGIONAMENTI_PERMISSIONS = [
 ] as const;
 
 export const ALL_PERMISSIONS = [
+  {
+    key: "emporio.eligibility.manage",
+    label: "Emporio: gestione abilitazioni del servizio",
+  },
   ...MENSA_PERMISSIONS,
   ...BENEFICIARI_PERMISSIONS,
   ...CREDITO_PERMISSIONS,
@@ -342,6 +346,8 @@ export const AREA_PERMISSION_MAP = {
   ],
   sociale: [
     ...permissionKeys(BENEFICIARI_PERMISSIONS),
+    // Selezionabile esplicitamente nell'editor ruoli; non nei grant di default.
+    "emporio.eligibility.manage",
     "credito.view",
     "credito.quota.manage",
     "credito.adjust",

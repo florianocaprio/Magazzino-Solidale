@@ -21,7 +21,8 @@ export interface SessioneCassaEmporioRicercaBeneficiarioResult {
   magazzinoEmporioPreferitoId?: number | null;
   /** @nullable */
   magazzinoEmporioPreferitoNome?: string | null;
-  saldoCreditoSolidale: number;
+  /** @nullable */
+  saldoCreditoSolidale: number | null;
   creditoSolidaleAbilitato: boolean;
   creditoSolidaleStato: string;
   attivo: boolean;

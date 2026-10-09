@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -29,11 +30,29 @@ test.beforeAll(async () => {
       "M62A E2E requires the verified independent disposable database",
     );
   process.env.DATABASE_URL = url.href;
-  database = (await import("../../../lib/db/src/index.ts")).pool;
-  const result = await database.query(
-    "select current_database() db, (select count(*)::int from app_meta.schema_migrations) ledger",
+  const { Pool } = createRequire(
+    new URL("../../../lib/db/package.json", import.meta.url),
+  )("pg");
+  database = new Pool({ connectionString: url.href });
+  // This setup needs the complete current schema, not a historical upgrade boundary.
+  // Compare the actual set and checksums, so a missing migration still fails.
+  const updates = new URL("../../../lib/db/updates/", import.meta.url);
+  const required = await Promise.all(
+    (await readdir(updates))
+      .filter((name) => /^\d{8}_.*\.sql$/.test(name))
+      .sort()
+      .map(async (filename) => ({
+        filename,
+        checksum_sha256: createHash("sha256")
+          .update(await readFile(new URL(filename, updates)))
+          .digest("hex"),
+      })),
   );
-  expect(result.rows[0]).toEqual({ db: "m62a", ledger: 47 });
+  const result = await database.query(
+    "select filename, checksum_sha256 from app_meta.schema_migrations order by filename",
+  );
+  expect(required.length).toBeGreaterThan(0);
+  expect(result.rows).toEqual(required);
 });
 test.afterAll(async () => {
   await database?.end();
@@ -78,6 +97,11 @@ async function fixture() {
       center,
       `${suffix}@example.invalid`,
     ],
+  );
+  // Explicit positive service eligibility; credit/preferred warehouse never imply it.
+  await database.query(
+    "insert into emporio_abilitazioni(beneficiario_id,area_operativa_id,stato,operatore_id,motivo) values($1,$2,'attivo',$3,'Diritto esplicito fixture E2E positiva')",
+    [beneficiary, area, user],
   );
   const productCode = `R2P-${suffix}`;
   const productName = `Prodotto R2 ${suffix}`;
@@ -366,7 +390,8 @@ test("A13/A14/A24: errore azione mantiene draft; GET revocata nasconde cache e P
   ).toBe(200);
   const sessionButton = page
     .getByRole("button")
-    .filter({ hasText: `${f.code.split("-")[1]} Persona sintetica` });
+    .filter({ hasText: `${f.code.split("-")[1]} Persona sintetica` })
+    .filter({ hasText: /Aperta/ });
   await expect(sessionButton).toBeVisible();
   await sessionButton.click();
   await expect(

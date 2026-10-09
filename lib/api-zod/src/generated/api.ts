@@ -8857,7 +8857,69 @@ export const CreateAccessoEmporioBody = zod.object({
 })
 
 
+export const ListEmporiOperativiResponseItem = zod.object({
+  "id": zod.number(),
+  "nome": zod.string(),
+  "areaOperativaId": zod.number()
+})
+export const ListEmporiOperativiResponse = zod.array(ListEmporiOperativiResponseItem)
+
+
+export const GetEmporioAbilitazioniRiepilogoBeneficiariQueryParams = zod.object({
+  "beneficiarioIds": zod.coerce.string().describe('Identificativi della pagina corrente, separati da virgola (massimo 100).')
+})
+
+export const GetEmporioAbilitazioniRiepilogoBeneficiariResponseItem = zod.object({
+  "beneficiarioId": zod.number(),
+  "areaOperativaId": zod.number().nullable(),
+  "stato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato', 'programmato'])
+})
+export const GetEmporioAbilitazioniRiepilogoBeneficiariResponse = zod.array(GetEmporioAbilitazioniRiepilogoBeneficiariResponseItem)
+
+
+export const GetEmporioAbilitazioneParams = zod.object({
+  "beneficiarioId": zod.coerce.number()
+})
+
+export const GetEmporioAbilitazioneResponse = zod.object({
+  "beneficiarioId": zod.number(),
+  "areaOperativaId": zod.number().nullable(),
+  "stato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']),
+  "dataEffetto": zod.string().nullish(),
+  "statoEffettivo": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato', 'programmato']).optional(),
+  "motivo": zod.string().nullish()
+})
+
+
+export const UpdateEmporioAbilitazioneParams = zod.object({
+  "beneficiarioId": zod.coerce.number()
+})
+
+export const updateEmporioAbilitazioneBodyMotivoMax = 1000;
+
+
+
+export const UpdateEmporioAbilitazioneBody = zod.object({
+  "stato": zod.enum(['attivo', 'sospeso', 'revocato']),
+  "motivo": zod.string().min(1).max(updateEmporioAbilitazioneBodyMotivoMax)
+})
+
+export const UpdateEmporioAbilitazioneResponse = zod.object({
+  "beneficiarioId": zod.number(),
+  "areaOperativaId": zod.number().nullable(),
+  "stato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']),
+  "dataEffetto": zod.string().nullish(),
+  "statoEffettivo": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato', 'programmato']).optional(),
+  "motivo": zod.string().nullish()
+})
+
+
+export const searchBeneficiariAccessiEmporioQueryIncludiNonPianificabiliDefault = false;
+
 export const SearchBeneficiariAccessiEmporioQueryParams = zod.object({
+  "includiNonPianificabili": zod.coerce.boolean().default(searchBeneficiariAccessiEmporioQueryIncludiNonPianificabiliDefault).describe('Include risultati operativi minimi non pianificabili della stessa Area autorizzata, con motivi. Non autorizza la creazione di Accessi né l\'accesso al dossier sociale.'),
+  "magazzinoEmporioId": zod.coerce.number(),
+  "codiceTessera": zod.coerce.string().optional(),
   "search": zod.coerce.string().optional(),
   "beneficiarioId": zod.coerce.number().optional()
 })
@@ -8866,14 +8928,18 @@ export const SearchBeneficiariAccessiEmporioResponseItem = zod.object({
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string(),
   "beneficiarioCodice": zod.string(),
+  "tesseraCorrispondente": zod.boolean().optional().describe('Corrispondenza esatta di una tessera attualmente valida, mai derivata dal nome.'),
   "beneficiarioCodiceFiscale": zod.string().nullish(),
+  "emporioStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato', 'programmato']).optional(),
+  "pianificabile": zod.boolean().optional().describe('Prerequisiti correnti verificati nella ricerca; il comando li rivalida sempre.'),
+  "motiviNonPianificabile": zod.array(zod.string()).optional().describe('Codici operativi senza motivi sociali o dati del dossier.'),
   "centroAscoltoId": zod.number().nullish(),
   "centroAscoltoNome": zod.string().nullish(),
   "areaOperativaId": zod.number().nullish(),
   "areaOperativaNome": zod.string().nullish(),
   "creditoSolidaleAbilitato": zod.boolean(),
   "creditoSolidaleStato": zod.string(),
-  "saldoCreditoSolidale": zod.number(),
+  "saldoCreditoSolidale": zod.number().nullable(),
   "quotaMensileAssegnata": zod.number().nullish(),
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "magazzinoEmporioPreferitoNome": zod.string().nullish(),
@@ -9774,11 +9840,12 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
 
 
 export const SearchBeneficiariCassaEmporioQueryParams = zod.object({
+  "codiceTessera": zod.coerce.string().optional(),
   "search": zod.coerce.string().optional(),
   "data": zod.coerce.string().optional(),
   "areaOperativaId": zod.coerce.number().optional(),
   "areaId": zod.coerce.number().optional(),
-  "magazzinoEmporioId": zod.coerce.number().optional()
+  "magazzinoEmporioId": zod.coerce.number()
 })
 
 export const SearchBeneficiariCassaEmporioResponseItem = zod.object({
@@ -9790,7 +9857,7 @@ export const SearchBeneficiariCassaEmporioResponseItem = zod.object({
   "areaOperativaId": zod.number().nullish(),
   "magazzinoEmporioPreferitoId": zod.number().nullish(),
   "magazzinoEmporioPreferitoNome": zod.string().nullish(),
-  "saldoCreditoSolidale": zod.number(),
+  "saldoCreditoSolidale": zod.number().nullable(),
   "creditoSolidaleAbilitato": zod.boolean(),
   "creditoSolidaleStato": zod.string(),
   "attivo": zod.boolean(),
