@@ -6722,6 +6722,8 @@ export const SessioneCassaEmporioStato = {
 } as const;
 
 export interface SessioneCassaEmporioRiga {
+  /** @nullable */
+  quantitaFrazionabile?: boolean | null;
   id: number;
   sessioneCassaId: number;
   prodottoId: number;
@@ -6896,6 +6898,8 @@ export interface AccessoEmporioForzatoResult {
 }
 
 export interface SessioneCassaEmporioRicercaProdottoResult {
+  /** @nullable */
+  quantitaFrazionabile?: boolean | null;
   prodottoId: number;
   codice: string;
   /** @nullable */

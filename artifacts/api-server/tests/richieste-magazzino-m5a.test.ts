@@ -5,6 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import express from "express";
 import request from "supertest";
+import { httpListeners } from "./helpers/http-listeners";
 import { and, eq, sql } from "drizzle-orm";
 import {
   auditEventiTable,
@@ -44,6 +45,7 @@ import {
 } from "./scope-helpers";
 
 let scope: SeedScope;
+const listeners = httpListeners({ diagnostics: "m5a-concurrent-update" });
 let areaA: number, areaB: number, centreA: number, centreB: number;
 let benA: number,
   benB: number,
@@ -85,7 +87,11 @@ function app(id: number | null) {
     if (id != null) req.user = (await loadSessionUser(id)) ?? undefined;
     next();
   });
-  result.use(requireAuth, areaGuard, richiesteRouter);
+  result.use(
+    requireAuth,
+    areaGuard,
+    listeners.router("richieste-magazzino", richiesteRouter),
+  );
   return result;
 }
 const key = () => randomUUID();
@@ -213,6 +219,7 @@ beforeEach(async () => {
 // Le ricevute sono append-only: i dati sintetici restano nel DB disposable
 // e vengono rimossi con l'intera istanza temporanea al termine del collaudo.
 afterAll(async () => {
+  await listeners.close();
   await pool.end();
 });
 
@@ -850,31 +857,98 @@ describe("M5A — Richiesta Magazzino reale su PostgreSQL isolato", () => {
   });
 
   it("modifica solo in inviata con versione corrente e non perde aggiornamenti concorrenti", async () => {
-    const created = await createSocial();
-    expect(created.status).toBe(201);
-    const id = created.body.id;
-    const command = (bisogno: string) =>
-      request(app(socialA))
-        .patch(`/richieste-magazzino/${id}`)
-        .send({ idempotencyKey: key(), versione: 1, bisogno });
-    const [first, second] = await Promise.all([
-      command("Pacco A"),
-      command("Pacco B"),
-    ]);
-    expect([first.status, second.status].sort()).toEqual([200, 409]);
-    expect(
-      (
-        await request(app(socialA))
+    const server = await listeners.open(socialA, () => app(socialA));
+    try {
+      const created = await request(server)
+        .post("/richieste-magazzino")
+        .send(createBody());
+      expect(created.status).toBe(201);
+      const id = created.body.id;
+      const commandKeys = [key(), key()];
+      expect(commandKeys[0]).not.toBe(commandKeys[1]);
+      const command = (bisogno: string, idempotencyKey: string) =>
+        request(server)
           .patch(`/richieste-magazzino/${id}`)
-          .send({ idempotencyKey: key(), versione: 1, bisogno: "Stale" })
-      ).status,
-    ).toBe(409);
-    const [row] = await db
-      .select()
-      .from(richiesteMagazzinoTable)
-      .where(eq(richiesteMagazzinoTable.id, id));
-    expect(row.versione).toBe(2);
-    expect(["Pacco A", "Pacco B"]).toContain(row.bisogno);
+          .send({ idempotencyKey, versione: 1, bisogno });
+      const completed = await Promise.allSettled([
+        command("Pacco A", commandKeys[0]),
+        command("Pacco B", commandKeys[1]),
+      ]);
+      const [first, second] = completed.map((result) => {
+        if (result.status === "rejected") {
+          console.error(
+            "M5A_CONCURRENT_TRANSPORT",
+            JSON.stringify({
+              listener: listeners.inspect(server),
+              code: result.reason?.code,
+            }),
+          );
+          throw result.reason;
+        }
+        return result.value;
+      });
+      const [row] = await db
+        .select()
+        .from(richiesteMagazzinoTable)
+        .where(eq(richiesteMagazzinoTable.id, id));
+      if (JSON.stringify([first.status, second.status].sort()) !== "[200,409]")
+        console.error(
+          "M5A_CONCURRENT_HTTP",
+          JSON.stringify({
+            method: "PATCH",
+            path: `/richieste-magazzino/${id}`,
+            listener: listeners.inspect(server),
+            beforeVersion: created.body.versione,
+            afterVersion: row?.versione,
+            responses: [first, second].map((response) => ({
+              status: response.status,
+              contentType: response.headers["content-type"],
+              code:
+                typeof response.body?.code === "string" &&
+                /^RICHIESTA_[A-Z_]+$/.test(response.body.code)
+                  ? response.body.code
+                  : undefined,
+              plain404: /^404 page not found\s*$/.test(response.text),
+            })),
+          }),
+        );
+      expect([first.status, second.status].sort()).toEqual([200, 409]);
+      expect(
+        (
+          await request(server)
+            .patch(`/richieste-magazzino/${id}`)
+            .send({ idempotencyKey: key(), versione: 1, bisogno: "Stale" })
+        ).status,
+      ).toBe(409);
+      expect(row.versione).toBe(2);
+      expect(["Pacco A", "Pacco B"]).toContain(row.bisogno);
+      const detail = await request(server).get(`/richieste-magazzino/${id}`);
+      expect(detail.status).toBe(200);
+      expect(detail.body.versione).toBe(2);
+      expect(detail.body.bisogno).toBe(row.bisogno);
+      const receipts = await db
+        .select()
+        .from(comandiOperativiTable)
+        .where(
+          and(
+            eq(
+              comandiOperativiTable.tipoComando,
+              "RICHIESTA_MAGAZZINO_MODIFICA",
+            ),
+            eq(comandiOperativiTable.aggregatoId, id),
+          ),
+        );
+      expect(receipts).toHaveLength(1);
+      expect(commandKeys).toContain(receipts[0].idempotencyKey);
+      const history = await request(server).get(
+        `/richieste-magazzino/${id}/storico`,
+      );
+      expect(history.status).toBe(200);
+      expect(history.body).toHaveLength(2);
+      expect(listeners.inspect(server).active).toBe(0);
+    } finally {
+      await listeners.close();
+    }
   });
 
   it("modifica, presa e annullamento non cambiano documenti, stock o materiali legacy", async () => {

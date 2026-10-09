@@ -16620,6 +16620,9 @@ export const getGetSpesaEmporioBySessioneUrl = (sessioneCassaId: number,) => {
   return `/api/spese-emporio/sessione/${sessioneCassaId}`
 }
 
+/**
+ * Lettura con emporio.sales.view nello scope corrente; recupero della sola propria Sessione con emporio.cassa.operate e rivalidazione corrente di territorio e abilitazione. Non autorizza liste, altre Spese o stampa.
+ */
 export const getSpesaEmporioBySessione = async (sessioneCassaId: number, options?: RequestInit): Promise<SpesaEmporio> => {
 
   return customFetch<SpesaEmporio>(getGetSpesaEmporioBySessioneUrl(sessioneCassaId),

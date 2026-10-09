@@ -9082,7 +9082,7 @@ export const ListSessioniCassaEmporioQueryParams = zod.object({
 })
 
 
-export const listSessioniCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+export const listSessioniCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.000001;
 
 
 
@@ -9117,6 +9117,7 @@ export const ListSessioniCassaEmporioResponseItem = zod.object({
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
+  "quantitaFrazionabile": zod.boolean().nullish(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "prodottoId": zod.number(),
@@ -9146,7 +9147,7 @@ export const GetSessioneCassaEmporioParams = zod.object({
 })
 
 
-export const getSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+export const getSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.000001;
 
 
 
@@ -9181,6 +9182,7 @@ export const GetSessioneCassaEmporioResponse = zod.object({
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
+  "quantitaFrazionabile": zod.boolean().nullish(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "prodottoId": zod.number(),
@@ -9254,11 +9256,12 @@ export const UpdateSessioneCassaEmporioRigaBody = zod.object({
   "note": zod.string().nullish()
 })
 
-export const updateSessioneCassaEmporioRigaResponseQuantitaMultipleOf = 0.01;
+export const updateSessioneCassaEmporioRigaResponseQuantitaMultipleOf = 0.000001;
 
 
 
 export const UpdateSessioneCassaEmporioRigaResponse = zod.object({
+  "quantitaFrazionabile": zod.boolean().nullish(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "prodottoId": zod.number(),
@@ -9294,7 +9297,7 @@ export const DeleteSessioneCassaEmporioRigaBody = zod.object({
 })
 
 
-export const deleteSessioneCassaEmporioRigaResponseRigheItemQuantitaMultipleOf = 0.01;
+export const deleteSessioneCassaEmporioRigaResponseRigheItemQuantitaMultipleOf = 0.000001;
 
 
 
@@ -9329,6 +9332,7 @@ export const DeleteSessioneCassaEmporioRigaResponse = zod.object({
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
+  "quantitaFrazionabile": zod.boolean().nullish(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "prodottoId": zod.number(),
@@ -9364,7 +9368,7 @@ export const SospendiSessioneCassaEmporioBody = zod.object({
 })
 
 
-export const sospendiSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+export const sospendiSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.000001;
 
 
 
@@ -9399,6 +9403,7 @@ export const SospendiSessioneCassaEmporioResponse = zod.object({
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
+  "quantitaFrazionabile": zod.boolean().nullish(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "prodottoId": zod.number(),
@@ -9434,7 +9439,7 @@ export const RiprendiSessioneCassaEmporioBody = zod.object({
 })
 
 
-export const riprendiSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+export const riprendiSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.000001;
 
 
 
@@ -9469,6 +9474,7 @@ export const RiprendiSessioneCassaEmporioResponse = zod.object({
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
+  "quantitaFrazionabile": zod.boolean().nullish(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "prodottoId": zod.number(),
@@ -9506,7 +9512,7 @@ export const AnnullaSessioneCassaEmporioBody = zod.object({
 })
 
 
-export const annullaSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+export const annullaSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.000001;
 
 
 
@@ -9541,6 +9547,7 @@ export const AnnullaSessioneCassaEmporioResponse = zod.object({
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
+  "quantitaFrazionabile": zod.boolean().nullish(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "prodottoId": zod.number(),
@@ -9576,7 +9583,7 @@ export const PreparaChiusuraSessioneCassaEmporioBody = zod.object({
 })
 
 
-export const preparaChiusuraSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.01;
+export const preparaChiusuraSessioneCassaEmporioResponseRigheItemQuantitaMultipleOf = 0.000001;
 
 
 
@@ -9611,6 +9618,7 @@ export const PreparaChiusuraSessioneCassaEmporioResponse = zod.object({
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
+  "quantitaFrazionabile": zod.boolean().nullish(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "prodottoId": zod.number(),
@@ -9647,7 +9655,7 @@ export const ChiudiSessioneCassaEmporioBody = zod.object({
 })
 
 
-export const chiudiSessioneCassaEmporioResponseSessioneOneRigheItemQuantitaMultipleOf = 0.01;
+export const chiudiSessioneCassaEmporioResponseSessioneOneRigheItemQuantitaMultipleOf = 0.000001;
 
 export const chiudiSessioneCassaEmporioResponseSpesaOneRigheItemQuantitaStornataMin = 0;
 
@@ -9691,6 +9699,7 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "motivoAnnullamento": zod.string().nullish(),
   "note": zod.string().nullish(),
   "righe": zod.array(zod.object({
+  "quantitaFrazionabile": zod.boolean().nullish(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "prodottoId": zod.number(),
@@ -9879,6 +9888,7 @@ export const SearchProdottiCassaEmporioQueryParams = zod.object({
 })
 
 export const SearchProdottiCassaEmporioResponseItem = zod.object({
+  "quantitaFrazionabile": zod.boolean().nullish(),
   "prodottoId": zod.number(),
   "codice": zod.string(),
   "codiceBarre": zod.string().nullish(),
@@ -9978,6 +9988,9 @@ export const ListSpeseEmporioResponseItem = zod.object({
 export const ListSpeseEmporioResponse = zod.array(ListSpeseEmporioResponseItem)
 
 
+/**
+ * Lettura con emporio.sales.view nello scope corrente; recupero della sola propria Sessione con emporio.cassa.operate e rivalidazione corrente di territorio e abilitazione. Non autorizza liste, altre Spese o stampa.
+ */
 export const GetSpesaEmporioBySessioneParams = zod.object({
   "sessioneCassaId": zod.coerce.number()
 })

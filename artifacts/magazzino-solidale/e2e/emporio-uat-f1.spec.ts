@@ -21,6 +21,23 @@ test.beforeAll(async () => {
     new URL("../../../lib/db/package.json", import.meta.url),
   )("pg");
   database = new Pool({ connectionString: url.href });
+  // Fresh disposable DB must be past bootstrap; ordinary actors below retain their grants.
+  const admin = await database.query(
+    "select u.id from utenti u join ruoli r on r.id=u.ruolo_id where u.attivo and r.is_admin limit 1",
+  );
+  if (admin.rows.length === 0) {
+    const suffix = randomUUID();
+    const {
+      rows: [role],
+    } = await database.query(
+      "insert into ruoli(nome,is_admin,aree,permessi) values($1,true,'[]','[]') returning id",
+      [`E2E bootstrap ${suffix}`],
+    );
+    await database.query(
+      "insert into utenti(username,nome,password_hash,ruolo_id) values($1,'E2E bootstrap only','not-a-login-hash',$2)",
+      [`e2e_boot_${suffix}`, role.id],
+    );
+  }
 });
 test.afterAll(async () => {
   await database?.end();
@@ -113,6 +130,408 @@ async function fixture(count: number, eligible = true, owner = false) {
   };
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
+async function checkoutFixture(page: Page) {
+  const f = await fixture(1);
+  const suffix = randomUUID().slice(0, 8);
+  const code = `BSCAN-${suffix}`;
+  const insertProduct = async (productCode: string, barcode: string) => {
+    const {
+      rows: [product],
+    } = await database.query(
+      "insert into prodotti(codice,nome,tipo_prodotto,unita_misura,quantita_frazionabile,abilitato_emporio,credito_solidale_valore,codice_barre) values($1,$2,'alimenti','pz',true,true,2,$3) returning id",
+      [productCode, `B prodotto ${productCode}`, barcode],
+    );
+    await database.query(
+      "insert into lotti(prodotto_id,magazzino_id,codice_lotto,data_carico,quantita_caricata,quantita_residua) values($1,$2,$3,CURRENT_DATE,10,10)",
+      [product.id, f.warehouses[0].id, `LOT-${productCode}`],
+    );
+    return product.id as number;
+  };
+  const product = await insertProduct(code, `BC-${suffix}`);
+  await insertProduct(`SECOND-${suffix}`, code); // Identificatori distinti per colonna, match cross-colonna ambiguo.
+  const {
+    rows: [access],
+  } = await database.query(
+    "insert into consegne(codice,beneficiario_id,tipo_pianificazione,tipo_consegna,data_prevista,magazzino_id,magazzino_emporio_id,data_ora_inizio,data_ora_fine,stato_accesso_emporio) values($1,$2,'accesso_emporio','accesso_emporio',CURRENT_DATE,$3,$3,now(),now()+interval '1 hour','confermato') returning id",
+    [`BAC-${suffix}`, f.beneficiary, f.warehouses[0].id],
+  );
+  await login(page, f);
+  // Hold the warehouse response until opening completes: an unloaded list must
+  // not invalidate the newly selected Sessione (observable barrier, no sleep).
+  let releaseWarehouses!: () => void;
+  const warehouseBarrier = new Promise<void>((resolve) => {
+    releaseWarehouses = resolve;
+  });
+  await page.route("**/api/emporio/magazzini", async (route) => {
+    await warehouseBarrier;
+    await route.continue();
+  });
+  const opened = page.waitForResponse(
+    (r) =>
+      r.url().includes(`/accessi/${access.id}/apri-sessione`) &&
+      r.request().method() === "POST",
+  );
+  await page.goto(`/emporio/cassa?accessoEmporioId=${access.id}`);
+  expect((await opened).status()).toBe(201);
+  const input = page.getByPlaceholder(
+    "Cerca prodotto per nome, codice o codice a barre",
+  );
+  await expect(input).toBeEnabled();
+  await expect(page).toHaveURL(/sessioneId=\d+/);
+  releaseWarehouses();
+  await expect(
+    page.getByRole("combobox", { name: "Emporio", exact: true }),
+  ).toContainText(f.warehouses[0].nome);
+  const session = Number(new URL(page.url()).searchParams.get("sessioneId"));
+  return { ...f, product, code, barcode: `BC-${suffix}`, input, session };
+}
+
+test("M62B B19/B20/B21: scanner esatto, ambiguo e doppio Enter senza inserimenti silenziosi", async ({
+  page,
+}) => {
+  const f = await checkoutFixture(page);
+  await f.input.fill(f.code);
+  await f.input.press("Enter");
+  const notifications = page.getByRole("region", {
+    name: "Notifications (F8)",
+  });
+  await expect(
+    notifications.getByText(
+      "Codice ambiguo: scegli esplicitamente il prodotto dai risultati.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  expect(
+    (
+      await database.query(
+        "select count(*)::int n from sessioni_cassa_emporio_righe where sessione_cassa_id=$1",
+        [f.session],
+      )
+    ).rows[0].n,
+  ).toBe(0);
+  await f.input.fill("B prodotto");
+  await f.input.press("Enter");
+  await expect(notifications.getByText(/Prodotto non trovato/)).toBeVisible();
+  expect(
+    (
+      await database.query(
+        "select count(*)::int n from sessioni_cassa_emporio_righe where sessione_cassa_id=$1",
+        [f.session],
+      )
+    ).rows[0].n,
+  ).toBe(0);
+  await f.input.fill(f.barcode);
+  const saved = page.waitForResponse(
+    (r) =>
+      /\/sessioni\/\d+\/righe$/.test(r.url()) &&
+      r.request().method() === "POST",
+  );
+  await f.input.evaluate((element) => {
+    element.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+    element.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+  });
+  expect((await saved).status()).toBe(201);
+  const quantity = page.getByRole("spinbutton", {
+    name: "Quantità",
+    exact: true,
+  });
+  await expect(quantity).toHaveValue("1");
+  await expect(quantity).toHaveAttribute("step", "0.000001");
+  expect(
+    (
+      await database.query(
+        "select count(*)::int n from sessioni_cassa_emporio_righe where sessione_cassa_id=$1",
+        [f.session],
+      )
+    ).rows[0].n,
+  ).toBe(1);
+});
+
+test("M62B B22/B24: risposta persa dopo commit, GET recovery e refresh senza secondo POST", async ({
+  page,
+}) => {
+  const f = await checkoutFixture(page);
+  await f.input.fill(f.barcode);
+  await f.input.press("Enter");
+  await expect(
+    page.getByRole("spinbutton", { name: "Quantità", exact: true }),
+  ).toHaveValue("1");
+  await page
+    .getByRole("button", { name: "Prepara chiusura", exact: true })
+    .click();
+  const close = page.getByRole("button", {
+    name: "Chiudi spesa Emporio",
+    exact: true,
+  });
+  await expect(close).toBeEnabled();
+  let posts = 0;
+  page.on("request", (r) => {
+    if (/\/sessioni\/\d+\/chiudi$/.test(r.url()) && r.method() === "POST")
+      posts++;
+  });
+  await page.route(
+    /\/api\/cassa-emporio\/sessioni\/\d+\/chiudi$/,
+    async (route) => {
+      const response = await route.fetch();
+      expect(response.status()).toBe(200);
+      await route.abort("failed");
+    },
+  );
+  await close.click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Chiudi spesa Emporio", exact: true })
+    .click();
+  await expect(
+    page.getByText(/Spesa Emporio chiusa correttamente.*Numero Spesa/),
+  ).toBeVisible();
+  const {
+    rows: [expense],
+  } = await database.query(
+    "select id,numero_spesa from spese_emporio where sessione_cassa_id=$1",
+    [f.session],
+  );
+  await expect(page.getByText(new RegExp(expense.numero_spesa))).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(new RegExp(expense.numero_spesa))).toBeVisible();
+  expect(posts).toBe(1);
+  const {
+    rows: [facts],
+  } = await database.query(
+    "select (select count(*) from spese_emporio where sessione_cassa_id=$1)::int expenses,(select sum(quantita) from movimenti where prodotto_id=$2)::text issued,(select quantita_residua from lotti where prodotto_id=$2)::text residual",
+    [f.session, f.product],
+  );
+  expect(facts.expenses).toBe(1);
+  expect(Number(facts.issued)).toBe(1);
+  expect(Number(facts.residual)).toBe(9);
+  await database.query(
+    "update emporio_abilitazioni set stato='revocato' where beneficiario_id=$1",
+    [f.beneficiary],
+  );
+  const revoked = page.waitForResponse(
+    (r) =>
+      r.url().includes(`/spese-emporio/sessione/${f.session}`) &&
+      r.status() === 400,
+  );
+  await page
+    .getByRole("heading", { name: "Cassa Emporio", exact: true })
+    .click();
+  await revoked;
+  await expect(page.getByText(new RegExp(expense.numero_spesa))).toHaveCount(0);
+});
+
+for (const outcome of ["rollback", "commit"] as const) {
+  test(`M62B R2 B23 timeout pre-commit: ${outcome}, GET e nessun secondo POST`, async ({
+    page,
+  }) => {
+    const f = await checkoutFixture(page);
+    await f.input.fill(f.barcode);
+    await f.input.press("Enter");
+    await expect(
+      page.getByRole("spinbutton", { name: "Quantità", exact: true }),
+    ).toHaveValue("1");
+    await page
+      .getByRole("button", { name: "Prepara chiusura", exact: true })
+      .click();
+    const close = page.getByRole("button", {
+      name: "Chiudi spesa Emporio",
+      exact: true,
+    });
+    await expect(close).toBeEnabled();
+    const blocker = await database.connect();
+    let forwarded: Promise<import("@playwright/test").APIResponse> | undefined;
+    let posts = 0,
+      uncertain = true,
+      commandPid = 0;
+    page.on("request", (r) => {
+      if (r.method() === "POST" && /\/sessioni\/\d+\/chiudi$/.test(r.url()))
+        posts++;
+    });
+    const recoveryPath = new RegExp(
+      `/api/cassa-emporio/sessioni/${f.session}$`,
+    );
+    await page.route(recoveryPath, async (route) => {
+      if (route.request().method() === "GET" && uncertain)
+        await route.abort("timedout");
+      else await route.continue();
+    });
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query(
+        "SELECT id FROM sessioni_cassa_emporio WHERE id=$1 FOR UPDATE",
+        [f.session],
+      );
+      const pid = (await blocker.query("SELECT pg_backend_pid() pid")).rows[0]
+        .pid;
+      await page.route(
+        /\/api\/cassa-emporio\/sessioni\/\d+\/chiudi$/,
+        async (route) => {
+          forwarded = route.fetch({ timeout: 45_000 });
+          // Observe the real command waiting BEFORE losing the browser response.
+          await expect
+            .poll(
+              async () => {
+                const { rows } = await database.query(
+                  "SELECT pid FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid))",
+                  [pid],
+                );
+                commandPid = rows[0]?.pid ?? 0;
+                return commandPid;
+              },
+              { timeout: 15_000 },
+            )
+            .toBeGreaterThan(0);
+          await route.abort("timedout");
+        },
+      );
+      await close.click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Chiudi spesa Emporio", exact: true })
+        .click();
+      const verify = page.getByRole("button", {
+        name: "Verifica esito della chiusura",
+        exact: true,
+      });
+      await expect(verify).toBeVisible();
+      await expect(page.getByText(/Numero Spesa:/)).toHaveCount(0);
+      expect(posts).toBe(1);
+      expect(
+        (
+          await database.query(
+            "SELECT count(*)::int n FROM spese_emporio WHERE sessione_cassa_id=$1",
+            [f.session],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      if (outcome === "rollback")
+        expect(
+          (
+            await database.query("SELECT pg_cancel_backend($1) cancelled", [
+              commandPid,
+            ])
+          ).rows[0].cancelled,
+        ).toBe(true);
+      await blocker.query("COMMIT");
+      expect((await forwarded!).status()).toBe(
+        outcome === "commit" ? 200 : 500,
+      );
+      uncertain = false;
+      await verify.click();
+      if (outcome === "commit") {
+        await expect(
+          page.getByText(/Spesa Emporio chiusa correttamente.*Numero Spesa/),
+        ).toBeVisible();
+      } else {
+        await expect(
+          page
+            .getByRole("alert")
+            .filter({ hasText: "La Sessione non risulta chiusa" }),
+        ).toBeVisible();
+        await expect(page.getByText(/Numero Spesa:/)).toHaveCount(0);
+        await expect(close).toBeEnabled();
+      }
+      const {
+        rows: [facts],
+      } = await database.query(
+        `SELECT
+        (SELECT count(*)::int FROM spese_emporio WHERE sessione_cassa_id=$1) expenses,
+        (SELECT quantita_residua::float8 FROM lotti WHERE prodotto_id=$2) stock,
+        (SELECT credito_solidale_saldo::float8 FROM beneficiari WHERE id=$3) credit,
+        (SELECT count(*)::int FROM bolle WHERE magazzino_id=$4) bills,
+        (SELECT count(*)::int FROM scarichi WHERE magazzino_id=$4) issues,
+        (SELECT count(*)::int FROM credito_solidale_movimenti WHERE beneficiario_id=$3) credit_entries,
+        (SELECT count(*)::int FROM audit_eventi WHERE azione='EMPORIO_CHECKOUT' AND metadata->>'cassaId'=$1::text) audits`,
+        [f.session, f.product, f.beneficiary, f.warehouses[0].id],
+      );
+      const n = outcome === "commit" ? 1 : 0;
+      expect(facts).toEqual({
+        expenses: n,
+        stock: 10 - n,
+        credit: 100 - 2 * n,
+        bills: n,
+        issues: n,
+        credit_entries: n,
+        audits: n,
+      });
+      await page.reload();
+      if (n)
+        await expect(
+          page.getByText(/Spesa Emporio chiusa correttamente.*Numero Spesa/),
+        ).toBeVisible();
+      else await expect(close).toBeEnabled();
+      expect(posts).toBe(1);
+    } finally {
+      uncertain = false;
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      await forwarded?.catch(() => undefined);
+    }
+  });
+}
+
+test("M62B B23: checkout respinto conserva l'errore backend e non inventa una ricevuta", async ({
+  page,
+}) => {
+  const f = await checkoutFixture(page);
+  await f.input.fill(f.barcode);
+  await f.input.press("Enter");
+  await expect(
+    page.getByRole("spinbutton", { name: "Quantità", exact: true }),
+  ).toHaveValue("1");
+  await page
+    .getByRole("button", { name: "Prepara chiusura", exact: true })
+    .click();
+  const close = page.getByRole("button", {
+    name: "Chiudi spesa Emporio",
+    exact: true,
+  });
+  await expect(close).toBeEnabled();
+  await database.query("update prodotti set attivo=false where id=$1", [
+    f.product,
+  ]);
+  const rejected = page.waitForResponse(
+    (r) =>
+      /\/sessioni\/\d+\/chiudi$/.test(r.url()) &&
+      r.request().method() === "POST",
+  );
+  await close.click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Chiudi spesa Emporio", exact: true })
+    .click();
+  const response = await rejected;
+  expect(response.status()).toBe(400);
+  const error = (await response.json()).error;
+  await expect(
+    page.getByRole("alert").filter({ hasText: error }),
+  ).toBeVisible();
+  await expect(close).toBeEnabled();
+  await expect(page.getByText(/Numero Spesa:/)).toHaveCount(0);
+  expect(
+    (
+      await database.query(
+        "select count(*)::int n from spese_emporio where sessione_cassa_id=$1",
+        [f.session],
+      )
+    ).rows[0].n,
+  ).toBe(0);
+  expect(
+    Number(
+      (
+        await database.query(
+          "select quantita_residua from lotti where prodotto_id=$1",
+          [f.product],
+        )
+      ).rows[0].quantita_residua,
+    ),
+  ).toBe(10);
+});
+
 test("T11/T12/T20 Cassa: name is explicit, USB legacy card is unique, financial details stay hidden", async ({
   page,
 }) => {

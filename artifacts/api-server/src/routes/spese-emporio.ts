@@ -1,4 +1,6 @@
 import { Router, type IRouter } from "express";
+import { db, sessioniCassaEmporioTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
   getBollaStampaSpesaEmporio,
   getSpesaEmporio,
@@ -24,6 +26,7 @@ import { requireModulo } from "../lib/featureFlags";
 import {
   requirePermission,
   emporioScopeErrorHandler,
+  requireEmporioCommandTx,
 } from "../lib/emporioScope";
 import { resolveSessionRuntimeConfig } from "../lib/sessionConfig";
 import {
@@ -178,9 +181,57 @@ router.get(
 
 router.get(
   "/spese-emporio/sessione/:sessioneCassaId",
-  requirePermission("emporio.sales.view"),
+  (req, res, next) =>
+    requirePermission(
+      req.user?.isAdmin || req.user?.permessi.includes("emporio.sales.view")
+        ? "emporio.sales.view"
+        : "emporio.cassa.operate",
+    )(req, res, next),
   async (req, res) => {
     if (!(await assertEmporioEnabled(res))) return;
+    if (
+      !req.user?.isAdmin &&
+      !req.user?.permessi.includes("emporio.sales.view")
+    ) {
+      // Recovery is scoped to this operator's own checkout, never the sales directory.
+      await db.transaction(async (tx) => {
+        const [session] = await tx
+          .select()
+          .from(sessioniCassaEmporioTable)
+          .where(
+            eq(
+              sessioniCassaEmporioTable.id,
+              Number(req.params.sessioneCassaId),
+            ),
+          )
+          .for("share");
+        if (
+          !session ||
+          (session.operatoreChiusuraId ?? session.operatoreAperturaId) !==
+            req.user!.id
+        ) {
+          res
+            .status(404)
+            .json({ error: "Esito della propria Sessione non disponibile." });
+          return;
+        }
+        await requireEmporioCommandTx(
+          tx,
+          req.user!.id,
+          "emporio.cassa.operate",
+          session,
+        );
+        const spesa = await getSpesaEmporioBySessione(session.id);
+        if (!spesa) {
+          res
+            .status(404)
+            .json({ error: "Nessuna Spesa contabilizzata per la Sessione." });
+          return;
+        }
+        res.json(spesa);
+      });
+      return;
+    }
     const spesa = await getSpesaEmporioBySessione(
       Number(req.params.sessioneCassaId),
     );

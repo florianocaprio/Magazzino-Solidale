@@ -9,10 +9,11 @@ import {
 } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import {
   beneficiariTable,
   auditConfigurazioniTable,
+  auditEventiTable,
   bolleTable,
   bollaRigheTable,
   centriAscoltoTable,
@@ -35,12 +36,30 @@ import {
   speseEmporioTable,
   utentiTable,
   operazioniDistribuzioneMagazzinoTable,
+  prenotazioniMagazzinoTable,
+  trasferimentiTable,
+  trasferimentoRigheTable,
+  menseTable,
+  mensaConsumiTable,
+  mensaGiornateServizioTable,
+  ruoliTable,
+  emporioAbilitazioniTable,
 } from "@workspace/db";
 import cassaEmporioRouter from "../src/routes/cassa-emporio";
 import bolleRouter from "../src/routes/bolle";
+import trasferimentiRouter from "../src/routes/trasferimenti";
+import scarichiRouter from "../src/routes/scarichi";
+import mensaRouter from "../src/routes/mensa";
+import {
+  creaScaricoInventariale,
+  InventoryError,
+} from "../src/lib/scaricoInventory";
 import speseEmporioRouter from "../src/routes/spese-emporio";
 import creditoSolidaleRouter from "../src/routes/credito-solidale";
-import { updateModuloAmbiente } from "../src/lib/configurazioneAmbiente";
+import {
+  listModuliFunzionali,
+  updateModuloAmbiente,
+} from "../src/lib/configurazioneAmbiente";
 import { dataCivileEuropeRome } from "../src/lib/interventiWorkflow";
 import { quantitaNettaMensileProdotto } from "../src/lib/speseEmporio";
 import {
@@ -63,6 +82,8 @@ const rigaIds: number[] = [];
 const spesaIds: number[] = [];
 const bollaIds: number[] = [];
 const scaricoIds: number[] = [];
+const transferIds: number[] = [];
+const mensaIds: number[] = [];
 let operatorUserId: number;
 
 function makeApp(
@@ -388,6 +409,39 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await cleanupEmporioActorFixtures();
+  if (magazzinoIds.length) {
+    const owned = await db
+      .select({ id: scarichiTable.id })
+      .from(scarichiTable)
+      .where(inArray(scarichiTable.magazzinoId, magazzinoIds));
+    for (const row of owned)
+      if (!scaricoIds.includes(row.id)) scaricoIds.push(row.id);
+  }
+  if (transferIds.length) {
+    await db
+      .delete(prenotazioniMagazzinoTable)
+      .where(inArray(prenotazioniMagazzinoTable.trasferimentoId, transferIds));
+    await db
+      .delete(movimentiTable)
+      .where(inArray(movimentiTable.trasferimentoId, transferIds));
+    await db
+      .delete(trasferimentoRigheTable)
+      .where(inArray(trasferimentoRigheTable.trasferimentoId, transferIds));
+    await db
+      .delete(trasferimentiTable)
+      .where(inArray(trasferimentiTable.id, transferIds.splice(0)));
+  }
+  if (mensaIds.length) {
+    await db
+      .delete(mensaConsumiTable)
+      .where(inArray(mensaConsumiTable.mensaId, mensaIds));
+    await db
+      .delete(mensaGiornateServizioTable)
+      .where(inArray(mensaGiornateServizioTable.mensaId, mensaIds));
+    await db
+      .delete(menseTable)
+      .where(inArray(menseTable.id, mensaIds.splice(0)));
+  }
   const currentSpesaIds = spesaIds.splice(0);
   const currentBollaIds = bollaIds.splice(0);
   const currentScaricoIds = scaricoIds.splice(0);
@@ -396,6 +450,11 @@ afterEach(async () => {
   const currentConsegnaIds = consegnaIds.splice(0);
   const currentBeneficiarioIds = beneficiarioIds.splice(0);
   const currentMagazzinoIds = magazzinoIds.splice(0);
+
+  if (currentBollaIds.length)
+    await db
+      .delete(prenotazioniMagazzinoTable)
+      .where(inArray(prenotazioniMagazzinoTable.bollaId, currentBollaIds));
 
   await db
     .delete(auditConfigurazioniTable)
@@ -433,6 +492,10 @@ afterEach(async () => {
     await db
       .delete(sessioniCassaEmporioTable)
       .where(inArray(sessioniCassaEmporioTable.id, currentSessioneIds));
+  if (prodottoIds.length)
+    await db
+      .delete(movimentiTable)
+      .where(inArray(movimentiTable.prodottoId, prodottoIds));
   if (currentBollaIds.length > 0)
     await db
       .delete(movimentiTable)
@@ -510,6 +573,1217 @@ afterAll(async () => {
 });
 
 describe("Cassa Emporio", () => {
+  async function observedWait(blockerPid: number, expected = 1) {
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      const { rows } = await pool.query<{ pid: number }>(
+        `WITH RECURSIVE waiters AS (
+          SELECT pid FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid))
+          UNION SELECT a.pid FROM pg_stat_activity a JOIN waiters w ON w.pid=ANY(pg_blocking_pids(a.pid))
+        ) SELECT pid FROM waiters`,
+        [blockerPid],
+      );
+      if (rows.length >= expected) return rows[0].pid;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw Error(
+      `Timeout barriera PostgreSQL: attesi ${expected} backend dietro ${blockerPid}`,
+    );
+  }
+
+  async function checkoutFacts(
+    fixture: Awaited<ReturnType<typeof createFixture>>,
+    product: number,
+    session: number,
+  ) {
+    const {
+      rows: [facts],
+    } = await pool.query(
+      `SELECT
+      (SELECT quantita_residua::float8 FROM lotti WHERE prodotto_id=$1) stock,
+      (SELECT credito_solidale_saldo::float8 FROM beneficiari WHERE id=$2) credit,
+      (SELECT count(*)::int FROM spese_emporio WHERE sessione_cassa_id=$3) expenses,
+      (SELECT count(*)::int FROM bolle WHERE magazzino_id=$4) bills,
+      (SELECT count(*)::int FROM scarichi WHERE magazzino_id=$4) issues,
+      (SELECT count(*)::int FROM credito_solidale_movimenti WHERE beneficiario_id=$2) credit_entries,
+      (SELECT count(*)::int FROM audit_eventi WHERE azione='EMPORIO_CHECKOUT' AND metadata->>'cassaId'=$3::text) audits,
+      (SELECT coalesce(sum(quantita),0)::float8 FROM movimenti WHERE prodotto_id=$1) issued,
+      (SELECT count(*)::int FROM operazioni_distribuzione_magazzino WHERE magazzino_id=$4) operations`,
+      [product, fixture.beneficiarioId, session, fixture.magazzinoId],
+    );
+    return facts;
+  }
+
+  it.each(["revoca-prima", "checkout-prima"] as const)(
+    "B25 R2 concorrenza PostgreSQL %s: contabilità atomica",
+    async (order) => {
+      const fixture = await createFixture({ saldo: "20.00" });
+      const product = await createProdotto({
+        magazzinoId: fixture.magazzinoId,
+        creditoSolidaleValore: "2.00",
+        quantitaResidua: "5",
+      });
+      const session = await readyCart(fixture, product);
+      const app = await stableApp(fixture.areaOperativaId, false);
+      const before = await checkoutFacts(fixture, product, session.id);
+      const blocker = await pool.connect(),
+        revoker = await pool.connect();
+      let pending: Promise<request.Response> | undefined,
+        revoke: Promise<unknown> | undefined;
+      try {
+        await blocker.query("BEGIN");
+        const pid = (await blocker.query("SELECT pg_backend_pid() pid")).rows[0]
+          .pid;
+        if (order === "revoca-prima")
+          await blocker.query(
+            "SELECT id FROM sessioni_cassa_emporio WHERE id=$1 FOR UPDATE",
+            [session.id],
+          );
+        else
+          await blocker.query(
+            "SELECT id FROM beneficiari WHERE id=$1 FOR UPDATE",
+            [fixture.beneficiarioId],
+          );
+        pending = request(app)
+          .post(`/cassa-emporio/sessioni/${session.id}/chiudi`)
+          .send({ versione: session.versione })
+          .then((r) => r);
+        const commandPid = await observedWait(pid);
+        revoke = revoker.query(
+          "UPDATE utenti SET area_operativa_id=null,centro_ascolto_id=null WHERE id=$1",
+          [operatorUserId],
+        );
+        if (order === "revoca-prima") await revoke;
+        else await observedWait(commandPid);
+        await blocker.query("COMMIT");
+        const result = await pending;
+        if (result.status === 200) await trackSpesa(result.body.spesa.id);
+        await revoke;
+        expect(result.status, result.text).toBe(
+          order === "revoca-prima" ? 403 : 200,
+        );
+        const after = await checkoutFacts(fixture, product, session.id);
+        if (order === "revoca-prima") expect(after).toEqual(before);
+        else
+          expect(after).toEqual({
+            stock: 4,
+            credit: 18,
+            expenses: 1,
+            bills: 1,
+            issues: 1,
+            credit_entries: 1,
+            audits: 1,
+            issued: 1,
+            operations: 1,
+          });
+        expect(
+          (await request(app).get(`/cassa-emporio/sessioni/${session.id}`))
+            .status,
+        ).toBe(403);
+      } finally {
+        await blocker.query("ROLLBACK");
+        blocker.release();
+        if (pending) await pending;
+        if (revoke) await revoke;
+        revoker.release();
+      }
+    },
+  );
+
+  it.each([
+    [{ attivo: false }, 400, /Prodotto/i],
+    [{ abilitatoEmporio: false }, 400, /abilitato/i],
+    [{ unitaMisura: "l" }, 409, /unità di misura/i],
+    [{ quantitaFrazionabile: false }, 409, /inter/i],
+    [{ quantitaMassimaPerSpesa: "0.25" }, 400, /limite/i],
+  ] as const)(
+    "B18/B19 Catalogo cambiato dopo preparazione: %j",
+    async (change, status, message) => {
+      const fixture = await createFixture();
+      const product = await createProdotto({
+        magazzinoId: fixture.magazzinoId,
+        unitaMisura: "kg",
+        quantitaFrazionabile: true,
+      });
+      const session = await readyCart(fixture, product, 0.5);
+      await db
+        .update(prodottiTable)
+        .set(change)
+        .where(eq(prodottiTable.id, product));
+      const close = await postSessionAction(session.id, "chiudi");
+      expect(close.status, close.text).toBe(status);
+      expect(close.body.error).toMatch(message);
+      expect(
+        await db
+          .select()
+          .from(speseEmporioTable)
+          .where(eq(speseEmporioTable.sessioneCassaId, session.id)),
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(bolleTable)
+          .where(eq(bolleTable.magazzinoId, fixture.magazzinoId)),
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(scarichiTable)
+          .where(eq(scarichiTable.magazzinoId, fixture.magazzinoId)),
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(movimentiTable)
+          .where(eq(movimentiTable.prodottoId, product)),
+      ).toHaveLength(0);
+      const [lot] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.prodottoId, product));
+      const [beneficiary] = await db
+        .select()
+        .from(beneficiariTable)
+        .where(eq(beneficiariTable.id, fixture.beneficiarioId));
+      expect(Number(lot.quantitaResidua)).toBe(10);
+      expect(Number(beneficiary.creditoSolidaleSaldo)).toBe(20);
+    },
+  );
+
+  it("B34 una Spesa con UOM pz/kg conserva dimensioni e un unico fatto distributivo", async () => {
+    const fixture = await createFixture();
+    const pieces = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      unitaMisura: "pz",
+    });
+    const kg = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      unitaMisura: "kg",
+    });
+    const session = await openSession(fixture.accessoId);
+    expect((await addProduct(session.body.id, pieces, 1)).status).toBe(201);
+    expect((await addProduct(session.body.id, kg, 0.125)).status).toBe(201);
+    expect(
+      (await postSessionAction(session.body.id, "pronta-per-chiusura")).status,
+    ).toBe(200);
+    const close = await postSessionAction(session.body.id, "chiudi");
+    expect(close.status, close.text).toBe(200);
+    await trackSpesa(close.body.spesa.id);
+    const moves = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.bollaId, close.body.spesa.bollaId));
+    expect(moves).toHaveLength(2);
+    expect(moves.find((m) => m.prodottoId === pieces)).toMatchObject({
+      unitaMisura: "pz",
+      quantitaPezzi: "1.00",
+    });
+    expect(moves.find((m) => m.prodottoId === kg)).toMatchObject({
+      unitaMisura: "kg",
+      quantitaKgLt: "0.125",
+    });
+    expect(new Set(moves.map((m) => m.operazioneDistribuzioneId)).size).toBe(1);
+    expect(
+      moves.every(
+        (m) =>
+          m.auditEventoId != null && m.lottoId != null && m.bollaRigaId != null,
+      ),
+    ).toBe(true);
+    // Fixture price is 2.50: 1 pz + 0.125 kg => 2.50 + 0.31 frozen credits.
+    expect(close.body.spesa.totaleCreditoConsumati).toBe(2.81);
+  });
+
+  it.each(["saldo", "limite mensile"])(
+    "B15 stesso Beneficiario: serializza %s con due checkout da 8",
+    async (policy) => {
+      const fixture = await createFixture({
+        saldo: policy === "saldo" ? "10" : "100",
+      });
+      const product = await createProdotto({
+        magazzinoId: fixture.magazzinoId,
+        quantitaResidua: "20",
+        creditoSolidaleValore: "1",
+        quantitaMassimaMensile: policy === "limite mensile" ? "10" : null,
+      });
+      const a = await readyCart(fixture, product, 8);
+      const secondAccess = await createAccesso({
+        beneficiarioId: fixture.beneficiarioId,
+        magazzinoId: fixture.magazzinoId,
+        dataOraInizio: "2026-07-16T09:00:00",
+      });
+      const b = await readyCart(
+        { ...fixture, accessoId: secondAccess },
+        product,
+        8,
+      );
+      expect(b.id).not.toBe(a.id);
+      const app = await stableApp(fixture.areaOperativaId);
+      const results = await raceAtLot(
+        product,
+        [a, b].map(
+          (session) => () =>
+            request(app)
+              .post(`/cassa-emporio/sessioni/${session.id}/chiudi`)
+              .send({ versione: session.versione })
+              .then((r) => r),
+        ),
+      );
+      expect(results.filter((result) => result.status === 200)).toHaveLength(1);
+      const denied = results.find((result) => result.status !== 200)!;
+      expect(denied.status).toBe(400);
+      expect(denied.body.error).toMatch(
+        policy === "saldo" ? /saldo|credito/i : /mensile/i,
+      );
+      const [beneficiary] = await db
+        .select()
+        .from(beneficiariTable)
+        .where(eq(beneficiariTable.id, fixture.beneficiarioId));
+      expect(Number(beneficiary.creditoSolidaleSaldo)).toBe(
+        policy === "saldo" ? 2 : 92,
+      );
+      const [lot] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.prodottoId, product));
+      expect(Number(lot.quantitaResidua)).toBe(12);
+    },
+  );
+
+  it.each(["grant", "area", "emporio", "abilitazione"])(
+    "B25/B26 revoca %s sulla stessa sessione reale: zero effetti",
+    async (kind) => {
+      const fixture = await createFixture();
+      const product = await createProdotto({
+        magazzinoId: fixture.magazzinoId,
+      });
+      const session = await readyCart(fixture, product);
+      const app = await stableApp(fixture.areaOperativaId, false);
+      if (kind === "grant") {
+        const [actor] = await db
+          .select()
+          .from(utentiTable)
+          .where(eq(utentiTable.id, operatorUserId));
+        await db
+          .update(ruoliTable)
+          .set({ permessi: [] })
+          .where(eq(ruoliTable.id, actor.ruoloId!));
+      }
+      if (kind === "area")
+        await db
+          .update(utentiTable)
+          .set({ areaOperativaId: null })
+          .where(eq(utentiTable.id, operatorUserId));
+      if (kind === "emporio")
+        await db
+          .update(magazziniTable)
+          .set({ stato: "inattivo" })
+          .where(eq(magazziniTable.id, fixture.magazzinoId));
+      if (kind === "abilitazione")
+        await db
+          .update(emporioAbilitazioniTable)
+          .set({ stato: "revocato" })
+          .where(
+            eq(emporioAbilitazioniTable.beneficiarioId, fixture.beneficiarioId),
+          );
+      const denied = await request(app)
+        .post(`/cassa-emporio/sessioni/${session.id}/chiudi`)
+        .send({ versione: session.versione });
+      expect(denied.status).toBe(["grant", "area"].includes(kind) ? 403 : 400);
+      expect(
+        await db
+          .select()
+          .from(speseEmporioTable)
+          .where(eq(speseEmporioTable.sessioneCassaId, session.id)),
+      ).toHaveLength(0);
+      const [lot] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.prodottoId, product));
+      expect(Number(lot.quantitaResidua)).toBe(10);
+      expect(
+        (await request(app).get(`/spese-emporio/sessione/${session.id}`))
+          .status,
+      ).toBe(["grant", "area"].includes(kind) ? 403 : 400);
+    },
+  );
+
+  it.each([
+    ["B27", "spese_emporio", "INSERT"],
+    ["B28", "lotti", "UPDATE"],
+    ["B29-credito", "credito_solidale_movimenti", "INSERT"],
+    ["B29-audit/B31", "audit_eventi", "INSERT"],
+  ])(
+    "%s fault injection PostgreSQL: rollback totale",
+    async (_code, table, operation) => {
+      expect(
+        process.env.M62B_DISPOSABLE_DB,
+        "fault injection solo su DB effimero esplicito",
+      ).toBe("verified");
+      const fixture = await createFixture();
+      const product = await createProdotto({
+        magazzinoId: fixture.magazzinoId,
+      });
+      const session = await readyCart(fixture, product);
+      const app = await stableApp(fixture.areaOperativaId);
+      const connection = await pool.connect();
+      const trigger = `m62b_fault_${rnd()}`;
+      const condition =
+        table === "lotti"
+          ? `NEW.prodotto_id = ${product}`
+          : table === "audit_eventi"
+            ? `NEW.azione = 'EMPORIO_CHECKOUT' AND NEW.metadata->>'cassaId' = '${session.id}'`
+            : `NEW.beneficiario_id = ${fixture.beneficiarioId}`;
+      try {
+        await connection.query(
+          `CREATE FUNCTION pg_temp.${trigger}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'M62B injected fault'; END $$`,
+        );
+        await connection.query(
+          `CREATE TRIGGER ${trigger} BEFORE ${operation} ON ${table} FOR EACH ROW WHEN (${condition}) EXECUTE FUNCTION pg_temp.${trigger}()`,
+        );
+        const close = await request(app)
+          .post(`/cassa-emporio/sessioni/${session.id}/chiudi`)
+          .send({ versione: session.versione });
+        expect(close.status).toBe(500);
+        const [lot] = await db
+          .select()
+          .from(lottiTable)
+          .where(eq(lottiTable.prodottoId, product));
+        const [beneficiary] = await db
+          .select()
+          .from(beneficiariTable)
+          .where(eq(beneficiariTable.id, fixture.beneficiarioId));
+        const [current] = await db
+          .select()
+          .from(sessioniCassaEmporioTable)
+          .where(eq(sessioniCassaEmporioTable.id, session.id));
+        expect(Number(lot.quantitaResidua)).toBe(10);
+        expect(Number(beneficiary.creditoSolidaleSaldo)).toBe(20);
+        expect(current.statoSessione).toBe("pronta_per_chiusura");
+        expect(current.spesaEmporioId).toBeNull();
+        expect(
+          await db
+            .select()
+            .from(speseEmporioTable)
+            .where(eq(speseEmporioTable.sessioneCassaId, session.id)),
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(bolleTable)
+            .where(eq(bolleTable.magazzinoId, fixture.magazzinoId)),
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(scarichiTable)
+            .where(eq(scarichiTable.magazzinoId, fixture.magazzinoId)),
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(movimentiTable)
+            .where(eq(movimentiTable.prodottoId, product)),
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(creditoSolidaleMovimentiTable)
+            .where(
+              eq(
+                creditoSolidaleMovimentiTable.beneficiarioId,
+                fixture.beneficiarioId,
+              ),
+            ),
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(operazioniDistribuzioneMagazzinoTable)
+            .where(
+              eq(
+                operazioniDistribuzioneMagazzinoTable.magazzinoId,
+                fixture.magazzinoId,
+              ),
+            ),
+        ).toHaveLength(0);
+        const events = await db
+          .select()
+          .from(auditEventiTable)
+          .where(eq(auditEventiTable.magazzinoIdSnapshot, fixture.magazzinoId));
+        expect(
+          events.filter((event) => event.azione === "EMPORIO_CHECKOUT"),
+        ).toHaveLength(0);
+        expect(
+          (await request(app).get(`/spese-emporio/sessione/${session.id}`))
+            .status,
+        ).toBe(404);
+      } finally {
+        await connection.query(`DROP TRIGGER IF EXISTS ${trigger} ON ${table}`);
+        await connection.query(`DROP FUNCTION IF EXISTS pg_temp.${trigger}()`);
+        connection.release();
+      }
+    },
+  );
+
+  it("B12/B34 FEFO 3+5, fondi e fattori fisici diversi conservati nei movimenti", async () => {
+    const fixture = await createFixture({ saldo: "100" });
+    const product = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      quantitaResidua: "3",
+      creditoSolidaleValore: "1",
+      dataScadenza: "2030-01-01",
+    });
+    const firstLot = lottoIds.at(-1)!;
+    await db
+      .update(lottiTable)
+      .set({ fattoreKgLtPezzo: "0.5" })
+      .where(eq(lottiTable.id, firstLot));
+    const [second] = await db
+      .insert(lottiTable)
+      .values({
+        prodottoId: product,
+        magazzinoId: fixture.magazzinoId,
+        codiceLotto: `B34-${rnd()}`,
+        dataCarico: todayInput(),
+        dataScadenza: "2030-02-01",
+        quantitaCaricata: "5",
+        quantitaResidua: "5",
+        fsePlus: true,
+        fondoOrigine: "FSE_PLUS",
+        fattoreKgLtPezzo: "0.75",
+      })
+      .returning();
+    lottoIds.push(second.id);
+    const session = await readyCart(fixture, product, 8);
+    const close = await postSessionAction(session.id, "chiudi");
+    expect(close.status, close.text).toBe(200);
+    await trackSpesa(close.body.spesa.id);
+    const moves = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.bollaId, close.body.spesa.bollaId));
+    expect(moves).toHaveLength(2);
+    expect(
+      moves.map((m) => [
+        m.lottoId,
+        Number(m.quantita),
+        m.fondoOrigine,
+        Number(m.fattoreKgLtPezzo),
+      ]),
+    ).toEqual([
+      [firstLot, 3, "NESSUN_FONDO", 0.5],
+      [second.id, 5, "FSE_PLUS", 0.75],
+    ]);
+    expect(
+      moves.every(
+        (m) =>
+          m.bollaRigaId &&
+          m.operazioneDistribuzioneId &&
+          m.auditEventoId &&
+          m.unitaMisura === "pz",
+      ),
+    ).toBe(true);
+  });
+
+  it("B13 stock 10 prenotato 7: 4 negato, 3 consentito, prenotazione intatta", async () => {
+    const fixture = await createFixture({ saldo: "100" });
+    const product = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      creditoSolidaleValore: "1",
+    });
+    const session = await readyCart(fixture, product, 4);
+    const [bolla] = await db
+      .insert(bolleTable)
+      .values({
+        numeroBolla: `B13-${rnd()}`,
+        dataBolla: todayInput(),
+        beneficiarioId: fixture.beneficiarioId,
+        magazzinoId: fixture.magazzinoId,
+        stato: "confermato",
+      })
+      .returning();
+    bollaIds.push(bolla.id);
+    const [row] = await db
+      .insert(bollaRigheTable)
+      .values({
+        bollaId: bolla.id,
+        prodottoId: product,
+        quantita: "7",
+        unitaMisura: "pz",
+        descrizione: "B13",
+      })
+      .returning();
+    const [reservation] = await db
+      .insert(prenotazioniMagazzinoTable)
+      .values({
+        bollaId: bolla.id,
+        rigaBollaId: row.id,
+        prodottoId: product,
+        magazzinoId: fixture.magazzinoId,
+        lottoId: lottoIds.at(-1)!,
+        quantita: "7",
+      })
+      .returning();
+    const denied = await postSessionAction(session.id, "chiudi");
+    expect(denied.status).toBe(409);
+    expect(denied.body.error).toMatch(/giacenza|disponibil/i);
+    const [cartRow] = await db
+      .select()
+      .from(sessioniCassaEmporioRigheTable)
+      .where(eq(sessioniCassaEmporioRigheTable.sessioneCassaId, session.id));
+    expect(
+      (
+        await request(makeApp())
+          .patch(`/cassa-emporio/sessioni/${session.id}/righe/${cartRow.id}`)
+          .send({
+            versione: await getSessionVersion(session.id),
+            quantita: "3",
+          })
+      ).status,
+    ).toBe(200);
+    await postSessionAction(session.id, "pronta-per-chiusura");
+    const close = await postSessionAction(session.id, "chiudi");
+    expect(close.status).toBe(200);
+    await trackSpesa(close.body.spesa.id);
+    const [lot] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.prodottoId, product));
+    expect(Number(lot.quantitaResidua)).toBe(7);
+    const [unchanged] = await db
+      .select()
+      .from(prenotazioniMagazzinoTable)
+      .where(eq(prenotazioniMagazzinoTable.id, reservation.id));
+    expect(unchanged.stato).toBe("attiva");
+    expect(Number(unchanged.quantita)).toBe(7);
+  });
+
+  async function stableApp(areaOperativaId: number, admin = true) {
+    const actor = await emporioActorFixture({
+      id: operatorUserId,
+      isAdmin: admin,
+      permessi: ["emporio.cassa.view", "emporio.cassa.operate"],
+      aree: ["emporio", "magazzino"],
+      areaOperativaId,
+      centroAscoltoId: null,
+    });
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      req.user = actor;
+      next();
+    });
+    app.use(
+      cassaEmporioRouter,
+      speseEmporioRouter,
+      bolleRouter,
+      trasferimentiRouter,
+      scarichiRouter,
+      mensaRouter,
+    );
+    return app;
+  }
+
+  async function readyCart(
+    fixture: Awaited<ReturnType<typeof createFixture>>,
+    product: number,
+    quantity = 1,
+  ) {
+    const opened = await openSession(fixture.accessoId);
+    expect(opened.status).toBe(201);
+    expect((await addProduct(opened.body.id, product, quantity)).status).toBe(
+      201,
+    );
+    const ready = await postSessionAction(
+      opened.body.id,
+      "pronta-per-chiusura",
+    );
+    expect(ready.status).toBe(200);
+    return ready.body as { id: number; versione: number };
+  }
+
+  async function raceAtLot(
+    product: number,
+    contenders: Array<() => Promise<request.Response>>,
+  ) {
+    const blocker = await pool.connect();
+    let pending: Array<Promise<request.Response>> = [];
+    try {
+      await blocker.query("BEGIN");
+      const {
+        rows: [{ pid }],
+      } = await blocker.query("SELECT pg_backend_pid() pid");
+      await blocker.query(
+        "SELECT id FROM lotti WHERE prodotto_id=$1 ORDER BY id FOR UPDATE",
+        [product],
+      );
+      pending = contenders.map((start) => start());
+      let blocked = 0;
+      const deadline = Date.now() + 10000;
+      while (Date.now() < deadline) {
+        await blocker.query("SELECT pg_stat_clear_snapshot()");
+        const result = await blocker.query(
+          `WITH RECURSIVE waiters AS (SELECT pid FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid)) UNION SELECT a.pid FROM pg_stat_activity a JOIN waiters w ON w.pid=ANY(pg_blocking_pids(a.pid))) SELECT count(*)::int n FROM waiters`,
+          [pid],
+        );
+        blocked = result.rows[0].n;
+        if (blocked >= contenders.length) break;
+      }
+      expect(
+        blocked,
+        "tutti i contender devono attendere lock PostgreSQL reali",
+      ).toBeGreaterThanOrEqual(contenders.length);
+      await blocker.query("COMMIT");
+      return await Promise.all(pending);
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      const results = await Promise.all(pending);
+      for (const result of results)
+        if (
+          result.status === 200 &&
+          result.body.spesa &&
+          !spesaIds.includes(result.body.spesa.id)
+        )
+          await trackSpesa(result.body.spesa.id);
+      for (const result of results)
+        if (
+          result.status < 300 &&
+          result.body.scaricoId &&
+          !scaricoIds.includes(result.body.scaricoId)
+        )
+          scaricoIds.push(result.body.scaricoId);
+      for (const result of results)
+        if (
+          result.status === 201 &&
+          result.body.codice?.startsWith("SC-") &&
+          !scaricoIds.includes(result.body.id)
+        )
+          scaricoIds.push(result.body.id);
+    }
+  }
+
+  it.each(["Bolla", "Trasferimento", "Scarico", "Mensa"] as const)(
+    "B07…B10 Cassa contro %s: stock e prenotazioni entro disponibilità",
+    async (kind) => {
+      const fixture = await createFixture({ tipoMagazzino: "misto" });
+      const product = await createProdotto({
+        magazzinoId: fixture.magazzinoId,
+        quantitaResidua: "1",
+        creditoSolidaleValore: "1",
+      });
+      const session = await readyCart(fixture, product);
+      const app = await stableApp(fixture.areaOperativaId);
+      const cash = () =>
+        request(app)
+          .post(`/cassa-emporio/sessioni/${session.id}/chiudi`)
+          .send({ versione: session.versione })
+          .then((r) => r);
+      let other: () => Promise<request.Response>;
+      let competingBolla: number | undefined,
+        competingTransfer: number | undefined;
+      if (kind === "Bolla") {
+        const [bolla] = await db
+          .insert(bolleTable)
+          .values({
+            numeroBolla: `M62B-${rnd()}`,
+            dataBolla: todayInput(),
+            beneficiarioId: fixture.beneficiarioId,
+            magazzinoId: fixture.magazzinoId,
+            operatoreId: operatorUserId,
+            stato: "bozza",
+          })
+          .returning();
+        bollaIds.push(bolla.id);
+        competingBolla = bolla.id;
+        await db.insert(bollaRigheTable).values({
+          bollaId: bolla.id,
+          prodottoId: product,
+          quantita: "1",
+          unitaMisura: "pz",
+          descrizione: "M62B",
+        });
+        other = () =>
+          request(app)
+            .post(`/bolle/${bolla.id}/conferma`)
+            .send({ versione: bolla.versione, idempotencyKey: `b-${rnd()}` })
+            .then((r) => r);
+      } else if (kind === "Trasferimento") {
+        const destination = await createMagazzino(
+          "logistico",
+          fixture.areaOperativaId,
+          fixture.centroId,
+        );
+        const [transfer] = await db
+          .insert(trasferimentiTable)
+          .values({
+            codice: `M62B-${rnd()}`,
+            magazzinoOrigineId: fixture.magazzinoId,
+            magazzinoDestinoId: destination,
+            dataRichiesta: todayInput(),
+            operatoreId: operatorUserId,
+            trasportatoreNome: "Fixture M62B",
+          })
+          .returning();
+        transferIds.push(transfer.id);
+        competingTransfer = transfer.id;
+        await db.insert(trasferimentoRigheTable).values({
+          trasferimentoId: transfer.id,
+          prodottoId: product,
+          quantita: "1",
+          unitaMisura: "pz",
+        });
+        other = () =>
+          request(app)
+            .post(`/trasferimenti/${transfer.id}/prepara`)
+            .send({ versione: transfer.versione, idempotencyKey: `t-${rnd()}` })
+            .then((r) => r);
+      } else if (kind === "Scarico") {
+        await updateModuloAmbiente("SCARICHI", true);
+        other = () =>
+          request(app)
+            .post("/scarichi")
+            .send({
+              magazzinoId: fixture.magazzinoId,
+              dataScarico: todayInput(),
+              causale: "deteriorata",
+              righe: [
+                { prodottoId: product, quantita: "1", unitaMisura: "pz" },
+              ],
+            })
+            .then((r) => r);
+      } else {
+        await updateModuloAmbiente("MENSA", true);
+        const [mensa] = await db
+          .insert(menseTable)
+          .values({
+            codice: `M62B-${rnd()}`,
+            nome: "M62B Mensa sintetica",
+            areaOperativaId: fixture.areaOperativaId,
+            magazzinoId: fixture.magazzinoId,
+          })
+          .returning();
+        mensaIds.push(mensa.id);
+        const denied = await request(app)
+          .post("/mensa/consumi")
+          .send({
+            mensaId: mensa.id,
+            prodottoId: product,
+            quantita: "1",
+            dataServizio: todayInput(),
+            tipoServizio: "pranzo",
+            causale: "consumo",
+            idempotencyKey: `m-${rnd()}`,
+          });
+        expect(denied.status).toBe(409);
+        expect(denied.body.error).toContain("Mensa o il magazzino");
+        // I gateway non autorizzano contemporaneamente Cassa e Mensa sulla stessa sede.
+        // La contesa fisica viene quindi provata al confine del motore realmente usato da Mensa.
+        other = async () => {
+          try {
+            const id = await db.transaction((tx) =>
+              creaScaricoInventariale(tx, {
+                codice: `MB-${rnd()}`,
+                magazzinoId: fixture.magazzinoId,
+                centroAscoltoId: fixture.centroId,
+                dataScarico: todayInput(),
+                causale: "altro",
+                causaleAltro: "Consumo Mensa",
+                operatoreId: operatorUserId,
+                source: {
+                  dominioOrigine: "MENSA",
+                  entitaOrigineTipo: "mensa_giornata_servizio",
+                  entitaOrigineId: mensa.id,
+                  naturaContabile: "DISTRIBUZIONE_FINALE",
+                  canaleOperativo: "MENSA",
+                },
+                operazioneDistribuzione: {
+                  canaleOperativo: "MENSA",
+                  dominioOrigine: "MENSA",
+                  entitaOrigineTipo: "mensa_giornata_servizio",
+                  entitaOrigineId: mensa.id,
+                  areaOperativaIdSnapshot: fixture.areaOperativaId,
+                  centroAscoltoIdSnapshot: fixture.centroId,
+                  territorioClassificazione: "attribuito",
+                },
+                righe: [
+                  { prodottoId: product, quantita: "1", unitaMisura: "pz" },
+                ],
+              }),
+            );
+            scaricoIds.push(id);
+            return {
+              status: 201,
+              body: { scaricoId: id },
+              text: "Mensa inventory primitive",
+            } as request.Response;
+          } catch (error) {
+            if (!(error instanceof InventoryError)) throw error;
+            return {
+              status: error.status,
+              body: { error: error.message },
+              text: error.message,
+            } as request.Response;
+          }
+        };
+      }
+      const results = await raceAtLot(product, [cash, other]);
+      expect(
+        results.filter((r) => r.status < 300),
+        results.map((r) => r.text).join("\n"),
+      ).toHaveLength(1);
+      const denied = results.find((r) => r.status >= 400)!;
+      expect([400, 409]).toContain(denied.status);
+      expect(denied.body.error).toMatch(/giacenza|disponibil|insufficiente/i);
+      const [lot] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.prodottoId, product));
+      const moves = await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.prodottoId, product));
+      const reservations = await db
+        .select()
+        .from(prenotazioniMagazzinoTable)
+        .where(eq(prenotazioniMagazzinoTable.prodottoId, product));
+      expect(Number(lot.quantitaResidua)).toBeGreaterThanOrEqual(0);
+      expect(
+        moves.reduce((n, m) => n + Number(m.quantita), 0) +
+          reservations
+            .filter((r) => r.stato === "attiva")
+            .reduce((n, r) => n + Number(r.quantita), 0),
+      ).toBe(1);
+      const cashWon = results[0].status === 200;
+      const facts = await checkoutFacts(fixture, product, session.id);
+      expect(facts.expenses).toBe(cashWon ? 1 : 0);
+      expect(facts.credit).toBe(cashWon ? 19 : 20);
+      expect(facts.credit_entries).toBe(cashWon ? 1 : 0);
+      expect(facts.audits).toBe(cashWon ? 1 : 0);
+      const reserved =
+        !cashWon && (kind === "Bolla" || kind === "Trasferimento");
+      expect(facts.stock).toBe(reserved ? 1 : 0);
+      expect(facts.issued).toBe(reserved ? 0 : 1);
+      expect(facts.issues).toBe(reserved ? 0 : 1);
+      // Deteriorata is an adjustment, not a final distribution operation.
+      expect(facts.operations).toBe(
+        reserved || (!cashWon && kind === "Scarico") ? 0 : 1,
+      );
+      expect(facts.bills).toBe((competingBolla ? 1 : 0) + (cashWon ? 1 : 0));
+      const active = reservations.filter((r) => r.stato === "attiva");
+      expect(active).toHaveLength(reserved ? 1 : 0);
+      if (reserved)
+        expect(active[0]).toMatchObject({
+          bollaId: competingBolla ?? null,
+          trasferimentoId: competingTransfer ?? null,
+        });
+      if (competingBolla)
+        expect(
+          (
+            await db
+              .select()
+              .from(bolleTable)
+              .where(eq(bolleTable.id, competingBolla))
+          )[0].stato,
+        ).toBe(cashWon ? "bozza" : "confermato");
+      if (competingTransfer)
+        expect(
+          (
+            await db
+              .select()
+              .from(trasferimentiTable)
+              .where(eq(trasferimentiTable.id, competingTransfer))
+          )[0].stato,
+        ).toBe(cashWon ? "bozza" : "preparato");
+      if (cashWon) {
+        const expense = results[0].body.spesa;
+        expect(moves).toHaveLength(1);
+        expect(moves[0]).toMatchObject({
+          bollaId: expense.bollaId,
+          entitaOrigineId: expense.id,
+          entitaOrigineTipo: "spesa_emporio",
+        });
+        const [issueLine] = await db
+          .select()
+          .from(scaricoRigheTable)
+          .where(eq(scaricoRigheTable.scaricoId, expense.scaricoId));
+        expect(Number(issueLine.quantita)).toBe(1);
+        expect(
+          await db
+            .select()
+            .from(scaricoRigheTable)
+            .where(eq(scaricoRigheTable.scaricoId, expense.scaricoId)),
+        ).toEqual([
+          expect.objectContaining({
+            prodottoId: product,
+            quantita: expect.any(String),
+          }),
+        ]);
+        expect(
+          await db
+            .select()
+            .from(speseEmporioRigheTable)
+            .where(eq(speseEmporioRigheTable.spesaEmporioId, expense.id)),
+        ).toEqual([
+          expect.objectContaining({
+            prodottoId: product,
+            lottoId: lot.id,
+            scaricoId: expense.scaricoId,
+            bollaRigaId: moves[0].bollaRigaId,
+          }),
+        ]);
+        expect(moves[0].auditEventoId).not.toBeNull();
+        const [credit] = await db
+          .select()
+          .from(creditoSolidaleMovimentiTable)
+          .where(
+            eq(
+              creditoSolidaleMovimentiTable.beneficiarioId,
+              fixture.beneficiarioId,
+            ),
+          );
+        expect(Number(credit.variazioneCredito)).toBe(-1);
+        expect(Number(credit.saldoPrima)).toBe(20);
+        expect(Number(credit.saldoDopo)).toBe(19);
+      } else if (!reserved) {
+        expect(moves).toHaveLength(1);
+        expect(moves[0].bollaId).toBeNull();
+        const [issueLine] = await db
+          .select()
+          .from(scaricoRigheTable)
+          .where(eq(scaricoRigheTable.prodottoId, product));
+        expect(Number(issueLine.quantita)).toBe(1);
+        expect(
+          await db
+            .select()
+            .from(scaricoRigheTable)
+            .where(eq(scaricoRigheTable.prodottoId, product)),
+        ).toEqual([
+          expect.objectContaining({
+            prodottoId: product,
+            quantita: expect.any(String),
+          }),
+        ]);
+      }
+    },
+  );
+
+  it("B22/B24 recupero GET della propria sessione senza sales.view; niente directory o stampa", async () => {
+    const fixture = await createFixture();
+    const product = await createProdotto({ magazzinoId: fixture.magazzinoId });
+    const session = await readyCart(fixture, product);
+    const app = await stableApp(fixture.areaOperativaId, false);
+    const close = await request(app)
+      .post(`/cassa-emporio/sessioni/${session.id}/chiudi`)
+      .send({ versione: session.versione });
+    expect(close.status, close.text).toBe(200);
+    await trackSpesa(close.body.spesa.id);
+    const recovered = await request(app).get(
+      `/spese-emporio/sessione/${session.id}`,
+    );
+    expect(recovered.status).toBe(200);
+    expect(recovered.body.id).toBe(close.body.spesa.id);
+    expect((await request(app).get("/spese-emporio")).status).toBe(403);
+    expect(
+      (
+        await request(app).get(
+          `/spese-emporio/${close.body.spesa.id}/bolla-stampa`,
+        )
+      ).status,
+    ).toBe(403);
+    await db
+      .update(sessioniCassaEmporioTable)
+      .set({ operatoreChiusuraId: null, operatoreAperturaId: null })
+      .where(eq(sessioniCassaEmporioTable.id, session.id));
+    expect(
+      (await request(app).get(`/spese-emporio/sessione/${session.id}`)).status,
+    ).toBe(404);
+  });
+
+  it("B18 PATCH non riscrive la UOM salvata dopo modifica Catalogo", async () => {
+    const fixture = await createFixture();
+    const product = await createProdotto({ magazzinoId: fixture.magazzinoId });
+    const session = await openSession(fixture.accessoId);
+    const row = await addProduct(session.body.id, product);
+    await db
+      .update(prodottiTable)
+      .set({ unitaMisura: "kg" })
+      .where(eq(prodottiTable.id, product));
+    const changed = await request(makeApp())
+      .patch(`/cassa-emporio/sessioni/${session.body.id}/righe/${row.body.id}`)
+      .send({
+        quantita: 2,
+        versione: await getSessionVersion(session.body.id),
+      });
+    expect(changed.status).toBe(409);
+    expect(changed.body.error).toContain("unità di misura");
+    const [saved] = await db
+      .select()
+      .from(sessioniCassaEmporioRigheTable)
+      .where(eq(sessioniCassaEmporioRigheTable.id, row.body.id));
+    expect(saved.unitaMisura).toBe("pz");
+    expect(Number(saved.quantita)).toBe(1);
+  });
+
+  it("B06 due Casse ultimo pezzo: lock PostgreSQL osservabile, una sola uscita", async () => {
+    const first = await createFixture();
+    const product = await createProdotto({
+      magazzinoId: first.magazzinoId,
+      quantitaResidua: "1",
+      creditoSolidaleValore: "1",
+    });
+    const secondBeneficiary = await createBeneficiario({
+      areaOperativaId: first.areaOperativaId,
+      centroAscoltoId: first.centroId,
+      saldo: "20",
+      magazzinoEmporioPreferitoId: first.magazzinoId,
+    });
+    const accessoId = await createAccesso({
+      beneficiarioId: secondBeneficiary,
+      magazzinoId: first.magazzinoId,
+    });
+    const a = await readyCart(first, product);
+    const b = await readyCart(
+      { ...first, beneficiarioId: secondBeneficiary, accessoId },
+      product,
+    );
+    const app = await stableApp(first.areaOperativaId);
+    const blocker = await pool.connect();
+    let pending: Array<Promise<request.Response>> = [];
+    try {
+      await blocker.query("BEGIN");
+      const pid = (await blocker.query("SELECT pg_backend_pid() pid")).rows[0]
+        .pid;
+      await blocker.query(
+        "SELECT id FROM lotti WHERE prodotto_id=$1 FOR UPDATE",
+        [product],
+      );
+      pending = [a, b].map((session) =>
+        request(app)
+          .post(`/cassa-emporio/sessioni/${session.id}/chiudi`)
+          .send({ versione: session.versione })
+          .then((result) => result),
+      );
+      const deadline = Date.now() + 10000;
+      let blocked = 0;
+      while (Date.now() < deadline) {
+        await blocker.query("SELECT pg_stat_clear_snapshot()");
+        const result = await blocker.query(
+          `WITH RECURSIVE waiters AS (SELECT pid FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid)) UNION SELECT a.pid FROM pg_stat_activity a JOIN waiters w ON w.pid=ANY(pg_blocking_pids(a.pid))) SELECT count(*)::int n FROM waiters`,
+          [pid],
+        );
+        blocked = result.rows[0].n;
+        if (blocked >= 2) break;
+      }
+      expect(
+        blocked,
+        "due connessioni devono essere realmente in attesa del lock",
+      ).toBeGreaterThanOrEqual(2);
+      await blocker.query("COMMIT");
+      const results = await Promise.all(pending);
+      expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
+      for (const result of results)
+        if (result.status === 200) await trackSpesa(result.body.spesa.id);
+      const [lot] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.prodottoId, product));
+      expect(Number(lot.quantitaResidua)).toBe(0);
+      const movements = await db
+        .select()
+        .from(movimentiTable)
+        .where(eq(movimentiTable.prodottoId, product));
+      expect(
+        movements.reduce(
+          (total, movement) => total + Number(movement.quantita),
+          0,
+        ),
+      ).toBe(1);
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      const results = await Promise.all(pending);
+      for (const result of results)
+        if (result.status === 200 && !spesaIds.includes(result.body.spesa.id))
+          await trackSpesa(result.body.spesa.id);
+    }
+  });
+
+  it("B16/B17 congela il prezzo all'aggiunta anche dopo PATCH quantità", async () => {
+    const fixture = await createFixture();
+    const prodottoId = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      creditoSolidaleValore: "2.00",
+    });
+    const sessione = await openSession(fixture.accessoId);
+    const added = await addProduct(sessione.body.id, prodottoId);
+    expect(added.status).toBe(201);
+    await db
+      .update(prodottiTable)
+      .set({ creditoSolidaleValore: "3.00" })
+      .where(eq(prodottiTable.id, prodottoId));
+    const changed = await request(makeApp())
+      .patch(
+        `/cassa-emporio/sessioni/${sessione.body.id}/righe/${added.body.id}`,
+      )
+      .send({
+        quantita: "2",
+        versione: await getSessionVersion(sessione.body.id),
+      });
+    expect(changed.status).toBe(200);
+    expect(changed.body.creditoUnitario).toBe(2);
+    expect(changed.body.creditoTotale).toBe(4);
+    const newer = await addProduct(sessione.body.id, prodottoId);
+    expect(newer.body.creditoUnitario).toBe(3);
+    await postSessionAction(sessione.body.id, "pronta-per-chiusura");
+    const close = await postSessionAction(sessione.body.id, "chiudi");
+    expect(close.status).toBe(200);
+    await trackSpesa(close.body.spesa.id);
+    expect(close.body.spesa.totaleCreditoConsumati).toBe(7);
+  });
+
+  it("B30 collega checkout e movimenti a un unico audit comune con attore e correlation", async () => {
+    const fixture = await createFixture();
+    const prodottoId = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+    });
+    const sessione = await openSession(fixture.accessoId);
+    await addProduct(sessione.body.id, prodottoId);
+    const ready = await postSessionAction(
+      sessione.body.id,
+      "pronta-per-chiusura",
+    );
+    const close = await request(makeApp())
+      .post(`/cassa-emporio/sessioni/${sessione.body.id}/chiudi`)
+      .send({ versione: ready.body.versione });
+    expect(close.status).toBe(200);
+    await trackSpesa(close.body.spesa.id);
+    const events = await db
+      .select()
+      .from(auditEventiTable)
+      .where(eq(auditEventiTable.entitaId, close.body.spesa.id));
+    const checkoutEvents = events.filter(
+      (event) => event.azione === "EMPORIO_CHECKOUT",
+    );
+    expect(checkoutEvents).toHaveLength(1);
+    expect(checkoutEvents[0].actorUserId).toBe(operatorUserId);
+    expect(checkoutEvents[0].actorCodeSnapshot).toBeTruthy();
+    expect(checkoutEvents[0].correlationId).toBeTruthy();
+    expect(checkoutEvents[0].metadata).toMatchObject({
+      cassaId: sessione.body.id,
+      bollaId: close.body.spesa.bollaId,
+      scaricoId: close.body.spesa.scaricoId,
+    });
+    const movements = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.bollaId, close.body.spesa.bollaId));
+    expect(movements.length).toBeGreaterThan(0);
+    expect(
+      movements.every((m) => m.auditEventoId === checkoutEvents[0].id),
+    ).toBe(true);
+  });
+
   it("applica RBAC dedicato a Cassa, force e Spese anche per utenti non-admin", async () => {
     for (const area of ["sociale", "uds"]) {
       const denied = makeApp({ isAdmin: false, aree: [area], permessi: [] });
@@ -1412,6 +2686,16 @@ describe("Cassa Emporio", () => {
   });
 
   it("pronta_per_chiusura non crea movimenti, non scala saldo, non scarica giacenza, non crea bolle o scarichi", async () => {
+    // Keep diagnostics limited to operation/error fields: no beneficiary DTO/PII.
+    const diagnostic = (step: string, response: request.Response) =>
+      JSON.stringify({
+        step,
+        status: response.status,
+        error: response.body?.error,
+        message: response.body?.message,
+        statoSessione: response.body?.statoSessione,
+        versione: response.body?.versione,
+      });
     const fixture = await createFixture({ saldo: "20.00" });
     const prodottoId = await createProdotto({
       magazzinoId: fixture.magazzinoId,
@@ -1419,7 +2703,75 @@ describe("Cassa Emporio", () => {
       quantitaResidua: "5",
     });
     const sessione = await openSession(fixture.accessoId);
-    await addProduct(sessione.body.id, prodottoId, 2);
+    expect(sessione.status, diagnostic("apri-sessione", sessione)).toBe(201);
+    expect(sessione.body).toMatchObject({
+      statoSessione: "aperta",
+      saldoCreditoIniziale: 20,
+      totaleCreditoPrevisto: 0,
+      righe: [],
+    });
+    expect(Number.isInteger(sessione.body.versione)).toBe(true);
+    const aggiunta = await addProduct(sessione.body.id, prodottoId, 2);
+    expect(aggiunta.status, diagnostic("aggiunta-prodotto", aggiunta)).toBe(
+      201,
+    );
+    expect(aggiunta.body).toMatchObject({
+      sessioneCassaId: sessione.body.id,
+      prodottoId,
+      quantita: 2,
+      creditoUnitario: 2,
+      creditoTotale: 4,
+      giacenzaDisponibileAlMomento: 5,
+      superaGiacenza: false,
+      superaLimitePerSpesa: false,
+      superaLimiteMensile: false,
+    });
+    const righeSalvate = await db
+      .select()
+      .from(sessioniCassaEmporioRigheTable)
+      .where(
+        eq(sessioniCassaEmporioRigheTable.sessioneCassaId, sessione.body.id),
+      );
+    expect(righeSalvate).toHaveLength(1);
+    expect(righeSalvate[0].id).toBe(aggiunta.body.id);
+    expect(Number(righeSalvate[0].quantita)).toBe(2);
+    expect(Number(righeSalvate[0].creditoTotale)).toBe(4);
+
+    // Validate the exact GET/version used by the command, not an unchecked
+    // second GET hidden inside postSessionAction().
+    const corrente = await request(makeApp()).get(
+      `/cassa-emporio/sessioni/${sessione.body.id}`,
+    );
+    expect(corrente.status, diagnostic("lettura-versione", corrente)).toBe(200);
+    expect(corrente.body).toMatchObject({
+      statoSessione: "aperta",
+      saldoCreditoIniziale: 20,
+      totaleCreditoPrevisto: 4,
+      creditoResiduoPrevisto: 16,
+    });
+    expect(corrente.body.righe).toHaveLength(1);
+    expect(corrente.body.versione).toBe(sessione.body.versione + 1);
+    const [persistita] = await db
+      .select()
+      .from(sessioniCassaEmporioTable)
+      .where(eq(sessioniCassaEmporioTable.id, sessione.body.id));
+    expect(persistita.versione).toBe(corrente.body.versione);
+    expect(persistita.statoSessione).toBe("aperta");
+    const moduli = await listModuliFunzionali();
+    expect(
+      moduli.find((modulo) => modulo.codice === "EMPORIO_SOLIDALE")?.attivo,
+    ).toBe(true);
+    const abilitazioni = await db
+      .select()
+      .from(emporioAbilitazioniTable)
+      .where(
+        eq(emporioAbilitazioniTable.beneficiarioId, fixture.beneficiarioId),
+      );
+    expect(abilitazioni).toHaveLength(1);
+    expect(abilitazioni[0]).toMatchObject({
+      areaOperativaId: fixture.areaOperativaId,
+      stato: "attivo",
+    });
 
     const [beneficiarioPrima] = await db
       .select()
@@ -1429,6 +2781,12 @@ describe("Cassa Emporio", () => {
       .select()
       .from(lottiTable)
       .where(inArray(lottiTable.id, lottoIds));
+    expect(beneficiarioPrima.creditoSolidaleAbilitato).toBe(true);
+    expect(beneficiarioPrima.creditoSolidaleStato).toBe("attivo");
+    expect(Number(beneficiarioPrima.creditoSolidaleSaldo)).toBe(20);
+    expect(lottoPrima.prodottoId).toBe(prodottoId);
+    expect(lottoPrima.magazzinoId).toBe(fixture.magazzinoId);
+    expect(Number(lottoPrima.quantitaResidua)).toBe(5);
     const movimentiPrima = await db
       .select({ id: creditoSolidaleMovimentiTable.id })
       .from(creditoSolidaleMovimentiTable)
@@ -1447,11 +2805,20 @@ describe("Cassa Emporio", () => {
       .from(scarichiTable)
       .where(eq(scarichiTable.magazzinoId, fixture.magazzinoId));
 
-    const ready = await postSessionAction(
-      sessione.body.id,
-      "pronta-per-chiusura",
-    );
-    expect(ready.status).toBe(200);
+    expect(movimentiPrima).toHaveLength(0);
+    expect(bollePrima).toHaveLength(0);
+    expect(scarichiPrima).toHaveLength(0);
+    const movimentiInventariali = () =>
+      db
+        .select({ id: movimentiTable.id })
+        .from(movimentiTable)
+        .where(eq(movimentiTable.lottoId, lottoPrima.id));
+    expect(await movimentiInventariali()).toHaveLength(0);
+
+    const ready = await request(makeApp())
+      .post(`/cassa-emporio/sessioni/${sessione.body.id}/pronta-per-chiusura`)
+      .send({ versione: corrente.body.versione });
+    expect(ready.status, diagnostic("pronta-per-chiusura", ready)).toBe(200);
     expect(ready.body.statoSessione).toBe("pronta_per_chiusura");
 
     const [beneficiarioDopo] = await db
@@ -1487,6 +2854,17 @@ describe("Cassa Emporio", () => {
     expect(movimentiDopo.length).toBe(movimentiPrima.length);
     expect(bolleDopo.length).toBe(bollePrima.length);
     expect(scarichiDopo.length).toBe(scarichiPrima.length);
+    expect(await movimentiInventariali()).toHaveLength(0);
+    const spese = await db
+      .select({ id: speseEmporioTable.id })
+      .from(speseEmporioTable)
+      .where(eq(speseEmporioTable.sessioneCassaId, sessione.body.id));
+    expect(spese).toHaveLength(0);
+    const [sessioneDopo] = await db
+      .select()
+      .from(sessioniCassaEmporioTable)
+      .where(eq(sessioniCassaEmporioTable.id, sessione.body.id));
+    expect(sessioneDopo.statoSessione).toBe("pronta_per_chiusura");
   });
 
   it("supporta quantità decimali e mantiene la UOM kg su Sessione, Spesa, Bolla e Movimento", async () => {
@@ -1967,16 +3345,40 @@ describe("Cassa Emporio", () => {
       "pronta-per-chiusura",
     );
     const versione = ready.body.versione;
-    const [update, close] = await Promise.all([
-      request(makeApp())
-        .patch(
-          `/cassa-emporio/sessioni/${sessione.body.id}/righe/${add.body.id}`,
-        )
-        .send({ quantita: 2, versione }),
-      request(makeApp())
-        .post(`/cassa-emporio/sessioni/${sessione.body.id}/chiudi`)
-        .send({ versione }),
-    ]);
+    const app = await stableApp(fixture.areaOperativaId);
+    const blocker = await pool.connect();
+    let pending: Array<Promise<request.Response>> = [];
+    let results: request.Response[];
+    try {
+      await blocker.query("BEGIN");
+      const pid = (await blocker.query("SELECT pg_backend_pid() pid")).rows[0]
+        .pid;
+      await blocker.query(
+        "SELECT id FROM sessioni_cassa_emporio WHERE id=$1 FOR UPDATE",
+        [sessione.body.id],
+      );
+      // Both commands are observed waiting on the SAME persisted session version.
+      pending = [
+        request(app)
+          .patch(
+            `/cassa-emporio/sessioni/${sessione.body.id}/righe/${add.body.id}`,
+          )
+          .send({ quantita: 2, versione })
+          .then((r) => r),
+        request(app)
+          .post(`/cassa-emporio/sessioni/${sessione.body.id}/chiudi`)
+          .send({ versione })
+          .then((r) => r),
+      ];
+      await observedWait(pid, 2);
+      await blocker.query("COMMIT");
+      results = await Promise.all(pending);
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      await Promise.allSettled(pending);
+    }
+    const [update, close] = results;
     expect([update.status, close.status].sort()).toEqual([200, 409]);
     if (close.status === 200) await trackSpesa(close.body.spesa.id);
     const [finale] = await db
@@ -1989,9 +3391,45 @@ describe("Cassa Emporio", () => {
       .where(eq(speseEmporioTable.sessioneCassaId, sessione.body.id));
     if (finale.statoSessione === "chiusa") {
       expect(spese).toHaveLength(1);
+      expect(
+        await checkoutFacts(fixture, prodottoId, sessione.body.id),
+      ).toEqual({
+        stock: 4,
+        credit: 18,
+        expenses: 1,
+        bills: 1,
+        issues: 1,
+        credit_entries: 1,
+        audits: 1,
+        issued: 1,
+        operations: 1,
+      });
     } else {
       expect(finale.statoSessione).toBe("aperta");
       expect(spese).toHaveLength(0);
+      expect(
+        await checkoutFacts(fixture, prodottoId, sessione.body.id),
+      ).toEqual({
+        stock: 5,
+        credit: 20,
+        expenses: 0,
+        bills: 0,
+        issues: 0,
+        credit_entries: 0,
+        audits: 0,
+        issued: 0,
+        operations: 0,
+      });
+      expect(
+        Number(
+          (
+            await db
+              .select()
+              .from(sessioniCassaEmporioRigheTable)
+              .where(eq(sessioniCassaEmporioRigheTable.id, add.body.id))
+          )[0].quantita,
+        ),
+      ).toBe(2);
     }
   });
 
@@ -2088,7 +3526,7 @@ describe("Cassa Emporio", () => {
         .every(
           (movement) =>
             movement.operatoreId === operatorUserId &&
-            movement.auditEventoId === null,
+            movement.auditEventoId != null,
         ),
     ).toBe(true);
     expect(

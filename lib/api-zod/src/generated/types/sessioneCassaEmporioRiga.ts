@@ -7,6 +7,8 @@
  */
 
 export interface SessioneCassaEmporioRiga {
+  /** @nullable */
+  quantitaFrazionabile?: boolean | null;
   id: number;
   sessioneCassaId: number;
   prodottoId: number;

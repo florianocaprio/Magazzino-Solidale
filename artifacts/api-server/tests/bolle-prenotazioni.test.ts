@@ -170,7 +170,12 @@ async function waitForBlockedBackends(
   blockerPid: number,
   expected: number,
 ): Promise<void> {
-  for (let attempt = 0; attempt < 300; attempt += 1) {
+  const deadline = Date.now() + 15_000;
+  let observed = 0;
+  const deadlocksBefore = await pool.query(
+    "SELECT deadlocks FROM pg_stat_database WHERE datname=current_database()",
+  );
+  while (Date.now() < deadline) {
     const result = await pool.query<{ blocked: string }>(
       `WITH RECURSIVE blocked(pid) AS (
          SELECT pid
@@ -185,11 +190,15 @@ async function waitForBlockedBackends(
        SELECT count(*)::text AS blocked FROM blocked`,
       [blockerPid],
     );
-    if (Number(result.rows[0]?.blocked ?? 0) >= expected) return;
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    observed = Number(result.rows[0]?.blocked ?? 0);
+    if (observed >= expected) return;
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
   }
+  const deadlocksAfter = await pool.query(
+    "SELECT deadlocks FROM pg_stat_database WHERE datname=current_database()",
+  );
   throw new Error(
-    `Attese ${expected} transazioni bloccate sul lock di laboratorio`,
+    `Timeout barriera PostgreSQL (15s): attese ${expected}, osservate ${observed}; deadlock DB delta=${Number(deadlocksAfter.rows[0].deadlocks) - Number(deadlocksBefore.rows[0].deadlocks)}`,
   );
 }
 

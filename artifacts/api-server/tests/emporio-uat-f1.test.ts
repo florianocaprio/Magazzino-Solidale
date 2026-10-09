@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
+import type { Server } from "node:http";
 import { eq, sql } from "drizzle-orm";
 import {
   db,
@@ -24,6 +25,7 @@ import {
   ALL_PERMISSION_KEYS,
 } from "../src/lib/permissions";
 import { defaultSocialOperatorPermissions } from "../src/lib/seedRoles";
+let server: Server;
 
 beforeAll(async () => {
   const u = new URL(process.env.DATABASE_URL!);
@@ -36,8 +38,18 @@ beforeAll(async () => {
     throw Error("F1 requires isolated disposable PostgreSQL");
   await updateModuloAmbiente("EMPORIO_SOLIDALE", true);
   await updateModuloAmbiente("CREDITO_SOLIDALE", true);
+  const { default: app } = await import("../src/app");
+  // Keep the real Express listener stable for the entire group, avoiding
+  // per-request port churn after an untraced non-Express 404 in this environment.
+  server = await new Promise<Server>((resolve) => {
+    const listener = app.listen(0, "127.0.0.1", () => resolve(listener));
+  });
 });
 afterAll(async () => {
+  if (server)
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
   await pool.end();
 });
 async function fixture() {
@@ -110,8 +122,7 @@ async function fixture() {
       centroAscoltoId: centers[0].id,
     })
     .returning();
-  const { default: app } = await import("../src/app");
-  const agent = request.agent(app);
+  const agent = request.agent(server);
   expect(
     (
       await agent.post("/api/auth/login").send({

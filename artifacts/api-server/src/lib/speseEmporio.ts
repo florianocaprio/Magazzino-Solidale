@@ -40,6 +40,7 @@ import {
 } from "drizzle-orm";
 import { parseDbNumber } from "./disponibilitaMagazzino";
 import { auditEmporioTx } from "./emporioAudit";
+import { recordAuditEvent, type AuditCommandContext } from "./auditEvent";
 import { magazzinoScopeFilter } from "./centroScope";
 import { requireEmporioCommandTx } from "./emporioScope";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
@@ -318,7 +319,9 @@ async function validateRigheFinali(
   const prodotti = await tx
     .select()
     .from(prodottiTable)
-    .where(inArray(prodottiTable.id, prodottoIds));
+    .where(inArray(prodottiTable.id, prodottoIds))
+    .orderBy(asc(prodottiTable.id))
+    .for("share");
   const productMap = new Map(prodotti.map((p) => [p.id, p]));
 
   const quantityByProduct = new Map<number, InventoryDecimal>();
@@ -415,6 +418,7 @@ async function scaricaRigaEmporio(
     dataOperativa: string;
     operatoreId: number | null;
     operazioneDistribuzioneId: number;
+    auditEventoId: number;
   },
 ) {
   let remaining = InventoryDecimal.parse(opts.riga.quantita);
@@ -510,6 +514,7 @@ async function scaricaRigaEmporio(
       entitaOrigineId: opts.spesaId,
       rigaOrigineId: opts.riga.id,
       operazioneDistribuzioneId: opts.operazioneDistribuzioneId,
+      auditEventoId: opts.auditEventoId,
       canaleOperativo: "EMPORIO",
       operatoreId: opts.operatoreId,
       documentoRiferimento: opts.numeroBolla,
@@ -548,17 +553,35 @@ export async function chiudiSessioneCassaEmporio(opts: {
   note?: string | null;
   ip?: string | null;
   beneficiaryAccessScope: BeneficiarioAccessScope;
+  auditCommand: AuditCommandContext;
 }): Promise<{ spesaId: number }> {
   return db.transaction(async (tx) => {
     const sessione = await lockSessione(tx, opts.sessioneId);
     if (!sessione)
       throw new SpesaEmporioError(404, "Sessione Cassa Emporio non trovata.");
-    await requireEmporioCommandTx(
+    const { actor } = await requireEmporioCommandTx(
       tx,
       opts.operatoreId,
       "emporio.cassa.operate",
       sessione,
     );
+    const [actorSnapshot] = await tx
+      .select({
+        matricola: utentiTable.matricola,
+        username: utentiTable.username,
+      })
+      .from(utentiTable)
+      .where(eq(utentiTable.id, actor.id));
+    const command: AuditCommandContext = {
+      ...opts.auditCommand,
+      actor: {
+        actorType: "user",
+        actorUserId: actor.id,
+        actorCodeSnapshot: actorSnapshot.matricola ?? actorSnapshot.username,
+        initiatedByUserId: null,
+        initiatedByCodeSnapshot: null,
+      },
+    };
     if (sessione.versione !== opts.versione) {
       throw new SpesaEmporioError(
         409,
@@ -738,6 +761,48 @@ export async function chiudiSessioneCassaEmporio(opts: {
       creatoDa: operationActorId,
     });
 
+    const auditEventoId = await recordAuditEvent(tx, {
+      command,
+      azione: "EMPORIO_CHECKOUT",
+      entitaTipo: "spesa_emporio",
+      entitaId: spesa.id,
+      documentoTipo: "bolla",
+      documentoId: bolla.id,
+      areaOperativaIdSnapshot: reportingSnapshot.areaOperativaIdSnapshot,
+      centroAscoltoIdSnapshot: reportingSnapshot.centroAscoltoIdSnapshot,
+      magazzinoIdSnapshot: sessione.magazzinoEmporioId,
+      dataOperativa: dataDocumento,
+      metadata: {
+        values: {
+          cassaId: sessione.id,
+          spesaId: spesa.id,
+          bollaId: bolla.id,
+          scaricoId: scarico.id,
+          operazioneDistribuzioneId: operation.id,
+          numeroSpesa,
+          numeroBolla,
+          creditoConsumato: totaleCredito,
+          righe: righe.map((riga) => ({
+            prodottoId: riga.prodottoId,
+            quantita: riga.quantita,
+            unitaMisura: riga.unitaMisura,
+            creditoUnitario: riga.creditoUnitario,
+          })),
+        },
+        allowedKeys: [
+          "cassaId",
+          "spesaId",
+          "bollaId",
+          "scaricoId",
+          "operazioneDistribuzioneId",
+          "numeroSpesa",
+          "numeroBolla",
+          "creditoConsumato",
+          "righe",
+        ],
+      },
+    });
+
     await lockInventoryLotsInGlobalOrder(tx, {
       kind: "warehouse-products",
       magazzinoId: sessione.magazzinoEmporioId,
@@ -760,6 +825,7 @@ export async function chiudiSessioneCassaEmporio(opts: {
         dataOperativa: dataDocumento,
         operatoreId: opts.operatoreId,
         operazioneDistribuzioneId: operation.id,
+        auditEventoId,
       });
     }
 

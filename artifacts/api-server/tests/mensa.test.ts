@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import express, { type Express } from "express";
 import request from "supertest";
+import { httpListeners } from "./helpers/http-listeners";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   auditConfigurazioniTable,
@@ -61,6 +62,8 @@ import { initDbExtensions } from "../src/lib/dbInit";
 import { InventoryDecimal } from "../src/lib/inventoryDecimal";
 import bcrypt from "bcryptjs";
 
+const sessionListeners = httpListeners({ diagnostics: "mensa-real-session" });
+
 async function realMensaSession(fixture: Fixture) {
   const password = `M61-${rnd()}-Password!`;
   await db
@@ -72,7 +75,12 @@ async function realMensaSession(fixture: Fixture) {
     .select()
     .from(utentiTable)
     .where(eq(utentiTable.id, fixture.userId));
-  const session = request.agent(app);
+  const server = await sessionListeners.open(Symbol("mensa-session"), () => {
+    const traced = express();
+    traced.use(sessionListeners.router("mensa-real-app", app));
+    return traced;
+  });
+  const session = request.agent(server);
   expect(
     (
       await session
@@ -439,6 +447,8 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  // Drain authenticated requests before removing their users, stock or days.
+  await sessionListeners.close();
   // Cleanup anche se un assert fallisce dopo il commit o dopo la ricezione.
   if (ids.canteens.length) {
     const consumptions = await db
@@ -624,6 +634,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await sessionListeners.close();
   await pool.end();
 });
 
@@ -1128,10 +1139,23 @@ describe("Modulo Mensa", () => {
           .post(`/api/mensa/consumi/${consumed.body.id}/storno`)
           .send({ motivo: "Correzione peso" });
       }
-      const [closed, mutation] = await Promise.all([
+      const completed = await Promise.allSettled([
         session.post(`/api/mensa/giornate/${day.body.id}/chiudi`).send({}),
         mutate,
       ]);
+      const [closed, mutation] = completed.map((result) => {
+        if (result.status === "rejected") {
+          console.error(
+            "MENSA_M61_13_TRANSPORT",
+            JSON.stringify({
+              kind,
+              code: result.reason?.code,
+            }),
+          );
+          throw result.reason;
+        }
+        return result.value;
+      });
       expect(closed.status, closed.text).toBe(200);
       expect(kind === "storno" ? [200, 409] : [201, 409]).toContain(
         mutation.status,

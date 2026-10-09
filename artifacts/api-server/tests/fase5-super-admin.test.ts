@@ -1,17 +1,33 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
+import type { Server } from "node:http";
+import { httpListeners } from "./helpers/http-listeners";
 import { eq, inArray } from "drizzle-orm";
-import { auditConfigurazioniTable, db, pool, ruoliTable, systemLogsTable, utentiTable } from "@workspace/db";
+import {
+  auditConfigurazioniTable,
+  db,
+  pool,
+  ruoliTable,
+  systemLogsTable,
+  utentiTable,
+} from "@workspace/db";
 import authRouter from "../src/routes/auth";
 import configurazioneAmbienteRouter from "../src/routes/configurazione-ambiente";
 import impostazioniModuliRouter from "../src/routes/impostazioni-moduli";
 import superAdminRouter from "../src/routes/super-admin";
 import utentiRouter from "../src/routes/utenti";
 import { requireAnyModulo, requireModulo } from "../src/lib/featureFlags";
-import { ensureFase5Bootstrap, getConfigurazioneAmbiente, listModuliFunzionali, updateConfigurazioneAmbiente, updateModuloAmbiente, type ConfigurazioneAmbienteDto } from "../src/lib/configurazioneAmbiente";
+import {
+  ensureFase5Bootstrap,
+  getConfigurazioneAmbiente,
+  listModuliFunzionali,
+  updateConfigurazioneAmbiente,
+  updateModuloAmbiente,
+  type ConfigurazioneAmbienteDto,
+} from "../src/lib/configurazioneAmbiente";
 import type { SessionUser } from "../src/middlewares/auth";
-import { loadSessionUser } from "../src/middlewares/auth";
+import { loadSessionUser, requireSuperAdmin } from "../src/middlewares/auth";
 import { DEFAULT_SUPER_ADMIN_USERNAME } from "../src/lib/configurazioneAmbiente";
 
 const rnd = () => Math.random().toString(36).slice(2, 8);
@@ -22,12 +38,51 @@ const createdSystemLogIds: number[] = [];
 
 let superUser: SessionUser;
 let adminUser: SessionUser;
+let superServer: Server;
+let adminServer: Server;
+let authServer: Server;
+const listeners = httpListeners({ diagnostics: "fase5-super-admin" });
+const superAdminGuardPresent = superAdminRouter.stack.some(
+  (layer: { handle: unknown }) => layer.handle === requireSuperAdmin,
+);
 let originalConfig: ConfigurazioneAmbienteDto;
 let originalPredittivoAttivo = true;
 let originalEmporioAttivo = true;
 let originalUdsAttivo = true;
 let originalCentroAscoltoAttivo = true;
 let originalMagazzinoSolidaleAttivo = true;
+
+it("drena una richiesta attiva prima di chiudere il listener di test", async () => {
+  let release!: () => void;
+  let entered!: () => void;
+  const received = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const server = await listeners.open("drain-regression", () => {
+    const app = express();
+    app.get("/harness-drain", (_req, res) => {
+      release = () => res.status(204).end();
+      entered();
+    });
+    return app;
+  });
+  const response = request(server)
+    .get("/harness-drain")
+    .then((res) => res);
+  await received;
+  const closing = listeners.close();
+  try {
+    await Promise.resolve();
+    expect(listeners.inspect(server).active).toBe(1);
+    expect(server.listening).toBe(true);
+  } finally {
+    release();
+    const result = await response;
+    await closing;
+    expect(result.status).toBe(204);
+  }
+  expect(server.listening).toBe(false);
+});
 
 function appAs(user: SessionUser): Express {
   const app = express();
@@ -36,19 +91,31 @@ function appAs(user: SessionUser): Express {
     req.user = user;
     next();
   });
-  app.use(configurazioneAmbienteRouter);
-  app.use(impostazioniModuliRouter);
-  app.use(superAdminRouter);
-  app.use(utentiRouter);
+  app.use(
+    listeners.router("configurazione-ambiente", configurazioneAmbienteRouter),
+  );
+  app.use(listeners.router("impostazioni-moduli", impostazioniModuliRouter));
+  app.use(
+    listeners.router("super-admin", superAdminRouter, superAdminGuardPresent),
+  );
+  app.use(listeners.router("utenti", utentiRouter));
   app.get("/test-predittivo", requireModulo("PREDITTIVO"), (_req, res) => {
     res.status(204).send();
   });
-  app.get("/test-modulo-inesistente", requireModulo("NON_ESISTE"), (_req, res) => {
-    res.status(204).send();
-  });
-  app.get("/test-centro-ascolto", requireModulo("CENTRO_ASCOLTO"), (_req, res) => {
-    res.status(204).send();
-  });
+  app.get(
+    "/test-modulo-inesistente",
+    requireModulo("NON_ESISTE"),
+    (_req, res) => {
+      res.status(204).send();
+    },
+  );
+  app.get(
+    "/test-centro-ascolto",
+    requireModulo("CENTRO_ASCOLTO"),
+    (_req, res) => {
+      res.status(204).send();
+    },
+  );
   app.get(
     "/test-interventi-condivisi",
     requireAnyModulo(["CENTRO_ASCOLTO", "UDS"]),
@@ -66,14 +133,17 @@ function authApp(sessionUserId: number): Express {
     };
     next();
   });
-  app.use(authRouter);
+  app.use(listeners.router("auth", authRouter));
   return app;
 }
 
 async function createAdminUser(isSuperAdmin: boolean): Promise<SessionUser> {
   const suffix = rnd();
   const ruoloNome = `Fase5 Admin ${suffix}`;
-  const [role] = await db.insert(ruoliTable).values({ nome: ruoloNome, isAdmin: true, aree: [] }).returning({ id: ruoliTable.id });
+  const [role] = await db
+    .insert(ruoliTable)
+    .values({ nome: ruoloNome, isAdmin: true, aree: [] })
+    .returning({ id: ruoliTable.id });
   createdRoleIds.push(role.id);
 
   const username = `fase5_${suffix}`;
@@ -167,44 +237,78 @@ async function restoreConfig(): Promise<void> {
 beforeEach(async () => {
   await ensureFase5Bootstrap();
   originalConfig = await getConfigurazioneAmbiente();
-  const predittivo = (await listModuliFunzionali()).find((m) => m.codice === "PREDITTIVO");
+  const predittivo = (await listModuliFunzionali()).find(
+    (m) => m.codice === "PREDITTIVO",
+  );
   originalPredittivoAttivo = predittivo?.attivo ?? true;
-  originalEmporioAttivo = (await listModuliFunzionali()).find((m) => m.codice === "EMPORIO_SOLIDALE")?.attivo ?? true;
-  originalUdsAttivo = (await listModuliFunzionali()).find((m) => m.codice === "UDS")?.attivo ?? true;
-  originalCentroAscoltoAttivo = (await listModuliFunzionali()).find((m) => m.codice === "CENTRO_ASCOLTO")?.attivo ?? true;
-  originalMagazzinoSolidaleAttivo = (await listModuliFunzionali()).find((m) => m.codice === "MAGAZZINO_SOLIDALE")?.attivo ?? true;
+  originalEmporioAttivo =
+    (await listModuliFunzionali()).find((m) => m.codice === "EMPORIO_SOLIDALE")
+      ?.attivo ?? true;
+  originalUdsAttivo =
+    (await listModuliFunzionali()).find((m) => m.codice === "UDS")?.attivo ??
+    true;
+  originalCentroAscoltoAttivo =
+    (await listModuliFunzionali()).find((m) => m.codice === "CENTRO_ASCOLTO")
+      ?.attivo ?? true;
+  originalMagazzinoSolidaleAttivo =
+    (await listModuliFunzionali()).find(
+      (m) => m.codice === "MAGAZZINO_SOLIDALE",
+    )?.attivo ?? true;
   superUser = await createAdminUser(true);
   adminUser = await createAdminUser(false);
+  expect(superAdminGuardPresent).toBe(true);
+  superServer = await listeners.open(superUser, () => appAs(superUser));
+  adminServer = await listeners.open(adminUser, () => appAs(adminUser));
+  authServer = await listeners.open("auth", () => authApp(superUser.id));
+  expect(superServer.listening).toBe(true);
+  expect(adminServer.address()).not.toEqual(superServer.address());
 });
 
 afterEach(async () => {
+  // Drain HTTP before restoring configuration or deleting its DB actors.
+  await listeners.close();
   await restoreConfig();
   await updateModuloAmbiente("PREDITTIVO", originalPredittivoAttivo, null);
   await updateModuloAmbiente("EMPORIO_SOLIDALE", originalEmporioAttivo, null);
   await updateModuloAmbiente("UDS", originalUdsAttivo, null);
-  await updateModuloAmbiente("CENTRO_ASCOLTO", originalCentroAscoltoAttivo, null);
-  await updateModuloAmbiente("MAGAZZINO_SOLIDALE", originalMagazzinoSolidaleAttivo, null);
+  await updateModuloAmbiente(
+    "CENTRO_ASCOLTO",
+    originalCentroAscoltoAttivo,
+    null,
+  );
+  await updateModuloAmbiente(
+    "MAGAZZINO_SOLIDALE",
+    originalMagazzinoSolidaleAttivo,
+    null,
+  );
   if (createdSystemLogIds.length > 0) {
     await db
       .delete(systemLogsTable)
       .where(inArray(systemLogsTable.id, createdSystemLogIds.splice(0)));
   }
   if (createdUserIds.length > 0) {
-    await db.delete(auditConfigurazioniTable).where(inArray(auditConfigurazioniTable.utenteId, createdUserIds));
-    await db.delete(utentiTable).where(inArray(utentiTable.id, createdUserIds.splice(0)));
+    await db
+      .delete(auditConfigurazioniTable)
+      .where(inArray(auditConfigurazioniTable.utenteId, createdUserIds));
+    await db
+      .delete(utentiTable)
+      .where(inArray(utentiTable.id, createdUserIds.splice(0)));
   }
   if (createdRoleIds.length > 0) {
-    await db.delete(ruoliTable).where(inArray(ruoliTable.id, createdRoleIds.splice(0)));
+    await db
+      .delete(ruoliTable)
+      .where(inArray(ruoliTable.id, createdRoleIds.splice(0)));
   }
 });
 
 afterAll(async () => {
+  await listeners.close();
   await pool.end();
 });
 
 describe("Fase 5.2 Super Admin e feature flags", () => {
   it("espone isSuperAdmin nella sessione /auth/me", async () => {
-    const res = await request(authApp(superUser.id)).get("/auth/me");
+    const res = await request(authServer).get("/auth/me");
 
     expect(res.status).toBe(200);
     expect(res.body.isSuperAdmin).toBe(true);
@@ -269,46 +373,71 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
   });
 
   it("riserva gli endpoint /super-admin ai soli Super Admin", async () => {
-    const forbidden = await request(appAs(adminUser)).get("/super-admin/configurazione-ambiente");
+    const forbidden = await request(adminServer).get(
+      "/super-admin/configurazione-ambiente",
+    );
     expect(forbidden.status).toBe(403);
 
-    const allowed = await request(appAs(superUser)).get("/super-admin/configurazione-ambiente");
+    const allowed = await request(superServer).get(
+      "/super-admin/configurazione-ambiente",
+    );
     expect(allowed.status).toBe(200);
     expect(allowed.body.id).toBe(1);
   });
 
   it("impedisce a un admin normale di modificare o resettare un SuperAdmin", async () => {
-    const patch = await request(appAs(adminUser)).patch(`/utenti/${superUser.id}`).send({ nome: "Non autorizzato" });
+    const patch = await request(adminServer)
+      .patch(`/utenti/${superUser.id}`)
+      .send({ nome: "Non autorizzato" });
     expect(patch.status).toBe(403);
 
-    const reset = await request(appAs(adminUser)).post(`/utenti/${superUser.id}/reset-password`).send({ newPassword: "NuovaPassword1" });
+    const reset = await request(adminServer)
+      .post(`/utenti/${superUser.id}/reset-password`)
+      .send({ newPassword: "NuovaPassword1" });
     expect(reset.status).toBe(403);
   });
 
   it("aggiorna la configurazione ambiente e registra audit", async () => {
     const nomeAmbiente = `Ambiente ${rnd()}`;
 
-    const patch = await request(appAs(superUser)).patch("/super-admin/configurazione-ambiente").send({ nomeAmbiente });
+    const patch = await request(superServer)
+      .patch("/super-admin/configurazione-ambiente")
+      .send({ nomeAmbiente });
 
     expect(patch.status).toBe(200);
     expect(patch.body.nomeAmbiente).toBe(nomeAmbiente);
     expect(patch.body.aggiornatoDaId).toBe(superUser.id);
 
-    const audit = await request(appAs(superUser)).get("/super-admin/audit-configurazioni").query({ limit: "20" });
+    const audit = await request(superServer)
+      .get("/super-admin/audit-configurazioni")
+      .query({ limit: "20" });
     expect(audit.status).toBe(200);
-    expect(audit.body.some((row: { area: string; chiave: string; utenteId: number | null }) => row.area === "configurazione_ambiente" && row.chiave === "singleton" && row.utenteId === superUser.id)).toBe(true);
+    expect(
+      audit.body.some(
+        (row: { area: string; chiave: string; utenteId: number | null }) =>
+          row.area === "configurazione_ambiente" &&
+          row.chiave === "singleton" &&
+          row.utenteId === superUser.id,
+      ),
+    ).toBe(true);
   });
 
   it("gestisce catalogo moduli, toggle e blocco dei moduli core", async () => {
-    const list = await request(appAs(superUser)).get("/super-admin/moduli");
+    const list = await request(superServer).get("/super-admin/moduli");
     expect(list.status).toBe(200);
-    expect(list.body.some((m: { codice: string }) => m.codice === "DASHBOARD")).toBe(true);
-    expect(list.body.some((m: { codice: string }) => m.codice === "PREDITTIVO")).toBe(true);
+    expect(
+      list.body.some((m: { codice: string }) => m.codice === "DASHBOARD"),
+    ).toBe(true);
+    expect(
+      list.body.some((m: { codice: string }) => m.codice === "PREDITTIVO"),
+    ).toBe(true);
     for (const expected of [
       ["MAGAZZINO_SOLIDALE", "Magazzino Solidale"],
       ["CENTRO_ASCOLTO", "Centro di Ascolto"],
     ]) {
-      const modulo = list.body.find((m: { codice: string }) => m.codice === expected[0]);
+      const modulo = list.body.find(
+        (m: { codice: string }) => m.codice === expected[0],
+      );
       expect(modulo).toMatchObject({
         nome: expected[1],
         categoria: "servizi",
@@ -328,69 +457,104 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
         "UDS",
       ]),
     );
-    expect(list.body.find((m: { codice: string }) => m.codice === "BENEFICIARI")).toMatchObject({
+    expect(
+      list.body.find((m: { codice: string }) => m.codice === "BENEFICIARI"),
+    ).toMatchObject({
       core: true,
       categoria: "tecnica",
     });
 
-    const disabled = await request(appAs(superUser)).patch("/super-admin/moduli/PREDITTIVO").send({ attivo: false });
+    const disabled = await request(superServer)
+      .patch("/super-admin/moduli/PREDITTIVO")
+      .send({ attivo: false });
     expect(disabled.status).toBe(200);
     expect(disabled.body.attivo).toBe(false);
 
-    const publicConfig = await request(appAs(superUser)).get("/configurazione-ambiente");
+    const publicConfig = await request(superServer).get(
+      "/configurazione-ambiente",
+    );
     expect(publicConfig.status).toBe(200);
     expect(publicConfig.body.moduliAttivi).not.toContain("PREDITTIVO");
 
-    const core = await request(appAs(superUser)).patch("/super-admin/moduli/DASHBOARD").send({ attivo: false });
+    const core = await request(superServer)
+      .patch("/super-admin/moduli/DASHBOARD")
+      .send({ attivo: false });
     expect(core.status).toBe(400);
   });
 
   it("mantiene il PATCH legacy coerente, riservato al Super Admin e con audit", async () => {
-    const forbidden = await request(appAs(adminUser)).patch("/impostazioni-moduli").send({ emporioAbilitato: !originalEmporioAttivo });
+    const forbidden = await request(adminServer)
+      .patch("/impostazioni-moduli")
+      .send({ emporioAbilitato: !originalEmporioAttivo });
     expect(forbidden.status).toBe(403);
 
-    const updated = await request(appAs(superUser)).patch("/impostazioni-moduli").send({
-      emporioAbilitato: !originalEmporioAttivo,
-      unitaStradaAbilitata: !originalUdsAttivo,
-    });
+    const updated = await request(superServer)
+      .patch("/impostazioni-moduli")
+      .send({
+        emporioAbilitato: !originalEmporioAttivo,
+        unitaStradaAbilitata: !originalUdsAttivo,
+      });
     expect(updated.status).toBe(200);
     expect(updated.body.emporioAbilitato).toBe(!originalEmporioAttivo);
     expect(updated.body.unitaStradaAbilitata).toBe(!originalUdsAttivo);
 
-    const publicConfig = await request(appAs(superUser)).get("/configurazione-ambiente");
-    expect(publicConfig.body.moduliAttivi.includes("EMPORIO_SOLIDALE")).toBe(!originalEmporioAttivo);
-    expect(publicConfig.body.moduliAttivi.includes("UDS")).toBe(!originalUdsAttivo);
+    const publicConfig = await request(superServer).get(
+      "/configurazione-ambiente",
+    );
+    expect(publicConfig.body.moduliAttivi.includes("EMPORIO_SOLIDALE")).toBe(
+      !originalEmporioAttivo,
+    );
+    expect(publicConfig.body.moduliAttivi.includes("UDS")).toBe(
+      !originalUdsAttivo,
+    );
 
-    const audit = await request(appAs(superUser)).get("/super-admin/audit-configurazioni").query({ limit: "20" });
+    const audit = await request(superServer)
+      .get("/super-admin/audit-configurazioni")
+      .query({ limit: "20" });
     for (const codice of ["EMPORIO_SOLIDALE", "UDS"]) {
-      expect(audit.body.some((row: { area: string; chiave: string; azione: string; utenteId: number | null }) => row.area === "moduli_funzionali" && row.chiave === codice && row.azione === "toggle" && row.utenteId === superUser.id)).toBe(true);
+      expect(
+        audit.body.some(
+          (row: {
+            area: string;
+            chiave: string;
+            azione: string;
+            utenteId: number | null;
+          }) =>
+            row.area === "moduli_funzionali" &&
+            row.chiave === codice &&
+            row.azione === "toggle" &&
+            row.utenteId === superUser.id,
+        ),
+      ).toBe(true);
     }
   });
 
   it("requireModulo lascia passare il modulo attivo e blocca quello disabilitato", async () => {
     await updateModuloAmbiente("PREDITTIVO", false, superUser.id);
 
-    const denied = await request(appAs(superUser)).get("/test-predittivo");
+    const denied = await request(superServer).get("/test-predittivo");
     expect(denied.status).toBe(403);
 
     await updateModuloAmbiente("PREDITTIVO", true, superUser.id);
-    const allowed = await request(appAs(superUser)).get("/test-predittivo");
+    const allowed = await request(superServer).get("/test-predittivo");
     expect(allowed.status).toBe(204);
   });
 
   it("requireModulo blocca in sicurezza un codice modulo inesistente", async () => {
-    const denied = await request(appAs(superUser)).get("/test-modulo-inesistente");
+    const denied = await request(superServer).get("/test-modulo-inesistente");
 
     expect(denied.status).toBe(403);
-    expect(denied.body.error).toBe("Modulo NON_ESISTE non abilitato per questo ambiente");
+    expect(denied.body.error).toBe(
+      "Modulo NON_ESISTE non abilitato per questo ambiente",
+    );
   });
 
   it("disabilita il workflow Centro senza bloccare il motore condiviso con UDS", async () => {
     await updateModuloAmbiente("CENTRO_ASCOLTO", false, superUser.id);
     await updateModuloAmbiente("UDS", true, superUser.id);
 
-    const center = await request(appAs(superUser)).get("/test-centro-ascolto");
-    const shared = await request(appAs(superUser)).get("/test-interventi-condivisi");
+    const center = await request(superServer).get("/test-centro-ascolto");
+    const shared = await request(superServer).get("/test-interventi-condivisi");
 
     expect(center.status).toBe(403);
     expect(shared.status).toBe(204);
@@ -405,7 +569,7 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
       details: { route: "/auth/forgot-password" },
     });
 
-    const res = await request(appAs(superUser))
+    const res = await request(superServer)
       .get("/super-admin/log-sistema")
       .query({ email: "consulta@fase5-log.example.org" });
 
@@ -421,7 +585,7 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
   });
 
   it("nega i log di sistema a un admin non Super Admin", async () => {
-    const res = await request(appAs(adminUser)).get("/super-admin/log-sistema");
+    const res = await request(adminServer).get("/super-admin/log-sistema");
 
     expect(res.status).toBe(403);
   });
@@ -438,7 +602,7 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
       username: "fase5_log_date_new",
     });
 
-    const res = await request(appAs(superUser))
+    const res = await request(superServer)
       .get("/super-admin/log-sistema")
       .query({
         dateFrom: "2026-02-01",
@@ -465,7 +629,7 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
       username: "fase5_log_evento",
     });
 
-    const res = await request(appAs(superUser))
+    const res = await request(superServer)
       .get("/super-admin/log-sistema")
       .query({
         search: "fase5_log_evento",
@@ -490,7 +654,7 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
       ipAddress: "10.0.0.99",
     });
 
-    const res = await request(appAs(superUser))
+    const res = await request(superServer)
       .get("/super-admin/log-sistema")
       .query({
         search: "utente_search",
@@ -520,7 +684,7 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
       username: "fase5_log_page",
     });
 
-    const res = await request(appAs(superUser))
+    const res = await request(superServer)
       .get("/super-admin/log-sistema")
       .query({ email: "page@fase5-log.example.org", limit: "1", offset: "1" });
 
@@ -551,12 +715,29 @@ describe("Fase 5.2 Super Admin e feature flags", () => {
       },
     });
 
-    const res = await request(appAs(superUser))
+    const res = await request(superServer)
       .get("/super-admin/log-sistema")
       .query({ email: "safe-metadata@fase5-log.example.org" });
 
     expect(res.status).toBe(200);
-    const row = res.body.items.find((item: { id: number }) => item.id === logId);
+    const row = res.body.items.find(
+      (item: { id: number }) => item.id === logId,
+    );
+    expect(listeners.inspect(superServer)).toMatchObject({
+      lifecycle: "listening",
+      active: 0,
+      last: {
+        status: 200,
+        route: "/super-admin/log-sistema",
+        superAdminGuardPresent: true,
+        actorSuperAdmin: true,
+      },
+    });
+    expect(listeners.inspect(superServer).last?.routers).toEqual([
+      "configurazione-ambiente",
+      "impostazioni-moduli",
+      "super-admin",
+    ]);
     expect(row.details.operation).toBe("reset");
     expect(row.details.route).toBe("/auth/reset-password");
     expect(row.details.token).toBeUndefined();

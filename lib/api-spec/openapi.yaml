@@ -5759,6 +5759,7 @@ paths:
   /spese-emporio/sessione/{sessioneCassaId}:
     get:
       operationId: getSpesaEmporioBySessione
+      description: Lettura con emporio.sales.view nello scope corrente; recupero della sola propria Sessione con emporio.cassa.operate e rivalidazione corrente di territorio e abilitazione. Non autorizza liste, altre Spese o stampa.
       tags: [spese-emporio]
       parameters:
         - name: sessioneCassaId
@@ -18421,6 +18422,8 @@ components:
     SessioneCassaEmporioRiga:
       type: object
       properties:
+        quantitaFrazionabile:
+          type: ["boolean", "null"]
         id:
           type: integer
         sessioneCassaId:
@@ -18435,7 +18438,7 @@ components:
           type: string
         quantita:
           type: number
-          multipleOf: 0.01
+          multipleOf: 0.000001
         unitaMisura:
           type: ["string", "null"]
         creditoUnitario:
@@ -18728,6 +18731,8 @@ components:
     SessioneCassaEmporioRicercaProdottoResult:
       type: object
       properties:
+        quantitaFrazionabile:
+          type: ["boolean", "null"]
         prodottoId:
           type: integer
         codice:

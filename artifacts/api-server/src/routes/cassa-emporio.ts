@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { auditContextFromRequest } from "../lib/auditEvent";
 import {
   beneficiariTable,
   centriAscoltoTable,
@@ -433,8 +434,15 @@ async function loadRighe(sessioneId: number) {
     .orderBy(asc(sessioniCassaEmporioRigheTable.id));
 }
 
-function formatRiga(row: typeof sessioniCassaEmporioRigheTable.$inferSelect) {
+async function formatRiga(
+  row: typeof sessioniCassaEmporioRigheTable.$inferSelect,
+) {
+  const [product] = await db
+    .select({ quantitaFrazionabile: prodottiTable.quantitaFrazionabile })
+    .from(prodottiTable)
+    .where(eq(prodottiTable.id, row.prodottoId));
   return {
+    quantitaFrazionabile: product?.quantitaFrazionabile ?? null,
     id: row.id,
     sessioneCassaId: row.sessioneCassaId,
     prodottoId: row.prodottoId,
@@ -518,7 +526,7 @@ async function formatSessione(
     operatoreChiusuraId: sessione.operatoreChiusuraId,
     motivoAnnullamento: sessione.motivoAnnullamento,
     note: sessione.note,
-    righe: righe.map(formatRiga),
+    righe: await Promise.all(righe.map(formatRiga)),
   };
 }
 
@@ -605,17 +613,30 @@ async function buildRigaValues(
   prodottoId: number,
   quantita: string,
   excludeRigaId?: number,
+  savedRow?: typeof sessioniCassaEmporioRigheTable.$inferSelect,
 ) {
   const [prodotto] = await executor
     .select()
     .from(prodottiTable)
-    .where(eq(prodottiTable.id, prodottoId));
-  const creditoUnitario = parseDbNumber(prodotto?.creditoSolidaleValore);
+    .where(eq(prodottiTable.id, prodottoId))
+    .for("share");
+  const creditoUnitario = parseDbNumber(
+    savedRow?.creditoUnitario ?? prodotto?.creditoSolidaleValore,
+  );
   if (!prodotto || !prodotto.attivo) {
     return { error: MSG_PRODOTTO_NON_TROVATO, status: 400 } as const;
   }
   if (!prodotto.abilitatoEmporio)
     return { error: MSG_PRODOTTO_NON_ABILITATO, status: 400 } as const;
+  if (
+    savedRow?.unitaMisura != null &&
+    savedRow.unitaMisura !== prodotto.unitaMisura
+  )
+    return {
+      error:
+        "L'unità di misura del Prodotto è cambiata: rimuovere e aggiungere nuovamente la riga.",
+      status: 409,
+    } as const;
   if (creditoUnitario <= 0)
     return { error: MSG_PRODOTTO_SENZA_CREDITO, status: 400 } as const;
   let quantity: InventoryDecimal;
@@ -688,7 +709,7 @@ async function buildRigaValues(
       codiceProdotto: prodotto.codiceBarre ?? prodotto.codice,
       descrizioneProdotto: prodotto.nome,
       quantita: quantity.toDb(),
-      unitaMisura: prodotto.unitaMisura,
+      unitaMisura: savedRow ? savedRow.unitaMisura : prodotto.unitaMisura,
       creditoUnitario: asMoney(creditoUnitario),
       creditoTotale: asMoney(creditoUnitario * creditQuantity),
       giacenzaDisponibileAlMomento: asMoney(parseDbNumber(disponibile.toDb())),
@@ -921,6 +942,7 @@ router.get(
         nome: prodottiTable.nome,
         descrizione: prodottiTable.descrizione,
         unitaMisura: prodottiTable.unitaMisura,
+        quantitaFrazionabile: prodottiTable.quantitaFrazionabile,
         creditoSolidaleValore: prodottiTable.creditoSolidaleValore,
         quantitaMassimaPerSpesa: prodottiTable.quantitaMassimaPerSpesa,
         quantitaMassimaMensile: prodottiTable.quantitaMassimaMensile,
@@ -964,6 +986,7 @@ router.get(
         nome: prodotto.nome,
         descrizione: prodotto.descrizione,
         unitaMisura: prodotto.unitaMisura,
+        quantitaFrazionabile: prodotto.quantitaFrazionabile,
         creditoSolidaleValore: parseDbNumber(prodotto.creditoSolidaleValore),
         quantitaMassimaPerSpesa:
           prodotto.quantitaMassimaPerSpesa == null
@@ -1593,7 +1616,7 @@ router.post(
         });
         return row;
       });
-      res.status(201).json(formatRiga(created));
+      res.status(201).json(await formatRiga(created));
     } catch (error) {
       if (handleCassaError(error, res)) return;
       throw error;
@@ -1660,6 +1683,7 @@ router.patch(
           existing.prodottoId,
           quantita,
           existing.id,
+          existing,
         );
         if ("error" in built)
           throw new CassaEmporioError(
@@ -1690,7 +1714,7 @@ router.patch(
         });
         return row;
       });
-      res.json(formatRiga(updated));
+      res.json(await formatRiga(updated));
     } catch (error) {
       if (handleCassaError(error, res)) return;
       throw error;
@@ -2021,6 +2045,7 @@ router.post(
         note: asText(req.body?.note),
         ip: req.ip,
         beneficiaryAccessScope: beneficiarioAccessScopeFromRequest(req),
+        auditCommand: auditContextFromRequest(req),
       });
       const spesa = await getSpesaEmporio(spesaId);
       const updatedSessione = await loadSessione(sessione.id);

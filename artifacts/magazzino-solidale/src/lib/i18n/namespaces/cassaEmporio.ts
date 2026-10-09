@@ -11,13 +11,18 @@ const it = {
   cercaBeneficiario: "Cerca beneficiario per nome, codice o codice a barre",
   cercaBeneficiarioPlaceholder: "Nome, codice tessera o codice fiscale",
   selezionaAreaPrima: "Seleziona prima l'Area Operativa.",
-  selezionaEmporioPrima: "Seleziona Area Operativa ed Emporio prima di cercare il beneficiario.",
-  contestoCassaBloccato: "Cassa in lavorazione: il contesto resta bloccato fino all'uscita.",
-  nessunAccessoValido: "Nessun Accesso Emporio valido trovato per questo beneficiario.",
+  selezionaEmporioPrima:
+    "Seleziona Area Operativa ed Emporio prima di cercare il beneficiario.",
+  contestoCassaBloccato:
+    "Cassa in lavorazione: il contesto resta bloccato fino all'uscita.",
+  nessunAccessoValido:
+    "Nessun Accesso Emporio valido trovato per questo beneficiario.",
   accessoStraordinario: "Accesso Emporio forzato",
-  pianificazioneNonPresente: "Pianificazione non presente. Vuoi comunque effettuare l'accesso?",
+  pianificazioneNonPresente:
+    "Pianificazione non presente. Vuoi comunque effettuare l'accesso?",
   forzaAccesso: "Sì, forza accesso",
-  accessoForzatoCreato: "Accesso Emporio forzato creato e tracciato correttamente.",
+  accessoForzatoCreato:
+    "Accesso Emporio forzato creato e tracciato correttamente.",
   accessoForzatoDaCassa: "Accesso forzato da Cassa",
   motivoAccessoForzato: "Motivo accesso forzato",
   selezionaEmporio: "Seleziona Emporio",
@@ -53,23 +58,39 @@ const it = {
   motivoAnnullamento: "Motivo annullamento",
   preparaChiusura: "Prepara chiusura",
   sessioneProntaPerChiusura: "Sessione pronta per la chiusura.",
-  saldoInsufficiente: "Saldo Credito Solidale insufficiente. Riduci il carrello o effettua una ricarica prima della chiusura.",
-  prodottoNonTrovato: "Prodotto non trovato. Verifica il codice a barre o cerca il prodotto per nome.",
-  prodottoNonAbilitato: "Il prodotto non è abilitato per Emporio. Abilitalo nella scheda prodotto prima di aggiungerlo al carrello.",
+  saldoInsufficiente:
+    "Saldo Credito Solidale insufficiente. Riduci il carrello o effettua una ricarica prima della chiusura.",
+  prodottoNonTrovato:
+    "Prodotto non trovato. Verifica il codice a barre o cerca il prodotto per nome.",
+  prodottoAmbiguo:
+    "Codice ambiguo: scegli esplicitamente il prodotto dai risultati.",
+  verificaEsito: "Verifica esito della chiusura",
+  chiusuraNonContabilizzata:
+    "La Sessione non risulta chiusa. Dati aggiornati: verifica il carrello prima di confermare nuovamente.",
+  prodottoNonAbilitato:
+    "Il prodotto non è abilitato per Emporio. Abilitalo nella scheda prodotto prima di aggiungerlo al carrello.",
   nessunProdottoEmporio: "Nessun prodotto disponibile in questo Emporio.",
-  giacenzaInsufficiente: "La quantità richiesta supera la giacenza disponibile nel magazzino Emporio selezionato.",
-  limitePerSpesaSuperato: "La quantità supera il limite previsto per singola spesa.",
-  limiteMensileSuperato: "La quantità supera il limite mensile previsto per questo prodotto.",
-  emporioDisabilitato: "Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.",
-  magazzinoNonEmporio: "La Cassa Emporio può essere aperta solo su un magazzino di tipo Emporio o Misto.",
+  giacenzaInsufficiente:
+    "La quantità richiesta supera la giacenza disponibile nel magazzino Emporio selezionato.",
+  limitePerSpesaSuperato:
+    "La quantità supera il limite previsto per singola spesa.",
+  limiteMensileSuperato:
+    "La quantità supera il limite mensile previsto per questo prodotto.",
+  emporioDisabilitato:
+    "Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.",
+  magazzinoNonEmporio:
+    "La Cassa Emporio può essere aperta solo su un magazzino di tipo Emporio o Misto.",
   beneficiarioNonValido: "Beneficiario non valido per la Cassa Emporio.",
   accessoNonValido: "Accesso Emporio non valido per la Cassa.",
-  sessioneGiaAperta: "Esiste già una sessione Cassa Emporio aperta per questo Accesso Emporio.",
-  sessioneGiaApertaUtente: "Sessione Cassa Emporio già aperta per questo beneficiario.",
+  sessioneGiaAperta:
+    "Esiste già una sessione Cassa Emporio aperta per questo Accesso Emporio.",
+  sessioneGiaApertaUtente:
+    "Sessione Cassa Emporio già aperta per questo beneficiario.",
   chiusuraDisponibileFase47: "Chiusura definitiva disponibile.",
   chiudiSpesa: "Chiudi spesa Emporio",
   confermaChiusuraTitolo: "Conferma chiusura spesa",
-  confermaChiusuraDescrizione: "Confermando la chiusura verranno consumati i Crediti Solidali previsti, scaricata la merce dal magazzino e generata la Bolla Emporio. Per inviarla via email usa il pulsante Apri email Bolla dopo la chiusura. L'operazione non potrà essere ripetuta.",
+  confermaChiusuraDescrizione:
+    "Confermando la chiusura verranno consumati i Crediti Solidali previsti, scaricata la merce dal magazzino e generata la Bolla Emporio. Per inviarla via email usa il pulsante Apri email Bolla dopo la chiusura. L'operazione non potrà essere ripetuta.",
   spesaChiusa: "Spesa Emporio chiusa correttamente",
   numeroSpesa: "Numero Spesa",
   numeroBolla: "Numero Bolla",
@@ -82,10 +103,12 @@ const it = {
   copiaTestoEmail: "Copia testo email",
   statoInvioEmailBolla: "Invio email Bolla",
   emailClientAperto: "Client email aperto.",
-  emailClientApertoDescrizione: "Controlla e invia la bozza dal programma di posta. Se non si apre, premi di nuovo Apri email Bolla.",
+  emailClientApertoDescrizione:
+    "Controlla e invia la bozza dal programma di posta. Se non si apre, premi di nuovo Apri email Bolla.",
   linkBollaCopiato: "Link Bolla copiato.",
   testoEmailCopiato: "Testo email Bolla copiato.",
-  nessunDestinatarioEmail: "Nessun destinatario email disponibile. Copia manualmente il link alla Bolla e invialo dal tuo client di posta.",
+  nessunDestinatarioEmail:
+    "Nessun destinatario email disponibile. Copia manualmente il link alla Bolla e invialo dal tuo client di posta.",
   emailPreparazioneErrore: "Errore nell'apertura dell'email Bolla.",
   emailDataUltimoClick: "Ultimo tentativo email",
   emailOperatore: "Operatore email",

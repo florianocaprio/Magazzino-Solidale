@@ -1,7 +1,9 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { eq, inArray } from "drizzle-orm";
+import { count, eq, inArray } from "drizzle-orm";
+import type { Server } from "node:http";
+import { httpListeners } from "./helpers/http-listeners";
 import {
   beneficiariTable,
   centriAscoltoTable,
@@ -10,6 +12,8 @@ import {
   db,
   politicheCreditoSolidaleTable,
   pool,
+  ruoliTable,
+  utentiTable,
 } from "@workspace/db";
 import creditoSolidaleRouter from "../src/routes/credito-solidale";
 import politicheCreditoSolidaleRouter from "../src/routes/politiche-credito-solidale";
@@ -27,34 +31,61 @@ const beneficiarioIds: number[] = [];
 const centroIds: number[] = [];
 const areaOperativaIds: number[] = [];
 const policyIdsToReactivate: number[] = [];
+const listeners = httpListeners({ diagnostics: "credito-solidale" });
+// Cleared after every scenario; no users/roles cached across tests.
+const scenarioApps = new Map<string, Promise<Server>>();
 
 async function setEmporioEnabled(enabled: boolean): Promise<void> {
   await updateModuloAmbiente("EMPORIO_SOLIDALE", enabled, null);
 }
 
-function makeApp(user: {
+async function makeApp(user: {
   centroAscoltoId: number | null;
   areaOperativaId: number | null;
   isAdmin?: boolean;
   aree?: string[];
   permessi?: string[];
-}): Express {
-  const app = express();
-  app.use(express.json());
-  app.use(async (req, _res, next) => {
-    (req as unknown as { user: typeof user & { id: number } }).user = {
-      id: 1,
-      ...user,
-      isAdmin: user.isAdmin ?? true,
-      aree: user.aree ?? ["sociale", "uds", "emporio"],
-      permessi: user.permessi ?? [],
-    };
-    req.user = await emporioActorFixture({ ...req.user!, id: undefined });
-    next();
-  });
-  app.use(politicheCreditoSolidaleRouter);
-  app.use(creditoSolidaleRouter);
-  return app;
+}): Promise<Server> {
+  const options = {
+    ...user,
+    isAdmin: user.isAdmin ?? true,
+    aree: user.aree ?? ["sociale", "uds", "emporio"],
+    permessi: user.permessi ?? [],
+  };
+  const key = JSON.stringify(options);
+  let setup = scenarioApps.get(key);
+  if (!setup) {
+    setup = (async () => {
+      // DB identity is established BEFORE HTTP, not mutated by middleware.
+      const actor = await emporioActorFixture(options);
+      expect(actor).toMatchObject({
+        isAdmin: options.isAdmin,
+        isSuperAdmin: false,
+        centroAscoltoId: options.centroAscoltoId,
+        areaOperativaId: options.areaOperativaId,
+        aree: options.aree,
+        permessi: options.permessi,
+      });
+      return listeners.open(key, () => {
+        const app: Express = express();
+        app.use(express.json());
+        app.use((req, _res, next) => {
+          req.user = actor;
+          next();
+        });
+        app.use(
+          listeners.router(
+            "politiche-credito-solidale",
+            politicheCreditoSolidaleRouter,
+          ),
+        );
+        app.use(listeners.router("credito-solidale", creditoSolidaleRouter));
+        return app;
+      });
+    })();
+    scenarioApps.set(key, setup);
+  }
+  return setup;
 }
 
 async function createAreaOperativa(): Promise<number> {
@@ -133,7 +164,7 @@ async function createBeneficiario(
 
 async function createPolicy(data: Record<string, unknown>): Promise<number> {
   const res = await request(
-    makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+    await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
   )
     .post("/politiche-credito-solidale")
     .send({
@@ -165,10 +196,13 @@ async function deactivateActivePoliciesForDefaultCase(): Promise<void> {
 }
 
 beforeEach(async () => {
+  expect(scenarioApps.size).toBe(0);
   await setEmporioEnabled(true);
 });
 
 afterEach(async () => {
+  await listeners.close();
+  scenarioApps.clear();
   await cleanupEmporioActorFixtures();
   if (policyIdsToReactivate.length > 0) {
     await db
@@ -210,6 +244,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await listeners.close();
   await setEmporioEnabled(true);
   await pool.end();
 });
@@ -217,7 +252,7 @@ afterAll(async () => {
 describe("Politiche Credito Solidale", () => {
   it("valida il giorno di ricarica mensile", async () => {
     const res = await request(
-      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+      await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     )
       .post("/politiche-credito-solidale")
       .send({ nome: "Giorno non valido", giornoRicaricaMensile: 29 });
@@ -230,7 +265,7 @@ describe("Politiche Credito Solidale", () => {
 
   it("valida il rapporto tra massimo e minimo mensile", async () => {
     const res = await request(
-      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+      await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     )
       .post("/politiche-credito-solidale")
       .send({
@@ -263,7 +298,7 @@ describe("Politiche Credito Solidale", () => {
     });
 
     const res = await request(
-      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+      await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     ).get(`/credito-solidale/calcola-beneficiario/${beneficiarioId}`);
 
     expect(res.status).toBe(200);
@@ -298,7 +333,38 @@ describe("Politiche Credito Solidale", () => {
     });
     const beneficiarioGlobale = await createBeneficiario();
 
-    const app = makeApp({ centroAscoltoId: null, areaOperativaId: null });
+    const app = await makeApp({ centroAscoltoId: null, areaOperativaId: null });
+    const ids = [
+      beneficiarioCentro,
+      beneficiarioAreaOperativa,
+      beneficiarioGlobale,
+    ];
+    const beneficiaries = () =>
+      db
+        .select()
+        .from(beneficiariTable)
+        .where(inArray(beneficiariTable.id, ids));
+    const movements = () =>
+      db
+        .select()
+        .from(creditoSolidaleMovimentiTable)
+        .where(inArray(creditoSolidaleMovimentiTable.beneficiarioId, ids));
+    const policies = () =>
+      db
+        .select()
+        .from(politicheCreditoSolidaleTable)
+        .where(inArray(politicheCreditoSolidaleTable.id, politicaIds));
+    const identities = async () => ({
+      users: (await db.select({ n: count() }).from(utentiTable))[0].n,
+      roles: (await db.select({ n: count() }).from(ruoliTable))[0].n,
+    });
+    const before = {
+      beneficiaries: await beneficiaries(),
+      movements: await movements(),
+      policies: await policies(),
+      identities: await identities(),
+    };
+    const listenerBefore = listeners.inspect(app);
     const centro = await request(app).get(
       `/credito-solidale/calcola-beneficiario/${beneficiarioCentro}`,
     );
@@ -315,6 +381,19 @@ describe("Politiche Credito Solidale", () => {
     expect(areaOperativa.body.totaleSuggerito).toBe(20);
     expect(globale.body.politicaOrigine).toBe("globale");
     expect(globale.body.totaleSuggerito).toBe(10);
+    expect(centro.status).toBe(200);
+    expect(areaOperativa.status).toBe(200);
+    expect(globale.status).toBe(200);
+    expect(await beneficiaries()).toEqual(before.beneficiaries);
+    expect(before.movements).toHaveLength(0);
+    expect(await movements()).toEqual(before.movements);
+    expect(await policies()).toEqual(before.policies);
+    expect(await identities()).toEqual(before.identities);
+    expect(listeners.inspect(app)).toMatchObject({
+      id: listenerBefore.id,
+      active: 0,
+      requests: listenerBefore.requests + 3,
+    });
   });
 
   it("usa la politica predefinita in memoria quando non esistono politiche attive", async () => {
@@ -327,7 +406,7 @@ describe("Politiche Credito Solidale", () => {
     const beneficiarioId = await createBeneficiario({ numComponenti: 1 });
 
     const res = await request(
-      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+      await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     ).get(`/credito-solidale/calcola-beneficiario/${beneficiarioId}`);
 
     expect(res.status).toBe(200);
@@ -346,7 +425,7 @@ describe("Movimenti Credito Solidale", () => {
         creditoSolidaleAbilitato: true,
         creditoSolidaleStato: "attivo",
       });
-      const denied = makeApp({
+      const denied = await makeApp({
         centroAscoltoId: null,
         areaOperativaId: null,
         isAdmin: false,
@@ -380,7 +459,7 @@ describe("Movimenti Credito Solidale", () => {
   );
 
   it("separa credito.adjust da credito.monthly.execute", async () => {
-    const adjustOnly = makeApp({
+    const adjustOnly = await makeApp({
       centroAscoltoId: null,
       areaOperativaId: null,
       isAdmin: false,
@@ -394,7 +473,7 @@ describe("Movimenti Credito Solidale", () => {
           .send({})
       ).status,
     ).toBe(403);
-    const monthlyOnly = makeApp({
+    const monthlyOnly = await makeApp({
       centroAscoltoId: null,
       areaOperativaId: null,
       isAdmin: false,
@@ -423,7 +502,7 @@ describe("Movimenti Credito Solidale", () => {
     });
 
     const res = await request(
-      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+      await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     )
       .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
       .send({ variazioneCredito: 25, motivo: "Avvio saldo" });
@@ -435,7 +514,7 @@ describe("Movimenti Credito Solidale", () => {
     expect(res.body.saldoDopo).toBe(25);
 
     const saldo = await request(
-      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+      await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     ).get(`/credito-solidale/beneficiari/${beneficiarioId}/saldo`);
     expect(saldo.status).toBe(200);
     expect(saldo.body.saldoAttuale).toBe(25);
@@ -446,12 +525,14 @@ describe("Movimenti Credito Solidale", () => {
       creditoSolidaleAbilitato: true,
       creditoSolidaleStato: "attivo",
     });
-    await request(makeApp({ centroAscoltoId: null, areaOperativaId: null }))
+    await request(
+      await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+    )
       .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
       .send({ variazioneCredito: 10 });
 
     const res = await request(
-      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+      await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     )
       .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
       .send({ variazioneCredito: -15, motivo: "Controllo saldo" });
@@ -461,7 +542,7 @@ describe("Movimenti Credito Solidale", () => {
       "Il saldo Credito Solidale non può diventare negativo.",
     );
     const saldo = await request(
-      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+      await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     ).get(`/credito-solidale/beneficiari/${beneficiarioId}/saldo`);
     expect(saldo.body.saldoAttuale).toBe(10);
   });
@@ -483,7 +564,7 @@ describe("Movimenti Credito Solidale", () => {
       creditoSolidaleStato: "attivo",
       creditoSolidaleMensileAssegnato: null,
     });
-    const app = makeApp({ centroAscoltoId: null, areaOperativaId: null });
+    const app = await makeApp({ centroAscoltoId: null, areaOperativaId: null });
 
     const preview = await request(app)
       .post("/credito-solidale/ricariche-mensili/preview")
@@ -526,12 +607,12 @@ describe("Movimenti Credito Solidale", () => {
     await setEmporioEnabled(false);
 
     const saldo = await request(
-      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+      await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     ).get(`/credito-solidale/beneficiari/${beneficiarioId}/saldo`);
     expect(saldo.status).toBe(200);
 
     const write = await request(
-      makeApp({ centroAscoltoId: null, areaOperativaId: null }),
+      await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     )
       .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
       .send({ variazioneCredito: 5 });
@@ -546,7 +627,7 @@ describe("Movimenti Credito Solidale", () => {
       creditoSolidaleAbilitato: true,
       creditoSolidaleStato: "attivo",
     });
-    const app = makeApp({ centroAscoltoId: null, areaOperativaId: null });
+    const app = await makeApp({ centroAscoltoId: null, areaOperativaId: null });
     const movimento = await request(app)
       .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
       .send({ variazioneCredito: 20 });
@@ -582,7 +663,7 @@ describe("Movimenti Credito Solidale", () => {
       creditoSolidaleStato: "attivo",
       creditoSolidaleSaldo: 20,
     });
-    const app = makeApp({ centroAscoltoId: null, areaOperativaId: null });
+    const app = await makeApp({ centroAscoltoId: null, areaOperativaId: null });
     const [plus, minus] = await Promise.all([
       request(app)
         .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
@@ -618,7 +699,7 @@ describe("Movimenti Credito Solidale", () => {
       creditoSolidaleMensileAssegnato: 10,
       creditoSolidaleSaldo: 0,
     });
-    const app = makeApp({ centroAscoltoId: null, areaOperativaId: null });
+    const app = await makeApp({ centroAscoltoId: null, areaOperativaId: null });
     const [first, second] = await Promise.all([
       request(app)
         .post(`/credito-solidale/beneficiari/${beneficiarioId}/refresh-credito`)
@@ -662,7 +743,7 @@ describe("Movimenti Credito Solidale", () => {
       creditoSolidaleStato: "attivo",
     });
     const forbidden = await request(
-      makeApp({
+      await makeApp({
         centroAscoltoId: centroA,
         areaOperativaId,
         isAdmin: false,
@@ -672,7 +753,10 @@ describe("Movimenti Credito Solidale", () => {
       .post(`/credito-solidale/beneficiari/${beneficiarioB}/ricarica-manuale`)
       .send({ variazioneCredito: 9 });
     expect(forbidden.status).toBe(403);
-    const globalApp = makeApp({ centroAscoltoId: null, areaOperativaId: null });
+    const globalApp = await makeApp({
+      centroAscoltoId: null,
+      areaOperativaId: null,
+    });
     await request(globalApp)
       .post(`/credito-solidale/beneficiari/${beneficiarioA}/ricarica-manuale`)
       .send({ variazioneCredito: 7 });
@@ -681,7 +765,7 @@ describe("Movimenti Credito Solidale", () => {
       .send({ variazioneCredito: 9 });
 
     const scoped = await request(
-      makeApp({
+      await makeApp({
         centroAscoltoId: centroA,
         areaOperativaId,
         isAdmin: false,

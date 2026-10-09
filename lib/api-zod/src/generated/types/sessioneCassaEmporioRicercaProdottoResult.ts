@@ -7,6 +7,8 @@
  */
 
 export interface SessioneCassaEmporioRicercaProdottoResult {
+  /** @nullable */
+  quantitaFrazionabile?: boolean | null;
   prodottoId: number;
   codice: string;
   /** @nullable */

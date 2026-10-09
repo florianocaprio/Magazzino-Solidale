@@ -9,6 +9,9 @@ import {
 import { Link } from "wouter";
 import {
   getGetSpesaEmporioQueryKey,
+  getSessioneCassaEmporio,
+  getSpesaEmporioBySessione,
+  getGetSpesaEmporioBySessioneQueryKey,
   getGetSessioneCassaEmporioQueryKey,
   getListAccessiEmporioQueryKey,
   getListSpeseEmporioQueryKey,
@@ -26,6 +29,7 @@ import {
   useForzaAccessoEmporioCassa,
   useGetSessioneCassaEmporio,
   useGetSpesaEmporio,
+  useGetSpesaEmporioBySessione,
   useGetImpostazioniStampa,
   useListAreeOperative,
   useListEmporiOperativi,
@@ -101,6 +105,10 @@ import { useAuth } from "@/lib/auth";
 import { cassaEmporioCapabilities } from "@/lib/emporio-permissions";
 import { downloadBollaEmporioPdf } from "@/lib/emporio-bolla-stampa";
 import { configurazioneQuantitaEmporio } from "@/lib/emporio-quantita";
+import {
+  scannedEmporioProduct,
+  readEmporioCheckoutOutcome,
+} from "@/lib/emporio-checkout";
 import type { BollaTemplate } from "@/lib/bolla-pdf";
 
 const ALL = "__all__";
@@ -120,7 +128,7 @@ function formatCredito(value: number | null | undefined): string {
 
 function formatQuantita(value: number, unitaMisura?: string | null): string {
   const quantita = new Intl.NumberFormat("it-IT", {
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 6,
   }).format(value);
   return unitaMisura ? `${quantita} ${unitaMisura}` : quantita;
 }
@@ -344,7 +352,12 @@ function EmporioCassa() {
     useState<SessioneCassaEmporioRicercaBeneficiarioResult | null>(null);
   const selectionEpoch = useRef(0);
   const [selectedSessioneId, setSelectedSessioneId] = useState<number | null>(
-    null,
+    () => {
+      const id = Number(
+        new URLSearchParams(window.location.search).get("sessioneId"),
+      );
+      return Number.isSafeInteger(id) && id > 0 ? id : null;
+    },
   );
   const security = useEmporioSecurity(selectedSessioneId);
   const [cassaDate, setCassaDate] = useState(todayInput());
@@ -360,7 +373,13 @@ function EmporioCassa() {
   const [motivoForzatura, setMotivoForzatura] = useState("");
   const [forzaEmporioId, setForzaEmporioId] = useState("");
   const [chiudiOpen, setChiudiOpen] = useState(false);
-  const [checkoutSpesa, setChiusuraSpesa] = useState<SpesaEmporio | null>(null);
+  const [checkoutUncertain, setCheckoutUncertain] = useState(false);
+  const [checkoutMessage, setCheckoutMessage] = useState("");
+  const recoveryBusy = useRef(new Set<string>());
+  const scanBusy = useRef(false);
+  const [recoveredSpesa, setChiusuraSpesa] = useState<SpesaEmporio | null>(
+    null,
+  );
   const [emailDraftBolla, setEmailDraftBolla] =
     useState<BollaEmporioEmailResult | null>(null);
   const [autoAccessoOpened, setAutoAccessoOpened] = useState(false);
@@ -398,15 +417,15 @@ function EmporioCassa() {
   const contestoSelezioneBloccato =
     selectedBeneficiario != null ||
     selectedSessioneId != null ||
-    checkoutSpesa != null;
+    recoveredSpesa != null;
 
   useEffect(() => {
-    if (emporioFilter === ALL) return;
+    if (emporioFilter === ALL || emporiQuery.isPending) return;
     if (!emporiFiltrati.some((m) => String(m.id) === emporioFilter)) {
       setEmporioFilter(ALL);
       resetContextSelection();
     }
-  }, [emporiFiltrati, emporioFilter]);
+  }, [emporiFiltrati, emporioFilter, emporiQuery.isPending]);
 
   const searchContext = {
     data: cassaDate || undefined,
@@ -468,6 +487,34 @@ function EmporioCassa() {
     },
   });
   const sessione = emporioReadableData(sessioneQuery);
+  // A cached checkout result is not an authorization. Revalidate the own-session
+  // endpoint just like the canonical Sessione, including while the page is open.
+  const checkoutOutcomeQuery = useGetSpesaEmporioBySessione(
+    selectedSessioneId ?? 0,
+    {
+      query: {
+        ...security.readOptions(
+          getGetSpesaEmporioBySessioneQueryKey(selectedSessioneId ?? 0),
+        ),
+        enabled: sessione?.statoSessione === "chiusa",
+        refetchInterval: sessione?.statoSessione === "chiusa" ? 2500 : false,
+      },
+    },
+  );
+  const checkoutSpesa =
+    sessione?.statoSessione === "chiusa" && !checkoutOutcomeQuery.isError
+      ? emporioReadableData(checkoutOutcomeQuery)
+      : undefined;
+  useEffect(() => {
+    if (!checkoutOutcomeQuery.error || sessione?.statoSessione !== "chiusa")
+      return;
+    setChiusuraSpesa(null);
+    setEmailDraftBolla(null);
+    setCheckoutUncertain(true);
+    setCheckoutMessage(
+      extractError(checkoutOutcomeQuery.error, t("cassaEmporio.verificaEsito")),
+    );
+  }, [checkoutOutcomeQuery.error, sessione?.statoSessione]);
   const chiusuraSpesaQuery = useGetSpesaEmporio(checkoutSpesa?.id ?? 0, {
     query: {
       ...security.readOptions(
@@ -476,9 +523,10 @@ function EmporioCassa() {
       enabled: checkoutSpesa != null && hasPermission("emporio.sales.view"),
     },
   });
-  const chiusuraSpesa = hasPermission("emporio.sales.view")
-    ? emporioReadableData(chiusuraSpesaQuery)
-    : undefined;
+  const chiusuraSpesa =
+    checkoutSpesa && hasPermission("emporio.sales.view")
+      ? emporioReadableData(chiusuraSpesaQuery)
+      : undefined;
   useEffect(() => {
     if (
       !emporioReadDenied(sessioneQuery.error) &&
@@ -635,10 +683,13 @@ function EmporioCassa() {
     { accept: () => boolean }
   >({
     mutation: {
+      retry: false,
       onMutate: () => ({ accept: security.isCurrent }),
       onSuccess: (data, _variables, intent) => {
         if (!intent?.accept()) return;
         setChiudiOpen(false);
+        setCheckoutUncertain(false);
+        setCheckoutMessage("");
         setChiusuraSpesa(data.spesa ?? null);
         if (data.sessione?.id) {
           setSelectedSessioneId(data.sessione.id);
@@ -650,9 +701,67 @@ function EmporioCassa() {
         invalidate();
         toast({ title: data.messaggio ?? t("cassaEmporio.spesaChiusa") });
       },
-      onError,
+      onError: (error, variables, intent) => {
+        if (!intent?.accept()) return;
+        setChiudiOpen(false);
+        setCheckoutUncertain(true);
+        setCheckoutMessage(
+          extractError(error, t("cassaEmporio.verificaEsito")),
+        );
+        void verifyCheckout(variables.id);
+      },
     },
   });
+  async function verifyCheckout(id: number) {
+    const key = `${security.context}:${id}`;
+    if (recoveryBusy.current.has(key)) return;
+    recoveryBusy.current.add(key);
+    const accept = security.isCurrent;
+    try {
+      const outcome = await readEmporioCheckoutOutcome(
+        id,
+        getSessioneCassaEmporio,
+        getSpesaEmporioBySessione,
+      );
+      if (!accept()) return;
+      await sessioneQuery.refetch();
+      if (!accept()) return;
+      if (outcome.kind === "closed") {
+        setChiusuraSpesa(outcome.expense);
+        setCheckoutMessage(t("cassaEmporio.spesaChiusa"));
+      } else {
+        const notice = t("cassaEmporio.chiusuraNonContabilizzata");
+        setCheckoutMessage((current) =>
+          current.includes(notice)
+            ? current
+            : current
+              ? `${current} — ${notice}`
+              : notice,
+        );
+      }
+      setCheckoutUncertain(false);
+    } catch (error) {
+      if (!accept()) return;
+      setChiusuraSpesa(null);
+      if (emporioReadDenied(error)) {
+        setSelectedBeneficiario(null);
+      }
+      setCheckoutMessage(extractError(error, t("cassaEmporio.verificaEsito")));
+      setCheckoutUncertain(true);
+    } finally {
+      recoveryBusy.current.delete(key);
+    }
+  }
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (selectedSessioneId == null) url.searchParams.delete("sessioneId");
+    else url.searchParams.set("sessioneId", String(selectedSessioneId));
+    window.history.replaceState(null, "", url);
+  }, [selectedSessioneId]);
+  useEffect(() => {
+    if (sessione?.statoSessione === "chiusa" && recoveredSpesa == null)
+      void verifyCheckout(sessione.id);
+  }, [sessione?.id, sessione?.statoSessione, security.context]);
   const registraInvioManualeBolla = useRegistraInvioManualeBollaSpesaEmporio();
   const refreshCredito = useRefreshCreditoSolidaleBeneficiario();
 
@@ -664,6 +773,7 @@ function EmporioCassa() {
     if (
       !emporioAbilitato ||
       !canOperate ||
+      selectedSessioneId != null ||
       autoAccessoOpened ||
       initialAccessoEmporioId == null
     )
@@ -679,6 +789,7 @@ function EmporioCassa() {
     canOperate,
     emporioAbilitato,
     initialAccessoEmporioId,
+    selectedSessioneId,
   ]);
 
   const activeAccessi = useMemo(
@@ -692,7 +803,10 @@ function EmporioCassa() {
   );
   const activeSessione = sessione ?? undefined;
   const canEdit =
-    emporioAbilitato && canOperate && sessioneModificabile(activeSessione);
+    emporioAbilitato &&
+    canOperate &&
+    !checkoutUncertain &&
+    sessioneModificabile(activeSessione);
   const saldoInsufficiente = (activeSessione?.creditoResiduoPrevisto ?? 0) < 0;
 
   const findExistingOpenSession = async (
@@ -843,9 +957,11 @@ function EmporioCassa() {
   };
 
   const addProductBySearch = async (value: string) => {
-    if (!activeSessione || !canEdit) return;
+    if (!activeSessione || !canEdit || scanBusy.current || addRiga.isPending)
+      return;
     const currentSearch = value.trim();
     if (!currentSearch) return;
+    scanBusy.current = true;
     let liveResults: SessioneCassaEmporioRicercaProdottoResult[];
     try {
       liveResults = await searchProdottiCassaEmporio({
@@ -853,30 +969,43 @@ function EmporioCassa() {
         magazzinoEmporioId: activeSessione.magazzinoEmporioId,
       });
     } catch (error) {
+      scanBusy.current = false;
       onError(error);
       return;
     }
-    if (!security.isCurrent()) return;
-    const normalized = normalizeSearchToken(currentSearch);
-    const exact = liveResults.find(
-      (p) =>
-        normalizeSearchToken(p.codice) === normalized ||
-        normalizeSearchToken(p.codiceBarre) === normalized ||
-        normalizeSearchToken(p.nome) === normalized,
-    );
-    const prodotto = exact ?? liveResults[0];
-    if (prodotto) {
-      addProduct(prodotto);
-      return;
+    try {
+      if (!security.isCurrent()) return;
+      const match = scannedEmporioProduct(currentSearch, liveResults);
+      if (match.kind === "found") {
+        await addRiga.mutateAsync({
+          id: activeSessione.id,
+          data: {
+            prodottoId: match.product.prodottoId,
+            quantita: "1",
+            versione: activeSessione.versione,
+          },
+        });
+        await sessioneQuery.refetch();
+      } else {
+        setProdottoSearch(currentSearch);
+        toast({
+          title: t(
+            match.kind === "ambiguous"
+              ? "cassaEmporio.prodottoAmbiguo"
+              : "cassaEmporio.prodottoNonTrovato",
+          ),
+          variant: "destructive",
+        });
+      }
+    } catch {
+      /* Mutation onError already reports the real backend error. */
+    } finally {
+      scanBusy.current = false;
     }
-    toast({
-      title: t("cassaEmporio.prodottoNonTrovato"),
-      variant: "destructive",
-    });
   };
 
   const onProdottoKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter") return;
+    if (event.key !== "Enter" || event.repeat) return;
     event.preventDefault();
     void addProductBySearch(event.currentTarget.value);
   };
@@ -891,6 +1020,8 @@ function EmporioCassa() {
     setSelectedBeneficiario(null);
     setSelectedSessioneId(null);
     setChiusuraSpesa(null);
+    setCheckoutUncertain(false);
+    setCheckoutMessage("");
     setProdottoSearch("");
   };
 
@@ -1045,6 +1176,30 @@ function EmporioCassa() {
 
   return (
     <div className="space-y-4">
+      {checkoutMessage && (
+        <Alert>
+          <AlertDescription>{checkoutMessage}</AlertDescription>
+          {checkoutUncertain && selectedSessioneId != null && (
+            <Button
+              variant="outline"
+              onClick={() => void verifyCheckout(selectedSessioneId)}
+            >
+              {t("cassaEmporio.verificaEsito")}
+            </Button>
+          )}
+        </Alert>
+      )}
+      {checkoutSpesa &&
+        !hasPermission("emporio.sales.view") &&
+        !emporioReadDenied(sessioneQuery.error) && (
+          <Alert>
+            <AlertDescription>
+              {t("cassaEmporio.spesaChiusa")} — {t("cassaEmporio.numeroSpesa")}:{" "}
+              {checkoutSpesa.numeroSpesa}; {t("cassaEmporio.numeroBolla")}:{" "}
+              {checkoutSpesa.bollaNumero ?? "-"}
+            </AlertDescription>
+          </Alert>
+        )}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-normal">
@@ -1696,9 +1851,10 @@ function EmporioCassa() {
                                         (riga.quantita -
                                           configurazioneQuantitaEmporio(
                                             riga.unitaMisura,
+                                            riga.quantitaFrazionabile,
                                           ).incremento) *
-                                          100,
-                                      ) / 100,
+                                          1000000,
+                                      ) / 1000000,
                                     )
                                   }
                                   disabled={
@@ -1706,9 +1862,11 @@ function EmporioCassa() {
                                     riga.quantita -
                                       configurazioneQuantitaEmporio(
                                         riga.unitaMisura,
+                                        riga.quantitaFrazionabile,
                                       ).incremento <
                                       configurazioneQuantitaEmporio(
                                         riga.unitaMisura,
+                                        riga.quantitaFrazionabile,
                                       ).min
                                   }
                                 >
@@ -1720,11 +1878,13 @@ function EmporioCassa() {
                                   min={
                                     configurazioneQuantitaEmporio(
                                       riga.unitaMisura,
+                                      riga.quantitaFrazionabile,
                                     ).min
                                   }
                                   step={
                                     configurazioneQuantitaEmporio(
                                       riga.unitaMisura,
+                                      riga.quantitaFrazionabile,
                                     ).step
                                   }
                                   className="h-9 w-24 text-center"
@@ -1750,9 +1910,10 @@ function EmporioCassa() {
                                         (riga.quantita +
                                           configurazioneQuantitaEmporio(
                                             riga.unitaMisura,
+                                            riga.quantitaFrazionabile,
                                           ).incremento) *
-                                          100,
-                                      ) / 100,
+                                          1000000,
+                                      ) / 1000000,
                                     )
                                   }
                                   disabled={!canEdit}
@@ -1890,7 +2051,10 @@ function EmporioCassa() {
                       <Button
                         onClick={() => setChiudiOpen(true)}
                         disabled={
-                          !canOperate || !emporioAbilitato || chiudi.isPending
+                          !canOperate ||
+                          !emporioAbilitato ||
+                          chiudi.isPending ||
+                          checkoutUncertain
                         }
                       >
                         <FileText className="mr-2 h-4 w-4" />
@@ -2133,7 +2297,9 @@ function EmporioCassa() {
                   data: { versione: activeSessione.versione },
                 })
               }
-              disabled={!activeSessione || chiudi.isPending}
+              disabled={
+                !activeSessione || chiudi.isPending || checkoutUncertain
+              }
             >
               {t("cassaEmporio.chiudiSpesa")}
             </Button>
