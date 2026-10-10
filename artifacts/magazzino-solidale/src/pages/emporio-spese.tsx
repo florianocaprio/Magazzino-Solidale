@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { creditoInteroInput, previewRimborso } from "@/lib/emporio-rettifica";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   emporioReadableData,
@@ -16,6 +17,8 @@ import {
   useListSpeseEmporio,
   useRegistraInvioManualeBollaSpesaEmporio,
   useStornaSpesaEmporio,
+  getEsitoRettificaSpesaEmporio,
+  type SpesaEmporioStornoInput,
   type BollaEmporioEmailResult,
   type BollaEmporioStampa,
   type SpesaEmporio,
@@ -83,7 +86,7 @@ function formatCredito(value: number | null | undefined): string {
 
 function formatQuantita(value: number, unitaMisura?: string | null): string {
   const quantita = new Intl.NumberFormat("it-IT", {
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 6,
   }).format(value);
   return unitaMisura ? `${quantita} ${unitaMisura}` : quantita;
 }
@@ -209,7 +212,7 @@ function EmporioSpese() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const { canManage, canReverse } = speseEmporioCapabilities(hasPermission);
   const { data: impostazioniStampa } = useGetImpostazioniStampa();
   const initialSpesaId = useMemo(() => {
@@ -228,6 +231,18 @@ function EmporioSpese() {
   const [emailDraftBolla, setEmailDraftBolla] =
     useState<BollaEmporioEmailResult | null>(null);
   const [stornoOpen, setStornoOpen] = useState(false);
+  const [tipoRettifica, setTipoRettifica] =
+    useState<NonNullable<SpesaEmporioStornoInput["tipoRettifica"]>>(
+      "reso_idoneo",
+    );
+  const [importoRettifica, setImportoRettifica] = useState("");
+  const [erroreRettifica, setErroreRettifica] = useState("");
+  const [esitoIncerto, setEsitoIncerto] = useState(false);
+  const intention = useRef<{ signature: string; key: string } | null>(null);
+  const physical =
+    tipoRettifica === "reso_idoneo" ||
+    tipoRettifica === "reso_non_distribuibile";
+  const recoveryStorageKey = `emporio-rettifica:${user?.id}:${selectedId}`;
   const [motivoStorno, setMotivoStorno] = useState("");
   const [confermaStorno, setConfermaStorno] = useState(false);
   const [quantitaStorno, setQuantitaStorno] = useState<Record<number, number>>(
@@ -277,9 +292,18 @@ function EmporioSpese() {
 
   useEffect(() => {
     setEmailDraftBolla(null);
-  }, [selectedId]);
+    intention.current = null;
+    setStornoOpen(false);
+    setEsitoIncerto(!!sessionStorage.getItem(recoveryStorageKey));
+    setErroreRettifica("");
+  }, [selectedId, recoveryStorageKey]);
 
   const openStorno = (spesa: SpesaEmporio) => {
+    if (esitoIncerto) return;
+    intention.current = null;
+    setTipoRettifica("reso_idoneo");
+    setImportoRettifica("");
+    setErroreRettifica("");
     setMotivoStorno("");
     setConfermaStorno(false);
     setQuantitaStorno(
@@ -297,46 +321,101 @@ function EmporioSpese() {
         quantita: quantitaStorno[riga.id] ?? 0,
       }))
       .filter((riga) => riga.quantita > 0) ?? [];
-  const creditoRestituitoPrevisto =
-    dettaglio?.righe.reduce(
-      (totale, riga) =>
-        totale + (quantitaStorno[riga.id] ?? 0) * riga.creditoUnitario,
-      0,
-    ) ?? 0;
+  const creditoRestituitoPrevisto = physical
+    ? dettaglio
+      ? previewRimborso(
+          dettaglio.righe,
+          quantitaStorno,
+          dettaglio.creditoRimborsabile ?? dettaglio.totaleCreditoConsumati,
+        )
+      : null
+    : creditoInteroInput(importoRettifica);
+
+  const acceptRettifica = async (result: {
+    spesa: SpesaEmporio;
+    creditoRestituito: number;
+  }) => {
+    if (!security.isCurrent()) return;
+    sessionStorage.removeItem(recoveryStorageKey);
+    setEsitoIncerto(false);
+    intention.current = null;
+    queryClient.setQueryData(
+      getGetSpesaEmporioQueryKey(result.spesa.id),
+      result.spesa,
+    );
+    await Promise.all(
+      [
+        "/api/spese-emporio",
+        "/api/credito-solidale",
+        "/api/giacenze",
+        "/api/movimenti",
+        "/api/cassa-emporio",
+      ].map((prefix) =>
+        queryClient.invalidateQueries({
+          predicate: (query) => String(query.queryKey[0]).startsWith(prefix),
+        }),
+      ),
+    );
+    setStornoOpen(false);
+  };
+  const recoverRettifica = async () => {
+    const key = sessionStorage.getItem(recoveryStorageKey);
+    if (!selectedId || !key) return;
+    try {
+      await acceptRettifica(
+        await getEsitoRettificaSpesaEmporio(selectedId, key),
+      );
+    } catch (error) {
+      if (security.isCurrent())
+        setErroreRettifica(extractError(error, t("speseEmporio.esitoIncerto")));
+    }
+  };
 
   const submitStorno = async () => {
     if (
       !dettaglio ||
       !motivoStorno.trim() ||
       !confermaStorno ||
-      righeStorno.length === 0
+      (physical && righeStorno.length === 0) ||
+      creditoRestituitoPrevisto == null ||
+      esitoIncerto
     )
       return;
     try {
+      const data: SpesaEmporioStornoInput = {
+        motivo: motivoStorno.trim(),
+        tipoRettifica,
+        ...(physical
+          ? {
+              righe: righeStorno.map((row) => ({
+                ...row,
+                quantita: String(row.quantita),
+              })),
+            }
+          : { creditoRestituito: creditoRestituitoPrevisto }),
+        idempotencyKey: "",
+      };
+      const signature = JSON.stringify(data);
+      if (intention.current?.signature !== signature)
+        intention.current = { signature, key: crypto.randomUUID() };
+      data.idempotencyKey = intention.current.key;
+      sessionStorage.setItem(recoveryStorageKey, data.idempotencyKey);
       const result = await stornaSpesa.mutateAsync({
         id: dettaglio.id,
-        data: {
-          motivo: motivoStorno.trim(),
-          righe: righeStorno,
-          idempotencyKey:
-            globalThis.crypto?.randomUUID?.() ??
-            `${dettaglio.id}-${Date.now()}`,
-        },
+        data,
       });
       if (!security.isCurrent()) return;
-      queryClient.setQueryData(
-        getGetSpesaEmporioQueryKey(dettaglio.id),
-        result.spesa,
-      );
-      await queryClient.invalidateQueries({
-        queryKey: getListSpeseEmporioQueryKey(),
-      });
-      setStornoOpen(false);
+      await acceptRettifica(result);
       toast({
-        title: "Storno registrato",
+        title: t("speseEmporio.rettificaRegistrata"),
         description: `Credito restituito: ${formatCredito(result.creditoRestituito)}`,
       });
     } catch (error) {
+      if (!security.isCurrent()) return;
+      const status = (error as { status?: number })?.status;
+      setErroreRettifica(extractError(error, t("speseEmporio.esitoIncerto")));
+      if (!status || status >= 500) setEsitoIncerto(true);
+      else sessionStorage.removeItem(recoveryStorageKey);
       toast({
         variant: "destructive",
         title: extractError(error, "Impossibile registrare lo storno."),
@@ -652,6 +731,15 @@ function EmporioSpese() {
                     </span>
                   </div>
                 </div>
+                {esitoIncerto && canReverse && (
+                  <div role="alert" className="rounded-md border p-3 space-y-2">
+                    <p>{t("speseEmporio.esitoIncerto")}</p>
+                    {erroreRettifica && <p>{erroreRettifica}</p>}
+                    <Button variant="outline" onClick={recoverRettifica}>
+                      {t("speseEmporio.recuperaEsito")}
+                    </Button>
+                  </div>
+                )}
                 <div className="space-y-2">
                   {dettaglio.righe.map((riga) => (
                     <div key={riga.id} className="rounded-md border p-3">
@@ -686,6 +774,23 @@ function EmporioSpese() {
                     </div>
                   ))}
                 </div>
+                {!!dettaglio.rettifiche?.length && (
+                  <section
+                    aria-label={t("speseEmporio.rettifica")}
+                    className="space-y-2"
+                  >
+                    {dettaglio.rettifiche.map((item) => (
+                      <div key={item.id} className="rounded-md border p-3">
+                        <p>
+                          {t(`speseEmporio.${item.tipoRettifica}`)} ·{" "}
+                          {formatCredito(item.creditoRestituito)}
+                        </p>
+                        <p>{item.motivo}</p>
+                        <p>{formatDateTime(item.createdAt)}</p>
+                      </div>
+                    ))}
+                  </section>
+                )}
                 <div className="flex flex-col gap-2">
                   <Button
                     variant="outline"
@@ -748,7 +853,7 @@ function EmporioSpese() {
                       onClick={() => openStorno(dettaglio)}
                     >
                       <RotateCcw className="mr-2 h-4 w-4" />
-                      Storna Spesa
+                      {t("speseEmporio.rettifica")}
                     </Button>
                   )}
                 </div>
@@ -770,7 +875,7 @@ function EmporioSpese() {
       <Dialog open={stornoOpen} onOpenChange={setStornoOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Conferma storno compensativo</DialogTitle>
+            <DialogTitle>{t("speseEmporio.rettifica")}</DialogTitle>
           </DialogHeader>
           {dettaglio && (
             <div className="space-y-4 text-sm">
@@ -783,58 +888,121 @@ function EmporioSpese() {
                   {formatDateTime(dettaglio.dataChiusura)}
                 </div>
               </div>
-              <div className="max-h-64 space-y-2 overflow-auto">
-                {dettaglio.righe
-                  .filter((riga) => riga.quantitaStornabile > 0)
-                  .map((riga) => (
-                    <div
-                      key={riga.id}
-                      className="grid items-center gap-2 rounded-md border p-3 md:grid-cols-[1fr_auto]"
-                    >
-                      <div>
-                        <div className="font-medium">
-                          {riga.descrizioneProdotto}
-                        </div>
-                        <div>
-                          Originale:{" "}
-                          {formatQuantita(riga.quantita, riga.unitaMisura)} ·
-                          già stornato:{" "}
-                          {formatQuantita(
-                            riga.quantitaStornata,
-                            riga.unitaMisura,
-                          )}
-                        </div>
-                        <div>
-                          Massimo residuo:{" "}
-                          {formatQuantita(
-                            riga.quantitaStornabile,
-                            riga.unitaMisura,
-                          )}
-                        </div>
-                      </div>
-                      <Input
-                        type="number"
-                        min="0"
-                        max={riga.quantitaStornabile}
-                        step="0.01"
-                        className="w-32"
-                        value={quantitaStorno[riga.id] ?? 0}
-                        onChange={(event) =>
-                          setQuantitaStorno((value) => ({
-                            ...value,
-                            [riga.id]: Number(event.target.value),
-                          }))
-                        }
-                      />
-                    </div>
+              <Select
+                value={tipoRettifica}
+                onValueChange={(value) =>
+                  setTipoRettifica(value as typeof tipoRettifica)
+                }
+                disabled={esitoIncerto}
+              >
+                <SelectTrigger aria-label={t("speseEmporio.tipoRettifica")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(
+                    [
+                      "reso_idoneo",
+                      "reso_non_distribuibile",
+                      "errore_amministrativo",
+                      "solo_credito",
+                    ] as const
+                  ).map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {t(`speseEmporio.${type}`)}
+                    </SelectItem>
                   ))}
-              </div>
+                </SelectContent>
+              </Select>
+              <p>
+                {t(
+                  physical
+                    ? tipoRettifica === "reso_idoneo"
+                      ? "speseEmporio.effettoIdoneo"
+                      : "speseEmporio.effettoScarto"
+                    : "speseEmporio.effettoCredito",
+                )}
+              </p>
+              <p>
+                {t("speseEmporio.creditoResiduo", {
+                  originale: dettaglio.totaleCreditoConsumati,
+                  restituito: dettaglio.creditoGiaRestituito ?? 0,
+                  residuo:
+                    dettaglio.creditoRimborsabile ??
+                    dettaglio.totaleCreditoConsumati,
+                })}
+              </p>
+              {dettaglio.creditoConforme === false && (
+                <p role="alert">{t("speseEmporio.legacyNonConforme")}</p>
+              )}
+              {!physical && (
+                <Input
+                  aria-label={t("speseEmporio.importo")}
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={importoRettifica}
+                  onChange={(event) => setImportoRettifica(event.target.value)}
+                  disabled={esitoIncerto}
+                />
+              )}
+              {physical && (
+                <div className="max-h-64 space-y-2 overflow-auto">
+                  {dettaglio.righe
+                    .filter((riga) => riga.quantitaStornabile > 0)
+                    .map((riga) => (
+                      <div
+                        key={riga.id}
+                        className="grid items-center gap-2 rounded-md border p-3 md:grid-cols-[1fr_auto]"
+                      >
+                        <div>
+                          <div className="font-medium">
+                            {riga.descrizioneProdotto}
+                          </div>
+                          <div>
+                            Originale:{" "}
+                            {formatQuantita(riga.quantita, riga.unitaMisura)} ·
+                            già stornato:{" "}
+                            {formatQuantita(
+                              riga.quantitaStornata,
+                              riga.unitaMisura,
+                            )}
+                          </div>
+                          <div>
+                            Massimo residuo:{" "}
+                            {formatQuantita(
+                              riga.quantitaStornabile,
+                              riga.unitaMisura,
+                            )}
+                          </div>
+                        </div>
+                        <Input
+                          type="number"
+                          min="0"
+                          max={riga.quantitaStornabile}
+                          step="0.000001"
+                          disabled={esitoIncerto}
+                          className="w-32"
+                          value={quantitaStorno[riga.id] ?? 0}
+                          onChange={(event) =>
+                            setQuantitaStorno((value) => ({
+                              ...value,
+                              [riga.id]: Number(event.target.value),
+                            }))
+                          }
+                        />
+                      </div>
+                    ))}
+                </div>
+              )}
               <div className="font-medium">
                 Credito restituito previsto:{" "}
-                {formatCredito(creditoRestituitoPrevisto)}
+                {creditoRestituitoPrevisto == null
+                  ? t("speseEmporio.frazioneBloccata")
+                  : formatCredito(creditoRestituitoPrevisto)}
               </div>
               <Textarea
                 value={motivoStorno}
+                disabled={esitoIncerto}
                 onChange={(event) => setMotivoStorno(event.target.value)}
                 placeholder="Motivo obbligatorio dello storno"
               />
@@ -844,14 +1012,17 @@ function EmporioSpese() {
                   checked={confermaStorno}
                   onChange={(event) => setConfermaStorno(event.target.checked)}
                 />
-                <span>
-                  Confermo di voler creare movimenti compensativi di inventario
-                  e Credito Solidale. L'operazione sarà auditata.
-                </span>
+                <span>{t("speseEmporio.confermaEffetti")}</span>
               </label>
             </div>
           )}
           <DialogFooter>
+            {esitoIncerto && (
+              <Button onClick={() => void recoverRettifica()}>
+                {t("speseEmporio.recuperaEsito")}
+              </Button>
+            )}
+            {erroreRettifica && <p role="alert">{erroreRettifica}</p>}
             <Button variant="outline" onClick={() => setStornoOpen(false)}>
               Annulla
             </Button>
@@ -863,11 +1034,15 @@ function EmporioSpese() {
               disabled={
                 !motivoStorno.trim() ||
                 !confermaStorno ||
-                righeStorno.length === 0 ||
+                (physical && righeStorno.length === 0) ||
+                creditoRestituitoPrevisto == null ||
+                (!physical && creditoRestituitoPrevisto <= 0) ||
+                dettaglio?.creditoConforme === false ||
+                esitoIncerto ||
                 stornaSpesa.isPending
               }
             >
-              Conferma storno
+              {t("speseEmporio.confermaRettifica")}
             </Button>
           </DialogFooter>
         </DialogContent>

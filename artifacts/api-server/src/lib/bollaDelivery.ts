@@ -16,6 +16,7 @@ import {
   movimentiTable,
   prenotazioniMagazzinoTable,
   prodottiTable,
+  speseEmporioTable,
 } from "@workspace/db";
 import { and, asc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
@@ -266,6 +267,16 @@ export async function stornoRigheTx(
   operatoreId: number,
   auditEventoId: number | null = null,
 ) {
+  const [emporioOwner] = await tx
+    .select({ id: speseEmporioTable.id })
+    .from(speseEmporioTable)
+    .where(eq(speseEmporioTable.bollaId, bollaId))
+    .limit(1);
+  if (emporioOwner)
+    throw new BollaActionError(
+      409,
+      "La Bolla Emporio si corregge esclusivamente da Rettifica spesa.",
+    );
   const rigaIds = [...new Set(righe.map((riga) => riga.id))].sort(
     (a, b) => a - b,
   );

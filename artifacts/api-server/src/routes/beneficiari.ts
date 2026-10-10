@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto";
+import { creditoIntero, CreditoInteroError } from "../lib/creditoIntero";
 import { Router, type IRouter, type Request } from "express";
 import { auditConfigurazioniTable, beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, areeOperativeTable, magazziniTable, tessereBeneficiariTable, zoneUdsTable } from "@workspace/db";
 import { db } from "@workspace/db";
@@ -115,16 +116,14 @@ function parseDateTime(v: unknown): Date | null {
 
 function parseNonNegativeDecimal(v: unknown, label: string): { value: string | null; number: number | null } | { error: string } {
   if (v == null || v === "") return { value: null, number: null };
-  const n = typeof v === "number" ? v : Number(String(v).replace(",", "."));
-  if (!Number.isFinite(n) || n < 0) return { error: `${label} non può essere negativo.` };
-  const rounded = Math.round(n * 100) / 100;
-  return { value: rounded.toFixed(2), number: rounded };
+  try { const n = creditoIntero(v); return { value: String(n), number: n }; }
+  catch (error) { if (error instanceof CreditoInteroError) return { error: `${label}: ${error.message}` }; throw error; }
 }
 
 function sameNullableDecimal(a: string | number | null | undefined, b: string | number | null | undefined): boolean {
   if (a == null && b == null) return true;
   if (a == null || b == null) return false;
-  return Math.round(Number(a) * 100) === Math.round(Number(b) * 100);
+  return Number(a) === Number(b);
 }
 
 const normalizzaSesso = (v: unknown): string | undefined => {

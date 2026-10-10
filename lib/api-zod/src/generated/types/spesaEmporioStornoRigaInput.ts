@@ -5,10 +5,10 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { QuantitaContabile } from './quantitaContabile';
 
 export interface SpesaEmporioStornoRigaInput {
   /** @minimum 1 */
   spesaRigaId: number;
-  /** @minimum 0.01 */
-  quantita: number;
+  quantita: QuantitaContabile;
 }

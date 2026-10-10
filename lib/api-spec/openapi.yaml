@@ -5891,6 +5891,28 @@ paths:
         "409":
           description: Quantità già stornata, over-storno o double-submit concorrente
 
+  /spese-emporio/{id}/rettifiche/esito/{key}:
+    get:
+      operationId: getEsitoRettificaSpesaEmporio
+      tags: [spese-emporio]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: key,
+            in: path,
+            required: true,
+            schema: { type: string, maxLength: 100 },
+          }
+      responses:
+        "200":
+          description: Ricevuta originale, dopo riautorizzazione corrente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpesaEmporioStornoResult"
+        "404":
+          description: Esito non disponibile; nessun nuovo POST automatico
+
   # ─── DOCUMENTI OPERATIVI M4A ──────────────────────────────────────────────────
   /enti-destinatari:
     get:
@@ -12345,7 +12367,7 @@ components:
         abilitatoEmporio:
           type: boolean
         creditoSolidaleValore:
-          type: number
+          type: integer
         quantitaMassimaPerSpesa:
           type: ["number", "null"]
         quantitaMassimaMensile:
@@ -12396,7 +12418,7 @@ components:
         abilitatoEmporio:
           type: boolean
         creditoSolidaleValore:
-          type: number
+          type: integer
         quantitaMassimaPerSpesa:
           type: ["number", "null"]
         quantitaMassimaMensile:
@@ -15630,25 +15652,25 @@ components:
         attiva:
           type: boolean
         creditoBaseNucleo:
-          type: number
+          type: integer
           minimum: 0
         creditoPerComponente:
-          type: number
+          type: integer
           minimum: 0
         bonusMinore:
-          type: number
+          type: integer
           minimum: 0
         bonusAnziano:
-          type: number
+          type: integer
           minimum: 0
         bonusDisabile:
-          type: number
+          type: integer
           minimum: 0
         creditoMinimoMensile:
-          type: number
+          type: integer
           minimum: 0
         creditoMassimoMensile:
-          type: ["number", "null"]
+          type: ["integer", "null"]
           minimum: 0
         giornoRicaricaMensile:
           type: integer
@@ -15679,25 +15701,25 @@ components:
         attiva:
           type: boolean
         creditoBaseNucleo:
-          type: number
+          type: integer
           minimum: 0
         creditoPerComponente:
-          type: number
+          type: integer
           minimum: 0
         bonusMinore:
-          type: number
+          type: integer
           minimum: 0
         bonusAnziano:
-          type: number
+          type: integer
           minimum: 0
         bonusDisabile:
-          type: number
+          type: integer
           minimum: 0
         creditoMinimoMensile:
-          type: number
+          type: integer
           minimum: 0
         creditoMassimoMensile:
-          type: ["number", "null"]
+          type: ["integer", "null"]
           minimum: 0
         giornoRicaricaMensile:
           type: integer
@@ -15945,9 +15967,9 @@ components:
           { type: string, enum: [non_abilitato, attivo, sospeso, revocato] }
         creditoSolidaleNote: { type: ["string", "null"] }
         creditoSolidaleMensileAssegnato:
-          { type: ["number", "null"], minimum: 0 }
+          { type: ["integer", "null"], minimum: 0, maximum: 99999999 }
         creditoSolidaleMensileSuggerito:
-          { type: ["number", "null"], minimum: 0 }
+          { type: ["integer", "null"], minimum: 0, maximum: 99999999 }
         creditoSolidaleMotivoModifica: { type: ["string", "null"] }
 
     CreditoSolidaleConfigurazione:
@@ -16008,8 +16030,9 @@ components:
       type: object
       properties:
         variazioneCredito:
-          type: number
-          minimum: 0.01
+          type: integer
+          minimum: 1
+          maximum: 99999999
         motivo:
           type: ["string", "null"]
         note:
@@ -16020,7 +16043,9 @@ components:
       type: object
       properties:
         variazioneCredito:
-          type: number
+          type: integer
+          minimum: -99999999
+          maximum: 99999999
         motivo:
           type: string
         note:
@@ -18822,6 +18847,24 @@ components:
     SpesaEmporio:
       type: object
       properties:
+        creditoGiaRestituito:
+          type: number
+          description: Proiezione storica; i nuovi importi operativi sono interi
+        creditoRimborsabile:
+          type: number
+        creditoConforme:
+          type: boolean
+        rettifiche:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              tipoRettifica: { type: string }
+              motivo: { type: string }
+              creditoRestituito: { type: number }
+              createdAt: { type: string }
+            required: [id, tipoRettifica, motivo, creditoRestituito, createdAt]
         id:
           type: integer
         sessioneCassaId:
@@ -18942,14 +18985,27 @@ components:
           type: integer
           minimum: 1
         quantita:
-          type: number
-          minimum: 0.01
-          multipleOf: 0.01
+          $ref: "#/components/schemas/QuantitaContabile"
       required: [spesaRigaId, quantita]
 
     SpesaEmporioStornoInput:
       type: object
       properties:
+        tipoRettifica:
+          type: string
+          enum:
+            [
+              reso_idoneo,
+              reso_non_distribuibile,
+              errore_amministrativo,
+              solo_credito,
+            ]
+          default: reso_idoneo
+        creditoRestituito:
+          type: integer
+          minimum: 1
+          maximum: 99999999
+          description: Solo per rettifiche economiche, senza righe fisiche
         motivo:
           type: string
           minLength: 1
@@ -18962,7 +19018,7 @@ components:
         idempotencyKey:
           type: string
           maxLength: 100
-      required: [motivo]
+      required: [motivo, idempotencyKey]
 
     SpesaEmporioStornoResult:
       type: object

@@ -680,7 +680,7 @@ function CreditoSolidaleQuotaPanel({
         <Input
           type="number"
           min="0"
-          step="0.01"
+          step="1"
           value={assegnato}
           onChange={(event) => setAssegnato(event.target.value)}
           disabled={disabled}
@@ -871,7 +871,7 @@ function CreditoSolidaleSaldoPanel({
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">{t("creditoSolidale.variazioneCredito")}</label>
-              <Input type="number" step="0.01" value={variazione} onChange={(event) => setVariazione(event.target.value)} disabled={pending} />
+              <Input type="number" step="1" value={variazione} onChange={(event) => setVariazione(event.target.value)} disabled={pending} />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">{t("creditoSolidale.motivo")}</label>

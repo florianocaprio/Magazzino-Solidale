@@ -18,6 +18,9 @@ export const speseEmporioStorniTable = pgTable("spese_emporio_storni", {
     .notNull()
     .references(() => speseEmporioTable.id),
   motivo: text("motivo").notNull(),
+  tipoRettifica: varchar("tipo_rettifica", { length: 40 })
+    .notNull()
+    .default("legacy_storno"),
   operatoreId: integer("operatore_id").references(() => utentiTable.id),
   creditoRestituito: decimal("credito_restituito", {
     precision: 10,

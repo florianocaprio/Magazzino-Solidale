@@ -919,7 +919,7 @@ function EmporioCreditiSaldo() {
               </label>
               <Input
                 type="number"
-                step="0.01"
+                step="1"
                 value={variazione}
                 onChange={(event) => setVariazione(event.target.value)}
                 disabled={actionDisabled}

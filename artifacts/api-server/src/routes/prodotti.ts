@@ -1,11 +1,18 @@
 import { randomInt } from "node:crypto";
+import { creditoIntero, CreditoInteroError } from "../lib/creditoIntero";
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { bollaRigheTable, lottiTable, movimentiTable, prodottiTable,
+import {
+  bollaRigheTable,
+  lottiTable,
+  movimentiTable,
+  prodottiTable,
 } from "@workspace/db";
 import { runBulk } from "../lib/bulk";
 import { eq, ilike, and, ne, or, desc, type SQL } from "drizzle-orm";
-import { EMPORIO_DISABLED_MSG, isEmporioEnabled,
+import {
+  EMPORIO_DISABLED_MSG,
+  isEmporioEnabled,
 } from "../lib/impostazioniModuli";
 import { requirePermission } from "../middlewares/auth";
 import {
@@ -19,11 +26,16 @@ import { defaultProductFractionalQuantity } from "../lib/productQuantity";
 
 const router: IRouter = Router();
 
-const CODICE_DUPLICATO_MSG = "Il codice prodotto indicato è già associato a un altro prodotto.";
-const BARCODE_DUPLICATO_MSG = "Il codice a barre indicato è già associato a un altro prodotto.";
-const BARCODE_NON_VALIDO_MSG = "Il codice a barre deve essere un EAN-13 numerico valido.";
+const CODICE_DUPLICATO_MSG =
+  "Il codice prodotto indicato è già associato a un altro prodotto.";
+const BARCODE_DUPLICATO_MSG =
+  "Il codice a barre indicato è già associato a un altro prodotto.";
+const BARCODE_NON_VALIDO_MSG =
+  "Il codice a barre deve essere un EAN-13 numerico valido.";
 
-function parseNonNegativeDecimal(value: unknown, label: string,
+function parseNonNegativeDecimal(
+  value: unknown,
+  label: string,
 ): { value: string } | { error: string } {
   const n = Number(value);
   if (!Number.isFinite(n)) return { error: `${label} non valido.` };
@@ -31,20 +43,35 @@ function parseNonNegativeDecimal(value: unknown, label: string,
   return { value: String(n) };
 }
 
-function parseOptionalNonNegativeDecimal(value: unknown, label: string,
+function parseCredito(value: unknown): { value: string } | { error: string } {
+  try {
+    return { value: String(creditoIntero(value)) };
+  } catch (error) {
+    if (error instanceof CreditoInteroError) return { error: error.message };
+    throw error;
+  }
+}
+
+function parseOptionalNonNegativeDecimal(
+  value: unknown,
+  label: string,
 ): { value: string | null } | { error: string } {
   if (value == null || value === "") return { value: null };
   return parseNonNegativeDecimal(value, label);
 }
 
-function parseOptionalBoolean(value: unknown, fallback: boolean,
+function parseOptionalBoolean(
+  value: unknown,
+  fallback: boolean,
 ): boolean | null {
   if (value == null || value === "") return fallback;
   if (typeof value === "boolean") return value;
-  if (typeof value === "number" && (value === 0 || value === 1)) return Boolean(value);
+  if (typeof value === "number" && (value === 0 || value === 1))
+    return Boolean(value);
   if (typeof value === "string") {
     const normalized = value.trim().toLowerCase();
-    if (["si", "sì", "true", "1", "yes", "y", "vero"].includes(normalized)) return true;
+    if (["si", "sì", "true", "1", "yes", "y", "vero"].includes(normalized))
+      return true;
     if (["no", "false", "0", "n", "falso"].includes(normalized)) return false;
   }
   return null;
@@ -66,8 +93,14 @@ const fmtProdotto = (r: typeof prodottiTable.$inferSelect) => ({
   scortaConsigliata: parseFloat(r.scortaConsigliata ?? "0"),
   abilitatoEmporio: r.abilitatoEmporio ?? false,
   creditoSolidaleValore: parseFloat(r.creditoSolidaleValore ?? "0"),
-  quantitaMassimaPerSpesa: r.quantitaMassimaPerSpesa == null ? null : parseFloat(r.quantitaMassimaPerSpesa),
-  quantitaMassimaMensile: r.quantitaMassimaMensile == null ? null : parseFloat(r.quantitaMassimaMensile),
+  quantitaMassimaPerSpesa:
+    r.quantitaMassimaPerSpesa == null
+      ? null
+      : parseFloat(r.quantitaMassimaPerSpesa),
+  quantitaMassimaMensile:
+    r.quantitaMassimaMensile == null
+      ? null
+      : parseFloat(r.quantitaMassimaMensile),
   conservazione: r.conservazione ?? null,
   taglia: r.taglia ?? null,
   genere: r.genere ?? null,
@@ -100,26 +133,38 @@ function prefissoProdotto(tipo: unknown): string {
 
 async function codiceProdottoEsiste(
   tx: InventoryTransaction,
-  codice: string, excludeId?: number,
+  codice: string,
+  excludeId?: number,
 ): Promise<boolean> {
-  const where = excludeId != null
-    ? and(eq(prodottiTable.codice, codice), ne(prodottiTable.id, excludeId))
-    : eq(prodottiTable.codice, codice);
+  const where =
+    excludeId != null
+      ? and(eq(prodottiTable.codice, codice), ne(prodottiTable.id, excludeId))
+      : eq(prodottiTable.codice, codice);
   const [hit] = await tx
-    .select({ id: prodottiTable.id }).from(prodottiTable).where(where).limit(1);
+    .select({ id: prodottiTable.id })
+    .from(prodottiTable)
+    .where(where)
+    .limit(1);
   return hit != null;
 }
 
 async function barcodeProdottoEsiste(
   tx: InventoryTransaction,
-  codiceBarre: string, excludeId?: number,
+  codiceBarre: string,
+  excludeId?: number,
 ): Promise<boolean> {
-  const where = excludeId != null
-    ? and(eq(prodottiTable.codiceBarre, codiceBarre), ne(prodottiTable.id, excludeId),
+  const where =
+    excludeId != null
+      ? and(
+          eq(prodottiTable.codiceBarre, codiceBarre),
+          ne(prodottiTable.id, excludeId),
         )
-    : eq(prodottiTable.codiceBarre, codiceBarre);
+      : eq(prodottiTable.codiceBarre, codiceBarre);
   const [hit] = await tx
-    .select({ id: prodottiTable.id }).from(prodottiTable).where(where).limit(1);
+    .select({ id: prodottiTable.id })
+    .from(prodottiTable)
+    .where(where)
+    .limit(1);
   return hit != null;
 }
 
@@ -147,14 +192,17 @@ async function generaCodiceProdotto(
 function ean13CheckDigit(first12: string): string {
   const sum = first12
     .split("")
-    .reduce((acc, digit, index) => acc + Number(digit) * (index % 2 === 0 ? 1 : 3), 0,
+    .reduce(
+      (acc, digit, index) => acc + Number(digit) * (index % 2 === 0 ? 1 : 3),
+      0,
     );
   return String((10 - (sum % 10)) % 10);
 }
 
 function isEan13Valido(codice: string): boolean {
   return (
-    /^\d{13}$/.test(codice) && ean13CheckDigit(codice.slice(0, 12)) === codice[12]
+    /^\d{13}$/.test(codice) &&
+    ean13CheckDigit(codice.slice(0, 12)) === codice[12]
   );
 }
 
@@ -169,37 +217,49 @@ async function generaCodiceBarreEan13(
   throw new Error("Impossibile generare un codice a barre univoco");
 }
 
-function isUniqueViolation(error: unknown, field: "codice" | "codiceBarre",
+function isUniqueViolation(
+  error: unknown,
+  field: "codice" | "codiceBarre",
 ): boolean {
   const e = error as
-    | { code?: string; constraint?: string; detail?: string } | null | undefined;
+    | { code?: string; constraint?: string; detail?: string }
+    | null
+    | undefined;
   if (e?.code !== "23505") return false;
-  if (field === "codice") return (
-      e.constraint === "prodotti_codice_unique" || (e.detail?.includes("codice") ?? false)
+  if (field === "codice")
+    return (
+      e.constraint === "prodotti_codice_unique" ||
+      (e.detail?.includes("codice") ?? false)
     );
   return (
-    e.constraint === "prodotti_codice_barre_unique" || (e.detail?.includes("codice_barre") ?? false)
+    e.constraint === "prodotti_codice_barre_unique" ||
+    (e.detail?.includes("codice_barre") ?? false)
   );
 }
 
-router.get("/prodotti", requirePermission("magazzino.view"), async (req, res) => {
-  const { tipo, search } = req.query as Record<string, string>;
-  const conditions: SQL[] = [];
-  if (tipo) conditions.push(eq(prodottiTable.tipoProdotto, tipo));
-  if (search) {
-    const q = `%${search}%`;
-    const searchFilter = or(
-      ilike(prodottiTable.nome, q),
-      ilike(prodottiTable.codice, q),
-      ilike(prodottiTable.codiceBarre, q),
-    );
-    if (searchFilter) conditions.push(searchFilter);
-  }
-  const rows = await db.select().from(prodottiTable)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(prodottiTable.dataCreazione), desc(prodottiTable.id));
-  res.json(rows.map(fmtProdotto));
-},
+router.get(
+  "/prodotti",
+  requirePermission("magazzino.view"),
+  async (req, res) => {
+    const { tipo, search } = req.query as Record<string, string>;
+    const conditions: SQL[] = [];
+    if (tipo) conditions.push(eq(prodottiTable.tipoProdotto, tipo));
+    if (search) {
+      const q = `%${search}%`;
+      const searchFilter = or(
+        ilike(prodottiTable.nome, q),
+        ilike(prodottiTable.codice, q),
+        ilike(prodottiTable.codiceBarre, q),
+      );
+      if (searchFilter) conditions.push(searchFilter);
+    }
+    const rows = await db
+      .select()
+      .from(prodottiTable)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(prodottiTable.dataCreazione), desc(prodottiTable.id));
+    res.json(rows.map(fmtProdotto));
+  },
 );
 
 async function createProdottoOne(
@@ -207,58 +267,77 @@ async function createProdottoOne(
   body: Record<string, unknown>,
   audit: AuditCommandContext,
 ): Promise<
-  | { row: typeof prodottiTable.$inferSelect } | { error: string; status?: number }> {
+  | { row: typeof prodottiTable.$inferSelect }
+  | { error: string; status?: number }
+> {
   const b = body as Record<string, any>;
-  const codice = trimOrUndefined(b.codice) ??
+  const codice =
+    trimOrUndefined(b.codice) ??
     (await generaCodiceProdotto(tx, b.tipoProdotto));
-  const codiceBarre = trimOrUndefined(b.codiceBarre) ?? (await generaCodiceBarreEan13(tx));
-  if (await codiceProdottoEsiste(tx, codice)) return { error: CODICE_DUPLICATO_MSG, status: 409 };
-  if (!isEan13Valido(codiceBarre)) return { error: BARCODE_NON_VALIDO_MSG, status: 400 };
-  if (await barcodeProdottoEsiste(tx, codiceBarre)) return { error: BARCODE_DUPLICATO_MSG, status: 409 };
+  const codiceBarre =
+    trimOrUndefined(b.codiceBarre) ?? (await generaCodiceBarreEan13(tx));
+  if (await codiceProdottoEsiste(tx, codice))
+    return { error: CODICE_DUPLICATO_MSG, status: 409 };
+  if (!isEan13Valido(codiceBarre))
+    return { error: BARCODE_NON_VALIDO_MSG, status: 400 };
+  if (await barcodeProdottoEsiste(tx, codiceBarre))
+    return { error: BARCODE_DUPLICATO_MSG, status: 409 };
   const abilitatoEmporio = parseOptionalBoolean(b.abilitatoEmporio, false);
-  if (abilitatoEmporio == null) return { error: "Abilitato Emporio non valido.", status: 400 };
+  if (abilitatoEmporio == null)
+    return { error: "Abilitato Emporio non valido.", status: 400 };
   if (abilitatoEmporio && !(await isEmporioEnabled())) {
     return { error: EMPORIO_DISABLED_MSG, status: 403 };
   }
   const creditoSolidaleDefault = abilitatoEmporio ? 1 : 0;
-  const creditoSolidaleValore = parseNonNegativeDecimal(b.creditoSolidaleValore ?? creditoSolidaleDefault, "Valore Credito Solidale",
+  const creditoSolidaleValore = parseCredito(
+    b.creditoSolidaleValore ?? creditoSolidaleDefault,
   );
-  if ("error" in creditoSolidaleValore) return { error: creditoSolidaleValore.error, status: 400 };
-  const quantitaMassimaPerSpesa = parseOptionalNonNegativeDecimal(b.quantitaMassimaPerSpesa, "Quantità massima per singola spesa",
+  if ("error" in creditoSolidaleValore)
+    return { error: creditoSolidaleValore.error, status: 400 };
+  const quantitaMassimaPerSpesa = parseOptionalNonNegativeDecimal(
+    b.quantitaMassimaPerSpesa,
+    "Quantità massima per singola spesa",
   );
-  if ("error" in quantitaMassimaPerSpesa) return { error: quantitaMassimaPerSpesa.error, status: 400 };
-  const quantitaMassimaMensile = parseOptionalNonNegativeDecimal(b.quantitaMassimaMensile, "Quantità massima mensile",
+  if ("error" in quantitaMassimaPerSpesa)
+    return { error: quantitaMassimaPerSpesa.error, status: 400 };
+  const quantitaMassimaMensile = parseOptionalNonNegativeDecimal(
+    b.quantitaMassimaMensile,
+    "Quantità massima mensile",
   );
-  if ("error" in quantitaMassimaMensile) return { error: quantitaMassimaMensile.error, status: 400 };
+  if ("error" in quantitaMassimaMensile)
+    return { error: quantitaMassimaMensile.error, status: 400 };
   try {
     const [row] = await tx
-      .insert(prodottiTable).values({
-      codice,
-      nome: b.nome,
-      descrizione: b.descrizione,
-      tipoProdotto: b.tipoProdotto,
-      unitaMisura: b.unitaMisura,
-      codiceBarre,
-        quantitaFrazionabile: b.quantitaFrazionabile ??
+      .insert(prodottiTable)
+      .values({
+        codice,
+        nome: b.nome,
+        descrizione: b.descrizione,
+        tipoProdotto: b.tipoProdotto,
+        unitaMisura: b.unitaMisura,
+        codiceBarre,
+        quantitaFrazionabile:
+          b.quantitaFrazionabile ??
           defaultProductFractionalQuantity(b.unitaMisura),
         lottoFisicoObbligatorio: b.lottoFisicoObbligatorio ?? false,
-      gestioneScadenza: b.gestioneScadenza ?? false,
-      fsePlus: b.fsePlus ?? false,
-      scortaMinima: b.scortaMinima?.toString() ?? "0",
-      scortaConsigliata: b.scortaConsigliata?.toString() ?? "0",
-      abilitatoEmporio,
-      creditoSolidaleValore: creditoSolidaleValore.value,
-      quantitaMassimaPerSpesa: quantitaMassimaPerSpesa.value,
-      quantitaMassimaMensile: quantitaMassimaMensile.value,
-      conservazione: b.conservazione,
-      taglia: b.taglia,
-      genere: b.genere,
-      stagione: b.stagione,
-      condizione: b.condizione,
-      attivo: b.attivo ?? true,
-      note: b.note,
-      fornitoreId: b.fornitoreId,
-    }).returning();
+        gestioneScadenza: b.gestioneScadenza ?? false,
+        fsePlus: b.fsePlus ?? false,
+        scortaMinima: b.scortaMinima?.toString() ?? "0",
+        scortaConsigliata: b.scortaConsigliata?.toString() ?? "0",
+        abilitatoEmporio,
+        creditoSolidaleValore: creditoSolidaleValore.value,
+        quantitaMassimaPerSpesa: quantitaMassimaPerSpesa.value,
+        quantitaMassimaMensile: quantitaMassimaMensile.value,
+        conservazione: b.conservazione,
+        taglia: b.taglia,
+        genere: b.genere,
+        stagione: b.stagione,
+        condizione: b.condizione,
+        attivo: b.attivo ?? true,
+        note: b.note,
+        fornitoreId: b.fornitoreId,
+      })
+      .returning();
     await recordAuditEvent(tx, {
       command: audit,
       azione: "PRODOTTO_CREATO",
@@ -277,141 +356,251 @@ async function createProdottoOne(
     });
     return { row };
   } catch (e) {
-    if (isUniqueViolation(e, "codice")) return { error: CODICE_DUPLICATO_MSG, status: 409 };
-    if (isUniqueViolation(e, "codiceBarre")) return { error: BARCODE_DUPLICATO_MSG, status: 409 };
+    if (isUniqueViolation(e, "codice"))
+      return { error: CODICE_DUPLICATO_MSG, status: 409 };
+    if (isUniqueViolation(e, "codiceBarre"))
+      return { error: BARCODE_DUPLICATO_MSG, status: 409 };
     throw e;
   }
 }
 
-router.post("/prodotti", requirePermission("magazzino.products.manage"), async (req, res) => {
-  const command = auditContextFromRequest(req);
+router.post(
+  "/prodotti",
+  requirePermission("magazzino.products.manage"),
+  async (req, res) => {
+    const command = auditContextFromRequest(req);
     const r = await db.transaction((tx) =>
       createProdottoOne(tx, req.body, command),
     );
-  if ("error" in r) { res.status(r.status ?? 400).json({ error: r.error }); return; }
-  res.status(201).json(fmtProdotto(r.row));
-},
+    if ("error" in r) {
+      res.status(r.status ?? 400).json({ error: r.error });
+      return;
+    }
+    res.status(201).json(fmtProdotto(r.row));
+  },
 );
 
-router.post("/prodotti/bulk", requirePermission("magazzino.products.manage"), async (req, res) => {
-  const righe = (req.body?.righe ?? []) as Record<string, unknown>[];
-  const result = await runBulk(righe, async (row) => {
-    const r = await db.transaction((tx) =>
+router.post(
+  "/prodotti/bulk",
+  requirePermission("magazzino.products.manage"),
+  async (req, res) => {
+    const righe = (req.body?.righe ?? []) as Record<string, unknown>[];
+    const result = await runBulk(righe, async (row) => {
+      const r = await db.transaction((tx) =>
         createProdottoOne(tx, row, auditContextFromRequest(req)),
       );
-    return "error" in r ? { error: r.error } : { ok: true };
-  });
-  res.json(result);
-},
+      return "error" in r ? { error: r.error } : { ok: true };
+    });
+    res.json(result);
+  },
 );
 
-router.get("/prodotti/:id", requirePermission("magazzino.view"), async (req, res) => {
-  const id = Number(req.params.id);
-  const [row] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, id));
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  res.json(fmtProdotto(row));
-},
-);
-
-router.patch("/prodotti/:id", requirePermission("magazzino.products.manage"), async (req, res) => {
-  const id = Number(req.params.id);
-  const [existing] = await db.select().from(prodottiTable).where(eq(prodottiTable.id, id));
-  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  const body = req.body ?? {};
-  const allowed = new Set([
-    "codice", "nome", "descrizione", "tipoProdotto", "unitaMisura", "codiceBarre",
-      "quantitaFrazionabile",
-      "lottoFisicoObbligatorio",
-      "gestioneScadenza", "fsePlus", "scortaMinima", "scortaConsigliata",
-    "abilitatoEmporio", "creditoSolidaleValore", "quantitaMassimaPerSpesa",
-    "quantitaMassimaMensile", "conservazione", "taglia", "genere", "stagione",
-    "condizione", "attivo", "note", "fornitoreId",
-  ]);
-  const unsupported = Object.keys(body).filter((key) => !allowed.has(key));
-  if (unsupported.length > 0) {
-    res.status(400).json({ error: `Campi Prodotto non modificabili: ${unsupported.join(", ")}`,
-        });
-    return;
-  }
-  const update: Record<string, unknown> = Object.fromEntries(
-    Object.entries(body).filter(([key]) => allowed.has(key)),
-  );
-  const sensitive = ["tipoProdotto", "unitaMisura",
-      "quantitaFrazionabile",
-      "lottoFisicoObbligatorio",
-      "gestioneScadenza", "fsePlus",
-    ];
-  const changesSensitive = sensitive.some((key) => key in body && body[key] !== existing[key as keyof typeof existing],
-    );
-  if (changesSensitive) {
-    const [[lotto], [movimento], [rigaBolla]] = await Promise.all([
-      db.select({ id: lottiTable.id }).from(lottiTable).where(eq(lottiTable.prodottoId, id)).limit(1),
-      db.select({ id: movimentiTable.id }).from(movimentiTable).where(eq(movimentiTable.prodottoId, id)).limit(1),
-      db.select({ id: bollaRigheTable.id }).from(bollaRigheTable).where(eq(bollaRigheTable.prodottoId, id)).limit(1),
-    ]);
-    if (lotto || movimento || rigaBolla) {
-      res.status(409).json({ error: "I campi inventariali del Prodotto non sono modificabili dopo la creazione dello storico",
-          });
+router.get(
+  "/prodotti/:id",
+  requirePermission("magazzino.view"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const [row] = await db
+      .select()
+      .from(prodottiTable)
+      .where(eq(prodottiTable.id, id));
+    if (!row) {
+      res.status(404).json({ error: "Not found" });
       return;
     }
-  }
-  if ("codice" in update) {
-    const codice = trimOrUndefined(update.codice);
-    if (!codice) { res.status(400).json({ error: "Codice prodotto obbligatorio" }); return; }
-    if (await db.transaction((tx) => codiceProdottoEsiste(tx, codice, id))) { res.status(409).json({ error: CODICE_DUPLICATO_MSG }); return; }
-    update.codice = codice;
-  }
-  if ("codiceBarre" in update) {
-    const codiceBarre = trimOrUndefined(update.codiceBarre);
-    if (codiceBarre == null) {
-      update.codiceBarre = null;
-    } else {
-      if (!isEan13Valido(codiceBarre)) { res.status(400).json({ error: BARCODE_NON_VALIDO_MSG }); return; }
-      if (await db.transaction((tx) =>
+    res.json(fmtProdotto(row));
+  },
+);
+
+router.patch(
+  "/prodotti/:id",
+  requirePermission("magazzino.products.manage"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const [existing] = await db
+      .select()
+      .from(prodottiTable)
+      .where(eq(prodottiTable.id, id));
+    if (!existing) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const body = req.body ?? {};
+    const allowed = new Set([
+      "codice",
+      "nome",
+      "descrizione",
+      "tipoProdotto",
+      "unitaMisura",
+      "codiceBarre",
+      "quantitaFrazionabile",
+      "lottoFisicoObbligatorio",
+      "gestioneScadenza",
+      "fsePlus",
+      "scortaMinima",
+      "scortaConsigliata",
+      "abilitatoEmporio",
+      "creditoSolidaleValore",
+      "quantitaMassimaPerSpesa",
+      "quantitaMassimaMensile",
+      "conservazione",
+      "taglia",
+      "genere",
+      "stagione",
+      "condizione",
+      "attivo",
+      "note",
+      "fornitoreId",
+    ]);
+    const unsupported = Object.keys(body).filter((key) => !allowed.has(key));
+    if (unsupported.length > 0) {
+      res.status(400).json({
+        error: `Campi Prodotto non modificabili: ${unsupported.join(", ")}`,
+      });
+      return;
+    }
+    const update: Record<string, unknown> = Object.fromEntries(
+      Object.entries(body).filter(([key]) => allowed.has(key)),
+    );
+    const sensitive = [
+      "tipoProdotto",
+      "unitaMisura",
+      "quantitaFrazionabile",
+      "lottoFisicoObbligatorio",
+      "gestioneScadenza",
+      "fsePlus",
+    ];
+    const changesSensitive = sensitive.some(
+      (key) =>
+        key in body && body[key] !== existing[key as keyof typeof existing],
+    );
+    if (changesSensitive) {
+      const [[lotto], [movimento], [rigaBolla]] = await Promise.all([
+        db
+          .select({ id: lottiTable.id })
+          .from(lottiTable)
+          .where(eq(lottiTable.prodottoId, id))
+          .limit(1),
+        db
+          .select({ id: movimentiTable.id })
+          .from(movimentiTable)
+          .where(eq(movimentiTable.prodottoId, id))
+          .limit(1),
+        db
+          .select({ id: bollaRigheTable.id })
+          .from(bollaRigheTable)
+          .where(eq(bollaRigheTable.prodottoId, id))
+          .limit(1),
+      ]);
+      if (lotto || movimento || rigaBolla) {
+        res.status(409).json({
+          error:
+            "I campi inventariali del Prodotto non sono modificabili dopo la creazione dello storico",
+        });
+        return;
+      }
+    }
+    if ("codice" in update) {
+      const codice = trimOrUndefined(update.codice);
+      if (!codice) {
+        res.status(400).json({ error: "Codice prodotto obbligatorio" });
+        return;
+      }
+      if (await db.transaction((tx) => codiceProdottoEsiste(tx, codice, id))) {
+        res.status(409).json({ error: CODICE_DUPLICATO_MSG });
+        return;
+      }
+      update.codice = codice;
+    }
+    if ("codiceBarre" in update) {
+      const codiceBarre = trimOrUndefined(update.codiceBarre);
+      if (codiceBarre == null) {
+        update.codiceBarre = null;
+      } else {
+        if (!isEan13Valido(codiceBarre)) {
+          res.status(400).json({ error: BARCODE_NON_VALIDO_MSG });
+          return;
+        }
+        if (
+          await db.transaction((tx) =>
             barcodeProdottoEsiste(tx, codiceBarre, id),
           )
-        ) { res.status(409).json({ error: BARCODE_DUPLICATO_MSG }); return; }
-      update.codiceBarre = codiceBarre;
+        ) {
+          res.status(409).json({ error: BARCODE_DUPLICATO_MSG });
+          return;
+        }
+        update.codiceBarre = codiceBarre;
+      }
     }
-  }
-  if (body.scortaMinima !== undefined) update.scortaMinima = body.scortaMinima.toString();
-  if (body.scortaConsigliata !== undefined) update.scortaConsigliata = body.scortaConsigliata.toString();
-  if ("abilitatoEmporio" in update) {
-    const abilitatoEmporio = parseOptionalBoolean(update.abilitatoEmporio, false,
+    if (body.scortaMinima !== undefined)
+      update.scortaMinima = body.scortaMinima.toString();
+    if (body.scortaConsigliata !== undefined)
+      update.scortaConsigliata = body.scortaConsigliata.toString();
+    if ("abilitatoEmporio" in update) {
+      const abilitatoEmporio = parseOptionalBoolean(
+        update.abilitatoEmporio,
+        false,
       );
-    if (abilitatoEmporio == null) { res.status(400).json({ error: "Abilitato Emporio non valido." }); return; }
-    if (abilitatoEmporio && !existing.abilitatoEmporio && !(await isEmporioEnabled())) {
-      res.status(403).json({ error: EMPORIO_DISABLED_MSG });
-      return;
+      if (abilitatoEmporio == null) {
+        res.status(400).json({ error: "Abilitato Emporio non valido." });
+        return;
+      }
+      if (
+        abilitatoEmporio &&
+        !existing.abilitatoEmporio &&
+        !(await isEmporioEnabled())
+      ) {
+        res.status(403).json({ error: EMPORIO_DISABLED_MSG });
+        return;
+      }
+      if (
+        abilitatoEmporio &&
+        !existing.abilitatoEmporio &&
+        !("creditoSolidaleValore" in update) &&
+        Number(existing.creditoSolidaleValore ?? "0") <= 0
+      ) {
+        update.creditoSolidaleValore = "1";
+      }
+      update.abilitatoEmporio = abilitatoEmporio;
     }
-    if (abilitatoEmporio && !existing.abilitatoEmporio && !("creditoSolidaleValore" in update) && Number(existing.creditoSolidaleValore ?? "0") <= 0) {
-      update.creditoSolidaleValore = "1";
+    if ("creditoSolidaleValore" in update) {
+      const creditoSolidaleValore = parseCredito(update.creditoSolidaleValore);
+      if ("error" in creditoSolidaleValore) {
+        res.status(400).json({ error: creditoSolidaleValore.error });
+        return;
+      }
+      update.creditoSolidaleValore = creditoSolidaleValore.value;
     }
-    update.abilitatoEmporio = abilitatoEmporio;
-  }
-  if ("creditoSolidaleValore" in update) {
-    const creditoSolidaleValore = parseNonNegativeDecimal(update.creditoSolidaleValore, "Valore Credito Solidale",
+    if ("quantitaMassimaPerSpesa" in update) {
+      const quantitaMassimaPerSpesa = parseOptionalNonNegativeDecimal(
+        update.quantitaMassimaPerSpesa,
+        "Quantità massima per singola spesa",
       );
-    if ("error" in creditoSolidaleValore) { res.status(400).json({ error: creditoSolidaleValore.error }); return; }
-    update.creditoSolidaleValore = creditoSolidaleValore.value;
-  }
-  if ("quantitaMassimaPerSpesa" in update) {
-    const quantitaMassimaPerSpesa = parseOptionalNonNegativeDecimal(update.quantitaMassimaPerSpesa, "Quantità massima per singola spesa",
+      if ("error" in quantitaMassimaPerSpesa) {
+        res.status(400).json({ error: quantitaMassimaPerSpesa.error });
+        return;
+      }
+      update.quantitaMassimaPerSpesa = quantitaMassimaPerSpesa.value;
+    }
+    if ("quantitaMassimaMensile" in update) {
+      const quantitaMassimaMensile = parseOptionalNonNegativeDecimal(
+        update.quantitaMassimaMensile,
+        "Quantità massima mensile",
       );
-    if ("error" in quantitaMassimaPerSpesa) { res.status(400).json({ error: quantitaMassimaPerSpesa.error }); return; }
-    update.quantitaMassimaPerSpesa = quantitaMassimaPerSpesa.value;
-  }
-  if ("quantitaMassimaMensile" in update) {
-    const quantitaMassimaMensile = parseOptionalNonNegativeDecimal(update.quantitaMassimaMensile, "Quantità massima mensile",
-      );
-    if ("error" in quantitaMassimaMensile) { res.status(400).json({ error: quantitaMassimaMensile.error }); return; }
-    update.quantitaMassimaMensile = quantitaMassimaMensile.value;
-  }
-  try {
-    const command = auditContextFromRequest(req);
+      if ("error" in quantitaMassimaMensile) {
+        res.status(400).json({ error: quantitaMassimaMensile.error });
+        return;
+      }
+      update.quantitaMassimaMensile = quantitaMassimaMensile.value;
+    }
+    try {
+      const command = auditContextFromRequest(req);
       const row = await db.transaction(async (tx) => {
         const [changed] = await tx
-          .update(prodottiTable).set(update).where(eq(prodottiTable.id, id)).returning();
+          .update(prodottiTable)
+          .set(update)
+          .where(eq(prodottiTable.id, id))
+          .returning();
         await recordAuditEvent(tx, {
           command,
           azione:
@@ -427,21 +616,33 @@ router.patch("/prodotti/:id", requirePermission("magazzino.products.manage"), as
         return changed;
       });
       res.json(fmtProdotto(row));
-  } catch (e) {
-    if (isUniqueViolation(e, "codice")) { res.status(409).json({ error: CODICE_DUPLICATO_MSG }); return; }
-    if (isUniqueViolation(e, "codiceBarre")) { res.status(409).json({ error: BARCODE_DUPLICATO_MSG }); return; }
-    throw e;
-  }
-},
+    } catch (e) {
+      if (isUniqueViolation(e, "codice")) {
+        res.status(409).json({ error: CODICE_DUPLICATO_MSG });
+        return;
+      }
+      if (isUniqueViolation(e, "codiceBarre")) {
+        res.status(409).json({ error: BARCODE_DUPLICATO_MSG });
+        return;
+      }
+      throw e;
+    }
+  },
 );
 
-router.delete("/prodotti/:id", requirePermission("magazzino.products.manage"), async (req, res) => {
-  const id = Number(req.params.id);
-  const command = auditContextFromRequest(req);
+router.delete(
+  "/prodotti/:id",
+  requirePermission("magazzino.products.manage"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const command = auditContextFromRequest(req);
     const row = await db.transaction(async (tx) => {
       const [changed] = await tx
-        .update(prodottiTable).set({ attivo: false }).where(eq(prodottiTable.id, id)).returning();
-  if (changed) {
+        .update(prodottiTable)
+        .set({ attivo: false })
+        .where(eq(prodottiTable.id, id))
+        .returning();
+      if (changed) {
         await recordAuditEvent(tx, {
           command,
           azione: "PRODOTTO_DISATTIVATO",
@@ -455,9 +656,12 @@ router.delete("/prodotti/:id", requirePermission("magazzino.products.manage"), a
       }
       return changed;
     });
-    if (!row) { res.status(404).json({ error: "Prodotto non trovato" }); return; }
-  res.json(fmtProdotto(row));
-},
+    if (!row) {
+      res.status(404).json({ error: "Prodotto non trovato" });
+      return;
+    }
+    res.json(fmtProdotto(row));
+  },
 );
 
 export default router;

@@ -5,9 +5,17 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { SpesaEmporioStornoInputTipoRettifica } from './spesaEmporioStornoInputTipoRettifica';
 import type { SpesaEmporioStornoRigaInput } from './spesaEmporioStornoRigaInput';
 
 export interface SpesaEmporioStornoInput {
+  tipoRettifica?: SpesaEmporioStornoInputTipoRettifica;
+  /**
+     * Solo per rettifiche economiche, senza righe fisiche
+     * @minimum 1
+     * @maximum 99999999
+     */
+  creditoRestituito?: number;
   /**
      * @minLength 1
      * @maxLength 2000
@@ -16,5 +24,5 @@ export interface SpesaEmporioStornoInput {
   /** @minItems 1 */
   righe?: SpesaEmporioStornoRigaInput[];
   /** @maxLength 100 */
-  idempotencyKey?: string;
+  idempotencyKey: string;
 }

@@ -40,7 +40,11 @@ import {
 } from "drizzle-orm";
 import { parseDbNumber } from "./disponibilitaMagazzino";
 import { auditEmporioTx } from "./emporioAudit";
-import { recordAuditEvent, type AuditCommandContext } from "./auditEvent";
+import {
+  recordAuditEvent,
+  auditFields,
+  type AuditCommandContext,
+} from "./auditEvent";
 import { magazzinoScopeFilter } from "./centroScope";
 import { requireEmporioCommandTx } from "./emporioScope";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
@@ -73,6 +77,21 @@ import {
   validateProductOperationalQuantity,
 } from "./productQuantity";
 import { lockInventoryLotsInGlobalOrder } from "./inventoryLocks";
+import {
+  creditoIntero,
+  creditoPerQuantita,
+  quotaTecnicaCredito,
+  CreditoInteroError,
+} from "./creditoIntero";
+import {
+  commandRequestHash,
+  requireIdempotencyKey,
+  lockDocumentCommand,
+  findDocumentCommand,
+  storeDocumentCommand,
+} from "./documentCommand";
+import { creaScaricoInventariale } from "./scaricoInventory";
+import { randomUUID } from "node:crypto";
 
 const PRENOTAZIONE_ATTIVA = "attiva";
 
@@ -116,7 +135,7 @@ function round2(value: number): number {
 }
 
 function asDecimal(value: number): string {
-  return round2(value).toFixed(2);
+  return String(creditoIntero(value, { signed: true }));
 }
 
 function today(): string {
@@ -331,7 +350,9 @@ async function validateRigheFinali(
       throw new SpesaEmporioError(400, MSG_PRODOTTO_NON_TROVATO);
     if (!prodotto.abilitatoEmporio)
       throw new SpesaEmporioError(400, MSG_PRODOTTO_NON_ABILITATO);
-    if (parseDbNumber(prodotto.creditoSolidaleValore) <= 0) {
+    if (
+      creditoIntero(prodotto.creditoSolidaleValore, { positive: true }) <= 0
+    ) {
       throw new SpesaEmporioError(400, MSG_PRODOTTO_SENZA_CREDITO);
     }
     if (riga.unitaMisura != null && riga.unitaMisura !== prodotto.unitaMisura) {
@@ -341,6 +362,14 @@ async function validateRigheFinali(
       );
     }
     let quantitaRiga: InventoryDecimal;
+    if (
+      creditoPerQuantita(riga.creditoUnitario, riga.quantita) !==
+      creditoIntero(riga.creditoTotale, { positive: true })
+    )
+      throw new SpesaEmporioError(
+        409,
+        "Credito della riga non coerente con il valore congelato.",
+      );
     try {
       quantitaRiga = validateProductOperationalQuantity({
         quantita: riga.quantita,
@@ -459,7 +488,15 @@ async function scaricaRigaEmporio(
     const disponibile = netto.isNegative() ? InventoryDecimal.zero() : netto;
     const take = disponibile.min(remaining);
     if (!take.isPositive()) continue;
-    const takeNumber = Number(take.toCanonical());
+    const previous = InventoryDecimal.parse(opts.riga.quantita).subtract(
+      remaining,
+    );
+    const quotaCredito = quotaTecnicaCredito(
+      opts.riga.creditoTotale,
+      previous.add(take),
+      previous,
+      InventoryDecimal.parse(opts.riga.quantita),
+    );
 
     await tx
       .update(lottiTable)
@@ -531,9 +568,7 @@ async function scaricaRigaEmporio(
       quantita: take.toDb(),
       unitaMisura,
       creditoUnitario: opts.riga.creditoUnitario,
-      creditoTotale: asDecimal(
-        parseDbNumber(opts.riga.creditoUnitario) * takeNumber,
-      ),
+      creditoTotale: String(quotaCredito),
       scaricoId: opts.scaricoId,
       bollaRigaId: bollaRiga.id,
     });
@@ -661,13 +696,13 @@ export async function chiudiSessioneCassaEmporio(opts: {
       dataChiusura,
     );
 
-    const totaleCredito = round2(
-      righe.reduce((acc, riga) => acc + parseDbNumber(riga.creditoTotale), 0),
+    const totaleCredito = creditoIntero(
+      righe.reduce((acc, riga) => acc + creditoIntero(riga.creditoTotale), 0),
     );
     if (totaleCredito <= 0)
       throw new SpesaEmporioError(400, MSG_CARRELLO_VUOTO);
-    const saldoPrima = parseDbNumber(beneficiario.creditoSolidaleSaldo);
-    const saldoDopo = round2(saldoPrima - totaleCredito);
+    const saldoPrima = creditoIntero(beneficiario.creditoSolidaleSaldo);
+    const saldoDopo = saldoPrima - totaleCredito;
     if (saldoDopo < 0)
       throw new SpesaEmporioError(400, MSG_SALDO_INSUFFICIENTE);
 
@@ -989,11 +1024,16 @@ function formatSpesa(
       quantita: parseDbNumber(r.r.quantita),
       unitaMisura: r.r.unitaMisura,
       quantitaStornata: quantitaStornataByRiga.get(r.r.id) ?? 0,
-      quantitaStornabile: round2(
-        Math.max(
-          0,
-          parseDbNumber(r.r.quantita) -
-            (quantitaStornataByRiga.get(r.r.id) ?? 0),
+      quantitaStornabile: Math.max(
+        0,
+        Number(
+          InventoryDecimal.parse(r.r.quantita)
+            .subtract(
+              InventoryDecimal.parse(
+                String(quantitaStornataByRiga.get(r.r.id) ?? 0),
+              ),
+            )
+            .toCanonical(),
         ),
       ),
       creditoUnitario: parseDbNumber(r.r.creditoUnitario),
@@ -1162,13 +1202,50 @@ export async function getSpesaEmporio(id: number) {
     )
     .where(eq(speseEmporioRigheTable.spesaEmporioId, id))
     .groupBy(speseEmporioStorniRigheTable.spesaRigaId);
-  return formatSpesa(
-    rows[0],
-    righe,
-    new Map(
-      reversed.map((row) => [row.spesaRigaId, parseDbNumber(row.quantita)]),
-    ),
+  const history = await db
+    .select()
+    .from(speseEmporioStorniTable)
+    .where(eq(speseEmporioStorniTable.spesaEmporioId, id))
+    .orderBy(asc(speseEmporioStorniTable.id));
+  const creditoGiaRestituito = history.reduce(
+    (acc, row) => acc + parseDbNumber(row.creditoRestituito),
+    0,
   );
+  const creditFields = [
+    rows[0].s.totaleCreditoConsumati,
+    rows[0].s.saldoPrima,
+    rows[0].s.saldoDopo,
+    ...history.map((row) => row.creditoRestituito),
+    ...righe.flatMap((row) => [row.r.creditoUnitario, row.r.creditoTotale]),
+  ];
+  const creditoConforme = creditFields.every((value) => {
+    try {
+      creditoIntero(value);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  return {
+    ...formatSpesa(
+      rows[0],
+      righe,
+      new Map(
+        reversed.map((row) => [row.spesaRigaId, parseDbNumber(row.quantita)]),
+      ),
+    ),
+    creditoGiaRestituito,
+    creditoRimborsabile:
+      parseDbNumber(rows[0].s.totaleCreditoConsumati) - creditoGiaRestituito,
+    creditoConforme,
+    rettifiche: history.map((row) => ({
+      id: row.id,
+      tipoRettifica: row.tipoRettifica,
+      motivo: row.motivo,
+      creditoRestituito: parseDbNumber(row.creditoRestituito),
+      createdAt: row.createdAt.toISOString(),
+    })),
+  };
 }
 
 export async function getSpesaEmporioBySessione(sessioneCassaId: number) {
@@ -1244,12 +1321,62 @@ export type StornoSpesaEmporioInput = {
   operatoreId: number | null;
   idempotencyKey?: string | null;
   ip?: string | null;
+  tipoRettifica?:
+    | "reso_idoneo"
+    | "reso_non_distribuibile"
+    | "errore_amministrativo"
+    | "solo_credito";
+  creditoRestituito?: unknown;
+  audit?: AuditCommandContext;
 };
 
 export async function stornaSpesaEmporio(
   opts: StornoSpesaEmporioInput,
 ): Promise<{ stornoId: number; creditoRestituito: number }> {
+  const tipoRettifica = opts.tipoRettifica ?? "reso_idoneo";
+  const physical =
+    tipoRettifica === "reso_idoneo" ||
+    tipoRettifica === "reso_non_distribuibile";
+  const key = requireIdempotencyKey(opts.idempotencyKey);
+  if (key.length > 100)
+    throw new SpesaEmporioError(400, "Chiave troppo lunga.");
+  const motivo = opts.motivo.trim();
+  if (!motivo) throw new SpesaEmporioError(400, "Il motivo è obbligatorio.");
+  if (!physical && opts.righe != null)
+    throw new SpesaEmporioError(
+      400,
+      "La rettifica solo economica non restituisce quantità fisiche.",
+    );
+  if (physical && opts.creditoRestituito != null)
+    throw new SpesaEmporioError(
+      400,
+      "Il rimborso fisico deriva dalla riga economica originale, non da un importo libero.",
+    );
+  const normalizedRows = opts.righe
+    ?.map((row) => ({
+      spesaRigaId: row.spesaRigaId,
+      quantita: positiveInventoryDecimal(row.quantita).toCanonical(),
+    }))
+    .sort((a, b) => a.spesaRigaId - b.spesaRigaId);
+  const amount = physical
+    ? null
+    : creditoIntero(opts.creditoRestituito, { positive: true });
+  const identity = {
+    tipoComando: "emporio.rettifica",
+    idempotencyKey: key,
+    requestHash: commandRequestHash({
+      spesaId: opts.spesaId,
+      tipoRettifica,
+      motivo,
+      righe: normalizedRows ?? null,
+      creditoRestituito: amount,
+    }),
+    actorUserId: opts.operatoreId!,
+    aggregatoTipo: "spesa_emporio",
+    aggregatoId: opts.spesaId,
+  };
   return db.transaction(async (tx) => {
+    await lockDocumentCommand(tx, identity.tipoComando, key);
     await tx.execute(
       sql`SELECT id FROM ${speseEmporioTable} WHERE ${speseEmporioTable.id} = ${opts.spesaId} FOR UPDATE`,
     );
@@ -1258,13 +1385,20 @@ export async function stornaSpesaEmporio(
       .from(speseEmporioTable)
       .where(eq(speseEmporioTable.id, opts.spesaId));
     if (!spesa) throw new SpesaEmporioError(404, "Spesa Emporio non trovata.");
-    await requireEmporioCommandTx(
+    const current = await requireEmporioCommandTx(
       tx,
       opts.operatoreId,
       "emporio.sales.reverse",
       spesa,
       false,
     );
+
+    const receipt = await findDocumentCommand(tx, identity);
+    if (receipt)
+      return receipt.resultSnapshot as {
+        stornoId: number;
+        creditoRestituito: number;
+      };
 
     if (opts.idempotencyKey) {
       const [replay] = await tx
@@ -1278,10 +1412,10 @@ export async function stornaSpesaEmporio(
             "La chiave di idempotenza è già associata a un'altra Spesa.",
           );
         }
-        return {
-          stornoId: replay.id,
-          creditoRestituito: parseDbNumber(replay.creditoRestituito),
-        };
+        throw new SpesaEmporioError(
+          409,
+          "Chiave legacy priva di identità verificabile: consulta lo storico, non ripetere la rettifica.",
+        );
       }
     }
 
@@ -1316,7 +1450,9 @@ export async function stornaSpesaEmporio(
     );
     const rowById = new Map(righe.map((row) => [row.id, row]));
     const requested = new Map<number, InventoryDecimal>();
-    if (opts.righe == null) {
+    if (!physical) {
+      // Credit-only has no physical lines and never changes monthly quantities.
+    } else if (opts.righe == null) {
       for (const row of righe) {
         const residual = InventoryDecimal.parse(row.quantita).subtract(
           reversedByRiga.get(row.id) ?? InventoryDecimal.zero(),
@@ -1344,14 +1480,91 @@ export async function stornaSpesaEmporio(
         requested.set(input.spesaRigaId, quantity);
       }
     }
-    if (requested.size === 0) {
+    if (physical && requested.size === 0) {
       throw new SpesaEmporioError(
         409,
         "La Spesa risulta già completamente stornata.",
       );
     }
 
-    let creditoRestituito = 0;
+    const refunds = await tx
+      .select({ amount: speseEmporioStorniTable.creditoRestituito })
+      .from(speseEmporioStorniTable)
+      .where(eq(speseEmporioStorniTable.spesaEmporioId, spesa.id));
+    const originalCredit = creditoIntero(spesa.totaleCreditoConsumati, {
+      positive: true,
+    });
+    creditoIntero(spesa.saldoPrima);
+    creditoIntero(spesa.saldoDopo);
+    // Two historical fractions can sum to an integer: validate each fact,
+    // not only the aggregate, before producing any new economic movement.
+    const refunded = refunds.reduce(
+      (total, row) => creditoIntero(total + creditoIntero(row.amount)),
+      0,
+    );
+    if (refunded > originalCredit)
+      throw new SpesaEmporioError(
+        409,
+        "Storico economico non riconciliabile: necessaria verifica amministrativa.",
+      );
+    const [originalDebit] =
+      spesa.movimentoCreditoSolidaleId == null
+        ? []
+        : await tx
+            .select()
+            .from(creditoSolidaleMovimentiTable)
+            .where(
+              eq(
+                creditoSolidaleMovimentiTable.id,
+                spesa.movimentoCreditoSolidaleId,
+              ),
+            );
+    if (
+      !originalDebit ||
+      originaleCreditoNonCoerente(originalDebit, originalCredit)
+    )
+      throw new SpesaEmporioError(
+        409,
+        "Addebito originale assente, frazionario o già compensato esternamente.",
+      );
+    let creditoRestituito = amount ?? 0;
+    const economicGroups = new Map<
+      number,
+      {
+        original: InventoryDecimal;
+        requested: InventoryDecimal;
+        credit: number;
+      }
+    >();
+    for (const row of righe) {
+      creditoIntero(row.creditoUnitario);
+      if (row.sessioneCassaRigaId == null && physical)
+        throw new SpesaEmporioError(
+          409,
+          "Riga economica legacy non riconciliabile.",
+        );
+      const groupId = row.sessioneCassaRigaId ?? row.id;
+      const group = economicGroups.get(groupId) ?? {
+        original: InventoryDecimal.zero(),
+        requested: InventoryDecimal.zero(),
+        credit: 0,
+      };
+      group.original = group.original.add(InventoryDecimal.parse(row.quantita));
+      group.credit = creditoIntero(
+        group.credit + creditoIntero(row.creditoTotale),
+      );
+      economicGroups.set(groupId, group);
+    }
+    if (
+      [...economicGroups.values()].reduce(
+        (total, group) => total + group.credit,
+        0,
+      ) !== originalCredit
+    )
+      throw new SpesaEmporioError(
+        409,
+        "Righe economiche non coerenti con l'addebito originale.",
+      );
     for (const [rowId, quantity] of requested) {
       const row = rowById.get(rowId);
       if (!row) throw new SpesaEmporioError(400, "Riga Spesa non valida.");
@@ -1364,24 +1577,55 @@ export async function stornaSpesaEmporio(
           "La quantità richiesta supera quella ancora stornabile.",
         );
       }
-      creditoRestituito = round2(
-        creditoRestituito +
-          parseDbNumber(row.creditoUnitario) * Number(quantity.toCanonical()),
-      );
+      const [product] = await tx
+        .select()
+        .from(prodottiTable)
+        .where(eq(prodottiTable.id, row.prodottoId))
+        .for("share");
+      if (!product)
+        throw new SpesaEmporioError(409, "Prodotto originale assente.");
+      validateProductOperationalQuantity({
+        quantita: quantity.toCanonical(),
+        quantitaFrazionabile: product.quantitaFrazionabile,
+        prodottoLabel: product.nome,
+      });
+      const group = economicGroups.get(row.sessioneCassaRigaId ?? row.id)!;
+      group.requested = group.requested.add(quantity);
     }
-    if (creditoRestituito <= 0) {
+    const fullPhysical =
+      physical &&
+      righe.every((row) =>
+        InventoryDecimal.parse(row.quantita)
+          .subtract(reversedByRiga.get(row.id) ?? InventoryDecimal.zero())
+          .subtract(requested.get(row.id) ?? InventoryDecimal.zero())
+          .isZero(),
+      );
+    if (physical) {
+      for (const group of economicGroups.values()) {
+        const numerator = BigInt(group.credit) * group.requested.toUnits();
+        if (numerator % group.original.toUnits() !== 0n && !fullPhysical)
+          throw new SpesaEmporioError(
+            409,
+            "Il rimborso proporzionale produce una frazione di credito: policy da approvare, nessuna operazione eseguita.",
+          );
+        const refund = Number(numerator / group.original.toUnits());
+        creditoRestituito += refund;
+      }
+      if (fullPhysical) creditoRestituito = originalCredit - refunded;
+    }
+    creditoIntero(creditoRestituito);
+    if (creditoRestituito > originalCredit - refunded)
       throw new SpesaEmporioError(
         409,
-        "Lo storno non produce Credito restituibile.",
+        "Il rimborso supera il credito residuo della Spesa.",
       );
-    }
 
     const beneficiario = await lockBeneficiario(tx, spesa.beneficiarioId);
     if (!beneficiario) {
       throw new SpesaEmporioError(409, "Beneficiario della Spesa non trovato.");
     }
-    const saldoPrima = parseDbNumber(beneficiario.creditoSolidaleSaldo);
-    const saldoDopo = round2(saldoPrima + creditoRestituito);
+    const saldoPrima = creditoIntero(beneficiario.creditoSolidaleSaldo);
+    const saldoDopo = creditoIntero(saldoPrima + creditoRestituito);
     await lockInventoryLotsInGlobalOrder(tx, {
       kind: "lot-ids",
       lottoIds: [...requested.keys()].flatMap((rowId) => {
@@ -1394,11 +1638,52 @@ export async function stornaSpesaEmporio(
       .values({
         spesaEmporioId: spesa.id,
         motivo: opts.motivo,
+        tipoRettifica,
         operatoreId: opts.operatoreId,
         creditoRestituito: asDecimal(creditoRestituito),
         idempotencyKey: opts.idempotencyKey ?? null,
       })
       .returning();
+
+    const [actorRecord] = await tx
+      .select({
+        matricola: utentiTable.matricola,
+        username: utentiTable.username,
+      })
+      .from(utentiTable)
+      .where(eq(utentiTable.id, current.actor.id));
+    const command: AuditCommandContext = {
+      actor: {
+        actorType: "user",
+        actorUserId: current.actor.id,
+        actorCodeSnapshot: actorRecord.matricola ?? actorRecord.username,
+        initiatedByUserId: null,
+        initiatedByCodeSnapshot: null,
+      },
+      correlationId: opts.audit?.correlationId ?? randomUUID(),
+      operationKey: `emporio.rettifica:${key}`,
+    };
+    const auditEventoId = await recordAuditEvent(tx, {
+      command,
+      azione: "EMPORIO_RETTIFICA",
+      entitaTipo: "storno_spesa_emporio",
+      entitaId: storno.id,
+      documentoTipo: "bolla",
+      documentoId: spesa.bollaId,
+      areaOperativaIdSnapshot: spesa.areaOperativaId,
+      centroAscoltoIdSnapshot: spesa.centroAscoltoId,
+      magazzinoIdSnapshot: spesa.magazzinoEmporioId,
+      motivo,
+      metadata: auditFields(
+        {
+          spesaId: spesa.id,
+          tipoRettifica,
+          creditoRestituito,
+          righe: normalizedRows ?? "totale",
+        },
+        ["spesaId", "tipoRettifica", "creditoRestituito", "righe"],
+      ),
+    });
 
     const dataMovimento = dataOperativaEuropeRome();
     const distributionOperationIds = new Set<number>();
@@ -1419,6 +1704,15 @@ export async function stornaSpesaEmporio(
         .where(eq(lottiTable.id, row.lottoId));
       if (!lotto)
         throw new SpesaEmporioError(409, "Lotto originale non trovato.");
+      if (
+        tipoRettifica === "reso_idoneo" &&
+        !isLottoDistribuibile(lotto.dataScadenza, dataMovimento)
+      ) {
+        throw new SpesaEmporioError(
+          409,
+          "Il lotto originale è scaduto: usare il reso non distribuibile.",
+        );
+      }
       const [originalMovement] = await tx
         .select()
         .from(movimentiTable)
@@ -1478,10 +1772,42 @@ export async function stornaSpesaEmporio(
           operazioneDistribuzioneId: originalMovement.operazioneDistribuzioneId,
           canaleOperativo: originalMovement.canaleOperativo,
           operatoreId: opts.operatoreId,
+          auditEventoId,
           documentoRiferimento: `STORNO-${storno.id}`,
           note: `Storno compensativo Spesa Emporio ${spesa.numeroSpesa}: ${opts.motivo}`,
         })
         .returning();
+      if (tipoRettifica === "reso_non_distribuibile") {
+        await creaScaricoInventariale(tx, {
+          codice: `RE-${storno.id}-${row.id}`,
+          magazzinoId: spesa.magazzinoEmporioId,
+          centroAscoltoId: spesa.centroAscoltoId,
+          dataScarico: dataMovimento,
+          causale: "deteriorata",
+          note: motivo,
+          operatoreId: opts.operatoreId!,
+          audit: {
+            ...command,
+            operationKey: `emporio.rettifica:${key}:scarto:${row.id}`,
+          },
+          source: {
+            naturaContabile: "SCARTO",
+            dominioOrigine: "EMPORIO",
+            entitaOrigineTipo: "storno_spesa_emporio",
+            entitaOrigineId: storno.id,
+            movimentoOrigineId: movement.id,
+          },
+          righe: [
+            {
+              prodottoId: row.prodottoId,
+              lottoId: lotto.id,
+              quantita: quantity.toDb(),
+              unitaMisura,
+              rigaOrigineId: row.id,
+            },
+          ],
+        });
+      }
       if (originalMovement.operazioneDistribuzioneId != null) {
         distributionOperationIds.add(
           originalMovement.operazioneDistribuzioneId,
@@ -1491,46 +1817,50 @@ export async function stornaSpesaEmporio(
         stornoId: storno.id,
         spesaRigaId: row.id,
         quantita: quantity.toDb(),
-        creditoRestituito: asDecimal(
-          parseDbNumber(row.creditoUnitario) * Number(quantity.toCanonical()),
-        ),
+        // Physical segments are not autonomous economic entitlements.
+        creditoRestituito: "0",
         movimentoInventarioId: movement.id,
         movimentoInventarioOriginaleId: originalMovement.id,
       });
     }
 
     const now = new Date();
-    const [creditMovement] = await tx
-      .insert(creditoSolidaleMovimentiTable)
-      .values({
-        beneficiarioId: beneficiario.id,
-        centroAscoltoId: beneficiario.centroAscoltoId,
-        areaOperativaId: beneficiario.areaOperativaId,
-        tipoMovimento: "storno",
-        variazioneCredito: asDecimal(creditoRestituito),
-        saldoPrima: asDecimal(saldoPrima),
-        saldoDopo: asDecimal(saldoDopo),
-        origine: "storno_spesa_emporio",
-        riferimentoId: storno.id,
-        riferimentoTipo: "storno_spesa_emporio",
-        motivo: opts.motivo,
-        note: `Restituzione Credito da Spesa ${spesa.numeroSpesa}`,
-        operatoreId: opts.operatoreId,
-        dataMovimento: now,
-      })
-      .returning();
-    await tx
-      .update(beneficiariTable)
-      .set({
-        creditoSolidaleSaldo: asDecimal(saldoDopo),
-        creditoSolidaleDataUltimoMovimento: creditMovement.dataMovimento,
-        dataAggiornamento: now,
-      })
-      .where(eq(beneficiariTable.id, beneficiario.id));
-    await tx
-      .update(speseEmporioStorniTable)
-      .set({ movimentoCreditoSolidaleId: creditMovement.id })
-      .where(eq(speseEmporioStorniTable.id, storno.id));
+    const [creditMovement] =
+      creditoRestituito === 0
+        ? []
+        : await tx
+            .insert(creditoSolidaleMovimentiTable)
+            .values({
+              beneficiarioId: beneficiario.id,
+              centroAscoltoId: beneficiario.centroAscoltoId,
+              areaOperativaId: beneficiario.areaOperativaId,
+              tipoMovimento: "storno",
+              variazioneCredito: asDecimal(creditoRestituito),
+              saldoPrima: asDecimal(saldoPrima),
+              saldoDopo: asDecimal(saldoDopo),
+              origine: "storno_spesa_emporio",
+              riferimentoId: storno.id,
+              riferimentoTipo: "storno_spesa_emporio",
+              motivo: opts.motivo,
+              note: `Restituzione Credito da Spesa ${spesa.numeroSpesa}`,
+              operatoreId: opts.operatoreId,
+              dataMovimento: now,
+            })
+            .returning();
+    if (creditMovement)
+      await tx
+        .update(beneficiariTable)
+        .set({
+          creditoSolidaleSaldo: asDecimal(saldoDopo),
+          creditoSolidaleDataUltimoMovimento: creditMovement.dataMovimento,
+          dataAggiornamento: now,
+        })
+        .where(eq(beneficiariTable.id, beneficiario.id));
+    if (creditMovement)
+      await tx
+        .update(speseEmporioStorniTable)
+        .set({ movimentoCreditoSolidaleId: creditMovement.id })
+        .where(eq(speseEmporioStorniTable.id, storno.id));
 
     const fullyReversed = righe.every((row) => {
       const residual = InventoryDecimal.parse(row.quantita).subtract(
@@ -1540,7 +1870,11 @@ export async function stornaSpesaEmporio(
         .subtract(requested.get(row.id) ?? InventoryDecimal.zero())
         .isZero();
     });
-    const statoSpesa = fullyReversed ? "stornata" : "stornata_parzialmente";
+    const statoSpesa = physical
+      ? fullyReversed
+        ? "stornata"
+        : "stornata_parzialmente"
+      : spesa.statoSpesa;
     for (const operationId of distributionOperationIds) {
       await markDistributionOperationReversed(tx, operationId);
     }
@@ -1564,8 +1898,22 @@ export async function stornaSpesaEmporio(
         creditoRestituito,
       },
     });
-    return { stornoId: storno.id, creditoRestituito };
+    const result = { stornoId: storno.id, creditoRestituito };
+    await storeDocumentCommand(tx, { ...identity, resultSnapshot: result });
+    return result;
   });
+}
+
+function originaleCreditoNonCoerente(
+  movement: typeof creditoSolidaleMovimentiTable.$inferSelect,
+  originalCredit: number,
+): boolean {
+  return (
+    movement.annullato ||
+    movement.tipoMovimento !== "consumo_spesa" ||
+    creditoIntero(movement.variazioneCredito, { signed: true }) !==
+      -originalCredit
+  );
 }
 
 function uniqueEmails(values: Array<string | null | undefined>): string[] {

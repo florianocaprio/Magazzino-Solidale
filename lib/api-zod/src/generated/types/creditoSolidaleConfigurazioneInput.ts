@@ -14,11 +14,13 @@ export interface CreditoSolidaleConfigurazioneInput {
   creditoSolidaleNote?: string | null;
   /**
      * @minimum 0
+     * @maximum 99999999
      * @nullable
      */
   creditoSolidaleMensileAssegnato?: number | null;
   /**
      * @minimum 0
+     * @maximum 99999999
      * @nullable
      */
   creditoSolidaleMensileSuggerito?: number | null;

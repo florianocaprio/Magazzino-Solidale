@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { Server } from "node:http";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import express from "express";
 import request from "supertest";
@@ -47,6 +48,7 @@ import { buildLogisticaReport } from "../src/lib/reporting/logistica";
 import { buildFsePlusReport } from "../src/lib/reporting/fsePlus";
 import type { ReportFilters } from "../src/lib/reporting/types";
 import { buildFseCanonicalReport } from "../src/lib/fseCanonicalReporting";
+import { httpListeners } from "./helpers/http-listeners";
 
 let scope: SeedScope;
 let actorId: number;
@@ -55,15 +57,30 @@ let warehouseId: number;
 let beneficiaryId: number;
 let productId: number;
 let lotId: number;
+let bollaServer: Server;
+let transferServer: Server;
+const listeners = httpListeners({ diagnostics: "transport-return-m4b2" });
+
+async function scopedServer(
+  router: Parameters<typeof makeScopedApp>[0],
+  user: Parameters<typeof makeScopedApp>[1],
+) {
+  const name =
+    router === bolleRouter
+      ? "bolle"
+      : router === trasferimentiRouter
+        ? "trasferimenti"
+        : "consegne";
+  const tracedRouter = express.Router();
+  tracedRouter.use(listeners.router(name, router));
+  const app = makeScopedApp(tracedRouter, user);
+  return listeners.open(app, () => app);
+}
 
 const key = () => `m4b2-${randomUUID()}`;
-const bollaApp = () =>
-  makeScopedApp(bolleRouter, { id: actorId, centroAscoltoId: centreId });
-const transferApp = () =>
-  makeScopedApp(trasferimentiRouter, {
-    id: actorId,
-    centroAscoltoId: centreId,
-  });
+// Supertest receives already-listening servers: only the scenario owns teardown.
+const bollaApp = () => bollaServer;
+const transferApp = () => transferServer;
 const lotAmount = async (id = lotId) => {
   const [lot] = await db.select().from(lottiTable).where(eq(lottiTable.id, id));
   return Number(lot.quantitaResidua);
@@ -274,11 +291,21 @@ beforeEach(async () => {
     magazzinoId: warehouseId,
     quantita: 100,
   });
+  bollaServer = await scopedServer(bolleRouter, {
+    id: actorId,
+    centroAscoltoId: centreId,
+  });
+  transferServer = await scopedServer(trasferimentiRouter, {
+    id: actorId,
+    centroAscoltoId: centreId,
+  });
 });
 afterEach(async () => {
+  await listeners.close();
   await cleanup(scope);
 });
 afterAll(async () => {
+  await listeners.close();
   await pool.end();
 });
 
@@ -802,7 +829,7 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
       quantita: 20,
       unitaMisura: "pz",
     });
-    const app = makeScopedApp(bolleRouter, {
+    const app = await scopedServer(bolleRouter, {
       id: actor,
       centroAscoltoId: centre.id,
       areaOperativaId: areaId,
@@ -895,7 +922,7 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
         }),
       );
     expect(entrusted.status, entrusted.text).toBe(200);
-    const app = makeScopedApp(consegneRouter, {
+    const app = await scopedServer(consegneRouter, {
       id: actorId,
       centroAscoltoId: centreId,
     });
@@ -903,6 +930,23 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
       .post(`/consegne/${consegnaId}/completa`)
       .send(command(entrusted.body.versione));
     expect(completed.status, completed.text).toBe(200);
+    expect(listeners.inspect(bollaServer)).toMatchObject({
+      lifecycle: "listening",
+      requests: 2,
+      active: 0,
+      last: { method: "POST", route: "/bolle/:id/affida", status: 200 },
+    });
+    expect(listeners.inspect(app)).toMatchObject({
+      lifecycle: "listening",
+      requests: 1,
+      active: 0,
+      last: {
+        method: "POST",
+        routers: ["consegne"],
+        route: "/consegne/:id/completa",
+        status: 200,
+      },
+    });
     expect(await lotAmount()).toBe(80);
     const movements = await db
       .select()
@@ -1179,7 +1223,7 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
       "SELECT id FROM bolla_righe WHERE bolla_id=$1",
       [id],
     );
-    const adminApp = makeScopedApp(bolleRouter, {
+    const adminApp = await scopedServer(bolleRouter, {
       id: actorId,
       centroAscoltoId: centreId,
       permessi: ["bolle.reverse.admin"],
@@ -1351,7 +1395,7 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
     const id = await entrustedBolla(2);
     await missingDelivery(id);
     const secondActorId = await createUtente(scope, { centroId: centreId });
-    const secondApp = makeScopedApp(bolleRouter, {
+    const secondApp = await scopedServer(bolleRouter, {
       id: secondActorId,
       centroAscoltoId: centreId,
     });
@@ -1464,7 +1508,7 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
 
   it("AUDIT-M4B2: errore audit annulla uscita e receipt dell'affidamento", async () => {
     const id = await readyBolla(2);
-    const invalidAuditApp = makeScopedApp(bolleRouter, {
+    const invalidAuditApp = await scopedServer(bolleRouter, {
       id: actorId,
       centroAscoltoId: centreId,
       matricola: "X".repeat(161),

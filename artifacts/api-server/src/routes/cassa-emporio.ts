@@ -1,4 +1,9 @@
 import { Router, type IRouter } from "express";
+import {
+  creditoIntero,
+  creditoPerQuantita,
+  CreditoInteroError,
+} from "../lib/creditoIntero";
 import { auditContextFromRequest } from "../lib/auditEvent";
 import {
   beneficiariTable,
@@ -545,8 +550,8 @@ async function recalcSessioneTx(
     .select()
     .from(beneficiariTable)
     .where(eq(beneficiariTable.id, sessione.beneficiarioId));
-  const totaleCreditoPrevisto = parseDbNumber(totale?.creditoTotale);
-  const saldoCreditoIniziale = parseDbNumber(
+  const totaleCreditoPrevisto = creditoIntero(totale?.creditoTotale ?? "0");
+  const saldoCreditoIniziale = creditoIntero(
     beneficiario?.creditoSolidaleSaldo ?? sessione.saldoCreditoIniziale,
   );
   const creditoResiduoPrevisto = saldoCreditoIniziale - totaleCreditoPrevisto;
@@ -620,9 +625,6 @@ async function buildRigaValues(
     .from(prodottiTable)
     .where(eq(prodottiTable.id, prodottoId))
     .for("share");
-  const creditoUnitario = parseDbNumber(
-    savedRow?.creditoUnitario ?? prodotto?.creditoSolidaleValore,
-  );
   if (!prodotto || !prodotto.attivo) {
     return { error: MSG_PRODOTTO_NON_TROVATO, status: 400 } as const;
   }
@@ -637,7 +639,10 @@ async function buildRigaValues(
         "L'unità di misura del Prodotto è cambiata: rimuovere e aggiungere nuovamente la riga.",
       status: 409,
     } as const;
-  if (creditoUnitario <= 0)
+  if (
+    prodotto.creditoSolidaleValore == null ||
+    Number(savedRow?.creditoUnitario ?? prodotto.creditoSolidaleValore) <= 0
+  )
     return { error: MSG_PRODOTTO_SENZA_CREDITO, status: 400 } as const;
   let quantity: InventoryDecimal;
   try {
@@ -652,7 +657,19 @@ async function buildRigaValues(
     }
     throw error;
   }
-  const creditQuantity = Number(quantity.toCanonical());
+  let creditoUnitario: number;
+  let creditoTotale: number;
+  try {
+    creditoUnitario = creditoIntero(
+      savedRow?.creditoUnitario ?? prodotto.creditoSolidaleValore,
+      { positive: true },
+    );
+    creditoTotale = creditoPerQuantita(creditoUnitario, quantity.toCanonical());
+  } catch (error) {
+    if (error instanceof CreditoInteroError)
+      return { error: error.message, status: 400 } as const;
+    throw error;
+  }
   const otherQuantity = await quantitaProdottoInSessionePrecisa(
     executor,
     sessione.id,
@@ -711,7 +728,7 @@ async function buildRigaValues(
       quantita: quantity.toDb(),
       unitaMisura: savedRow ? savedRow.unitaMisura : prodotto.unitaMisura,
       creditoUnitario: asMoney(creditoUnitario),
-      creditoTotale: asMoney(creditoUnitario * creditQuantity),
+      creditoTotale: String(creditoTotale),
       giacenzaDisponibileAlMomento: asMoney(parseDbNumber(disponibile.toDb())),
       limitePerSpesa:
         limitePerSpesa == null
@@ -1228,7 +1245,7 @@ router.post(
           lockedAccess,
         );
         syncEmporioScope(req, current.actor);
-        const saldoCreditoIniziale = parseDbNumber(
+        const saldoCreditoIniziale = creditoIntero(
           current.beneficiary.creditoSolidaleSaldo,
         );
         const lockedBeneficiaryContext =
@@ -1419,7 +1436,7 @@ router.post(
           { beneficiarioId, magazzinoEmporioId },
         );
         syncEmporioScope(req, current.actor);
-        const saldoCreditoIniziale = parseDbNumber(
+        const saldoCreditoIniziale = creditoIntero(
           current.beneficiary.creditoSolidaleSaldo,
         );
         const lockedBeneficiaryContext =
@@ -2072,5 +2089,19 @@ router.post(
   },
 );
 
+router.use(
+  (
+    error: unknown,
+    _req: import("express").Request,
+    res: import("express").Response,
+    next: import("express").NextFunction,
+  ) => {
+    if (error instanceof CreditoInteroError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    next(error);
+  },
+);
 router.use(emporioScopeErrorHandler);
 export default router;

@@ -1,6 +1,14 @@
 import { Router, type IRouter } from "express";
-import { db, sessioniCassaEmporioTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import {
+  db,
+  sessioniCassaEmporioTable,
+  comandiOperativiTable,
+} from "@workspace/db";
+import { and, eq } from "drizzle-orm";
+import { auditContextFromRequest } from "../lib/auditEvent";
+import { CreditoInteroError } from "../lib/creditoIntero";
+import { DocumentCommandError } from "../lib/documentCommand";
+import { ProductOperationalQuantityError } from "../lib/productQuantity";
 import {
   getBollaStampaSpesaEmporio,
   getSpesaEmporio,
@@ -308,6 +316,18 @@ router.post(
     const spesa = await getSpesaEmporio(spesaId);
     if (!(await ensureSpesaAccess(spesa, req, res))) return;
     const motivo = asText(req.body?.motivo);
+    const tipoRettifica = req.body?.tipoRettifica ?? "reso_idoneo";
+    if (
+      ![
+        "reso_idoneo",
+        "reso_non_distribuibile",
+        "errore_amministrativo",
+        "solo_credito",
+      ].includes(tipoRettifica)
+    ) {
+      res.status(400).json({ error: "Tipo rettifica non valido." });
+      return;
+    }
     if (!motivo) {
       res.status(400).json({ error: "Il motivo dello storno è obbligatorio." });
       return;
@@ -360,12 +380,23 @@ router.post(
         operatoreId: operatorId(req),
         idempotencyKey,
         ip: req.ip,
+        tipoRettifica,
+        creditoRestituito: req.body?.creditoRestituito,
+        audit: auditContextFromRequest(req),
       });
       res
         .status(201)
         .json({ ...result, spesa: await getSpesaEmporio(spesaId) });
     } catch (error) {
-      if (error instanceof SpesaEmporioError) {
+      if (error instanceof ProductOperationalQuantityError) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+      if (
+        error instanceof SpesaEmporioError ||
+        error instanceof CreditoInteroError ||
+        error instanceof DocumentCommandError
+      ) {
         res.status(error.status).json({ error: error.message });
         return;
       }
@@ -374,5 +405,45 @@ router.post(
   },
 );
 
+router.get(
+  "/spese-emporio/:id/rettifiche/esito/:key",
+  requirePermission("emporio.sales.reverse"),
+  async (req, res) => {
+    const spesaId = Number(req.params.id);
+    await db.transaction(async (tx) => {
+      const spesa = await getSpesaEmporio(spesaId);
+      if (!spesa) {
+        res.status(404).json({ error: "Spesa non trovata." });
+        return;
+      }
+      await requireEmporioCommandTx(
+        tx,
+        operatorId(req),
+        "emporio.sales.reverse",
+        spesa,
+        false,
+      );
+      const [receipt] = await tx
+        .select()
+        .from(comandiOperativiTable)
+        .where(
+          and(
+            eq(comandiOperativiTable.tipoComando, "emporio.rettifica"),
+            eq(comandiOperativiTable.idempotencyKey, String(req.params.key)),
+            eq(comandiOperativiTable.aggregatoId, spesaId),
+            eq(comandiOperativiTable.aggregatoTipo, "spesa_emporio"),
+            eq(comandiOperativiTable.actorUserId, operatorId(req)!),
+          ),
+        );
+      if (!receipt) {
+        res.status(404).json({
+          error: "Esito non disponibile: non ripetere con una nuova chiave.",
+        });
+        return;
+      }
+      res.json({ ...receipt.resultSnapshot, spesa });
+    });
+  },
+);
 router.use(emporioScopeErrorHandler);
 export default router;

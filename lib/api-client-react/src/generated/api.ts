@@ -17026,6 +17026,82 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getStornaSpesaEmporioMutationOptions(options));
     }
 
+export const getGetEsitoRettificaSpesaEmporioUrl = (id: number,
+    key: string,) => {
+
+
+
+
+  return `/api/spese-emporio/${id}/rettifiche/esito/${key}`
+}
+
+export const getEsitoRettificaSpesaEmporio = async (id: number,
+    key: string, options?: RequestInit): Promise<SpesaEmporioStornoResult> => {
+
+  return customFetch<SpesaEmporioStornoResult>(getGetEsitoRettificaSpesaEmporioUrl(id,key),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEsitoRettificaSpesaEmporioQueryKey = (id: number,
+    key: string,) => {
+    return [
+    `/api/spese-emporio/${id}/rettifiche/esito/${key}`
+    ] as const;
+    }
+
+
+export const getGetEsitoRettificaSpesaEmporioQueryOptions = <TData = Awaited<ReturnType<typeof getEsitoRettificaSpesaEmporio>>, TError = ErrorType<void>>(id: number,
+    key: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEsitoRettificaSpesaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEsitoRettificaSpesaEmporioQueryKey(id,key);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEsitoRettificaSpesaEmporio>>> = ({ signal }) => getEsitoRettificaSpesaEmporio(id,key, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id && key), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEsitoRettificaSpesaEmporio>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEsitoRettificaSpesaEmporioQueryResult = NonNullable<Awaited<ReturnType<typeof getEsitoRettificaSpesaEmporio>>>
+export type GetEsitoRettificaSpesaEmporioQueryError = ErrorType<void>
+
+
+
+export function useGetEsitoRettificaSpesaEmporio<TData = Awaited<ReturnType<typeof getEsitoRettificaSpesaEmporio>>, TError = ErrorType<void>>(
+ id: number,
+    key: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEsitoRettificaSpesaEmporio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEsitoRettificaSpesaEmporioQueryOptions(id,key,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListEntiDestinatariUrl = (params?: ListEntiDestinatariParams,) => {
   const normalizedParams = new URLSearchParams();
 

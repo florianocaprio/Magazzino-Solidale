@@ -7,7 +7,10 @@
  */
 
 export interface CreditoSolidaleRicaricaManualeInput {
-  /** @minimum 0.01 */
+  /**
+     * @minimum 1
+     * @maximum 99999999
+     */
   variazioneCredito: number;
   /** @nullable */
   motivo?: string | null;

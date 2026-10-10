@@ -7,6 +7,10 @@
  */
 
 export interface CreditoSolidaleRettificaInput {
+  /**
+     * @minimum -99999999
+     * @maximum 99999999
+     */
   variazioneCredito: number;
   motivo: string;
   /** @nullable */

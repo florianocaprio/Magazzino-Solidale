@@ -41,12 +41,12 @@ function makeSchema(t: (k: string) => string) {
     centroAscoltoId: z.string().default(NONE),
     areaOperativaId: z.string().default(NONE),
     attiva: z.boolean().default(true),
-    creditoBaseNucleo: z.coerce.number().min(0),
-    creditoPerComponente: z.coerce.number().min(0),
-    bonusMinore: z.coerce.number().min(0),
-    bonusAnziano: z.coerce.number().min(0),
-    bonusDisabile: z.coerce.number().min(0),
-    creditoMinimoMensile: z.coerce.number().min(0),
+    creditoBaseNucleo: z.coerce.number().int().min(0).max(99_999_999),
+    creditoPerComponente: z.coerce.number().int().min(0).max(99_999_999),
+    bonusMinore: z.coerce.number().int().min(0).max(99_999_999),
+    bonusAnziano: z.coerce.number().int().min(0).max(99_999_999),
+    bonusDisabile: z.coerce.number().int().min(0).max(99_999_999),
+    creditoMinimoMensile: z.coerce.number().int().min(0).max(99_999_999),
     creditoMassimoMensile: z.string().optional().default(""),
     giornoRicaricaMensile: z.coerce.number().int().min(1, t("creditoSolidale.dayRange")).max(28, t("creditoSolidale.dayRange")),
     ricaricaAutomaticaAbilitata: z.boolean().default(false),
@@ -55,7 +55,7 @@ function makeSchema(t: (k: string) => string) {
   }).refine((data) => {
     if (!data.creditoMassimoMensile?.trim()) return true;
     const max = Number(data.creditoMassimoMensile.replace(",", "."));
-    return Number.isFinite(max) && max >= data.creditoMinimoMensile;
+    return Number.isSafeInteger(max) && max <= 99_999_999 && max >= data.creditoMinimoMensile;
   }, {
     message: t("creditoSolidale.maxMustBeGreater"),
     path: ["creditoMassimoMensile"],
@@ -371,7 +371,7 @@ export default function PoliticheCreditoSolidale() {
                     <FormField key={name} control={form.control} name={name} render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t(`creditoSolidale.${name}`)}</FormLabel>
-                        <FormControl><Input type="number" min={0} step="0.01" {...field} /></FormControl>
+                        <FormControl><Input type="number" min={0} step="1" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -382,7 +382,7 @@ export default function PoliticheCreditoSolidale() {
                   <FormField control={form.control} name="creditoMassimoMensile" render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("creditoSolidale.creditoMassimoMensile")}</FormLabel>
-                      <FormControl><Input type="number" min={0} step="0.01" placeholder={t("creditoSolidale.noMaximum")} {...field} /></FormControl>
+                      <FormControl><Input type="number" min={0} step="1" placeholder={t("creditoSolidale.noMaximum")} {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />

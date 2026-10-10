@@ -4902,11 +4902,13 @@ export interface CreditoSolidaleConfigurazioneInput {
   creditoSolidaleNote?: string | null;
   /**
      * @minimum 0
+     * @maximum 99999999
      * @nullable
      */
   creditoSolidaleMensileAssegnato?: number | null;
   /**
      * @minimum 0
+     * @maximum 99999999
      * @nullable
      */
   creditoSolidaleMensileSuggerito?: number | null;
@@ -4958,7 +4960,10 @@ export interface CreditoSolidaleRefreshResult {
 }
 
 export interface CreditoSolidaleRicaricaManualeInput {
-  /** @minimum 0.01 */
+  /**
+     * @minimum 1
+     * @maximum 99999999
+     */
   variazioneCredito: number;
   /** @nullable */
   motivo?: string | null;
@@ -4967,6 +4972,10 @@ export interface CreditoSolidaleRicaricaManualeInput {
 }
 
 export interface CreditoSolidaleRettificaInput {
+  /**
+     * @minimum -99999999
+     * @maximum 99999999
+     */
   variazioneCredito: number;
   motivo: string;
   /** @nullable */
@@ -6955,6 +6964,14 @@ export interface SpesaEmporioRiga {
   fsePlus: boolean;
 }
 
+export type SpesaEmporioRettificheItem = {
+  id: number;
+  tipoRettifica: string;
+  motivo: string;
+  creditoRestituito: number;
+  createdAt: string;
+};
+
 export type SpesaEmporioStatoSpesa = typeof SpesaEmporioStatoSpesa[keyof typeof SpesaEmporioStatoSpesa];
 
 
@@ -6975,6 +6992,11 @@ export const SpesaEmporioEmailBollaStato = {
 } as const;
 
 export interface SpesaEmporio {
+  /** Proiezione storica; i nuovi importi operativi sono interi */
+  creditoGiaRestituito?: number;
+  creditoRimborsabile?: number;
+  creditoConforme?: boolean;
+  rettifiche?: SpesaEmporioRettificheItem[];
   id: number;
   sessioneCassaId: number;
   accessoEmporioId: number;
@@ -7047,11 +7069,27 @@ export interface BollaEmporioInvioManualeInput { [key: string]: unknown }
 export interface SpesaEmporioStornoRigaInput {
   /** @minimum 1 */
   spesaRigaId: number;
-  /** @minimum 0.01 */
-  quantita: number;
+  quantita: QuantitaContabile;
 }
 
+export type SpesaEmporioStornoInputTipoRettifica = typeof SpesaEmporioStornoInputTipoRettifica[keyof typeof SpesaEmporioStornoInputTipoRettifica];
+
+
+export const SpesaEmporioStornoInputTipoRettifica = {
+  reso_idoneo: 'reso_idoneo',
+  reso_non_distribuibile: 'reso_non_distribuibile',
+  errore_amministrativo: 'errore_amministrativo',
+  solo_credito: 'solo_credito',
+} as const;
+
 export interface SpesaEmporioStornoInput {
+  tipoRettifica?: SpesaEmporioStornoInputTipoRettifica;
+  /**
+     * Solo per rettifiche economiche, senza righe fisiche
+     * @minimum 1
+     * @maximum 99999999
+     */
+  creditoRestituito?: number;
   /**
      * @minLength 1
      * @maxLength 2000
@@ -7060,7 +7098,7 @@ export interface SpesaEmporioStornoInput {
   /** @minItems 1 */
   righe?: SpesaEmporioStornoRigaInput[];
   /** @maxLength 100 */
-  idempotencyKey?: string;
+  idempotencyKey: string;
 }
 
 export interface SpesaEmporioStornoResult {

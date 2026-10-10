@@ -62,6 +62,7 @@ async function loginAs(page: Page, username: string) {
 
 test("R2-02: presa in carico, Bolla aperta, P1/P2 persistenti e volontario con errore reale", async ({
   browser,
+  viewport,
 }) => {
   test.setTimeout(90_000);
   const suffix = randomUUID().slice(0, 8);
@@ -97,8 +98,8 @@ test("R2-02: presa in carico, Bolla aperta, P1/P2 persistenti e volontario con e
     [volunteerId],
   );
 
-  const social = await browser.newContext();
-  const warehouse = await browser.newContext();
+  const social = await browser.newContext({ viewport });
+  const warehouse = await browser.newContext({ viewport });
   try {
     const socialPage = await social.newPage();
     await loginAs(socialPage, "m5c1-e2e-social");
@@ -471,16 +472,23 @@ test("R2-02: presa in carico, Bolla aperta, P1/P2 persistenti e volontario con e
 
 test("R2-03: Centro gestisce Enti, Magazzino cerca e crea Bolla ma non modifica l'anagrafica", async ({
   browser,
+  viewport,
 }) => {
   const suffix = randomUUID().replaceAll("-", "").slice(0, 8);
   const token = `Q${suffix.slice(0, 2)}`;
   const names = ["Alfa", "Beta", "Gamma", "Delta", "Epsilon", "Zeta"].map(
     (name) => `${token} ${name} ${suffix}`,
   );
-  const areaId = 2;
-  const social = await browser.newContext();
-  const warehouse = await browser.newContext();
-  const custom = await browser.newContext();
+  // L'Area appartiene alla fixture Sociale, non alla sequenza degli ID del DB.
+  const { rows: actors } = await database.query<{ area_operativa_id: number }>(
+    "SELECT area_operativa_id FROM utenti WHERE username='m5c1-e2e-social'",
+  );
+  expect(actors).toHaveLength(1);
+  const areaId = actors[0].area_operativa_id;
+  expect(areaId).toBeGreaterThan(0);
+  const social = await browser.newContext({ viewport });
+  const warehouse = await browser.newContext({ viewport });
+  const custom = await browser.newContext({ viewport });
   try {
     const centerPage = await social.newPage();
     await loginAs(centerPage, "m5c1-e2e-social");

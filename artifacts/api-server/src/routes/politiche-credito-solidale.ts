@@ -63,6 +63,8 @@ const MAX_MSG =
   "Il credito massimo mensile deve essere maggiore o uguale al minimo.";
 const ROUNDING_MSG = "Tipo di arrotondamento non valido.";
 
+import { creditoIntero, CreditoInteroError } from "../lib/creditoIntero";
+
 const toNumber = (v: string | number | null | undefined): number | null => {
   if (v == null || v === "") return null;
   const n = Number(v);
@@ -71,9 +73,12 @@ const toNumber = (v: string | number | null | undefined): number | null => {
 
 const decimalString = (v: unknown): string | null => {
   if (v == null || v === "") return null;
-  const n = typeof v === "number" ? v : Number(String(v).replace(",", "."));
-  if (!Number.isFinite(n) || n < 0) return null;
-  return n.toFixed(2);
+  try {
+    return String(creditoIntero(v));
+  } catch (error) {
+    if (error instanceof CreditoInteroError) return null;
+    throw error;
+  }
 };
 
 const nullableText = (v: unknown): string | null =>

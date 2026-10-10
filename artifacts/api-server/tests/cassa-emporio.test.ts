@@ -56,6 +56,9 @@ import {
 } from "../src/lib/scaricoInventory";
 import speseEmporioRouter from "../src/routes/spese-emporio";
 import creditoSolidaleRouter from "../src/routes/credito-solidale";
+import prodottiRouter from "../src/routes/prodotti";
+import politicheCreditoSolidaleRouter from "../src/routes/politiche-credito-solidale";
+import { httpListeners } from "./helpers/http-listeners";
 import {
   listModuliFunzionali,
   updateModuloAmbiente,
@@ -85,6 +88,7 @@ const scaricoIds: number[] = [];
 const transferIds: number[] = [];
 const mensaIds: number[] = [];
 let operatorUserId: number;
+const cListeners = httpListeners({ diagnostics: "m62c" });
 
 function makeApp(
   options: {
@@ -314,7 +318,7 @@ async function createProdotto(opts: {
           .toString()
           .padStart(9, "0")}0`,
       abilitatoEmporio: opts.abilitatoEmporio ?? true,
-      creditoSolidaleValore: opts.creditoSolidaleValore ?? "2.50",
+      creditoSolidaleValore: opts.creditoSolidaleValore ?? "2",
       quantitaMassimaPerSpesa: opts.quantitaMassimaPerSpesa ?? null,
       quantitaMassimaMensile: opts.quantitaMassimaMensile ?? null,
       attivo: true,
@@ -408,6 +412,16 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await cListeners.close();
+  // Track committed facts even when the response/assertion failed after commit.
+  if (sessioneIds.length) {
+    const committed = await db
+      .select({ id: speseEmporioTable.id })
+      .from(speseEmporioTable)
+      .where(inArray(speseEmporioTable.sessioneCassaId, sessioneIds));
+    for (const row of committed)
+      if (!spesaIds.includes(row.id)) await trackSpesa(row.id);
+  }
   await cleanupEmporioActorFixtures();
   if (magazzinoIds.length) {
     const owned = await db
@@ -573,6 +587,851 @@ afterAll(async () => {
 });
 
 describe("Cassa Emporio", () => {
+  async function cExpense(
+    price = "3",
+    quantity = 2,
+    uom = "pz",
+    multi = false,
+  ) {
+    const fixture = await createFixture();
+    const product = await createProdotto({
+      magazzinoId: fixture.magazzinoId,
+      creditoSolidaleValore: price,
+      unitaMisura: uom,
+      quantitaResidua: "10",
+    });
+    if (multi) {
+      const [original] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.prodottoId, product));
+      await db
+        .update(lottiTable)
+        .set({ quantitaCaricata: "0.5", quantitaResidua: "0.5" })
+        .where(eq(lottiTable.id, original.id));
+      const [second] = await db
+        .insert(lottiTable)
+        .values({
+          ...original,
+          id: undefined,
+          codiceLotto: `C-MULTI-${rnd()}`,
+          quantitaCaricata: "0.5",
+          quantitaResidua: "0.5",
+        })
+        .returning();
+      lottoIds.push(second.id);
+    }
+    const session = await readyCart(fixture, product, quantity);
+    const close = await postSessionAction(session.id, "chiudi");
+    expect(close.status, close.text).toBe(200);
+    await trackSpesa(close.body.spesa.id);
+    const app = await stableApp(fixture.areaOperativaId);
+    app.use(creditoSolidaleRouter);
+    app.use(prodottiRouter);
+    app.use(politicheCreditoSolidaleRouter);
+    const server = await cListeners.open(app, () => app);
+    return { fixture, product, session, spesa: close.body.spesa, server };
+  }
+  function cPost(
+    c: Awaited<ReturnType<typeof cExpense>>,
+    body: Record<string, unknown>,
+  ) {
+    return request(c.server)
+      .post(`/spese-emporio/${c.spesa.id}/storna`)
+      .send({
+        motivo: "Rettifica sintetica M6.2-C",
+        idempotencyKey: `c-${rnd()}`,
+        ...body,
+      });
+  }
+
+  it("C04/C05 credito intero con quantità frazionaria, rifiuto senza effetti", async () => {
+    const f = await createFixture();
+    const product = await createProdotto({
+      magazzinoId: f.magazzinoId,
+      creditoSolidaleValore: "3",
+      unitaMisura: "kg",
+    });
+    const s = await openSession(f.accessoId);
+    const denied = await addProduct(s.body.id, product, 0.5);
+    expect(denied.status).toBe(400);
+    expect(denied.body.error).toContain("frazione di credito");
+    expect(
+      await db
+        .select()
+        .from(sessioniCassaEmporioRigheTable)
+        .where(eq(sessioniCassaEmporioRigheTable.sessioneCassaId, s.body.id)),
+    ).toHaveLength(0);
+    await db
+      .update(prodottiTable)
+      .set({ creditoSolidaleValore: "4" })
+      .where(eq(prodottiTable.id, product));
+    expect((await addProduct(s.body.id, product, 0.5)).status).toBe(201);
+    await postSessionAction(s.body.id, "pronta-per-chiusura");
+    const closed = await postSessionAction(s.body.id, "chiudi");
+    expect(closed.status, closed.text).toBe(200);
+    await trackSpesa(closed.body.spesa.id);
+    expect(closed.body.spesa.totaleCreditoConsumati).toBe(2);
+    expect(closed.body.spesa.righe[0].quantita).toBe(0.5);
+  });
+
+  it("C07/C08/C12/C13/C14/C16/C18 credito-only poi totale, replay e recupero GET", async () => {
+    const c = await cExpense();
+    await db
+      .update(prodottiTable)
+      .set({ creditoSolidaleValore: "9" })
+      .where(eq(prodottiTable.id, c.product));
+    const credit = await cPost(c, {
+      tipoRettifica: "solo_credito",
+      creditoRestituito: 2,
+    });
+    expect(credit.status, credit.text).toBe(201);
+    expect(credit.body.spesa.righe[0].quantitaStornata).toBe(0);
+    expect(credit.body.spesa.statoSpesa).toBe(c.spesa.statoSpesa);
+    const key = `total-${rnd()}`;
+    const total = await cPost(c, { idempotencyKey: key });
+    expect(total.status, total.text).toBe(201);
+    expect(total.body.creditoRestituito).toBe(4);
+    const replay = await cPost(c, { idempotencyKey: key });
+    expect(replay.status, replay.text).toBe(201);
+    expect(replay.body.stornoId).toBe(total.body.stornoId);
+    expect(
+      (await cPost(c, { idempotencyKey: key, motivo: "Altro comando" })).status,
+    ).toBe(409);
+    const recovered = await request(c.server).get(
+      `/spese-emporio/${c.spesa.id}/rettifiche/esito/${key}`,
+    );
+    expect(recovered.status, recovered.text).toBe(200);
+    expect(recovered.body.stornoId).toBe(total.body.stornoId);
+    expect(recovered.body.spesa.creditoGiaRestituito).toBe(6);
+    expect(recovered.body.spesa.creditoRimborsabile).toBe(0);
+    expect(
+      (await cPost(c, { tipoRettifica: "solo_credito", creditoRestituito: 1 }))
+        .status,
+    ).toBe(409);
+    const [lot] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.prodottoId, c.product));
+    expect(Number(lot.quantitaResidua)).toBe(10);
+    const [person] = await db
+      .select()
+      .from(beneficiariTable)
+      .where(eq(beneficiariTable.id, c.fixture.beneficiarioId));
+    expect(Number(person.creditoSolidaleSaldo)).toBe(20);
+  });
+
+  it("C08 errore amministrativo 12−4=8: nessun rientro inventato, audit e ledger riconciliati", async () => {
+    const c = await cExpense("3", 4);
+    const first = await cPost(c, {
+      tipoRettifica: "errore_amministrativo",
+      creditoRestituito: 4,
+    });
+    expect(first.status, first.text).toBe(201);
+    expect(first.body.spesa.righe[0].quantitaStornata).toBe(0);
+    const full = await cPost(c, {});
+    expect(full.status, full.text).toBe(201);
+    expect(full.body.creditoRestituito).toBe(8);
+    const moves = await db
+      .select()
+      .from(creditoSolidaleMovimentiTable)
+      .where(
+        eq(
+          creditoSolidaleMovimentiTable.beneficiarioId,
+          c.fixture.beneficiarioId,
+        ),
+      );
+    expect(
+      moves.map((r) => Number(r.variazioneCredito)).sort((a, b) => a - b),
+    ).toEqual([-12, 4, 8]);
+    expect(
+      moves.every(
+        (r) =>
+          Number(r.saldoPrima) + Number(r.variazioneCredito) ===
+          Number(r.saldoDopo),
+      ),
+    ).toBe(true);
+    const audits = await db
+      .select()
+      .from(auditEventiTable)
+      .where(eq(auditEventiTable.entitaId, first.body.stornoId));
+    const audit = audits.find((r) => r.entitaTipo === "storno_spesa_emporio");
+    expect(audit?.actorUserId).toBe(operatorUserId);
+    expect(audit?.correlationId).toMatch(/^[a-f0-9-]{36}$/);
+    expect(audit?.motivo).toBe("Rettifica sintetica M6.2-C");
+    const [lot] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.prodottoId, c.product));
+    expect(Number(lot.quantitaResidua)).toBe(10);
+  });
+
+  it("C12 stessa chiave in parallelo: una ricevuta e un solo rimborso", async () => {
+    const c = await cExpense(),
+      blocker = await pool.connect(),
+      key = `same-${rnd()}`;
+    let pending: Array<Promise<request.Response>> = [];
+    try {
+      await blocker.query("BEGIN");
+      const pid = (await blocker.query("SELECT pg_backend_pid() pid")).rows[0]
+        .pid;
+      await blocker.query(
+        "SELECT id FROM spese_emporio WHERE id=$1 FOR UPDATE",
+        [c.spesa.id],
+      );
+      pending = [1, 2].map(() =>
+        cPost(c, {
+          idempotencyKey: key,
+          tipoRettifica: "solo_credito",
+          creditoRestituito: 2,
+        }).then((r) => r),
+      );
+      await observedWait(pid, 2);
+      await blocker.query("COMMIT");
+      const [a, b] = await Promise.all(pending);
+      expect([a.status, b.status]).toEqual([201, 201]);
+      expect(a.body.stornoId).toBe(b.body.stornoId);
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int n FROM comandi_operativi WHERE aggregato_tipo='spesa_emporio' AND aggregato_id=$1",
+            [c.spesa.id],
+          )
+        ).rows[0].n,
+      ).toBe(1);
+      expect(
+        await db
+          .select()
+          .from(speseEmporioStorniTable)
+          .where(eq(speseEmporioStorniTable.spesaEmporioId, c.spesa.id)),
+      ).toHaveLength(1);
+      const [person] = await db
+        .select()
+        .from(beneficiariTable)
+        .where(eq(beneficiariTable.id, c.fixture.beneficiarioId));
+      expect(Number(person.creditoSolidaleSaldo)).toBe(16);
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      await Promise.allSettled(pending);
+    }
+  });
+
+  it.each(["2026-12-31T23:30:00Z", "2026-12-31T22:30:00Z"])(
+    "C23 confine anno Europe/Rome %s: il reso resta nel mese originale",
+    async (instant) => {
+      const c = await cExpense();
+      await db
+        .update(speseEmporioTable)
+        .set({ dataChiusura: new Date(instant) })
+        .where(eq(speseEmporioTable.id, c.spesa.id));
+      const net = (date: string) =>
+        quantitaNettaMensileProdotto(
+          db,
+          c.fixture.beneficiarioId,
+          c.product,
+          new Date(date),
+        );
+      const january = instant.includes("23:30");
+      expect(
+        await net(january ? "2027-01-15T12:00Z" : "2026-12-15T12:00Z"),
+      ).toBe(2);
+      const result = await cPost(c, {
+        righe: [{ spesaRigaId: c.spesa.righe[0].id, quantita: "1" }],
+      });
+      expect(result.status, result.text).toBe(201);
+      expect(
+        await net(january ? "2027-01-15T12:00Z" : "2026-12-15T12:00Z"),
+      ).toBe(1);
+      expect(
+        await net(january ? "2026-12-15T12:00Z" : "2027-01-15T12:00Z"),
+      ).toBe(0);
+    },
+  );
+
+  it("C15 GET di esito assente non dichiara successo e non crea fatti", async () => {
+    const c = await cExpense();
+    expect(
+      (
+        await request(c.server).get(
+          `/spese-emporio/${c.spesa.id}/rettifiche/esito/mai-eseguito`,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      await db
+        .select()
+        .from(speseEmporioStorniTable)
+        .where(eq(speseEmporioStorniTable.spesaEmporioId, c.spesa.id)),
+    ).toHaveLength(0);
+  });
+
+  it("C12/C27 chiave legacy senza hash: diniego conservativo e storico leggibile", async () => {
+    const c = await cExpense(),
+      key = `legacy-${rnd()}`;
+    await db.insert(speseEmporioStorniTable).values({
+      spesaEmporioId: c.spesa.id,
+      motivo: "Rettifica storica sintetica",
+      tipoRettifica: "legacy_storno",
+      creditoRestituito: "1",
+      operatoreId: operatorUserId,
+      idempotencyKey: key,
+    });
+    const denied = await cPost(c, { idempotencyKey: key });
+    expect(denied.status, denied.text).toBe(409);
+    expect(denied.body.error).toContain("Chiave legacy");
+    const history = await request(c.server).get(`/spese-emporio/${c.spesa.id}`);
+    expect(history.status, history.text).toBe(200);
+    expect(history.body.rettifiche).toHaveLength(1);
+    expect(
+      (
+        await request(c.server).get(
+          `/spese-emporio/${c.spesa.id}/rettifiche/esito/${key}`,
+        )
+      ).status,
+    ).toBe(404);
+  });
+
+  it.each(["saldi", "rimborsi"] as const)(
+    "C27 storico frazionario %s leggibile ma non rettificabile, anche se la somma è intera",
+    async (legacy) => {
+      expect(process.env.M62C_DISPOSABLE_DB).toBe("verified");
+      const target = new URL(process.env.DATABASE_URL!);
+      expect(target.hostname).toBe("127.0.0.1");
+      expect(target.port).toBe("58621");
+      expect(target.pathname).toBe("/m62a");
+      const c = await cExpense();
+      const connection = await pool.connect();
+      try {
+        await connection.query("BEGIN");
+        // Simulate pre-49 facts only on this verified disposable connection.
+        // SET LOCAL is undone by COMMIT/ROLLBACK; production guards stay intact.
+        await connection.query("SET LOCAL session_replication_role = replica");
+        if (legacy === "saldi") {
+          await connection.query(
+            "UPDATE spese_emporio SET saldo_prima = 20.25, saldo_dopo = 14.25 WHERE id = $1",
+            [c.spesa.id],
+          );
+        } else {
+          await connection.query(
+            `INSERT INTO spese_emporio_storni
+              (spesa_emporio_id, motivo, tipo_rettifica, credito_restituito, operatore_id)
+             VALUES ($1, 'Legacy sintetico A', 'legacy_storno', 0.5, $2),
+                    ($1, 'Legacy sintetico B', 'legacy_storno', 0.5, $2)`,
+            [c.spesa.id, operatorUserId],
+          );
+        }
+        await connection.query("COMMIT");
+      } finally {
+        await connection.query("ROLLBACK");
+        connection.release();
+      }
+      const history = await request(c.server).get(
+        `/spese-emporio/${c.spesa.id}`,
+      );
+      expect(history.status, history.text).toBe(200);
+      expect(history.body.creditoConforme).toBe(false);
+      const denied = await cPost(c, {
+        tipoRettifica: "solo_credito",
+        creditoRestituito: 1,
+      });
+      expect(denied.status, denied.text).toBe(400);
+      expect(denied.body.error).toContain("inter");
+      expect(
+        await db
+          .select()
+          .from(speseEmporioStorniTable)
+          .where(eq(speseEmporioStorniTable.spesaEmporioId, c.spesa.id)),
+      ).toHaveLength(legacy === "saldi" ? 0 : 2);
+      const [lot] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.prodottoId, c.product));
+      const [person] = await db
+        .select()
+        .from(beneficiariTable)
+        .where(eq(beneficiariTable.id, c.fixture.beneficiarioId));
+      expect(Number(lot.quantitaResidua)).toBe(8);
+      expect(Number(person.creditoSolidaleSaldo)).toBe(14);
+    },
+  );
+
+  it("C06/C10 FEFO multi-lotto non definisce il rimborso; nessun resto redistribuito", async () => {
+    const c = await cExpense("3", 1, "kg", true);
+    expect(c.spesa.righe).toHaveLength(2);
+    expect(
+      c.spesa.righe
+        .map((row: { creditoTotale: number }) => row.creditoTotale)
+        .sort(),
+    ).toEqual([1, 2]);
+    expect(c.spesa.totaleCreditoConsumati).toBe(3);
+    for (const row of c.spesa.righe) {
+      const denied = await cPost(c, {
+        righe: [{ spesaRigaId: row.id, quantita: "0.5" }],
+      });
+      expect(denied.status, denied.text).toBe(409);
+      expect(denied.body.error).toContain("frazione di credito");
+    }
+    expect(
+      await db
+        .select()
+        .from(speseEmporioStorniTable)
+        .where(eq(speseEmporioStorniTable.spesaEmporioId, c.spesa.id)),
+    ).toHaveLength(0);
+    const full = await cPost(c, {});
+    expect(full.status, full.text).toBe(201);
+    expect(full.body.creditoRestituito).toBe(3);
+  });
+
+  it("C09/C23 solo reso quantitativo riduce il mese della Spesa originaria", async () => {
+    const c = await cExpense();
+    await db
+      .update(speseEmporioTable)
+      .set({ dataChiusura: new Date("2026-09-20T10:00:00Z") })
+      .where(eq(speseEmporioTable.id, c.spesa.id));
+    const net = (date: string) =>
+      quantitaNettaMensileProdotto(
+        db,
+        c.fixture.beneficiarioId,
+        c.product,
+        new Date(date + "T12:00:00Z"),
+      );
+    expect(await net("2026-09-20")).toBe(2);
+    const credit = await cPost(c, {
+      tipoRettifica: "solo_credito",
+      creditoRestituito: 1,
+    });
+    expect(credit.status).toBe(201);
+    expect(await net("2026-09-20")).toBe(2);
+    const partial = await cPost(c, {
+      righe: [{ spesaRigaId: c.spesa.righe[0].id, quantita: "1" }],
+    });
+    expect(partial.status, partial.text).toBe(201);
+    expect(partial.body.creditoRestituito).toBe(3);
+    expect(await net("2026-09-20")).toBe(1);
+    expect(await net("2026-10-10")).toBe(0);
+  });
+
+  it("C24 sei decimali preservati UI-contract → API → DB → risposta", async () => {
+    const c = await cExpense("1000000", 0.000001, "kg");
+    const response = await cPost(c, {
+      righe: [{ spesaRigaId: c.spesa.righe[0].id, quantita: "0.000001" }],
+    });
+    expect(response.status, response.text).toBe(201);
+    expect(response.body.creditoRestituito).toBe(1);
+    expect(response.body.spesa.righe[0].quantitaStornata).toBe(0.000001);
+    const [physical] = await db
+      .select()
+      .from(speseEmporioStorniRigheTable)
+      .where(eq(speseEmporioStorniRigheTable.stornoId, response.body.stornoId));
+    expect(Number(physical.quantita)).toBe(0.000001);
+  });
+
+  it.each([
+    ["lotti", "UPDATE"],
+    ["credito_solidale_movimenti", "INSERT"],
+    ["comandi_operativi", "INSERT"],
+    ["audit_eventi", "INSERT"],
+  ])(
+    "C28 fault %s: stock, credito, ricevuta e audit annullati insieme",
+    async (table, operation) => {
+      expect(process.env.M62C_DISPOSABLE_DB).toBe("verified");
+      const c = await cExpense();
+      const admin = await pool.connect(),
+        name = `m62c_fault_${rnd()}`;
+      const condition =
+        table === "lotti"
+          ? `NEW.prodotto_id=${c.product}`
+          : table === "credito_solidale_movimenti"
+            ? `NEW.beneficiario_id=${c.fixture.beneficiarioId}`
+            : table === "comandi_operativi"
+              ? `NEW.aggregato_tipo='spesa_emporio' AND NEW.aggregato_id=${c.spesa.id}`
+              : `NEW.entita_tipo='storno_spesa_emporio' AND NEW.magazzino_id_snapshot=${c.fixture.magazzinoId}`;
+      try {
+        await admin.query(
+          `CREATE FUNCTION pg_temp.${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'M62C fault injection'; END $$`,
+        );
+        await admin.query(
+          `CREATE TRIGGER ${name} BEFORE ${operation} ON ${table} FOR EACH ROW WHEN (${condition}) EXECUTE FUNCTION pg_temp.${name}()`,
+        );
+        expect((await cPost(c, {})).status).toBe(500);
+        const [lot] = await db
+          .select()
+          .from(lottiTable)
+          .where(eq(lottiTable.prodottoId, c.product));
+        const [person] = await db
+          .select()
+          .from(beneficiariTable)
+          .where(eq(beneficiariTable.id, c.fixture.beneficiarioId));
+        expect(Number(lot.quantitaResidua)).toBe(8);
+        expect(Number(person.creditoSolidaleSaldo)).toBe(14);
+        expect(
+          (
+            await pool.query(
+              "SELECT count(*)::int n FROM comandi_operativi WHERE aggregato_tipo='spesa_emporio' AND aggregato_id=$1",
+              [c.spesa.id],
+            )
+          ).rows[0].n,
+        ).toBe(0);
+        expect(
+          (
+            await pool.query(
+              "SELECT count(*)::int n FROM audit_eventi WHERE entita_tipo='storno_spesa_emporio' AND magazzino_id_snapshot=$1",
+              [c.fixture.magazzinoId],
+            )
+          ).rows[0].n,
+        ).toBe(0);
+        expect(
+          await db
+            .select()
+            .from(speseEmporioStorniTable)
+            .where(eq(speseEmporioStorniTable.spesaEmporioId, c.spesa.id)),
+        ).toHaveLength(0);
+      } finally {
+        await admin.query(`DROP TRIGGER IF EXISTS ${name} ON ${table}`);
+        await admin.query(`DROP FUNCTION pg_temp.${name}()`);
+        admin.release();
+      }
+    },
+  );
+
+  it("C02 input frazionario diretto non crea rettifiche", async () => {
+    const c = await cExpense();
+    for (const amount of ["0.5", "1,5", "2.25", "3.0000000000000001"]) {
+      expect(
+        (
+          await cPost(c, {
+            tipoRettifica: "solo_credito",
+            creditoRestituito: amount,
+          })
+        ).status,
+      ).toBe(400);
+      const topup = await request(c.server)
+        .post(
+          `/credito-solidale/beneficiari/${c.fixture.beneficiarioId}/ricarica-manuale`,
+        )
+        .send({ variazioneCredito: amount, motivo: "Vietato frazionario" });
+      expect(topup.status, topup.text).toBe(400);
+      const product = await request(c.server)
+        .patch(`/prodotti/${c.product}`)
+        .send({ creditoSolidaleValore: amount });
+      expect(product.status, product.text).toBe(400);
+      const policy = await request(c.server)
+        .post("/politiche-credito-solidale")
+        .send({ nome: `C invalid ${rnd()}`, creditoBaseNucleo: amount });
+      expect(policy.status, policy.text).toBe(400);
+      const config = await request(c.server)
+        .patch(
+          `/credito-solidale/beneficiari/${c.fixture.beneficiarioId}/configurazione`,
+        )
+        .send({ creditoSolidaleMensileAssegnato: amount });
+      expect(config.status, config.text).toBe(400);
+    }
+    expect(
+      await db
+        .select()
+        .from(speseEmporioStorniTable)
+        .where(eq(speseEmporioStorniTable.spesaEmporioId, c.spesa.id)),
+    ).toHaveLength(0);
+  });
+
+  it("C17 reso non distribuibile: scarto M4, saldo corretto, lotto sano invariato", async () => {
+    const c = await cExpense();
+    const result = await cPost(c, {
+      tipoRettifica: "reso_non_distribuibile",
+      righe: [{ spesaRigaId: c.spesa.righe[0].id, quantita: "1" }],
+    });
+    expect(result.status, result.text).toBe(201);
+    expect(result.body.creditoRestituito).toBe(3);
+    const [lot] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.prodottoId, c.product));
+    expect(Number(lot.quantitaResidua)).toBe(8);
+    const events = await db
+      .select()
+      .from(movimentiTable)
+      .where(eq(movimentiTable.prodottoId, c.product));
+    expect(
+      events.filter((row) => row.naturaContabile === "SCARTO"),
+    ).toHaveLength(1);
+    expect(
+      events.filter((row) => row.tipoDettaglio === "storno_spesa_emporio"),
+    ).toHaveLength(1);
+    expect(events.every((row) => row.auditEventoId != null)).toBe(true);
+  });
+
+  it("C19/C20 storni esterni credito e Bolla Emporio rifiutati prima degli effetti", async () => {
+    const c = await cExpense();
+    const credit = await request(c.server)
+      .post(
+        `/credito-solidale/movimenti/${c.spesa.movimentoCreditoSolidaleId}/storno`,
+      )
+      .send({ motivo: "Vietato" });
+    expect(credit.status, credit.text).toBe(409);
+    expect(credit.body.error).toContain("Rettifica spesa");
+    const [currentBill] = await db
+      .select()
+      .from(bolleTable)
+      .where(eq(bolleTable.id, c.spesa.bollaId));
+    const bill = await request(c.server)
+      .post(`/bolle/${c.spesa.bollaId}/storno-amministrativo`)
+      .send({
+        motivo: "Vietato",
+        rigaIds: [c.spesa.righe[0].bollaRigaId],
+        versione: currentBill.versione,
+        idempotencyKey: `outside-${rnd()}`,
+      });
+    expect(bill.status, bill.text).toBe(409);
+    expect(bill.body.error).toContain("Rettifica spesa");
+    const [lot] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.prodottoId, c.product));
+    expect(Number(lot.quantitaResidua)).toBe(8);
+  });
+
+  it("C11 due rimborsi concorrenti, barriera PostgreSQL osservata sulla Spesa", async () => {
+    const c = await cExpense();
+    const blocker = await pool.connect();
+    let pending: Array<Promise<request.Response>> = [];
+    try {
+      await blocker.query("BEGIN");
+      const pid = (await blocker.query("SELECT pg_backend_pid() pid")).rows[0]
+        .pid;
+      await blocker.query(
+        "SELECT id FROM spese_emporio WHERE id=$1 FOR UPDATE",
+        [c.spesa.id],
+      );
+      pending = [1, 2].map(() =>
+        cPost(c, { tipoRettifica: "solo_credito", creditoRestituito: 4 }).then(
+          (r) => r,
+        ),
+      );
+      await observedWait(pid, 2);
+      await blocker.query("COMMIT");
+      const results = await Promise.all(pending);
+      expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+      expect(
+        (
+          await db
+            .select()
+            .from(speseEmporioStorniTable)
+            .where(eq(speseEmporioStorniTable.spesaEmporioId, c.spesa.id))
+        ).reduce((sum, row) => sum + Number(row.creditoRestituito), 0),
+      ).toBe(4);
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      await Promise.allSettled(pending);
+    }
+  });
+
+  it("C22 replay e recupero rivalidano la revoca corrente senza alterare sessione", async () => {
+    const c = await cExpense();
+    const key = `revoca-${rnd()}`;
+    const first = await cPost(c, { idempotencyKey: key });
+    expect(first.status, first.text).toBe(201);
+    const [actor] = await db
+      .select()
+      .from(utentiTable)
+      .where(eq(utentiTable.id, operatorUserId));
+    await db
+      .update(ruoliTable)
+      .set({ isAdmin: false, permessi: ["emporio.cassa.operate"] })
+      .where(eq(ruoliTable.id, actor.ruoloId!));
+    expect((await cPost(c, { idempotencyKey: key })).status).toBe(403);
+    expect(
+      (
+        await request(c.server).get(
+          `/spese-emporio/${c.spesa.id}/rettifiche/esito/${key}`,
+        )
+      ).status,
+    ).toBe(403);
+  });
+
+  it("C11 parziale contro totale: quantità e rimborso cumulativi sotto lock", async () => {
+    const c = await cExpense(),
+      blocker = await pool.connect();
+    let pending: Array<Promise<request.Response>> = [];
+    try {
+      await blocker.query("BEGIN");
+      const pid = (await blocker.query("SELECT pg_backend_pid() pid")).rows[0]
+        .pid;
+      await blocker.query(
+        "SELECT id FROM spese_emporio WHERE id=$1 FOR UPDATE",
+        [c.spesa.id],
+      );
+      pending = [
+        cPost(c, {
+          righe: [{ spesaRigaId: c.spesa.righe[0].id, quantita: "1" }],
+        }).then((r) => r),
+        cPost(c, {}).then((r) => r),
+      ];
+      await observedWait(pid, 2);
+      await blocker.query("COMMIT");
+      const results = await Promise.all(pending);
+      expect(results.every((r) => [201, 409].includes(r.status))).toBe(true);
+      expect(results.filter((r) => r.status === 201).length).toBeGreaterThan(0);
+      expect(
+        (
+          await db
+            .select()
+            .from(speseEmporioStorniTable)
+            .where(eq(speseEmporioStorniTable.spesaEmporioId, c.spesa.id))
+        ).reduce((s, r) => s + Number(r.creditoRestituito), 0),
+      ).toBe(6);
+      const [lot] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.prodottoId, c.product));
+      expect(Number(lot.quantitaResidua)).toBe(10);
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      await Promise.allSettled(pending);
+    }
+  });
+
+  it.each(["credito", "bolla"])(
+    "C19/C20 rettifica in corso contro compensazione esterna %s",
+    async (kind) => {
+      const c = await cExpense(),
+        blocker = await pool.connect();
+      let pending: Promise<request.Response> | undefined;
+      try {
+        await blocker.query("BEGIN");
+        const pid = (await blocker.query("SELECT pg_backend_pid() pid")).rows[0]
+          .pid;
+        await blocker.query(
+          "SELECT id FROM spese_emporio WHERE id=$1 FOR UPDATE",
+          [c.spesa.id],
+        );
+        pending = cPost(c, {}).then((r) => r);
+        await observedWait(pid);
+        const [bill] = await db
+          .select()
+          .from(bolleTable)
+          .where(eq(bolleTable.id, c.spesa.bollaId));
+        const denied =
+          kind === "credito"
+            ? await request(c.server)
+                .post(
+                  `/credito-solidale/movimenti/${c.spesa.movimentoCreditoSolidaleId}/storno`,
+                )
+                .send({ motivo: "Conflitto sintetico" })
+            : await request(c.server)
+                .post(`/bolle/${c.spesa.bollaId}/storno-amministrativo`)
+                .send({
+                  motivo: "Conflitto sintetico",
+                  versione: bill.versione,
+                  rigaIds: [c.spesa.righe[0].bollaRigaId],
+                  idempotencyKey: `external-${rnd()}`,
+                });
+        expect(denied.status, denied.text).toBe(409);
+        expect(denied.body.error).toContain("Rettifica spesa");
+        await blocker.query("COMMIT");
+        expect((await pending).status).toBe(201);
+        expect(
+          await db
+            .select()
+            .from(speseEmporioStorniTable)
+            .where(eq(speseEmporioStorniTable.spesaEmporioId, c.spesa.id)),
+        ).toHaveLength(1);
+      } finally {
+        await blocker.query("ROLLBACK");
+        blocker.release();
+        if (pending) await Promise.allSettled([pending]);
+      }
+    },
+  );
+
+  it("C22 revoca concorrente dopo il preliminare: rivalidazione transazionale", async () => {
+    const c = await cExpense(),
+      blocker = await pool.connect();
+    let pending: Promise<request.Response> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      const pid = (await blocker.query("SELECT pg_backend_pid() pid")).rows[0]
+        .pid;
+      await blocker.query(
+        "SELECT id FROM spese_emporio WHERE id=$1 FOR UPDATE",
+        [c.spesa.id],
+      );
+      pending = cPost(c, {}).then((r) => r);
+      await observedWait(pid);
+      const [actor] = await db
+        .select()
+        .from(utentiTable)
+        .where(eq(utentiTable.id, operatorUserId));
+      await db
+        .update(ruoliTable)
+        .set({ isAdmin: false, permessi: ["emporio.cassa.operate"] })
+        .where(eq(ruoliTable.id, actor.ruoloId!));
+      await blocker.query("COMMIT");
+      expect((await pending).status).toBe(403);
+      expect(
+        await db
+          .select()
+          .from(speseEmporioStorniTable)
+          .where(eq(speseEmporioStorniTable.spesaEmporioId, c.spesa.id)),
+      ).toHaveLength(0);
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      if (pending) await Promise.allSettled([pending]);
+    }
+  });
+
+  it("C11 rientro contro writer indipendente dello stesso lotto: nessun lost update", async () => {
+    const c = await cExpense(),
+      blocker = await pool.connect();
+    let pending: Promise<request.Response> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      const pid = (await blocker.query("SELECT pg_backend_pid() pid")).rows[0]
+        .pid;
+      // Simulate an independent inventory writer owning the canonical lot lock.
+      await blocker.query(
+        "UPDATE lotti SET quantita_residua=quantita_residua-1 WHERE prodotto_id=$1",
+        [c.product],
+      );
+      pending = cPost(c, {
+        righe: [{ spesaRigaId: c.spesa.righe[0].id, quantita: "1" }],
+      }).then((r) => r);
+      await observedWait(pid);
+      await blocker.query("COMMIT");
+      expect((await pending).status).toBe(201);
+      const [lot] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.prodottoId, c.product));
+      expect(Number(lot.quantitaResidua)).toBe(8);
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      if (pending) await Promise.allSettled([pending]);
+    }
+  });
+
+  it("C17 lotto divenuto scaduto: no reso idoneo, scarto atomico consentito", async () => {
+    const c = await cExpense();
+    await db
+      .update(lottiTable)
+      .set({ dataScadenza: "2020-01-01" })
+      .where(eq(lottiTable.prodottoId, c.product));
+    expect((await cPost(c, {})).status).toBe(409);
+    expect(
+      (await cPost(c, { tipoRettifica: "reso_non_distribuibile" })).status,
+    ).toBe(201);
+    const [lot] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.prodottoId, c.product));
+    expect(Number(lot.quantitaResidua)).toBe(8);
+    expect(lot.dataScadenza).toBe("2020-01-01");
+  });
+
   async function observedWait(blockerPid: number, expected = 1) {
     const deadline = Date.now() + 15_000;
     while (Date.now() < deadline) {
@@ -759,6 +1618,7 @@ describe("Cassa Emporio", () => {
     const kg = await createProdotto({
       magazzinoId: fixture.magazzinoId,
       unitaMisura: "kg",
+      creditoSolidaleValore: "8",
     });
     const session = await openSession(fixture.accessoId);
     expect((await addProduct(session.body.id, pieces, 1)).status).toBe(201);
@@ -789,8 +1649,8 @@ describe("Cassa Emporio", () => {
           m.auditEventoId != null && m.lottoId != null && m.bollaRigaId != null,
       ),
     ).toBe(true);
-    // Fixture price is 2.50: 1 pz + 0.125 kg => 2.50 + 0.31 frozen credits.
-    expect(close.body.spesa.totaleCreditoConsumati).toBe(2.81);
+    // M6.2-C: 1 pz × 2 + 0.125 kg × 8 = 3 crediti, senza arrotondamenti.
+    expect(close.body.spesa.totaleCreditoConsumati).toBe(3);
   });
 
   it.each(["saldo", "limite mensile"])(
@@ -2261,6 +3121,8 @@ describe("Cassa Emporio", () => {
 
   it("mostra beneficiari accreditati e filtra gli accessi validi per data, area ed Emporio", async () => {
     const fixture = await createFixture();
+    const app = makeApp();
+    const server = await cListeners.open(app, () => app);
     const otherAreaOperativaId = await createAreaOperativa();
     const otherCentroId = await createCentro(otherAreaOperativaId);
     const otherMagazzinoId = await createMagazzino(
@@ -2269,7 +3131,7 @@ describe("Cassa Emporio", () => {
       otherCentroId,
     );
 
-    const list = await request(makeApp())
+    const list = await request(server)
       .get("/cassa-emporio/beneficiari/ricerca")
       .query({
         data: "2026-07-15",
@@ -2284,7 +3146,7 @@ describe("Cassa Emporio", () => {
       fixture.accessoId,
     );
 
-    const wrongDate = await request(makeApp())
+    const wrongDate = await request(server)
       .get("/cassa-emporio/beneficiari/ricerca")
       .query({
         data: "2026-07-16",
@@ -2297,13 +3159,14 @@ describe("Cassa Emporio", () => {
     );
     expect(wrongDateRow?.accessi).toEqual([]);
 
-    const wrongEmporio = await request(makeApp())
+    const wrongEmporio = await request(server)
       .get("/cassa-emporio/beneficiari/ricerca")
       .query({
         data: "2026-07-15",
         areaOperativaId: fixture.areaOperativaId,
         magazzinoEmporioId: otherMagazzinoId,
       });
+    expect(wrongEmporio.status, wrongEmporio.text).toBe(200);
     expect(
       wrongEmporio.body.map(
         (b: { beneficiarioId: number }) => b.beneficiarioId,
@@ -2442,7 +3305,7 @@ describe("Cassa Emporio", () => {
     const fixture = await createFixture();
     const prodottoId = await createProdotto({
       magazzinoId: fixture.magazzinoId,
-      creditoSolidaleValore: "2.50",
+      creditoSolidaleValore: "3",
     });
     const sessione = await openSession(fixture.accessoId);
 
@@ -2451,7 +3314,7 @@ describe("Cassa Emporio", () => {
     let detail = await request(makeApp()).get(
       `/cassa-emporio/sessioni/${sessione.body.id}`,
     );
-    expect(detail.body.totaleCreditoPrevisto).toBe(5);
+    expect(detail.body.totaleCreditoPrevisto).toBe(6);
 
     const patch = await request(makeApp())
       .patch(`/cassa-emporio/sessioni/${sessione.body.id}/righe/${add.body.id}`)
@@ -2463,7 +3326,7 @@ describe("Cassa Emporio", () => {
     detail = await request(makeApp()).get(
       `/cassa-emporio/sessioni/${sessione.body.id}`,
     );
-    expect(detail.body.totaleCreditoPrevisto).toBe(7.5);
+    expect(detail.body.totaleCreditoPrevisto).toBe(9);
 
     const ready = await postSessionAction(
       sessione.body.id,
@@ -3540,7 +4403,7 @@ describe("Cassa Emporio", () => {
         .every(
           (movement) =>
             movement.operatoreId === operatorUserId &&
-            movement.auditEventoId === null,
+            movement.auditEventoId != null,
         ),
     ).toBe(true);
     expect(
@@ -3580,7 +4443,10 @@ describe("Cassa Emporio", () => {
 
     const response = await request(makeApp())
       .post(`/spese-emporio/${close.body.spesa.id}/storna`)
-      .send({ motivo: "Riferimento legacy incompleto" });
+      .send({
+        motivo: "Riferimento legacy incompleto",
+        idempotencyKey: `legacy-${rnd()}`,
+      });
     expect(response.status).toBe(409);
 
     expect(
@@ -4027,6 +4893,7 @@ describe("Cassa Emporio", () => {
     const prodottoLitriId = await createProdotto({
       magazzinoId: fixture.magazzinoId,
       unitaMisura: "l",
+      creditoSolidaleValore: "4",
     });
     const prodottoMillilitriId = await createProdotto({
       magazzinoId: fixture.magazzinoId,
@@ -4075,7 +4942,7 @@ describe("Cassa Emporio", () => {
 
     await db
       .update(sessioniCassaEmporioRigheTable)
-      .set({ quantita: "0.50", creditoTotale: "0.50" })
+      .set({ quantita: "0.50", creditoTotale: "1" })
       .where(eq(sessioniCassaEmporioRigheTable.id, pz.body.id));
     expect(
       (await postSessionAction(sessione.body.id, "pronta-per-chiusura")).status,

@@ -9722,6 +9722,16 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
 }))
 }),zod.null()]).optional(),
   "spesa": zod.union([zod.object({
+  "creditoGiaRestituito": zod.number().optional().describe('Proiezione storica; i nuovi importi operativi sono interi'),
+  "creditoRimborsabile": zod.number().optional(),
+  "creditoConforme": zod.boolean().optional(),
+  "rettifiche": zod.array(zod.object({
+  "id": zod.number(),
+  "tipoRettifica": zod.string(),
+  "motivo": zod.string(),
+  "creditoRestituito": zod.number(),
+  "createdAt": zod.string()
+})).optional(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -9788,6 +9798,16 @@ export const ChiudiSessioneCassaEmporioResponse = zod.object({
   "errore": zod.string().nullish(),
   "messaggio": zod.string().optional(),
   "spesa": zod.union([zod.object({
+  "creditoGiaRestituito": zod.number().optional().describe('Proiezione storica; i nuovi importi operativi sono interi'),
+  "creditoRimborsabile": zod.number().optional(),
+  "creditoConforme": zod.boolean().optional(),
+  "rettifiche": zod.array(zod.object({
+  "id": zod.number(),
+  "tipoRettifica": zod.string(),
+  "motivo": zod.string(),
+  "creditoRestituito": zod.number(),
+  "createdAt": zod.string()
+})).optional(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -9930,6 +9950,16 @@ export const listSpeseEmporioResponseRigheItemQuantitaStornabileMin = 0;
 
 
 export const ListSpeseEmporioResponseItem = zod.object({
+  "creditoGiaRestituito": zod.number().optional().describe('Proiezione storica; i nuovi importi operativi sono interi'),
+  "creditoRimborsabile": zod.number().optional(),
+  "creditoConforme": zod.boolean().optional(),
+  "rettifiche": zod.array(zod.object({
+  "id": zod.number(),
+  "tipoRettifica": zod.string(),
+  "motivo": zod.string(),
+  "creditoRestituito": zod.number(),
+  "createdAt": zod.string()
+})).optional(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -10002,6 +10032,16 @@ export const getSpesaEmporioBySessioneResponseRigheItemQuantitaStornabileMin = 0
 
 
 export const GetSpesaEmporioBySessioneResponse = zod.object({
+  "creditoGiaRestituito": zod.number().optional().describe('Proiezione storica; i nuovi importi operativi sono interi'),
+  "creditoRimborsabile": zod.number().optional(),
+  "creditoConforme": zod.boolean().optional(),
+  "rettifiche": zod.array(zod.object({
+  "id": zod.number(),
+  "tipoRettifica": zod.string(),
+  "motivo": zod.string(),
+  "creditoRestituito": zod.number(),
+  "createdAt": zod.string()
+})).optional(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -10070,6 +10110,16 @@ export const getSpesaEmporioResponseRigheItemQuantitaStornabileMin = 0;
 
 
 export const GetSpesaEmporioResponse = zod.object({
+  "creditoGiaRestituito": zod.number().optional().describe('Proiezione storica; i nuovi importi operativi sono interi'),
+  "creditoRimborsabile": zod.number().optional(),
+  "creditoConforme": zod.boolean().optional(),
+  "rettifiche": zod.array(zod.object({
+  "id": zod.number(),
+  "tipoRettifica": zod.string(),
+  "motivo": zod.string(),
+  "creditoRestituito": zod.number(),
+  "createdAt": zod.string()
+})).optional(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -10202,6 +10252,16 @@ export const RegistraInvioManualeBollaSpesaEmporioResponse = zod.object({
   "errore": zod.string().nullish(),
   "messaggio": zod.string().optional(),
   "spesa": zod.union([zod.object({
+  "creditoGiaRestituito": zod.number().optional().describe('Proiezione storica; i nuovi importi operativi sono interi'),
+  "creditoRimborsabile": zod.number().optional(),
+  "creditoConforme": zod.boolean().optional(),
+  "rettifiche": zod.array(zod.object({
+  "id": zod.number(),
+  "tipoRettifica": zod.string(),
+  "motivo": zod.string(),
+  "creditoRestituito": zod.number(),
+  "createdAt": zod.string()
+})).optional(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -10285,6 +10345,16 @@ export const InviaBollaEmailSpesaEmporioResponse = zod.object({
   "errore": zod.string().nullish(),
   "messaggio": zod.string().optional(),
   "spesa": zod.union([zod.object({
+  "creditoGiaRestituito": zod.number().optional().describe('Proiezione storica; i nuovi importi operativi sono interi'),
+  "creditoRimborsabile": zod.number().optional(),
+  "creditoConforme": zod.boolean().optional(),
+  "rettifiche": zod.array(zod.object({
+  "id": zod.number(),
+  "tipoRettifica": zod.string(),
+  "motivo": zod.string(),
+  "creditoRestituito": zod.number(),
+  "createdAt": zod.string()
+})).optional(),
   "id": zod.number(),
   "sessioneCassaId": zod.number(),
   "accessoEmporioId": zod.number(),
@@ -10355,24 +10425,114 @@ export const StornaSpesaEmporioHeader = zod.object({
   "Idempotency-Key": zod.string().max(stornaSpesaEmporioHeaderIdempotencyKeyMax).optional()
 })
 
+export const stornaSpesaEmporioBodyTipoRettificaDefault = `reso_idoneo`;
+export const stornaSpesaEmporioBodyCreditoRestituitoMax = 99999999;
+
 export const stornaSpesaEmporioBodyMotivoMax = 2000;
 
 
-export const stornaSpesaEmporioBodyRigheItemQuantitaMin = 0.01;
-export const stornaSpesaEmporioBodyRigheItemQuantitaMultipleOf = 0.01;
-
+export const stornaSpesaEmporioBodyRigheItemQuantitaRegExp = new RegExp('^[0-9]+(?:\\.[0-9]{1,6})?$');
 
 export const stornaSpesaEmporioBodyIdempotencyKeyMax = 100;
 
 
 
 export const StornaSpesaEmporioBody = zod.object({
+  "tipoRettifica": zod.enum(['reso_idoneo', 'reso_non_distribuibile', 'errore_amministrativo', 'solo_credito']).default(stornaSpesaEmporioBodyTipoRettificaDefault),
+  "creditoRestituito": zod.number().min(1).max(stornaSpesaEmporioBodyCreditoRestituitoMax).optional().describe('Solo per rettifiche economiche, senza righe fisiche'),
   "motivo": zod.string().min(1).max(stornaSpesaEmporioBodyMotivoMax),
   "righe": zod.array(zod.object({
   "spesaRigaId": zod.number().min(1),
-  "quantita": zod.number().min(stornaSpesaEmporioBodyRigheItemQuantitaMin).multipleOf(stornaSpesaEmporioBodyRigheItemQuantitaMultipleOf)
+  "quantita": zod.string().regex(stornaSpesaEmporioBodyRigheItemQuantitaRegExp).describe('Decimale esatto; non convertire in number JavaScript per i calcoli.')
 })).min(1).optional(),
-  "idempotencyKey": zod.string().max(stornaSpesaEmporioBodyIdempotencyKeyMax).optional()
+  "idempotencyKey": zod.string().max(stornaSpesaEmporioBodyIdempotencyKeyMax)
+})
+
+
+export const getEsitoRettificaSpesaEmporioPathKeyMax = 100;
+
+
+
+export const GetEsitoRettificaSpesaEmporioParams = zod.object({
+  "id": zod.coerce.number(),
+  "key": zod.coerce.string().max(getEsitoRettificaSpesaEmporioPathKeyMax)
+})
+
+export const getEsitoRettificaSpesaEmporioResponseSpesaRigheItemQuantitaStornataMin = 0;
+
+export const getEsitoRettificaSpesaEmporioResponseSpesaRigheItemQuantitaStornabileMin = 0;
+
+
+
+export const GetEsitoRettificaSpesaEmporioResponse = zod.object({
+  "stornoId": zod.number(),
+  "creditoRestituito": zod.number(),
+  "spesa": zod.object({
+  "creditoGiaRestituito": zod.number().optional().describe('Proiezione storica; i nuovi importi operativi sono interi'),
+  "creditoRimborsabile": zod.number().optional(),
+  "creditoConforme": zod.boolean().optional(),
+  "rettifiche": zod.array(zod.object({
+  "id": zod.number(),
+  "tipoRettifica": zod.string(),
+  "motivo": zod.string(),
+  "creditoRestituito": zod.number(),
+  "createdAt": zod.string()
+})).optional(),
+  "id": zod.number(),
+  "sessioneCassaId": zod.number(),
+  "accessoEmporioId": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullish(),
+  "centroAscoltoId": zod.number().nullish(),
+  "centroAscoltoNome": zod.string().nullish(),
+  "areaOperativaId": zod.number().nullish(),
+  "areaOperativaNome": zod.string().nullish(),
+  "magazzinoEmporioId": zod.number(),
+  "magazzinoEmporioNome": zod.string().nullish(),
+  "scaricoId": zod.number().nullish(),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "movimentoCreditoSolidaleId": zod.number().nullish(),
+  "numeroSpesa": zod.string(),
+  "dataChiusura": zod.coerce.date(),
+  "totaleCreditoConsumati": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "statoSpesa": zod.enum(['chiusa', 'stornata_parzialmente', 'stornata']),
+  "operatoreChiusuraId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "emailBollaStato": zod.enum(['non_preparata', 'invio_manuale_avviato', 'nessun_destinatario', 'errore']),
+  "emailBollaDestinatari": zod.string().nullish(),
+  "emailBollaDataInvio": zod.coerce.date().nullish(),
+  "emailBollaDataUltimoClick": zod.coerce.date().nullish(),
+  "emailBollaOperatoreId": zod.number().nullish(),
+  "emailBollaOggetto": zod.string().nullish(),
+  "emailBollaErrore": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "righe": zod.array(zod.object({
+  "id": zod.number(),
+  "spesaEmporioId": zod.number(),
+  "sessioneCassaRigaId": zod.number().nullish(),
+  "prodottoId": zod.number(),
+  "prodottoNome": zod.string().nullish(),
+  "lottoId": zod.number().nullish(),
+  "codiceLotto": zod.string().nullish(),
+  "codiceProdotto": zod.string().nullish(),
+  "descrizioneProdotto": zod.string(),
+  "quantita": zod.number(),
+  "unitaMisura": zod.string().nullish(),
+  "quantitaStornata": zod.number().min(getEsitoRettificaSpesaEmporioResponseSpesaRigheItemQuantitaStornataMin),
+  "quantitaStornabile": zod.number().min(getEsitoRettificaSpesaEmporioResponseSpesaRigheItemQuantitaStornabileMin),
+  "creditoUnitario": zod.number(),
+  "creditoTotale": zod.number(),
+  "scaricoId": zod.number().nullish(),
+  "bollaRigaId": zod.number().nullish(),
+  "fsePlus": zod.boolean()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
 })
 
 
@@ -13213,8 +13373,10 @@ export const UpdateCreditoSolidaleBeneficiarioConfigurazioneParams = zod.object(
 })
 
 export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileAssegnatoMin = 0;
+export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileAssegnatoMax = 99999999;
 
 export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileSuggeritoMin = 0;
+export const updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileSuggeritoMax = 99999999;
 
 
 
@@ -13222,8 +13384,8 @@ export const UpdateCreditoSolidaleBeneficiarioConfigurazioneBody = zod.object({
   "creditoSolidaleAbilitato": zod.boolean().optional(),
   "creditoSolidaleStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']).optional(),
   "creditoSolidaleNote": zod.string().nullish(),
-  "creditoSolidaleMensileAssegnato": zod.number().min(updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileAssegnatoMin).nullish(),
-  "creditoSolidaleMensileSuggerito": zod.number().min(updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileSuggeritoMin).nullish(),
+  "creditoSolidaleMensileAssegnato": zod.number().min(updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileAssegnatoMin).max(updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileAssegnatoMax).nullish(),
+  "creditoSolidaleMensileSuggerito": zod.number().min(updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileSuggeritoMin).max(updateCreditoSolidaleBeneficiarioConfigurazioneBodyCreditoSolidaleMensileSuggeritoMax).nullish(),
   "creditoSolidaleMotivoModifica": zod.string().nullish()
 })
 
@@ -13328,12 +13490,12 @@ export const CreateCreditoSolidaleRicaricaManualeParams = zod.object({
   "beneficiarioId": zod.coerce.number()
 })
 
-export const createCreditoSolidaleRicaricaManualeBodyVariazioneCreditoMin = 0.01;
+export const createCreditoSolidaleRicaricaManualeBodyVariazioneCreditoMax = 99999999;
 
 
 
 export const CreateCreditoSolidaleRicaricaManualeBody = zod.object({
-  "variazioneCredito": zod.number().min(createCreditoSolidaleRicaricaManualeBodyVariazioneCreditoMin),
+  "variazioneCredito": zod.number().min(1).max(createCreditoSolidaleRicaricaManualeBodyVariazioneCreditoMax),
   "motivo": zod.string().nullish(),
   "note": zod.string().nullish()
 })
@@ -13343,8 +13505,13 @@ export const CreateCreditoSolidaleRettificaParams = zod.object({
   "beneficiarioId": zod.coerce.number()
 })
 
+export const createCreditoSolidaleRettificaBodyVariazioneCreditoMin = -99999999;
+export const createCreditoSolidaleRettificaBodyVariazioneCreditoMax = 99999999;
+
+
+
 export const CreateCreditoSolidaleRettificaBody = zod.object({
-  "variazioneCredito": zod.number(),
+  "variazioneCredito": zod.number().min(createCreditoSolidaleRettificaBodyVariazioneCreditoMin).max(createCreditoSolidaleRettificaBodyVariazioneCreditoMax),
   "motivo": zod.string(),
   "note": zod.string().nullish()
 })

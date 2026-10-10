@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
+import { creditoIntero, CreditoInteroError } from "../lib/creditoIntero";
 import {
   and,
   desc,
@@ -19,6 +20,8 @@ import {
   db,
   magazziniTable,
   politicheCreditoSolidaleTable,
+  speseEmporioTable,
+  speseEmporioStorniTable,
 } from "@workspace/db";
 import {
   callerCentroId,
@@ -101,9 +104,9 @@ const toNumber = (v: string | number | null | undefined): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const round2 = (n: number): number =>
-  Math.round((n + Number.EPSILON) * 100) / 100;
-const decimalString = (n: number): string => round2(n).toFixed(2);
+const round2 = (n: number): number => creditoIntero(n, { signed: true });
+const decimalString = (n: number): string =>
+  String(creditoIntero(n, { signed: true }));
 
 const nullableText = (v: unknown): string | null =>
   typeof v === "string" ? v.trim() || null : v == null ? null : String(v);
@@ -114,9 +117,12 @@ function currentPeriodo(): string {
 
 function parseDecimal(value: unknown): number | null {
   if (value == null || value === "") return null;
-  const n =
-    typeof value === "number" ? value : Number(String(value).replace(",", "."));
-  return Number.isFinite(n) ? round2(n) : null;
+  try {
+    return creditoIntero(value, { signed: true });
+  } catch (error) {
+    if (error instanceof CreditoInteroError) return null;
+    throw error;
+  }
 }
 
 function parsePeriodo(value: unknown): string | null {
@@ -134,6 +140,8 @@ function parseOptionalId(value: unknown): { value?: number; error?: string } {
 }
 
 function applyRounding(value: number, mode: string): number {
+  // Validate BEFORE the historical policy: no mode may legalize a fraction.
+  creditoIntero(value);
   switch (mode) {
     case "intero_superiore":
       return Math.ceil(value);
@@ -439,7 +447,13 @@ async function creaMovimentoCreditoSolidaleTx(
     return { error: MONTHLY_ALREADY_DONE_MSG, status: 409 } as const;
   }
 
-  const saldoPrima = toNumber(beneficiario.creditoSolidaleSaldo);
+  const saldoPrima = creditoIntero(beneficiario.creditoSolidaleSaldo);
+  creditoIntero(input.variazioneCredito, { signed: true });
+  if (input.variazioneCredito === 0)
+    return {
+      error: "Un movimento di credito non può avere importo zero.",
+      status: 400,
+    } as const;
   const saldoDopo = round2(saldoPrima + input.variazioneCredito);
   if (saldoDopo < 0)
     return { error: NEGATIVE_BALANCE_MSG, status: 400 } as const;
@@ -951,6 +965,13 @@ router.patch(
       return;
     }
     const input = parsed.data;
+    for (const field of [
+      "creditoSolidaleMensileAssegnato",
+      "creditoSolidaleMensileSuggerito",
+    ] as const) {
+      if (req.body?.[field] != null && req.body[field] !== "")
+        creditoIntero(req.body[field]);
+    }
     const row = await db.transaction(async (tx) => {
       const { beneficiary: existing } = await requireEmporioCommandTx(
         tx,
@@ -1308,6 +1329,28 @@ router.post(
           error: "Il movimento è già stato stornato.",
           status: 400,
         } as const;
+      const [spesaOwner] = await tx
+        .select({ id: speseEmporioTable.id })
+        .from(speseEmporioTable)
+        .where(eq(speseEmporioTable.movimentoCreditoSolidaleId, originale.id))
+        .limit(1);
+      const [rettificaOwner] = await tx
+        .select({ id: speseEmporioStorniTable.id })
+        .from(speseEmporioStorniTable)
+        .where(
+          eq(speseEmporioStorniTable.movimentoCreditoSolidaleId, originale.id),
+        )
+        .limit(1);
+      if (
+        spesaOwner ||
+        rettificaOwner ||
+        originale.tipoMovimento === "consumo_spesa"
+      )
+        return {
+          error:
+            "Il credito di una Spesa Emporio si corregge esclusivamente da Rettifica spesa.",
+          status: 409,
+        } as const;
       const [beneficiario] = await tx
         .select()
         .from(beneficiariTable)
@@ -1452,5 +1495,19 @@ router.post(
   },
 );
 
+router.use(
+  (
+    error: unknown,
+    _req: Request,
+    res: import("express").Response,
+    next: import("express").NextFunction,
+  ) => {
+    if (error instanceof CreditoInteroError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    next(error);
+  },
+);
 router.use(emporioScopeErrorHandler);
 export default router;

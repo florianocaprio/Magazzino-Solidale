@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    setupFiles: ["./tests/setup-http.ts"],
     // These tests share a single real database, so they must not run in
     // parallel across files or workers.
     fileParallelism: false,

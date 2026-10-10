@@ -89,7 +89,10 @@ import { useTranslation } from "react-i18next";
 import * as z from "zod";
 import { fractionalQuantityAfterUnitChange } from "@/lib/product-quantity-form";
 
-const makeFormSchema = (t: (key: string) => string) => {
+const makeFormSchema = (
+  t: (key: string) => string,
+  unchangedCredit?: number,
+) => {
   const optionalNonNegativeNumber = z.preprocess(
     (value) => (value === "" || value == null ? null : value),
     z.coerce.number().min(0, t("prodotti.errQuantitaNonNegative")).nullable(),
@@ -111,7 +114,12 @@ const makeFormSchema = (t: (key: string) => string) => {
     abilitatoEmporio: z.boolean().default(false),
     creditoSolidaleValore: z.coerce
       .number()
+      .max(99_999_999)
       .min(0, t("prodotti.errCreditoSolidaleNonNegative"))
+      .refine(
+        (value) => Number.isInteger(value) || value === unchangedCredit,
+        t("speseEmporio.creditoInteroRichiesto"),
+      )
       .default(0),
     quantitaMassimaPerSpesa: optionalNonNegativeNumber,
     quantitaMassimaMensile: optionalNonNegativeNumber,
@@ -168,7 +176,10 @@ export default function Prodotti() {
   const { emporioAbilitato } = useModuloFlags();
   const [isImportOpen, setIsImportOpen] = useState(false);
 
-  const formSchema = makeFormSchema(t);
+  const unchangedCredit = prodotti?.find(
+    (product) => product.id === editingId,
+  )?.creditoSolidaleValore;
+  const formSchema = makeFormSchema(t, unchangedCredit);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -262,8 +273,11 @@ export default function Prodotti() {
       });
     };
     if (editingId) {
+      const update = { ...data } as Partial<FormValues>;
+      if (data.creditoSolidaleValore === unchangedCredit)
+        delete update.creditoSolidaleValore;
       updateProdotto.mutate(
-        { id: editingId, data },
+        { id: editingId, data: update },
         {
           onSuccess: () => {
             queryClient.invalidateQueries({
@@ -1102,7 +1116,7 @@ export default function Prodotti() {
                             <Input
                               type="number"
                               min="0"
-                              step="0.01"
+                              step="1"
                               disabled={!emporioAbilitato || !abilitatoEmporio}
                               {...field}
                             />
