@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioIdentifierOrigine } from './volontarioIdentifierOrigine';
-import type { VolontarioIdentifierStato } from './volontarioIdentifierStato';
-import type { VolontarioIdentifierTipoIdentificativo } from './volontarioIdentifierTipoIdentificativo';
+import type { VolontarioIdentifierOrigine } from "./volontarioIdentifierOrigine";
+import type { VolontarioIdentifierStato } from "./volontarioIdentifierStato";
+import type { VolontarioIdentifierTipoIdentificativo } from "./volontarioIdentifierTipoIdentificativo";
 
 export interface VolontarioIdentifier {
   id: number;

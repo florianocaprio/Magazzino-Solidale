@@ -27,6 +27,7 @@ import {
   insertBolla,
   insertIntervento,
 } from "./scope-helpers";
+import { createPersistedSocialActor } from "./persisted-social-actor";
 
 /**
  * Centro scoping for indirect-link entities (consegne, bolle, interventi):
@@ -46,6 +47,9 @@ let benB: number;
 let benNull: number;
 let magNull: number;
 let magB: number;
+let socialActor: Awaited<ReturnType<typeof createPersistedSocialActor>>;
+let globalSocialActor: typeof socialActor;
+let unassignedSocialActor: typeof socialActor;
 
 const idsOf = (body: unknown) => {
   const rows = Array.isArray(body)
@@ -56,7 +60,15 @@ const idsOf = (body: unknown) => {
 const appAs = (
   router: Parameters<typeof makeScopedApp>[0],
   centro: number | null,
-) => makeScopedApp(router, { id: operatoreId, centroAscoltoId: centro });
+) =>
+  makeScopedApp(
+    router,
+    router === interventiRouter
+      ? centro === null
+        ? globalSocialActor
+        : socialActor
+      : { id: operatoreId, centroAscoltoId: centro },
+  );
 const commandKey = (label: string) => `${label}-${randomUUID()}`;
 
 beforeAll(async () => {
@@ -74,6 +86,26 @@ beforeEach(async () => {
   benNull = await createBeneficiario(scope, null, { areaOperativaId });
   magNull = await createMagazzino(scope, null);
   magB = await createMagazzino(scope, centroB);
+  const actors = [];
+  for (const input of [
+    { areaOperativaId, centroAscoltoId: centroA, isAdmin: false },
+    { areaOperativaId: null, centroAscoltoId: null, isAdmin: true },
+    { areaOperativaId: null, centroAscoltoId: null, isAdmin: false },
+  ]) {
+    const actor = await createPersistedSocialActor({
+      ...input,
+      aree: ["sociale"],
+      permessi: [
+        "sociale.interventi.view",
+        "sociale.interventi.create",
+        "sociale.interventi.update",
+      ],
+    });
+    actors.push(actor);
+    scope.utenteIds.push(actor.id);
+    scope.ruoloIds.push(actor.ruoloId);
+  }
+  [socialActor, globalSocialActor, unassignedSocialActor] = actors;
 });
 
 afterEach(async () => {
@@ -341,6 +373,26 @@ describe("Bolle — scoping via beneficiario", () => {
 });
 
 describe("Interventi — scoping via beneficiario", () => {
+  it("ordinario senza Area non diventa globale: lista vuota e comandi negati", async () => {
+    const id = await insertIntervento(scope, { beneficiarioId: benA });
+    const app = makeScopedApp(interventiRouter, unassignedSocialActor);
+    const list = await request(app)
+      .get("/interventi")
+      .query({ ambito: "sociale" });
+    expect(list.status).toBe(200);
+    expect(list.body).toEqual([]);
+    expect((await request(app).get(`/interventi/${id}`)).status).toBe(403);
+    expect(
+      (
+        await request(app).post("/interventi").send({
+          beneficiarioId: benA,
+          tipoIntervento: "Negato",
+          ambito: "sociale",
+          stato: "da_pianificare",
+        })
+      ).status,
+    ).toBe(403);
+  });
   it("lista: A vede gli interventi di benA, non quelli di benB o senza Centro", async () => {
     const iA = await insertIntervento(scope, { beneficiarioId: benA });
     const iB = await insertIntervento(scope, { beneficiarioId: benB });

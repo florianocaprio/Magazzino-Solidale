@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type TurnoStatoInputStato = typeof TurnoStatoInputStato[keyof typeof TurnoStatoInputStato];
-
+export type TurnoStatoInputStato =
+  (typeof TurnoStatoInputStato)[keyof typeof TurnoStatoInputStato];
 
 export const TurnoStatoInputStato = {
-  confermato: 'confermato',
-  completato: 'completato',
-  annullato: 'annullato',
+  confermato: "confermato",
+  completato: "completato",
+  annullato: "annullato",
 } as const;

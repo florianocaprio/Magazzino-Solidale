@@ -5,26 +5,26 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { InterventoAttivitaInput } from './interventoAttivitaInput';
-import type { InterventoDocumentoInput } from './interventoDocumentoInput';
-import type { InterventoMaterialeInput } from './interventoMaterialeInput';
+import type { InterventoAttivitaInput } from "./interventoAttivitaInput";
+import type { InterventoDocumentoInput } from "./interventoDocumentoInput";
+import type { InterventoMaterialeInput } from "./interventoMaterialeInput";
 
 export interface InterventoOperativitaInput {
   versione: Date;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   risultato?: string | null;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   esito?: string | null;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   note?: string | null;
   attivita?: InterventoAttivitaInput[];
   materiali?: InterventoMaterialeInput[];

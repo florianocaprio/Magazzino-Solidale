@@ -5,10 +5,10 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { AgeaImportazioneNoteAudit } from './ageaImportazioneNoteAudit';
-import type { AgeaImportazioneTracciatoCodice } from './ageaImportazioneTracciatoCodice';
-import type { AgeaImportModalita } from './ageaImportModalita';
-import type { AgeaImportStato } from './ageaImportStato';
+import type { AgeaImportazioneNoteAudit } from "./ageaImportazioneNoteAudit";
+import type { AgeaImportazioneTracciatoCodice } from "./ageaImportazioneTracciatoCodice";
+import type { AgeaImportModalita } from "./ageaImportModalita";
+import type { AgeaImportStato } from "./ageaImportStato";
 
 export interface AgeaImportazione {
   id: number;

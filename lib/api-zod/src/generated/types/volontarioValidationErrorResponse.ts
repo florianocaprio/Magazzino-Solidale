@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioFieldErrors } from './volontarioFieldErrors';
-import type { VolontarioValidationErrorResponseDetails } from './volontarioValidationErrorResponseDetails';
+import type { VolontarioFieldErrors } from "./volontarioFieldErrors";
+import type { VolontarioValidationErrorResponseDetails } from "./volontarioValidationErrorResponseDetails";
 
 export interface VolontarioValidationErrorResponse {
   error: string;

@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseResolutionInputAzione = typeof FseResolutionInputAzione[keyof typeof FseResolutionInputAzione];
-
+export type FseResolutionInputAzione =
+  (typeof FseResolutionInputAzione)[keyof typeof FseResolutionInputAzione];
 
 export const FseResolutionInputAzione = {
-  ABBINA: 'ABBINA',
-  DISABBINA: 'DISABBINA',
-  ACCETTA_SCOSTAMENTO: 'ACCETTA_SCOSTAMENTO',
-  SEGNALA_DA_CORREGGERE: 'SEGNALA_DA_CORREGGERE',
-  RIAPRI: 'RIAPRI',
+  ABBINA: "ABBINA",
+  DISABBINA: "DISABBINA",
+  ACCETTA_SCOSTAMENTO: "ACCETTA_SCOSTAMENTO",
+  SEGNALA_DA_CORREGGERE: "SEGNALA_DA_CORREGGERE",
+  RIAPRI: "RIAPRI",
 } as const;

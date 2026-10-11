@@ -8,14 +8,14 @@
 
 export interface FseImportSourceInput {
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   codice: string;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   descrizione: string;
   /** @minimum 1 */
   areaOperativaId: number;

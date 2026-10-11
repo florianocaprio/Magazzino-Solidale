@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BeneficiariFseError } from './beneficiariFseError';
+import type { BeneficiariFseError } from "./beneficiariFseError";
 
 /**
  * Codice fascicolo già associato o conflitto di riconciliazione

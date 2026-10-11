@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AgeaImportazioneTracciatoCodice = typeof AgeaImportazioneTracciatoCodice[keyof typeof AgeaImportazioneTracciatoCodice];
-
+export type AgeaImportazioneTracciatoCodice =
+  (typeof AgeaImportazioneTracciatoCodice)[keyof typeof AgeaImportazioneTracciatoCodice];
 
 export const AgeaImportazioneTracciatoCodice = {
-  SIFEAD_REGISTRO_XLSX_OSSERVATO_V1: 'SIFEAD_REGISTRO_XLSX_OSSERVATO_V1',
+  SIFEAD_REGISTRO_XLSX_OSSERVATO_V1: "SIFEAD_REGISTRO_XLSX_OSSERVATO_V1",
 } as const;

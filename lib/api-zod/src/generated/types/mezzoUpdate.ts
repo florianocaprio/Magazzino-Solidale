@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MezzoUpdateStato } from './mezzoUpdateStato';
+import type { MezzoUpdateStato } from "./mezzoUpdateStato";
 
 export interface MezzoUpdate {
   tipo?: string;

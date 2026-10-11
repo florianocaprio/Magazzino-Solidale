@@ -5,10 +5,10 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { SpesaEmporioEmailBollaStato } from './spesaEmporioEmailBollaStato';
-import type { SpesaEmporioRettificheItem } from './spesaEmporioRettificheItem';
-import type { SpesaEmporioRiga } from './spesaEmporioRiga';
-import type { SpesaEmporioStatoSpesa } from './spesaEmporioStatoSpesa';
+import type { SpesaEmporioEmailBollaStato } from "./spesaEmporioEmailBollaStato";
+import type { SpesaEmporioRettificheItem } from "./spesaEmporioRettificheItem";
+import type { SpesaEmporioRiga } from "./spesaEmporioRiga";
+import type { SpesaEmporioStatoSpesa } from "./spesaEmporioStatoSpesa";
 
 export interface SpesaEmporio {
   /** Proiezione storica; i nuovi importi operativi sono interi */

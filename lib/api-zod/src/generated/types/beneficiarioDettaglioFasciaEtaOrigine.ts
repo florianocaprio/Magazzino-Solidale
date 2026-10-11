@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiarioDettaglioFasciaEtaOrigine = typeof BeneficiarioDettaglioFasciaEtaOrigine[keyof typeof BeneficiarioDettaglioFasciaEtaOrigine];
-
+export type BeneficiarioDettaglioFasciaEtaOrigine =
+  (typeof BeneficiarioDettaglioFasciaEtaOrigine)[keyof typeof BeneficiarioDettaglioFasciaEtaOrigine];
 
 export const BeneficiarioDettaglioFasciaEtaOrigine = {
-  calcolata: 'calcolata',
-  presunta: 'presunta',
-  non_determinata: 'non_determinata',
+  calcolata: "calcolata",
+  presunta: "presunta",
+  non_determinata: "non_determinata",
 } as const;

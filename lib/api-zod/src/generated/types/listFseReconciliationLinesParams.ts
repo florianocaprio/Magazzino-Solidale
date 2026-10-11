@@ -7,13 +7,13 @@
  */
 
 export type ListFseReconciliationLinesParams = {
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: number;
 };

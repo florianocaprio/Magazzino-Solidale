@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaConsumoInputCausale } from './mensaConsumoInputCausale';
-import type { MensaConsumoInputTipoServizio } from './mensaConsumoInputTipoServizio';
-import type { QuantitaContabile } from './quantitaContabile';
+import type { MensaConsumoInputCausale } from "./mensaConsumoInputCausale";
+import type { MensaConsumoInputTipoServizio } from "./mensaConsumoInputTipoServizio";
+import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface MensaConsumoInput {
   mensaId: number;
@@ -17,24 +17,24 @@ export interface MensaConsumoInput {
   quantita: QuantitaContabile;
   causale: MensaConsumoInputCausale;
   /**
-     * Lotto obbligatorio quando richiesto dal Catalogo; negli altri casi FEFO comune.
-     * @nullable
-     */
+   * Lotto obbligatorio quando richiesto dal Catalogo; negli altri casi FEFO comune.
+   * @nullable
+   */
   lottoId?: number | null;
   /**
-     * Obbligatorio per scarto fisico; non rappresenta sfrido culinario.
-     * @maxLength 2000
-     * @nullable
-     */
+   * Obbligatorio per scarto fisico; non rappresenta sfrido culinario.
+   * @maxLength 2000
+   * @nullable
+   */
   motivo?: string | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   note?: string | null;
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   idempotencyKey: string;
 }

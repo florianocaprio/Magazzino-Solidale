@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetInterventiRiepilogoVisteAmbitoLegacy = typeof GetInterventiRiepilogoVisteAmbitoLegacy[keyof typeof GetInterventiRiepilogoVisteAmbitoLegacy];
-
+export type GetInterventiRiepilogoVisteAmbitoLegacy =
+  (typeof GetInterventiRiepilogoVisteAmbitoLegacy)[keyof typeof GetInterventiRiepilogoVisteAmbitoLegacy];
 
 export const GetInterventiRiepilogoVisteAmbitoLegacy = {
-  tutti: 'tutti',
-  classificati: 'classificati',
-  legacy: 'legacy',
+  tutti: "tutti",
+  classificati: "classificati",
+  legacy: "legacy",
 } as const;

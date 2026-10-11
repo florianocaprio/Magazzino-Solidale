@@ -9,9 +9,9 @@
 export interface InterventoAnnullamentoInput {
   versione: Date;
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   motivo: string;
   dataOraAnnullamento?: Date;
 }

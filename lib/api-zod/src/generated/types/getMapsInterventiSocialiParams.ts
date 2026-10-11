@@ -5,16 +5,16 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MapsAParameter } from './mapsAParameter';
-import type { MapsDaParameter } from './mapsDaParameter';
+import type { MapsAParameter } from "./mapsAParameter";
+import type { MapsDaParameter } from "./mapsDaParameter";
 
 export type GetMapsInterventiSocialiParams = {
-/**
- * Data civile iniziale Europe/Rome; default oggi
- */
-da?: MapsDaParameter;
-/**
- * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
- */
-a?: MapsAParameter;
+  /**
+   * Data civile iniziale Europe/Rome; default oggi
+   */
+  da?: MapsDaParameter;
+  /**
+   * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
+   */
+  a?: MapsAParameter;
 };

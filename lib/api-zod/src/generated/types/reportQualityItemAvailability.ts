@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ReportQualityItemAvailability = typeof ReportQualityItemAvailability[keyof typeof ReportQualityItemAvailability];
-
+export type ReportQualityItemAvailability =
+  (typeof ReportQualityItemAvailability)[keyof typeof ReportQualityItemAvailability];
 
 export const ReportQualityItemAvailability = {
-  ok: 'ok',
-  derivable: 'derivable',
-  missing: 'missing',
+  ok: "ok",
+  derivable: "derivable",
+  missing: "missing",
 } as const;

@@ -6,10 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseImportMode = typeof FseImportMode[keyof typeof FseImportMode];
-
+export type FseImportMode = (typeof FseImportMode)[keyof typeof FseImportMode];
 
 export const FseImportMode = {
-  NUOVI_CARICHI: 'NUOVI_CARICHI',
-  SALDO_INIZIALE: 'SALDO_INIZIALE',
+  NUOVI_CARICHI: "NUOVI_CARICHI",
+  SALDO_INIZIALE: "SALDO_INIZIALE",
 } as const;

@@ -7,7 +7,7 @@
  */
 
 export type ListProdottiParams = {
-categoria?: string;
-tipo?: string;
-search?: string;
+  categoria?: string;
+  tipo?: string;
+  search?: string;
 };

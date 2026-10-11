@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { QuantitaContabileConSegno } from './quantitaContabileConSegno';
-import type { RettificaLottoInputCausale } from './rettificaLottoInputCausale';
+import type { QuantitaContabileConSegno } from "./quantitaContabileConSegno";
+import type { RettificaLottoInputCausale } from "./rettificaLottoInputCausale";
 
 export interface RettificaLottoInput {
   delta: QuantitaContabileConSegno;

@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MaterialePreparazioneUpdateInputStatoPreparazione } from './materialePreparazioneUpdateInputStatoPreparazione';
+import type { MaterialePreparazioneUpdateInputStatoPreparazione } from "./materialePreparazioneUpdateInputStatoPreparazione";
 
 export interface MaterialePreparazioneUpdateInput {
   statoPreparazione: MaterialePreparazioneUpdateInputStatoPreparazione;

@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MensaAccessoEsito = typeof MensaAccessoEsito[keyof typeof MensaAccessoEsito];
-
+export type MensaAccessoEsito =
+  (typeof MensaAccessoEsito)[keyof typeof MensaAccessoEsito];
 
 export const MensaAccessoEsito = {
-  consentito: 'consentito',
-  negato: 'negato',
-  consentito_eccezione: 'consentito_eccezione',
+  consentito: "consentito",
+  negato: "negato",
+  consentito_eccezione: "consentito_eccezione",
 } as const;

@@ -9,11 +9,11 @@
 /**
  * Obbligatorio con causale consegna_beneficiario.
  */
-export type ScaricoInputCanaleOperativo = typeof ScaricoInputCanaleOperativo[keyof typeof ScaricoInputCanaleOperativo];
-
+export type ScaricoInputCanaleOperativo =
+  (typeof ScaricoInputCanaleOperativo)[keyof typeof ScaricoInputCanaleOperativo];
 
 export const ScaricoInputCanaleOperativo = {
-  PACCHI: 'PACCHI',
-  RITIRO_SEDE: 'RITIRO_SEDE',
-  DOMICILIARE: 'DOMICILIARE',
+  PACCHI: "PACCHI",
+  RITIRO_SEDE: "RITIRO_SEDE",
+  DOMICILIARE: "DOMICILIARE",
 } as const;

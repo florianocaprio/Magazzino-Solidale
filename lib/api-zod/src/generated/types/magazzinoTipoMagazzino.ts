@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MagazzinoTipoMagazzino = typeof MagazzinoTipoMagazzino[keyof typeof MagazzinoTipoMagazzino];
-
+export type MagazzinoTipoMagazzino =
+  (typeof MagazzinoTipoMagazzino)[keyof typeof MagazzinoTipoMagazzino];
 
 export const MagazzinoTipoMagazzino = {
-  logistico: 'logistico',
-  emporio: 'emporio',
-  misto: 'misto',
-  mensa: 'mensa',
+  logistico: "logistico",
+  emporio: "emporio",
+  misto: "misto",
+  mensa: "mensa",
 } as const;

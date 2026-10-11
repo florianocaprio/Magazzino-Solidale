@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaAccessoEsito } from './mensaAccessoEsito';
-import type { MensaAccessoModalitaAccesso } from './mensaAccessoModalitaAccesso';
-import type { MensaAccessoTipoServizio } from './mensaAccessoTipoServizio';
+import type { MensaAccessoEsito } from "./mensaAccessoEsito";
+import type { MensaAccessoModalitaAccesso } from "./mensaAccessoModalitaAccesso";
+import type { MensaAccessoTipoServizio } from "./mensaAccessoTipoServizio";
 
 export interface MensaAccesso {
   id: number;

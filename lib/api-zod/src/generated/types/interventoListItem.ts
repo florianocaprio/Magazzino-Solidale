@@ -5,11 +5,11 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { InterventoAmbito } from './interventoAmbito';
-import type { InterventoAvviso } from './interventoAvviso';
-import type { InterventoPriorita } from './interventoPriorita';
-import type { InterventoRaccordoMagazzino } from './interventoRaccordoMagazzino';
-import type { InterventoStato } from './interventoStato';
+import type { InterventoAmbito } from "./interventoAmbito";
+import type { InterventoAvviso } from "./interventoAvviso";
+import type { InterventoPriorita } from "./interventoPriorita";
+import type { InterventoRaccordoMagazzino } from "./interventoRaccordoMagazzino";
+import type { InterventoStato } from "./interventoStato";
 
 /**
  * Proiezione minimale per liste, calendario e dashboard; non include note o contenuti sociali estesi.

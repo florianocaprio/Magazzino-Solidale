@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BeneficiariFsePreviewResultConteggi } from './beneficiariFsePreviewResultConteggi';
-import type { BeneficiariFsePreviewRow } from './beneficiariFsePreviewRow';
+import type { BeneficiariFsePreviewResultConteggi } from "./beneficiariFsePreviewResultConteggi";
+import type { BeneficiariFsePreviewRow } from "./beneficiariFsePreviewRow";
 
 export interface BeneficiariFsePreviewResult {
   centroAscoltoId: number;

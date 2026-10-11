@@ -10,9 +10,9 @@ export type RichiestaMagazzinoDocumentoCreateRigheItem = {
   /** @minimum 1 */
   prodottoId: number;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   lottoId?: number | null;
   quantita: string | number;
   /** @nullable */

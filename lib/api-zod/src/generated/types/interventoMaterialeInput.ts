@@ -5,20 +5,20 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { InterventoMaterialeStato } from './interventoMaterialeStato';
+import type { InterventoMaterialeStato } from "./interventoMaterialeStato";
 
 export interface InterventoMaterialeInput {
   /** @nullable */
   prodottoId?: number | null;
   /**
-     * @maxLength 255
-     * @nullable
-     */
+   * @maxLength 255
+   * @nullable
+   */
   descrizioneSnapshot?: string | null;
   /**
-     * @maxLength 40
-     * @nullable
-     */
+   * @maxLength 40
+   * @nullable
+   */
   unitaMisuraSnapshot?: string | null;
   /** @minimum 0 */
   quantitaPrevista?: number;
@@ -28,8 +28,8 @@ export interface InterventoMaterialeInput {
   /** @nullable */
   magazzinoId?: number | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   note?: string | null;
 }

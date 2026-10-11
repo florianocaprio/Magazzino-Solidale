@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type CaricoPraticaStato = typeof CaricoPraticaStato[keyof typeof CaricoPraticaStato];
-
+export type CaricoPraticaStato =
+  (typeof CaricoPraticaStato)[keyof typeof CaricoPraticaStato];
 
 export const CaricoPraticaStato = {
-  bozza: 'bozza',
-  aperta: 'aperta',
-  chiusa: 'chiusa',
-  annullata: 'annullata',
+  bozza: "bozza",
+  aperta: "aperta",
+  chiusa: "chiusa",
+  annullata: "annullata",
 } as const;

@@ -8,8 +8,8 @@
 
 export interface RitiroNonEffettuatoInput {
   /**
-     * @maxLength 500
-     * @nullable
-     */
+   * @maxLength 500
+   * @nullable
+   */
   motivo?: string | null;
 }

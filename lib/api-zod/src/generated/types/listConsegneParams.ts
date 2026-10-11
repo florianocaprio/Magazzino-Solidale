@@ -7,23 +7,23 @@
  */
 
 export type ListConsegneParams = {
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-pageSize?: number;
-/**
- * Ricerca per codice, beneficiario o indirizzo
- */
-q?: string;
-stato?: string;
-data?: string;
-dataInizio?: string;
-dataFine?: string;
-beneficiarioId?: number;
-centroAscoltoId?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  pageSize?: number;
+  /**
+   * Ricerca per codice, beneficiario o indirizzo
+   */
+  q?: string;
+  stato?: string;
+  data?: string;
+  dataInizio?: string;
+  dataFine?: string;
+  beneficiarioId?: number;
+  centroAscoltoId?: number;
 };

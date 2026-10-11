@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MensaConsumoInputCausale = typeof MensaConsumoInputCausale[keyof typeof MensaConsumoInputCausale];
-
+export type MensaConsumoInputCausale =
+  (typeof MensaConsumoInputCausale)[keyof typeof MensaConsumoInputCausale];
 
 export const MensaConsumoInputCausale = {
-  consumo: 'consumo',
-  scarto: 'scarto',
+  consumo: "consumo",
+  scarto: "scarto",
 } as const;

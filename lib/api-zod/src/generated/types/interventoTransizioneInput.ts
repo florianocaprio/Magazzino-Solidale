@@ -5,15 +5,15 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { InterventoStato } from './interventoStato';
+import type { InterventoStato } from "./interventoStato";
 
 export interface InterventoTransizioneInput {
   versione: Date;
   stato: InterventoStato;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   motivo?: string | null;
   /** Timestamp effettivo con offset; se omesso viene usato l'istante corrente del server. */
   dataOraTransizione?: Date;

@@ -6,15 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiariFsePreviewRowClassificazione = typeof BeneficiariFsePreviewRowClassificazione[keyof typeof BeneficiariFsePreviewRowClassificazione];
-
+export type BeneficiariFsePreviewRowClassificazione =
+  (typeof BeneficiariFsePreviewRowClassificazione)[keyof typeof BeneficiariFsePreviewRowClassificazione];
 
 export const BeneficiariFsePreviewRowClassificazione = {
-  nuovo: 'nuovo',
-  da_collegare: 'da_collegare',
-  da_aggiornare: 'da_aggiornare',
-  invariato: 'invariato',
-  possibile_duplicato: 'possibile_duplicato',
-  conflitto: 'conflitto',
-  errore: 'errore',
+  nuovo: "nuovo",
+  da_collegare: "da_collegare",
+  da_aggiornare: "da_aggiornare",
+  invariato: "invariato",
+  possibile_duplicato: "possibile_duplicato",
+  conflitto: "conflitto",
+  errore: "errore",
 } as const;

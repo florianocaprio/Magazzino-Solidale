@@ -6,14 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AgeaTipoMovimento = typeof AgeaTipoMovimento[keyof typeof AgeaTipoMovimento];
-
+export type AgeaTipoMovimento =
+  (typeof AgeaTipoMovimento)[keyof typeof AgeaTipoMovimento];
 
 export const AgeaTipoMovimento = {
-  CARICO: 'CARICO',
-  DISTRIBUZIONE: 'DISTRIBUZIONE',
-  RESO: 'RESO',
-  MOVIMENTO_NEGATIVO_NON_CLASSIFICATO: 'MOVIMENTO_NEGATIVO_NON_CLASSIFICATO',
-  SEGNO_INCOERENTE: 'SEGNO_INCOERENTE',
-  RIGA_SENZA_MOVIMENTO: 'RIGA_SENZA_MOVIMENTO',
+  CARICO: "CARICO",
+  DISTRIBUZIONE: "DISTRIBUZIONE",
+  RESO: "RESO",
+  MOVIMENTO_NEGATIVO_NON_CLASSIFICATO: "MOVIMENTO_NEGATIVO_NON_CLASSIFICATO",
+  SEGNO_INCOERENTE: "SEGNO_INCOERENTE",
+  RIGA_SENZA_MOVIMENTO: "RIGA_SENZA_MOVIMENTO",
 } as const;

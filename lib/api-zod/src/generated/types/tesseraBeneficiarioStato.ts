@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type TesseraBeneficiarioStato = typeof TesseraBeneficiarioStato[keyof typeof TesseraBeneficiarioStato];
-
+export type TesseraBeneficiarioStato =
+  (typeof TesseraBeneficiarioStato)[keyof typeof TesseraBeneficiarioStato];
 
 export const TesseraBeneficiarioStato = {
-  attiva: 'attiva',
-  sospesa: 'sospesa',
-  revocata: 'revocata',
-  scaduta: 'scaduta',
+  attiva: "attiva",
+  sospesa: "sospesa",
+  revocata: "revocata",
+  scaduta: "scaduta",
 } as const;

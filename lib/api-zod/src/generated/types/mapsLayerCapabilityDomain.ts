@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MapsLayerCapabilityDomain = typeof MapsLayerCapabilityDomain[keyof typeof MapsLayerCapabilityDomain];
-
+export type MapsLayerCapabilityDomain =
+  (typeof MapsLayerCapabilityDomain)[keyof typeof MapsLayerCapabilityDomain];
 
 export const MapsLayerCapabilityDomain = {
-  sociale: 'sociale',
-  pacchi: 'pacchi',
-  centro: 'centro',
+  sociale: "sociale",
+  pacchi: "pacchi",
+  centro: "centro",
 } as const;

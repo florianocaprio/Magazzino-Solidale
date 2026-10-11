@@ -11,8 +11,8 @@ export interface FseOpcReturnReversalInput {
   versione: number;
   data: Date;
   /**
-     * @minLength 3
-     * @maxLength 2000
-     */
+   * @minLength 3
+   * @maxLength 2000
+   */
   motivazione: string;
 }

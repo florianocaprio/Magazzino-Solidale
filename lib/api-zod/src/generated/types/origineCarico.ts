@@ -6,17 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type OrigineCarico = typeof OrigineCarico[keyof typeof OrigineCarico];
-
+export type OrigineCarico = (typeof OrigineCarico)[keyof typeof OrigineCarico];
 
 export const OrigineCarico = {
-  AGEA_SIFEAD: 'AGEA_SIFEAD',
-  RACCOLTA_ALIMENTARE: 'RACCOLTA_ALIMENTARE',
-  DONAZIONE: 'DONAZIONE',
-  ACQUISTO: 'ACQUISTO',
-  FORNITORE: 'FORNITORE',
-  RETTIFICA_INVENTARIO: 'RETTIFICA_INVENTARIO',
-  SALDO_INIZIALE: 'SALDO_INIZIALE',
-  ALTRO: 'ALTRO',
-  LEGACY: 'LEGACY',
+  AGEA_SIFEAD: "AGEA_SIFEAD",
+  RACCOLTA_ALIMENTARE: "RACCOLTA_ALIMENTARE",
+  DONAZIONE: "DONAZIONE",
+  ACQUISTO: "ACQUISTO",
+  FORNITORE: "FORNITORE",
+  RETTIFICA_INVENTARIO: "RETTIFICA_INVENTARIO",
+  SALDO_INIZIALE: "SALDO_INIZIALE",
+  ALTRO: "ALTRO",
+  LEGACY: "LEGACY",
 } as const;

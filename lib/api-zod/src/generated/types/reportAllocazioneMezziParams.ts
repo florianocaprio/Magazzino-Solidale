@@ -7,8 +7,8 @@
  */
 
 export type ReportAllocazioneMezziParams = {
-da?: string;
-a?: string;
-centroAscoltoId?: number;
-areaOperativaId?: number;
+  da?: string;
+  a?: string;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
 };

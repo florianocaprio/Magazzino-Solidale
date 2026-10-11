@@ -5,13 +5,13 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { EmporioAbilitazioneInputStato } from './emporioAbilitazioneInputStato';
+import type { EmporioAbilitazioneInputStato } from "./emporioAbilitazioneInputStato";
 
 export interface EmporioAbilitazioneInput {
   stato: EmporioAbilitazioneInputStato;
   /**
-     * @minLength 1
-     * @maxLength 1000
-     */
+   * @minLength 1
+   * @maxLength 1000
+   */
   motivo: string;
 }

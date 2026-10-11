@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ApprovazioneMezzo } from './approvazioneMezzo';
-import type { ApprovazioneVolontario } from './approvazioneVolontario';
+import type { ApprovazioneMezzo } from "./approvazioneMezzo";
+import type { ApprovazioneVolontario } from "./approvazioneVolontario";
 
 export interface ApprovazioniLogistica {
   volontari: ApprovazioneVolontario[];

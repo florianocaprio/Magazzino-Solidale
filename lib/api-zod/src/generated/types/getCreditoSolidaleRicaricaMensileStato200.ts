@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { GetCreditoSolidaleRicaricaMensileStato200EsitiItem } from './getCreditoSolidaleRicaricaMensileStato200EsitiItem';
-import type { GetCreditoSolidaleRicaricaMensileStato200Stato } from './getCreditoSolidaleRicaricaMensileStato200Stato';
+import type { GetCreditoSolidaleRicaricaMensileStato200EsitiItem } from "./getCreditoSolidaleRicaricaMensileStato200EsitiItem";
+import type { GetCreditoSolidaleRicaricaMensileStato200Stato } from "./getCreditoSolidaleRicaricaMensileStato200Stato";
 
 export type GetCreditoSolidaleRicaricaMensileStato200 = {
   periodo: string;

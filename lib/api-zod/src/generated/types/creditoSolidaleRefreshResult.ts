@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { CreditoSolidaleMovimento } from './creditoSolidaleMovimento';
-import type { CreditoSolidaleSaldo } from './creditoSolidaleSaldo';
+import type { CreditoSolidaleMovimento } from "./creditoSolidaleMovimento";
+import type { CreditoSolidaleSaldo } from "./creditoSolidaleSaldo";
 
 export interface CreditoSolidaleRefreshResult {
   periodoRiferimento: string;

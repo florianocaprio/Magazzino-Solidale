@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type RichiestaMagazzinoCreateTipoDestinatario = typeof RichiestaMagazzinoCreateTipoDestinatario[keyof typeof RichiestaMagazzinoCreateTipoDestinatario];
-
+export type RichiestaMagazzinoCreateTipoDestinatario =
+  (typeof RichiestaMagazzinoCreateTipoDestinatario)[keyof typeof RichiestaMagazzinoCreateTipoDestinatario];
 
 export const RichiestaMagazzinoCreateTipoDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
-  magazzino: 'magazzino',
+  beneficiario: "beneficiario",
+  ente: "ente",
+  magazzino: "magazzino",
 } as const;

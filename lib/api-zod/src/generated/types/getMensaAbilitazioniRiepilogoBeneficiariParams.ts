@@ -7,8 +7,8 @@
  */
 
 export type GetMensaAbilitazioniRiepilogoBeneficiariParams = {
-/**
- * ID positivi separati da virgola, deduplicati dal server; massimo 500.
- */
-beneficiarioIds?: string;
+  /**
+   * ID positivi separati da virgola, deduplicati dal server; massimo 500.
+   */
+  beneficiarioIds?: string;
 };

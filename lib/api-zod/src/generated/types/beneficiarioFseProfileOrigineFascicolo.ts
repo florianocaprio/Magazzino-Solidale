@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiarioFseProfileOrigineFascicolo = typeof BeneficiarioFseProfileOrigineFascicolo[keyof typeof BeneficiarioFseProfileOrigineFascicolo];
-
+export type BeneficiarioFseProfileOrigineFascicolo =
+  (typeof BeneficiarioFseProfileOrigineFascicolo)[keyof typeof BeneficiarioFseProfileOrigineFascicolo];
 
 export const BeneficiarioFseProfileOrigineFascicolo = {
-  interno: 'interno',
-  import_fse: 'import_fse',
+  interno: "interno",
+  import_fse: "import_fse",
 } as const;

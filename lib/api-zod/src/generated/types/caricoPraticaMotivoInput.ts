@@ -10,8 +10,8 @@ export interface CaricoPraticaMotivoInput {
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 1000
-     */
+   * @minLength 1
+   * @maxLength 1000
+   */
   motivo: string;
 }

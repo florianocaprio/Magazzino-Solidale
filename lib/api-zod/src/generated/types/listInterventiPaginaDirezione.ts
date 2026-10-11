@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListInterventiPaginaDirezione = typeof ListInterventiPaginaDirezione[keyof typeof ListInterventiPaginaDirezione];
-
+export type ListInterventiPaginaDirezione =
+  (typeof ListInterventiPaginaDirezione)[keyof typeof ListInterventiPaginaDirezione];
 
 export const ListInterventiPaginaDirezione = {
-  asc: 'asc',
-  desc: 'desc',
+  asc: "asc",
+  desc: "desc",
 } as const;

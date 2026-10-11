@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { RichiestaMagazzinoError } from './richiestaMagazzinoError';
+import type { RichiestaMagazzinoError } from "./richiestaMagazzinoError";
 
 /**
  * Permesso o scope non disponibile

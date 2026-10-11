@@ -9,10 +9,11 @@
 /**
  * @nullable
  */
-export type MensaStatoMagazzino = typeof MensaStatoMagazzino[keyof typeof MensaStatoMagazzino] | null;
-
+export type MensaStatoMagazzino =
+  | (typeof MensaStatoMagazzino)[keyof typeof MensaStatoMagazzino]
+  | null;
 
 export const MensaStatoMagazzino = {
-  attivo: 'attivo',
-  inattivo: 'inattivo',
+  attivo: "attivo",
+  inattivo: "inattivo",
 } as const;

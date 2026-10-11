@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ReportDrilldownReportingModelVersion = typeof ReportDrilldownReportingModelVersion[keyof typeof ReportDrilldownReportingModelVersion];
-
+export type ReportDrilldownReportingModelVersion =
+  (typeof ReportDrilldownReportingModelVersion)[keyof typeof ReportDrilldownReportingModelVersion];
 
 export const ReportDrilldownReportingModelVersion = {
-  REPORTING_2_0_V1: 'REPORTING_2_0_V1',
+  REPORTING_2_0_V1: "REPORTING_2_0_V1",
 } as const;

@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type RichiestaMagazzinoCreateModalitaPreferita = typeof RichiestaMagazzinoCreateModalitaPreferita[keyof typeof RichiestaMagazzinoCreateModalitaPreferita];
-
+export type RichiestaMagazzinoCreateModalitaPreferita =
+  (typeof RichiestaMagazzinoCreateModalitaPreferita)[keyof typeof RichiestaMagazzinoCreateModalitaPreferita];
 
 export const RichiestaMagazzinoCreateModalitaPreferita = {
-  da_definire: 'da_definire',
-  ritiro: 'ritiro',
-  domicilio: 'domicilio',
+  da_definire: "da_definire",
+  ritiro: "ritiro",
+  domicilio: "domicilio",
 } as const;

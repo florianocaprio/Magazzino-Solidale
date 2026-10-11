@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { RientroTrasportoDocumento } from './rientroTrasportoDocumento';
-import type { RientroTrasportoPartita } from './rientroTrasportoPartita';
+import type { RientroTrasportoDocumento } from "./rientroTrasportoDocumento";
+import type { RientroTrasportoPartita } from "./rientroTrasportoPartita";
 
 export interface RientroTrasportoDettaglio {
   id: number;

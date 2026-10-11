@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ImpostazioniEmailProvider } from './impostazioniEmailProvider';
+import type { ImpostazioniEmailProvider } from "./impostazioniEmailProvider";
 
 /**
  * Le credenziali SMTP sono gestite esclusivamente tramite variabili MAIL_* e secret di ambiente; i campi SMTP restituiti sono legacy e non usati dal runtime.
@@ -20,21 +20,21 @@ export interface ImpostazioniEmail {
   /** @nullable */
   adminEmail?: string | null;
   /**
-     * @deprecated
-     * @nullable
-     */
+   * @deprecated
+   * @nullable
+   */
   smtpHost?: string | null;
   /**
-     * @deprecated
-     * @nullable
-     */
+   * @deprecated
+   * @nullable
+   */
   smtpPort?: number | null;
   /** @deprecated */
   smtpSecure: boolean;
   /**
-     * @deprecated
-     * @nullable
-     */
+   * @deprecated
+   * @nullable
+   */
   smtpUser?: string | null;
   /** @deprecated */
   hasPassword: boolean;

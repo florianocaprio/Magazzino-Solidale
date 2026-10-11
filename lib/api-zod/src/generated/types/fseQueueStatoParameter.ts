@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseQueueStatoParameter = typeof FseQueueStatoParameter[keyof typeof FseQueueStatoParameter];
-
+export type FseQueueStatoParameter =
+  (typeof FseQueueStatoParameter)[keyof typeof FseQueueStatoParameter];
 
 export const FseQueueStatoParameter = {
-  DA_RENDICONTARE: 'DA_RENDICONTARE',
-  ARRETRATO_NON_RENDICONTATO: 'ARRETRATO_NON_RENDICONTATO',
-  BLOCCATO: 'BLOCCATO',
+  DA_RENDICONTARE: "DA_RENDICONTARE",
+  ARRETRATO_NON_RENDICONTATO: "ARRETRATO_NON_RENDICONTATO",
+  BLOCCATO: "BLOCCATO",
 } as const;

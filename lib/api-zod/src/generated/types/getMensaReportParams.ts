@@ -7,8 +7,8 @@
  */
 
 export type GetMensaReportParams = {
-dal: Date;
-al: Date;
-mensaId?: number;
-tipoServizio?: string;
+  dal: Date;
+  al: Date;
+  mensaId?: number;
+  tipoServizio?: string;
 };

@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListRichiesteMagazzinoSorgente = typeof ListRichiesteMagazzinoSorgente[keyof typeof ListRichiesteMagazzinoSorgente];
-
+export type ListRichiesteMagazzinoSorgente =
+  (typeof ListRichiesteMagazzinoSorgente)[keyof typeof ListRichiesteMagazzinoSorgente];
 
 export const ListRichiesteMagazzinoSorgente = {
-  beneficiario: 'beneficiario',
-  intervento_sociale: 'intervento_sociale',
-  operativa: 'operativa',
+  beneficiario: "beneficiario",
+  intervento_sociale: "intervento_sociale",
+  operativa: "operativa",
 } as const;

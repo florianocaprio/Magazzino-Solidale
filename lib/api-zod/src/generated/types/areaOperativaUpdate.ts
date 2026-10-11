@@ -13,9 +13,9 @@ export interface AreaOperativaUpdate {
   /** @maxLength 2 */
   sigla?: string;
   /**
-     * @maxLength 8
-     * @pattern ^[A-Za-z0-9]+$
-     */
+   * @maxLength 8
+   * @pattern ^[A-Za-z0-9]+$
+   */
   codiceMatricola?: string;
   attivo?: boolean;
   note?: string;

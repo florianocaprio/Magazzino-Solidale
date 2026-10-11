@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { InterventiRiepilogoVisteFusoOrario } from './interventiRiepilogoVisteFusoOrario';
+import type { InterventiRiepilogoVisteFusoOrario } from "./interventiRiepilogoVisteFusoOrario";
 
 export interface InterventiRiepilogoViste {
   daPianificare: number;

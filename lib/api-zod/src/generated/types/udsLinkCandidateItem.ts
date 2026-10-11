@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { UdsLinkCandidateItemFasciaEtaCorrente } from './udsLinkCandidateItemFasciaEtaCorrente';
+import type { UdsLinkCandidateItemFasciaEtaCorrente } from "./udsLinkCandidateItemFasciaEtaCorrente";
 
 /**
  * Candidato attivo non ancora UDS; non contiene dossier, Centro o PII estesa.

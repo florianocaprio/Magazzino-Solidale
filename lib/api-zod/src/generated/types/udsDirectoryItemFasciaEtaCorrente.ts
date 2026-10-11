@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UdsDirectoryItemFasciaEtaCorrente = typeof UdsDirectoryItemFasciaEtaCorrente[keyof typeof UdsDirectoryItemFasciaEtaCorrente];
-
+export type UdsDirectoryItemFasciaEtaCorrente =
+  (typeof UdsDirectoryItemFasciaEtaCorrente)[keyof typeof UdsDirectoryItemFasciaEtaCorrente];
 
 export const UdsDirectoryItemFasciaEtaCorrente = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
 } as const;

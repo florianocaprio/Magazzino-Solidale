@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario } from './volontariImportConfirmInputRigheItemCorrezioniTipoVolontario';
+import type { VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario } from "./volontariImportConfirmInputRigheItemCorrezioniTipoVolontario";
 
 export type VolontariImportConfirmInputRigheItemCorrezioni = {
   /** @nullable */

@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ConsegnaDaBollaInputFasciaOraria = typeof ConsegnaDaBollaInputFasciaOraria[keyof typeof ConsegnaDaBollaInputFasciaOraria];
-
+export type ConsegnaDaBollaInputFasciaOraria =
+  (typeof ConsegnaDaBollaInputFasciaOraria)[keyof typeof ConsegnaDaBollaInputFasciaOraria];
 
 export const ConsegnaDaBollaInputFasciaOraria = {
-  Mattina: 'Mattina',
-  Pomeriggio: 'Pomeriggio',
-  Sera: 'Sera',
+  Mattina: "Mattina",
+  Pomeriggio: "Pomeriggio",
+  Sera: "Sera",
 } as const;

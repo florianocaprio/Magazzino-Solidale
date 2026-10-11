@@ -7,10 +7,10 @@
  */
 
 export type SearchBeneficiariCassaEmporioParams = {
-codiceTessera?: string;
-search?: string;
-data?: string;
-areaOperativaId?: number;
-areaId?: number;
-magazzinoEmporioId: number;
+  codiceTessera?: string;
+  search?: string;
+  data?: string;
+  areaOperativaId?: number;
+  areaId?: number;
+  magazzinoEmporioId: number;
 };

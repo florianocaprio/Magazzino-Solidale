@@ -112,6 +112,16 @@ test("M63 pagine reali, filtri, calendario bounded, dettaglio e revoca", async (
   expect(
     xlsx.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]),
   ).toHaveLength(201);
+  const pdfDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: /^esporta$/i }).click();
+  await page.getByRole("menuitem", { name: /pdf/i }).click();
+  const pdf = await readFile((await (await pdfDownload).path())!);
+  expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+  // jsPDF uses uncompressed text streams here: verify every exported row,
+  // not only that a PDF download was offered or the first page was fetched.
+  expect(
+    pdf.toString("latin1").match(new RegExp(`\\(M63-${suffix}\\) Tj`, "g")),
+  ).toHaveLength(201);
   await nav.getByRole("button", { name: "Successiva" }).click();
   await expect(page).toHaveURL(/pagina=2/);
   await expect(first).toHaveCount(0);

@@ -10,9 +10,9 @@ export interface ResetPasswordInput {
   /** @minLength 1 */
   token: string;
   /**
-     * Deve contenere almeno una lettera e un numero.
-     * @minLength 8
-     */
+   * Deve contenere almeno una lettera e un numero.
+   * @minLength 8
+   */
   newPassword: string;
   /** @minLength 1 */
   confirmPassword?: string;

@@ -5,15 +5,15 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FseReconciliationRow } from './fseReconciliationRow';
+import type { FseReconciliationRow } from "./fseReconciliationRow";
 
 export interface FseReconciliationRowsPage {
   /** @minimum 1 */
   page: number;
   /**
-     * @minimum 1
-     * @maximum 200
-     */
+   * @minimum 1
+   * @maximum 200
+   */
   pageSize: number;
   /** @minimum 0 */
   total: number;

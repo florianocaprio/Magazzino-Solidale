@@ -13,6 +13,7 @@ import {
   pool,
   prodottiTable,
   utentiTable,
+  ruoliTable,
 } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
@@ -21,6 +22,7 @@ import {
   dataCivileEuropeRome,
 } from "../src/lib/interventiWorkflow";
 import { dateTimeEuropeRomeToUtc } from "../src/lib/interventiViste";
+import { createPersistedSocialActor } from "./persisted-social-actor";
 
 const rnd = () => Math.random().toString(36).slice(2, 10);
 const ids = {
@@ -28,6 +30,7 @@ const ids = {
   centri: [] as number[],
   beneficiari: [] as number[],
   utenti: [] as number[],
+  ruoli: [] as number[],
   interventi: [] as number[],
   magazzini: [] as number[],
   prodotti: [] as number[],
@@ -39,6 +42,7 @@ let centroRoma: number;
 let centroMilano: number;
 let operatoreRoma: number;
 let operatoreMilano: number;
+let operatoreMistoRoma: number;
 let beneficiarioRoma: number;
 let beneficiarioMilano: number;
 let prodottoId: number;
@@ -86,7 +90,11 @@ function makeApp(
         };
       }
     ).user = {
-      id: options.userId ?? operatoreRoma,
+      id:
+        options.userId ??
+        (options.aree?.includes("magazzino")
+          ? operatoreMistoRoma
+          : operatoreRoma),
       areaOperativaId: options.areaOperativaId ?? roma,
       centroAscoltoId: options.centroId ?? centroRoma,
       zonaUdsId: null,
@@ -173,27 +181,25 @@ beforeAll(async () => {
     .returning({ id: centriAscoltoTable.id });
   [centroRoma, centroMilano] = centers.map((row) => row.id);
   ids.centri.push(centroRoma, centroMilano);
-  const users = await db
-    .insert(utentiTable)
-    .values([
-      {
-        username: `prep_roma_${rnd()}`,
-        passwordHash: "test",
-        nome: "Prep Roma",
-        areaOperativaId: roma,
-        centroAscoltoId: centroRoma,
-      },
-      {
-        username: `prep_milano_${rnd()}`,
-        passwordHash: "test",
-        nome: "Prep Milano",
-        areaOperativaId: milano,
-        centroAscoltoId: centroMilano,
-      },
-    ])
-    .returning({ id: utentiTable.id });
-  [operatoreRoma, operatoreMilano] = users.map((row) => row.id);
-  ids.utenti.push(operatoreRoma, operatoreMilano);
+  const users = [];
+  for (const [areaOperativaId, centroAscoltoId, aree] of [
+    [roma, centroRoma, ["sociale"]],
+    [milano, centroMilano, ["sociale"]],
+    [roma, centroRoma, ["sociale", "magazzino"]],
+  ] as const) {
+    const actor = await createPersistedSocialActor({
+      areaOperativaId,
+      centroAscoltoId,
+      aree: [...aree],
+      permessi: ["sociale.interventi.view", "sociale.interventi.update"],
+    });
+    users.push(actor);
+    ids.utenti.push(actor.id);
+    ids.ruoli.push(actor.ruoloId);
+  }
+  [operatoreRoma, operatoreMilano, operatoreMistoRoma] = users.map(
+    (row) => row.id,
+  );
   const beneficiaries = await db
     .insert(beneficiariTable)
     .values([
@@ -371,6 +377,7 @@ afterAll(async () => {
     .delete(beneficiariTable)
     .where(inArray(beneficiariTable.id, ids.beneficiari));
   await db.delete(utentiTable).where(inArray(utentiTable.id, ids.utenti));
+  await db.delete(ruoliTable).where(inArray(ruoliTable.id, ids.ruoli));
   await db
     .delete(centriAscoltoTable)
     .where(inArray(centriAscoltoTable.id, ids.centri));

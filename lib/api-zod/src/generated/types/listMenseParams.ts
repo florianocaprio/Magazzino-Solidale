@@ -7,9 +7,9 @@
  */
 
 export type ListMenseParams = {
-/**
- * Identificativo dell'Area Operativa usata come confine organizzativo dei dati.
- */
-areaOperativaId?: number;
-attiva?: boolean;
+  /**
+   * Identificativo dell'Area Operativa usata come confine organizzativo dei dati.
+   */
+  areaOperativaId?: number;
+  attiva?: boolean;
 };

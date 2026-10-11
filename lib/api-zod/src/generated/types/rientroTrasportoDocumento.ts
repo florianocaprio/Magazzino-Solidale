@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { QuantitaContabile } from './quantitaContabile';
-import type { RientroTrasportoDocumentoTipo } from './rientroTrasportoDocumentoTipo';
+import type { QuantitaContabile } from "./quantitaContabile";
+import type { RientroTrasportoDocumentoTipo } from "./rientroTrasportoDocumentoTipo";
 
 export interface RientroTrasportoDocumento {
   tipo: RientroTrasportoDocumentoTipo;

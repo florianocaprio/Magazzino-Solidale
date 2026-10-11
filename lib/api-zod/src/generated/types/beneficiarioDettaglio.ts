@@ -5,15 +5,15 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BeneficiarioDettaglioCreditoSolidaleStato } from './beneficiarioDettaglioCreditoSolidaleStato';
-import type { BeneficiarioDettaglioFasciaEtaCorrente } from './beneficiarioDettaglioFasciaEtaCorrente';
-import type { BeneficiarioDettaglioFasciaEtaOrigine } from './beneficiarioDettaglioFasciaEtaOrigine';
-import type { BeneficiarioDettaglioFasciaEtaPresunta } from './beneficiarioDettaglioFasciaEtaPresunta';
-import type { BeneficiarioDettaglioPriorita } from './beneficiarioDettaglioPriorita';
-import type { BeneficiarioDettaglioStatoAnagrafica } from './beneficiarioDettaglioStatoAnagrafica';
-import type { Consegna } from './consegna';
-import type { Intervento } from './intervento';
-import type { NucleoFamiliare } from './nucleoFamiliare';
+import type { BeneficiarioDettaglioCreditoSolidaleStato } from "./beneficiarioDettaglioCreditoSolidaleStato";
+import type { BeneficiarioDettaglioFasciaEtaCorrente } from "./beneficiarioDettaglioFasciaEtaCorrente";
+import type { BeneficiarioDettaglioFasciaEtaOrigine } from "./beneficiarioDettaglioFasciaEtaOrigine";
+import type { BeneficiarioDettaglioFasciaEtaPresunta } from "./beneficiarioDettaglioFasciaEtaPresunta";
+import type { BeneficiarioDettaglioPriorita } from "./beneficiarioDettaglioPriorita";
+import type { BeneficiarioDettaglioStatoAnagrafica } from "./beneficiarioDettaglioStatoAnagrafica";
+import type { Consegna } from "./consegna";
+import type { Intervento } from "./intervento";
+import type { NucleoFamiliare } from "./nucleoFamiliare";
 
 export interface BeneficiarioDettaglio {
   id: number;
@@ -26,9 +26,9 @@ export interface BeneficiarioDettaglio {
   /** @nullable */
   dataNascita?: string | null;
   /**
-     * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
-     * @nullable
-     */
+   * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
+   * @nullable
+   */
   fasciaEtaPresunta: BeneficiarioDettaglioFasciaEtaPresunta;
   /** Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta. */
   fasciaEtaCorrente: BeneficiarioDettaglioFasciaEtaCorrente;

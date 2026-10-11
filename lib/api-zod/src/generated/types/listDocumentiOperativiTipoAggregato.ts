@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListDocumentiOperativiTipoAggregato = typeof ListDocumentiOperativiTipoAggregato[keyof typeof ListDocumentiOperativiTipoAggregato];
-
+export type ListDocumentiOperativiTipoAggregato =
+  (typeof ListDocumentiOperativiTipoAggregato)[keyof typeof ListDocumentiOperativiTipoAggregato];
 
 export const ListDocumentiOperativiTipoAggregato = {
-  bolla: 'bolla',
-  trasferimento: 'trasferimento',
+  bolla: "bolla",
+  trasferimento: "trasferimento",
 } as const;

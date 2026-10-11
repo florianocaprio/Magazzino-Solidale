@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { AgeaImportRiga } from './ageaImportRiga';
+import type { AgeaImportRiga } from "./ageaImportRiga";
 
 export interface AgeaImportRighePage {
   items: AgeaImportRiga[];

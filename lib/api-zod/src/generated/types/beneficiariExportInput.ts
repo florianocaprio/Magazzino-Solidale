@@ -5,15 +5,15 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BeneficiariExportInputTipo } from './beneficiariExportInputTipo';
+import type { BeneficiariExportInputTipo } from "./beneficiariExportInputTipo";
 
 export interface BeneficiariExportInput {
   tipo: BeneficiariExportInputTipo;
   /** @nullable */
   beneficiarioId?: number | null;
   /**
-     * @minimum 0
-     * @maximum 100000
-     */
+   * @minimum 0
+   * @maximum 100000
+   */
   numeroRecord: number;
 }

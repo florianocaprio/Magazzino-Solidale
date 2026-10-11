@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ApprovvigionamentoRigaInput } from './approvvigionamentoRigaInput';
+import type { ApprovvigionamentoRigaInput } from "./approvvigionamentoRigaInput";
 
 export interface ApprovvigionamentoInput {
   fornitoreId: number;

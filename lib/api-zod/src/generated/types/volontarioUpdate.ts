@@ -21,17 +21,17 @@ export interface VolontarioUpdate {
   dataNascita?: Date;
   indirizzoResidenza?: string;
   /**
-     * Null quando il domicilio coincide con la residenza.
-     * @nullable
-     */
+   * Null quando il domicilio coincide con la residenza.
+   * @nullable
+   */
   indirizzoDomicilio?: string | null;
   /** @nullable */
   codiceFiscale?: string | null;
   codiceFiscaleNonDisponibile?: boolean;
   /**
-     * Nota facoltativa quando il codice fiscale non è disponibile.
-     * @nullable
-     */
+   * Nota facoltativa quando il codice fiscale non è disponibile.
+   * @nullable
+   */
   codiceFiscaleNota?: string | null;
   /** @minimum 1 */
   ruoloVolontarioId?: number;

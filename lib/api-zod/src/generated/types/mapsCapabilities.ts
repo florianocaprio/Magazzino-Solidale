@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MapsLayerCapability } from './mapsLayerCapability';
+import type { MapsLayerCapability } from "./mapsLayerCapability";
 
 export interface MapsCapabilities {
   operational: boolean;

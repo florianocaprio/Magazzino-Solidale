@@ -7,5 +7,5 @@
  */
 
 export type ListTessereBeneficiarioParams = {
-beneficiarioId: number;
+  beneficiarioId: number;
 };

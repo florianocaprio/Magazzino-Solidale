@@ -9,10 +9,10 @@
 /**
  * Ambito esplicito; i record storici non classificabili mantengono null.
  */
-export type InterventoAmbito = typeof InterventoAmbito[keyof typeof InterventoAmbito];
-
+export type InterventoAmbito =
+  (typeof InterventoAmbito)[keyof typeof InterventoAmbito];
 
 export const InterventoAmbito = {
-  sociale: 'sociale',
-  uds: 'uds',
+  sociale: "sociale",
+  uds: "uds",
 } as const;

@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type SpesaEmporioStatoSpesa = typeof SpesaEmporioStatoSpesa[keyof typeof SpesaEmporioStatoSpesa];
-
+export type SpesaEmporioStatoSpesa =
+  (typeof SpesaEmporioStatoSpesa)[keyof typeof SpesaEmporioStatoSpesa];
 
 export const SpesaEmporioStatoSpesa = {
-  chiusa: 'chiusa',
-  stornata_parzialmente: 'stornata_parzialmente',
-  stornata: 'stornata',
+  chiusa: "chiusa",
+  stornata_parzialmente: "stornata_parzialmente",
+  stornata: "stornata",
 } as const;

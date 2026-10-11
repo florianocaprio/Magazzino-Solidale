@@ -9,10 +9,10 @@
 /**
  * È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server.
  */
-export type BeneficiarioUpdateStatoAnagrafica = typeof BeneficiarioUpdateStatoAnagrafica[keyof typeof BeneficiarioUpdateStatoAnagrafica];
-
+export type BeneficiarioUpdateStatoAnagrafica =
+  (typeof BeneficiarioUpdateStatoAnagrafica)[keyof typeof BeneficiarioUpdateStatoAnagrafica];
 
 export const BeneficiarioUpdateStatoAnagrafica = {
-  provvisoria: 'provvisoria',
-  completa: 'completa',
+  provvisoria: "provvisoria",
+  completa: "completa",
 } as const;

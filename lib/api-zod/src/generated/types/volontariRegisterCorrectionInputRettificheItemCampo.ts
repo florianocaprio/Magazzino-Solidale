@@ -6,22 +6,22 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontariRegisterCorrectionInputRettificheItemCampo = typeof VolontariRegisterCorrectionInputRettificheItemCampo[keyof typeof VolontariRegisterCorrectionInputRettificheItemCampo];
-
+export type VolontariRegisterCorrectionInputRettificheItemCampo =
+  (typeof VolontariRegisterCorrectionInputRettificheItemCampo)[keyof typeof VolontariRegisterCorrectionInputRettificheItemCampo];
 
 export const VolontariRegisterCorrectionInputRettificheItemCampo = {
-  matricola: 'matricola',
-  nome: 'nome',
-  cognome: 'cognome',
-  codiceFiscale: 'codiceFiscale',
-  dataNascita: 'dataNascita',
-  luogoNascita: 'luogoNascita',
-  indirizzoResidenza: 'indirizzoResidenza',
-  indirizzoDomicilio: 'indirizzoDomicilio',
-  tipoVolontario: 'tipoVolontario',
-  centroAscoltoId: 'centroAscoltoId',
-  centroAscoltoNome: 'centroAscoltoNome',
-  ruoloVolontarioId: 'ruoloVolontarioId',
-  ruoloNome: 'ruoloNome',
-  dataInizio: 'dataInizio',
+  matricola: "matricola",
+  nome: "nome",
+  cognome: "cognome",
+  codiceFiscale: "codiceFiscale",
+  dataNascita: "dataNascita",
+  luogoNascita: "luogoNascita",
+  indirizzoResidenza: "indirizzoResidenza",
+  indirizzoDomicilio: "indirizzoDomicilio",
+  tipoVolontario: "tipoVolontario",
+  centroAscoltoId: "centroAscoltoId",
+  centroAscoltoNome: "centroAscoltoNome",
+  ruoloVolontarioId: "ruoloVolontarioId",
+  ruoloNome: "ruoloNome",
+  dataInizio: "dataInizio",
 } as const;

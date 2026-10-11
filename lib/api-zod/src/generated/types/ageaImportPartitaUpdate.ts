@@ -10,9 +10,9 @@ export interface AgeaImportPartitaUpdate {
   /** @nullable */
   dataScadenza: Date | null;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   motivazione: string;
   /** @minimum 1 */
   versione: number;

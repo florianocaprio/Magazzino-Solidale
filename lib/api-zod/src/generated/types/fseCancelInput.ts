@@ -10,8 +10,8 @@ export interface FseCancelInput {
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   motivazione: string;
 }

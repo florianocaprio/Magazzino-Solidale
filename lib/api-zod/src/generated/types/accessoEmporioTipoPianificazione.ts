@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AccessoEmporioTipoPianificazione = typeof AccessoEmporioTipoPianificazione[keyof typeof AccessoEmporioTipoPianificazione];
-
+export type AccessoEmporioTipoPianificazione =
+  (typeof AccessoEmporioTipoPianificazione)[keyof typeof AccessoEmporioTipoPianificazione];
 
 export const AccessoEmporioTipoPianificazione = {
-  accesso_emporio: 'accesso_emporio',
+  accesso_emporio: "accesso_emporio",
 } as const;

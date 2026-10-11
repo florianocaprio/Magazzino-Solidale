@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { DocumentoOperativo } from './documentoOperativo';
+import type { DocumentoOperativo } from "./documentoOperativo";
 
 export interface DocumentoOperativoPage {
   items: DocumentoOperativo[];

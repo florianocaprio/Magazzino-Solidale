@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ReportTextParams = {[key: string]: string | number};
+export type ReportTextParams = { [key: string]: string | number };

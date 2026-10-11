@@ -8,9 +8,9 @@
 
 export interface MensaUpdate {
   /**
-     * @minLength 1
-     * @maxLength 160
-     */
+   * @minLength 1
+   * @maxLength 160
+   */
   nome?: string;
   /** @nullable */
   indirizzo?: string | null;

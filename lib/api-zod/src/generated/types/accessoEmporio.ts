@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { AccessoEmporioStato } from './accessoEmporioStato';
-import type { AccessoEmporioTipoPianificazione } from './accessoEmporioTipoPianificazione';
+import type { AccessoEmporioStato } from "./accessoEmporioStato";
+import type { AccessoEmporioTipoPianificazione } from "./accessoEmporioTipoPianificazione";
 
 export interface AccessoEmporio {
   id: number;

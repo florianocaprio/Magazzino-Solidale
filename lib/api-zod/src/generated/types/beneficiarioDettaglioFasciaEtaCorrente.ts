@@ -9,13 +9,13 @@
 /**
  * Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta.
  */
-export type BeneficiarioDettaglioFasciaEtaCorrente = typeof BeneficiarioDettaglioFasciaEtaCorrente[keyof typeof BeneficiarioDettaglioFasciaEtaCorrente];
-
+export type BeneficiarioDettaglioFasciaEtaCorrente =
+  (typeof BeneficiarioDettaglioFasciaEtaCorrente)[keyof typeof BeneficiarioDettaglioFasciaEtaCorrente];
 
 export const BeneficiarioDettaglioFasciaEtaCorrente = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
 } as const;

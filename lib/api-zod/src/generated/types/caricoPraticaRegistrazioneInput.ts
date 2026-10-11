@@ -12,8 +12,8 @@ export interface CaricoPraticaRegistrazioneInput {
   /** @minItems 1 */
   rigaIds: number[];
   /**
-     * @minLength 1
-     * @maxLength 100
-     */
+   * @minLength 1
+   * @maxLength 100
+   */
   idempotencyKey: string;
 }

@@ -5,27 +5,27 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { LimitParamParameter } from './limitParamParameter';
-import type { PageParamParameter } from './pageParamParameter';
+import type { LimitParamParameter } from "./limitParamParameter";
+import type { PageParamParameter } from "./pageParamParameter";
 
 export type ListSpeseEmporioParams = {
-dataDa?: string;
-dataA?: string;
-beneficiarioSearch?: string;
-beneficiarioId?: number;
-magazzinoEmporioId?: number;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-areaId?: number;
-/**
- * Pagina richiesta, indicizzata da 1
- * @minimum 1
- */
-page?: PageParamParameter;
-/**
- * Numero di record per pagina
- * @minimum 1
- * @maximum 100
- */
-limit?: LimitParamParameter;
+  dataDa?: string;
+  dataA?: string;
+  beneficiarioSearch?: string;
+  beneficiarioId?: number;
+  magazzinoEmporioId?: number;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  areaId?: number;
+  /**
+   * Pagina richiesta, indicizzata da 1
+   * @minimum 1
+   */
+  page?: PageParamParameter;
+  /**
+   * Numero di record per pagina
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: LimitParamParameter;
 };

@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FseImportMode } from './fseImportMode';
-import type { FseImportSessionCoperturaConfermata } from './fseImportSessionCoperturaConfermata';
-import type { FseImportSessionState } from './fseImportSessionState';
+import type { FseImportMode } from "./fseImportMode";
+import type { FseImportSessionCoperturaConfermata } from "./fseImportSessionCoperturaConfermata";
+import type { FseImportSessionState } from "./fseImportSessionState";
 
 export interface FseImportSession {
   id: number;

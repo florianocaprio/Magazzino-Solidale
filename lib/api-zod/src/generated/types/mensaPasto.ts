@@ -5,10 +5,10 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaPastoFasciaEtaOrigineSnapshot } from './mensaPastoFasciaEtaOrigineSnapshot';
-import type { MensaPastoFasciaEtaSnapshot } from './mensaPastoFasciaEtaSnapshot';
-import type { MensaPastoSessoSnapshot } from './mensaPastoSessoSnapshot';
-import type { MensaPastoTipoServizio } from './mensaPastoTipoServizio';
+import type { MensaPastoFasciaEtaOrigineSnapshot } from "./mensaPastoFasciaEtaOrigineSnapshot";
+import type { MensaPastoFasciaEtaSnapshot } from "./mensaPastoFasciaEtaSnapshot";
+import type { MensaPastoSessoSnapshot } from "./mensaPastoSessoSnapshot";
+import type { MensaPastoTipoServizio } from "./mensaPastoTipoServizio";
 
 export interface MensaPasto {
   id: number;
@@ -38,4 +38,4 @@ export interface MensaPasto {
   operatore?: string;
   idempotentReplay?: boolean;
   [key: string]: unknown;
- }
+}

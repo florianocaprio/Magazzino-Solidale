@@ -6,14 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListVolontariStatoAssicurazione = typeof ListVolontariStatoAssicurazione[keyof typeof ListVolontariStatoAssicurazione];
-
+export type ListVolontariStatoAssicurazione =
+  (typeof ListVolontariStatoAssicurazione)[keyof typeof ListVolontariStatoAssicurazione];
 
 export const ListVolontariStatoAssicurazione = {
-  TEMPORANEA: 'TEMPORANEA',
-  MANCANTE: 'MANCANTE',
-  VALIDA: 'VALIDA',
-  IN_SCADENZA: 'IN_SCADENZA',
-  SCADUTA: 'SCADUTA',
-  NON_ANCORA_VALIDA: 'NON_ANCORA_VALIDA',
+  TEMPORANEA: "TEMPORANEA",
+  MANCANTE: "MANCANTE",
+  VALIDA: "VALIDA",
+  IN_SCADENZA: "IN_SCADENZA",
+  SCADUTA: "SCADUTA",
+  NON_ANCORA_VALIDA: "NON_ANCORA_VALIDA",
 } as const;

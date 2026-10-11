@@ -7,5 +7,5 @@
  */
 
 export type AnalyzeVolontariImportParams = {
-centroAscoltoId?: number;
+  centroAscoltoId?: number;
 };

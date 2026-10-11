@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiariFseImportResultStato = typeof BeneficiariFseImportResultStato[keyof typeof BeneficiariFseImportResultStato];
-
+export type BeneficiariFseImportResultStato =
+  (typeof BeneficiariFseImportResultStato)[keyof typeof BeneficiariFseImportResultStato];
 
 export const BeneficiariFseImportResultStato = {
-  confermato: 'confermato',
-  parziale: 'parziale',
+  confermato: "confermato",
+  parziale: "parziale",
 } as const;

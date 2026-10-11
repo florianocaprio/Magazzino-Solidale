@@ -7,10 +7,10 @@
  */
 
 export type ReportConsegnePerMeseParams = {
-anno?: number;
-da?: string;
-a?: string;
-magazzinoId?: number;
-centroAscoltoId?: number;
-areaOperativaId?: number;
+  anno?: number;
+  da?: string;
+  a?: string;
+  magazzinoId?: number;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
 };

@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiarioUpdatePriorita = typeof BeneficiarioUpdatePriorita[keyof typeof BeneficiarioUpdatePriorita];
-
+export type BeneficiarioUpdatePriorita =
+  (typeof BeneficiarioUpdatePriorita)[keyof typeof BeneficiarioUpdatePriorita];
 
 export const BeneficiarioUpdatePriorita = {
-  bassa: 'bassa',
-  media: 'media',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  media: "media",
+  alta: "alta",
+  urgente: "urgente",
 } as const;

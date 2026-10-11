@@ -6,16 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ReportFilterOptionsSection = typeof ReportFilterOptionsSection[keyof typeof ReportFilterOptionsSection];
-
+export type ReportFilterOptionsSection =
+  (typeof ReportFilterOptionsSection)[keyof typeof ReportFilterOptionsSection];
 
 export const ReportFilterOptionsSection = {
-  generale: 'generale',
-  pacchi: 'pacchi',
-  'centro-ascolto': 'centro-ascolto',
-  emporio: 'emporio',
-  mensa: 'mensa',
-  uds: 'uds',
-  'magazzino-logistica': 'magazzino-logistica',
-  'fse-plus': 'fse-plus',
+  generale: "generale",
+  pacchi: "pacchi",
+  "centro-ascolto": "centro-ascolto",
+  emporio: "emporio",
+  mensa: "mensa",
+  uds: "uds",
+  "magazzino-logistica": "magazzino-logistica",
+  "fse-plus": "fse-plus",
 } as const;

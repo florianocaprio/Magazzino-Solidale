@@ -5,13 +5,13 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { PoliticaCreditoSolidaleUpdateArrotondamento } from './politicaCreditoSolidaleUpdateArrotondamento';
+import type { PoliticaCreditoSolidaleUpdateArrotondamento } from "./politicaCreditoSolidaleUpdateArrotondamento";
 
 export interface PoliticaCreditoSolidaleUpdate {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   nome?: string;
   /** @nullable */
   descrizione?: string | null;
@@ -33,21 +33,21 @@ export interface PoliticaCreditoSolidaleUpdate {
   /** @minimum 0 */
   creditoMinimoMensile?: number;
   /**
-     * @minimum 0
-     * @nullable
-     */
+   * @minimum 0
+   * @nullable
+   */
   creditoMassimoMensile?: number | null;
   /**
-     * Calendario automatico fisso al primo del mese; omettere nei nuovi client.
-     * @deprecated
-     * @minimum 1
-     * @maximum 1
-     */
+   * Calendario automatico fisso al primo del mese; omettere nei nuovi client.
+   * @deprecated
+   * @minimum 1
+   * @maximum 1
+   */
   giornoRicaricaMensile?: number;
   /**
-     * Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.
-     * @deprecated
-     */
+   * Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.
+   * @deprecated
+   */
   ricaricaAutomaticaAbilitata?: true;
   arrotondamento?: PoliticaCreditoSolidaleUpdateArrotondamento;
   /** @nullable */

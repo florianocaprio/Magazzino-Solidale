@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FseExportInputFormatCode } from './fseExportInputFormatCode';
+import type { FseExportInputFormatCode } from "./fseExportInputFormatCode";
 
 export interface FseExportInput {
   /** @minimum 1 */

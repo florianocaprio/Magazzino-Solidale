@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BeneficiariFseImportDetailEsito } from './beneficiariFseImportDetailEsito';
+import type { BeneficiariFseImportDetailEsito } from "./beneficiariFseImportDetailEsito";
 
 export interface BeneficiariFseImportDetail {
   numeroRiga: number;

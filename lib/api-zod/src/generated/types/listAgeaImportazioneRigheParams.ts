@@ -5,23 +5,23 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { AgeaTipoMovimento } from './ageaTipoMovimento';
+import type { AgeaTipoMovimento } from "./ageaTipoMovimento";
 
 export type ListAgeaImportazioneRigheParams = {
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: number;
-stato?: string;
-fondo?: string;
-tipo?: AgeaTipoMovimento;
-/**
- * @maxLength 100
- */
-q?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: number;
+  stato?: string;
+  fondo?: string;
+  tipo?: AgeaTipoMovimento;
+  /**
+   * @maxLength 100
+   */
+  q?: string;
 };

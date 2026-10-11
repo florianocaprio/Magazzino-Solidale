@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type CreditoSolidaleCalcoloPoliticaOrigine = typeof CreditoSolidaleCalcoloPoliticaOrigine[keyof typeof CreditoSolidaleCalcoloPoliticaOrigine];
-
+export type CreditoSolidaleCalcoloPoliticaOrigine =
+  (typeof CreditoSolidaleCalcoloPoliticaOrigine)[keyof typeof CreditoSolidaleCalcoloPoliticaOrigine];
 
 export const CreditoSolidaleCalcoloPoliticaOrigine = {
-  centro: 'centro',
-  areaOperativa: 'areaOperativa',
-  globale: 'globale',
-  default: 'default',
+  centro: "centro",
+  areaOperativa: "areaOperativa",
+  globale: "globale",
+  default: "default",
 } as const;

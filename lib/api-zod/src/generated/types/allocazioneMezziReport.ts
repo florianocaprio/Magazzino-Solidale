@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { AllocazioneMezziReportAltro } from './allocazioneMezziReportAltro';
-import type { AllocazioneMezziRiga } from './allocazioneMezziRiga';
+import type { AllocazioneMezziReportAltro } from "./allocazioneMezziReportAltro";
+import type { AllocazioneMezziRiga } from "./allocazioneMezziRiga";
 
 export interface AllocazioneMezziReport {
   mezzi: AllocazioneMezziRiga[];

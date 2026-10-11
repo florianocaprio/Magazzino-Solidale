@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FattoreContabile } from './fattoreContabile';
-import type { QuantitaContabile } from './quantitaContabile';
-import type { QuantitaContabileConSegno } from './quantitaContabileConSegno';
+import type { FattoreContabile } from "./fattoreContabile";
+import type { QuantitaContabile } from "./quantitaContabile";
+import type { QuantitaContabileConSegno } from "./quantitaContabileConSegno";
 
 export interface AgeaImportPartita {
   id: number;

@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { PoliticaCreditoSolidaleArrotondamento } from './politicaCreditoSolidaleArrotondamento';
+import type { PoliticaCreditoSolidaleArrotondamento } from "./politicaCreditoSolidaleArrotondamento";
 
 export interface PoliticaCreditoSolidale {
   id: number;

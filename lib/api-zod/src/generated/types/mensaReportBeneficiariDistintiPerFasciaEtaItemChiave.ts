@@ -6,14 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MensaReportBeneficiariDistintiPerFasciaEtaItemChiave = typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave[keyof typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave];
-
+export type MensaReportBeneficiariDistintiPerFasciaEtaItemChiave =
+  (typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave)[keyof typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave];
 
 export const MensaReportBeneficiariDistintiPerFasciaEtaItemChiave = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
-  ND: 'ND',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
+  ND: "ND",
 } as const;

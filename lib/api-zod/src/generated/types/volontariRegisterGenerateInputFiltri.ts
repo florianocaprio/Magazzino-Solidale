@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontariRegisterGenerateInputFiltriAssicurazione } from './volontariRegisterGenerateInputFiltriAssicurazione';
-import type { VolontariRegisterGenerateInputFiltriStato } from './volontariRegisterGenerateInputFiltriStato';
-import type { VolontariRegisterGenerateInputFiltriTipo } from './volontariRegisterGenerateInputFiltriTipo';
+import type { VolontariRegisterGenerateInputFiltriAssicurazione } from "./volontariRegisterGenerateInputFiltriAssicurazione";
+import type { VolontariRegisterGenerateInputFiltriStato } from "./volontariRegisterGenerateInputFiltriStato";
+import type { VolontariRegisterGenerateInputFiltriTipo } from "./volontariRegisterGenerateInputFiltriTipo";
 
 export type VolontariRegisterGenerateInputFiltri = {
   tipo?: VolontariRegisterGenerateInputFiltriTipo;

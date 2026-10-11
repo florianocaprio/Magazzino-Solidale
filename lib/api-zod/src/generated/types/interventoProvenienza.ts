@@ -9,11 +9,11 @@
 /**
  * Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.
  */
-export type InterventoProvenienza = typeof InterventoProvenienza[keyof typeof InterventoProvenienza];
-
+export type InterventoProvenienza =
+  (typeof InterventoProvenienza)[keyof typeof InterventoProvenienza];
 
 export const InterventoProvenienza = {
-  sociale: 'sociale',
-  derivato_bolla: 'derivato_bolla',
-  legacy_non_classificato: 'legacy_non_classificato',
+  sociale: "sociale",
+  derivato_bolla: "derivato_bolla",
+  legacy_non_classificato: "legacy_non_classificato",
 } as const;

@@ -5,34 +5,34 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ExportDocumentiOperativiDestinatario } from './exportDocumentiOperativiDestinatario';
-import type { ExportDocumentiOperativiSortBy } from './exportDocumentiOperativiSortBy';
-import type { ExportDocumentiOperativiSortDirection } from './exportDocumentiOperativiSortDirection';
-import type { ExportDocumentiOperativiTipoAggregato } from './exportDocumentiOperativiTipoAggregato';
+import type { ExportDocumentiOperativiDestinatario } from "./exportDocumentiOperativiDestinatario";
+import type { ExportDocumentiOperativiSortBy } from "./exportDocumentiOperativiSortBy";
+import type { ExportDocumentiOperativiSortDirection } from "./exportDocumentiOperativiSortDirection";
+import type { ExportDocumentiOperativiTipoAggregato } from "./exportDocumentiOperativiTipoAggregato";
 
 export type ExportDocumentiOperativiParams = {
-tipoAggregato?: ExportDocumentiOperativiTipoAggregato;
-destinatario?: ExportDocumentiOperativiDestinatario;
-stato?: string;
-/**
- * @minimum 1
- */
-areaOperativaId?: number;
-/**
- * @minimum 1
- */
-magazzinoId?: number;
-/**
- * @minimum 1
- */
-centroAscoltoId?: number;
-dataDa?: Date;
-dataA?: Date;
-/**
- * @minLength 1
- * @maxLength 120
- */
-ricerca?: string;
-sortBy?: ExportDocumentiOperativiSortBy;
-sortDirection?: ExportDocumentiOperativiSortDirection;
+  tipoAggregato?: ExportDocumentiOperativiTipoAggregato;
+  destinatario?: ExportDocumentiOperativiDestinatario;
+  stato?: string;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  magazzinoId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+  dataDa?: Date;
+  dataA?: Date;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  ricerca?: string;
+  sortBy?: ExportDocumentiOperativiSortBy;
+  sortDirection?: ExportDocumentiOperativiSortDirection;
 };

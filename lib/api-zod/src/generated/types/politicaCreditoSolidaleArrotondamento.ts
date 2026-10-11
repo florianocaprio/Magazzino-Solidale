@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type PoliticaCreditoSolidaleArrotondamento = typeof PoliticaCreditoSolidaleArrotondamento[keyof typeof PoliticaCreditoSolidaleArrotondamento];
-
+export type PoliticaCreditoSolidaleArrotondamento =
+  (typeof PoliticaCreditoSolidaleArrotondamento)[keyof typeof PoliticaCreditoSolidaleArrotondamento];
 
 export const PoliticaCreditoSolidaleArrotondamento = {
-  nessuno: 'nessuno',
-  intero_superiore: 'intero_superiore',
-  intero_inferiore: 'intero_inferiore',
-  intero_piu_vicino: 'intero_piu_vicino',
+  nessuno: "nessuno",
+  intero_superiore: "intero_superiore",
+  intero_inferiore: "intero_inferiore",
+  intero_piu_vicino: "intero_piu_vicino",
 } as const;

@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseMonitoringInputCompletezza = typeof FseMonitoringInputCompletezza[keyof typeof FseMonitoringInputCompletezza];
-
+export type FseMonitoringInputCompletezza =
+  (typeof FseMonitoringInputCompletezza)[keyof typeof FseMonitoringInputCompletezza];
 
 export const FseMonitoringInputCompletezza = {
-  PARZIALE: 'PARZIALE',
-  COMPLETA: 'COMPLETA',
+  PARZIALE: "PARZIALE",
+  COMPLETA: "COMPLETA",
 } as const;

@@ -9,14 +9,14 @@
 /**
  * Stato canonico del ciclo di vita dell'intervento.
  */
-export type InterventoStato = typeof InterventoStato[keyof typeof InterventoStato];
-
+export type InterventoStato =
+  (typeof InterventoStato)[keyof typeof InterventoStato];
 
 export const InterventoStato = {
-  da_pianificare: 'da_pianificare',
-  pianificato: 'pianificato',
-  in_corso: 'in_corso',
-  concluso: 'concluso',
-  annullato: 'annullato',
-  mancata_presentazione: 'mancata_presentazione',
+  da_pianificare: "da_pianificare",
+  pianificato: "pianificato",
+  in_corso: "in_corso",
+  concluso: "concluso",
+  annullato: "annullato",
+  mancata_presentazione: "mancata_presentazione",
 } as const;

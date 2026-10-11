@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontariImportMatricolaProposal } from './volontariImportMatricolaProposal';
-import type { VolontariImportPreviewRowDatiNormalizzati } from './volontariImportPreviewRowDatiNormalizzati';
-import type { VolontariImportPreviewRowDatiOriginali } from './volontariImportPreviewRowDatiOriginali';
+import type { VolontariImportMatricolaProposal } from "./volontariImportMatricolaProposal";
+import type { VolontariImportPreviewRowDatiNormalizzati } from "./volontariImportPreviewRowDatiNormalizzati";
+import type { VolontariImportPreviewRowDatiOriginali } from "./volontariImportPreviewRowDatiOriginali";
 
 export interface VolontariImportPreviewRow {
   /** @minimum 2 */
@@ -25,4 +25,4 @@ export interface VolontariImportPreviewRow {
   errori: string[];
   avvisi: string[];
   [key: string]: unknown;
- }
+}

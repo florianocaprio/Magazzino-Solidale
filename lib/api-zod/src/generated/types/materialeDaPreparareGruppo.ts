@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { InterventoAvviso } from './interventoAvviso';
-import type { InterventoPriorita } from './interventoPriorita';
-import type { MaterialeDaPreparareDettaglio } from './materialeDaPreparareDettaglio';
+import type { InterventoAvviso } from "./interventoAvviso";
+import type { InterventoPriorita } from "./interventoPriorita";
+import type { MaterialeDaPreparareDettaglio } from "./materialeDaPreparareDettaglio";
 
 export interface MaterialeDaPreparareGruppo {
   chiave: string;

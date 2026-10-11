@@ -5,71 +5,71 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { InterventoAmbito } from './interventoAmbito';
-import type { InterventoPriorita } from './interventoPriorita';
-import type { InterventoStato } from './interventoStato';
-import type { InterventoVista } from './interventoVista';
-import type { ListInterventiPaginaAmbitoLegacy } from './listInterventiPaginaAmbitoLegacy';
-import type { ListInterventiPaginaBisogni } from './listInterventiPaginaBisogni';
-import type { ListInterventiPaginaDirezione } from './listInterventiPaginaDirezione';
-import type { ListInterventiPaginaOrdina } from './listInterventiPaginaOrdina';
+import type { InterventoAmbito } from "./interventoAmbito";
+import type { InterventoPriorita } from "./interventoPriorita";
+import type { InterventoStato } from "./interventoStato";
+import type { InterventoVista } from "./interventoVista";
+import type { ListInterventiPaginaAmbitoLegacy } from "./listInterventiPaginaAmbitoLegacy";
+import type { ListInterventiPaginaBisogni } from "./listInterventiPaginaBisogni";
+import type { ListInterventiPaginaDirezione } from "./listInterventiPaginaDirezione";
+import type { ListInterventiPaginaOrdina } from "./listInterventiPaginaOrdina";
 
 export type ListInterventiPaginaParams = {
-beneficiarioId?: number;
-tipo?: string;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-/**
- * Filtra gli interventi in base ai Bisogni Pianificati collegati.
- */
-bisogni?: ListInterventiPaginaBisogni;
-stato?: InterventoStato;
-ambito?: InterventoAmbito;
-/**
- * Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.
- */
-includiStorici?: boolean;
-operatoreId?: number;
-priorita?: InterventoPriorita;
-/**
- * Estremo iniziale ISO 8601 con fuso dell'intervallo pianificato.
- */
-pianificataDa?: Date;
-/**
- * Estremo finale ISO 8601 con fuso dell'intervallo pianificato.
- */
-pianificataA?: Date;
-interventoPrecedenteId?: number;
-/**
- * Vista operativa Sociale; richiede ambito=sociale. Oggi e i relativi confini civili sono calcolati in Europe/Rome.
- */
-vista?: InterventoVista;
-/**
- * Ricerca beneficiario per nome, cognome, nome completo o codice.
- * @maxLength 120
- */
-ricerca?: string;
-/**
- * Data civile iniziale inclusiva Europe/Rome; deve essere usata insieme ad a.
- */
-da?: Date;
-/**
- * Data civile finale inclusiva Europe/Rome; intervallo massimo 366 giorni.
- */
-a?: Date;
-ordina?: ListInterventiPaginaOrdina;
-direzione?: ListInterventiPaginaDirezione;
-/**
- * Selezione conservativa dei record Sociali classificati o con ambito storico non determinato.
- */
-ambitoLegacy?: ListInterventiPaginaAmbitoLegacy;
-/**
- * @minimum 1
- */
-pagina?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-limite?: number;
+  beneficiarioId?: number;
+  tipo?: string;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  /**
+   * Filtra gli interventi in base ai Bisogni Pianificati collegati.
+   */
+  bisogni?: ListInterventiPaginaBisogni;
+  stato?: InterventoStato;
+  ambito?: InterventoAmbito;
+  /**
+   * Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.
+   */
+  includiStorici?: boolean;
+  operatoreId?: number;
+  priorita?: InterventoPriorita;
+  /**
+   * Estremo iniziale ISO 8601 con fuso dell'intervallo pianificato.
+   */
+  pianificataDa?: Date;
+  /**
+   * Estremo finale ISO 8601 con fuso dell'intervallo pianificato.
+   */
+  pianificataA?: Date;
+  interventoPrecedenteId?: number;
+  /**
+   * Vista operativa Sociale; richiede ambito=sociale. Oggi e i relativi confini civili sono calcolati in Europe/Rome.
+   */
+  vista?: InterventoVista;
+  /**
+   * Ricerca beneficiario per nome, cognome, nome completo o codice.
+   * @maxLength 120
+   */
+  ricerca?: string;
+  /**
+   * Data civile iniziale inclusiva Europe/Rome; deve essere usata insieme ad a.
+   */
+  da?: Date;
+  /**
+   * Data civile finale inclusiva Europe/Rome; intervallo massimo 366 giorni.
+   */
+  a?: Date;
+  ordina?: ListInterventiPaginaOrdina;
+  direzione?: ListInterventiPaginaDirezione;
+  /**
+   * Selezione conservativa dei record Sociali classificati o con ambito storico non determinato.
+   */
+  ambitoLegacy?: ListInterventiPaginaAmbitoLegacy;
+  /**
+   * @minimum 1
+   */
+  pagina?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  limite?: number;
 };

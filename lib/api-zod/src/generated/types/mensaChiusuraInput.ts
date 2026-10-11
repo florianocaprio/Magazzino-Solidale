@@ -8,8 +8,8 @@
 
 export interface MensaChiusuraInput {
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   note?: string | null;
 }

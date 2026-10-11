@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { InterventoAmbito } from './interventoAmbito';
-import type { InterventoPriorita } from './interventoPriorita';
-import type { InterventoStato } from './interventoStato';
+import type { InterventoAmbito } from "./interventoAmbito";
+import type { InterventoPriorita } from "./interventoPriorita";
+import type { InterventoStato } from "./interventoStato";
 
 export interface InterventoSuccessivoInput {
   tipoIntervento: string;
@@ -23,9 +23,9 @@ export interface InterventoSuccessivoInput {
   /** @nullable */
   dataOraConclusione?: Date | null;
   /**
-     * @maxLength 255
-     * @nullable
-     */
+   * @maxLength 255
+   * @nullable
+   */
   sede?: string | null;
   descrizione?: string;
   risultato?: string;

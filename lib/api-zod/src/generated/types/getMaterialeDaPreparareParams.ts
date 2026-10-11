@@ -5,18 +5,18 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { GetMaterialeDaPrepararePeriodo } from './getMaterialeDaPrepararePeriodo';
+import type { GetMaterialeDaPrepararePeriodo } from "./getMaterialeDaPrepararePeriodo";
 
 export type GetMaterialeDaPreparareParams = {
-periodo?: GetMaterialeDaPrepararePeriodo;
-/**
- * Data civile Europe/Rome, obbligatoria per periodo personalizzato.
- */
-da?: Date;
-/**
- * Data civile Europe/Rome inclusiva; massimo 31 giorni.
- */
-a?: Date;
-areaOperativaId?: number;
-centroAscoltoId?: number;
+  periodo?: GetMaterialeDaPrepararePeriodo;
+  /**
+   * Data civile Europe/Rome, obbligatoria per periodo personalizzato.
+   */
+  da?: Date;
+  /**
+   * Data civile Europe/Rome inclusiva; massimo 31 giorni.
+   */
+  a?: Date;
+  areaOperativaId?: number;
+  centroAscoltoId?: number;
 };

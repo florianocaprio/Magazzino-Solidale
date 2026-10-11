@@ -5,28 +5,28 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ConfigurazioneMatricoleVolontariInputAmbitoProgressivo } from './configurazioneMatricoleVolontariInputAmbitoProgressivo';
-import type { ConfigurazioneMatricoleVolontariInputSeparatore } from './configurazioneMatricoleVolontariInputSeparatore';
+import type { ConfigurazioneMatricoleVolontariInputAmbitoProgressivo } from "./configurazioneMatricoleVolontariInputAmbitoProgressivo";
+import type { ConfigurazioneMatricoleVolontariInputSeparatore } from "./configurazioneMatricoleVolontariInputSeparatore";
 
 export interface ConfigurazioneMatricoleVolontariInput {
   /**
-     * @maxLength 12
-     * @nullable
-     * @pattern ^[A-Za-z0-9]*$
-     */
+   * @maxLength 12
+   * @nullable
+   * @pattern ^[A-Za-z0-9]*$
+   */
   prefissoAssociazione?: string | null;
   includiCodiceArea: boolean;
   /**
-     * @maxLength 8
-     * @nullable
-     * @pattern ^[A-Za-z0-9]*$
-     */
+   * @maxLength 8
+   * @nullable
+   * @pattern ^[A-Za-z0-9]*$
+   */
   segmentoFisso?: string | null;
   separatore: ConfigurazioneMatricoleVolontariInputSeparatore;
   /**
-     * @minimum 2
-     * @maximum 8
-     */
+   * @minimum 2
+   * @maximum 8
+   */
   cifreProgressivo: number;
   /** @minimum 1 */
   numeroIniziale: number;

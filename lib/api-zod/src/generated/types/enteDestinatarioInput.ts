@@ -8,29 +8,29 @@
 
 export interface EnteDestinatarioInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /**
-     * @minLength 1
-     * @maxLength 200
-     */
+   * @minLength 1
+   * @maxLength 200
+   */
   denominazione: string;
   /**
-     * @minLength 1
-     * @maxLength 250
-     */
+   * @minLength 1
+   * @maxLength 250
+   */
   indirizzo: string;
   /**
-     * @maxLength 50
-     * @nullable
-     */
+   * @maxLength 50
+   * @nullable
+   */
   telefono?: string | null;
   /**
-     * @maxLength 200
-     * @nullable
-     */
+   * @maxLength 200
+   * @nullable
+   */
   email?: string | null;
   /** @minimum 1 */
   areaOperativaId: number;

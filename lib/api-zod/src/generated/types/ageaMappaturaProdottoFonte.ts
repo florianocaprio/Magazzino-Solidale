@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AgeaMappaturaProdottoFonte = typeof AgeaMappaturaProdottoFonte[keyof typeof AgeaMappaturaProdottoFonte];
-
+export type AgeaMappaturaProdottoFonte =
+  (typeof AgeaMappaturaProdottoFonte)[keyof typeof AgeaMappaturaProdottoFonte];
 
 export const AgeaMappaturaProdottoFonte = {
-  AGEA_SIFEAD: 'AGEA_SIFEAD',
+  AGEA_SIFEAD: "AGEA_SIFEAD",
 } as const;

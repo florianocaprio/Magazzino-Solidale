@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { CaricoPraticaStato } from './caricoPraticaStato';
-import type { CaricoPraticaTipoPratica } from './caricoPraticaTipoPratica';
-import type { OrigineCarico } from './origineCarico';
+import type { CaricoPraticaStato } from "./caricoPraticaStato";
+import type { CaricoPraticaTipoPratica } from "./caricoPraticaTipoPratica";
+import type { OrigineCarico } from "./origineCarico";
 
 export interface CaricoPratica {
   id: number;

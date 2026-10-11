@@ -5,20 +5,20 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { InterventoDocumentoStato } from './interventoDocumentoStato';
+import type { InterventoDocumentoStato } from "./interventoDocumentoStato";
 
 export interface InterventoDocumentoInput {
   /**
-     * @minLength 1
-     * @maxLength 200
-     */
+   * @minLength 1
+   * @maxLength 200
+   */
   tipoDescrizione: string;
   stato: InterventoDocumentoStato;
   /** @nullable */
   dataScadenza?: Date | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   note?: string | null;
 }

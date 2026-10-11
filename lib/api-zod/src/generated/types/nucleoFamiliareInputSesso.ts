@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type NucleoFamiliareInputSesso = typeof NucleoFamiliareInputSesso[keyof typeof NucleoFamiliareInputSesso];
-
+export type NucleoFamiliareInputSesso =
+  (typeof NucleoFamiliareInputSesso)[keyof typeof NucleoFamiliareInputSesso];
 
 export const NucleoFamiliareInputSesso = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
 } as const;

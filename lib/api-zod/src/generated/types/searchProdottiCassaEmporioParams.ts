@@ -7,6 +7,6 @@
  */
 
 export type SearchProdottiCassaEmporioParams = {
-search?: string;
-magazzinoEmporioId?: number;
+  search?: string;
+  magazzinoEmporioId?: number;
 };

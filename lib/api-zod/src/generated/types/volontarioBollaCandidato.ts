@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioBollaCandidatoTipoVolontario } from './volontarioBollaCandidatoTipoVolontario';
+import type { VolontarioBollaCandidatoTipoVolontario } from "./volontarioBollaCandidatoTipoVolontario";
 
 export interface VolontarioBollaCandidato {
   id: number;

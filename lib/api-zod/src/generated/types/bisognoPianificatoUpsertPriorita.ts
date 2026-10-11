@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BisognoPianificatoUpsertPriorita = typeof BisognoPianificatoUpsertPriorita[keyof typeof BisognoPianificatoUpsertPriorita];
-
+export type BisognoPianificatoUpsertPriorita =
+  (typeof BisognoPianificatoUpsertPriorita)[keyof typeof BisognoPianificatoUpsertPriorita];
 
 export const BisognoPianificatoUpsertPriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;

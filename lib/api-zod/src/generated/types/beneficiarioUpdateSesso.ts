@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiarioUpdateSesso = typeof BeneficiarioUpdateSesso[keyof typeof BeneficiarioUpdateSesso];
-
+export type BeneficiarioUpdateSesso =
+  (typeof BeneficiarioUpdateSesso)[keyof typeof BeneficiarioUpdateSesso];
 
 export const BeneficiarioUpdateSesso = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
 } as const;

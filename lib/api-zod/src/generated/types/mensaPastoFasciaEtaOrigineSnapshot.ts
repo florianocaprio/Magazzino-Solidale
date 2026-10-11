@@ -9,11 +9,12 @@
 /**
  * @nullable
  */
-export type MensaPastoFasciaEtaOrigineSnapshot = typeof MensaPastoFasciaEtaOrigineSnapshot[keyof typeof MensaPastoFasciaEtaOrigineSnapshot] | null;
-
+export type MensaPastoFasciaEtaOrigineSnapshot =
+  | (typeof MensaPastoFasciaEtaOrigineSnapshot)[keyof typeof MensaPastoFasciaEtaOrigineSnapshot]
+  | null;
 
 export const MensaPastoFasciaEtaOrigineSnapshot = {
-  calcolata: 'calcolata',
-  presunta: 'presunta',
-  non_determinata: 'non_determinata',
+  calcolata: "calcolata",
+  presunta: "presunta",
+  non_determinata: "non_determinata",
 } as const;

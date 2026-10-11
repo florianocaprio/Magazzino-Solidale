@@ -5,20 +5,20 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FondoOrigine } from './fondoOrigine';
-import type { OrigineCarico } from './origineCarico';
+import type { FondoOrigine } from "./fondoOrigine";
+import type { OrigineCarico } from "./origineCarico";
 
 export type ListLottiParams = {
-prodottoId?: number;
-magazzinoId?: number;
-inScadenza?: boolean;
-fondoOrigine?: FondoOrigine;
-/**
- * Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.
- */
-origineCaricoPresente?: OrigineCarico;
-/**
- * Include anche le partite con residuo zero; omesso mantiene il filtro storico sui soli residui positivi.
- */
-includeEsauriti?: boolean;
+  prodottoId?: number;
+  magazzinoId?: number;
+  inScadenza?: boolean;
+  fondoOrigine?: FondoOrigine;
+  /**
+   * Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.
+   */
+  origineCaricoPresente?: OrigineCarico;
+  /**
+   * Include anche le partite con residuo zero; omesso mantiene il filtro storico sui soli residui positivi.
+   */
+  includeEsauriti?: boolean;
 };

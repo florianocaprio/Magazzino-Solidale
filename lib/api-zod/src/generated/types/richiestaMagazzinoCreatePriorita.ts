@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type RichiestaMagazzinoCreatePriorita = typeof RichiestaMagazzinoCreatePriorita[keyof typeof RichiestaMagazzinoCreatePriorita];
-
+export type RichiestaMagazzinoCreatePriorita =
+  (typeof RichiestaMagazzinoCreatePriorita)[keyof typeof RichiestaMagazzinoCreatePriorita];
 
 export const RichiestaMagazzinoCreatePriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;

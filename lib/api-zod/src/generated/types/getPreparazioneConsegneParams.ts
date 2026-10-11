@@ -7,6 +7,6 @@
  */
 
 export type GetPreparazioneConsegneParams = {
-areaOperativaId?: number;
-magazzinoId?: number;
+  areaOperativaId?: number;
+  magazzinoId?: number;
 };

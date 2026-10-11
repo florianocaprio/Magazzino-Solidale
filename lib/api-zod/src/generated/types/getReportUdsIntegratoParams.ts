@@ -5,32 +5,32 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ReportAParameter } from './reportAParameter';
-import type { ReportAreaOperativaIdParameter } from './reportAreaOperativaIdParameter';
-import type { ReportCentroIdParameter } from './reportCentroIdParameter';
-import type { ReportDaParameter } from './reportDaParameter';
-import type { ReportOperatoreIdParameter } from './reportOperatoreIdParameter';
-import type { ReportTipoInterventoParameter } from './reportTipoInterventoParameter';
-import type { ReportZonaUdsIdParameter } from './reportZonaUdsIdParameter';
+import type { ReportAParameter } from "./reportAParameter";
+import type { ReportAreaOperativaIdParameter } from "./reportAreaOperativaIdParameter";
+import type { ReportCentroIdParameter } from "./reportCentroIdParameter";
+import type { ReportDaParameter } from "./reportDaParameter";
+import type { ReportOperatoreIdParameter } from "./reportOperatoreIdParameter";
+import type { ReportTipoInterventoParameter } from "./reportTipoInterventoParameter";
+import type { ReportZonaUdsIdParameter } from "./reportZonaUdsIdParameter";
 
 export type GetReportUdsIntegratoParams = {
-/**
- * Data civile iniziale Europe/Rome (YYYY-MM-DD)
- */
-da?: ReportDaParameter;
-/**
- * Data civile finale Europe/Rome (YYYY-MM-DD)
- */
-a?: ReportAParameter;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
-/**
- * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
- */
-centroAscoltoId?: ReportCentroIdParameter;
-zonaUdsId?: ReportZonaUdsIdParameter;
-operatoreId?: ReportOperatoreIdParameter;
-tipoIntervento?: ReportTipoInterventoParameter;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  zonaUdsId?: ReportZonaUdsIdParameter;
+  operatoreId?: ReportOperatoreIdParameter;
+  tipoIntervento?: ReportTipoInterventoParameter;
 };

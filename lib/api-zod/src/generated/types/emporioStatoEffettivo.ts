@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type EmporioStatoEffettivo = typeof EmporioStatoEffettivo[keyof typeof EmporioStatoEffettivo];
-
+export type EmporioStatoEffettivo =
+  (typeof EmporioStatoEffettivo)[keyof typeof EmporioStatoEffettivo];
 
 export const EmporioStatoEffettivo = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
-  programmato: 'programmato',
+  non_abilitato: "non_abilitato",
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
+  programmato: "programmato",
 } as const;

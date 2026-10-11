@@ -9,4 +9,6 @@
 /**
  * Il server costruisce il link Bolla da configurazione trusted o same-origin validata.
  */
-export interface BollaEmporioInvioManualeInput { [key: string]: unknown }
+export interface BollaEmporioInvioManualeInput {
+  [key: string]: unknown;
+}

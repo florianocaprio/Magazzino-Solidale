@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BollaDettaglio } from './bollaDettaglio';
-import type { DocumentoOperativoDettaglioTipoAggregato } from './documentoOperativoDettaglioTipoAggregato';
-import type { Trasferimento } from './trasferimento';
+import type { BollaDettaglio } from "./bollaDettaglio";
+import type { DocumentoOperativoDettaglioTipoAggregato } from "./documentoOperativoDettaglioTipoAggregato";
+import type { Trasferimento } from "./trasferimento";
 
 export interface DocumentoOperativoDettaglio {
   documentoId: string;

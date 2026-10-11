@@ -9,8 +9,8 @@
 export interface AssegnazioneMensaInput {
   attiva: boolean;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   motivo: string;
 }

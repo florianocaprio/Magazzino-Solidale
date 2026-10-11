@@ -8,30 +8,30 @@
 
 export interface BeneficiarioFseUpdate {
   /**
-     * @minLength 1
-     * @maxLength 255
-     */
+   * @minLength 1
+   * @maxLength 255
+   */
   codiceFascicolo?: string;
   /**
-     * @minimum 0
-     * @nullable
-     */
+   * @minimum 0
+   * @nullable
+   */
   origineStranieraMinoranze?: number | null;
   /**
-     * @minimum 0
-     * @nullable
-     */
+   * @minimum 0
+   * @nullable
+   */
   cittadiniPaesiTerzi?: number | null;
   /**
-     * @minimum 0
-     * @nullable
-     */
+   * @minimum 0
+   * @nullable
+   */
   senzaTettoEsclusioneAbitativa?: number | null;
   /** Data civile Europe/Rome di validità storica della correzione. */
   dataRiferimento: Date;
   /**
-     * Versione letta dal chiamante per optimistic locking; 0 se il profilo non esiste ancora.
-     * @minimum 0
-     */
+   * Versione letta dal chiamante per optimistic locking; 0 se il profilo non esiste ancora.
+   * @minimum 0
+   */
   versione: number;
 }

@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BeneficiarioFseComparisonStato } from './beneficiarioFseComparisonStato';
-import type { BeneficiarioFseDifference } from './beneficiarioFseDifference';
+import type { BeneficiarioFseComparisonStato } from "./beneficiarioFseComparisonStato";
+import type { BeneficiarioFseDifference } from "./beneficiarioFseDifference";
 
 export interface BeneficiarioFseComparison {
   stato: BeneficiarioFseComparisonStato;

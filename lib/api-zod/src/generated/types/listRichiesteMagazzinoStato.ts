@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListRichiesteMagazzinoStato = typeof ListRichiesteMagazzinoStato[keyof typeof ListRichiesteMagazzinoStato];
-
+export type ListRichiesteMagazzinoStato =
+  (typeof ListRichiesteMagazzinoStato)[keyof typeof ListRichiesteMagazzinoStato];
 
 export const ListRichiesteMagazzinoStato = {
-  aperte: 'aperte',
-  inviata: 'inviata',
-  presa_in_carico: 'presa_in_carico',
-  chiusa: 'chiusa',
-  annullata: 'annullata',
+  aperte: "aperte",
+  inviata: "inviata",
+  presa_in_carico: "presa_in_carico",
+  chiusa: "chiusa",
+  annullata: "annullata",
 } as const;

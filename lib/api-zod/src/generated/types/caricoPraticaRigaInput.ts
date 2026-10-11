@@ -5,24 +5,24 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FattoreContabile } from './fattoreContabile';
-import type { FondoOrigine } from './fondoOrigine';
-import type { QuantitaContabile } from './quantitaContabile';
+import type { FattoreContabile } from "./fattoreContabile";
+import type { FondoOrigine } from "./fondoOrigine";
+import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface CaricoPraticaRigaInput {
   /**
-     * @maxLength 100
-     * @nullable
-     */
+   * @maxLength 100
+   * @nullable
+   */
   clientId?: string | null;
   /** @minimum 1 */
   prodottoId: number;
   fondoOrigine: FondoOrigine;
   quantita?: QuantitaContabile | null;
   /**
-     * @maxLength 80
-     * @nullable
-     */
+   * @maxLength 80
+   * @nullable
+   */
   codiceLottoProduttore?: string | null;
   /** @nullable */
   dataScadenza?: Date | null;

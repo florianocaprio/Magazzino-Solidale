@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiarioStatoAnagrafica = typeof BeneficiarioStatoAnagrafica[keyof typeof BeneficiarioStatoAnagrafica];
-
+export type BeneficiarioStatoAnagrafica =
+  (typeof BeneficiarioStatoAnagrafica)[keyof typeof BeneficiarioStatoAnagrafica];
 
 export const BeneficiarioStatoAnagrafica = {
-  provvisoria: 'provvisoria',
-  completa: 'completa',
+  provvisoria: "provvisoria",
+  completa: "completa",
 } as const;

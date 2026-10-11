@@ -9,4 +9,6 @@
 /**
  * @nullable
  */
-export type MensaReportChiusurePrecedentiItemSnapshot = { [key: string]: unknown } | null;
+export type MensaReportChiusurePrecedentiItemSnapshot = {
+  [key: string]: unknown;
+} | null;

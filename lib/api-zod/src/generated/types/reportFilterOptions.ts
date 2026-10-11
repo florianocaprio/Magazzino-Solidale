@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ReportFilterOption } from './reportFilterOption';
-import type { ReportFilterOptionsSection } from './reportFilterOptionsSection';
+import type { ReportFilterOption } from "./reportFilterOption";
+import type { ReportFilterOptionsSection } from "./reportFilterOptionsSection";
 
 export interface ReportFilterOptions {
   section: ReportFilterOptionsSection;

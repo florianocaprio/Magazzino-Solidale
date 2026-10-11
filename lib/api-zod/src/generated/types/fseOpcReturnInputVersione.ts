@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseOpcReturnInputVersione = typeof FseOpcReturnInputVersione[keyof typeof FseOpcReturnInputVersione];
-
+export type FseOpcReturnInputVersione =
+  (typeof FseOpcReturnInputVersione)[keyof typeof FseOpcReturnInputVersione];
 
 export const FseOpcReturnInputVersione = {
   NUMBER_1: 1,

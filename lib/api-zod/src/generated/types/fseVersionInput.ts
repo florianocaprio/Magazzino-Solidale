@@ -10,15 +10,15 @@ export interface FseVersionInput {
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   motivazione?: string;
   data?: Date;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   riferimentoEsterno?: string;
   conScostamenti?: boolean;
 }

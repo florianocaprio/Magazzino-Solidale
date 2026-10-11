@@ -6,17 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type RichiestaMagazzinoDocumentoSummaryAvanzamento = typeof RichiestaMagazzinoDocumentoSummaryAvanzamento[keyof typeof RichiestaMagazzinoDocumentoSummaryAvanzamento];
-
+export type RichiestaMagazzinoDocumentoSummaryAvanzamento =
+  (typeof RichiestaMagazzinoDocumentoSummaryAvanzamento)[keyof typeof RichiestaMagazzinoDocumentoSummaryAvanzamento];
 
 export const RichiestaMagazzinoDocumentoSummaryAvanzamento = {
-  in_preparazione: 'in_preparazione',
-  pronta: 'pronta',
-  in_viaggio: 'in_viaggio',
-  rientro_atteso: 'rientro_atteso',
-  esito_registrato: 'esito_registrato',
-  rientrato: 'rientrato',
-  annullato: 'annullato',
-  non_disponibile: 'non_disponibile',
-  stato_non_riconosciuto: 'stato_non_riconosciuto',
+  in_preparazione: "in_preparazione",
+  pronta: "pronta",
+  in_viaggio: "in_viaggio",
+  rientro_atteso: "rientro_atteso",
+  esito_registrato: "esito_registrato",
+  rientrato: "rientrato",
+  annullato: "annullato",
+  non_disponibile: "non_disponibile",
+  stato_non_riconosciuto: "stato_non_riconosciuto",
 } as const;

@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { TurnoFascia } from './turnoFascia';
-import type { TurnoStato } from './turnoStato';
-import type { TurnoVolontario } from './turnoVolontario';
+import type { TurnoFascia } from "./turnoFascia";
+import type { TurnoStato } from "./turnoStato";
+import type { TurnoVolontario } from "./turnoVolontario";
 
 export interface Turno {
   id: number;

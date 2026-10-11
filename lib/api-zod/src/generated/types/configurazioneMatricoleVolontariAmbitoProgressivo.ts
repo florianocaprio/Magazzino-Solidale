@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ConfigurazioneMatricoleVolontariAmbitoProgressivo = typeof ConfigurazioneMatricoleVolontariAmbitoProgressivo[keyof typeof ConfigurazioneMatricoleVolontariAmbitoProgressivo];
-
+export type ConfigurazioneMatricoleVolontariAmbitoProgressivo =
+  (typeof ConfigurazioneMatricoleVolontariAmbitoProgressivo)[keyof typeof ConfigurazioneMatricoleVolontariAmbitoProgressivo];
 
 export const ConfigurazioneMatricoleVolontariAmbitoProgressivo = {
-  GLOBALE: 'GLOBALE',
-  PER_AREA: 'PER_AREA',
+  GLOBALE: "GLOBALE",
+  PER_AREA: "PER_AREA",
 } as const;

@@ -5,17 +5,17 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { AgeaImportModalita } from './ageaImportModalita';
+import type { AgeaImportModalita } from "./ageaImportModalita";
 
 export type AnalyzeAgeaImportazioneParams = {
-/**
- * @minimum 1
- */
-magazzinoId: number;
-modalita: AgeaImportModalita;
-/**
- * @maxLength 255
- * @pattern .*\.xlsx$
- */
-nomeFile: string;
+  /**
+   * @minimum 1
+   */
+  magazzinoId: number;
+  modalita: AgeaImportModalita;
+  /**
+   * @maxLength 255
+   * @pattern .*\.xlsx$
+   */
+  nomeFile: string;
 };

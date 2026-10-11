@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MaterialeDaPreparareFusoOrario = typeof MaterialeDaPreparareFusoOrario[keyof typeof MaterialeDaPreparareFusoOrario];
-
+export type MaterialeDaPreparareFusoOrario =
+  (typeof MaterialeDaPreparareFusoOrario)[keyof typeof MaterialeDaPreparareFusoOrario];
 
 export const MaterialeDaPreparareFusoOrario = {
-  'Europe/Rome': 'Europe/Rome',
+  "Europe/Rome": "Europe/Rome",
 } as const;

@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetVolontariCaricoFascia = typeof GetVolontariCaricoFascia[keyof typeof GetVolontariCaricoFascia];
-
+export type GetVolontariCaricoFascia =
+  (typeof GetVolontariCaricoFascia)[keyof typeof GetVolontariCaricoFascia];
 
 export const GetVolontariCaricoFascia = {
-  '09-13': '09-13',
-  '14-18': '14-18',
-  '18-20': '18-20',
+  "09-13": "09-13",
+  "14-18": "14-18",
+  "18-20": "18-20",
 } as const;

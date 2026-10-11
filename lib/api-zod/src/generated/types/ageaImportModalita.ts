@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AgeaImportModalita = typeof AgeaImportModalita[keyof typeof AgeaImportModalita];
-
+export type AgeaImportModalita =
+  (typeof AgeaImportModalita)[keyof typeof AgeaImportModalita];
 
 export const AgeaImportModalita = {
-  PRIMA_ACQUISIZIONE: 'PRIMA_ACQUISIZIONE',
-  AGGIORNAMENTO: 'AGGIORNAMENTO',
-  SOLO_ANALISI: 'SOLO_ANALISI',
+  PRIMA_ACQUISIZIONE: "PRIMA_ACQUISIZIONE",
+  AGGIORNAMENTO: "AGGIORNAMENTO",
+  SOLO_ANALISI: "SOLO_ANALISI",
 } as const;

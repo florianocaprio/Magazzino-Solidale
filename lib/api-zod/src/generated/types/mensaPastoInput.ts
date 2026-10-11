@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaPastoInputTipoServizio } from './mensaPastoInputTipoServizio';
+import type { MensaPastoInputTipoServizio } from "./mensaPastoInputTipoServizio";
 
 export interface MensaPastoInput {
   accessoMensaId: number;
@@ -16,8 +16,8 @@ export interface MensaPastoInput {
   /** @nullable */
   motivoOverride?: string | null;
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   idempotencyKey: string;
 }

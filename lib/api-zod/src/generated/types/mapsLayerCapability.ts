@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MapsLayerCapabilityDomain } from './mapsLayerCapabilityDomain';
-import type { MapsLayerCode } from './mapsLayerCode';
+import type { MapsLayerCapabilityDomain } from "./mapsLayerCapabilityDomain";
+import type { MapsLayerCode } from "./mapsLayerCode";
 
 export interface MapsLayerCapability {
   code: MapsLayerCode;

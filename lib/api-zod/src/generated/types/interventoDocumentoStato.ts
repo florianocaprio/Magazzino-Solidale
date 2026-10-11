@@ -6,14 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type InterventoDocumentoStato = typeof InterventoDocumentoStato[keyof typeof InterventoDocumentoStato];
-
+export type InterventoDocumentoStato =
+  (typeof InterventoDocumentoStato)[keyof typeof InterventoDocumentoStato];
 
 export const InterventoDocumentoStato = {
-  da_acquisire: 'da_acquisire',
-  da_verificare: 'da_verificare',
-  acquisito: 'acquisito',
-  verificato: 'verificato',
-  non_disponibile: 'non_disponibile',
-  annullato: 'annullato',
+  da_acquisire: "da_acquisire",
+  da_verificare: "da_verificare",
+  acquisito: "acquisito",
+  verificato: "verificato",
+  non_disponibile: "non_disponibile",
+  annullato: "annullato",
 } as const;

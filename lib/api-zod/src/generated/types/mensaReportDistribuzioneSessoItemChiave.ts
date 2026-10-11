@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MensaReportDistribuzioneSessoItemChiave = typeof MensaReportDistribuzioneSessoItemChiave[keyof typeof MensaReportDistribuzioneSessoItemChiave];
-
+export type MensaReportDistribuzioneSessoItemChiave =
+  (typeof MensaReportDistribuzioneSessoItemChiave)[keyof typeof MensaReportDistribuzioneSessoItemChiave];
 
 export const MensaReportDistribuzioneSessoItemChiave = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
-  ND: 'ND',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
+  ND: "ND",
 } as const;

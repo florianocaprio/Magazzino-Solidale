@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato } from './creditoSolidaleCalcoloDettaglioArrotondamentoApplicato';
+import type { CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato } from "./creditoSolidaleCalcoloDettaglioArrotondamentoApplicato";
 
 export interface CreditoSolidaleCalcoloDettaglio {
   creditoBaseNucleo: number;

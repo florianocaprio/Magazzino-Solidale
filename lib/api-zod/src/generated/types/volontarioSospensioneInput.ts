@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioSospensioneInputMotivo } from './volontarioSospensioneInputMotivo';
+import type { VolontarioSospensioneInputMotivo } from "./volontarioSospensioneInputMotivo";
 
 export interface VolontarioSospensioneInput {
   /** @minimum 1 */

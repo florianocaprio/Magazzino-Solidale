@@ -5,11 +5,11 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FseImportFile } from './fseImportFile';
-import type { FseImportRow } from './fseImportRow';
-import type { FseImportSession } from './fseImportSession';
-import type { FseImportStockRow } from './fseImportStockRow';
-import type { FseImportSummary } from './fseImportSummary';
+import type { FseImportFile } from "./fseImportFile";
+import type { FseImportRow } from "./fseImportRow";
+import type { FseImportSession } from "./fseImportSession";
+import type { FseImportStockRow } from "./fseImportStockRow";
+import type { FseImportSummary } from "./fseImportSummary";
 
 export type FseImportSessionDetail = FseImportSession & {
   files: FseImportFile[];

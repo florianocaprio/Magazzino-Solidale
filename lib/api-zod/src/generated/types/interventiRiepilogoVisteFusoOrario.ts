@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type InterventiRiepilogoVisteFusoOrario = typeof InterventiRiepilogoVisteFusoOrario[keyof typeof InterventiRiepilogoVisteFusoOrario];
-
+export type InterventiRiepilogoVisteFusoOrario =
+  (typeof InterventiRiepilogoVisteFusoOrario)[keyof typeof InterventiRiepilogoVisteFusoOrario];
 
 export const InterventiRiepilogoVisteFusoOrario = {
-  'Europe/Rome': 'Europe/Rome',
+  "Europe/Rome": "Europe/Rome",
 } as const;

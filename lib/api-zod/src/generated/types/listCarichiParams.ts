@@ -5,11 +5,11 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { OrigineCarico } from './origineCarico';
+import type { OrigineCarico } from "./origineCarico";
 
 export type ListCarichiParams = {
-magazzinoId?: number;
-origineCarico?: OrigineCarico;
-da?: Date;
-a?: Date;
+  magazzinoId?: number;
+  origineCarico?: OrigineCarico;
+  da?: Date;
+  a?: Date;
 };

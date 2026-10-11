@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FseImportFileFormato } from './fseImportFileFormato';
-import type { FseImportFileProfile } from './fseImportFileProfile';
+import type { FseImportFileFormato } from "./fseImportFileFormato";
+import type { FseImportFileProfile } from "./fseImportFileProfile";
 
 export interface FseImportFile {
   id: number;

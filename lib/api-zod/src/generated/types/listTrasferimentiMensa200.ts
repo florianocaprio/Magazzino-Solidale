@@ -5,6 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaTrasferimentiPage } from './mensaTrasferimentiPage';
+import type { MensaTrasferimentiPage } from "./mensaTrasferimentiPage";
 
-export type ListTrasferimentiMensa200 = { [key: string]: unknown }[] | MensaTrasferimentiPage;
+export type ListTrasferimentiMensa200 =
+  | { [key: string]: unknown }[]
+  | MensaTrasferimentiPage;

@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ExportDocumentiOperativiDestinatario = typeof ExportDocumentiOperativiDestinatario[keyof typeof ExportDocumentiOperativiDestinatario];
-
+export type ExportDocumentiOperativiDestinatario =
+  (typeof ExportDocumentiOperativiDestinatario)[keyof typeof ExportDocumentiOperativiDestinatario];
 
 export const ExportDocumentiOperativiDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
-  magazzino: 'magazzino',
+  beneficiario: "beneficiario",
+  ente: "ente",
+  magazzino: "magazzino",
 } as const;

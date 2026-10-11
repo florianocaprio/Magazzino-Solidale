@@ -6,12 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FondoOrigine = typeof FondoOrigine[keyof typeof FondoOrigine];
-
+export type FondoOrigine = (typeof FondoOrigine)[keyof typeof FondoOrigine];
 
 export const FondoOrigine = {
-  FSE_PLUS: 'FSE_PLUS',
-  FONDO_NAZIONALE: 'FONDO_NAZIONALE',
-  FONDO_NAZIONALE_COFINANZIATO: 'FONDO_NAZIONALE_COFINANZIATO',
-  NESSUN_FONDO: 'NESSUN_FONDO',
+  FSE_PLUS: "FSE_PLUS",
+  FONDO_NAZIONALE: "FONDO_NAZIONALE",
+  FONDO_NAZIONALE_COFINANZIATO: "FONDO_NAZIONALE_COFINANZIATO",
+  NESSUN_FONDO: "NESSUN_FONDO",
 } as const;

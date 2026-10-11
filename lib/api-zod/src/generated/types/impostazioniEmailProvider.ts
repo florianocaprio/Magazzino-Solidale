@@ -9,10 +9,10 @@
 /**
  * @deprecated
  */
-export type ImpostazioniEmailProvider = typeof ImpostazioniEmailProvider[keyof typeof ImpostazioniEmailProvider];
-
+export type ImpostazioniEmailProvider =
+  (typeof ImpostazioniEmailProvider)[keyof typeof ImpostazioniEmailProvider];
 
 export const ImpostazioniEmailProvider = {
-  connector: 'connector',
-  smtp: 'smtp',
+  connector: "connector",
+  smtp: "smtp",
 } as const;

@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MensaAccessoInputTipoServizio = typeof MensaAccessoInputTipoServizio[keyof typeof MensaAccessoInputTipoServizio];
-
+export type MensaAccessoInputTipoServizio =
+  (typeof MensaAccessoInputTipoServizio)[keyof typeof MensaAccessoInputTipoServizio];
 
 export const MensaAccessoInputTipoServizio = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;

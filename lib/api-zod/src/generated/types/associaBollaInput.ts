@@ -8,15 +8,15 @@
 
 export interface AssociaBollaInput {
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   bollaId: number | null;
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
 }

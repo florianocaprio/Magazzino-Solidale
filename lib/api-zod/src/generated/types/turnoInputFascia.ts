@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type TurnoInputFascia = typeof TurnoInputFascia[keyof typeof TurnoInputFascia];
-
+export type TurnoInputFascia =
+  (typeof TurnoInputFascia)[keyof typeof TurnoInputFascia];
 
 export const TurnoInputFascia = {
-  '09-13': '09-13',
-  '14-18': '14-18',
-  '18-20': '18-20',
+  "09-13": "09-13",
+  "14-18": "14-18",
+  "18-20": "18-20",
 } as const;

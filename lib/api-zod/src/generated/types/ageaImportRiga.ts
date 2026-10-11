@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { AgeaTipoMovimento } from './ageaTipoMovimento';
-import type { QuantitaContabileConSegno } from './quantitaContabileConSegno';
+import type { AgeaTipoMovimento } from "./ageaTipoMovimento";
+import type { QuantitaContabileConSegno } from "./quantitaContabileConSegno";
 
 export interface AgeaImportRiga {
   id: number;

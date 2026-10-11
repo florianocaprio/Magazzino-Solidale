@@ -5,30 +5,30 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ListBeneficiariStatoAnagrafica } from './listBeneficiariStatoAnagrafica';
+import type { ListBeneficiariStatoAnagrafica } from "./listBeneficiariStatoAnagrafica";
 
 export type ListBeneficiariParams = {
-search?: string;
-priorita?: string;
-domicilio?: boolean;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-zonaUdsId?: number;
-uds?: boolean;
-attivo?: boolean;
-/**
- * Filtra le anagrafiche complete o quelle provvisorie ancora da completare.
- */
-statoAnagrafica?: ListBeneficiariStatoAnagrafica;
-/**
- * Pagina richiesta, a partire da 1.
- * @minimum 1
- */
-page?: number;
-/**
- * Numero massimo di risultati per pagina.
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  search?: string;
+  priorita?: string;
+  domicilio?: boolean;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  zonaUdsId?: number;
+  uds?: boolean;
+  attivo?: boolean;
+  /**
+   * Filtra le anagrafiche complete o quelle provvisorie ancora da completare.
+   */
+  statoAnagrafica?: ListBeneficiariStatoAnagrafica;
+  /**
+   * Pagina richiesta, a partire da 1.
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * Numero massimo di risultati per pagina.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };

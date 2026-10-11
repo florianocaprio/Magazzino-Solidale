@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { TesseraBeneficiarioStato } from './tesseraBeneficiarioStato';
+import type { TesseraBeneficiarioStato } from "./tesseraBeneficiarioStato";
 
 export interface TesseraBeneficiario {
   id: number;

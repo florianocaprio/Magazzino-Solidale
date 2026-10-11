@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { DocumentoOperativoTipoAggregato } from './documentoOperativoTipoAggregato';
-import type { DocumentoOperativoTipoDestinatario } from './documentoOperativoTipoDestinatario';
+import type { DocumentoOperativoTipoAggregato } from "./documentoOperativoTipoAggregato";
+import type { DocumentoOperativoTipoDestinatario } from "./documentoOperativoTipoDestinatario";
 
 export interface DocumentoOperativo {
   /** @pattern ^(bolla|trasferimento):[1-9][0-9]*$ */

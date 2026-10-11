@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontarioIdentifierTipoIdentificativo = typeof VolontarioIdentifierTipoIdentificativo[keyof typeof VolontarioIdentifierTipoIdentificativo];
-
+export type VolontarioIdentifierTipoIdentificativo =
+  (typeof VolontarioIdentifierTipoIdentificativo)[keyof typeof VolontarioIdentifierTipoIdentificativo];
 
 export const VolontarioIdentifierTipoIdentificativo = {
-  TEMPORANEA: 'TEMPORANEA',
-  PERMANENTE: 'PERMANENTE',
-  LEGACY: 'LEGACY',
+  TEMPORANEA: "TEMPORANEA",
+  PERMANENTE: "PERMANENTE",
+  LEGACY: "LEGACY",
 } as const;

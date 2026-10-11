@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { RichiestaMagazzinoDocumentoSummary } from './richiestaMagazzinoDocumentoSummary';
+import type { RichiestaMagazzinoDocumentoSummary } from "./richiestaMagazzinoDocumentoSummary";
 
 export interface RichiestaMagazzinoDocumenti {
   corrente: RichiestaMagazzinoDocumentoSummary | null;

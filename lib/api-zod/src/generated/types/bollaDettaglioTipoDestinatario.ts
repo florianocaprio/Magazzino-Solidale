@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BollaDettaglioTipoDestinatario = typeof BollaDettaglioTipoDestinatario[keyof typeof BollaDettaglioTipoDestinatario];
-
+export type BollaDettaglioTipoDestinatario =
+  (typeof BollaDettaglioTipoDestinatario)[keyof typeof BollaDettaglioTipoDestinatario];
 
 export const BollaDettaglioTipoDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
+  beneficiario: "beneficiario",
+  ente: "ente",
 } as const;

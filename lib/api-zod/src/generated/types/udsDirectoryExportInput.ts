@@ -8,9 +8,9 @@
 
 export interface UdsDirectoryExportInput {
   /**
-     * @minLength 2
-     * @maxLength 120
-     */
+   * @minLength 2
+   * @maxLength 120
+   */
   search?: string;
   /** @minimum 1 */
   areaOperativaId?: number;

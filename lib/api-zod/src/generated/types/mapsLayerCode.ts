@@ -6,12 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MapsLayerCode = typeof MapsLayerCode[keyof typeof MapsLayerCode];
-
+export type MapsLayerCode = (typeof MapsLayerCode)[keyof typeof MapsLayerCode];
 
 export const MapsLayerCode = {
-  socialeinterventi_pianificati: 'sociale.interventi_pianificati',
-  pacchiconsegne: 'pacchi.consegne',
-  pacchiritiri_non_effettuati: 'pacchi.ritiri_non_effettuati',
-  centropunti_operativi: 'centro.punti_operativi',
+  socialeinterventi_pianificati: "sociale.interventi_pianificati",
+  pacchiconsegne: "pacchi.consegne",
+  pacchiritiri_non_effettuati: "pacchi.ritiri_non_effettuati",
+  centropunti_operativi: "centro.punti_operativi",
 } as const;

@@ -9,24 +9,24 @@
 export interface UdsInterventoRettificaInput {
   versione: Date;
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   motivo: string;
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   tipoIntervento?: string;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   descrizione?: string | null;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   note?: string | null;
   dataIntervento?: Date;
 }

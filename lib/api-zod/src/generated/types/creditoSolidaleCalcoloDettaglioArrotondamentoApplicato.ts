@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato = typeof CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato[keyof typeof CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato];
-
+export type CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato =
+  (typeof CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato)[keyof typeof CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato];
 
 export const CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato = {
-  nessuno: 'nessuno',
-  intero_superiore: 'intero_superiore',
-  intero_inferiore: 'intero_inferiore',
-  intero_piu_vicino: 'intero_piu_vicino',
+  nessuno: "nessuno",
+  intero_superiore: "intero_superiore",
+  intero_inferiore: "intero_inferiore",
+  intero_piu_vicino: "intero_piu_vicino",
 } as const;

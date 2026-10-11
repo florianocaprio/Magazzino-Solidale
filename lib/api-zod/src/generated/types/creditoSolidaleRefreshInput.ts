@@ -8,9 +8,9 @@
 
 export interface CreditoSolidaleRefreshInput {
   /**
-     * @nullable
-     * @pattern ^\d{4}-(0[1-9]|1[0-2])$
-     */
+   * @nullable
+   * @pattern ^\d{4}-(0[1-9]|1[0-2])$
+   */
   periodoRiferimento?: string | null;
   /** @nullable */
   note?: string | null;

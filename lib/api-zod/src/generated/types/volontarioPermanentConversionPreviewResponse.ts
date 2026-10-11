@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { PermanentVolunteerIdentifierPreview } from './permanentVolunteerIdentifierPreview';
+import type { PermanentVolunteerIdentifierPreview } from "./permanentVolunteerIdentifierPreview";
 
 export interface VolontarioPermanentConversionPreviewResponse {
   volontarioId: number;

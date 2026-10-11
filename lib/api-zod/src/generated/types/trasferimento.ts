@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { TrasferimentoRiga } from './trasferimentoRiga';
+import type { TrasferimentoRiga } from "./trasferimentoRiga";
 
 export interface Trasferimento {
   id: number;

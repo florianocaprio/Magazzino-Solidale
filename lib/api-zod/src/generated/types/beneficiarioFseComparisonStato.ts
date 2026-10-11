@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiarioFseComparisonStato = typeof BeneficiarioFseComparisonStato[keyof typeof BeneficiarioFseComparisonStato];
-
+export type BeneficiarioFseComparisonStato =
+  (typeof BeneficiarioFseComparisonStato)[keyof typeof BeneficiarioFseComparisonStato];
 
 export const BeneficiarioFseComparisonStato = {
-  coerente: 'coerente',
-  non_allineato: 'non_allineato',
-  non_confrontabile: 'non_confrontabile',
+  coerente: "coerente",
+  non_allineato: "non_allineato",
+  non_confrontabile: "non_confrontabile",
 } as const;

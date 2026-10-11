@@ -5,32 +5,32 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { RichiestaMagazzinoUpdateModalitaPreferita } from './richiestaMagazzinoUpdateModalitaPreferita';
-import type { RichiestaMagazzinoUpdatePriorita } from './richiestaMagazzinoUpdatePriorita';
+import type { RichiestaMagazzinoUpdateModalitaPreferita } from "./richiestaMagazzinoUpdateModalitaPreferita";
+import type { RichiestaMagazzinoUpdatePriorita } from "./richiestaMagazzinoUpdatePriorita";
 
 export interface RichiestaMagazzinoUpdate {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   bisogno?: string;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   noteOperative?: string | null;
   priorita?: RichiestaMagazzinoUpdatePriorita;
   /**
-     * @nullable
-     * @pattern ^\d{4}-\d{2}-\d{2}$
-     */
+   * @nullable
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
   dataDesiderata?: string | null;
   modalitaPreferita?: RichiestaMagazzinoUpdateModalitaPreferita;
 }

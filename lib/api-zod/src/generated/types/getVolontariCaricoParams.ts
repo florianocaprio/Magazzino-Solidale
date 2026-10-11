@@ -5,13 +5,13 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { GetVolontariCaricoFascia } from './getVolontariCaricoFascia';
+import type { GetVolontariCaricoFascia } from "./getVolontariCaricoFascia";
 
 export type GetVolontariCaricoParams = {
-/**
- * Data del turno (YYYY-MM-DD)
- */
-data: string;
-excludeConsegnaId?: number;
-fascia: GetVolontariCaricoFascia;
+  /**
+   * Data del turno (YYYY-MM-DD)
+   */
+  data: string;
+  excludeConsegnaId?: number;
+  fascia: GetVolontariCaricoFascia;
 };

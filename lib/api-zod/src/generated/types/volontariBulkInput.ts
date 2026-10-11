@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioInput } from './volontarioInput';
+import type { VolontarioInput } from "./volontarioInput";
 
 export interface VolontariBulkInput {
   righe: VolontarioInput[];

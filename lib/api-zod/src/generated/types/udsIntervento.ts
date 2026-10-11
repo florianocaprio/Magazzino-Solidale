@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { UdsInterventoAmbito } from './udsInterventoAmbito';
-import type { UdsInterventoStato } from './udsInterventoStato';
+import type { UdsInterventoAmbito } from "./udsInterventoAmbito";
+import type { UdsInterventoStato } from "./udsInterventoStato";
 
 export interface UdsIntervento {
   id: number;

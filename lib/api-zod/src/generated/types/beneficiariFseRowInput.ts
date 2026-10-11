@@ -7,22 +7,22 @@
  */
 
 export interface BeneficiariFseRowInput {
-  'Nome Referente fascicolo': string;
-  'Cognome Referente fascicolo': string;
-  'Codice fascicolo': string;
-  'Data di presa in carico': string | number;
-  'Numero componenti fascicolo': string | number;
-  'Tipologia di Attività': string;
-  'Stato attuale': string;
+  "Nome Referente fascicolo": string;
+  "Cognome Referente fascicolo": string;
+  "Codice fascicolo": string;
+  "Data di presa in carico": string | number;
+  "Numero componenti fascicolo": string | number;
+  "Tipologia di Attività": string;
+  "Stato attuale": string;
   Donne: string | number;
   Uomini: string | number;
-  'Età<18': string | number;
-  'Età 18-29': string | number;
-  'Età 30-64': string | number;
-  'Età>=65': string | number;
-  'Origine straniera e minoranze': string | number;
+  "Età<18": string | number;
+  "Età 18-29": string | number;
+  "Età 30-64": string | number;
+  "Età>=65": string | number;
+  "Origine straniera e minoranze": string | number;
   Disabili: string | number;
-  'Cittadini di Paesi Terzi': string | number;
-  'Senzatetto o colpiti da esclusione abitativa': string | number;
+  "Cittadini di Paesi Terzi": string | number;
+  "Senzatetto o colpiti da esclusione abitativa": string | number;
   [key: string]: unknown;
- }
+}

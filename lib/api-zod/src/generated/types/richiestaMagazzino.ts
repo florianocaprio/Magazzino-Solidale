@@ -5,12 +5,12 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { RichiestaMagazzinoDocumentoSummary } from './richiestaMagazzinoDocumentoSummary';
-import type { RichiestaMagazzinoModalitaPreferita } from './richiestaMagazzinoModalitaPreferita';
-import type { RichiestaMagazzinoPriorita } from './richiestaMagazzinoPriorita';
-import type { RichiestaMagazzinoSorgente } from './richiestaMagazzinoSorgente';
-import type { RichiestaMagazzinoStato } from './richiestaMagazzinoStato';
-import type { RichiestaMagazzinoTipoDestinatario } from './richiestaMagazzinoTipoDestinatario';
+import type { RichiestaMagazzinoDocumentoSummary } from "./richiestaMagazzinoDocumentoSummary";
+import type { RichiestaMagazzinoModalitaPreferita } from "./richiestaMagazzinoModalitaPreferita";
+import type { RichiestaMagazzinoPriorita } from "./richiestaMagazzinoPriorita";
+import type { RichiestaMagazzinoSorgente } from "./richiestaMagazzinoSorgente";
+import type { RichiestaMagazzinoStato } from "./richiestaMagazzinoStato";
+import type { RichiestaMagazzinoTipoDestinatario } from "./richiestaMagazzinoTipoDestinatario";
 
 /**
  * Snapshot operativo; nessun dato del dossier sociale live.
@@ -29,15 +29,15 @@ export interface RichiestaMagazzino {
   /** @nullable */
   centroAscoltoId?: number | null;
   /**
-     * Contesto tecnico di scope sociale all'invio
-     * @nullable
-     */
+   * Contesto tecnico di scope sociale all'invio
+   * @nullable
+   */
   zonaUdsIdSnapshot?: number | null;
   sorgente: RichiestaMagazzinoSorgente;
   /**
-     * Oscurato senza diritto di lettura Interventi sociali
-     * @nullable
-     */
+   * Oscurato senza diritto di lettura Interventi sociali
+   * @nullable
+   */
   interventoId?: number | null;
   /** @nullable */
   destinatarioCodiceSnapshot?: string | null;
@@ -52,9 +52,9 @@ export interface RichiestaMagazzino {
   noteOperative?: string | null;
   priorita: RichiestaMagazzinoPriorita;
   /**
-     * @nullable
-     * @pattern ^\d{4}-\d{2}-\d{2}$
-     */
+   * @nullable
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
   dataDesiderata?: string | null;
   modalitaPreferita: RichiestaMagazzinoModalitaPreferita;
   stato: RichiestaMagazzinoStato;

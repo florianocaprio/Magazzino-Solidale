@@ -7,23 +7,23 @@
  */
 
 export type ListUdsDirectoryParams = {
-/**
- * @minLength 2
- * @maxLength 120
- */
-search?: string;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
-/**
- * Disponibile soltanto ai profili amministrativi globali.
- */
-areaOperativaId?: number;
-zonaUdsId?: number;
+  /**
+   * @minLength 2
+   * @maxLength 120
+   */
+  search?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * Disponibile soltanto ai profili amministrativi globali.
+   */
+  areaOperativaId?: number;
+  zonaUdsId?: number;
 };

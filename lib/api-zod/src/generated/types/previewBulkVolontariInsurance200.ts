@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioBulkInsurancePreviewRow } from './volontarioBulkInsurancePreviewRow';
+import type { VolontarioBulkInsurancePreviewRow } from "./volontarioBulkInsurancePreviewRow";
 
 export type PreviewBulkVolontariInsurance200 = {
   items: VolontarioBulkInsurancePreviewRow[];

@@ -13,9 +13,9 @@ export interface FseImportAddToPracticeInput {
   versionePratica?: number;
   rigaIds?: number[];
   /**
-     * @minLength 1
-     * @maxLength 100
-     */
+   * @minLength 1
+   * @maxLength 100
+   */
   idempotencyKey: string;
   /** Conferma amministrativa richiesta esclusivamente per predisporre un saldo iniziale. */
   confermaCoperturaStorica?: boolean;

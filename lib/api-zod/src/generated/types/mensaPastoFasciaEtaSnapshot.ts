@@ -9,13 +9,14 @@
 /**
  * @nullable
  */
-export type MensaPastoFasciaEtaSnapshot = typeof MensaPastoFasciaEtaSnapshot[keyof typeof MensaPastoFasciaEtaSnapshot] | null;
-
+export type MensaPastoFasciaEtaSnapshot =
+  | (typeof MensaPastoFasciaEtaSnapshot)[keyof typeof MensaPastoFasciaEtaSnapshot]
+  | null;
 
 export const MensaPastoFasciaEtaSnapshot = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
 } as const;

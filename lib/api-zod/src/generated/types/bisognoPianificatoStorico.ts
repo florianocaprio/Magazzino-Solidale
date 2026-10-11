@@ -5,14 +5,19 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BisognoPianificatoStoricoStatoNuovo } from './bisognoPianificatoStoricoStatoNuovo';
-import type { BisognoPianificatoStoricoValoreNuovo } from './bisognoPianificatoStoricoValoreNuovo';
-import type { BisognoPianificatoStoricoValorePrecedente } from './bisognoPianificatoStoricoValorePrecedente';
+import type { BisognoPianificatoStoricoStatoNuovo } from "./bisognoPianificatoStoricoStatoNuovo";
+import type { BisognoPianificatoStoricoValoreNuovo } from "./bisognoPianificatoStoricoValoreNuovo";
+import type { BisognoPianificatoStoricoValorePrecedente } from "./bisognoPianificatoStoricoValorePrecedente";
 
 export interface BisognoPianificatoStorico {
   id: number;
   bisognoId: number;
-  statoPrecedente: 'da_pianificare' | 'pianificato' | 'completato' | 'annullato' | null;
+  statoPrecedente:
+    | "da_pianificare"
+    | "pianificato"
+    | "completato"
+    | "annullato"
+    | null;
   statoNuovo: BisognoPianificatoStoricoStatoNuovo;
   /** @nullable */
   operatoreId: number | null;

@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontarioStatoApprovazione = typeof VolontarioStatoApprovazione[keyof typeof VolontarioStatoApprovazione];
-
+export type VolontarioStatoApprovazione =
+  (typeof VolontarioStatoApprovazione)[keyof typeof VolontarioStatoApprovazione];
 
 export const VolontarioStatoApprovazione = {
-  in_attesa: 'in_attesa',
-  approvato: 'approvato',
-  respinto: 'respinto',
+  in_attesa: "in_attesa",
+  approvato: "approvato",
+  respinto: "respinto",
 } as const;

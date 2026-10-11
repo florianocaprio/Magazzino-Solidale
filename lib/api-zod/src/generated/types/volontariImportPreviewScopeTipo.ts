@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontariImportPreviewScopeTipo = typeof VolontariImportPreviewScopeTipo[keyof typeof VolontariImportPreviewScopeTipo];
-
+export type VolontariImportPreviewScopeTipo =
+  (typeof VolontariImportPreviewScopeTipo)[keyof typeof VolontariImportPreviewScopeTipo];
 
 export const VolontariImportPreviewScopeTipo = {
-  CENTRO: 'CENTRO',
-  AREA: 'AREA',
-  GLOBALE: 'GLOBALE',
+  CENTRO: "CENTRO",
+  AREA: "AREA",
+  GLOBALE: "GLOBALE",
 } as const;

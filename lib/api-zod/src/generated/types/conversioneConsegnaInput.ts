@@ -5,28 +5,28 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ConversioneConsegnaInputFasciaOraria } from './conversioneConsegnaInputFasciaOraria';
+import type { ConversioneConsegnaInputFasciaOraria } from "./conversioneConsegnaInputFasciaOraria";
 
 export interface ConversioneConsegnaInput {
   /**
-     * @minLength 1
-     * @maxLength 200
-     */
+   * @minLength 1
+   * @maxLength 200
+   */
   indirizzoConsegna: string;
   dataPrevista: Date;
   /** @nullable */
   fasciaOraria?: ConversioneConsegnaInputFasciaOraria;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   volontarioId?: number | null;
   /** @nullable */
   volontarioAltro?: string | null;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   mezzoId?: number | null;
   mezzoAltro?: boolean;
   /** @nullable */

@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontariRegisterGenerateInputTipo = typeof VolontariRegisterGenerateInputTipo[keyof typeof VolontariRegisterGenerateInputTipo];
-
+export type VolontariRegisterGenerateInputTipo =
+  (typeof VolontariRegisterGenerateInputTipo)[keyof typeof VolontariRegisterGenerateInputTipo];
 
 export const VolontariRegisterGenerateInputTipo = {
-  PDF: 'PDF',
-  XLSX: 'XLSX',
+  PDF: "PDF",
+  XLSX: "XLSX",
 } as const;

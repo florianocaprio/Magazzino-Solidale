@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type RettificaLottoInputCausale = typeof RettificaLottoInputCausale[keyof typeof RettificaLottoInputCausale];
-
+export type RettificaLottoInputCausale =
+  (typeof RettificaLottoInputCausale)[keyof typeof RettificaLottoInputCausale];
 
 export const RettificaLottoInputCausale = {
-  inventario_fisico: 'inventario_fisico',
-  errore_registrazione: 'errore_registrazione',
-  deterioramento: 'deterioramento',
-  altro: 'altro',
+  inventario_fisico: "inventario_fisico",
+  errore_registrazione: "errore_registrazione",
+  deterioramento: "deterioramento",
+  altro: "altro",
 } as const;

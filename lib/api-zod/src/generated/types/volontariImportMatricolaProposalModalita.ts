@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontariImportMatricolaProposalModalita = typeof VolontariImportMatricolaProposalModalita[keyof typeof VolontariImportMatricolaProposalModalita];
-
+export type VolontariImportMatricolaProposalModalita =
+  (typeof VolontariImportMatricolaProposalModalita)[keyof typeof VolontariImportMatricolaProposalModalita];
 
 export const VolontariImportMatricolaProposalModalita = {
-  AUTOMATICA_AL_COMMIT: 'AUTOMATICA_AL_COMMIT',
+  AUTOMATICA_AL_COMMIT: "AUTOMATICA_AL_COMMIT",
 } as const;

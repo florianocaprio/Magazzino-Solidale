@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListRichiesteMagazzinoTipoDestinatario = typeof ListRichiesteMagazzinoTipoDestinatario[keyof typeof ListRichiesteMagazzinoTipoDestinatario];
-
+export type ListRichiesteMagazzinoTipoDestinatario =
+  (typeof ListRichiesteMagazzinoTipoDestinatario)[keyof typeof ListRichiesteMagazzinoTipoDestinatario];
 
 export const ListRichiesteMagazzinoTipoDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
-  magazzino: 'magazzino',
+  beneficiario: "beneficiario",
+  ente: "ente",
+  magazzino: "magazzino",
 } as const;

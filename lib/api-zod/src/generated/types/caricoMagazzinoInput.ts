@@ -5,16 +5,16 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { CaricoMagazzinoRigaInput } from './caricoMagazzinoRigaInput';
-import type { OrigineCarico } from './origineCarico';
+import type { CaricoMagazzinoRigaInput } from "./caricoMagazzinoRigaInput";
+import type { OrigineCarico } from "./origineCarico";
 
 export interface CaricoMagazzinoInput {
   /** @minimum 1 */
   magazzinoId: number;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   lottoLogicoId?: number | null;
   origineCarico: OrigineCarico;
   /** @nullable */
@@ -29,9 +29,9 @@ export interface CaricoMagazzinoInput {
   /** @nullable */
   note?: string | null;
   /**
-     * @maxLength 120
-     * @nullable
-     */
+   * @maxLength 120
+   * @nullable
+   */
   idempotencyKey?: string | null;
   /** @minItems 1 */
   righe: CaricoMagazzinoRigaInput[];

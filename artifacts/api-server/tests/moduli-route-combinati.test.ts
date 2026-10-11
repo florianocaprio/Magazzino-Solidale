@@ -25,8 +25,8 @@ import {
   createBeneficiario,
   createAreaOperativa,
   createCentro,
+  createCentroRec,
   createMagazzino,
-  createUtente,
   createZona,
   insertBolla,
   insertConsegna,
@@ -35,6 +35,7 @@ import {
   newScope,
   type SeedScope,
 } from "./scope-helpers";
+import { createPersistedSocialActor } from "./persisted-social-actor";
 
 const MODULI_TEST = [
   "CENTRO_ASCOLTO",
@@ -90,9 +91,21 @@ afterAll(async () => {
 describe("prerequisiti combinati sulle route reali", () => {
   it("applica Centro di Ascolto e UDS all'ambito reale degli interventi", async () => {
     const areaOperativaId = await createAreaOperativa(scope);
-    const centroId = await createCentro(scope);
+    const centroId = (await createCentroRec(scope, { areaOperativaId })).id;
     const zona = await createZona(scope, areaOperativaId);
-    const operatoreId = await createUtente(scope, { centroId });
+    const actor = await createPersistedSocialActor({
+      areaOperativaId,
+      centroAscoltoId: centroId,
+      aree: ["sociale", "uds"],
+      permessi: [
+        "sociale.interventi.view",
+        "sociale.interventi.create",
+        "uds.interventi.view",
+        "uds.interventi.create",
+      ],
+    });
+    scope.utenteIds.push(actor.id);
+    scope.ruoloIds.push(actor.ruoloId);
     const socialeId = await createBeneficiario(scope, centroId, {
       areaOperativaId,
     });
@@ -101,27 +114,23 @@ describe("prerequisiti combinati sulle route reali", () => {
       zonaUdsId: zona.id,
       uds: true,
     });
-    const app = makeScopedApp(interventiRouter, {
-      id: operatoreId,
-      centroAscoltoId: centroId,
-      areaOperativaId,
-      aree: ["sociale", "uds"],
-    });
+    const app = makeScopedApp(interventiRouter, actor);
     const sociale = await request(app).post("/interventi").send({
       beneficiarioId: socialeId,
       tipoIntervento: "test-modulo-sociale",
       ambito: "sociale",
       stato: "da_pianificare",
     });
+    if (sociale.status === 201) scope.interventoIds.push(sociale.body.id);
     const uds = await request(app).post("/interventi").send({
       beneficiarioId: udsId,
       tipoIntervento: "test-modulo-uds",
       ambito: "uds",
       stato: "da_pianificare",
     });
+    if (uds.status === 201) scope.interventoIds.push(uds.body.id);
     expect(sociale.status).toBe(201);
     expect(uds.status).toBe(201);
-    scope.interventoIds.push(sociale.body.id, uds.body.id);
     const legacyId = await insertIntervento(scope, {
       beneficiarioId: udsId,
       tipoIntervento: "test-modulo-legacy",

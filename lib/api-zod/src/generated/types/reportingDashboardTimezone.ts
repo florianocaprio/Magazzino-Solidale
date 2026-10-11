@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ReportingDashboardTimezone = typeof ReportingDashboardTimezone[keyof typeof ReportingDashboardTimezone];
-
+export type ReportingDashboardTimezone =
+  (typeof ReportingDashboardTimezone)[keyof typeof ReportingDashboardTimezone];
 
 export const ReportingDashboardTimezone = {
-  'Europe/Rome': 'Europe/Rome',
+  "Europe/Rome": "Europe/Rome",
 } as const;

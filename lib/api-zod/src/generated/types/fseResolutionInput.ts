@@ -5,16 +5,16 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FseResolutionInputAzione } from './fseResolutionInputAzione';
+import type { FseResolutionInputAzione } from "./fseResolutionInputAzione";
 
 export interface FseResolutionInput {
   /** @minimum 1 */
   versione: number;
   azione: FseResolutionInputAzione;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   motivazione: string;
   /** @minimum 1 */
   movimentoId?: number;

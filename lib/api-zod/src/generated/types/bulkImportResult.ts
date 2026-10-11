@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BulkImportResultErroriItem } from './bulkImportResultErroriItem';
+import type { BulkImportResultErroriItem } from "./bulkImportResultErroriItem";
 
 export interface BulkImportResult {
   creati: number;

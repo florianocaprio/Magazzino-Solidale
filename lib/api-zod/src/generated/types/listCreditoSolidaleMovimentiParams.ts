@@ -5,16 +5,16 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ListCreditoSolidaleMovimentiTipoMovimento } from './listCreditoSolidaleMovimentiTipoMovimento';
+import type { ListCreditoSolidaleMovimentiTipoMovimento } from "./listCreditoSolidaleMovimentiTipoMovimento";
 
 export type ListCreditoSolidaleMovimentiParams = {
-beneficiarioId?: number;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-tipoMovimento?: ListCreditoSolidaleMovimentiTipoMovimento;
-/**
- * @pattern ^\d{4}-(0[1-9]|1[0-2])$
- */
-periodoRiferimento?: string;
-annullato?: boolean;
+  beneficiarioId?: number;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  tipoMovimento?: ListCreditoSolidaleMovimentiTipoMovimento;
+  /**
+   * @pattern ^\d{4}-(0[1-9]|1[0-2])$
+   */
+  periodoRiferimento?: string;
+  annullato?: boolean;
 };

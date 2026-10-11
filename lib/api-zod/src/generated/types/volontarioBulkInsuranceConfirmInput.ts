@@ -5,13 +5,13 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioBulkInsuranceConfirmInputRigheItem } from './volontarioBulkInsuranceConfirmInputRigheItem';
-import type { VolontarioInsuranceInput } from './volontarioInsuranceInput';
+import type { VolontarioBulkInsuranceConfirmInputRigheItem } from "./volontarioBulkInsuranceConfirmInputRigheItem";
+import type { VolontarioInsuranceInput } from "./volontarioInsuranceInput";
 
 export type VolontarioBulkInsuranceConfirmInput = VolontarioInsuranceInput & {
   /**
-     * @minItems 1
-     * @maxItems 2000
-     */
+   * @minItems 1
+   * @maxItems 2000
+   */
   righe: VolontarioBulkInsuranceConfirmInputRigheItem[];
 };

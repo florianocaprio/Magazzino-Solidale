@@ -9,12 +9,13 @@
 /**
  * @nullable
  */
-export type MensaPastoSessoSnapshot = typeof MensaPastoSessoSnapshot[keyof typeof MensaPastoSessoSnapshot] | null;
-
+export type MensaPastoSessoSnapshot =
+  | (typeof MensaPastoSessoSnapshot)[keyof typeof MensaPastoSessoSnapshot]
+  | null;
 
 export const MensaPastoSessoSnapshot = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
-  ND: 'ND',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
+  ND: "ND",
 } as const;

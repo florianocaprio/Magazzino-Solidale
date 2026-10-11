@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FornitoreInput } from './fornitoreInput';
+import type { FornitoreInput } from "./fornitoreInput";
 
 export interface FornitoriBulkInput {
   righe: FornitoreInput[];

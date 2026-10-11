@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ReportingDashboardReportingModelVersion = typeof ReportingDashboardReportingModelVersion[keyof typeof ReportingDashboardReportingModelVersion];
-
+export type ReportingDashboardReportingModelVersion =
+  (typeof ReportingDashboardReportingModelVersion)[keyof typeof ReportingDashboardReportingModelVersion];
 
 export const ReportingDashboardReportingModelVersion = {
-  REPORTING_2_0_V1: 'REPORTING_2_0_V1',
+  REPORTING_2_0_V1: "REPORTING_2_0_V1",
 } as const;

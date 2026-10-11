@@ -13,14 +13,14 @@ export interface EnteDestinatario {
   /** @maxLength 250 */
   indirizzo: string;
   /**
-     * @maxLength 50
-     * @nullable
-     */
+   * @maxLength 50
+   * @nullable
+   */
   telefono?: string | null;
   /**
-     * @maxLength 200
-     * @nullable
-     */
+   * @maxLength 200
+   * @nullable
+   */
   email?: string | null;
   areaOperativaId: number;
   attivo: boolean;

@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaReportDistribuzioneSessoItemChiave } from './mensaReportDistribuzioneSessoItemChiave';
+import type { MensaReportDistribuzioneSessoItemChiave } from "./mensaReportDistribuzioneSessoItemChiave";
 
 export type MensaReportDistribuzioneSessoItem = {
   chiave: MensaReportDistribuzioneSessoItemChiave;

@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MensaStatoServizio = typeof MensaStatoServizio[keyof typeof MensaStatoServizio];
-
+export type MensaStatoServizio =
+  (typeof MensaStatoServizio)[keyof typeof MensaStatoServizio];
 
 export const MensaStatoServizio = {
-  attivo: 'attivo',
-  inattivo: 'inattivo',
+  attivo: "attivo",
+  inattivo: "inattivo",
 } as const;

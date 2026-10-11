@@ -8,8 +8,8 @@
 
 export interface MensaStornoInput {
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   motivo: string;
 }

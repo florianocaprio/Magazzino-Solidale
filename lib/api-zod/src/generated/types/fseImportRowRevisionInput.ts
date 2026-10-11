@@ -5,39 +5,39 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FattoreContabile } from './fattoreContabile';
-import type { QuantitaContabile } from './quantitaContabile';
+import type { FattoreContabile } from "./fattoreContabile";
+import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface FseImportRowRevisionInput {
   /** @minimum 1 */
   versione: number;
   quantita?: QuantitaContabile;
   /**
-     * @maxLength 100
-     * @nullable
-     */
+   * @maxLength 100
+   * @nullable
+   */
   numeroDocumento?: string | null;
   /** @nullable */
   dataDocumento?: Date | null;
   /** @nullable */
   dataOperativa?: Date | null;
   /**
-     * @maxLength 80
-     * @nullable
-     */
+   * @maxLength 80
+   * @nullable
+   */
   lottoFisico?: string | null;
   /** @nullable */
   dataScadenza?: Date | null;
   fattoreKgLtPezzo?: FattoreContabile | null;
   /**
-     * @maxLength 80
-     * @nullable
-     */
+   * @maxLength 80
+   * @nullable
+   */
   disambiguatore?: string | null;
   accettaFallbackData?: boolean;
   /**
-     * @minLength 1
-     * @maxLength 1000
-     */
+   * @minLength 1
+   * @maxLength 1000
+   */
   motivo: string;
 }

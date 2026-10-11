@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MensaAccessoModalitaAccesso = typeof MensaAccessoModalitaAccesso[keyof typeof MensaAccessoModalitaAccesso];
-
+export type MensaAccessoModalitaAccesso =
+  (typeof MensaAccessoModalitaAccesso)[keyof typeof MensaAccessoModalitaAccesso];
 
 export const MensaAccessoModalitaAccesso = {
-  tessera: 'tessera',
-  manuale: 'manuale',
-  temporaneo: 'temporaneo',
+  tessera: "tessera",
+  manuale: "manuale",
+  temporaneo: "temporaneo",
 } as const;

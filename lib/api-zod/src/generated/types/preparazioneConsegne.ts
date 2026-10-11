@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { PreparazioneConsegnaRef } from './preparazioneConsegnaRef';
-import type { PreparazioneRiga } from './preparazioneRiga';
+import type { PreparazioneConsegnaRef } from "./preparazioneConsegnaRef";
+import type { PreparazioneRiga } from "./preparazioneRiga";
 
 export interface PreparazioneConsegne {
   righe: PreparazioneRiga[];

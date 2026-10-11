@@ -5,11 +5,11 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FseDownloadRepresentationParameter } from './fseDownloadRepresentationParameter';
+import type { FseDownloadRepresentationParameter } from "./fseDownloadRepresentationParameter";
 
 export type DownloadFseExportParams = {
-/**
- * Rappresentazione derivata dallo stesso snapshot immutabile
- */
-representation?: FseDownloadRepresentationParameter;
+  /**
+   * Rappresentazione derivata dallo stesso snapshot immutabile
+   */
+  representation?: FseDownloadRepresentationParameter;
 };

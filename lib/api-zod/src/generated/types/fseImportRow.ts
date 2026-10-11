@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FattoreContabile } from './fattoreContabile';
-import type { FseImportProductSummary } from './fseImportProductSummary';
-import type { QuantitaContabile } from './quantitaContabile';
+import type { FattoreContabile } from "./fattoreContabile";
+import type { FseImportProductSummary } from "./fseImportProductSummary";
+import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface FseImportRow {
   id: number;

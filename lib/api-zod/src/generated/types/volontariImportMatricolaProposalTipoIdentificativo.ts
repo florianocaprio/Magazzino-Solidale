@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontariImportMatricolaProposalTipoIdentificativo = typeof VolontariImportMatricolaProposalTipoIdentificativo[keyof typeof VolontariImportMatricolaProposalTipoIdentificativo];
-
+export type VolontariImportMatricolaProposalTipoIdentificativo =
+  (typeof VolontariImportMatricolaProposalTipoIdentificativo)[keyof typeof VolontariImportMatricolaProposalTipoIdentificativo];
 
 export const VolontariImportMatricolaProposalTipoIdentificativo = {
-  PERMANENTE: 'PERMANENTE',
-  TEMPORANEA: 'TEMPORANEA',
+  PERMANENTE: "PERMANENTE",
+  TEMPORANEA: "TEMPORANEA",
 } as const;

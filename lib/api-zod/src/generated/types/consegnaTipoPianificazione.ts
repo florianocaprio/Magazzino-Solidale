@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ConsegnaTipoPianificazione = typeof ConsegnaTipoPianificazione[keyof typeof ConsegnaTipoPianificazione];
-
+export type ConsegnaTipoPianificazione =
+  (typeof ConsegnaTipoPianificazione)[keyof typeof ConsegnaTipoPianificazione];
 
 export const ConsegnaTipoPianificazione = {
-  consegna_pacco: 'consegna_pacco',
-  accesso_emporio: 'accesso_emporio',
+  consegna_pacco: "consegna_pacco",
+  accesso_emporio: "accesso_emporio",
 } as const;

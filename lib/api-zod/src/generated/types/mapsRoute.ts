@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MapsRouteProvider } from './mapsRouteProvider';
+import type { MapsRouteProvider } from "./mapsRouteProvider";
 
 export interface MapsRoute {
   origin: string;

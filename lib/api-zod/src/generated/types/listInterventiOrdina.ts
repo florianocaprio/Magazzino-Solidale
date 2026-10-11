@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListInterventiOrdina = typeof ListInterventiOrdina[keyof typeof ListInterventiOrdina];
-
+export type ListInterventiOrdina =
+  (typeof ListInterventiOrdina)[keyof typeof ListInterventiOrdina];
 
 export const ListInterventiOrdina = {
-  data: 'data',
-  priorita: 'priorita',
-  beneficiario: 'beneficiario',
-  operatore: 'operatore',
+  data: "data",
+  priorita: "priorita",
+  beneficiario: "beneficiario",
+  operatore: "operatore",
 } as const;

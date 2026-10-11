@@ -5,17 +5,17 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FsePageParameter } from './fsePageParameter';
-import type { FsePageSizeParameter } from './fsePageSizeParameter';
+import type { FsePageParameter } from "./fsePageParameter";
+import type { FsePageSizeParameter } from "./fsePageSizeParameter";
 
 export type ListFseExportLinesParams = {
-/**
- * @minimum 1
- */
-page?: FsePageParameter;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: FsePageSizeParameter;
+  /**
+   * @minimum 1
+   */
+  page?: FsePageParameter;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: FsePageSizeParameter;
 };

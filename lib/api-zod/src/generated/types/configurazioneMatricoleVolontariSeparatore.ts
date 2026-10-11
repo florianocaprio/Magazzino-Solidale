@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ConfigurazioneMatricoleVolontariSeparatore = typeof ConfigurazioneMatricoleVolontariSeparatore[keyof typeof ConfigurazioneMatricoleVolontariSeparatore];
-
+export type ConfigurazioneMatricoleVolontariSeparatore =
+  (typeof ConfigurazioneMatricoleVolontariSeparatore)[keyof typeof ConfigurazioneMatricoleVolontariSeparatore];
 
 export const ConfigurazioneMatricoleVolontariSeparatore = {
-  '': '',
-  '-': '-',
-  '/': '/',
+  "": "",
+  "-": "-",
+  "/": "/",
 } as const;

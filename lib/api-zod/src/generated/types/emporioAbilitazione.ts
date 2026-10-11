@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { EmporioAbilitazioneStato } from './emporioAbilitazioneStato';
-import type { EmporioStatoEffettivo } from './emporioStatoEffettivo';
+import type { EmporioAbilitazioneStato } from "./emporioAbilitazioneStato";
+import type { EmporioStatoEffettivo } from "./emporioStatoEffettivo";
 
 export interface EmporioAbilitazione {
   beneficiarioId: number;

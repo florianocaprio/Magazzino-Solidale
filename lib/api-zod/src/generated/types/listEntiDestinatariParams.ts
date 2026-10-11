@@ -7,20 +7,20 @@
  */
 
 export type ListEntiDestinatariParams = {
-attivo?: boolean;
-/**
- * Ricerca case-insensitive su denominazione, indirizzo, telefono ed email
- * @minLength 2
- * @maxLength 100
- */
-search?: string;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
-/**
- * @minimum 0
- */
-offset?: number;
+  attivo?: boolean;
+  /**
+   * Ricerca case-insensitive su denominazione, indirizzo, telefono ed email
+   * @minLength 2
+   * @maxLength 100
+   */
+  search?: string;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * @minimum 0
+   */
+  offset?: number;
 };

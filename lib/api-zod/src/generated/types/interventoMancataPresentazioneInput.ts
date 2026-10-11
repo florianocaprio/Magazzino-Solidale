@@ -9,9 +9,9 @@
 export interface InterventoMancataPresentazioneInput {
   versione: Date;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   nota?: string | null;
   dataOraRegistrazione?: Date;
 }

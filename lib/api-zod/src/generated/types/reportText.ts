@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ReportTextParams } from './reportTextParams';
+import type { ReportTextParams } from "./reportTextParams";
 
 export interface ReportText {
   code: string;

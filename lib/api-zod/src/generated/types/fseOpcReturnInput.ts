@@ -5,29 +5,29 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FseOpcReturnInputModalitaSelezione } from './fseOpcReturnInputModalitaSelezione';
-import type { FseOpcReturnInputVersione } from './fseOpcReturnInputVersione';
-import type { FseOpcReturnLineInput } from './fseOpcReturnLineInput';
+import type { FseOpcReturnInputModalitaSelezione } from "./fseOpcReturnInputModalitaSelezione";
+import type { FseOpcReturnInputVersione } from "./fseOpcReturnInputVersione";
+import type { FseOpcReturnLineInput } from "./fseOpcReturnLineInput";
 
 export interface FseOpcReturnInput {
   versione: FseOpcReturnInputVersione;
   /**
-     * @minLength 8
-     * @maxLength 100
-     */
+   * @minLength 8
+   * @maxLength 100
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   magazzinoId: number;
   dataReso: Date;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   destinazioneOpc: string;
   /**
-     * @minLength 3
-     * @maxLength 2000
-     */
+   * @minLength 3
+   * @maxLength 2000
+   */
   motivazione: string;
   modalitaSelezione: FseOpcReturnInputModalitaSelezione;
   /** @minItems 1 */

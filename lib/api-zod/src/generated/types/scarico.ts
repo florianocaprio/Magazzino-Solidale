@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ScaricoRiga } from './scaricoRiga';
+import type { ScaricoRiga } from "./scaricoRiga";
 
 export interface Scarico {
   id: number;

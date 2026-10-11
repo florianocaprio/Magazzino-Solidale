@@ -7,6 +7,6 @@
  */
 
 export type ReportFsePlusParams = {
-anno?: number;
-areaOperativaId?: number;
+  anno?: number;
+  areaOperativaId?: number;
 };

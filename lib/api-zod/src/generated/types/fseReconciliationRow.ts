@@ -11,19 +11,19 @@ export interface FseReconciliationRow {
   id?: number;
   active?: boolean;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   supersededByRowId?: number | null;
   /**
-     * @nullable
-     * @pattern ^[0-9a-f]{64}$
-     */
+   * @nullable
+   * @pattern ^[0-9a-f]{64}$
+   */
   resolutionGroupId?: string | null;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   companionRowId?: number | null;
   [key: string]: unknown;
- }
+}

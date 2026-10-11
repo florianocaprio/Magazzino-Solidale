@@ -6,10 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseExportInputFormatCode = typeof FseExportInputFormatCode[keyof typeof FseExportInputFormatCode];
-
+export type FseExportInputFormatCode =
+  (typeof FseExportInputFormatCode)[keyof typeof FseExportInputFormatCode];
 
 export const FseExportInputFormatCode = {
-  FSE_CANONICAL_AUDIT_XLSX_V1: 'FSE_CANONICAL_AUDIT_XLSX_V1',
-  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1: 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1',
+  FSE_CANONICAL_AUDIT_XLSX_V1: "FSE_CANONICAL_AUDIT_XLSX_V1",
+  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1:
+    "SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1",
 } as const;

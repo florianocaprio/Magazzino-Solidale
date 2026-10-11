@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiariFsePreviewResultConteggi = {[key: string]: number};
+export type BeneficiariFsePreviewResultConteggi = { [key: string]: number };

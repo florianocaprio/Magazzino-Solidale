@@ -9,10 +9,11 @@
 /**
  * @nullable
  */
-export type VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario = typeof VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario[keyof typeof VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario] | null;
-
+export type VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario =
+  | (typeof VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario)[keyof typeof VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario]
+  | null;
 
 export const VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario = {
-  PERMANENTE: 'PERMANENTE',
-  TEMPORANEO: 'TEMPORANEO',
+  PERMANENTE: "PERMANENTE",
+  TEMPORANEO: "TEMPORANEO",
 } as const;

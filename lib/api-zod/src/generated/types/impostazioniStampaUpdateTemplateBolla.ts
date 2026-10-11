@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ImpostazioniStampaUpdateTemplateBolla = typeof ImpostazioniStampaUpdateTemplateBolla[keyof typeof ImpostazioniStampaUpdateTemplateBolla];
-
+export type ImpostazioniStampaUpdateTemplateBolla =
+  (typeof ImpostazioniStampaUpdateTemplateBolla)[keyof typeof ImpostazioniStampaUpdateTemplateBolla];
 
 export const ImpostazioniStampaUpdateTemplateBolla = {
-  standard: 'standard',
-  moderno: 'moderno',
-  minimal: 'minimal',
+  standard: "standard",
+  moderno: "moderno",
+  minimal: "minimal",
 } as const;

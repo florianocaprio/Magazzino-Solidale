@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { CreditoSolidaleConfigurazioneInputCreditoSolidaleStato } from './creditoSolidaleConfigurazioneInputCreditoSolidaleStato';
+import type { CreditoSolidaleConfigurazioneInputCreditoSolidaleStato } from "./creditoSolidaleConfigurazioneInputCreditoSolidaleStato";
 
 export interface CreditoSolidaleConfigurazioneInput {
   creditoSolidaleAbilitato?: boolean;
@@ -13,16 +13,16 @@ export interface CreditoSolidaleConfigurazioneInput {
   /** @nullable */
   creditoSolidaleNote?: string | null;
   /**
-     * @minimum 0
-     * @maximum 99999999
-     * @nullable
-     */
+   * @minimum 0
+   * @maximum 99999999
+   * @nullable
+   */
   creditoSolidaleMensileAssegnato?: number | null;
   /**
-     * @minimum 0
-     * @maximum 99999999
-     * @nullable
-     */
+   * @minimum 0
+   * @maximum 99999999
+   * @nullable
+   */
   creditoSolidaleMensileSuggerito?: number | null;
   /** @nullable */
   creditoSolidaleMotivoModifica?: string | null;

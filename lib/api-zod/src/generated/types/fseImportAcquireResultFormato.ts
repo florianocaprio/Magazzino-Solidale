@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseImportAcquireResultFormato = typeof FseImportAcquireResultFormato[keyof typeof FseImportAcquireResultFormato];
-
+export type FseImportAcquireResultFormato =
+  (typeof FseImportAcquireResultFormato)[keyof typeof FseImportAcquireResultFormato];
 
 export const FseImportAcquireResultFormato = {
-  XLSX: 'XLSX',
-  XLS: 'XLS',
-  CSV: 'CSV',
+  XLSX: "XLSX",
+  XLS: "XLS",
+  CSV: "CSV",
 } as const;

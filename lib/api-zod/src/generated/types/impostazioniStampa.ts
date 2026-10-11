@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ImpostazioniStampaTemplateBolla } from './impostazioniStampaTemplateBolla';
+import type { ImpostazioniStampaTemplateBolla } from "./impostazioniStampaTemplateBolla";
 
 export interface ImpostazioniStampa {
   templateBolla: ImpostazioniStampaTemplateBolla;

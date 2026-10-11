@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AccessoEmporioStato = typeof AccessoEmporioStato[keyof typeof AccessoEmporioStato];
-
+export type AccessoEmporioStato =
+  (typeof AccessoEmporioStato)[keyof typeof AccessoEmporioStato];
 
 export const AccessoEmporioStato = {
-  pianificato: 'pianificato',
-  confermato: 'confermato',
-  effettuato: 'effettuato',
-  annullato: 'annullato',
-  non_presentato: 'non_presentato',
+  pianificato: "pianificato",
+  confermato: "confermato",
+  effettuato: "effettuato",
+  annullato: "annullato",
+  non_presentato: "non_presentato",
 } as const;

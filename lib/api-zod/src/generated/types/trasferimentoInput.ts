@@ -5,13 +5,13 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { TrasferimentoRigaInput } from './trasferimentoRigaInput';
+import type { TrasferimentoRigaInput } from "./trasferimentoRigaInput";
 
 export interface TrasferimentoInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   magazzinoOrigineId: number;
   magazzinoDestinoId: number;

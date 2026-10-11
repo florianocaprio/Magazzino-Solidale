@@ -6,11 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontarioKnownConflictResponseCode = typeof VolontarioKnownConflictResponseCode[keyof typeof VolontarioKnownConflictResponseCode];
-
+export type VolontarioKnownConflictResponseCode =
+  (typeof VolontarioKnownConflictResponseCode)[keyof typeof VolontarioKnownConflictResponseCode];
 
 export const VolontarioKnownConflictResponseCode = {
-  GIORNATA_TEMPORANEA_DUPLICATA: 'GIORNATA_TEMPORANEA_DUPLICATA',
-  ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO: 'ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO',
-  STALE_VERSION: 'STALE_VERSION',
+  GIORNATA_TEMPORANEA_DUPLICATA: "GIORNATA_TEMPORANEA_DUPLICATA",
+  ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO:
+    "ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO",
+  STALE_VERSION: "STALE_VERSION",
 } as const;

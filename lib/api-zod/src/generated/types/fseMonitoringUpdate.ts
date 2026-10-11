@@ -10,4 +10,4 @@ export interface FseMonitoringUpdate {
   /** @minimum 1 */
   versione: number;
   [key: string]: unknown;
- }
+}

@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MezzoInput } from './mezzoInput';
+import type { MezzoInput } from "./mezzoInput";
 
 export interface MezziBulkInput {
   righe: MezzoInput[];

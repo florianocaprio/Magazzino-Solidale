@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MapsMarkerEntityType = typeof MapsMarkerEntityType[keyof typeof MapsMarkerEntityType];
-
+export type MapsMarkerEntityType =
+  (typeof MapsMarkerEntityType)[keyof typeof MapsMarkerEntityType];
 
 export const MapsMarkerEntityType = {
-  intervento: 'intervento',
-  consegna: 'consegna',
-  bolla: 'bolla',
-  magazzino: 'magazzino',
-  centro_ascolto: 'centro_ascolto',
+  intervento: "intervento",
+  consegna: "consegna",
+  bolla: "bolla",
+  magazzino: "magazzino",
+  centro_ascolto: "centro_ascolto",
 } as const;

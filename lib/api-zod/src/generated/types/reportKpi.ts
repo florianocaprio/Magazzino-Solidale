@@ -5,17 +5,17 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ReportKpiAvailability } from './reportKpiAvailability';
-import type { ReportKpiUnit } from './reportKpiUnit';
+import type { ReportKpiAvailability } from "./reportKpiAvailability";
+import type { ReportKpiUnit } from "./reportKpiUnit";
 
 export interface ReportKpi {
   key: string;
   /** @nullable */
   value: number | null;
   /**
-     * Valore decimale esatto; le decisioni non usano la proiezione number.
-     * @nullable
-     */
+   * Valore decimale esatto; le decisioni non usano la proiezione number.
+   * @nullable
+   */
   exactValue: string | null;
   unit: ReportKpiUnit;
   availability: ReportKpiAvailability;

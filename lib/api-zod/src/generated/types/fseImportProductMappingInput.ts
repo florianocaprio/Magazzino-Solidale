@@ -10,16 +10,16 @@ export interface FseImportProductMappingInput {
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 4000
-     */
+   * @minLength 1
+   * @maxLength 4000
+   */
   descrizioneEsterna: string;
   /** @minimum 1 */
   prodottoId: number;
   /**
-     * @minLength 1
-     * @maxLength 1000
-     */
+   * @minLength 1
+   * @maxLength 1000
+   */
   motivo: string;
   accettaFallbackData?: boolean;
 }

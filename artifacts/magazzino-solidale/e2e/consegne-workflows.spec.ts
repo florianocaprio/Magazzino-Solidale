@@ -36,6 +36,11 @@ async function runConsegnaLifecycle(
   expect(stockBefore).toBeGreaterThan(0);
 
   await page.goto("/consegne");
+  await page
+    .getByRole("navigation", { name: "Stato pianificazione consegne" })
+    .getByRole("button", { name: "Consegne pianificate", exact: true })
+    .click();
+  await expect(page.getByTestId(listTestId)).toBeVisible();
   if (auditTablet) {
     await expect(page.getByTestId("consegne-mobile-list")).toBeVisible();
     await expect(page.getByTestId("consegne-desktop-list")).toBeHidden();
@@ -81,11 +86,16 @@ async function runConsegnaLifecycle(
     codice: string;
   };
   await expect(planning).toBeHidden();
+  await page
+    .getByRole("navigation", { name: "Stato pianificazione consegne" })
+    .getByRole("button", { name: "Consegne pianificate", exact: true })
+    .click();
 
   let row = page.locator(
     `[data-testid="${listTestId}"] [data-consegna-id="${delivery.id}"]`,
   );
   await expect(row).toContainText(delivery.codice);
+  await expect(row).toBeVisible();
   if (auditTablet) await assertViewportSafe(page);
   await row.getByRole("button", { name: /crea bolla/i }).click();
 
@@ -126,14 +136,51 @@ async function runConsegnaLifecycle(
     }),
     /Pasta Demo 500g/,
   );
+  // Il prodotto demo richiede un lotto fisico: attraversa la selezione reale,
+  // senza rimuovere il requisito di catalogo per adattare la fixture al test.
+  const lotsResponse = await page.request.get(
+    `/api/lotti?prodottoId=${product.id}&magazzinoId=${warehouse.id}`,
+  );
+  expect(lotsResponse.status()).toBe(200);
+  const lots = (await lotsResponse.json()) as {
+    id: number;
+    codiceLotto: string;
+    quantitaResidua: number;
+    dataScadenza: string | null;
+  }[];
+  const lot = lots
+    .filter(
+      (item) =>
+        item.quantitaResidua >= 1 &&
+        (!item.dataScadenza ||
+          item.dataScadenza.slice(0, 10) >=
+            new Date().toISOString().slice(0, 10)),
+    )
+    .sort(
+      (a, b) =>
+        (a.dataScadenza ?? "9999").localeCompare(b.dataScadenza ?? "9999") ||
+        a.id - b.id,
+    )[0];
+  expect(lot).toBeDefined();
+  await selectOption(
+    page,
+    addProduct.getByRole("combobox", { name: /lotto/i }),
+    new RegExp(`^${lot.codiceLotto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} —`),
+  );
+  // La scelta del lotto azzera intenzionalmente la quantità precedente.
   await addProduct.getByRole("spinbutton", { name: /quantità/i }).fill("1");
+  await expect(
+    addProduct.getByRole("button", { name: /^aggiungi$/i }),
+  ).toBeEnabled();
   const addLinePromise = page.waitForResponse(
     (response) =>
       response.url().endsWith(`/api/bolle/${note.id}/righe`) &&
       response.request().method() === "POST",
   );
   await addProduct.getByRole("button", { name: /^aggiungi$/i }).click();
-  expect((await addLinePromise).status()).toBe(201);
+  const addedLine = await addLinePromise;
+  expect(addedLine.status()).toBe(201);
+  expect(addedLine.request().postDataJSON()).toMatchObject({ lottoId: lot.id });
   await addProduct.getByRole("button", { name: /^chiudi$/i }).click();
   await expect(noteSheet).toContainText(/Pasta Demo 500g/i);
 
@@ -171,7 +218,8 @@ async function runConsegnaLifecycle(
   await confirmation
     .getByRole("button", { name: /conferma consegna/i })
     .click();
-  expect((await completePromise).status()).toBe(200);
+  const completed = await completePromise;
+  expect(completed.status()).toBe(200);
 
   await expect(row).toContainText(/consegnata/i);
   await expect(
@@ -190,6 +238,14 @@ async function runConsegnaLifecycle(
     stato: "consegnato",
     consegnaId: delivery.id,
   });
+  expect(await readStock()).toBe(stockBefore - 1);
+  const replay = await page.request.post(
+    `/api/consegne/${delivery.id}/completa`,
+    {
+      data: completed.request().postDataJSON(),
+    },
+  );
+  expect(replay.status()).toBe(200);
   expect(await readStock()).toBe(stockBefore - 1);
 }
 

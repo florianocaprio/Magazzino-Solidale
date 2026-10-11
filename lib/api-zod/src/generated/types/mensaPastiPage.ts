@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaPasto } from './mensaPasto';
+import type { MensaPasto } from "./mensaPasto";
 
 export interface MensaPastiPage {
   items: MensaPasto[];

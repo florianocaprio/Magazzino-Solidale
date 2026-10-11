@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseImportFileProfile = typeof FseImportFileProfile[keyof typeof FseImportFileProfile];
-
+export type FseImportFileProfile =
+  (typeof FseImportFileProfile)[keyof typeof FseImportFileProfile];
 
 export const FseImportFileProfile = {
-  REGISTRO: 'REGISTRO',
-  GIACENZE: 'GIACENZE',
+  REGISTRO: "REGISTRO",
+  GIACENZE: "GIACENZE",
 } as const;

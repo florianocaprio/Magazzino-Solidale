@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BisognoPianificatoUpsertStato = typeof BisognoPianificatoUpsertStato[keyof typeof BisognoPianificatoUpsertStato];
-
+export type BisognoPianificatoUpsertStato =
+  (typeof BisognoPianificatoUpsertStato)[keyof typeof BisognoPianificatoUpsertStato];
 
 export const BisognoPianificatoUpsertStato = {
-  da_pianificare: 'da_pianificare',
-  pianificato: 'pianificato',
-  completato: 'completato',
-  annullato: 'annullato',
+  da_pianificare: "da_pianificare",
+  pianificato: "pianificato",
+  completato: "completato",
+  annullato: "annullato",
 } as const;

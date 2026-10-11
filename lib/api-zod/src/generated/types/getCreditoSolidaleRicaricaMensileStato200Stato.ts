@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetCreditoSolidaleRicaricaMensileStato200Stato = typeof GetCreditoSolidaleRicaricaMensileStato200Stato[keyof typeof GetCreditoSolidaleRicaricaMensileStato200Stato];
-
+export type GetCreditoSolidaleRicaricaMensileStato200Stato =
+  (typeof GetCreditoSolidaleRicaricaMensileStato200Stato)[keyof typeof GetCreditoSolidaleRicaricaMensileStato200Stato];
 
 export const GetCreditoSolidaleRicaricaMensileStato200Stato = {
-  non_avviata: 'non_avviata',
-  in_corso: 'in_corso',
-  completata: 'completata',
+  non_avviata: "non_avviata",
+  in_corso: "in_corso",
+  completata: "completata",
 } as const;

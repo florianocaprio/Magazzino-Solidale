@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { CaricoPraticaRigaInput } from './caricoPraticaRigaInput';
+import type { CaricoPraticaRigaInput } from "./caricoPraticaRigaInput";
 
 export type CaricoPraticaRigaCreateInput = CaricoPraticaRigaInput & {
   /** @minimum 1 */

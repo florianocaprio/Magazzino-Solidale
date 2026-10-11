@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FattoreContabile } from './fattoreContabile';
-import type { FondoOrigine } from './fondoOrigine';
-import type { QuantitaContabile } from './quantitaContabile';
+import type { FattoreContabile } from "./fattoreContabile";
+import type { FondoOrigine } from "./fondoOrigine";
+import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface Movimento {
   id: number;
@@ -55,9 +55,9 @@ export interface Movimento {
   /** @nullable */
   operatoreId?: number | null;
   /**
-     * Snapshot del codice attore audit; fallback all'operatore legacy corrente.
-     * @nullable
-     */
+   * Snapshot del codice attore audit; fallback all'operatore legacy corrente.
+   * @nullable
+   */
   operatoreCodice?: string | null;
   /** @nullable */
   auditEventoId?: number | null;

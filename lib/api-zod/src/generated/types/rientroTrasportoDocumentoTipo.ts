@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type RientroTrasportoDocumentoTipo = typeof RientroTrasportoDocumentoTipo[keyof typeof RientroTrasportoDocumentoTipo];
-
+export type RientroTrasportoDocumentoTipo =
+  (typeof RientroTrasportoDocumentoTipo)[keyof typeof RientroTrasportoDocumentoTipo];
 
 export const RientroTrasportoDocumentoTipo = {
-  rientro: 'rientro',
-  deteriorata: 'deteriorata',
-  scaduta: 'scaduta',
-  mancante: 'mancante',
-  rubata: 'rubata',
+  rientro: "rientro",
+  deteriorata: "deteriorata",
+  scaduta: "scaduta",
+  mancante: "mancante",
+  rubata: "rubata",
 } as const;

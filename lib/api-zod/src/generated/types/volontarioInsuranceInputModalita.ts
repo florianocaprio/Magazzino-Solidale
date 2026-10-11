@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontarioInsuranceInputModalita = typeof VolontarioInsuranceInputModalita[keyof typeof VolontarioInsuranceInputModalita];
-
+export type VolontarioInsuranceInputModalita =
+  (typeof VolontarioInsuranceInputModalita)[keyof typeof VolontarioInsuranceInputModalita];
 
 export const VolontarioInsuranceInputModalita = {
-  CONTINUA_SCADENZA: 'CONTINUA_SCADENZA',
-  NUOVA_DA_DATA: 'NUOVA_DA_DATA',
+  CONTINUA_SCADENZA: "CONTINUA_SCADENZA",
+  NUOVA_DA_DATA: "NUOVA_DA_DATA",
 } as const;

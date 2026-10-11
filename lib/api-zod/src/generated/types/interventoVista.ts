@@ -6,14 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type InterventoVista = typeof InterventoVista[keyof typeof InterventoVista];
-
+export type InterventoVista =
+  (typeof InterventoVista)[keyof typeof InterventoVista];
 
 export const InterventoVista = {
-  da_pianificare: 'da_pianificare',
-  pianificati: 'pianificati',
-  oggi: 'oggi',
-  in_corso: 'in_corso',
-  conclusi: 'conclusi',
-  annullati: 'annullati',
+  da_pianificare: "da_pianificare",
+  pianificati: "pianificati",
+  oggi: "oggi",
+  in_corso: "in_corso",
+  conclusi: "conclusi",
+  annullati: "annullati",
 } as const;

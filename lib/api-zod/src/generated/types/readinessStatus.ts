@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ReadinessStatusChecks } from './readinessStatusChecks';
+import type { ReadinessStatusChecks } from "./readinessStatusChecks";
 
 export interface ReadinessStatus {
   status: string;

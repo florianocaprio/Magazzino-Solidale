@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseImportSourceAttiva = typeof FseImportSourceAttiva[keyof typeof FseImportSourceAttiva];
-
+export type FseImportSourceAttiva =
+  (typeof FseImportSourceAttiva)[keyof typeof FseImportSourceAttiva];
 
 export const FseImportSourceAttiva = {
   NUMBER_0: 0,

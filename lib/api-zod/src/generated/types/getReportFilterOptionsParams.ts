@@ -5,13 +5,13 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { GetReportFilterOptionsSection } from './getReportFilterOptionsSection';
-import type { ReportAreaOperativaIdParameter } from './reportAreaOperativaIdParameter';
+import type { GetReportFilterOptionsSection } from "./getReportFilterOptionsSection";
+import type { ReportAreaOperativaIdParameter } from "./reportAreaOperativaIdParameter";
 
 export type GetReportFilterOptionsParams = {
-section: GetReportFilterOptionsSection;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
+  section: GetReportFilterOptionsSection;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
 };

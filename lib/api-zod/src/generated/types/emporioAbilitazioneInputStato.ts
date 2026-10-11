@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type EmporioAbilitazioneInputStato = typeof EmporioAbilitazioneInputStato[keyof typeof EmporioAbilitazioneInputStato];
-
+export type EmporioAbilitazioneInputStato =
+  (typeof EmporioAbilitazioneInputStato)[keyof typeof EmporioAbilitazioneInputStato];
 
 export const EmporioAbilitazioneInputStato = {
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
 } as const;

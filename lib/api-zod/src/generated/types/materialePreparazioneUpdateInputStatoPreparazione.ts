@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MaterialePreparazioneUpdateInputStatoPreparazione = typeof MaterialePreparazioneUpdateInputStatoPreparazione[keyof typeof MaterialePreparazioneUpdateInputStatoPreparazione];
-
+export type MaterialePreparazioneUpdateInputStatoPreparazione =
+  (typeof MaterialePreparazioneUpdateInputStatoPreparazione)[keyof typeof MaterialePreparazioneUpdateInputStatoPreparazione];
 
 export const MaterialePreparazioneUpdateInputStatoPreparazione = {
-  da_preparare: 'da_preparare',
-  pronto: 'pronto',
+  da_preparare: "da_preparare",
+  pronto: "pronto",
 } as const;

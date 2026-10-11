@@ -5,11 +5,11 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BeneficiarioDirectoryFasciaEtaCorrente } from './beneficiarioDirectoryFasciaEtaCorrente';
-import type { BeneficiarioDirectoryFasciaEtaOrigine } from './beneficiarioDirectoryFasciaEtaOrigine';
-import type { BeneficiarioDirectoryFasciaEtaPresunta } from './beneficiarioDirectoryFasciaEtaPresunta';
-import type { BeneficiarioDirectoryPriorita } from './beneficiarioDirectoryPriorita';
-import type { BeneficiarioDirectoryStatoAnagrafica } from './beneficiarioDirectoryStatoAnagrafica';
+import type { BeneficiarioDirectoryFasciaEtaCorrente } from "./beneficiarioDirectoryFasciaEtaCorrente";
+import type { BeneficiarioDirectoryFasciaEtaOrigine } from "./beneficiarioDirectoryFasciaEtaOrigine";
+import type { BeneficiarioDirectoryFasciaEtaPresunta } from "./beneficiarioDirectoryFasciaEtaPresunta";
+import type { BeneficiarioDirectoryPriorita } from "./beneficiarioDirectoryPriorita";
+import type { BeneficiarioDirectoryStatoAnagrafica } from "./beneficiarioDirectoryStatoAnagrafica";
 
 /**
  * Proiezione minima usata negli elenchi, priva di dati sociali ed economici sensibili.
@@ -35,9 +35,9 @@ export interface BeneficiarioDirectory {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /**
-     * Identificativo tecnico legacy dell'Area.
-     * @nullable
-     */
+   * Identificativo tecnico legacy dell'Area.
+   * @nullable
+   */
   areaOperativaId?: number | null;
   /** @nullable */
   areaOperativaNome?: string | null;

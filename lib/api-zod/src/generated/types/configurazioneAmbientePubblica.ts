@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ConfigurazioneAmbiente } from './configurazioneAmbiente';
-import type { ModuloFunzionale } from './moduloFunzionale';
+import type { ConfigurazioneAmbiente } from "./configurazioneAmbiente";
+import type { ModuloFunzionale } from "./moduloFunzionale";
 
 export interface ConfigurazioneAmbientePubblica {
   configurazione: ConfigurazioneAmbiente;

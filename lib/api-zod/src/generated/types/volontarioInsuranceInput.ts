@@ -5,15 +5,15 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioInsuranceInputModalita } from './volontarioInsuranceInputModalita';
+import type { VolontarioInsuranceInputModalita } from "./volontarioInsuranceInputModalita";
 
 export interface VolontarioInsuranceInput {
   modalita: VolontarioInsuranceInputModalita;
   dataDecorrenza?: Date;
   /**
-     * @minimum 1
-     * @maximum 120
-     */
+   * @minimum 1
+   * @maximum 120
+   */
   durataMesi?: number;
   riferimentoPolizza?: string;
   note?: string;

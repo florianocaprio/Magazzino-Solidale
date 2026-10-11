@@ -17,8 +17,11 @@ import {
   utentiTable,
   areeOperativeTable,
   lottiLogiciTable,
+  beneficiariTable,
+  interventiTable,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
+import { creaScaricoInventariale } from "../src/lib/scaricoInventory";
 import carichiRouter from "../src/routes/carichi";
 import lottiRouter from "../src/routes/lotti";
 import movimentiRouter from "../src/routes/movimenti";
@@ -39,6 +42,17 @@ let originalLottiAttivo = true;
 let areaOperativaId: number;
 let lottoGeneraleId: number;
 const suffix = `${process.pid}${Date.now().toString(36)}`;
+
+// Namespace written by inventoryLedger.ts; the numeric ID alone is not unique.
+const caricoMovementWhere = (caricoId: number) =>
+  and(
+    eq(movimentiTable.dominioOrigine, "MAGAZZINO"),
+    eq(movimentiTable.entitaOrigineTipo, "carico_magazzino"),
+    eq(movimentiTable.entitaOrigineId, caricoId),
+    eq(movimentiTable.tipoMovimento, "carico"),
+    eq(movimentiTable.prodottoId, prodottoPezziId),
+    eq(movimentiTable.magazzinoId, magazzinoId),
+  );
 
 function makeApp(
   userId: number,
@@ -625,15 +639,157 @@ describe("POST /carichi — Magazzino 2.0A", () => {
       quantitaKgLt: "53.593120",
       fattoreKgLtPezzo: "0.334957000",
     });
-    const [movement] = await db
+    const movements = await db
       .select()
       .from(movimentiTable)
-      .where(eq(movimentiTable.entitaOrigineId, response.body.id));
-    expect(movement).toMatchObject({
+      .where(caricoMovementWhere(response.body.id));
+    expect(movements).toHaveLength(1);
+    expect(movements[0]).toMatchObject({
       quantitaPezzi: "160.00",
       quantitaKgLt: "53.59312",
       fattoreKgLtPezzo: "0.334957",
     });
+  });
+
+  it("identifica il Carico anche con un'origine Sociale valida dello stesso ID numerico", async () => {
+    const rollback = new Error("rollback fixture collisione origini");
+    await expect(
+      db.transaction(async (tx) => {
+        // Reserve an unused ID only inside this rolled-back fixture: no sequence changes.
+        const result = await tx.execute(sql`select greatest(
+        coalesce((select max(id) from interventi),0),
+        coalesce((select max(id) from carichi_magazzino),0)) + 1 as id`);
+        const id = Number(result.rows[0].id);
+        const [beneficiary] = await tx
+          .insert(beneficiariTable)
+          .values({
+            codice: `COLL-${suffix}`,
+            nome: "Persona",
+            cognome: "Sintetica",
+            areaOperativaId,
+          })
+          .returning();
+        await tx.insert(interventiTable).values({
+          id,
+          beneficiarioId: beneficiary.id,
+          tipoIntervento: "Collisione namespace",
+          ambito: "sociale",
+          stato: "in_corso",
+          operatoreId,
+          dataAggiornamento: new Date(),
+        });
+        await tx.insert(carichiMagazzinoTable).values({
+          id,
+          magazzinoId,
+          origineCarico: "RACCOLTA_ALIMENTARE",
+          dataCarico: "2026-08-29",
+          creatoDa: operatoreId,
+        });
+        const [lot] = await tx
+          .insert(lottiTable)
+          .values({
+            prodottoId: prodottoPezziId,
+            magazzinoId,
+            lottoLogicoId: lottoGeneraleId,
+            codiceLotto: `COLL-${suffix}`,
+            dataCarico: "2026-08-29",
+            dataScadenza: "2099-12-31",
+            quantitaCaricata: "160",
+            quantitaResidua: "160",
+          })
+          .returning();
+        const [line] = await tx
+          .insert(carichiMagazzinoRigheTable)
+          .values({
+            caricoMagazzinoId: id,
+            numeroRiga: 1,
+            prodottoId: prodottoPezziId,
+            lottoId: lot.id,
+            fondoOrigine: "NESSUN_FONDO",
+            quantitaOperativa: "160",
+            unitaMisuraOperativa: "pz",
+            quantitaPezzi: "160",
+            quantitaKgLt: "53.593120",
+            fattoreKgLtPezzo: "0.334957000",
+          })
+          .returning();
+        await tx.insert(movimentiTable).values({
+          tipoMovimento: "carico",
+          tipoDettaglio: "raccolta_alimentare",
+          dataMovimento: "2026-08-29",
+          magazzinoId,
+          prodottoId: prodottoPezziId,
+          lottoId: lot.id,
+          quantita: "160",
+          unitaMisura: "pz",
+          quantitaPezzi: "160",
+          quantitaKgLt: "53.593120",
+          fattoreKgLtPezzo: "0.334957000",
+          naturaContabile: "CARICO",
+          dominioOrigine: "MAGAZZINO",
+          entitaOrigineTipo: "carico_magazzino",
+          entitaOrigineId: id,
+          rigaOrigineId: line.id,
+          caricoMagazzinoRigaId: line.id,
+          operatoreId,
+        });
+        const source = {
+          dominioOrigine: "SOCIALE",
+          entitaOrigineTipo: `intervento_materiali_${magazzinoId}`,
+          entitaOrigineId: id,
+          canaleOperativo: "ALTRO" as const,
+        };
+        await creaScaricoInventariale(tx, {
+          codice: `COLL-${suffix}`,
+          magazzinoId,
+          centroAscoltoId: null,
+          dataScarico: "2026-08-29",
+          causale: "altro",
+          causaleAltro: "Consegna Intervento Sociale",
+          operatoreId,
+          beneficiarioId: beneficiary.id,
+          documentoRiferimento: `INTERVENTO-${id}`,
+          source: { ...source, naturaContabile: "DISTRIBUZIONE_FINALE" },
+          operazioneDistribuzione: {
+            ...source,
+            areaOperativaIdSnapshot: areaOperativaId,
+            centroAscoltoIdSnapshot: null,
+            territorioClassificazione: "attribuito",
+            numeroDocumento: `INTERVENTO-${id}`,
+          },
+          righe: [
+            {
+              prodottoId: prodottoPezziId,
+              quantita: "1",
+              unitaMisura: "pz",
+              lottoId: lot.id,
+            },
+          ],
+        });
+        const ambiguous = await tx
+          .select()
+          .from(movimentiTable)
+          .where(eq(movimentiTable.entitaOrigineId, id));
+        expect(ambiguous).toHaveLength(2);
+        expect(new Set(ambiguous.map((row) => row.dominioOrigine))).toEqual(
+          new Set(["SOCIALE", "MAGAZZINO"]),
+        );
+        const selected = await tx
+          .select()
+          .from(movimentiTable)
+          .where(caricoMovementWhere(id));
+        expect(selected).toHaveLength(1);
+        expect(selected[0]).toMatchObject({
+          lottoId: lot.id,
+          caricoMagazzinoRigaId: line.id,
+          quantitaPezzi: "160.00",
+          quantitaKgLt: "53.59312",
+          fattoreKgLtPezzo: "0.334957",
+        });
+        // Both origins coexist at assertion time; rollback is fixture cleanup only.
+        throw rollback;
+      }),
+    ).rejects.toBe(rollback);
   });
 
   it("non adotta lotti legacy ambigui e crea una nuova Partita nel Generale", async () => {

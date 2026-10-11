@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FseImportSourceAttiva } from './fseImportSourceAttiva';
+import type { FseImportSourceAttiva } from "./fseImportSourceAttiva";
 
 export interface FseImportSource {
   id: number;

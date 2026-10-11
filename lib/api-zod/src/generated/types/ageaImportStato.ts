@@ -6,15 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AgeaImportStato = typeof AgeaImportStato[keyof typeof AgeaImportStato];
-
+export type AgeaImportStato =
+  (typeof AgeaImportStato)[keyof typeof AgeaImportStato];
 
 export const AgeaImportStato = {
-  ANALIZZATA: 'ANALIZZATA',
-  DA_MAPPARE: 'DA_MAPPARE',
-  BLOCCATA: 'BLOCCATA',
-  PRONTA: 'PRONTA',
-  CONFERMATA: 'CONFERMATA',
-  ANNULLATA: 'ANNULLATA',
-  ERRORE: 'ERRORE',
+  ANALIZZATA: "ANALIZZATA",
+  DA_MAPPARE: "DA_MAPPARE",
+  BLOCCATA: "BLOCCATA",
+  PRONTA: "PRONTA",
+  CONFERMATA: "CONFERMATA",
+  ANNULLATA: "ANNULLATA",
+  ERRORE: "ERRORE",
 } as const;

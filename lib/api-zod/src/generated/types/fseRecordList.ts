@@ -5,6 +5,6 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FseRecord } from './fseRecord';
+import type { FseRecord } from "./fseRecord";
 
 export type FseRecordList = FseRecord[];

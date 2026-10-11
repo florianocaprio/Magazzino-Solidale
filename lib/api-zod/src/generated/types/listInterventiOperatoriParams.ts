@@ -7,6 +7,6 @@
  */
 
 export type ListInterventiOperatoriParams = {
-centroAscoltoId?: number;
-areaOperativaId?: number;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
 };

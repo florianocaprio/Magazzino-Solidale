@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontarioServiceDayInputStato = typeof VolontarioServiceDayInputStato[keyof typeof VolontarioServiceDayInputStato];
-
+export type VolontarioServiceDayInputStato =
+  (typeof VolontarioServiceDayInputStato)[keyof typeof VolontarioServiceDayInputStato];
 
 export const VolontarioServiceDayInputStato = {
-  PIANIFICATA: 'PIANIFICATA',
-  PRESENTE: 'PRESENTE',
-  ASSENTE: 'ASSENTE',
-  ANNULLATA: 'ANNULLATA',
+  PIANIFICATA: "PIANIFICATA",
+  PRESENTE: "PRESENTE",
+  ASSENTE: "ASSENTE",
+  ANNULLATA: "ANNULLATA",
 } as const;

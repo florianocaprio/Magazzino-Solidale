@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MensaAbilitazioneStato = typeof MensaAbilitazioneStato[keyof typeof MensaAbilitazioneStato];
-
+export type MensaAbilitazioneStato =
+  (typeof MensaAbilitazioneStato)[keyof typeof MensaAbilitazioneStato];
 
 export const MensaAbilitazioneStato = {
-  attiva: 'attiva',
-  sospesa: 'sospesa',
-  revocata: 'revocata',
-  scaduta: 'scaduta',
+  attiva: "attiva",
+  sospesa: "sospesa",
+  revocata: "revocata",
+  scaduta: "scaduta",
 } as const;

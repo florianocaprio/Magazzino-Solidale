@@ -7,8 +7,8 @@
  */
 
 export type ReportUdsInterventiPerZonaParams = {
-da?: string;
-a?: string;
-areaOperativaId?: number;
-zonaUdsId?: number;
+  da?: string;
+  a?: string;
+  areaOperativaId?: number;
+  zonaUdsId?: number;
 };

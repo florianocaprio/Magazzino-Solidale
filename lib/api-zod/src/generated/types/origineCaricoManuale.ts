@@ -9,13 +9,13 @@
 /**
  * Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.
  */
-export type OrigineCaricoManuale = typeof OrigineCaricoManuale[keyof typeof OrigineCaricoManuale];
-
+export type OrigineCaricoManuale =
+  (typeof OrigineCaricoManuale)[keyof typeof OrigineCaricoManuale];
 
 export const OrigineCaricoManuale = {
-  RACCOLTA_ALIMENTARE: 'RACCOLTA_ALIMENTARE',
-  DONAZIONE: 'DONAZIONE',
-  ACQUISTO: 'ACQUISTO',
-  FORNITORE: 'FORNITORE',
-  ALTRO: 'ALTRO',
+  RACCOLTA_ALIMENTARE: "RACCOLTA_ALIMENTARE",
+  DONAZIONE: "DONAZIONE",
+  ACQUISTO: "ACQUISTO",
+  FORNITORE: "FORNITORE",
+  ALTRO: "ALTRO",
 } as const;

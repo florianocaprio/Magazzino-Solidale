@@ -7,6 +7,6 @@
  */
 
 export type ListGiornateMensaParams = {
-mensaId?: number;
-data?: Date;
+  mensaId?: number;
+  data?: Date;
 };

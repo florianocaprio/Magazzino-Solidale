@@ -9,4 +9,6 @@
 /**
  * @nullable
  */
-export type AuditConfigurazioneValorePrecedente = { [key: string]: unknown } | null;
+export type AuditConfigurazioneValorePrecedente = {
+  [key: string]: unknown;
+} | null;

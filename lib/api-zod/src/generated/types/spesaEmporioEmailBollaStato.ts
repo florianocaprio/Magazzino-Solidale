@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type SpesaEmporioEmailBollaStato = typeof SpesaEmporioEmailBollaStato[keyof typeof SpesaEmporioEmailBollaStato];
-
+export type SpesaEmporioEmailBollaStato =
+  (typeof SpesaEmporioEmailBollaStato)[keyof typeof SpesaEmporioEmailBollaStato];
 
 export const SpesaEmporioEmailBollaStato = {
-  non_preparata: 'non_preparata',
-  invio_manuale_avviato: 'invio_manuale_avviato',
-  nessun_destinatario: 'nessun_destinatario',
-  errore: 'errore',
+  non_preparata: "non_preparata",
+  invio_manuale_avviato: "invio_manuale_avviato",
+  nessun_destinatario: "nessun_destinatario",
+  errore: "errore",
 } as const;

@@ -9,4 +9,6 @@
 /**
  * @nullable
  */
-export type BisognoPianificatoStoricoValoreNuovo = { [key: string]: unknown } | null;
+export type BisognoPianificatoStoricoValoreNuovo = {
+  [key: string]: unknown;
+} | null;

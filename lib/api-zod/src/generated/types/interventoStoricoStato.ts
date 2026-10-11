@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { InterventoStato } from './interventoStato';
+import type { InterventoStato } from "./interventoStato";
 
 export interface InterventoStoricoStato {
   id: number;

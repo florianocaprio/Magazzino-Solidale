@@ -6,16 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetReportDrilldownSection = typeof GetReportDrilldownSection[keyof typeof GetReportDrilldownSection];
-
+export type GetReportDrilldownSection =
+  (typeof GetReportDrilldownSection)[keyof typeof GetReportDrilldownSection];
 
 export const GetReportDrilldownSection = {
-  generale: 'generale',
-  pacchi: 'pacchi',
-  'centro-ascolto': 'centro-ascolto',
-  emporio: 'emporio',
-  mensa: 'mensa',
-  uds: 'uds',
-  'magazzino-logistica': 'magazzino-logistica',
-  'fse-plus': 'fse-plus',
+  generale: "generale",
+  pacchi: "pacchi",
+  "centro-ascolto": "centro-ascolto",
+  emporio: "emporio",
+  mensa: "mensa",
+  uds: "uds",
+  "magazzino-logistica": "magazzino-logistica",
+  "fse-plus": "fse-plus",
 } as const;

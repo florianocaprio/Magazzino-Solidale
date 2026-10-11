@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { QuantitaContabile } from './quantitaContabile';
+import type { QuantitaContabile } from "./quantitaContabile";
 
 export type MensaTrasferimentoInputRigheItem = {
   prodottoId: number;
@@ -15,8 +15,8 @@ export type MensaTrasferimentoInputRigheItem = {
   /** @nullable */
   note?: string | null;
   /**
-     * Lotto fisico selezionato; obbligatorio se il Prodotto lo richiede.
-     * @nullable
-     */
+   * Lotto fisico selezionato; obbligatorio se il Prodotto lo richiede.
+   * @nullable
+   */
   lottoId?: number | null;
 };

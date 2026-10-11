@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MensaGiornataStato = typeof MensaGiornataStato[keyof typeof MensaGiornataStato];
-
+export type MensaGiornataStato =
+  (typeof MensaGiornataStato)[keyof typeof MensaGiornataStato];
 
 export const MensaGiornataStato = {
-  aperta: 'aperta',
-  chiusa: 'chiusa',
+  aperta: "aperta",
+  chiusa: "chiusa",
 } as const;

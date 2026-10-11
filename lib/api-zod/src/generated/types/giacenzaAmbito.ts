@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GiacenzaAmbito = typeof GiacenzaAmbito[keyof typeof GiacenzaAmbito];
-
+export type GiacenzaAmbito =
+  (typeof GiacenzaAmbito)[keyof typeof GiacenzaAmbito];
 
 export const GiacenzaAmbito = {
-  area: 'area',
-  magazzino: 'magazzino',
+  area: "area",
+  magazzino: "magazzino",
 } as const;

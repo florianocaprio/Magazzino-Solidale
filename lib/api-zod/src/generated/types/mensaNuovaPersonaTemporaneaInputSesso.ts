@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MensaNuovaPersonaTemporaneaInputSesso = typeof MensaNuovaPersonaTemporaneaInputSesso[keyof typeof MensaNuovaPersonaTemporaneaInputSesso];
-
+export type MensaNuovaPersonaTemporaneaInputSesso =
+  (typeof MensaNuovaPersonaTemporaneaInputSesso)[keyof typeof MensaNuovaPersonaTemporaneaInputSesso];
 
 export const MensaNuovaPersonaTemporaneaInputSesso = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
 } as const;

@@ -6,13 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MezzoStato = typeof MezzoStato[keyof typeof MezzoStato];
-
+export type MezzoStato = (typeof MezzoStato)[keyof typeof MezzoStato];
 
 export const MezzoStato = {
-  disponibile: 'disponibile',
-  non_disponibile: 'non_disponibile',
-  manutenzione: 'manutenzione',
-  respinto: 'respinto',
-  ritirato: 'ritirato',
+  disponibile: "disponibile",
+  non_disponibile: "non_disponibile",
+  manutenzione: "manutenzione",
+  respinto: "respinto",
+  ritirato: "ritirato",
 } as const;

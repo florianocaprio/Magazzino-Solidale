@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { UdsDirectoryItemCanale } from './udsDirectoryItemCanale';
-import type { UdsDirectoryItemFasciaEtaCorrente } from './udsDirectoryItemFasciaEtaCorrente';
+import type { UdsDirectoryItemCanale } from "./udsDirectoryItemCanale";
+import type { UdsDirectoryItemFasciaEtaCorrente } from "./udsDirectoryItemFasciaEtaCorrente";
 
 /**
  * Proiezione minimizzata Area-wide; non contiene dossier o PII estesa.

@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MezzoUpdateStato = typeof MezzoUpdateStato[keyof typeof MezzoUpdateStato];
-
+export type MezzoUpdateStato =
+  (typeof MezzoUpdateStato)[keyof typeof MezzoUpdateStato];
 
 export const MezzoUpdateStato = {
-  disponibile: 'disponibile',
-  non_disponibile: 'non_disponibile',
-  manutenzione: 'manutenzione',
-  respinto: 'respinto',
-  ritirato: 'ritirato',
+  disponibile: "disponibile",
+  non_disponibile: "non_disponibile",
+  manutenzione: "manutenzione",
+  respinto: "respinto",
+  ritirato: "ritirato",
 } as const;

@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type RichiestaMagazzinoDocumentoSummaryTipoDocumento = typeof RichiestaMagazzinoDocumentoSummaryTipoDocumento[keyof typeof RichiestaMagazzinoDocumentoSummaryTipoDocumento];
-
+export type RichiestaMagazzinoDocumentoSummaryTipoDocumento =
+  (typeof RichiestaMagazzinoDocumentoSummaryTipoDocumento)[keyof typeof RichiestaMagazzinoDocumentoSummaryTipoDocumento];
 
 export const RichiestaMagazzinoDocumentoSummaryTipoDocumento = {
-  bolla: 'bolla',
-  trasferimento: 'trasferimento',
+  bolla: "bolla",
+  trasferimento: "trasferimento",
 } as const;

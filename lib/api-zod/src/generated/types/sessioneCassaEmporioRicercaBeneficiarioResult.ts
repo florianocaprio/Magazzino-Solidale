@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { SessioneCassaEmporioAccessoValido } from './sessioneCassaEmporioAccessoValido';
+import type { SessioneCassaEmporioAccessoValido } from "./sessioneCassaEmporioAccessoValido";
 
 export interface SessioneCassaEmporioRicercaBeneficiarioResult {
   beneficiarioId: number;

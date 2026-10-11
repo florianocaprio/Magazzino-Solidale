@@ -7,8 +7,8 @@
  */
 
 export type SearchMensaBeneficiariParams = {
-/**
- * @minLength 2
- */
-search: string;
+  /**
+   * @minLength 2
+   */
+  search: string;
 };

@@ -5,15 +5,15 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { CaricoIntegrazione } from './caricoIntegrazione';
-import type { CaricoPratica } from './caricoPratica';
-import type { CaricoPraticaRiga } from './caricoPraticaRiga';
+import type { CaricoIntegrazione } from "./caricoIntegrazione";
+import type { CaricoPratica } from "./caricoPratica";
+import type { CaricoPraticaRiga } from "./caricoPraticaRiga";
 
-export type CaricoPraticaDettaglio = CaricoPratica & ({
+export type CaricoPraticaDettaglio = CaricoPratica & {
   areaOperativaNome: string;
   lottoLogicoCodice: string;
   /** @nullable */
   fornitoreNome?: string | null;
   righe: CaricoPraticaRiga[];
   integrazioni: CaricoIntegrazione[];
-});
+};

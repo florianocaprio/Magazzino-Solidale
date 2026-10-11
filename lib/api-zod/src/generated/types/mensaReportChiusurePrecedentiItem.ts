@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaReportChiusurePrecedentiItemSnapshot } from './mensaReportChiusurePrecedentiItemSnapshot';
+import type { MensaReportChiusurePrecedentiItemSnapshot } from "./mensaReportChiusurePrecedentiItemSnapshot";
 
 export type MensaReportChiusurePrecedentiItem = {
   id: number;

@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ConfigurazioneMatricoleVolontariScopeTipo = typeof ConfigurazioneMatricoleVolontariScopeTipo[keyof typeof ConfigurazioneMatricoleVolontariScopeTipo];
-
+export type ConfigurazioneMatricoleVolontariScopeTipo =
+  (typeof ConfigurazioneMatricoleVolontariScopeTipo)[keyof typeof ConfigurazioneMatricoleVolontariScopeTipo];
 
 export const ConfigurazioneMatricoleVolontariScopeTipo = {
-  GLOBALE: 'GLOBALE',
+  GLOBALE: "GLOBALE",
 } as const;

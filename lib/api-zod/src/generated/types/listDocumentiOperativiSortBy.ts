@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListDocumentiOperativiSortBy = typeof ListDocumentiOperativiSortBy[keyof typeof ListDocumentiOperativiSortBy];
-
+export type ListDocumentiOperativiSortBy =
+  (typeof ListDocumentiOperativiSortBy)[keyof typeof ListDocumentiOperativiSortBy];
 
 export const ListDocumentiOperativiSortBy = {
-  dataDocumento: 'dataDocumento',
-  dataCreazione: 'dataCreazione',
-  numero: 'numero',
+  dataDocumento: "dataDocumento",
+  dataCreazione: "dataCreazione",
+  numero: "numero",
 } as const;

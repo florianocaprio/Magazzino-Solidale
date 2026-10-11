@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BollaDettaglioDestinatarioSnapshotFonte } from './bollaDettaglioDestinatarioSnapshotFonte';
-import type { BollaDettaglioTipoDestinatario } from './bollaDettaglioTipoDestinatario';
-import type { BollaRiga } from './bollaRiga';
+import type { BollaDettaglioDestinatarioSnapshotFonte } from "./bollaDettaglioDestinatarioSnapshotFonte";
+import type { BollaDettaglioTipoDestinatario } from "./bollaDettaglioTipoDestinatario";
+import type { BollaRiga } from "./bollaRiga";
 
 export interface BollaDettaglio {
   id: number;

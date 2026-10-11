@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontarioIdentifierStato = typeof VolontarioIdentifierStato[keyof typeof VolontarioIdentifierStato];
-
+export type VolontarioIdentifierStato =
+  (typeof VolontarioIdentifierStato)[keyof typeof VolontarioIdentifierStato];
 
 export const VolontarioIdentifierStato = {
-  ATTIVA: 'ATTIVA',
-  STORICA: 'STORICA',
+  ATTIVA: "ATTIVA",
+  STORICA: "STORICA",
 } as const;

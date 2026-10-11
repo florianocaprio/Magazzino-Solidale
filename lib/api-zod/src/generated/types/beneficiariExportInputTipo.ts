@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiariExportInputTipo = typeof BeneficiariExportInputTipo[keyof typeof BeneficiariExportInputTipo];
-
+export type BeneficiariExportInputTipo =
+  (typeof BeneficiariExportInputTipo)[keyof typeof BeneficiariExportInputTipo];
 
 export const BeneficiariExportInputTipo = {
-  lista: 'lista',
-  scheda: 'scheda',
-  dossier: 'dossier',
-  interventi: 'interventi',
+  lista: "lista",
+  scheda: "scheda",
+  dossier: "dossier",
+  interventi: "interventi",
 } as const;

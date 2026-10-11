@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaAbilitazioneRiepilogoBeneficiarioStato } from './mensaAbilitazioneRiepilogoBeneficiarioStato';
+import type { MensaAbilitazioneRiepilogoBeneficiarioStato } from "./mensaAbilitazioneRiepilogoBeneficiarioStato";
 
 export interface MensaAbilitazioneRiepilogoBeneficiario {
   beneficiarioId: number;

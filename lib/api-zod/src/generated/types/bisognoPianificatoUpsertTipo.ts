@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BisognoPianificatoUpsertTipo = typeof BisognoPianificatoUpsertTipo[keyof typeof BisognoPianificatoUpsertTipo];
-
+export type BisognoPianificatoUpsertTipo =
+  (typeof BisognoPianificatoUpsertTipo)[keyof typeof BisognoPianificatoUpsertTipo];
 
 export const BisognoPianificatoUpsertTipo = {
-  richiesta: 'richiesta',
-  azione: 'azione',
+  richiesta: "richiesta",
+  azione: "azione",
 } as const;

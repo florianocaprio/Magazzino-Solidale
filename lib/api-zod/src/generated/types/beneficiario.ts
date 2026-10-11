@@ -5,12 +5,12 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BeneficiarioCreditoSolidaleStato } from './beneficiarioCreditoSolidaleStato';
-import type { BeneficiarioFasciaEtaCorrente } from './beneficiarioFasciaEtaCorrente';
-import type { BeneficiarioFasciaEtaOrigine } from './beneficiarioFasciaEtaOrigine';
-import type { BeneficiarioFasciaEtaPresunta } from './beneficiarioFasciaEtaPresunta';
-import type { BeneficiarioPriorita } from './beneficiarioPriorita';
-import type { BeneficiarioStatoAnagrafica } from './beneficiarioStatoAnagrafica';
+import type { BeneficiarioCreditoSolidaleStato } from "./beneficiarioCreditoSolidaleStato";
+import type { BeneficiarioFasciaEtaCorrente } from "./beneficiarioFasciaEtaCorrente";
+import type { BeneficiarioFasciaEtaOrigine } from "./beneficiarioFasciaEtaOrigine";
+import type { BeneficiarioFasciaEtaPresunta } from "./beneficiarioFasciaEtaPresunta";
+import type { BeneficiarioPriorita } from "./beneficiarioPriorita";
+import type { BeneficiarioStatoAnagrafica } from "./beneficiarioStatoAnagrafica";
 
 /**
  * Anagrafica canonica; i campi sensibili ed economici sono presenti soltanto con i permessi dedicati.
@@ -26,9 +26,9 @@ export interface Beneficiario {
   /** @nullable */
   dataNascita?: string | null;
   /**
-     * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
-     * @nullable
-     */
+   * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
+   * @nullable
+   */
   fasciaEtaPresunta: BeneficiarioFasciaEtaPresunta;
   /** Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta. */
   fasciaEtaCorrente: BeneficiarioFasciaEtaCorrente;

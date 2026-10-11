@@ -7,8 +7,8 @@
  */
 
 export type GetEmporioAbilitazioniRiepilogoBeneficiariParams = {
-/**
- * Identificativi della pagina corrente, separati da virgola (massimo 100).
- */
-beneficiarioIds: string;
+  /**
+   * Identificativi della pagina corrente, separati da virgola (massimo 100).
+   */
+  beneficiarioIds: string;
 };

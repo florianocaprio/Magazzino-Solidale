@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type SystemLogEventStatus = typeof SystemLogEventStatus[keyof typeof SystemLogEventStatus];
-
+export type SystemLogEventStatus =
+  (typeof SystemLogEventStatus)[keyof typeof SystemLogEventStatus];
 
 export const SystemLogEventStatus = {
-  SUCCESS: 'SUCCESS',
-  FAILED: 'FAILED',
-  INFO: 'INFO',
+  SUCCESS: "SUCCESS",
+  FAILED: "FAILED",
+  INFO: "INFO",
 } as const;

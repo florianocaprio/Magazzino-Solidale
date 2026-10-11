@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UdsInterventoStato = typeof UdsInterventoStato[keyof typeof UdsInterventoStato];
-
+export type UdsInterventoStato =
+  (typeof UdsInterventoStato)[keyof typeof UdsInterventoStato];
 
 export const UdsInterventoStato = {
-  concluso: 'concluso',
+  concluso: "concluso",
 } as const;

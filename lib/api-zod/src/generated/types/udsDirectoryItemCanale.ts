@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UdsDirectoryItemCanale = typeof UdsDirectoryItemCanale[keyof typeof UdsDirectoryItemCanale];
-
+export type UdsDirectoryItemCanale =
+  (typeof UdsDirectoryItemCanale)[keyof typeof UdsDirectoryItemCanale];
 
 export const UdsDirectoryItemCanale = {
-  uds: 'uds',
-  uds_centro: 'uds_centro',
+  uds: "uds",
+  uds_centro: "uds_centro",
 } as const;

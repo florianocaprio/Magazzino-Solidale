@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FseRecord } from './fseRecord';
+import type { FseRecord } from "./fseRecord";
 
 export interface FseReportingPreview {
   modelVersion: string;
@@ -32,4 +32,4 @@ export interface FseReportingPreview {
   bloccanti: number;
   cutoff?: FseRecord;
   [key: string]: unknown;
- }
+}

@@ -5,15 +5,15 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ReportAppliedFilters } from './reportAppliedFilters';
-import type { ReportingDashboardReportingModelVersion } from './reportingDashboardReportingModelVersion';
-import type { ReportingDashboardSection } from './reportingDashboardSection';
-import type { ReportingDashboardTimezone } from './reportingDashboardTimezone';
-import type { ReportKpi } from './reportKpi';
-import type { ReportQualityItem } from './reportQualityItem';
-import type { ReportSeries } from './reportSeries';
-import type { ReportTable } from './reportTable';
-import type { ReportText } from './reportText';
+import type { ReportAppliedFilters } from "./reportAppliedFilters";
+import type { ReportingDashboardReportingModelVersion } from "./reportingDashboardReportingModelVersion";
+import type { ReportingDashboardSection } from "./reportingDashboardSection";
+import type { ReportingDashboardTimezone } from "./reportingDashboardTimezone";
+import type { ReportKpi } from "./reportKpi";
+import type { ReportQualityItem } from "./reportQualityItem";
+import type { ReportSeries } from "./reportSeries";
+import type { ReportTable } from "./reportTable";
+import type { ReportText } from "./reportText";
 
 export interface ReportingDashboard {
   reportingModelVersion: ReportingDashboardReportingModelVersion;

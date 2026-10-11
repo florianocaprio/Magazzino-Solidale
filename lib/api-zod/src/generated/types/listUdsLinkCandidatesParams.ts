@@ -7,14 +7,14 @@
  */
 
 export type ListUdsLinkCandidatesParams = {
-/**
- * @minLength 2
- * @maxLength 120
- */
-search: string;
-/**
- * Disponibile soltanto ai profili amministrativi globali.
- * @minimum 1
- */
-areaOperativaId?: number;
+  /**
+   * @minLength 2
+   * @maxLength 120
+   */
+  search: string;
+  /**
+   * Disponibile soltanto ai profili amministrativi globali.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
 };

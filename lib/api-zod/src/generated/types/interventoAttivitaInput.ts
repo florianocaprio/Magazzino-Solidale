@@ -10,18 +10,18 @@ export interface InterventoAttivitaInput {
   /** @nullable */
   tipologiaId?: number | null;
   /**
-     * @maxLength 120
-     * @nullable
-     */
+   * @maxLength 120
+   * @nullable
+   */
   tipologiaSnapshot?: string | null;
   /**
-     * @minLength 1
-     * @maxLength 4000
-     */
+   * @minLength 1
+   * @maxLength 4000
+   */
   descrizione: string;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   risultato?: string | null;
 }

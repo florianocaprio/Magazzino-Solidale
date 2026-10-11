@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type LottoInputCausale = typeof LottoInputCausale[keyof typeof LottoInputCausale];
-
+export type LottoInputCausale =
+  (typeof LottoInputCausale)[keyof typeof LottoInputCausale];
 
 export const LottoInputCausale = {
-  acquisto: 'acquisto',
-  donazione: 'donazione',
-  fse_plus: 'fse_plus',
+  acquisto: "acquisto",
+  donazione: "donazione",
+  fse_plus: "fse_plus",
 } as const;

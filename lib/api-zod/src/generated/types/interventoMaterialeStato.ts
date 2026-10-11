@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type InterventoMaterialeStato = typeof InterventoMaterialeStato[keyof typeof InterventoMaterialeStato];
-
+export type InterventoMaterialeStato =
+  (typeof InterventoMaterialeStato)[keyof typeof InterventoMaterialeStato];
 
 export const InterventoMaterialeStato = {
-  da_preparare: 'da_preparare',
-  pronto: 'pronto',
-  consegnato: 'consegnato',
-  annullato: 'annullato',
+  da_preparare: "da_preparare",
+  pronto: "pronto",
+  consegnato: "consegnato",
+  annullato: "annullato",
 } as const;

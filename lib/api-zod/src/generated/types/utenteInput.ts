@@ -12,9 +12,9 @@ export interface UtenteInput {
   /** @minLength 1 */
   email: string;
   /**
-     * Deve contenere almeno una lettera e un numero.
-     * @minLength 8
-     */
+   * Deve contenere almeno una lettera e un numero.
+   * @minLength 8
+   */
   password: string;
   /** @minLength 1 */
   nome: string;

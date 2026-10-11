@@ -7,9 +7,9 @@
  */
 
 export type ListLottiLogiciParams = {
-/**
- * @minimum 1
- */
-areaOperativaId?: number;
-includeStorico?: boolean;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  includeStorico?: boolean;
 };

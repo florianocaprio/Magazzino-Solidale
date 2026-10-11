@@ -5,10 +5,10 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FondoOrigine } from './fondoOrigine';
-import type { LottoDocumentiCaricoItem } from './lottoDocumentiCaricoItem';
-import type { LottoLineageCarichiItem } from './lottoLineageCarichiItem';
-import type { QuantitaContabile } from './quantitaContabile';
+import type { FondoOrigine } from "./fondoOrigine";
+import type { LottoDocumentiCaricoItem } from "./lottoDocumentiCaricoItem";
+import type { LottoLineageCarichiItem } from "./lottoLineageCarichiItem";
+import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface Lotto {
   id: number;

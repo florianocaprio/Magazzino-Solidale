@@ -7,5 +7,5 @@
  */
 
 export type GetVolontarioParams = {
-dataRiferimento?: Date;
+  dataRiferimento?: Date;
 };

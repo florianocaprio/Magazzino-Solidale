@@ -5,19 +5,19 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta } from './mensaNuovaPersonaTemporaneaInputFasciaEtaPresunta';
-import type { MensaNuovaPersonaTemporaneaInputSesso } from './mensaNuovaPersonaTemporaneaInputSesso';
+import type { MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta } from "./mensaNuovaPersonaTemporaneaInputFasciaEtaPresunta";
+import type { MensaNuovaPersonaTemporaneaInputSesso } from "./mensaNuovaPersonaTemporaneaInputSesso";
 
 export interface MensaNuovaPersonaTemporaneaInput {
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   nome: string;
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   cognome: string;
   sesso: MensaNuovaPersonaTemporaneaInputSesso;
   /** @nullable */
@@ -25,14 +25,14 @@ export interface MensaNuovaPersonaTemporaneaInput {
   /** @nullable */
   fasciaEtaPresunta?: MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta;
   /**
-     * @maxLength 20
-     * @nullable
-     */
+   * @maxLength 20
+   * @nullable
+   */
   telefono?: string | null;
   /**
-     * @maxLength 60
-     * @nullable
-     */
+   * @maxLength 60
+   * @nullable
+   */
   cittadinanza?: string | null;
   /** @nullable */
   allergie?: string | null;

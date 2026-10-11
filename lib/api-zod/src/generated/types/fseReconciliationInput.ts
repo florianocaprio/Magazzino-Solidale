@@ -12,9 +12,9 @@ export interface FseReconciliationInput {
   /** @minimum 1 */
   importazioneAgeaId: number;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   importazioneAgeaPrecedenteId?: number | null;
   dataRiferimento: Date;
   /** @minimum 1 */

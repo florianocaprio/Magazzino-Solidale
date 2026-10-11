@@ -9,10 +9,11 @@
 /**
  * @nullable
  */
-export type BollaDestinatarioSnapshotFonte = typeof BollaDestinatarioSnapshotFonte[keyof typeof BollaDestinatarioSnapshotFonte] | null;
-
+export type BollaDestinatarioSnapshotFonte =
+  | (typeof BollaDestinatarioSnapshotFonte)[keyof typeof BollaDestinatarioSnapshotFonte]
+  | null;
 
 export const BollaDestinatarioSnapshotFonte = {
-  confermato: 'confermato',
-  legacy_live: 'legacy_live',
+  confermato: "confermato",
+  legacy_live: "legacy_live",
 } as const;

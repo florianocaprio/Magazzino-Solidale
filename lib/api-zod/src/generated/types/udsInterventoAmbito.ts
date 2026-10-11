@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UdsInterventoAmbito = typeof UdsInterventoAmbito[keyof typeof UdsInterventoAmbito];
-
+export type UdsInterventoAmbito =
+  (typeof UdsInterventoAmbito)[keyof typeof UdsInterventoAmbito];
 
 export const UdsInterventoAmbito = {
-  uds: 'uds',
+  uds: "uds",
 } as const;

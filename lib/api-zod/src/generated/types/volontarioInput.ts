@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioInputTipoVolontario } from './volontarioInputTipoVolontario';
+import type { VolontarioInputTipoVolontario } from "./volontarioInputTipoVolontario";
 
-export type VolontarioInput = unknown & ({
+export type VolontarioInput = unknown & {
   nome: string;
   cognome: string;
   tipoVolontario?: VolontarioInputTipoVolontario;
@@ -23,17 +23,17 @@ export type VolontarioInput = unknown & ({
   dataNascita: Date;
   indirizzoResidenza: string;
   /**
-     * Null quando il domicilio coincide con la residenza.
-     * @nullable
-     */
+   * Null quando il domicilio coincide con la residenza.
+   * @nullable
+   */
   indirizzoDomicilio?: string | null;
   /** @nullable */
   codiceFiscale?: string | null;
   codiceFiscaleNonDisponibile?: boolean;
   /**
-     * Nota facoltativa quando il codice fiscale non è disponibile.
-     * @nullable
-     */
+   * Nota facoltativa quando il codice fiscale non è disponibile.
+   * @nullable
+   */
   codiceFiscaleNota?: string | null;
   /** Prima giornata, obbligatoria quando tipoVolontario è TEMPORANEO. */
   dataServizio?: Date;
@@ -45,4 +45,4 @@ export type VolontarioInput = unknown & ({
   maxConsegneTurno?: number;
   /** @nullable */
   note?: string | null;
-});
+};

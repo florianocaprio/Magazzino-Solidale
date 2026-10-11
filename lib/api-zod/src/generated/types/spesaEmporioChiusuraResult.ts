@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BollaEmporioEmailResult } from './bollaEmporioEmailResult';
-import type { SessioneCassaEmporio } from './sessioneCassaEmporio';
-import type { SpesaEmporio } from './spesaEmporio';
+import type { BollaEmporioEmailResult } from "./bollaEmporioEmailResult";
+import type { SessioneCassaEmporio } from "./sessioneCassaEmporio";
+import type { SpesaEmporio } from "./spesaEmporio";
 
 export interface SpesaEmporioChiusuraResult {
   sessione?: SessioneCassaEmporio | null;

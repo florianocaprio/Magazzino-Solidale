@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListVolontariStato = typeof ListVolontariStato[keyof typeof ListVolontariStato];
-
+export type ListVolontariStato =
+  (typeof ListVolontariStato)[keyof typeof ListVolontariStato];
 
 export const ListVolontariStato = {
-  attivi: 'attivi',
-  non_attivi: 'non_attivi',
-  tutti: 'tutti',
+  attivi: "attivi",
+  non_attivi: "non_attivi",
+  tutti: "tutti",
 } as const;

@@ -7,9 +7,9 @@
  */
 
 export type ListZoneUdsParams = {
-areaOperativaId?: number;
-/**
- * Riservato ai profili amministrativi.
- */
-includiInattive?: boolean;
+  areaOperativaId?: number;
+  /**
+   * Riservato ai profili amministrativi.
+   */
+  includiInattive?: boolean;
 };

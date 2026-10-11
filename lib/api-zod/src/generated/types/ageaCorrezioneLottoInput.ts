@@ -8,15 +8,15 @@
 
 export interface AgeaCorrezioneLottoInput {
   /**
-     * @minLength 1
-     * @maxLength 80
-     * @nullable
-     */
+   * @minLength 1
+   * @maxLength 80
+   * @nullable
+   */
   valore: string | null;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   motivazione: string;
   /** @minimum 1 */
   versione: number;

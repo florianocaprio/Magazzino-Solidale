@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioServiceDayUpdateInputStato } from './volontarioServiceDayUpdateInputStato';
+import type { VolontarioServiceDayUpdateInputStato } from "./volontarioServiceDayUpdateInputStato";
 
 export interface VolontarioServiceDayUpdateInput {
   /** @minimum 1 */

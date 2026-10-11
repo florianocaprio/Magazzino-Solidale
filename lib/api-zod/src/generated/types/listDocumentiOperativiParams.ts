@@ -5,43 +5,43 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ListDocumentiOperativiDestinatario } from './listDocumentiOperativiDestinatario';
-import type { ListDocumentiOperativiSortBy } from './listDocumentiOperativiSortBy';
-import type { ListDocumentiOperativiSortDirection } from './listDocumentiOperativiSortDirection';
-import type { ListDocumentiOperativiTipoAggregato } from './listDocumentiOperativiTipoAggregato';
+import type { ListDocumentiOperativiDestinatario } from "./listDocumentiOperativiDestinatario";
+import type { ListDocumentiOperativiSortBy } from "./listDocumentiOperativiSortBy";
+import type { ListDocumentiOperativiSortDirection } from "./listDocumentiOperativiSortDirection";
+import type { ListDocumentiOperativiTipoAggregato } from "./listDocumentiOperativiTipoAggregato";
 
 export type ListDocumentiOperativiParams = {
-tipoAggregato?: ListDocumentiOperativiTipoAggregato;
-destinatario?: ListDocumentiOperativiDestinatario;
-stato?: string;
-/**
- * @minimum 1
- */
-areaOperativaId?: number;
-/**
- * @minimum 1
- */
-magazzinoId?: number;
-/**
- * @minimum 1
- */
-centroAscoltoId?: number;
-dataDa?: Date;
-dataA?: Date;
-/**
- * @minLength 1
- * @maxLength 120
- */
-ricerca?: string;
-sortBy?: ListDocumentiOperativiSortBy;
-sortDirection?: ListDocumentiOperativiSortDirection;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  tipoAggregato?: ListDocumentiOperativiTipoAggregato;
+  destinatario?: ListDocumentiOperativiDestinatario;
+  stato?: string;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  magazzinoId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+  dataDa?: Date;
+  dataA?: Date;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  ricerca?: string;
+  sortBy?: ListDocumentiOperativiSortBy;
+  sortDirection?: ListDocumentiOperativiSortDirection;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };

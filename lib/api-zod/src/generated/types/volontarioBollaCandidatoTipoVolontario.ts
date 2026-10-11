@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontarioBollaCandidatoTipoVolontario = typeof VolontarioBollaCandidatoTipoVolontario[keyof typeof VolontarioBollaCandidatoTipoVolontario];
-
+export type VolontarioBollaCandidatoTipoVolontario =
+  (typeof VolontarioBollaCandidatoTipoVolontario)[keyof typeof VolontarioBollaCandidatoTipoVolontario];
 
 export const VolontarioBollaCandidatoTipoVolontario = {
-  PERMANENTE: 'PERMANENTE',
-  TEMPORANEO: 'TEMPORANEO',
+  PERMANENTE: "PERMANENTE",
+  TEMPORANEO: "TEMPORANEO",
 } as const;

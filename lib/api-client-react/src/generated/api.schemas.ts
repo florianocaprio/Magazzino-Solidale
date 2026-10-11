@@ -11,27 +11,27 @@ export interface RichiestaMagazzinoOrigine {
   percorso: string;
 }
 
-export type RichiestaMagazzinoDocumentoSummaryTipoDocumento = typeof RichiestaMagazzinoDocumentoSummaryTipoDocumento[keyof typeof RichiestaMagazzinoDocumentoSummaryTipoDocumento];
-
+export type RichiestaMagazzinoDocumentoSummaryTipoDocumento =
+  (typeof RichiestaMagazzinoDocumentoSummaryTipoDocumento)[keyof typeof RichiestaMagazzinoDocumentoSummaryTipoDocumento];
 
 export const RichiestaMagazzinoDocumentoSummaryTipoDocumento = {
-  bolla: 'bolla',
-  trasferimento: 'trasferimento',
+  bolla: "bolla",
+  trasferimento: "trasferimento",
 } as const;
 
-export type RichiestaMagazzinoDocumentoSummaryAvanzamento = typeof RichiestaMagazzinoDocumentoSummaryAvanzamento[keyof typeof RichiestaMagazzinoDocumentoSummaryAvanzamento];
-
+export type RichiestaMagazzinoDocumentoSummaryAvanzamento =
+  (typeof RichiestaMagazzinoDocumentoSummaryAvanzamento)[keyof typeof RichiestaMagazzinoDocumentoSummaryAvanzamento];
 
 export const RichiestaMagazzinoDocumentoSummaryAvanzamento = {
-  in_preparazione: 'in_preparazione',
-  pronta: 'pronta',
-  in_viaggio: 'in_viaggio',
-  rientro_atteso: 'rientro_atteso',
-  esito_registrato: 'esito_registrato',
-  rientrato: 'rientrato',
-  annullato: 'annullato',
-  non_disponibile: 'non_disponibile',
-  stato_non_riconosciuto: 'stato_non_riconosciuto',
+  in_preparazione: "in_preparazione",
+  pronta: "pronta",
+  in_viaggio: "in_viaggio",
+  rientro_atteso: "rientro_atteso",
+  esito_registrato: "esito_registrato",
+  rientrato: "rientrato",
+  annullato: "annullato",
+  non_disponibile: "non_disponibile",
+  stato_non_riconosciuto: "stato_non_riconosciuto",
 } as const;
 
 export interface RichiestaMagazzinoDocumentoSummary {
@@ -63,9 +63,9 @@ export type RichiestaMagazzinoDocumentoCreateRigheItem = {
   /** @minimum 1 */
   prodottoId: number;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   lottoId?: number | null;
   quantita: string | number;
   /** @nullable */
@@ -76,9 +76,9 @@ export type RichiestaMagazzinoDocumentoCreateRigheItem = {
 
 export interface RichiestaMagazzinoDocumentoCreate {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
@@ -87,12 +87,12 @@ export interface RichiestaMagazzinoDocumentoCreate {
   righe?: RichiestaMagazzinoDocumentoCreateRigheItem[];
 }
 
-export type RichiestaMagazzinoDocumentoResultTipoDocumento = typeof RichiestaMagazzinoDocumentoResultTipoDocumento[keyof typeof RichiestaMagazzinoDocumentoResultTipoDocumento];
-
+export type RichiestaMagazzinoDocumentoResultTipoDocumento =
+  (typeof RichiestaMagazzinoDocumentoResultTipoDocumento)[keyof typeof RichiestaMagazzinoDocumentoResultTipoDocumento];
 
 export const RichiestaMagazzinoDocumentoResultTipoDocumento = {
-  bolla: 'bolla',
-  trasferimento: 'trasferimento',
+  bolla: "bolla",
+  trasferimento: "trasferimento",
 } as const;
 
 export interface RichiestaMagazzinoDocumentoResult {
@@ -113,14 +113,14 @@ export interface RichiestaMagazzinoError {
   correlationId?: string;
 }
 
-export type RichiestaMagazzinoCommandResultStato = typeof RichiestaMagazzinoCommandResultStato[keyof typeof RichiestaMagazzinoCommandResultStato];
-
+export type RichiestaMagazzinoCommandResultStato =
+  (typeof RichiestaMagazzinoCommandResultStato)[keyof typeof RichiestaMagazzinoCommandResultStato];
 
 export const RichiestaMagazzinoCommandResultStato = {
-  inviata: 'inviata',
-  presa_in_carico: 'presa_in_carico',
-  chiusa: 'chiusa',
-  annullata: 'annullata',
+  inviata: "inviata",
+  presa_in_carico: "presa_in_carico",
+  chiusa: "chiusa",
+  annullata: "annullata",
 } as const;
 
 export interface RichiestaMagazzinoCommandResult {
@@ -130,48 +130,48 @@ export interface RichiestaMagazzinoCommandResult {
   versione: number;
 }
 
-export type RichiestaMagazzinoCreateTipoDestinatario = typeof RichiestaMagazzinoCreateTipoDestinatario[keyof typeof RichiestaMagazzinoCreateTipoDestinatario];
-
+export type RichiestaMagazzinoCreateTipoDestinatario =
+  (typeof RichiestaMagazzinoCreateTipoDestinatario)[keyof typeof RichiestaMagazzinoCreateTipoDestinatario];
 
 export const RichiestaMagazzinoCreateTipoDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
-  magazzino: 'magazzino',
+  beneficiario: "beneficiario",
+  ente: "ente",
+  magazzino: "magazzino",
 } as const;
 
-export type RichiestaMagazzinoCreateSorgente = typeof RichiestaMagazzinoCreateSorgente[keyof typeof RichiestaMagazzinoCreateSorgente];
-
+export type RichiestaMagazzinoCreateSorgente =
+  (typeof RichiestaMagazzinoCreateSorgente)[keyof typeof RichiestaMagazzinoCreateSorgente];
 
 export const RichiestaMagazzinoCreateSorgente = {
-  beneficiario: 'beneficiario',
-  intervento_sociale: 'intervento_sociale',
-  operativa: 'operativa',
+  beneficiario: "beneficiario",
+  intervento_sociale: "intervento_sociale",
+  operativa: "operativa",
 } as const;
 
-export type RichiestaMagazzinoCreatePriorita = typeof RichiestaMagazzinoCreatePriorita[keyof typeof RichiestaMagazzinoCreatePriorita];
-
+export type RichiestaMagazzinoCreatePriorita =
+  (typeof RichiestaMagazzinoCreatePriorita)[keyof typeof RichiestaMagazzinoCreatePriorita];
 
 export const RichiestaMagazzinoCreatePriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
-export type RichiestaMagazzinoCreateModalitaPreferita = typeof RichiestaMagazzinoCreateModalitaPreferita[keyof typeof RichiestaMagazzinoCreateModalitaPreferita];
-
+export type RichiestaMagazzinoCreateModalitaPreferita =
+  (typeof RichiestaMagazzinoCreateModalitaPreferita)[keyof typeof RichiestaMagazzinoCreateModalitaPreferita];
 
 export const RichiestaMagazzinoCreateModalitaPreferita = {
-  da_definire: 'da_definire',
-  ritiro: 'ritiro',
-  domicilio: 'domicilio',
+  da_definire: "da_definire",
+  ritiro: "ritiro",
+  domicilio: "domicilio",
 } as const;
 
 export interface RichiestaMagazzinoCreate {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   tipoDestinatario: RichiestaMagazzinoCreateTipoDestinatario;
   /** @minimum 1 */
@@ -188,75 +188,75 @@ export interface RichiestaMagazzinoCreate {
   centroAscoltoId?: number;
   sorgente: RichiestaMagazzinoCreateSorgente;
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   bisogno: string;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   noteOperative?: string | null;
   priorita?: RichiestaMagazzinoCreatePriorita;
   /**
-     * @nullable
-     * @pattern ^\d{4}-\d{2}-\d{2}$
-     */
+   * @nullable
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
   dataDesiderata?: string | null;
   modalitaPreferita?: RichiestaMagazzinoCreateModalitaPreferita;
 }
 
-export type RichiestaMagazzinoUpdatePriorita = typeof RichiestaMagazzinoUpdatePriorita[keyof typeof RichiestaMagazzinoUpdatePriorita];
-
+export type RichiestaMagazzinoUpdatePriorita =
+  (typeof RichiestaMagazzinoUpdatePriorita)[keyof typeof RichiestaMagazzinoUpdatePriorita];
 
 export const RichiestaMagazzinoUpdatePriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
-export type RichiestaMagazzinoUpdateModalitaPreferita = typeof RichiestaMagazzinoUpdateModalitaPreferita[keyof typeof RichiestaMagazzinoUpdateModalitaPreferita];
-
+export type RichiestaMagazzinoUpdateModalitaPreferita =
+  (typeof RichiestaMagazzinoUpdateModalitaPreferita)[keyof typeof RichiestaMagazzinoUpdateModalitaPreferita];
 
 export const RichiestaMagazzinoUpdateModalitaPreferita = {
-  da_definire: 'da_definire',
-  ritiro: 'ritiro',
-  domicilio: 'domicilio',
+  da_definire: "da_definire",
+  ritiro: "ritiro",
+  domicilio: "domicilio",
 } as const;
 
 export interface RichiestaMagazzinoUpdate {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   bisogno?: string;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   noteOperative?: string | null;
   priorita?: RichiestaMagazzinoUpdatePriorita;
   /**
-     * @nullable
-     * @pattern ^\d{4}-\d{2}-\d{2}$
-     */
+   * @nullable
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
   dataDesiderata?: string | null;
   modalitaPreferita?: RichiestaMagazzinoUpdateModalitaPreferita;
 }
 
 export interface RichiestaMagazzinoVersionCommand {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
@@ -264,69 +264,69 @@ export interface RichiestaMagazzinoVersionCommand {
 
 export interface RichiestaMagazzinoCancel {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   motivo: string;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   nota?: string | null;
 }
 
-export type RichiestaMagazzinoTipoDestinatario = typeof RichiestaMagazzinoTipoDestinatario[keyof typeof RichiestaMagazzinoTipoDestinatario];
-
+export type RichiestaMagazzinoTipoDestinatario =
+  (typeof RichiestaMagazzinoTipoDestinatario)[keyof typeof RichiestaMagazzinoTipoDestinatario];
 
 export const RichiestaMagazzinoTipoDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
-  magazzino: 'magazzino',
+  beneficiario: "beneficiario",
+  ente: "ente",
+  magazzino: "magazzino",
 } as const;
 
-export type RichiestaMagazzinoSorgente = typeof RichiestaMagazzinoSorgente[keyof typeof RichiestaMagazzinoSorgente];
-
+export type RichiestaMagazzinoSorgente =
+  (typeof RichiestaMagazzinoSorgente)[keyof typeof RichiestaMagazzinoSorgente];
 
 export const RichiestaMagazzinoSorgente = {
-  beneficiario: 'beneficiario',
-  intervento_sociale: 'intervento_sociale',
-  operativa: 'operativa',
+  beneficiario: "beneficiario",
+  intervento_sociale: "intervento_sociale",
+  operativa: "operativa",
 } as const;
 
-export type RichiestaMagazzinoPriorita = typeof RichiestaMagazzinoPriorita[keyof typeof RichiestaMagazzinoPriorita];
-
+export type RichiestaMagazzinoPriorita =
+  (typeof RichiestaMagazzinoPriorita)[keyof typeof RichiestaMagazzinoPriorita];
 
 export const RichiestaMagazzinoPriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
-export type RichiestaMagazzinoModalitaPreferita = typeof RichiestaMagazzinoModalitaPreferita[keyof typeof RichiestaMagazzinoModalitaPreferita];
-
+export type RichiestaMagazzinoModalitaPreferita =
+  (typeof RichiestaMagazzinoModalitaPreferita)[keyof typeof RichiestaMagazzinoModalitaPreferita];
 
 export const RichiestaMagazzinoModalitaPreferita = {
-  da_definire: 'da_definire',
-  ritiro: 'ritiro',
-  domicilio: 'domicilio',
+  da_definire: "da_definire",
+  ritiro: "ritiro",
+  domicilio: "domicilio",
 } as const;
 
-export type RichiestaMagazzinoStato = typeof RichiestaMagazzinoStato[keyof typeof RichiestaMagazzinoStato];
-
+export type RichiestaMagazzinoStato =
+  (typeof RichiestaMagazzinoStato)[keyof typeof RichiestaMagazzinoStato];
 
 export const RichiestaMagazzinoStato = {
-  inviata: 'inviata',
-  presa_in_carico: 'presa_in_carico',
-  chiusa: 'chiusa',
-  annullata: 'annullata',
+  inviata: "inviata",
+  presa_in_carico: "presa_in_carico",
+  chiusa: "chiusa",
+  annullata: "annullata",
 } as const;
 
 /**
@@ -346,15 +346,15 @@ export interface RichiestaMagazzino {
   /** @nullable */
   centroAscoltoId?: number | null;
   /**
-     * Contesto tecnico di scope sociale all'invio
-     * @nullable
-     */
+   * Contesto tecnico di scope sociale all'invio
+   * @nullable
+   */
   zonaUdsIdSnapshot?: number | null;
   sorgente: RichiestaMagazzinoSorgente;
   /**
-     * Oscurato senza diritto di lettura Interventi sociali
-     * @nullable
-     */
+   * Oscurato senza diritto di lettura Interventi sociali
+   * @nullable
+   */
   interventoId?: number | null;
   /** @nullable */
   destinatarioCodiceSnapshot?: string | null;
@@ -369,9 +369,9 @@ export interface RichiestaMagazzino {
   noteOperative?: string | null;
   priorita: RichiestaMagazzinoPriorita;
   /**
-     * @nullable
-     * @pattern ^\d{4}-\d{2}-\d{2}$
-     */
+   * @nullable
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
   dataDesiderata?: string | null;
   modalitaPreferita: RichiestaMagazzinoModalitaPreferita;
   stato: RichiestaMagazzinoStato;
@@ -423,25 +423,25 @@ export interface RichiestaMagazzinoEvent {
 }
 
 export interface BeneficiariFseRowInput {
-  'Nome Referente fascicolo': string;
-  'Cognome Referente fascicolo': string;
-  'Codice fascicolo': string;
-  'Data di presa in carico': string | number;
-  'Numero componenti fascicolo': string | number;
-  'Tipologia di Attività': string;
-  'Stato attuale': string;
+  "Nome Referente fascicolo": string;
+  "Cognome Referente fascicolo": string;
+  "Codice fascicolo": string;
+  "Data di presa in carico": string | number;
+  "Numero componenti fascicolo": string | number;
+  "Tipologia di Attività": string;
+  "Stato attuale": string;
   Donne: string | number;
   Uomini: string | number;
-  'Età<18': string | number;
-  'Età 18-29': string | number;
-  'Età 30-64': string | number;
-  'Età>=65': string | number;
-  'Origine straniera e minoranze': string | number;
+  "Età<18": string | number;
+  "Età 18-29": string | number;
+  "Età 30-64": string | number;
+  "Età>=65": string | number;
+  "Origine straniera e minoranze": string | number;
   Disabili: string | number;
-  'Cittadini di Paesi Terzi': string | number;
-  'Senzatetto o colpiti da esclusione abitativa': string | number;
+  "Cittadini di Paesi Terzi": string | number;
+  "Senzatetto o colpiti da esclusione abitativa": string | number;
   [key: string]: unknown;
- }
+}
 
 export interface BeneficiariFseWorkbookUpload {
   /** @minimum 1 */
@@ -452,12 +452,12 @@ export interface BeneficiariFseWorkbookUpload {
   file: Blob;
 }
 
-export type BeneficiariFseImportResolutionAzione = typeof BeneficiariFseImportResolutionAzione[keyof typeof BeneficiariFseImportResolutionAzione];
-
+export type BeneficiariFseImportResolutionAzione =
+  (typeof BeneficiariFseImportResolutionAzione)[keyof typeof BeneficiariFseImportResolutionAzione];
 
 export const BeneficiariFseImportResolutionAzione = {
-  crea: 'crea',
-  collega: 'collega',
+  crea: "crea",
+  collega: "collega",
 } as const;
 
 export interface BeneficiariFseImportResolution {
@@ -486,17 +486,17 @@ export interface BeneficiariFseDuplicateCandidate {
   centroAscoltoId: number | null;
 }
 
-export type BeneficiariFsePreviewRowClassificazione = typeof BeneficiariFsePreviewRowClassificazione[keyof typeof BeneficiariFsePreviewRowClassificazione];
-
+export type BeneficiariFsePreviewRowClassificazione =
+  (typeof BeneficiariFsePreviewRowClassificazione)[keyof typeof BeneficiariFsePreviewRowClassificazione];
 
 export const BeneficiariFsePreviewRowClassificazione = {
-  nuovo: 'nuovo',
-  da_collegare: 'da_collegare',
-  da_aggiornare: 'da_aggiornare',
-  invariato: 'invariato',
-  possibile_duplicato: 'possibile_duplicato',
-  conflitto: 'conflitto',
-  errore: 'errore',
+  nuovo: "nuovo",
+  da_collegare: "da_collegare",
+  da_aggiornare: "da_aggiornare",
+  invariato: "invariato",
+  possibile_duplicato: "possibile_duplicato",
+  conflitto: "conflitto",
+  errore: "errore",
 } as const;
 
 export interface BeneficiariFsePreviewRow {
@@ -510,7 +510,7 @@ export interface BeneficiariFsePreviewRow {
   duplicati?: BeneficiariFseDuplicateCandidate[];
 }
 
-export type BeneficiariFsePreviewResultConteggi = {[key: string]: number};
+export type BeneficiariFsePreviewResultConteggi = { [key: string]: number };
 
 export interface BeneficiariFsePreviewResult {
   centroAscoltoId: number;
@@ -523,16 +523,16 @@ export interface BeneficiariFsePreviewResult {
   dataRiferimento: string;
 }
 
-export type BeneficiariFseImportDetailEsito = typeof BeneficiariFseImportDetailEsito[keyof typeof BeneficiariFseImportDetailEsito];
-
+export type BeneficiariFseImportDetailEsito =
+  (typeof BeneficiariFseImportDetailEsito)[keyof typeof BeneficiariFseImportDetailEsito];
 
 export const BeneficiariFseImportDetailEsito = {
-  creato: 'creato',
-  collegato: 'collegato',
-  aggiornato: 'aggiornato',
-  invariato: 'invariato',
-  conflitto: 'conflitto',
-  errore: 'errore',
+  creato: "creato",
+  collegato: "collegato",
+  aggiornato: "aggiornato",
+  invariato: "invariato",
+  conflitto: "conflitto",
+  errore: "errore",
 } as const;
 
 export interface BeneficiariFseImportDetail {
@@ -543,12 +543,12 @@ export interface BeneficiariFseImportDetail {
   errori: string[];
 }
 
-export type BeneficiariFseImportResultStato = typeof BeneficiariFseImportResultStato[keyof typeof BeneficiariFseImportResultStato];
-
+export type BeneficiariFseImportResultStato =
+  (typeof BeneficiariFseImportResultStato)[keyof typeof BeneficiariFseImportResultStato];
 
 export const BeneficiariFseImportResultStato = {
-  confermato: 'confermato',
-  parziale: 'parziale',
+  confermato: "confermato",
+  parziale: "parziale",
 } as const;
 
 export interface BeneficiariFseImportResult {
@@ -591,31 +591,31 @@ export interface BeneficiariFseExportPreflight {
 
 export interface BeneficiarioFseUpdate {
   /**
-     * @minLength 1
-     * @maxLength 255
-     */
+   * @minLength 1
+   * @maxLength 255
+   */
   codiceFascicolo?: string;
   /**
-     * @minimum 0
-     * @nullable
-     */
+   * @minimum 0
+   * @nullable
+   */
   origineStranieraMinoranze?: number | null;
   /**
-     * @minimum 0
-     * @nullable
-     */
+   * @minimum 0
+   * @nullable
+   */
   cittadiniPaesiTerzi?: number | null;
   /**
-     * @minimum 0
-     * @nullable
-     */
+   * @minimum 0
+   * @nullable
+   */
   senzaTettoEsclusioneAbitativa?: number | null;
   /** Data civile Europe/Rome di validità storica della correzione. */
   dataRiferimento: string;
   /**
-     * Versione letta dal chiamante per optimistic locking; 0 se il profilo non esiste ancora.
-     * @minimum 0
-     */
+   * Versione letta dal chiamante per optimistic locking; 0 se il profilo non esiste ancora.
+   * @minimum 0
+   */
   versione: number;
 }
 
@@ -629,12 +629,12 @@ export interface BeneficiarioFseSnapshot {
   eta65Plus: number;
 }
 
-export type BeneficiarioFseDemografiaOrigine = typeof BeneficiarioFseDemografiaOrigine[keyof typeof BeneficiarioFseDemografiaOrigine];
-
+export type BeneficiarioFseDemografiaOrigine =
+  (typeof BeneficiarioFseDemografiaOrigine)[keyof typeof BeneficiarioFseDemografiaOrigine];
 
 export const BeneficiarioFseDemografiaOrigine = {
-  anagrafica_calcolata: 'anagrafica_calcolata',
-  snapshot_fse: 'snapshot_fse',
+  anagrafica_calcolata: "anagrafica_calcolata",
+  snapshot_fse: "snapshot_fse",
 } as const;
 
 export type BeneficiarioFseDemografia = BeneficiarioFseSnapshot & {
@@ -649,13 +649,13 @@ export interface BeneficiarioFseDifference {
   calcolato: number;
 }
 
-export type BeneficiarioFseComparisonStato = typeof BeneficiarioFseComparisonStato[keyof typeof BeneficiarioFseComparisonStato];
-
+export type BeneficiarioFseComparisonStato =
+  (typeof BeneficiarioFseComparisonStato)[keyof typeof BeneficiarioFseComparisonStato];
 
 export const BeneficiarioFseComparisonStato = {
-  coerente: 'coerente',
-  non_allineato: 'non_allineato',
-  non_confrontabile: 'non_confrontabile',
+  coerente: "coerente",
+  non_allineato: "non_allineato",
+  non_confrontabile: "non_confrontabile",
 } as const;
 
 export interface BeneficiarioFseComparison {
@@ -663,12 +663,12 @@ export interface BeneficiarioFseComparison {
   differenze: BeneficiarioFseDifference[];
 }
 
-export type BeneficiarioFseProfileOrigineFascicolo = typeof BeneficiarioFseProfileOrigineFascicolo[keyof typeof BeneficiarioFseProfileOrigineFascicolo];
-
+export type BeneficiarioFseProfileOrigineFascicolo =
+  (typeof BeneficiarioFseProfileOrigineFascicolo)[keyof typeof BeneficiarioFseProfileOrigineFascicolo];
 
 export const BeneficiarioFseProfileOrigineFascicolo = {
-  interno: 'interno',
-  import_fse: 'import_fse',
+  interno: "interno",
+  import_fse: "import_fse",
 } as const;
 
 export interface BeneficiarioFseProfile {
@@ -747,7 +747,9 @@ export interface FseErrorResponse {
   error: string;
 }
 
-export interface FseRecord { [key: string]: unknown }
+export interface FseRecord {
+  [key: string]: unknown;
+}
 
 export interface FseReportingPreview {
   modelVersion: string;
@@ -774,7 +776,7 @@ export interface FseReportingPreview {
   bloccanti: number;
   cutoff?: FseRecord;
   [key: string]: unknown;
- }
+}
 
 export type FseRecordList = FseRecord[];
 
@@ -782,9 +784,9 @@ export interface FseRecordPage {
   /** @minimum 1 */
   page: number;
   /**
-     * @minimum 1
-     * @maximum 200
-     */
+   * @minimum 1
+   * @maximum 200
+   */
   pageSize: number;
   /** @minimum 0 */
   total: number;
@@ -797,42 +799,43 @@ export interface FseReconciliationRow {
   id?: number;
   active?: boolean;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   supersededByRowId?: number | null;
   /**
-     * @nullable
-     * @pattern ^[0-9a-f]{64}$
-     */
+   * @nullable
+   * @pattern ^[0-9a-f]{64}$
+   */
   resolutionGroupId?: string | null;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   companionRowId?: number | null;
   [key: string]: unknown;
- }
+}
 
 export interface FseReconciliationRowsPage {
   /** @minimum 1 */
   page: number;
   /**
-     * @minimum 1
-     * @maximum 200
-     */
+   * @minimum 1
+   * @maximum 200
+   */
   pageSize: number;
   /** @minimum 0 */
   total: number;
   rows: FseReconciliationRow[];
 }
 
-export type FseExportInputFormatCode = typeof FseExportInputFormatCode[keyof typeof FseExportInputFormatCode];
-
+export type FseExportInputFormatCode =
+  (typeof FseExportInputFormatCode)[keyof typeof FseExportInputFormatCode];
 
 export const FseExportInputFormatCode = {
-  FSE_CANONICAL_AUDIT_XLSX_V1: 'FSE_CANONICAL_AUDIT_XLSX_V1',
-  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1: 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1',
+  FSE_CANONICAL_AUDIT_XLSX_V1: "FSE_CANONICAL_AUDIT_XLSX_V1",
+  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1:
+    "SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1",
 } as const;
 
 export interface FseExportInput {
@@ -853,15 +856,15 @@ export interface FseVersionInput {
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   motivazione?: string;
   data?: string;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   riferimentoEsterno?: string;
   conScostamenti?: boolean;
 }
@@ -871,9 +874,9 @@ export interface FseMarkEnteredInput {
   versione: number;
   data: string;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   riferimentoEsterno: string;
 }
 
@@ -881,9 +884,9 @@ export interface FseCancelInput {
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   motivazione: string;
 }
 
@@ -893,9 +896,9 @@ export interface FseReconciliationInput {
   /** @minimum 1 */
   importazioneAgeaId: number;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   importazioneAgeaPrecedenteId?: number | null;
   dataRiferimento: string;
   /** @minimum 1 */
@@ -904,15 +907,15 @@ export interface FseReconciliationInput {
   maxOperazioneDistribuzioneId?: number;
 }
 
-export type FseResolutionInputAzione = typeof FseResolutionInputAzione[keyof typeof FseResolutionInputAzione];
-
+export type FseResolutionInputAzione =
+  (typeof FseResolutionInputAzione)[keyof typeof FseResolutionInputAzione];
 
 export const FseResolutionInputAzione = {
-  ABBINA: 'ABBINA',
-  DISABBINA: 'DISABBINA',
-  ACCETTA_SCOSTAMENTO: 'ACCETTA_SCOSTAMENTO',
-  SEGNALA_DA_CORREGGERE: 'SEGNALA_DA_CORREGGERE',
-  RIAPRI: 'RIAPRI',
+  ABBINA: "ABBINA",
+  DISABBINA: "DISABBINA",
+  ACCETTA_SCOSTAMENTO: "ACCETTA_SCOSTAMENTO",
+  SEGNALA_DA_CORREGGERE: "SEGNALA_DA_CORREGGERE",
+  RIAPRI: "RIAPRI",
 } as const;
 
 export interface FseResolutionInput {
@@ -920,9 +923,9 @@ export interface FseResolutionInput {
   versione: number;
   azione: FseResolutionInputAzione;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   motivazione: string;
   /** @minimum 1 */
   movimentoId?: number;
@@ -930,29 +933,29 @@ export interface FseResolutionInput {
   importazioneAgeaRigaId?: number;
 }
 
-export type FseMonitoringInputCanaleUfficiale = typeof FseMonitoringInputCanaleUfficiale[keyof typeof FseMonitoringInputCanaleUfficiale];
-
+export type FseMonitoringInputCanaleUfficiale =
+  (typeof FseMonitoringInputCanaleUfficiale)[keyof typeof FseMonitoringInputCanaleUfficiale];
 
 export const FseMonitoringInputCanaleUfficiale = {
-  PACCHI: 'PACCHI',
-  MENSA: 'MENSA',
-  STRADA: 'STRADA',
+  PACCHI: "PACCHI",
+  MENSA: "MENSA",
+  STRADA: "STRADA",
 } as const;
 
-export type FseMonitoringInputFonte = typeof FseMonitoringInputFonte[keyof typeof FseMonitoringInputFonte];
-
+export type FseMonitoringInputFonte =
+  (typeof FseMonitoringInputFonte)[keyof typeof FseMonitoringInputFonte];
 
 export const FseMonitoringInputFonte = {
-  RILEVAZIONE_MANUALE_VERIFICATA: 'RILEVAZIONE_MANUALE_VERIFICATA',
-  DERIVAZIONE_STRUTTURATA: 'DERIVAZIONE_STRUTTURATA',
+  RILEVAZIONE_MANUALE_VERIFICATA: "RILEVAZIONE_MANUALE_VERIFICATA",
+  DERIVAZIONE_STRUTTURATA: "DERIVAZIONE_STRUTTURATA",
 } as const;
 
-export type FseMonitoringInputCompletezza = typeof FseMonitoringInputCompletezza[keyof typeof FseMonitoringInputCompletezza];
-
+export type FseMonitoringInputCompletezza =
+  (typeof FseMonitoringInputCompletezza)[keyof typeof FseMonitoringInputCompletezza];
 
 export const FseMonitoringInputCompletezza = {
-  PARZIALE: 'PARZIALE',
-  COMPLETA: 'COMPLETA',
+  PARZIALE: "PARZIALE",
+  COMPLETA: "COMPLETA",
 } as const;
 
 export interface FseMonitoringInput {
@@ -963,20 +966,20 @@ export interface FseMonitoringInput {
   canaleUfficiale: FseMonitoringInputCanaleUfficiale;
   dataRiferimento: string;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   operazioneDistribuzioneId?: number | null;
   fonte: FseMonitoringInputFonte;
   completezza: FseMonitoringInputCompletezza;
   [key: string]: unknown;
- }
+}
 
 export interface FseMonitoringUpdate {
   /** @minimum 1 */
   versione: number;
   [key: string]: unknown;
- }
+}
 
 export interface FseOpcReturnLineInput {
   /** @minimum 1 */
@@ -986,40 +989,40 @@ export interface FseOpcReturnLineInput {
   quantita: number | string;
 }
 
-export type FseOpcReturnInputVersione = typeof FseOpcReturnInputVersione[keyof typeof FseOpcReturnInputVersione];
-
+export type FseOpcReturnInputVersione =
+  (typeof FseOpcReturnInputVersione)[keyof typeof FseOpcReturnInputVersione];
 
 export const FseOpcReturnInputVersione = {
   NUMBER_1: 1,
 } as const;
 
-export type FseOpcReturnInputModalitaSelezione = typeof FseOpcReturnInputModalitaSelezione[keyof typeof FseOpcReturnInputModalitaSelezione];
-
+export type FseOpcReturnInputModalitaSelezione =
+  (typeof FseOpcReturnInputModalitaSelezione)[keyof typeof FseOpcReturnInputModalitaSelezione];
 
 export const FseOpcReturnInputModalitaSelezione = {
-  FEFO: 'FEFO',
-  PARTITA_ESATTA: 'PARTITA_ESATTA',
+  FEFO: "FEFO",
+  PARTITA_ESATTA: "PARTITA_ESATTA",
 } as const;
 
 export interface FseOpcReturnInput {
   versione: FseOpcReturnInputVersione;
   /**
-     * @minLength 8
-     * @maxLength 100
-     */
+   * @minLength 8
+   * @maxLength 100
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   magazzinoId: number;
   dataReso: string;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   destinazioneOpc: string;
   /**
-     * @minLength 3
-     * @maxLength 2000
-     */
+   * @minLength 3
+   * @maxLength 2000
+   */
   motivazione: string;
   modalitaSelezione: FseOpcReturnInputModalitaSelezione;
   /** @minItems 1 */
@@ -1031,29 +1034,28 @@ export interface FseOpcReturnReversalInput {
   versione: number;
   data: string;
   /**
-     * @minLength 3
-     * @maxLength 2000
-     */
+   * @minLength 3
+   * @maxLength 2000
+   */
   motivazione: string;
 }
 
-export type MapsLayerCode = typeof MapsLayerCode[keyof typeof MapsLayerCode];
-
+export type MapsLayerCode = (typeof MapsLayerCode)[keyof typeof MapsLayerCode];
 
 export const MapsLayerCode = {
-  socialeinterventi_pianificati: 'sociale.interventi_pianificati',
-  pacchiconsegne: 'pacchi.consegne',
-  pacchiritiri_non_effettuati: 'pacchi.ritiri_non_effettuati',
-  centropunti_operativi: 'centro.punti_operativi',
+  socialeinterventi_pianificati: "sociale.interventi_pianificati",
+  pacchiconsegne: "pacchi.consegne",
+  pacchiritiri_non_effettuati: "pacchi.ritiri_non_effettuati",
+  centropunti_operativi: "centro.punti_operativi",
 } as const;
 
-export type MapsLayerCapabilityDomain = typeof MapsLayerCapabilityDomain[keyof typeof MapsLayerCapabilityDomain];
-
+export type MapsLayerCapabilityDomain =
+  (typeof MapsLayerCapabilityDomain)[keyof typeof MapsLayerCapabilityDomain];
 
 export const MapsLayerCapabilityDomain = {
-  sociale: 'sociale',
-  pacchi: 'pacchi',
-  centro: 'centro',
+  sociale: "sociale",
+  pacchi: "pacchi",
+  centro: "centro",
 } as const;
 
 export interface MapsLayerCapability {
@@ -1068,34 +1070,34 @@ export interface MapsCapabilities {
   layers: MapsLayerCapability[];
 }
 
-export type MapsMarkerEntityType = typeof MapsMarkerEntityType[keyof typeof MapsMarkerEntityType];
-
+export type MapsMarkerEntityType =
+  (typeof MapsMarkerEntityType)[keyof typeof MapsMarkerEntityType];
 
 export const MapsMarkerEntityType = {
-  intervento: 'intervento',
-  consegna: 'consegna',
-  bolla: 'bolla',
-  magazzino: 'magazzino',
-  centro_ascolto: 'centro_ascolto',
+  intervento: "intervento",
+  consegna: "consegna",
+  bolla: "bolla",
+  magazzino: "magazzino",
+  centro_ascolto: "centro_ascolto",
 } as const;
 
-export type MapsMarkerActionsItem = typeof MapsMarkerActionsItem[keyof typeof MapsMarkerActionsItem];
-
+export type MapsMarkerActionsItem =
+  (typeof MapsMarkerActionsItem)[keyof typeof MapsMarkerActionsItem];
 
 export const MapsMarkerActionsItem = {
-  open: 'open',
-  route: 'route',
-  convert_delivery: 'convert_delivery',
+  open: "open",
+  route: "route",
+  convert_delivery: "convert_delivery",
 } as const;
 
-export type MapsMarkerLocationStatus = typeof MapsMarkerLocationStatus[keyof typeof MapsMarkerLocationStatus];
-
+export type MapsMarkerLocationStatus =
+  (typeof MapsMarkerLocationStatus)[keyof typeof MapsMarkerLocationStatus];
 
 export const MapsMarkerLocationStatus = {
-  resolved: 'resolved',
-  pending: 'pending',
-  not_found: 'not_found',
-  error: 'error',
+  resolved: "resolved",
+  pending: "pending",
+  not_found: "not_found",
+  error: "error",
 } as const;
 
 /**
@@ -1121,11 +1123,11 @@ export interface MapsMarker {
   locationStatus?: MapsMarkerLocationStatus;
 }
 
-export type MapsRouteProvider = typeof MapsRouteProvider[keyof typeof MapsRouteProvider];
-
+export type MapsRouteProvider =
+  (typeof MapsRouteProvider)[keyof typeof MapsRouteProvider];
 
 export const MapsRouteProvider = {
-  'openstreetmap-directions': 'openstreetmap-directions',
+  "openstreetmap-directions": "openstreetmap-directions",
 } as const;
 
 export interface MapsRoute {
@@ -1135,32 +1137,32 @@ export interface MapsRoute {
   url: string;
 }
 
-export type ReportingDashboardReportingModelVersion = typeof ReportingDashboardReportingModelVersion[keyof typeof ReportingDashboardReportingModelVersion];
-
+export type ReportingDashboardReportingModelVersion =
+  (typeof ReportingDashboardReportingModelVersion)[keyof typeof ReportingDashboardReportingModelVersion];
 
 export const ReportingDashboardReportingModelVersion = {
-  REPORTING_2_0_V1: 'REPORTING_2_0_V1',
+  REPORTING_2_0_V1: "REPORTING_2_0_V1",
 } as const;
 
-export type ReportingDashboardSection = typeof ReportingDashboardSection[keyof typeof ReportingDashboardSection];
-
+export type ReportingDashboardSection =
+  (typeof ReportingDashboardSection)[keyof typeof ReportingDashboardSection];
 
 export const ReportingDashboardSection = {
-  generale: 'generale',
-  pacchi: 'pacchi',
-  'centro-ascolto': 'centro-ascolto',
-  emporio: 'emporio',
-  mensa: 'mensa',
-  uds: 'uds',
-  'magazzino-logistica': 'magazzino-logistica',
-  'fse-plus': 'fse-plus',
+  generale: "generale",
+  pacchi: "pacchi",
+  "centro-ascolto": "centro-ascolto",
+  emporio: "emporio",
+  mensa: "mensa",
+  uds: "uds",
+  "magazzino-logistica": "magazzino-logistica",
+  "fse-plus": "fse-plus",
 } as const;
 
-export type ReportingDashboardTimezone = typeof ReportingDashboardTimezone[keyof typeof ReportingDashboardTimezone];
-
+export type ReportingDashboardTimezone =
+  (typeof ReportingDashboardTimezone)[keyof typeof ReportingDashboardTimezone];
 
 export const ReportingDashboardTimezone = {
-  'Europe/Rome': 'Europe/Rome',
+  "Europe/Rome": "Europe/Rome",
 } as const;
 
 export interface ReportAppliedFilters {
@@ -1185,28 +1187,27 @@ export interface ReportAppliedFilters {
   tipoServizio: string | null;
 }
 
-export type ReportKpiUnit = typeof ReportKpiUnit[keyof typeof ReportKpiUnit];
-
+export type ReportKpiUnit = (typeof ReportKpiUnit)[keyof typeof ReportKpiUnit];
 
 export const ReportKpiUnit = {
-  count: 'count',
-  pieces: 'pieces',
-  kgLt: 'kgLt',
-  percentage: 'percentage',
-  credit: 'credit',
-  days: 'days',
-  average: 'average',
-  quantity: 'quantity',
-  kg: 'kg',
+  count: "count",
+  pieces: "pieces",
+  kgLt: "kgLt",
+  percentage: "percentage",
+  credit: "credit",
+  days: "days",
+  average: "average",
+  quantity: "quantity",
+  kg: "kg",
 } as const;
 
-export type ReportKpiAvailability = typeof ReportKpiAvailability[keyof typeof ReportKpiAvailability];
-
+export type ReportKpiAvailability =
+  (typeof ReportKpiAvailability)[keyof typeof ReportKpiAvailability];
 
 export const ReportKpiAvailability = {
-  ok: 'ok',
-  derivable: 'derivable',
-  missing: 'missing',
+  ok: "ok",
+  derivable: "derivable",
+  missing: "missing",
 } as const;
 
 export interface ReportKpi {
@@ -1214,9 +1215,9 @@ export interface ReportKpi {
   /** @nullable */
   value: number | null;
   /**
-     * Valore decimale esatto; le decisioni non usano la proiezione number.
-     * @nullable
-     */
+   * Valore decimale esatto; le decisioni non usano la proiezione number.
+   * @nullable
+   */
   exactValue: string | null;
   unit: ReportKpiUnit;
   availability: ReportKpiAvailability;
@@ -1244,16 +1245,16 @@ export interface ReportTable {
   rows: ReportTableRowsItem[];
 }
 
-export type ReportQualityItemAvailability = typeof ReportQualityItemAvailability[keyof typeof ReportQualityItemAvailability];
-
+export type ReportQualityItemAvailability =
+  (typeof ReportQualityItemAvailability)[keyof typeof ReportQualityItemAvailability];
 
 export const ReportQualityItemAvailability = {
-  ok: 'ok',
-  derivable: 'derivable',
-  missing: 'missing',
+  ok: "ok",
+  derivable: "derivable",
+  missing: "missing",
 } as const;
 
-export type ReportTextParams = {[key: string]: string | number};
+export type ReportTextParams = { [key: string]: string | number };
 
 export interface ReportText {
   code: string;
@@ -1281,11 +1282,11 @@ export interface ReportingDashboard {
   timezone: ReportingDashboardTimezone;
 }
 
-export type ReportDrilldownReportingModelVersion = typeof ReportDrilldownReportingModelVersion[keyof typeof ReportDrilldownReportingModelVersion];
-
+export type ReportDrilldownReportingModelVersion =
+  (typeof ReportDrilldownReportingModelVersion)[keyof typeof ReportDrilldownReportingModelVersion];
 
 export const ReportDrilldownReportingModelVersion = {
-  REPORTING_2_0_V1: 'REPORTING_2_0_V1',
+  REPORTING_2_0_V1: "REPORTING_2_0_V1",
 } as const;
 
 export type ReportDrilldownRowsItem = { [key: string]: unknown };
@@ -1310,18 +1311,18 @@ export interface ReportFilterOption {
   centroAscoltoId?: number | null;
 }
 
-export type ReportFilterOptionsSection = typeof ReportFilterOptionsSection[keyof typeof ReportFilterOptionsSection];
-
+export type ReportFilterOptionsSection =
+  (typeof ReportFilterOptionsSection)[keyof typeof ReportFilterOptionsSection];
 
 export const ReportFilterOptionsSection = {
-  generale: 'generale',
-  pacchi: 'pacchi',
-  'centro-ascolto': 'centro-ascolto',
-  emporio: 'emporio',
-  mensa: 'mensa',
-  uds: 'uds',
-  'magazzino-logistica': 'magazzino-logistica',
-  'fse-plus': 'fse-plus',
+  generale: "generale",
+  pacchi: "pacchi",
+  "centro-ascolto": "centro-ascolto",
+  emporio: "emporio",
+  mensa: "mensa",
+  uds: "uds",
+  "magazzino-logistica": "magazzino-logistica",
+  "fse-plus": "fse-plus",
 } as const;
 
 export interface ReportFilterOptions {
@@ -1414,14 +1415,14 @@ export interface MovimentoSummary {
   dataMovimento: string;
 }
 
-export type MagazzinoTipoMagazzino = typeof MagazzinoTipoMagazzino[keyof typeof MagazzinoTipoMagazzino];
-
+export type MagazzinoTipoMagazzino =
+  (typeof MagazzinoTipoMagazzino)[keyof typeof MagazzinoTipoMagazzino];
 
 export const MagazzinoTipoMagazzino = {
-  logistico: 'logistico',
-  emporio: 'emporio',
-  misto: 'misto',
-  mensa: 'mensa',
+  logistico: "logistico",
+  emporio: "emporio",
+  misto: "misto",
+  mensa: "mensa",
 } as const;
 
 export interface Magazzino {
@@ -1454,15 +1455,15 @@ export interface Magazzino {
   dataCreazione: string;
 }
 
-export type VolontarioInputTipoVolontario = typeof VolontarioInputTipoVolontario[keyof typeof VolontarioInputTipoVolontario];
-
+export type VolontarioInputTipoVolontario =
+  (typeof VolontarioInputTipoVolontario)[keyof typeof VolontarioInputTipoVolontario];
 
 export const VolontarioInputTipoVolontario = {
-  PERMANENTE: 'PERMANENTE',
-  TEMPORANEO: 'TEMPORANEO',
+  PERMANENTE: "PERMANENTE",
+  TEMPORANEO: "TEMPORANEO",
 } as const;
 
-export type VolontarioInput = unknown & ({
+export type VolontarioInput = unknown & {
   nome: string;
   cognome: string;
   tipoVolontario?: VolontarioInputTipoVolontario;
@@ -1478,17 +1479,17 @@ export type VolontarioInput = unknown & ({
   dataNascita: string;
   indirizzoResidenza: string;
   /**
-     * Null quando il domicilio coincide con la residenza.
-     * @nullable
-     */
+   * Null quando il domicilio coincide con la residenza.
+   * @nullable
+   */
   indirizzoDomicilio?: string | null;
   /** @nullable */
   codiceFiscale?: string | null;
   codiceFiscaleNonDisponibile?: boolean;
   /**
-     * Nota facoltativa quando il codice fiscale non è disponibile.
-     * @nullable
-     */
+   * Nota facoltativa quando il codice fiscale non è disponibile.
+   * @nullable
+   */
   codiceFiscaleNota?: string | null;
   /** Prima giornata, obbligatoria quando tipoVolontario è TEMPORANEO. */
   dataServizio?: string;
@@ -1500,7 +1501,7 @@ export type VolontarioInput = unknown & ({
   maxConsegneTurno?: number;
   /** @nullable */
   note?: string | null;
-});
+};
 
 export interface VolontariBulkInput {
   righe: VolontarioInput[];
@@ -1584,45 +1585,46 @@ export interface ProdottiBulkInput {
   righe: ProdottoInput[];
 }
 
-export type BeneficiarioInputStatoAnagrafica = typeof BeneficiarioInputStatoAnagrafica[keyof typeof BeneficiarioInputStatoAnagrafica];
-
+export type BeneficiarioInputStatoAnagrafica =
+  (typeof BeneficiarioInputStatoAnagrafica)[keyof typeof BeneficiarioInputStatoAnagrafica];
 
 export const BeneficiarioInputStatoAnagrafica = {
-  provvisoria: 'provvisoria',
-  completa: 'completa',
+  provvisoria: "provvisoria",
+  completa: "completa",
 } as const;
 
 /**
  * Fascia d'età stimata dall'operatore; null indica che non è determinata.
  * @nullable
  */
-export type BeneficiarioInputFasciaEtaPresunta = typeof BeneficiarioInputFasciaEtaPresunta[keyof typeof BeneficiarioInputFasciaEtaPresunta] | null;
-
+export type BeneficiarioInputFasciaEtaPresunta =
+  | (typeof BeneficiarioInputFasciaEtaPresunta)[keyof typeof BeneficiarioInputFasciaEtaPresunta]
+  | null;
 
 export const BeneficiarioInputFasciaEtaPresunta = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
 } as const;
 
-export type BeneficiarioInputPriorita = typeof BeneficiarioInputPriorita[keyof typeof BeneficiarioInputPriorita];
-
+export type BeneficiarioInputPriorita =
+  (typeof BeneficiarioInputPriorita)[keyof typeof BeneficiarioInputPriorita];
 
 export const BeneficiarioInputPriorita = {
-  bassa: 'bassa',
-  media: 'media',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  media: "media",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
-export type BeneficiarioInputSesso = typeof BeneficiarioInputSesso[keyof typeof BeneficiarioInputSesso];
-
+export type BeneficiarioInputSesso =
+  (typeof BeneficiarioInputSesso)[keyof typeof BeneficiarioInputSesso];
 
 export const BeneficiarioInputSesso = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
 } as const;
 
 export interface BeneficiarioInput {
@@ -1635,9 +1637,9 @@ export interface BeneficiarioInput {
   /** @nullable */
   dataNascita?: string | null;
   /**
-     * Fascia d'età stimata dall'operatore; null indica che non è determinata.
-     * @nullable
-     */
+   * Fascia d'età stimata dall'operatore; null indica che non è determinata.
+   * @nullable
+   */
   fasciaEtaPresunta?: BeneficiarioInputFasciaEtaPresunta;
   cittadinanza?: string;
   residenza?: string;
@@ -1689,14 +1691,14 @@ export interface BulkImportResult {
   errori: BulkImportResultErroriItem[];
 }
 
-export type MagazzinoInputTipoMagazzino = typeof MagazzinoInputTipoMagazzino[keyof typeof MagazzinoInputTipoMagazzino];
-
+export type MagazzinoInputTipoMagazzino =
+  (typeof MagazzinoInputTipoMagazzino)[keyof typeof MagazzinoInputTipoMagazzino];
 
 export const MagazzinoInputTipoMagazzino = {
-  logistico: 'logistico',
-  emporio: 'emporio',
-  misto: 'misto',
-  mensa: 'mensa',
+  logistico: "logistico",
+  emporio: "emporio",
+  misto: "misto",
+  mensa: "mensa",
 } as const;
 
 export interface MagazzinoInput {
@@ -1712,23 +1714,23 @@ export interface MagazzinoInput {
   /** @nullable */
   centroAscoltoId?: number | null;
   /**
-     * Area identifier; required when tipoMagazzino is mensa
-     * @nullable
-     */
+   * Area identifier; required when tipoMagazzino is mensa
+   * @nullable
+   */
   areaOperativaId?: number | null;
   tipoMagazzino?: MagazzinoInputTipoMagazzino;
   stato?: string;
   note?: string;
 }
 
-export type MagazzinoUpdateTipoMagazzino = typeof MagazzinoUpdateTipoMagazzino[keyof typeof MagazzinoUpdateTipoMagazzino];
-
+export type MagazzinoUpdateTipoMagazzino =
+  (typeof MagazzinoUpdateTipoMagazzino)[keyof typeof MagazzinoUpdateTipoMagazzino];
 
 export const MagazzinoUpdateTipoMagazzino = {
-  logistico: 'logistico',
-  emporio: 'emporio',
-  misto: 'misto',
-  mensa: 'mensa',
+  logistico: "logistico",
+  emporio: "emporio",
+  misto: "misto",
+  mensa: "mensa",
 } as const;
 
 export interface MagazzinoUpdate {
@@ -1744,9 +1746,9 @@ export interface MagazzinoUpdate {
   /** @nullable */
   centroAscoltoId?: number | null;
   /**
-     * Area identifier; required when the resulting type is mensa
-     * @nullable
-     */
+   * Area identifier; required when the resulting type is mensa
+   * @nullable
+   */
   areaOperativaId?: number | null;
   tipoMagazzino?: MagazzinoUpdateTipoMagazzino;
   stato?: string;
@@ -1822,43 +1824,41 @@ export interface ProdottoUpdate {
   fornitoreId?: number;
 }
 
-export type FondoOrigine = typeof FondoOrigine[keyof typeof FondoOrigine];
-
+export type FondoOrigine = (typeof FondoOrigine)[keyof typeof FondoOrigine];
 
 export const FondoOrigine = {
-  FSE_PLUS: 'FSE_PLUS',
-  FONDO_NAZIONALE: 'FONDO_NAZIONALE',
-  FONDO_NAZIONALE_COFINANZIATO: 'FONDO_NAZIONALE_COFINANZIATO',
-  NESSUN_FONDO: 'NESSUN_FONDO',
+  FSE_PLUS: "FSE_PLUS",
+  FONDO_NAZIONALE: "FONDO_NAZIONALE",
+  FONDO_NAZIONALE_COFINANZIATO: "FONDO_NAZIONALE_COFINANZIATO",
+  NESSUN_FONDO: "NESSUN_FONDO",
 } as const;
 
-export type OrigineCarico = typeof OrigineCarico[keyof typeof OrigineCarico];
-
+export type OrigineCarico = (typeof OrigineCarico)[keyof typeof OrigineCarico];
 
 export const OrigineCarico = {
-  AGEA_SIFEAD: 'AGEA_SIFEAD',
-  RACCOLTA_ALIMENTARE: 'RACCOLTA_ALIMENTARE',
-  DONAZIONE: 'DONAZIONE',
-  ACQUISTO: 'ACQUISTO',
-  FORNITORE: 'FORNITORE',
-  RETTIFICA_INVENTARIO: 'RETTIFICA_INVENTARIO',
-  SALDO_INIZIALE: 'SALDO_INIZIALE',
-  ALTRO: 'ALTRO',
-  LEGACY: 'LEGACY',
+  AGEA_SIFEAD: "AGEA_SIFEAD",
+  RACCOLTA_ALIMENTARE: "RACCOLTA_ALIMENTARE",
+  DONAZIONE: "DONAZIONE",
+  ACQUISTO: "ACQUISTO",
+  FORNITORE: "FORNITORE",
+  RETTIFICA_INVENTARIO: "RETTIFICA_INVENTARIO",
+  SALDO_INIZIALE: "SALDO_INIZIALE",
+  ALTRO: "ALTRO",
+  LEGACY: "LEGACY",
 } as const;
 
 /**
  * Origini accettate dal normale flusso manuale; le origini di sistema sono riservate.
  */
-export type OrigineCaricoManuale = typeof OrigineCaricoManuale[keyof typeof OrigineCaricoManuale];
-
+export type OrigineCaricoManuale =
+  (typeof OrigineCaricoManuale)[keyof typeof OrigineCaricoManuale];
 
 export const OrigineCaricoManuale = {
-  RACCOLTA_ALIMENTARE: 'RACCOLTA_ALIMENTARE',
-  DONAZIONE: 'DONAZIONE',
-  ACQUISTO: 'ACQUISTO',
-  FORNITORE: 'FORNITORE',
-  ALTRO: 'ALTRO',
+  RACCOLTA_ALIMENTARE: "RACCOLTA_ALIMENTARE",
+  DONAZIONE: "DONAZIONE",
+  ACQUISTO: "ACQUISTO",
+  FORNITORE: "FORNITORE",
+  ALTRO: "ALTRO",
 } as const;
 
 /**
@@ -1867,36 +1867,35 @@ export const OrigineCaricoManuale = {
  */
 export type QuantitaContabile = string;
 
-export type FseImportMode = typeof FseImportMode[keyof typeof FseImportMode];
-
+export type FseImportMode = (typeof FseImportMode)[keyof typeof FseImportMode];
 
 export const FseImportMode = {
-  NUOVI_CARICHI: 'NUOVI_CARICHI',
-  SALDO_INIZIALE: 'SALDO_INIZIALE',
+  NUOVI_CARICHI: "NUOVI_CARICHI",
+  SALDO_INIZIALE: "SALDO_INIZIALE",
 } as const;
 
-export type FseImportFileProfile = typeof FseImportFileProfile[keyof typeof FseImportFileProfile];
-
+export type FseImportFileProfile =
+  (typeof FseImportFileProfile)[keyof typeof FseImportFileProfile];
 
 export const FseImportFileProfile = {
-  REGISTRO: 'REGISTRO',
-  GIACENZE: 'GIACENZE',
+  REGISTRO: "REGISTRO",
+  GIACENZE: "GIACENZE",
 } as const;
 
-export type FseImportSessionState = typeof FseImportSessionState[keyof typeof FseImportSessionState];
-
+export type FseImportSessionState =
+  (typeof FseImportSessionState)[keyof typeof FseImportSessionState];
 
 export const FseImportSessionState = {
-  IN_ANALISI: 'IN_ANALISI',
-  DA_COMPLETARE: 'DA_COMPLETARE',
-  PRONTA: 'PRONTA',
-  IN_PRATICA: 'IN_PRATICA',
-  REGISTRATA: 'REGISTRATA',
-  ANNULLATA: 'ANNULLATA',
+  IN_ANALISI: "IN_ANALISI",
+  DA_COMPLETARE: "DA_COMPLETARE",
+  PRONTA: "PRONTA",
+  IN_PRATICA: "IN_PRATICA",
+  REGISTRATA: "REGISTRATA",
+  ANNULLATA: "ANNULLATA",
 } as const;
 
-export type FseImportSourceAttiva = typeof FseImportSourceAttiva[keyof typeof FseImportSourceAttiva];
-
+export type FseImportSourceAttiva =
+  (typeof FseImportSourceAttiva)[keyof typeof FseImportSourceAttiva];
 
 export const FseImportSourceAttiva = {
   NUMBER_0: 0,
@@ -1915,21 +1914,21 @@ export interface FseImportSource {
 
 export interface FseImportSourceInput {
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   codice: string;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   descrizione: string;
   /** @minimum 1 */
   areaOperativaId: number;
 }
 
-export type FseImportSessionCoperturaConfermata = typeof FseImportSessionCoperturaConfermata[keyof typeof FseImportSessionCoperturaConfermata];
-
+export type FseImportSessionCoperturaConfermata =
+  (typeof FseImportSessionCoperturaConfermata)[keyof typeof FseImportSessionCoperturaConfermata];
 
 export const FseImportSessionCoperturaConfermata = {
   NUMBER_0: 0,
@@ -1956,13 +1955,13 @@ export interface FseImportSession {
   dataAggiornamento: string;
 }
 
-export type FseImportFileFormato = typeof FseImportFileFormato[keyof typeof FseImportFileFormato];
-
+export type FseImportFileFormato =
+  (typeof FseImportFileFormato)[keyof typeof FseImportFileFormato];
 
 export const FseImportFileFormato = {
-  XLSX: 'XLSX',
-  XLS: 'XLS',
-  CSV: 'CSV',
+  XLSX: "XLSX",
+  XLS: "XLS",
+  CSV: "CSV",
 } as const;
 
 export interface FseImportFile {
@@ -2072,13 +2071,13 @@ export type FseImportSessionDetail = FseImportSession & {
   summary: FseImportSummary;
 };
 
-export type FseImportAcquireResultFormato = typeof FseImportAcquireResultFormato[keyof typeof FseImportAcquireResultFormato];
-
+export type FseImportAcquireResultFormato =
+  (typeof FseImportAcquireResultFormato)[keyof typeof FseImportAcquireResultFormato];
 
 export const FseImportAcquireResultFormato = {
-  XLSX: 'XLSX',
-  XLS: 'XLS',
-  CSV: 'CSV',
+  XLSX: "XLSX",
+  XLS: "XLS",
+  CSV: "CSV",
 } as const;
 
 export interface FseImportAcquireResult {
@@ -2096,16 +2095,16 @@ export interface FseImportProductMappingInput {
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 4000
-     */
+   * @minLength 1
+   * @maxLength 4000
+   */
   descrizioneEsterna: string;
   /** @minimum 1 */
   prodottoId: number;
   /**
-     * @minLength 1
-     * @maxLength 1000
-     */
+   * @minLength 1
+   * @maxLength 1000
+   */
   motivo: string;
   accettaFallbackData?: boolean;
 }
@@ -2115,32 +2114,32 @@ export interface FseImportRowRevisionInput {
   versione: number;
   quantita?: QuantitaContabile;
   /**
-     * @maxLength 100
-     * @nullable
-     */
+   * @maxLength 100
+   * @nullable
+   */
   numeroDocumento?: string | null;
   /** @nullable */
   dataDocumento?: string | null;
   /** @nullable */
   dataOperativa?: string | null;
   /**
-     * @maxLength 80
-     * @nullable
-     */
+   * @maxLength 80
+   * @nullable
+   */
   lottoFisico?: string | null;
   /** @nullable */
   dataScadenza?: string | null;
   fattoreKgLtPezzo?: FattoreContabile | null;
   /**
-     * @maxLength 80
-     * @nullable
-     */
+   * @maxLength 80
+   * @nullable
+   */
   disambiguatore?: string | null;
   accettaFallbackData?: boolean;
   /**
-     * @minLength 1
-     * @maxLength 1000
-     */
+   * @minLength 1
+   * @maxLength 1000
+   */
   motivo: string;
 }
 
@@ -2151,9 +2150,9 @@ export interface FseImportAddToPracticeInput {
   versionePratica?: number;
   rigaIds?: number[];
   /**
-     * @minLength 1
-     * @maxLength 100
-     */
+   * @minLength 1
+   * @maxLength 100
+   */
   idempotencyKey: string;
   /** Conferma amministrativa richiesta esclusivamente per predisporre un saldo iniziale. */
   confermaCoperturaStorica?: boolean;
@@ -2166,13 +2165,13 @@ export interface FseImportAddToPracticeResult {
   replay: boolean;
 }
 
-export type AgeaImportModalita = typeof AgeaImportModalita[keyof typeof AgeaImportModalita];
-
+export type AgeaImportModalita =
+  (typeof AgeaImportModalita)[keyof typeof AgeaImportModalita];
 
 export const AgeaImportModalita = {
-  PRIMA_ACQUISIZIONE: 'PRIMA_ACQUISIZIONE',
-  AGGIORNAMENTO: 'AGGIORNAMENTO',
-  SOLO_ANALISI: 'SOLO_ANALISI',
+  PRIMA_ACQUISIZIONE: "PRIMA_ACQUISIZIONE",
+  AGGIORNAMENTO: "AGGIORNAMENTO",
+  SOLO_ANALISI: "SOLO_ANALISI",
 } as const;
 
 export interface AgeaErrorResponse {
@@ -2180,36 +2179,36 @@ export interface AgeaErrorResponse {
   code?: string;
 }
 
-export type AgeaImportStato = typeof AgeaImportStato[keyof typeof AgeaImportStato];
-
+export type AgeaImportStato =
+  (typeof AgeaImportStato)[keyof typeof AgeaImportStato];
 
 export const AgeaImportStato = {
-  ANALIZZATA: 'ANALIZZATA',
-  DA_MAPPARE: 'DA_MAPPARE',
-  BLOCCATA: 'BLOCCATA',
-  PRONTA: 'PRONTA',
-  CONFERMATA: 'CONFERMATA',
-  ANNULLATA: 'ANNULLATA',
-  ERRORE: 'ERRORE',
+  ANALIZZATA: "ANALIZZATA",
+  DA_MAPPARE: "DA_MAPPARE",
+  BLOCCATA: "BLOCCATA",
+  PRONTA: "PRONTA",
+  CONFERMATA: "CONFERMATA",
+  ANNULLATA: "ANNULLATA",
+  ERRORE: "ERRORE",
 } as const;
 
-export type AgeaTipoMovimento = typeof AgeaTipoMovimento[keyof typeof AgeaTipoMovimento];
-
+export type AgeaTipoMovimento =
+  (typeof AgeaTipoMovimento)[keyof typeof AgeaTipoMovimento];
 
 export const AgeaTipoMovimento = {
-  CARICO: 'CARICO',
-  DISTRIBUZIONE: 'DISTRIBUZIONE',
-  RESO: 'RESO',
-  MOVIMENTO_NEGATIVO_NON_CLASSIFICATO: 'MOVIMENTO_NEGATIVO_NON_CLASSIFICATO',
-  SEGNO_INCOERENTE: 'SEGNO_INCOERENTE',
-  RIGA_SENZA_MOVIMENTO: 'RIGA_SENZA_MOVIMENTO',
+  CARICO: "CARICO",
+  DISTRIBUZIONE: "DISTRIBUZIONE",
+  RESO: "RESO",
+  MOVIMENTO_NEGATIVO_NON_CLASSIFICATO: "MOVIMENTO_NEGATIVO_NON_CLASSIFICATO",
+  SEGNO_INCOERENTE: "SEGNO_INCOERENTE",
+  RIGA_SENZA_MOVIMENTO: "RIGA_SENZA_MOVIMENTO",
 } as const;
 
-export type AgeaImportazioneTracciatoCodice = typeof AgeaImportazioneTracciatoCodice[keyof typeof AgeaImportazioneTracciatoCodice];
-
+export type AgeaImportazioneTracciatoCodice =
+  (typeof AgeaImportazioneTracciatoCodice)[keyof typeof AgeaImportazioneTracciatoCodice];
 
 export const AgeaImportazioneTracciatoCodice = {
-  SIFEAD_REGISTRO_XLSX_OSSERVATO_V1: 'SIFEAD_REGISTRO_XLSX_OSSERVATO_V1',
+  SIFEAD_REGISTRO_XLSX_OSSERVATO_V1: "SIFEAD_REGISTRO_XLSX_OSSERVATO_V1",
 } as const;
 
 /**
@@ -2393,9 +2392,9 @@ export interface AgeaImportPartitaUpdate {
   /** @nullable */
   dataScadenza: string | null;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   motivazione: string;
   /** @minimum 1 */
   versione: number;
@@ -2410,9 +2409,9 @@ export interface AgeaCorrezioneDataInput {
   /** @nullable */
   valore: string | null;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   motivazione: string;
   /** @minimum 1 */
   versione: number;
@@ -2420,15 +2419,15 @@ export interface AgeaCorrezioneDataInput {
 
 export interface AgeaCorrezioneLottoInput {
   /**
-     * @minLength 1
-     * @maxLength 80
-     * @nullable
-     */
+   * @minLength 1
+   * @maxLength 80
+   * @nullable
+   */
   valore: string | null;
   /**
-     * @minLength 3
-     * @maxLength 500
-     */
+   * @minLength 3
+   * @maxLength 500
+   */
   motivazione: string;
   /** @minimum 1 */
   versione: number;
@@ -2439,11 +2438,11 @@ export interface AgeaImportConfermaInput {
   versione: number;
 }
 
-export type AgeaMappaturaProdottoFonte = typeof AgeaMappaturaProdottoFonte[keyof typeof AgeaMappaturaProdottoFonte];
-
+export type AgeaMappaturaProdottoFonte =
+  (typeof AgeaMappaturaProdottoFonte)[keyof typeof AgeaMappaturaProdottoFonte];
 
 export const AgeaMappaturaProdottoFonte = {
-  AGEA_SIFEAD: 'AGEA_SIFEAD',
+  AGEA_SIFEAD: "AGEA_SIFEAD",
 } as const;
 
 export interface AgeaMappaturaProdotto {
@@ -2463,12 +2462,12 @@ export interface AgeaImportConfermaResult {
   carichi: number[];
 }
 
-export type CaricoMagazzinoStato = typeof CaricoMagazzinoStato[keyof typeof CaricoMagazzinoStato];
-
+export type CaricoMagazzinoStato =
+  (typeof CaricoMagazzinoStato)[keyof typeof CaricoMagazzinoStato];
 
 export const CaricoMagazzinoStato = {
-  confermato: 'confermato',
-  stornato: 'stornato',
+  confermato: "confermato",
+  stornato: "stornato",
 } as const;
 
 export interface CaricoMagazzino {
@@ -2561,9 +2560,9 @@ export interface CaricoMagazzinoInput {
   /** @minimum 1 */
   magazzinoId: number;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   lottoLogicoId?: number | null;
   origineCarico: OrigineCarico;
   /** @nullable */
@@ -2578,30 +2577,30 @@ export interface CaricoMagazzinoInput {
   /** @nullable */
   note?: string | null;
   /**
-     * @maxLength 120
-     * @nullable
-     */
+   * @maxLength 120
+   * @nullable
+   */
   idempotencyKey?: string | null;
   /** @minItems 1 */
   righe: CaricoMagazzinoRigaInput[];
 }
 
-export type CaricoPraticaStato = typeof CaricoPraticaStato[keyof typeof CaricoPraticaStato];
-
+export type CaricoPraticaStato =
+  (typeof CaricoPraticaStato)[keyof typeof CaricoPraticaStato];
 
 export const CaricoPraticaStato = {
-  bozza: 'bozza',
-  aperta: 'aperta',
-  chiusa: 'chiusa',
-  annullata: 'annullata',
+  bozza: "bozza",
+  aperta: "aperta",
+  chiusa: "chiusa",
+  annullata: "annullata",
 } as const;
 
-export type CaricoPraticaTipoPratica = typeof CaricoPraticaTipoPratica[keyof typeof CaricoPraticaTipoPratica];
-
+export type CaricoPraticaTipoPratica =
+  (typeof CaricoPraticaTipoPratica)[keyof typeof CaricoPraticaTipoPratica];
 
 export const CaricoPraticaTipoPratica = {
-  ORDINARIA: 'ORDINARIA',
-  SALDO_INIZIALE: 'SALDO_INIZIALE',
+  ORDINARIA: "ORDINARIA",
+  SALDO_INIZIALE: "SALDO_INIZIALE",
 } as const;
 
 export interface CaricoPratica {
@@ -2682,29 +2681,29 @@ export interface CaricoIntegrazione {
   dataRegistrazione: string;
 }
 
-export type CaricoPraticaDettaglio = CaricoPratica & ({
+export type CaricoPraticaDettaglio = CaricoPratica & {
   areaOperativaNome: string;
   lottoLogicoCodice: string;
   /** @nullable */
   fornitoreNome?: string | null;
   righe: CaricoPraticaRiga[];
   integrazioni: CaricoIntegrazione[];
-});
+};
 
 export interface CaricoPraticaRigaInput {
   /**
-     * @maxLength 100
-     * @nullable
-     */
+   * @maxLength 100
+   * @nullable
+   */
   clientId?: string | null;
   /** @minimum 1 */
   prodottoId: number;
   fondoOrigine: FondoOrigine;
   quantita?: QuantitaContabile | null;
   /**
-     * @maxLength 80
-     * @nullable
-     */
+   * @maxLength 80
+   * @nullable
+   */
   codiceLottoProduttore?: string | null;
   /** @nullable */
   dataScadenza?: string | null;
@@ -2725,14 +2724,14 @@ export interface CaricoPraticaInput {
   /** @minLength 1 */
   descrizione: string;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   fornitoreId?: number | null;
   /**
-     * @maxLength 100
-     * @nullable
-     */
+   * @maxLength 100
+   * @nullable
+   */
   numeroDocumento?: string | null;
   /** @nullable */
   dataDocumento?: string | null;
@@ -2765,14 +2764,14 @@ export interface CaricoPraticaUpdate {
   /** @minLength 1 */
   descrizione?: string;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   fornitoreId?: number | null;
   /**
-     * @maxLength 100
-     * @nullable
-     */
+   * @maxLength 100
+   * @nullable
+   */
   numeroDocumento?: string | null;
   /** @nullable */
   dataDocumento?: string | null;
@@ -2789,9 +2788,9 @@ export interface CaricoPraticaMotivoInput {
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 1000
-     */
+   * @minLength 1
+   * @maxLength 1000
+   */
   motivo: string;
 }
 
@@ -2801,9 +2800,9 @@ export interface CaricoPraticaRegistrazioneInput {
   /** @minItems 1 */
   rigaIds: number[];
   /**
-     * @minLength 1
-     * @maxLength 100
-     */
+   * @minLength 1
+   * @maxLength 100
+   */
   idempotencyKey: string;
 }
 
@@ -2821,14 +2820,14 @@ export interface CaricoPraticaRettificaInput {
   versione: number;
   quantita: QuantitaContabile;
   /**
-     * @minLength 1
-     * @maxLength 1000
-     */
+   * @minLength 1
+   * @maxLength 1000
+   */
   motivo: string;
   /**
-     * @minLength 1
-     * @maxLength 100
-     */
+   * @minLength 1
+   * @maxLength 100
+   */
   idempotencyKey: string;
 }
 
@@ -2843,13 +2842,13 @@ export interface CaricoPraticaRettificaResult {
   replay: boolean;
 }
 
-export type LottoLogicoStato = typeof LottoLogicoStato[keyof typeof LottoLogicoStato];
-
+export type LottoLogicoStato =
+  (typeof LottoLogicoStato)[keyof typeof LottoLogicoStato];
 
 export const LottoLogicoStato = {
-  aperto: 'aperto',
-  chiuso: 'chiuso',
-  archiviato: 'archiviato',
+  aperto: "aperto",
+  chiuso: "chiuso",
+  archiviato: "archiviato",
 } as const;
 
 export interface LottoLogico {
@@ -2990,13 +2989,13 @@ export interface Lotto {
   dataCreazione: string;
 }
 
-export type LottoInputCausale = typeof LottoInputCausale[keyof typeof LottoInputCausale];
-
+export type LottoInputCausale =
+  (typeof LottoInputCausale)[keyof typeof LottoInputCausale];
 
 export const LottoInputCausale = {
-  acquisto: 'acquisto',
-  donazione: 'donazione',
-  fse_plus: 'fse_plus',
+  acquisto: "acquisto",
+  donazione: "donazione",
+  fse_plus: "fse_plus",
 } as const;
 
 export interface LottoInput {
@@ -3021,14 +3020,14 @@ export interface LottoUpdate {
   note?: string | null;
 }
 
-export type RettificaLottoInputCausale = typeof RettificaLottoInputCausale[keyof typeof RettificaLottoInputCausale];
-
+export type RettificaLottoInputCausale =
+  (typeof RettificaLottoInputCausale)[keyof typeof RettificaLottoInputCausale];
 
 export const RettificaLottoInputCausale = {
-  inventario_fisico: 'inventario_fisico',
-  errore_registrazione: 'errore_registrazione',
-  deterioramento: 'deterioramento',
-  altro: 'altro',
+  inventario_fisico: "inventario_fisico",
+  errore_registrazione: "errore_registrazione",
+  deterioramento: "deterioramento",
+  altro: "altro",
 } as const;
 
 export interface RettificaLottoInput {
@@ -3084,9 +3083,9 @@ export interface Movimento {
   /** @nullable */
   operatoreId?: number | null;
   /**
-     * Snapshot del codice attore audit; fallback all'operatore legacy corrente.
-     * @nullable
-     */
+   * Snapshot del codice attore audit; fallback all'operatore legacy corrente.
+   * @nullable
+   */
   operatoreCodice?: string | null;
   /** @nullable */
   auditEventoId?: number | null;
@@ -3112,12 +3111,12 @@ export interface MovimentoInput {
   note?: string;
 }
 
-export type GiacenzaAmbito = typeof GiacenzaAmbito[keyof typeof GiacenzaAmbito];
-
+export type GiacenzaAmbito =
+  (typeof GiacenzaAmbito)[keyof typeof GiacenzaAmbito];
 
 export const GiacenzaAmbito = {
-  area: 'area',
-  magazzino: 'magazzino',
+  area: "area",
+  magazzino: "magazzino",
 } as const;
 
 export interface Giacenza {
@@ -3283,9 +3282,9 @@ export interface TrasferimentoRigaInput {
 
 export interface TrasferimentoInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   magazzinoOrigineId: number;
   magazzinoDestinoId: number;
@@ -3300,9 +3299,9 @@ export interface TrasferimentoInput {
 
 export interface TrasferimentoUpdate {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
@@ -3316,16 +3315,16 @@ export interface TrasferimentoUpdate {
 
 export interface AnnullaTrasferimentoInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   motivo: string;
 }
 
@@ -3367,27 +3366,27 @@ export interface Scarico {
   dataCreazione: string;
 }
 
-export type ScaricoInputCausale = typeof ScaricoInputCausale[keyof typeof ScaricoInputCausale];
-
+export type ScaricoInputCausale =
+  (typeof ScaricoInputCausale)[keyof typeof ScaricoInputCausale];
 
 export const ScaricoInputCausale = {
-  deteriorata: 'deteriorata',
-  rubata: 'rubata',
-  scaduta: 'scaduta',
-  consegna_beneficiario: 'consegna_beneficiario',
-  altro: 'altro',
+  deteriorata: "deteriorata",
+  rubata: "rubata",
+  scaduta: "scaduta",
+  consegna_beneficiario: "consegna_beneficiario",
+  altro: "altro",
 } as const;
 
 /**
  * Obbligatorio con causale consegna_beneficiario.
  */
-export type ScaricoInputCanaleOperativo = typeof ScaricoInputCanaleOperativo[keyof typeof ScaricoInputCanaleOperativo];
-
+export type ScaricoInputCanaleOperativo =
+  (typeof ScaricoInputCanaleOperativo)[keyof typeof ScaricoInputCanaleOperativo];
 
 export const ScaricoInputCanaleOperativo = {
-  PACCHI: 'PACCHI',
-  RITIRO_SEDE: 'RITIRO_SEDE',
-  DOMICILIARE: 'DOMICILIARE',
+  PACCHI: "PACCHI",
+  RITIRO_SEDE: "RITIRO_SEDE",
+  DOMICILIARE: "DOMICILIARE",
 } as const;
 
 export interface ScaricoRigaInput {
@@ -3404,9 +3403,9 @@ export interface ScaricoInput {
   dataScarico: string;
   causale: ScaricoInputCausale;
   /**
-     * Obbligatorio con causale consegna_beneficiario.
-     * @minimum 1
-     */
+   * Obbligatorio con causale consegna_beneficiario.
+   * @minimum 1
+   */
   beneficiarioId?: number;
   /** Obbligatorio con causale consegna_beneficiario. */
   canaleOperativo?: ScaricoInputCanaleOperativo;
@@ -3417,9 +3416,9 @@ export interface ScaricoInput {
 
 export interface ConfermaRicezione {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
@@ -3429,9 +3428,9 @@ export interface ConfermaRicezione {
 
 export interface ComandoVersionatoInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
@@ -3439,16 +3438,16 @@ export interface ComandoVersionatoInput {
 
 export interface MancatoTrasportoInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   motivo: string;
 }
 
@@ -3461,25 +3460,25 @@ export interface RientroTrasportoRigaInput {
   mancante?: QuantitaContabile;
   rubata?: QuantitaContabile;
   /**
-     * @maxLength 500
-     * @nullable
-     */
+   * @maxLength 500
+   * @nullable
+   */
   nota?: string | null;
 }
 
 export interface RientroTrasportoInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   dataRientro?: string;
   /**
-     * @maxLength 1000
-     * @nullable
-     */
+   * @maxLength 1000
+   * @nullable
+   */
   note?: string | null;
   /** @minItems 1 */
   righe: RientroTrasportoRigaInput[];
@@ -3498,15 +3497,15 @@ export interface RientroTrasportoPartita {
   quantitaFrazionabile?: boolean;
 }
 
-export type RientroTrasportoDocumentoTipo = typeof RientroTrasportoDocumentoTipo[keyof typeof RientroTrasportoDocumentoTipo];
-
+export type RientroTrasportoDocumentoTipo =
+  (typeof RientroTrasportoDocumentoTipo)[keyof typeof RientroTrasportoDocumentoTipo];
 
 export const RientroTrasportoDocumentoTipo = {
-  rientro: 'rientro',
-  deteriorata: 'deteriorata',
-  scaduta: 'scaduta',
-  mancante: 'mancante',
-  rubata: 'rubata',
+  rientro: "rientro",
+  deteriorata: "deteriorata",
+  scaduta: "scaduta",
+  mancante: "mancante",
+  rubata: "rubata",
 } as const;
 
 export interface RientroTrasportoDocumento {
@@ -3665,23 +3664,21 @@ export interface ApprovvigionamentoUpdate {
   righe?: ApprovvigionamentoRigaInput[];
 }
 
-export type TurnoFascia = typeof TurnoFascia[keyof typeof TurnoFascia];
-
+export type TurnoFascia = (typeof TurnoFascia)[keyof typeof TurnoFascia];
 
 export const TurnoFascia = {
-  '09-13': '09-13',
-  '14-18': '14-18',
-  '18-20': '18-20',
+  "09-13": "09-13",
+  "14-18": "14-18",
+  "18-20": "18-20",
 } as const;
 
-export type TurnoStato = typeof TurnoStato[keyof typeof TurnoStato];
-
+export type TurnoStato = (typeof TurnoStato)[keyof typeof TurnoStato];
 
 export const TurnoStato = {
-  pianificato: 'pianificato',
-  confermato: 'confermato',
-  completato: 'completato',
-  annullato: 'annullato',
+  pianificato: "pianificato",
+  confermato: "confermato",
+  completato: "completato",
+  annullato: "annullato",
 } as const;
 
 export interface TurnoVolontario {
@@ -3718,13 +3715,13 @@ export interface Turno {
   volontari: TurnoVolontario[];
 }
 
-export type TurnoInputFascia = typeof TurnoInputFascia[keyof typeof TurnoInputFascia];
-
+export type TurnoInputFascia =
+  (typeof TurnoInputFascia)[keyof typeof TurnoInputFascia];
 
 export const TurnoInputFascia = {
-  '09-13': '09-13',
-  '14-18': '14-18',
-  '18-20': '18-20',
+  "09-13": "09-13",
+  "14-18": "14-18",
+  "18-20": "18-20",
 } as const;
 
 export interface TurnoVolontarioInput {
@@ -3769,13 +3766,13 @@ export interface TurnoMezzoPendingInput {
   note?: string;
 }
 
-export type TurnoStatoInputStato = typeof TurnoStatoInputStato[keyof typeof TurnoStatoInputStato];
-
+export type TurnoStatoInputStato =
+  (typeof TurnoStatoInputStato)[keyof typeof TurnoStatoInputStato];
 
 export const TurnoStatoInputStato = {
-  confermato: 'confermato',
-  completato: 'completato',
-  annullato: 'annullato',
+  confermato: "confermato",
+  completato: "completato",
+  annullato: "annullato",
 } as const;
 
 export interface TurnoStatoInput {
@@ -3820,55 +3817,56 @@ export interface BeneficiarioSimile {
   score: number;
 }
 
-export type BeneficiarioDirectoryStatoAnagrafica = typeof BeneficiarioDirectoryStatoAnagrafica[keyof typeof BeneficiarioDirectoryStatoAnagrafica];
-
+export type BeneficiarioDirectoryStatoAnagrafica =
+  (typeof BeneficiarioDirectoryStatoAnagrafica)[keyof typeof BeneficiarioDirectoryStatoAnagrafica];
 
 export const BeneficiarioDirectoryStatoAnagrafica = {
-  provvisoria: 'provvisoria',
-  completa: 'completa',
+  provvisoria: "provvisoria",
+  completa: "completa",
 } as const;
 
 /**
  * @nullable
  */
-export type BeneficiarioDirectoryFasciaEtaPresunta = typeof BeneficiarioDirectoryFasciaEtaPresunta[keyof typeof BeneficiarioDirectoryFasciaEtaPresunta] | null;
-
+export type BeneficiarioDirectoryFasciaEtaPresunta =
+  | (typeof BeneficiarioDirectoryFasciaEtaPresunta)[keyof typeof BeneficiarioDirectoryFasciaEtaPresunta]
+  | null;
 
 export const BeneficiarioDirectoryFasciaEtaPresunta = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
 } as const;
 
-export type BeneficiarioDirectoryFasciaEtaCorrente = typeof BeneficiarioDirectoryFasciaEtaCorrente[keyof typeof BeneficiarioDirectoryFasciaEtaCorrente];
-
+export type BeneficiarioDirectoryFasciaEtaCorrente =
+  (typeof BeneficiarioDirectoryFasciaEtaCorrente)[keyof typeof BeneficiarioDirectoryFasciaEtaCorrente];
 
 export const BeneficiarioDirectoryFasciaEtaCorrente = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
 } as const;
 
-export type BeneficiarioDirectoryFasciaEtaOrigine = typeof BeneficiarioDirectoryFasciaEtaOrigine[keyof typeof BeneficiarioDirectoryFasciaEtaOrigine];
-
+export type BeneficiarioDirectoryFasciaEtaOrigine =
+  (typeof BeneficiarioDirectoryFasciaEtaOrigine)[keyof typeof BeneficiarioDirectoryFasciaEtaOrigine];
 
 export const BeneficiarioDirectoryFasciaEtaOrigine = {
-  calcolata: 'calcolata',
-  presunta: 'presunta',
-  non_determinata: 'non_determinata',
+  calcolata: "calcolata",
+  presunta: "presunta",
+  non_determinata: "non_determinata",
 } as const;
 
-export type BeneficiarioDirectoryPriorita = typeof BeneficiarioDirectoryPriorita[keyof typeof BeneficiarioDirectoryPriorita];
-
+export type BeneficiarioDirectoryPriorita =
+  (typeof BeneficiarioDirectoryPriorita)[keyof typeof BeneficiarioDirectoryPriorita];
 
 export const BeneficiarioDirectoryPriorita = {
-  bassa: 'bassa',
-  media: 'media',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  media: "media",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
 /**
@@ -3895,9 +3893,9 @@ export interface BeneficiarioDirectory {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /**
-     * Identificativo tecnico legacy dell'Area.
-     * @nullable
-     */
+   * Identificativo tecnico legacy dell'Area.
+   * @nullable
+   */
   areaOperativaId?: number | null;
   /** @nullable */
   areaOperativaNome?: string | null;
@@ -3913,69 +3911,70 @@ export interface BeneficiarioDirectory {
   versione: number;
 }
 
-export type BeneficiarioStatoAnagrafica = typeof BeneficiarioStatoAnagrafica[keyof typeof BeneficiarioStatoAnagrafica];
-
+export type BeneficiarioStatoAnagrafica =
+  (typeof BeneficiarioStatoAnagrafica)[keyof typeof BeneficiarioStatoAnagrafica];
 
 export const BeneficiarioStatoAnagrafica = {
-  provvisoria: 'provvisoria',
-  completa: 'completa',
+  provvisoria: "provvisoria",
+  completa: "completa",
 } as const;
 
 /**
  * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
  * @nullable
  */
-export type BeneficiarioFasciaEtaPresunta = typeof BeneficiarioFasciaEtaPresunta[keyof typeof BeneficiarioFasciaEtaPresunta] | null;
-
+export type BeneficiarioFasciaEtaPresunta =
+  | (typeof BeneficiarioFasciaEtaPresunta)[keyof typeof BeneficiarioFasciaEtaPresunta]
+  | null;
 
 export const BeneficiarioFasciaEtaPresunta = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
 } as const;
 
 /**
  * Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta.
  */
-export type BeneficiarioFasciaEtaCorrente = typeof BeneficiarioFasciaEtaCorrente[keyof typeof BeneficiarioFasciaEtaCorrente];
-
+export type BeneficiarioFasciaEtaCorrente =
+  (typeof BeneficiarioFasciaEtaCorrente)[keyof typeof BeneficiarioFasciaEtaCorrente];
 
 export const BeneficiarioFasciaEtaCorrente = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
 } as const;
 
-export type BeneficiarioFasciaEtaOrigine = typeof BeneficiarioFasciaEtaOrigine[keyof typeof BeneficiarioFasciaEtaOrigine];
-
+export type BeneficiarioFasciaEtaOrigine =
+  (typeof BeneficiarioFasciaEtaOrigine)[keyof typeof BeneficiarioFasciaEtaOrigine];
 
 export const BeneficiarioFasciaEtaOrigine = {
-  calcolata: 'calcolata',
-  presunta: 'presunta',
-  non_determinata: 'non_determinata',
+  calcolata: "calcolata",
+  presunta: "presunta",
+  non_determinata: "non_determinata",
 } as const;
 
-export type BeneficiarioPriorita = typeof BeneficiarioPriorita[keyof typeof BeneficiarioPriorita];
-
+export type BeneficiarioPriorita =
+  (typeof BeneficiarioPriorita)[keyof typeof BeneficiarioPriorita];
 
 export const BeneficiarioPriorita = {
-  bassa: 'bassa',
-  media: 'media',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  media: "media",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
-export type BeneficiarioCreditoSolidaleStato = typeof BeneficiarioCreditoSolidaleStato[keyof typeof BeneficiarioCreditoSolidaleStato];
-
+export type BeneficiarioCreditoSolidaleStato =
+  (typeof BeneficiarioCreditoSolidaleStato)[keyof typeof BeneficiarioCreditoSolidaleStato];
 
 export const BeneficiarioCreditoSolidaleStato = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+  non_abilitato: "non_abilitato",
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
 } as const;
 
 /**
@@ -3992,9 +3991,9 @@ export interface Beneficiario {
   /** @nullable */
   dataNascita?: string | null;
   /**
-     * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
-     * @nullable
-     */
+   * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
+   * @nullable
+   */
   fasciaEtaPresunta: BeneficiarioFasciaEtaPresunta;
   /** Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta. */
   fasciaEtaCorrente: BeneficiarioFasciaEtaCorrente;
@@ -4064,69 +4063,70 @@ export interface Beneficiario {
   versione: number;
 }
 
-export type BeneficiarioDettaglioStatoAnagrafica = typeof BeneficiarioDettaglioStatoAnagrafica[keyof typeof BeneficiarioDettaglioStatoAnagrafica];
-
+export type BeneficiarioDettaglioStatoAnagrafica =
+  (typeof BeneficiarioDettaglioStatoAnagrafica)[keyof typeof BeneficiarioDettaglioStatoAnagrafica];
 
 export const BeneficiarioDettaglioStatoAnagrafica = {
-  provvisoria: 'provvisoria',
-  completa: 'completa',
+  provvisoria: "provvisoria",
+  completa: "completa",
 } as const;
 
 /**
  * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
  * @nullable
  */
-export type BeneficiarioDettaglioFasciaEtaPresunta = typeof BeneficiarioDettaglioFasciaEtaPresunta[keyof typeof BeneficiarioDettaglioFasciaEtaPresunta] | null;
-
+export type BeneficiarioDettaglioFasciaEtaPresunta =
+  | (typeof BeneficiarioDettaglioFasciaEtaPresunta)[keyof typeof BeneficiarioDettaglioFasciaEtaPresunta]
+  | null;
 
 export const BeneficiarioDettaglioFasciaEtaPresunta = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
 } as const;
 
 /**
  * Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta.
  */
-export type BeneficiarioDettaglioFasciaEtaCorrente = typeof BeneficiarioDettaglioFasciaEtaCorrente[keyof typeof BeneficiarioDettaglioFasciaEtaCorrente];
-
+export type BeneficiarioDettaglioFasciaEtaCorrente =
+  (typeof BeneficiarioDettaglioFasciaEtaCorrente)[keyof typeof BeneficiarioDettaglioFasciaEtaCorrente];
 
 export const BeneficiarioDettaglioFasciaEtaCorrente = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
 } as const;
 
-export type BeneficiarioDettaglioFasciaEtaOrigine = typeof BeneficiarioDettaglioFasciaEtaOrigine[keyof typeof BeneficiarioDettaglioFasciaEtaOrigine];
-
+export type BeneficiarioDettaglioFasciaEtaOrigine =
+  (typeof BeneficiarioDettaglioFasciaEtaOrigine)[keyof typeof BeneficiarioDettaglioFasciaEtaOrigine];
 
 export const BeneficiarioDettaglioFasciaEtaOrigine = {
-  calcolata: 'calcolata',
-  presunta: 'presunta',
-  non_determinata: 'non_determinata',
+  calcolata: "calcolata",
+  presunta: "presunta",
+  non_determinata: "non_determinata",
 } as const;
 
-export type BeneficiarioDettaglioPriorita = typeof BeneficiarioDettaglioPriorita[keyof typeof BeneficiarioDettaglioPriorita];
-
+export type BeneficiarioDettaglioPriorita =
+  (typeof BeneficiarioDettaglioPriorita)[keyof typeof BeneficiarioDettaglioPriorita];
 
 export const BeneficiarioDettaglioPriorita = {
-  bassa: 'bassa',
-  media: 'media',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  media: "media",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
-export type BeneficiarioDettaglioCreditoSolidaleStato = typeof BeneficiarioDettaglioCreditoSolidaleStato[keyof typeof BeneficiarioDettaglioCreditoSolidaleStato];
-
+export type BeneficiarioDettaglioCreditoSolidaleStato =
+  (typeof BeneficiarioDettaglioCreditoSolidaleStato)[keyof typeof BeneficiarioDettaglioCreditoSolidaleStato];
 
 export const BeneficiarioDettaglioCreditoSolidaleStato = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+  non_abilitato: "non_abilitato",
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
 } as const;
 
 export interface NucleoFamiliare {
@@ -4157,13 +4157,13 @@ export interface NucleoFamiliare {
 /**
  * Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.
  */
-export type InterventoProvenienza = typeof InterventoProvenienza[keyof typeof InterventoProvenienza];
-
+export type InterventoProvenienza =
+  (typeof InterventoProvenienza)[keyof typeof InterventoProvenienza];
 
 export const InterventoProvenienza = {
-  sociale: 'sociale',
-  derivato_bolla: 'derivato_bolla',
-  legacy_non_classificato: 'legacy_non_classificato',
+  sociale: "sociale",
+  derivato_bolla: "derivato_bolla",
+  legacy_non_classificato: "legacy_non_classificato",
 } as const;
 
 export interface InterventoRaccordoMagazzino {
@@ -4191,40 +4191,45 @@ export interface InterventoRaccordoMagazzino {
 /**
  * Stato canonico del ciclo di vita dell'intervento.
  */
-export type InterventoStato = typeof InterventoStato[keyof typeof InterventoStato];
-
+export type InterventoStato =
+  (typeof InterventoStato)[keyof typeof InterventoStato];
 
 export const InterventoStato = {
-  da_pianificare: 'da_pianificare',
-  pianificato: 'pianificato',
-  in_corso: 'in_corso',
-  concluso: 'concluso',
-  annullato: 'annullato',
-  mancata_presentazione: 'mancata_presentazione',
+  da_pianificare: "da_pianificare",
+  pianificato: "pianificato",
+  in_corso: "in_corso",
+  concluso: "concluso",
+  annullato: "annullato",
+  mancata_presentazione: "mancata_presentazione",
 } as const;
 
 /**
  * Ambito esplicito; i record storici non classificabili mantengono null.
  */
-export type InterventoAmbito = typeof InterventoAmbito[keyof typeof InterventoAmbito];
-
+export type InterventoAmbito =
+  (typeof InterventoAmbito)[keyof typeof InterventoAmbito];
 
 export const InterventoAmbito = {
-  sociale: 'sociale',
-  uds: 'uds',
+  sociale: "sociale",
+  uds: "uds",
 } as const;
 
-export type InterventoPriorita = typeof InterventoPriorita[keyof typeof InterventoPriorita];
-
+export type InterventoPriorita =
+  (typeof InterventoPriorita)[keyof typeof InterventoPriorita];
 
 export const InterventoPriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
-export type InterventoAvviso = 'scaduto' | 'oggi' | 'imminente' | 'prossimo' | null;
+export type InterventoAvviso =
+  | "scaduto"
+  | "oggi"
+  | "imminente"
+  | "prossimo"
+  | null;
 
 export interface Intervento {
   /** Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico. */
@@ -4308,12 +4313,12 @@ export interface Intervento {
   bisogniPianificatiProssimaScadenza: string | null;
 }
 
-export type ConsegnaTipoPianificazione = typeof ConsegnaTipoPianificazione[keyof typeof ConsegnaTipoPianificazione];
-
+export type ConsegnaTipoPianificazione =
+  (typeof ConsegnaTipoPianificazione)[keyof typeof ConsegnaTipoPianificazione];
 
 export const ConsegnaTipoPianificazione = {
-  consegna_pacco: 'consegna_pacco',
-  accesso_emporio: 'accesso_emporio',
+  consegna_pacco: "consegna_pacco",
+  accesso_emporio: "accesso_emporio",
 } as const;
 
 export interface Consegna {
@@ -4359,9 +4364,9 @@ export interface Consegna {
   /** @nullable */
   bollaStato?: string | null;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   bollaVersione?: number | null;
   /** @nullable */
   noteOperative?: string | null;
@@ -4381,9 +4386,9 @@ export interface BeneficiarioDettaglio {
   /** @nullable */
   dataNascita?: string | null;
   /**
-     * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
-     * @nullable
-     */
+   * Fascia d'età stimata dall'operatore, usata solo quando la data di nascita non è disponibile.
+   * @nullable
+   */
   fasciaEtaPresunta: BeneficiarioDettaglioFasciaEtaPresunta;
   /** Fascia corrente calcolata dalla data di nascita o, in sua assenza, presunta. */
   fasciaEtaCorrente: BeneficiarioDettaglioFasciaEtaCorrente;
@@ -4476,45 +4481,46 @@ export interface BeneficiarioDettaglio {
 /**
  * È consentita solo la transizione provvisoria-completa; richiede un Centro di Ascolto valido e dati anagrafici minimi ed è auditata dal server.
  */
-export type BeneficiarioUpdateStatoAnagrafica = typeof BeneficiarioUpdateStatoAnagrafica[keyof typeof BeneficiarioUpdateStatoAnagrafica];
-
+export type BeneficiarioUpdateStatoAnagrafica =
+  (typeof BeneficiarioUpdateStatoAnagrafica)[keyof typeof BeneficiarioUpdateStatoAnagrafica];
 
 export const BeneficiarioUpdateStatoAnagrafica = {
-  provvisoria: 'provvisoria',
-  completa: 'completa',
+  provvisoria: "provvisoria",
+  completa: "completa",
 } as const;
 
 /**
  * Fascia d'età stimata dall'operatore; null indica che non è determinata.
  * @nullable
  */
-export type BeneficiarioUpdateFasciaEtaPresunta = typeof BeneficiarioUpdateFasciaEtaPresunta[keyof typeof BeneficiarioUpdateFasciaEtaPresunta] | null;
-
+export type BeneficiarioUpdateFasciaEtaPresunta =
+  | (typeof BeneficiarioUpdateFasciaEtaPresunta)[keyof typeof BeneficiarioUpdateFasciaEtaPresunta]
+  | null;
 
 export const BeneficiarioUpdateFasciaEtaPresunta = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
 } as const;
 
-export type BeneficiarioUpdatePriorita = typeof BeneficiarioUpdatePriorita[keyof typeof BeneficiarioUpdatePriorita];
-
+export type BeneficiarioUpdatePriorita =
+  (typeof BeneficiarioUpdatePriorita)[keyof typeof BeneficiarioUpdatePriorita];
 
 export const BeneficiarioUpdatePriorita = {
-  bassa: 'bassa',
-  media: 'media',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  media: "media",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
-export type BeneficiarioUpdateSesso = typeof BeneficiarioUpdateSesso[keyof typeof BeneficiarioUpdateSesso];
-
+export type BeneficiarioUpdateSesso =
+  (typeof BeneficiarioUpdateSesso)[keyof typeof BeneficiarioUpdateSesso];
 
 export const BeneficiarioUpdateSesso = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
 } as const;
 
 export interface BeneficiarioUpdate {
@@ -4527,9 +4533,9 @@ export interface BeneficiarioUpdate {
   /** @nullable */
   dataNascita?: string | null;
   /**
-     * Fascia d'età stimata dall'operatore; null indica che non è determinata.
-     * @nullable
-     */
+   * Fascia d'età stimata dall'operatore; null indica che non è determinata.
+   * @nullable
+   */
   fasciaEtaPresunta?: BeneficiarioUpdateFasciaEtaPresunta;
   cittadinanza?: string;
   residenza?: string;
@@ -4574,14 +4580,14 @@ export interface BeneficiarioStatoInput {
   versione: number;
 }
 
-export type BeneficiariExportInputTipo = typeof BeneficiariExportInputTipo[keyof typeof BeneficiariExportInputTipo];
-
+export type BeneficiariExportInputTipo =
+  (typeof BeneficiariExportInputTipo)[keyof typeof BeneficiariExportInputTipo];
 
 export const BeneficiariExportInputTipo = {
-  lista: 'lista',
-  scheda: 'scheda',
-  dossier: 'dossier',
-  interventi: 'interventi',
+  lista: "lista",
+  scheda: "scheda",
+  dossier: "dossier",
+  interventi: "interventi",
 } as const;
 
 export interface BeneficiariExportInput {
@@ -4589,20 +4595,20 @@ export interface BeneficiariExportInput {
   /** @nullable */
   beneficiarioId?: number | null;
   /**
-     * @minimum 0
-     * @maximum 100000
-     */
+   * @minimum 0
+   * @maximum 100000
+   */
   numeroRecord: number;
 }
 
-export type PoliticaCreditoSolidaleArrotondamento = typeof PoliticaCreditoSolidaleArrotondamento[keyof typeof PoliticaCreditoSolidaleArrotondamento];
-
+export type PoliticaCreditoSolidaleArrotondamento =
+  (typeof PoliticaCreditoSolidaleArrotondamento)[keyof typeof PoliticaCreditoSolidaleArrotondamento];
 
 export const PoliticaCreditoSolidaleArrotondamento = {
-  nessuno: 'nessuno',
-  intero_superiore: 'intero_superiore',
-  intero_inferiore: 'intero_inferiore',
-  intero_piu_vicino: 'intero_piu_vicino',
+  nessuno: "nessuno",
+  intero_superiore: "intero_superiore",
+  intero_inferiore: "intero_inferiore",
+  intero_piu_vicino: "intero_piu_vicino",
 } as const;
 
 export interface PoliticaCreditoSolidale {
@@ -4637,21 +4643,21 @@ export interface PoliticaCreditoSolidale {
   dataAggiornamento?: string | null;
 }
 
-export type PoliticaCreditoSolidaleInputArrotondamento = typeof PoliticaCreditoSolidaleInputArrotondamento[keyof typeof PoliticaCreditoSolidaleInputArrotondamento];
-
+export type PoliticaCreditoSolidaleInputArrotondamento =
+  (typeof PoliticaCreditoSolidaleInputArrotondamento)[keyof typeof PoliticaCreditoSolidaleInputArrotondamento];
 
 export const PoliticaCreditoSolidaleInputArrotondamento = {
-  nessuno: 'nessuno',
-  intero_superiore: 'intero_superiore',
-  intero_inferiore: 'intero_inferiore',
-  intero_piu_vicino: 'intero_piu_vicino',
+  nessuno: "nessuno",
+  intero_superiore: "intero_superiore",
+  intero_inferiore: "intero_inferiore",
+  intero_piu_vicino: "intero_piu_vicino",
 } as const;
 
 export interface PoliticaCreditoSolidaleInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   nome: string;
   /** @nullable */
   descrizione?: string | null;
@@ -4673,42 +4679,42 @@ export interface PoliticaCreditoSolidaleInput {
   /** @minimum 0 */
   creditoMinimoMensile?: number;
   /**
-     * @minimum 0
-     * @nullable
-     */
+   * @minimum 0
+   * @nullable
+   */
   creditoMassimoMensile?: number | null;
   /**
-     * Calendario automatico fisso al primo del mese; omettere nei nuovi client.
-     * @deprecated
-     * @minimum 1
-     * @maximum 1
-     */
+   * Calendario automatico fisso al primo del mese; omettere nei nuovi client.
+   * @deprecated
+   * @minimum 1
+   * @maximum 1
+   */
   giornoRicaricaMensile?: number;
   /**
-     * Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.
-     * @deprecated
-     */
+   * Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.
+   * @deprecated
+   */
   ricaricaAutomaticaAbilitata?: true;
   arrotondamento?: PoliticaCreditoSolidaleInputArrotondamento;
   /** @nullable */
   note?: string | null;
 }
 
-export type PoliticaCreditoSolidaleUpdateArrotondamento = typeof PoliticaCreditoSolidaleUpdateArrotondamento[keyof typeof PoliticaCreditoSolidaleUpdateArrotondamento];
-
+export type PoliticaCreditoSolidaleUpdateArrotondamento =
+  (typeof PoliticaCreditoSolidaleUpdateArrotondamento)[keyof typeof PoliticaCreditoSolidaleUpdateArrotondamento];
 
 export const PoliticaCreditoSolidaleUpdateArrotondamento = {
-  nessuno: 'nessuno',
-  intero_superiore: 'intero_superiore',
-  intero_inferiore: 'intero_inferiore',
-  intero_piu_vicino: 'intero_piu_vicino',
+  nessuno: "nessuno",
+  intero_superiore: "intero_superiore",
+  intero_inferiore: "intero_inferiore",
+  intero_piu_vicino: "intero_piu_vicino",
 } as const;
 
 export interface PoliticaCreditoSolidaleUpdate {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   nome?: string;
   /** @nullable */
   descrizione?: string | null;
@@ -4730,35 +4736,35 @@ export interface PoliticaCreditoSolidaleUpdate {
   /** @minimum 0 */
   creditoMinimoMensile?: number;
   /**
-     * @minimum 0
-     * @nullable
-     */
+   * @minimum 0
+   * @nullable
+   */
   creditoMassimoMensile?: number | null;
   /**
-     * Calendario automatico fisso al primo del mese; omettere nei nuovi client.
-     * @deprecated
-     * @minimum 1
-     * @maximum 1
-     */
+   * Calendario automatico fisso al primo del mese; omettere nei nuovi client.
+   * @deprecated
+   * @minimum 1
+   * @maximum 1
+   */
   giornoRicaricaMensile?: number;
   /**
-     * Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.
-     * @deprecated
-     */
+   * Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.
+   * @deprecated
+   */
   ricaricaAutomaticaAbilitata?: true;
   arrotondamento?: PoliticaCreditoSolidaleUpdateArrotondamento;
   /** @nullable */
   note?: string | null;
 }
 
-export type CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato = typeof CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato[keyof typeof CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato];
-
+export type CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato =
+  (typeof CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato)[keyof typeof CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato];
 
 export const CreditoSolidaleCalcoloDettaglioArrotondamentoApplicato = {
-  nessuno: 'nessuno',
-  intero_superiore: 'intero_superiore',
-  intero_inferiore: 'intero_inferiore',
-  intero_piu_vicino: 'intero_piu_vicino',
+  nessuno: "nessuno",
+  intero_superiore: "intero_superiore",
+  intero_inferiore: "intero_inferiore",
+  intero_piu_vicino: "intero_piu_vicino",
 } as const;
 
 export interface CreditoSolidaleCalcoloDettaglio {
@@ -4776,14 +4782,14 @@ export interface CreditoSolidaleCalcoloDettaglio {
   totaleSuggerito: number;
 }
 
-export type CreditoSolidaleCalcoloPoliticaOrigine = typeof CreditoSolidaleCalcoloPoliticaOrigine[keyof typeof CreditoSolidaleCalcoloPoliticaOrigine];
-
+export type CreditoSolidaleCalcoloPoliticaOrigine =
+  (typeof CreditoSolidaleCalcoloPoliticaOrigine)[keyof typeof CreditoSolidaleCalcoloPoliticaOrigine];
 
 export const CreditoSolidaleCalcoloPoliticaOrigine = {
-  centro: 'centro',
-  areaOperativa: 'areaOperativa',
-  globale: 'globale',
-  default: 'default',
+  centro: "centro",
+  areaOperativa: "areaOperativa",
+  globale: "globale",
+  default: "default",
 } as const;
 
 export interface CreditoSolidaleCalcolo {
@@ -4798,16 +4804,16 @@ export interface CreditoSolidaleCalcolo {
   dettaglio: CreditoSolidaleCalcoloDettaglio;
 }
 
-export type CreditoSolidaleMovimentoTipoMovimento = typeof CreditoSolidaleMovimentoTipoMovimento[keyof typeof CreditoSolidaleMovimentoTipoMovimento];
-
+export type CreditoSolidaleMovimentoTipoMovimento =
+  (typeof CreditoSolidaleMovimentoTipoMovimento)[keyof typeof CreditoSolidaleMovimentoTipoMovimento];
 
 export const CreditoSolidaleMovimentoTipoMovimento = {
-  ricarica_mensile: 'ricarica_mensile',
-  ricarica_manuale: 'ricarica_manuale',
-  rettifica_positiva: 'rettifica_positiva',
-  rettifica_negativa: 'rettifica_negativa',
-  storno: 'storno',
-  consumo_spesa: 'consumo_spesa',
+  ricarica_mensile: "ricarica_mensile",
+  ricarica_manuale: "ricarica_manuale",
+  rettifica_positiva: "rettifica_positiva",
+  rettifica_negativa: "rettifica_negativa",
+  storno: "storno",
+  consumo_spesa: "consumo_spesa",
 } as const;
 
 export interface CreditoSolidaleMovimento {
@@ -4849,14 +4855,14 @@ export interface CreditoSolidaleMovimento {
   annullatoDaMovimentoId: number | null;
 }
 
-export type CreditoSolidaleBeneficiarioCreditoSolidaleStato = typeof CreditoSolidaleBeneficiarioCreditoSolidaleStato[keyof typeof CreditoSolidaleBeneficiarioCreditoSolidaleStato];
-
+export type CreditoSolidaleBeneficiarioCreditoSolidaleStato =
+  (typeof CreditoSolidaleBeneficiarioCreditoSolidaleStato)[keyof typeof CreditoSolidaleBeneficiarioCreditoSolidaleStato];
 
 export const CreditoSolidaleBeneficiarioCreditoSolidaleStato = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+  non_abilitato: "non_abilitato",
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
 } as const;
 
 export interface CreditoSolidaleBeneficiario {
@@ -4871,9 +4877,9 @@ export interface CreditoSolidaleBeneficiario {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /**
-     * Identificativo tecnico legacy dell'Area.
-     * @nullable
-     */
+   * Identificativo tecnico legacy dell'Area.
+   * @nullable
+   */
   areaOperativaId?: number | null;
   /** @nullable */
   areaOperativaNome?: string | null;
@@ -4891,14 +4897,14 @@ export interface CreditoSolidaleBeneficiario {
   magazzinoEmporioPreferitoNome?: string | null;
 }
 
-export type CreditoSolidaleSaldoCreditoSolidaleStato = typeof CreditoSolidaleSaldoCreditoSolidaleStato[keyof typeof CreditoSolidaleSaldoCreditoSolidaleStato];
-
+export type CreditoSolidaleSaldoCreditoSolidaleStato =
+  (typeof CreditoSolidaleSaldoCreditoSolidaleStato)[keyof typeof CreditoSolidaleSaldoCreditoSolidaleStato];
 
 export const CreditoSolidaleSaldoCreditoSolidaleStato = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+  non_abilitato: "non_abilitato",
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
 } as const;
 
 export interface CreditoSolidaleSaldo {
@@ -4913,14 +4919,14 @@ export interface CreditoSolidaleSaldo {
   dataUltimoMovimento: string | null;
 }
 
-export type CreditoSolidaleConfigurazioneInputCreditoSolidaleStato = typeof CreditoSolidaleConfigurazioneInputCreditoSolidaleStato[keyof typeof CreditoSolidaleConfigurazioneInputCreditoSolidaleStato];
-
+export type CreditoSolidaleConfigurazioneInputCreditoSolidaleStato =
+  (typeof CreditoSolidaleConfigurazioneInputCreditoSolidaleStato)[keyof typeof CreditoSolidaleConfigurazioneInputCreditoSolidaleStato];
 
 export const CreditoSolidaleConfigurazioneInputCreditoSolidaleStato = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+  non_abilitato: "non_abilitato",
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
 } as const;
 
 export interface CreditoSolidaleConfigurazioneInput {
@@ -4929,29 +4935,29 @@ export interface CreditoSolidaleConfigurazioneInput {
   /** @nullable */
   creditoSolidaleNote?: string | null;
   /**
-     * @minimum 0
-     * @maximum 99999999
-     * @nullable
-     */
+   * @minimum 0
+   * @maximum 99999999
+   * @nullable
+   */
   creditoSolidaleMensileAssegnato?: number | null;
   /**
-     * @minimum 0
-     * @maximum 99999999
-     * @nullable
-     */
+   * @minimum 0
+   * @maximum 99999999
+   * @nullable
+   */
   creditoSolidaleMensileSuggerito?: number | null;
   /** @nullable */
   creditoSolidaleMotivoModifica?: string | null;
 }
 
-export type CreditoSolidaleConfigurazioneCreditoSolidaleStato = typeof CreditoSolidaleConfigurazioneCreditoSolidaleStato[keyof typeof CreditoSolidaleConfigurazioneCreditoSolidaleStato];
-
+export type CreditoSolidaleConfigurazioneCreditoSolidaleStato =
+  (typeof CreditoSolidaleConfigurazioneCreditoSolidaleStato)[keyof typeof CreditoSolidaleConfigurazioneCreditoSolidaleStato];
 
 export const CreditoSolidaleConfigurazioneCreditoSolidaleStato = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+  non_abilitato: "non_abilitato",
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
 } as const;
 
 export interface CreditoSolidaleConfigurazione {
@@ -4971,9 +4977,9 @@ export interface CreditoSolidaleConfigurazione {
 
 export interface CreditoSolidaleRefreshInput {
   /**
-     * @nullable
-     * @pattern ^\d{4}-(0[1-9]|1[0-2])$
-     */
+   * @nullable
+   * @pattern ^\d{4}-(0[1-9]|1[0-2])$
+   */
   periodoRiferimento?: string | null;
   /** @nullable */
   note?: string | null;
@@ -4989,9 +4995,9 @@ export interface CreditoSolidaleRefreshResult {
 
 export interface CreditoSolidaleRicaricaManualeInput {
   /**
-     * @minimum 1
-     * @maximum 99999999
-     */
+   * @minimum 1
+   * @maximum 99999999
+   */
   variazioneCredito: number;
   /** @nullable */
   motivo?: string | null;
@@ -5001,14 +5007,14 @@ export interface CreditoSolidaleRicaricaManualeInput {
 
 export interface CreditoSolidaleRettificaInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /**
-     * @minimum -99999999
-     * @maximum 99999999
-     */
+   * @minimum -99999999
+   * @maximum 99999999
+   */
   variazioneCredito: number;
   motivo: string;
   /** @nullable */
@@ -5167,9 +5173,9 @@ export interface AreaOperativaInput {
   /** @maxLength 2 */
   sigla?: string;
   /**
-     * @maxLength 8
-     * @pattern ^[A-Za-z0-9]+$
-     */
+   * @maxLength 8
+   * @pattern ^[A-Za-z0-9]+$
+   */
   codiceMatricola?: string;
   attivo?: boolean;
   note?: string;
@@ -5182,9 +5188,9 @@ export interface AreaOperativaUpdate {
   /** @maxLength 2 */
   sigla?: string;
   /**
-     * @maxLength 8
-     * @pattern ^[A-Za-z0-9]+$
-     */
+   * @maxLength 8
+   * @pattern ^[A-Za-z0-9]+$
+   */
   codiceMatricola?: string;
   attivo?: boolean;
   note?: string;
@@ -5230,9 +5236,9 @@ export interface ZonaUdsVersioneInput {
 
 export interface UdsDirectoryExportInput {
   /**
-     * @minLength 2
-     * @maxLength 120
-     */
+   * @minLength 2
+   * @maxLength 120
+   */
   search?: string;
   /** @minimum 1 */
   areaOperativaId?: number;
@@ -5240,23 +5246,23 @@ export interface UdsDirectoryExportInput {
   zonaUdsId?: number;
 }
 
-export type UdsDirectoryItemFasciaEtaCorrente = typeof UdsDirectoryItemFasciaEtaCorrente[keyof typeof UdsDirectoryItemFasciaEtaCorrente];
-
+export type UdsDirectoryItemFasciaEtaCorrente =
+  (typeof UdsDirectoryItemFasciaEtaCorrente)[keyof typeof UdsDirectoryItemFasciaEtaCorrente];
 
 export const UdsDirectoryItemFasciaEtaCorrente = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
 } as const;
 
-export type UdsDirectoryItemCanale = typeof UdsDirectoryItemCanale[keyof typeof UdsDirectoryItemCanale];
-
+export type UdsDirectoryItemCanale =
+  (typeof UdsDirectoryItemCanale)[keyof typeof UdsDirectoryItemCanale];
 
 export const UdsDirectoryItemCanale = {
-  uds: 'uds',
-  uds_centro: 'uds_centro',
+  uds: "uds",
+  uds_centro: "uds_centro",
 } as const;
 
 /**
@@ -5278,15 +5284,15 @@ export interface UdsDirectoryItem {
   accessoCompleto: boolean;
 }
 
-export type UdsLinkCandidateItemFasciaEtaCorrente = typeof UdsLinkCandidateItemFasciaEtaCorrente[keyof typeof UdsLinkCandidateItemFasciaEtaCorrente];
-
+export type UdsLinkCandidateItemFasciaEtaCorrente =
+  (typeof UdsLinkCandidateItemFasciaEtaCorrente)[keyof typeof UdsLinkCandidateItemFasciaEtaCorrente];
 
 export const UdsLinkCandidateItemFasciaEtaCorrente = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
 } as const;
 
 /**
@@ -5304,18 +5310,18 @@ export interface UdsLinkCandidateItem {
   versione: number;
 }
 
-export type UdsInterventoStato = typeof UdsInterventoStato[keyof typeof UdsInterventoStato];
-
+export type UdsInterventoStato =
+  (typeof UdsInterventoStato)[keyof typeof UdsInterventoStato];
 
 export const UdsInterventoStato = {
-  concluso: 'concluso',
+  concluso: "concluso",
 } as const;
 
-export type UdsInterventoAmbito = typeof UdsInterventoAmbito[keyof typeof UdsInterventoAmbito];
-
+export type UdsInterventoAmbito =
+  (typeof UdsInterventoAmbito)[keyof typeof UdsInterventoAmbito];
 
 export const UdsInterventoAmbito = {
-  uds: 'uds',
+  uds: "uds",
 } as const;
 
 export interface UdsIntervento {
@@ -5348,73 +5354,73 @@ export interface UdsIntervento {
   versione: string | null;
 }
 
-export type BisognoPianificatoInputTipo = typeof BisognoPianificatoInputTipo[keyof typeof BisognoPianificatoInputTipo];
-
+export type BisognoPianificatoInputTipo =
+  (typeof BisognoPianificatoInputTipo)[keyof typeof BisognoPianificatoInputTipo];
 
 export const BisognoPianificatoInputTipo = {
-  richiesta: 'richiesta',
-  azione: 'azione',
+  richiesta: "richiesta",
+  azione: "azione",
 } as const;
 
-export type BisognoPianificatoInputStato = typeof BisognoPianificatoInputStato[keyof typeof BisognoPianificatoInputStato];
-
+export type BisognoPianificatoInputStato =
+  (typeof BisognoPianificatoInputStato)[keyof typeof BisognoPianificatoInputStato];
 
 export const BisognoPianificatoInputStato = {
-  da_pianificare: 'da_pianificare',
-  pianificato: 'pianificato',
-  completato: 'completato',
-  annullato: 'annullato',
+  da_pianificare: "da_pianificare",
+  pianificato: "pianificato",
+  completato: "completato",
+  annullato: "annullato",
 } as const;
 
-export type BisognoPianificatoInputPriorita = typeof BisognoPianificatoInputPriorita[keyof typeof BisognoPianificatoInputPriorita];
-
+export type BisognoPianificatoInputPriorita =
+  (typeof BisognoPianificatoInputPriorita)[keyof typeof BisognoPianificatoInputPriorita];
 
 export const BisognoPianificatoInputPriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
 export interface BisognoPianificatoInput {
   tipo: BisognoPianificatoInputTipo;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   descrizione: string;
   stato?: BisognoPianificatoInputStato;
   /** @nullable */
   dataPrevista?: string | null;
   priorita?: BisognoPianificatoInputPriorita;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   note?: string | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   motivo?: string | null;
 }
 
 export interface UdsInterventoInput {
   beneficiarioId: number;
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   tipoIntervento: string;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   descrizione?: string | null;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   note?: string | null;
   bisogniPianificati?: BisognoPianificatoInput[];
 }
@@ -5422,33 +5428,33 @@ export interface UdsInterventoInput {
 export interface UdsInterventoNotaInput {
   versione: string;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   noteUds?: string | null;
 }
 
 export interface UdsInterventoRettificaInput {
   versione: string;
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   motivo: string;
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   tipoIntervento?: string;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   descrizione?: string | null;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   note?: string | null;
   dataIntervento?: string;
 }
@@ -5507,13 +5513,13 @@ export interface CentroAscoltoUpdate {
   note?: string;
 }
 
-export type ImpostazioniStampaTemplateBolla = typeof ImpostazioniStampaTemplateBolla[keyof typeof ImpostazioniStampaTemplateBolla];
-
+export type ImpostazioniStampaTemplateBolla =
+  (typeof ImpostazioniStampaTemplateBolla)[keyof typeof ImpostazioniStampaTemplateBolla];
 
 export const ImpostazioniStampaTemplateBolla = {
-  standard: 'standard',
-  moderno: 'moderno',
-  minimal: 'minimal',
+  standard: "standard",
+  moderno: "moderno",
+  minimal: "minimal",
 } as const;
 
 export interface ImpostazioniStampa {
@@ -5523,13 +5529,13 @@ export interface ImpostazioniStampa {
   dataAggiornamento?: string;
 }
 
-export type ImpostazioniStampaUpdateTemplateBolla = typeof ImpostazioniStampaUpdateTemplateBolla[keyof typeof ImpostazioniStampaUpdateTemplateBolla];
-
+export type ImpostazioniStampaUpdateTemplateBolla =
+  (typeof ImpostazioniStampaUpdateTemplateBolla)[keyof typeof ImpostazioniStampaUpdateTemplateBolla];
 
 export const ImpostazioniStampaUpdateTemplateBolla = {
-  standard: 'standard',
-  moderno: 'moderno',
-  minimal: 'minimal',
+  standard: "standard",
+  moderno: "moderno",
+  minimal: "minimal",
 } as const;
 
 export interface ImpostazioniStampaUpdate {
@@ -5541,12 +5547,12 @@ export interface ImpostazioniStampaUpdate {
 /**
  * @deprecated
  */
-export type ImpostazioniEmailProvider = typeof ImpostazioniEmailProvider[keyof typeof ImpostazioniEmailProvider];
-
+export type ImpostazioniEmailProvider =
+  (typeof ImpostazioniEmailProvider)[keyof typeof ImpostazioniEmailProvider];
 
 export const ImpostazioniEmailProvider = {
-  connector: 'connector',
-  smtp: 'smtp',
+  connector: "connector",
+  smtp: "smtp",
 } as const;
 
 /**
@@ -5562,21 +5568,21 @@ export interface ImpostazioniEmail {
   /** @nullable */
   adminEmail?: string | null;
   /**
-     * @deprecated
-     * @nullable
-     */
+   * @deprecated
+   * @nullable
+   */
   smtpHost?: string | null;
   /**
-     * @deprecated
-     * @nullable
-     */
+   * @deprecated
+   * @nullable
+   */
   smtpPort?: number | null;
   /** @deprecated */
   smtpSecure: boolean;
   /**
-     * @deprecated
-     * @nullable
-     */
+   * @deprecated
+   * @nullable
+   */
   smtpUser?: string | null;
   /** @deprecated */
   hasPassword: boolean;
@@ -5718,7 +5724,9 @@ export interface ConfigurazioneAmbientePubblica {
 /**
  * @nullable
  */
-export type AuditConfigurazioneValorePrecedente = { [key: string]: unknown } | null;
+export type AuditConfigurazioneValorePrecedente = {
+  [key: string]: unknown;
+} | null;
 
 /**
  * @nullable
@@ -5743,32 +5751,32 @@ export interface AuditConfigurazione {
   note: string | null;
 }
 
-export type SystemLogEventType = typeof SystemLogEventType[keyof typeof SystemLogEventType];
-
+export type SystemLogEventType =
+  (typeof SystemLogEventType)[keyof typeof SystemLogEventType];
 
 export const SystemLogEventType = {
-  LOGIN_SUCCESS: 'LOGIN_SUCCESS',
-  LOGIN_FAILED: 'LOGIN_FAILED',
-  LOGOUT: 'LOGOUT',
-  PASSWORD_RESET_REQUESTED: 'PASSWORD_RESET_REQUESTED',
-  PASSWORD_RESET_EMAIL_SENT: 'PASSWORD_RESET_EMAIL_SENT',
-  PASSWORD_RESET_COMPLETED: 'PASSWORD_RESET_COMPLETED',
-  PASSWORD_CHANGED_BY_USER: 'PASSWORD_CHANGED_BY_USER',
-  PASSWORD_CHANGED_BY_ADMIN: 'PASSWORD_CHANGED_BY_ADMIN',
-  USER_CREATED: 'USER_CREATED',
-  USER_DISABLED: 'USER_DISABLED',
-  USER_ROLE_CHANGED: 'USER_ROLE_CHANGED',
-  ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',
-  ACCOUNT_UNLOCKED: 'ACCOUNT_UNLOCKED',
+  LOGIN_SUCCESS: "LOGIN_SUCCESS",
+  LOGIN_FAILED: "LOGIN_FAILED",
+  LOGOUT: "LOGOUT",
+  PASSWORD_RESET_REQUESTED: "PASSWORD_RESET_REQUESTED",
+  PASSWORD_RESET_EMAIL_SENT: "PASSWORD_RESET_EMAIL_SENT",
+  PASSWORD_RESET_COMPLETED: "PASSWORD_RESET_COMPLETED",
+  PASSWORD_CHANGED_BY_USER: "PASSWORD_CHANGED_BY_USER",
+  PASSWORD_CHANGED_BY_ADMIN: "PASSWORD_CHANGED_BY_ADMIN",
+  USER_CREATED: "USER_CREATED",
+  USER_DISABLED: "USER_DISABLED",
+  USER_ROLE_CHANGED: "USER_ROLE_CHANGED",
+  ACCOUNT_LOCKED: "ACCOUNT_LOCKED",
+  ACCOUNT_UNLOCKED: "ACCOUNT_UNLOCKED",
 } as const;
 
-export type SystemLogEventStatus = typeof SystemLogEventStatus[keyof typeof SystemLogEventStatus];
-
+export type SystemLogEventStatus =
+  (typeof SystemLogEventStatus)[keyof typeof SystemLogEventStatus];
 
 export const SystemLogEventStatus = {
-  SUCCESS: 'SUCCESS',
-  FAILED: 'FAILED',
-  INFO: 'INFO',
+  SUCCESS: "SUCCESS",
+  FAILED: "FAILED",
+  INFO: "INFO",
 } as const;
 
 /**
@@ -5812,13 +5820,13 @@ export interface EmailSendResult {
   error?: string | null;
 }
 
-export type NucleoFamiliareInputSesso = typeof NucleoFamiliareInputSesso[keyof typeof NucleoFamiliareInputSesso];
-
+export type NucleoFamiliareInputSesso =
+  (typeof NucleoFamiliareInputSesso)[keyof typeof NucleoFamiliareInputSesso];
 
 export const NucleoFamiliareInputSesso = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
 } as const;
 
 export interface NucleoFamiliareInput {
@@ -5841,7 +5849,7 @@ export interface NucleoFamiliareUpdate {
   cognome?: string | null;
   /** @nullable */
   dataNascita?: string | null;
-  sesso?: 'M' | 'F' | 'ALTRO' | null;
+  sesso?: "M" | "F" | "ALTRO" | null;
   /** @nullable */
   areaProvenienza?: string | null;
   /** @nullable */
@@ -5856,23 +5864,23 @@ export interface NucleoFamiliareUpdate {
   note?: string | null;
 }
 
-export type InterventoVista = typeof InterventoVista[keyof typeof InterventoVista];
-
+export type InterventoVista =
+  (typeof InterventoVista)[keyof typeof InterventoVista];
 
 export const InterventoVista = {
-  da_pianificare: 'da_pianificare',
-  pianificati: 'pianificati',
-  oggi: 'oggi',
-  in_corso: 'in_corso',
-  conclusi: 'conclusi',
-  annullati: 'annullati',
+  da_pianificare: "da_pianificare",
+  pianificati: "pianificati",
+  oggi: "oggi",
+  in_corso: "in_corso",
+  conclusi: "conclusi",
+  annullati: "annullati",
 } as const;
 
-export type InterventiRiepilogoVisteFusoOrario = typeof InterventiRiepilogoVisteFusoOrario[keyof typeof InterventiRiepilogoVisteFusoOrario];
-
+export type InterventiRiepilogoVisteFusoOrario =
+  (typeof InterventiRiepilogoVisteFusoOrario)[keyof typeof InterventiRiepilogoVisteFusoOrario];
 
 export const InterventiRiepilogoVisteFusoOrario = {
-  'Europe/Rome': 'Europe/Rome',
+  "Europe/Rome": "Europe/Rome",
 } as const;
 
 export interface InterventiRiepilogoViste {
@@ -5953,32 +5961,32 @@ export interface InterventoListItem {
   bisogniPianificatiProssimaScadenza: string | null;
 }
 
-export type BisognoPianificatoUpsertTipo = typeof BisognoPianificatoUpsertTipo[keyof typeof BisognoPianificatoUpsertTipo];
-
+export type BisognoPianificatoUpsertTipo =
+  (typeof BisognoPianificatoUpsertTipo)[keyof typeof BisognoPianificatoUpsertTipo];
 
 export const BisognoPianificatoUpsertTipo = {
-  richiesta: 'richiesta',
-  azione: 'azione',
+  richiesta: "richiesta",
+  azione: "azione",
 } as const;
 
-export type BisognoPianificatoUpsertStato = typeof BisognoPianificatoUpsertStato[keyof typeof BisognoPianificatoUpsertStato];
-
+export type BisognoPianificatoUpsertStato =
+  (typeof BisognoPianificatoUpsertStato)[keyof typeof BisognoPianificatoUpsertStato];
 
 export const BisognoPianificatoUpsertStato = {
-  da_pianificare: 'da_pianificare',
-  pianificato: 'pianificato',
-  completato: 'completato',
-  annullato: 'annullato',
+  da_pianificare: "da_pianificare",
+  pianificato: "pianificato",
+  completato: "completato",
+  annullato: "annullato",
 } as const;
 
-export type BisognoPianificatoUpsertPriorita = typeof BisognoPianificatoUpsertPriorita[keyof typeof BisognoPianificatoUpsertPriorita];
-
+export type BisognoPianificatoUpsertPriorita =
+  (typeof BisognoPianificatoUpsertPriorita)[keyof typeof BisognoPianificatoUpsertPriorita];
 
 export const BisognoPianificatoUpsertPriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
 export interface BisognoPianificatoUpsert {
@@ -5987,23 +5995,23 @@ export interface BisognoPianificatoUpsert {
   versione?: number;
   tipo: BisognoPianificatoUpsertTipo;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   descrizione: string;
   stato: BisognoPianificatoUpsertStato;
   /** @nullable */
   dataPrevista?: string | null;
   priorita: BisognoPianificatoUpsertPriorita;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   note?: string | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   motivo?: string | null;
 }
 
@@ -6029,14 +6037,14 @@ export interface InterventoInput {
   /** @nullable */
   interventoPrecedenteId?: number | null;
   /**
-     * @maxLength 255
-     * @nullable
-     */
+   * @maxLength 255
+   * @nullable
+   */
   sede?: string | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   motivoAnnullamento?: string | null;
   descrizione?: string;
   risultato?: string;
@@ -6065,9 +6073,9 @@ export interface InterventoUpdate {
   /** @nullable */
   interventoPrecedenteId?: number | null;
   /**
-     * @maxLength 255
-     * @nullable
-     */
+   * @maxLength 255
+   * @nullable
+   */
   sede?: string | null;
   descrizione?: string;
   risultato?: string;
@@ -6085,9 +6093,9 @@ export interface InterventoTransizioneInput {
   versione: string;
   stato: InterventoStato;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   motivo?: string | null;
   /** Timestamp effettivo con offset; se omesso viene usato l'istante corrente del server. */
   dataOraTransizione?: string;
@@ -6121,9 +6129,9 @@ export interface InterventoSuccessivoInput {
   /** @nullable */
   dataOraConclusione?: string | null;
   /**
-     * @maxLength 255
-     * @nullable
-     */
+   * @maxLength 255
+   * @nullable
+   */
   sede?: string | null;
   descrizione?: string;
   risultato?: string;
@@ -6152,30 +6160,30 @@ export interface InterventoAttivitaInput {
   /** @nullable */
   tipologiaId?: number | null;
   /**
-     * @maxLength 120
-     * @nullable
-     */
+   * @maxLength 120
+   * @nullable
+   */
   tipologiaSnapshot?: string | null;
   /**
-     * @minLength 1
-     * @maxLength 4000
-     */
+   * @minLength 1
+   * @maxLength 4000
+   */
   descrizione: string;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   risultato?: string | null;
 }
 
-export type InterventoMaterialeStato = typeof InterventoMaterialeStato[keyof typeof InterventoMaterialeStato];
-
+export type InterventoMaterialeStato =
+  (typeof InterventoMaterialeStato)[keyof typeof InterventoMaterialeStato];
 
 export const InterventoMaterialeStato = {
-  da_preparare: 'da_preparare',
-  pronto: 'pronto',
-  consegnato: 'consegnato',
-  annullato: 'annullato',
+  da_preparare: "da_preparare",
+  pronto: "pronto",
+  consegnato: "consegnato",
+  annullato: "annullato",
 } as const;
 
 export interface InterventoMateriale {
@@ -6202,14 +6210,14 @@ export interface InterventoMaterialeInput {
   /** @nullable */
   prodottoId?: number | null;
   /**
-     * @maxLength 255
-     * @nullable
-     */
+   * @maxLength 255
+   * @nullable
+   */
   descrizioneSnapshot?: string | null;
   /**
-     * @maxLength 40
-     * @nullable
-     */
+   * @maxLength 40
+   * @nullable
+   */
   unitaMisuraSnapshot?: string | null;
   /** @minimum 0 */
   quantitaPrevista?: number;
@@ -6219,22 +6227,22 @@ export interface InterventoMaterialeInput {
   /** @nullable */
   magazzinoId?: number | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   note?: string | null;
 }
 
-export type InterventoDocumentoStato = typeof InterventoDocumentoStato[keyof typeof InterventoDocumentoStato];
-
+export type InterventoDocumentoStato =
+  (typeof InterventoDocumentoStato)[keyof typeof InterventoDocumentoStato];
 
 export const InterventoDocumentoStato = {
-  da_acquisire: 'da_acquisire',
-  da_verificare: 'da_verificare',
-  acquisito: 'acquisito',
-  verificato: 'verificato',
-  non_disponibile: 'non_disponibile',
-  annullato: 'annullato',
+  da_acquisire: "da_acquisire",
+  da_verificare: "da_verificare",
+  acquisito: "acquisito",
+  verificato: "verificato",
+  non_disponibile: "non_disponibile",
+  annullato: "annullato",
 } as const;
 
 export interface InterventoDocumento {
@@ -6252,17 +6260,17 @@ export interface InterventoDocumento {
 
 export interface InterventoDocumentoInput {
   /**
-     * @minLength 1
-     * @maxLength 200
-     */
+   * @minLength 1
+   * @maxLength 200
+   */
   tipoDescrizione: string;
   stato: InterventoDocumentoStato;
   /** @nullable */
   dataScadenza?: string | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   note?: string | null;
 }
 
@@ -6285,19 +6293,19 @@ export interface InterventoOperativita {
 export interface InterventoOperativitaInput {
   versione: string;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   risultato?: string | null;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   esito?: string | null;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   note?: string | null;
   attivita?: InterventoAttivitaInput[];
   materiali?: InterventoMaterialeInput[];
@@ -6312,9 +6320,9 @@ export interface InterventoAvvioInput {
 export interface InterventoAnnullamentoInput {
   versione: string;
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   motivo: string;
   dataOraAnnullamento?: string;
 }
@@ -6322,9 +6330,9 @@ export interface InterventoAnnullamentoInput {
 export interface InterventoMancataPresentazioneInput {
   versione: string;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   nota?: string | null;
   dataOraRegistrazione?: string;
 }
@@ -6335,11 +6343,11 @@ export type InterventoSuccessivoOperativoInput = InterventoSuccessivoInput & {
   documenti?: InterventoDocumentoInput[];
 };
 
-export type InterventoConclusioneInput = InterventoOperativitaInput & ({
+export type InterventoConclusioneInput = InterventoOperativitaInput & {
   conferma: true;
   dataOraConclusione?: string;
   successivo?: InterventoSuccessivoOperativoInput | null;
-});
+};
 
 export interface InterventoConclusioneResult {
   intervento: Intervento;
@@ -6390,11 +6398,11 @@ export interface MaterialeDaPreparareGruppo {
   interventi: MaterialeDaPreparareDettaglio[];
 }
 
-export type MaterialeDaPreparareFusoOrario = typeof MaterialeDaPreparareFusoOrario[keyof typeof MaterialeDaPreparareFusoOrario];
-
+export type MaterialeDaPreparareFusoOrario =
+  (typeof MaterialeDaPreparareFusoOrario)[keyof typeof MaterialeDaPreparareFusoOrario];
 
 export const MaterialeDaPreparareFusoOrario = {
-  'Europe/Rome': 'Europe/Rome',
+  "Europe/Rome": "Europe/Rome",
 } as const;
 
 export interface MaterialeDaPreparare {
@@ -6404,12 +6412,12 @@ export interface MaterialeDaPreparare {
   gruppi: MaterialeDaPreparareGruppo[];
 }
 
-export type MaterialePreparazioneUpdateInputStatoPreparazione = typeof MaterialePreparazioneUpdateInputStatoPreparazione[keyof typeof MaterialePreparazioneUpdateInputStatoPreparazione];
-
+export type MaterialePreparazioneUpdateInputStatoPreparazione =
+  (typeof MaterialePreparazioneUpdateInputStatoPreparazione)[keyof typeof MaterialePreparazioneUpdateInputStatoPreparazione];
 
 export const MaterialePreparazioneUpdateInputStatoPreparazione = {
-  da_preparare: 'da_preparare',
-  pronto: 'pronto',
+  da_preparare: "da_preparare",
+  pronto: "pronto",
 } as const;
 
 export interface MaterialePreparazioneUpdateInput {
@@ -6417,32 +6425,32 @@ export interface MaterialePreparazioneUpdateInput {
   versione: string;
 }
 
-export type BisognoPianificatoTipo = typeof BisognoPianificatoTipo[keyof typeof BisognoPianificatoTipo];
-
+export type BisognoPianificatoTipo =
+  (typeof BisognoPianificatoTipo)[keyof typeof BisognoPianificatoTipo];
 
 export const BisognoPianificatoTipo = {
-  richiesta: 'richiesta',
-  azione: 'azione',
+  richiesta: "richiesta",
+  azione: "azione",
 } as const;
 
-export type BisognoPianificatoStato = typeof BisognoPianificatoStato[keyof typeof BisognoPianificatoStato];
-
+export type BisognoPianificatoStato =
+  (typeof BisognoPianificatoStato)[keyof typeof BisognoPianificatoStato];
 
 export const BisognoPianificatoStato = {
-  da_pianificare: 'da_pianificare',
-  pianificato: 'pianificato',
-  completato: 'completato',
-  annullato: 'annullato',
+  da_pianificare: "da_pianificare",
+  pianificato: "pianificato",
+  completato: "completato",
+  annullato: "annullato",
 } as const;
 
-export type BisognoPianificatoPriorita = typeof BisognoPianificatoPriorita[keyof typeof BisognoPianificatoPriorita];
-
+export type BisognoPianificatoPriorita =
+  (typeof BisognoPianificatoPriorita)[keyof typeof BisognoPianificatoPriorita];
 
 export const BisognoPianificatoPriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
 export interface BisognoPianificato {
@@ -6456,9 +6464,9 @@ export interface BisognoPianificato {
   dataPrevista: string | null;
   priorita: BisognoPianificatoPriorita;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   note: string | null;
   /** @minimum 1 */
   versione: number;
@@ -6468,32 +6476,32 @@ export interface BisognoPianificato {
   dataAggiornamento: string;
 }
 
-export type BisognoPianificatoUpdateTipo = typeof BisognoPianificatoUpdateTipo[keyof typeof BisognoPianificatoUpdateTipo];
-
+export type BisognoPianificatoUpdateTipo =
+  (typeof BisognoPianificatoUpdateTipo)[keyof typeof BisognoPianificatoUpdateTipo];
 
 export const BisognoPianificatoUpdateTipo = {
-  richiesta: 'richiesta',
-  azione: 'azione',
+  richiesta: "richiesta",
+  azione: "azione",
 } as const;
 
-export type BisognoPianificatoUpdateStato = typeof BisognoPianificatoUpdateStato[keyof typeof BisognoPianificatoUpdateStato];
-
+export type BisognoPianificatoUpdateStato =
+  (typeof BisognoPianificatoUpdateStato)[keyof typeof BisognoPianificatoUpdateStato];
 
 export const BisognoPianificatoUpdateStato = {
-  da_pianificare: 'da_pianificare',
-  pianificato: 'pianificato',
-  completato: 'completato',
-  annullato: 'annullato',
+  da_pianificare: "da_pianificare",
+  pianificato: "pianificato",
+  completato: "completato",
+  annullato: "annullato",
 } as const;
 
-export type BisognoPianificatoUpdatePriorita = typeof BisognoPianificatoUpdatePriorita[keyof typeof BisognoPianificatoUpdatePriorita];
-
+export type BisognoPianificatoUpdatePriorita =
+  (typeof BisognoPianificatoUpdatePriorita)[keyof typeof BisognoPianificatoUpdatePriorita];
 
 export const BisognoPianificatoUpdatePriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
 export interface BisognoPianificatoUpdate {
@@ -6501,50 +6509,59 @@ export interface BisognoPianificatoUpdate {
   versione: number;
   tipo?: BisognoPianificatoUpdateTipo;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   descrizione?: string;
   stato?: BisognoPianificatoUpdateStato;
   /** @nullable */
   dataPrevista?: string | null;
   priorita?: BisognoPianificatoUpdatePriorita;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   note?: string | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   motivo?: string | null;
 }
 
-export type BisognoPianificatoStoricoStatoNuovo = typeof BisognoPianificatoStoricoStatoNuovo[keyof typeof BisognoPianificatoStoricoStatoNuovo];
-
+export type BisognoPianificatoStoricoStatoNuovo =
+  (typeof BisognoPianificatoStoricoStatoNuovo)[keyof typeof BisognoPianificatoStoricoStatoNuovo];
 
 export const BisognoPianificatoStoricoStatoNuovo = {
-  da_pianificare: 'da_pianificare',
-  pianificato: 'pianificato',
-  completato: 'completato',
-  annullato: 'annullato',
+  da_pianificare: "da_pianificare",
+  pianificato: "pianificato",
+  completato: "completato",
+  annullato: "annullato",
 } as const;
 
 /**
  * @nullable
  */
-export type BisognoPianificatoStoricoValorePrecedente = { [key: string]: unknown } | null;
+export type BisognoPianificatoStoricoValorePrecedente = {
+  [key: string]: unknown;
+} | null;
 
 /**
  * @nullable
  */
-export type BisognoPianificatoStoricoValoreNuovo = { [key: string]: unknown } | null;
+export type BisognoPianificatoStoricoValoreNuovo = {
+  [key: string]: unknown;
+} | null;
 
 export interface BisognoPianificatoStorico {
   id: number;
   bisognoId: number;
-  statoPrecedente: 'da_pianificare' | 'pianificato' | 'completato' | 'annullato' | null;
+  statoPrecedente:
+    | "da_pianificare"
+    | "pianificato"
+    | "completato"
+    | "annullato"
+    | null;
   statoNuovo: BisognoPianificatoStoricoStatoNuovo;
   /** @nullable */
   operatoreId: number | null;
@@ -6570,22 +6587,22 @@ export interface ConsegneExport {
   total: number;
 }
 
-export type AccessoEmporioStato = typeof AccessoEmporioStato[keyof typeof AccessoEmporioStato];
-
+export type AccessoEmporioStato =
+  (typeof AccessoEmporioStato)[keyof typeof AccessoEmporioStato];
 
 export const AccessoEmporioStato = {
-  pianificato: 'pianificato',
-  confermato: 'confermato',
-  effettuato: 'effettuato',
-  annullato: 'annullato',
-  non_presentato: 'non_presentato',
+  pianificato: "pianificato",
+  confermato: "confermato",
+  effettuato: "effettuato",
+  annullato: "annullato",
+  non_presentato: "non_presentato",
 } as const;
 
-export type AccessoEmporioTipoPianificazione = typeof AccessoEmporioTipoPianificazione[keyof typeof AccessoEmporioTipoPianificazione];
-
+export type AccessoEmporioTipoPianificazione =
+  (typeof AccessoEmporioTipoPianificazione)[keyof typeof AccessoEmporioTipoPianificazione];
 
 export const AccessoEmporioTipoPianificazione = {
-  accesso_emporio: 'accesso_emporio',
+  accesso_emporio: "accesso_emporio",
 } as const;
 
 export interface AccessoEmporio {
@@ -6667,15 +6684,15 @@ export interface EmporioOperativo {
   areaOperativaId: number;
 }
 
-export type EmporioStatoEffettivo = typeof EmporioStatoEffettivo[keyof typeof EmporioStatoEffettivo];
-
+export type EmporioStatoEffettivo =
+  (typeof EmporioStatoEffettivo)[keyof typeof EmporioStatoEffettivo];
 
 export const EmporioStatoEffettivo = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
-  programmato: 'programmato',
+  non_abilitato: "non_abilitato",
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
+  programmato: "programmato",
 } as const;
 
 export interface EmporioAbilitazioneRiepilogoBeneficiario {
@@ -6685,14 +6702,14 @@ export interface EmporioAbilitazioneRiepilogoBeneficiario {
   stato: EmporioStatoEffettivo;
 }
 
-export type EmporioAbilitazioneStato = typeof EmporioAbilitazioneStato[keyof typeof EmporioAbilitazioneStato];
-
+export type EmporioAbilitazioneStato =
+  (typeof EmporioAbilitazioneStato)[keyof typeof EmporioAbilitazioneStato];
 
 export const EmporioAbilitazioneStato = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+  non_abilitato: "non_abilitato",
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
 } as const;
 
 export interface EmporioAbilitazione {
@@ -6707,21 +6724,21 @@ export interface EmporioAbilitazione {
   motivo?: string | null;
 }
 
-export type EmporioAbilitazioneInputStato = typeof EmporioAbilitazioneInputStato[keyof typeof EmporioAbilitazioneInputStato];
-
+export type EmporioAbilitazioneInputStato =
+  (typeof EmporioAbilitazioneInputStato)[keyof typeof EmporioAbilitazioneInputStato];
 
 export const EmporioAbilitazioneInputStato = {
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
 } as const;
 
 export interface EmporioAbilitazioneInput {
   stato: EmporioAbilitazioneInputStato;
   /**
-     * @minLength 1
-     * @maxLength 1000
-     */
+   * @minLength 1
+   * @maxLength 1000
+   */
   motivo: string;
 }
 
@@ -6759,15 +6776,15 @@ export interface BeneficiarioAccessoEmporioSearchResult {
   attivo: boolean;
 }
 
-export type SessioneCassaEmporioStato = typeof SessioneCassaEmporioStato[keyof typeof SessioneCassaEmporioStato];
-
+export type SessioneCassaEmporioStato =
+  (typeof SessioneCassaEmporioStato)[keyof typeof SessioneCassaEmporioStato];
 
 export const SessioneCassaEmporioStato = {
-  aperta: 'aperta',
-  sospesa: 'sospesa',
-  annullata: 'annullata',
-  pronta_per_chiusura: 'pronta_per_chiusura',
-  chiusa: 'chiusa',
+  aperta: "aperta",
+  sospesa: "sospesa",
+  annullata: "annullata",
+  pronta_per_chiusura: "pronta_per_chiusura",
+  chiusa: "chiusa",
 } as const;
 
 export interface SessioneCassaEmporioRiga {
@@ -7012,23 +7029,23 @@ export type SpesaEmporioRettificheItem = {
   createdAt: string;
 };
 
-export type SpesaEmporioStatoSpesa = typeof SpesaEmporioStatoSpesa[keyof typeof SpesaEmporioStatoSpesa];
-
+export type SpesaEmporioStatoSpesa =
+  (typeof SpesaEmporioStatoSpesa)[keyof typeof SpesaEmporioStatoSpesa];
 
 export const SpesaEmporioStatoSpesa = {
-  chiusa: 'chiusa',
-  stornata_parzialmente: 'stornata_parzialmente',
-  stornata: 'stornata',
+  chiusa: "chiusa",
+  stornata_parzialmente: "stornata_parzialmente",
+  stornata: "stornata",
 } as const;
 
-export type SpesaEmporioEmailBollaStato = typeof SpesaEmporioEmailBollaStato[keyof typeof SpesaEmporioEmailBollaStato];
-
+export type SpesaEmporioEmailBollaStato =
+  (typeof SpesaEmporioEmailBollaStato)[keyof typeof SpesaEmporioEmailBollaStato];
 
 export const SpesaEmporioEmailBollaStato = {
-  non_preparata: 'non_preparata',
-  invio_manuale_avviato: 'invio_manuale_avviato',
-  nessun_destinatario: 'nessun_destinatario',
-  errore: 'errore',
+  non_preparata: "non_preparata",
+  invio_manuale_avviato: "invio_manuale_avviato",
+  nessun_destinatario: "nessun_destinatario",
+  errore: "errore",
 } as const;
 
 export interface SpesaEmporio {
@@ -7104,7 +7121,9 @@ export interface SpesaEmporioChiusuraInput {
 /**
  * Il server costruisce il link Bolla da configurazione trusted o same-origin validata.
  */
-export interface BollaEmporioInvioManualeInput { [key: string]: unknown }
+export interface BollaEmporioInvioManualeInput {
+  [key: string]: unknown;
+}
 
 export interface SpesaEmporioStornoRigaInput {
   /** @minimum 1 */
@@ -7112,28 +7131,28 @@ export interface SpesaEmporioStornoRigaInput {
   quantita: QuantitaContabile;
 }
 
-export type SpesaEmporioStornoInputTipoRettifica = typeof SpesaEmporioStornoInputTipoRettifica[keyof typeof SpesaEmporioStornoInputTipoRettifica];
-
+export type SpesaEmporioStornoInputTipoRettifica =
+  (typeof SpesaEmporioStornoInputTipoRettifica)[keyof typeof SpesaEmporioStornoInputTipoRettifica];
 
 export const SpesaEmporioStornoInputTipoRettifica = {
-  reso_idoneo: 'reso_idoneo',
-  reso_non_distribuibile: 'reso_non_distribuibile',
-  errore_amministrativo: 'errore_amministrativo',
-  solo_credito: 'solo_credito',
+  reso_idoneo: "reso_idoneo",
+  reso_non_distribuibile: "reso_non_distribuibile",
+  errore_amministrativo: "errore_amministrativo",
+  solo_credito: "solo_credito",
 } as const;
 
 export interface SpesaEmporioStornoInput {
   tipoRettifica?: SpesaEmporioStornoInputTipoRettifica;
   /**
-     * Solo per rettifiche economiche, senza righe fisiche
-     * @minimum 1
-     * @maximum 99999999
-     */
+   * Solo per rettifiche economiche, senza righe fisiche
+   * @minimum 1
+   * @maximum 99999999
+   */
   creditoRestituito?: number;
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   motivo: string;
   /** @minItems 1 */
   righe?: SpesaEmporioStornoRigaInput[];
@@ -7147,14 +7166,14 @@ export interface SpesaEmporioStornoResult {
   spesa: SpesaEmporio;
 }
 
-export type BollaEmporioEmailResultStato = typeof BollaEmporioEmailResultStato[keyof typeof BollaEmporioEmailResultStato];
-
+export type BollaEmporioEmailResultStato =
+  (typeof BollaEmporioEmailResultStato)[keyof typeof BollaEmporioEmailResultStato];
 
 export const BollaEmporioEmailResultStato = {
-  non_preparata: 'non_preparata',
-  invio_manuale_avviato: 'invio_manuale_avviato',
-  nessun_destinatario: 'nessun_destinatario',
-  errore: 'errore',
+  non_preparata: "non_preparata",
+  invio_manuale_avviato: "invio_manuale_avviato",
+  nessun_destinatario: "nessun_destinatario",
+  errore: "errore",
 } as const;
 
 export interface BollaEmporioEmailResult {
@@ -7214,16 +7233,16 @@ export interface BollaEmporioStampa {
 
 export interface AssociaBollaInput {
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   bollaId: number | null;
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
 }
 
@@ -7258,38 +7277,38 @@ export interface BollaProntaDaPianificare {
   volontarioPropostoId?: number | null;
 }
 
-export type ConsegnaDaBollaInputTipoConsegna = typeof ConsegnaDaBollaInputTipoConsegna[keyof typeof ConsegnaDaBollaInputTipoConsegna];
-
+export type ConsegnaDaBollaInputTipoConsegna =
+  (typeof ConsegnaDaBollaInputTipoConsegna)[keyof typeof ConsegnaDaBollaInputTipoConsegna];
 
 export const ConsegnaDaBollaInputTipoConsegna = {
-  in_sede: 'in_sede',
-  domicilio: 'domicilio',
+  in_sede: "in_sede",
+  domicilio: "domicilio",
 } as const;
 
-export type ConsegnaDaBollaInputFasciaOraria = typeof ConsegnaDaBollaInputFasciaOraria[keyof typeof ConsegnaDaBollaInputFasciaOraria];
-
+export type ConsegnaDaBollaInputFasciaOraria =
+  (typeof ConsegnaDaBollaInputFasciaOraria)[keyof typeof ConsegnaDaBollaInputFasciaOraria];
 
 export const ConsegnaDaBollaInputFasciaOraria = {
-  Mattina: 'Mattina',
-  Pomeriggio: 'Pomeriggio',
-  Sera: 'Sera',
+  Mattina: "Mattina",
+  Pomeriggio: "Pomeriggio",
+  Sera: "Sera",
 } as const;
 
 export interface ConsegnaDaBollaInput {
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   tipoConsegna: ConsegnaDaBollaInputTipoConsegna;
   dataPrevista: string;
   fasciaOraria: ConsegnaDaBollaInputFasciaOraria;
   /**
-     * @maxLength 200
-     * @nullable
-     */
+   * @maxLength 200
+   * @nullable
+   */
   indirizzoConsegna?: string | null;
   /** @nullable */
   zona?: string | null;
@@ -7343,14 +7362,14 @@ export interface EnteDestinatario {
   /** @maxLength 250 */
   indirizzo: string;
   /**
-     * @maxLength 50
-     * @nullable
-     */
+   * @maxLength 50
+   * @nullable
+   */
   telefono?: string | null;
   /**
-     * @maxLength 200
-     * @nullable
-     */
+   * @maxLength 200
+   * @nullable
+   */
   email?: string | null;
   areaOperativaId: number;
   attivo: boolean;
@@ -7362,29 +7381,29 @@ export interface EnteDestinatario {
 
 export interface EnteDestinatarioInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /**
-     * @minLength 1
-     * @maxLength 200
-     */
+   * @minLength 1
+   * @maxLength 200
+   */
   denominazione: string;
   /**
-     * @minLength 1
-     * @maxLength 250
-     */
+   * @minLength 1
+   * @maxLength 250
+   */
   indirizzo: string;
   /**
-     * @maxLength 50
-     * @nullable
-     */
+   * @maxLength 50
+   * @nullable
+   */
   telefono?: string | null;
   /**
-     * @maxLength 200
-     * @nullable
-     */
+   * @maxLength 200
+   * @nullable
+   */
   email?: string | null;
   /** @minimum 1 */
   areaOperativaId: number;
@@ -7392,50 +7411,50 @@ export interface EnteDestinatarioInput {
 
 export interface EnteDestinatarioUpdate {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 200
-     */
+   * @minLength 1
+   * @maxLength 200
+   */
   denominazione?: string;
   /**
-     * @minLength 1
-     * @maxLength 250
-     */
+   * @minLength 1
+   * @maxLength 250
+   */
   indirizzo?: string;
   /**
-     * @maxLength 50
-     * @nullable
-     */
+   * @maxLength 50
+   * @nullable
+   */
   telefono?: string | null;
   /**
-     * @maxLength 200
-     * @nullable
-     */
+   * @maxLength 200
+   * @nullable
+   */
   email?: string | null;
   attivo?: boolean;
 }
 
-export type DocumentoOperativoTipoAggregato = typeof DocumentoOperativoTipoAggregato[keyof typeof DocumentoOperativoTipoAggregato];
-
+export type DocumentoOperativoTipoAggregato =
+  (typeof DocumentoOperativoTipoAggregato)[keyof typeof DocumentoOperativoTipoAggregato];
 
 export const DocumentoOperativoTipoAggregato = {
-  bolla: 'bolla',
-  trasferimento: 'trasferimento',
+  bolla: "bolla",
+  trasferimento: "trasferimento",
 } as const;
 
-export type DocumentoOperativoTipoDestinatario = typeof DocumentoOperativoTipoDestinatario[keyof typeof DocumentoOperativoTipoDestinatario];
-
+export type DocumentoOperativoTipoDestinatario =
+  (typeof DocumentoOperativoTipoDestinatario)[keyof typeof DocumentoOperativoTipoDestinatario];
 
 export const DocumentoOperativoTipoDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
-  magazzino: 'magazzino',
+  beneficiario: "beneficiario",
+  ente: "ente",
+  magazzino: "magazzino",
 } as const;
 
 export interface DocumentoOperativo {
@@ -7472,31 +7491,32 @@ export interface DocumentoOperativoPage {
   total: number;
 }
 
-export type DocumentoOperativoDettaglioTipoAggregato = typeof DocumentoOperativoDettaglioTipoAggregato[keyof typeof DocumentoOperativoDettaglioTipoAggregato];
-
+export type DocumentoOperativoDettaglioTipoAggregato =
+  (typeof DocumentoOperativoDettaglioTipoAggregato)[keyof typeof DocumentoOperativoDettaglioTipoAggregato];
 
 export const DocumentoOperativoDettaglioTipoAggregato = {
-  bolla: 'bolla',
-  trasferimento: 'trasferimento',
+  bolla: "bolla",
+  trasferimento: "trasferimento",
 } as const;
 
-export type BollaDettaglioTipoDestinatario = typeof BollaDettaglioTipoDestinatario[keyof typeof BollaDettaglioTipoDestinatario];
-
+export type BollaDettaglioTipoDestinatario =
+  (typeof BollaDettaglioTipoDestinatario)[keyof typeof BollaDettaglioTipoDestinatario];
 
 export const BollaDettaglioTipoDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
+  beneficiario: "beneficiario",
+  ente: "ente",
 } as const;
 
 /**
  * @nullable
  */
-export type BollaDettaglioDestinatarioSnapshotFonte = typeof BollaDettaglioDestinatarioSnapshotFonte[keyof typeof BollaDettaglioDestinatarioSnapshotFonte] | null;
-
+export type BollaDettaglioDestinatarioSnapshotFonte =
+  | (typeof BollaDettaglioDestinatarioSnapshotFonte)[keyof typeof BollaDettaglioDestinatarioSnapshotFonte]
+  | null;
 
 export const BollaDettaglioDestinatarioSnapshotFonte = {
-  confermato: 'confermato',
-  legacy_live: 'legacy_live',
+  confermato: "confermato",
+  legacy_live: "legacy_live",
 } as const;
 
 export interface BollaRiga {
@@ -7615,23 +7635,24 @@ export interface DocumentoOperativoDettaglio {
   dettaglio: BollaDettaglio | Trasferimento;
 }
 
-export type BollaTipoDestinatario = typeof BollaTipoDestinatario[keyof typeof BollaTipoDestinatario];
-
+export type BollaTipoDestinatario =
+  (typeof BollaTipoDestinatario)[keyof typeof BollaTipoDestinatario];
 
 export const BollaTipoDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
+  beneficiario: "beneficiario",
+  ente: "ente",
 } as const;
 
 /**
  * @nullable
  */
-export type BollaDestinatarioSnapshotFonte = typeof BollaDestinatarioSnapshotFonte[keyof typeof BollaDestinatarioSnapshotFonte] | null;
-
+export type BollaDestinatarioSnapshotFonte =
+  | (typeof BollaDestinatarioSnapshotFonte)[keyof typeof BollaDestinatarioSnapshotFonte]
+  | null;
 
 export const BollaDestinatarioSnapshotFonte = {
-  confermato: 'confermato',
-  legacy_live: 'legacy_live',
+  confermato: "confermato",
+  legacy_live: "legacy_live",
 } as const;
 
 export interface Bolla {
@@ -7694,12 +7715,12 @@ export interface Bolla {
   dataCreazione: string;
 }
 
-export type VolontarioBollaCandidatoTipoVolontario = typeof VolontarioBollaCandidatoTipoVolontario[keyof typeof VolontarioBollaCandidatoTipoVolontario];
-
+export type VolontarioBollaCandidatoTipoVolontario =
+  (typeof VolontarioBollaCandidatoTipoVolontario)[keyof typeof VolontarioBollaCandidatoTipoVolontario];
 
 export const VolontarioBollaCandidatoTipoVolontario = {
-  PERMANENTE: 'PERMANENTE',
-  TEMPORANEO: 'TEMPORANEO',
+  PERMANENTE: "PERMANENTE",
+  TEMPORANEO: "TEMPORANEO",
 } as const;
 
 export interface VolontarioBollaCandidato {
@@ -7711,9 +7732,9 @@ export interface VolontarioBollaCandidato {
 
 export interface BollaRigaInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
@@ -7726,9 +7747,9 @@ export interface BollaRigaInput {
 
 export interface ConsegnaRicezioneInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
@@ -7738,46 +7759,46 @@ export interface ConsegnaRicezioneInput {
 
 export interface AffidaBollaInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   /**
-     * @maxLength 120
-     * @nullable
-     */
+   * @maxLength 120
+   * @nullable
+   */
   trasportatoreNome?: string | null;
 }
 
 export interface BollaAnnullamentoInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   motivo: string;
 }
 
 export interface BollaStornoAmministrativoInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   motivo: string;
   /** @minItems 1 */
   rigaIds: number[];
@@ -7785,44 +7806,45 @@ export interface BollaStornoAmministrativoInput {
 
 export interface RitiroNonEffettuatoInput {
   /**
-     * @maxLength 500
-     * @nullable
-     */
+   * @maxLength 500
+   * @nullable
+   */
   motivo?: string | null;
 }
 
 /**
  * @nullable
  */
-export type ConversioneConsegnaInputFasciaOraria = typeof ConversioneConsegnaInputFasciaOraria[keyof typeof ConversioneConsegnaInputFasciaOraria] | null;
-
+export type ConversioneConsegnaInputFasciaOraria =
+  | (typeof ConversioneConsegnaInputFasciaOraria)[keyof typeof ConversioneConsegnaInputFasciaOraria]
+  | null;
 
 export const ConversioneConsegnaInputFasciaOraria = {
-  Mattina: 'Mattina',
-  Pomeriggio: 'Pomeriggio',
-  Sera: 'Sera',
+  Mattina: "Mattina",
+  Pomeriggio: "Pomeriggio",
+  Sera: "Sera",
 } as const;
 
 export interface ConversioneConsegnaInput {
   /**
-     * @minLength 1
-     * @maxLength 200
-     */
+   * @minLength 1
+   * @maxLength 200
+   */
   indirizzoConsegna: string;
   dataPrevista: string;
   /** @nullable */
   fasciaOraria?: ConversioneConsegnaInputFasciaOraria;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   volontarioId?: number | null;
   /** @nullable */
   volontarioAltro?: string | null;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   mezzoId?: number | null;
   mezzoAltro?: boolean;
   /** @nullable */
@@ -7835,19 +7857,19 @@ export interface ConversioneConsegnaResult {
   codice: string;
 }
 
-export type BollaInputTipoDestinatario = typeof BollaInputTipoDestinatario[keyof typeof BollaInputTipoDestinatario];
-
+export type BollaInputTipoDestinatario =
+  (typeof BollaInputTipoDestinatario)[keyof typeof BollaInputTipoDestinatario];
 
 export const BollaInputTipoDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
+  beneficiario: "beneficiario",
+  ente: "ente",
 } as const;
 
 export interface BollaInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   tipoDestinatario: BollaInputTipoDestinatario;
   /** @nullable */
@@ -7866,9 +7888,9 @@ export interface BollaInput {
 
 export interface BollaUpdate {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
@@ -7886,28 +7908,28 @@ export interface BollaUpdate {
   noteConsegna?: string | null;
 }
 
-export type ConfigurazioneMatricoleVolontariScopeTipo = typeof ConfigurazioneMatricoleVolontariScopeTipo[keyof typeof ConfigurazioneMatricoleVolontariScopeTipo];
-
+export type ConfigurazioneMatricoleVolontariScopeTipo =
+  (typeof ConfigurazioneMatricoleVolontariScopeTipo)[keyof typeof ConfigurazioneMatricoleVolontariScopeTipo];
 
 export const ConfigurazioneMatricoleVolontariScopeTipo = {
-  GLOBALE: 'GLOBALE',
+  GLOBALE: "GLOBALE",
 } as const;
 
-export type ConfigurazioneMatricoleVolontariSeparatore = typeof ConfigurazioneMatricoleVolontariSeparatore[keyof typeof ConfigurazioneMatricoleVolontariSeparatore];
-
+export type ConfigurazioneMatricoleVolontariSeparatore =
+  (typeof ConfigurazioneMatricoleVolontariSeparatore)[keyof typeof ConfigurazioneMatricoleVolontariSeparatore];
 
 export const ConfigurazioneMatricoleVolontariSeparatore = {
-  '': '',
-  '-': '-',
-  '/': '/',
+  "": "",
+  "-": "-",
+  "/": "/",
 } as const;
 
-export type ConfigurazioneMatricoleVolontariAmbitoProgressivo = typeof ConfigurazioneMatricoleVolontariAmbitoProgressivo[keyof typeof ConfigurazioneMatricoleVolontariAmbitoProgressivo];
-
+export type ConfigurazioneMatricoleVolontariAmbitoProgressivo =
+  (typeof ConfigurazioneMatricoleVolontariAmbitoProgressivo)[keyof typeof ConfigurazioneMatricoleVolontariAmbitoProgressivo];
 
 export const ConfigurazioneMatricoleVolontariAmbitoProgressivo = {
-  GLOBALE: 'GLOBALE',
-  PER_AREA: 'PER_AREA',
+  GLOBALE: "GLOBALE",
+  PER_AREA: "PER_AREA",
 } as const;
 
 export interface ConfigurazioneMatricoleVolontari {
@@ -7916,21 +7938,21 @@ export interface ConfigurazioneMatricoleVolontari {
   /** @minimum 1 */
   versione: number;
   /**
-     * @maxLength 12
-     * @nullable
-     */
+   * @maxLength 12
+   * @nullable
+   */
   prefissoAssociazione?: string | null;
   includiCodiceArea: boolean;
   /**
-     * @maxLength 8
-     * @nullable
-     */
+   * @maxLength 8
+   * @nullable
+   */
   segmentoFisso?: string | null;
   separatore: ConfigurazioneMatricoleVolontariSeparatore;
   /**
-     * @minimum 2
-     * @maximum 8
-     */
+   * @minimum 2
+   * @maximum 8
+   */
   cifreProgressivo: number;
   /** @minimum 1 */
   numeroIniziale: number;
@@ -7942,42 +7964,42 @@ export interface ConfigurazioneMatricoleVolontari {
   dataAggiornamento: string;
 }
 
-export type ConfigurazioneMatricoleVolontariInputSeparatore = typeof ConfigurazioneMatricoleVolontariInputSeparatore[keyof typeof ConfigurazioneMatricoleVolontariInputSeparatore];
-
+export type ConfigurazioneMatricoleVolontariInputSeparatore =
+  (typeof ConfigurazioneMatricoleVolontariInputSeparatore)[keyof typeof ConfigurazioneMatricoleVolontariInputSeparatore];
 
 export const ConfigurazioneMatricoleVolontariInputSeparatore = {
-  '': '',
-  '-': '-',
-  '/': '/',
+  "": "",
+  "-": "-",
+  "/": "/",
 } as const;
 
-export type ConfigurazioneMatricoleVolontariInputAmbitoProgressivo = typeof ConfigurazioneMatricoleVolontariInputAmbitoProgressivo[keyof typeof ConfigurazioneMatricoleVolontariInputAmbitoProgressivo];
-
+export type ConfigurazioneMatricoleVolontariInputAmbitoProgressivo =
+  (typeof ConfigurazioneMatricoleVolontariInputAmbitoProgressivo)[keyof typeof ConfigurazioneMatricoleVolontariInputAmbitoProgressivo];
 
 export const ConfigurazioneMatricoleVolontariInputAmbitoProgressivo = {
-  GLOBALE: 'GLOBALE',
-  PER_AREA: 'PER_AREA',
+  GLOBALE: "GLOBALE",
+  PER_AREA: "PER_AREA",
 } as const;
 
 export interface ConfigurazioneMatricoleVolontariInput {
   /**
-     * @maxLength 12
-     * @nullable
-     * @pattern ^[A-Za-z0-9]*$
-     */
+   * @maxLength 12
+   * @nullable
+   * @pattern ^[A-Za-z0-9]*$
+   */
   prefissoAssociazione?: string | null;
   includiCodiceArea: boolean;
   /**
-     * @maxLength 8
-     * @nullable
-     * @pattern ^[A-Za-z0-9]*$
-     */
+   * @maxLength 8
+   * @nullable
+   * @pattern ^[A-Za-z0-9]*$
+   */
   segmentoFisso?: string | null;
   separatore: ConfigurazioneMatricoleVolontariInputSeparatore;
   /**
-     * @minimum 2
-     * @maximum 8
-     */
+   * @minimum 2
+   * @maximum 8
+   */
   cifreProgressivo: number;
   /** @minimum 1 */
   numeroIniziale: number;
@@ -7991,33 +8013,33 @@ export interface ConfigurazioneMatricoleVolontariResponse {
   storico?: ConfigurazioneMatricoleVolontari[];
 }
 
-export type VolontarioTipoVolontario = typeof VolontarioTipoVolontario[keyof typeof VolontarioTipoVolontario];
-
+export type VolontarioTipoVolontario =
+  (typeof VolontarioTipoVolontario)[keyof typeof VolontarioTipoVolontario];
 
 export const VolontarioTipoVolontario = {
-  PERMANENTE: 'PERMANENTE',
-  TEMPORANEO: 'TEMPORANEO',
+  PERMANENTE: "PERMANENTE",
+  TEMPORANEO: "TEMPORANEO",
 } as const;
 
-export type VolontarioStatoAssicurazione = typeof VolontarioStatoAssicurazione[keyof typeof VolontarioStatoAssicurazione];
-
+export type VolontarioStatoAssicurazione =
+  (typeof VolontarioStatoAssicurazione)[keyof typeof VolontarioStatoAssicurazione];
 
 export const VolontarioStatoAssicurazione = {
-  TEMPORANEA: 'TEMPORANEA',
-  MANCANTE: 'MANCANTE',
-  VALIDA: 'VALIDA',
-  IN_SCADENZA: 'IN_SCADENZA',
-  SCADUTA: 'SCADUTA',
-  NON_ANCORA_VALIDA: 'NON_ANCORA_VALIDA',
+  TEMPORANEA: "TEMPORANEA",
+  MANCANTE: "MANCANTE",
+  VALIDA: "VALIDA",
+  IN_SCADENZA: "IN_SCADENZA",
+  SCADUTA: "SCADUTA",
+  NON_ANCORA_VALIDA: "NON_ANCORA_VALIDA",
 } as const;
 
-export type VolontarioStatoApprovazione = typeof VolontarioStatoApprovazione[keyof typeof VolontarioStatoApprovazione];
-
+export type VolontarioStatoApprovazione =
+  (typeof VolontarioStatoApprovazione)[keyof typeof VolontarioStatoApprovazione];
 
 export const VolontarioStatoApprovazione = {
-  in_attesa: 'in_attesa',
-  approvato: 'approvato',
-  respinto: 'respinto',
+  in_attesa: "in_attesa",
+  approvato: "approvato",
+  respinto: "respinto",
 } as const;
 
 export interface Volontario {
@@ -8104,17 +8126,17 @@ export interface VolontarioUpdate {
   dataNascita?: string;
   indirizzoResidenza?: string;
   /**
-     * Null quando il domicilio coincide con la residenza.
-     * @nullable
-     */
+   * Null quando il domicilio coincide con la residenza.
+   * @nullable
+   */
   indirizzoDomicilio?: string | null;
   /** @nullable */
   codiceFiscale?: string | null;
   codiceFiscaleNonDisponibile?: boolean;
   /**
-     * Nota facoltativa quando il codice fiscale non è disponibile.
-     * @nullable
-     */
+   * Nota facoltativa quando il codice fiscale non è disponibile.
+   * @nullable
+   */
   codiceFiscaleNota?: string | null;
   /** @minimum 1 */
   ruoloVolontarioId?: number;
@@ -8167,13 +8189,14 @@ export interface VolontarioValidationErrorResponse {
   details: VolontarioValidationErrorResponseDetails;
 }
 
-export type VolontarioKnownConflictResponseCode = typeof VolontarioKnownConflictResponseCode[keyof typeof VolontarioKnownConflictResponseCode];
-
+export type VolontarioKnownConflictResponseCode =
+  (typeof VolontarioKnownConflictResponseCode)[keyof typeof VolontarioKnownConflictResponseCode];
 
 export const VolontarioKnownConflictResponseCode = {
-  GIORNATA_TEMPORANEA_DUPLICATA: 'GIORNATA_TEMPORANEA_DUPLICATA',
-  ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO: 'ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO',
-  STALE_VERSION: 'STALE_VERSION',
+  GIORNATA_TEMPORANEA_DUPLICATA: "GIORNATA_TEMPORANEA_DUPLICATA",
+  ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO:
+    "ASSICURAZIONE_ANNUALE_NON_APPLICABILE_TEMPORANEO",
+  STALE_VERSION: "STALE_VERSION",
 } as const;
 
 export interface VolontarioKnownConflictResponse {
@@ -8185,31 +8208,31 @@ export interface VolontarioKnownConflictResponse {
   giornataId?: number;
 }
 
-export type VolontarioIdentifierTipoIdentificativo = typeof VolontarioIdentifierTipoIdentificativo[keyof typeof VolontarioIdentifierTipoIdentificativo];
-
+export type VolontarioIdentifierTipoIdentificativo =
+  (typeof VolontarioIdentifierTipoIdentificativo)[keyof typeof VolontarioIdentifierTipoIdentificativo];
 
 export const VolontarioIdentifierTipoIdentificativo = {
-  TEMPORANEA: 'TEMPORANEA',
-  PERMANENTE: 'PERMANENTE',
-  LEGACY: 'LEGACY',
+  TEMPORANEA: "TEMPORANEA",
+  PERMANENTE: "PERMANENTE",
+  LEGACY: "LEGACY",
 } as const;
 
-export type VolontarioIdentifierStato = typeof VolontarioIdentifierStato[keyof typeof VolontarioIdentifierStato];
-
+export type VolontarioIdentifierStato =
+  (typeof VolontarioIdentifierStato)[keyof typeof VolontarioIdentifierStato];
 
 export const VolontarioIdentifierStato = {
-  ATTIVA: 'ATTIVA',
-  STORICA: 'STORICA',
+  ATTIVA: "ATTIVA",
+  STORICA: "STORICA",
 } as const;
 
-export type VolontarioIdentifierOrigine = typeof VolontarioIdentifierOrigine[keyof typeof VolontarioIdentifierOrigine];
-
+export type VolontarioIdentifierOrigine =
+  (typeof VolontarioIdentifierOrigine)[keyof typeof VolontarioIdentifierOrigine];
 
 export const VolontarioIdentifierOrigine = {
-  GENERATA: 'GENERATA',
-  IMPORTATA: 'IMPORTATA',
-  CONVERSIONE: 'CONVERSIONE',
-  BACKFILL: 'BACKFILL',
+  GENERATA: "GENERATA",
+  IMPORTATA: "IMPORTATA",
+  CONVERSIONE: "CONVERSIONE",
+  BACKFILL: "BACKFILL",
 } as const;
 
 export interface VolontarioIdentifier {
@@ -8254,16 +8277,16 @@ export interface VolontarioPermanentConversionInput {
   preview: PermanentVolunteerIdentifierPreview;
 }
 
-export type VolontarioOperationalStateStatoAssicurazione = typeof VolontarioOperationalStateStatoAssicurazione[keyof typeof VolontarioOperationalStateStatoAssicurazione];
-
+export type VolontarioOperationalStateStatoAssicurazione =
+  (typeof VolontarioOperationalStateStatoAssicurazione)[keyof typeof VolontarioOperationalStateStatoAssicurazione];
 
 export const VolontarioOperationalStateStatoAssicurazione = {
-  TEMPORANEA: 'TEMPORANEA',
-  MANCANTE: 'MANCANTE',
-  VALIDA: 'VALIDA',
-  IN_SCADENZA: 'IN_SCADENZA',
-  SCADUTA: 'SCADUTA',
-  NON_ANCORA_VALIDA: 'NON_ANCORA_VALIDA',
+  TEMPORANEA: "TEMPORANEA",
+  MANCANTE: "MANCANTE",
+  VALIDA: "VALIDA",
+  IN_SCADENZA: "IN_SCADENZA",
+  SCADUTA: "SCADUTA",
+  NON_ANCORA_VALIDA: "NON_ANCORA_VALIDA",
 } as const;
 
 export interface VolontarioOperationalState {
@@ -8290,14 +8313,14 @@ export interface VolontarioActionResult {
   copertura?: VolontarioActionResultCopertura;
 }
 
-export type VolontarioSospensioneInputMotivo = typeof VolontarioSospensioneInputMotivo[keyof typeof VolontarioSospensioneInputMotivo];
-
+export type VolontarioSospensioneInputMotivo =
+  (typeof VolontarioSospensioneInputMotivo)[keyof typeof VolontarioSospensioneInputMotivo];
 
 export const VolontarioSospensioneInputMotivo = {
-  indisponibilita_temporanea: 'indisponibilita_temporanea',
-  dimissioni_cessazione: 'dimissioni_cessazione',
-  sospensione_organizzativa: 'sospensione_organizzativa',
-  altro: 'altro',
+  indisponibilita_temporanea: "indisponibilita_temporanea",
+  dimissioni_cessazione: "dimissioni_cessazione",
+  sospensione_organizzativa: "sospensione_organizzativa",
+  altro: "altro",
 } as const;
 
 export interface VolontarioSospensioneInput {
@@ -8315,21 +8338,21 @@ export interface VolontarioRiattivazioneInput {
   note?: string;
 }
 
-export type VolontarioInsuranceInputModalita = typeof VolontarioInsuranceInputModalita[keyof typeof VolontarioInsuranceInputModalita];
-
+export type VolontarioInsuranceInputModalita =
+  (typeof VolontarioInsuranceInputModalita)[keyof typeof VolontarioInsuranceInputModalita];
 
 export const VolontarioInsuranceInputModalita = {
-  CONTINUA_SCADENZA: 'CONTINUA_SCADENZA',
-  NUOVA_DA_DATA: 'NUOVA_DA_DATA',
+  CONTINUA_SCADENZA: "CONTINUA_SCADENZA",
+  NUOVA_DA_DATA: "NUOVA_DA_DATA",
 } as const;
 
 export interface VolontarioInsuranceInput {
   modalita: VolontarioInsuranceInputModalita;
   dataDecorrenza?: string;
   /**
-     * @minimum 1
-     * @maximum 120
-     */
+   * @minimum 1
+   * @maximum 120
+   */
   durataMesi?: number;
   riferimentoPolizza?: string;
   note?: string;
@@ -8340,26 +8363,26 @@ export type VolontarioInsuranceVersionInput = VolontarioInsuranceInput & {
   versione: number;
 };
 
-export type VolontarioBulkInsuranceInputModalita = typeof VolontarioBulkInsuranceInputModalita[keyof typeof VolontarioBulkInsuranceInputModalita];
-
+export type VolontarioBulkInsuranceInputModalita =
+  (typeof VolontarioBulkInsuranceInputModalita)[keyof typeof VolontarioBulkInsuranceInputModalita];
 
 export const VolontarioBulkInsuranceInputModalita = {
-  CONTINUA_SCADENZA: 'CONTINUA_SCADENZA',
-  NUOVA_DA_DATA: 'NUOVA_DA_DATA',
+  CONTINUA_SCADENZA: "CONTINUA_SCADENZA",
+  NUOVA_DA_DATA: "NUOVA_DA_DATA",
 } as const;
 
 export interface VolontarioBulkInsuranceInput {
   /**
-     * @minItems 1
-     * @maxItems 2000
-     */
+   * @minItems 1
+   * @maxItems 2000
+   */
   volontarioIds: number[];
   modalita: VolontarioBulkInsuranceInputModalita;
   dataDecorrenza?: string;
   /**
-     * @minimum 1
-     * @maximum 120
-     */
+   * @minimum 1
+   * @maximum 120
+   */
   durataMesi?: number;
   riferimentoPolizza?: string;
   note?: string;
@@ -8395,20 +8418,20 @@ export type VolontarioBulkInsuranceConfirmInputRigheItem = {
 
 export type VolontarioBulkInsuranceConfirmInput = VolontarioInsuranceInput & {
   /**
-     * @minItems 1
-     * @maxItems 2000
-     */
+   * @minItems 1
+   * @maxItems 2000
+   */
   righe: VolontarioBulkInsuranceConfirmInputRigheItem[];
 };
 
-export type VolontarioServiceDayInputStato = typeof VolontarioServiceDayInputStato[keyof typeof VolontarioServiceDayInputStato];
-
+export type VolontarioServiceDayInputStato =
+  (typeof VolontarioServiceDayInputStato)[keyof typeof VolontarioServiceDayInputStato];
 
 export const VolontarioServiceDayInputStato = {
-  PIANIFICATA: 'PIANIFICATA',
-  PRESENTE: 'PRESENTE',
-  ASSENTE: 'ASSENTE',
-  ANNULLATA: 'ANNULLATA',
+  PIANIFICATA: "PIANIFICATA",
+  PRESENTE: "PRESENTE",
+  ASSENTE: "ASSENTE",
+  ANNULLATA: "ANNULLATA",
 } as const;
 
 export interface VolontarioServiceDayInput {
@@ -8420,14 +8443,14 @@ export interface VolontarioServiceDayInput {
   note?: string;
 }
 
-export type VolontarioServiceDayUpdateInputStato = typeof VolontarioServiceDayUpdateInputStato[keyof typeof VolontarioServiceDayUpdateInputStato];
-
+export type VolontarioServiceDayUpdateInputStato =
+  (typeof VolontarioServiceDayUpdateInputStato)[keyof typeof VolontarioServiceDayUpdateInputStato];
 
 export const VolontarioServiceDayUpdateInputStato = {
-  PIANIFICATA: 'PIANIFICATA',
-  PRESENTE: 'PRESENTE',
-  ASSENTE: 'ASSENTE',
-  ANNULLATA: 'ANNULLATA',
+  PIANIFICATA: "PIANIFICATA",
+  PRESENTE: "PRESENTE",
+  ASSENTE: "ASSENTE",
+  ANNULLATA: "ANNULLATA",
 } as const;
 
 export interface VolontarioServiceDayUpdateInput {
@@ -8438,19 +8461,19 @@ export interface VolontarioServiceDayUpdateInput {
   note?: string;
 }
 
-export type VolontariImportMatricolaProposalModalita = typeof VolontariImportMatricolaProposalModalita[keyof typeof VolontariImportMatricolaProposalModalita];
-
+export type VolontariImportMatricolaProposalModalita =
+  (typeof VolontariImportMatricolaProposalModalita)[keyof typeof VolontariImportMatricolaProposalModalita];
 
 export const VolontariImportMatricolaProposalModalita = {
-  AUTOMATICA_AL_COMMIT: 'AUTOMATICA_AL_COMMIT',
+  AUTOMATICA_AL_COMMIT: "AUTOMATICA_AL_COMMIT",
 } as const;
 
-export type VolontariImportMatricolaProposalTipoIdentificativo = typeof VolontariImportMatricolaProposalTipoIdentificativo[keyof typeof VolontariImportMatricolaProposalTipoIdentificativo];
-
+export type VolontariImportMatricolaProposalTipoIdentificativo =
+  (typeof VolontariImportMatricolaProposalTipoIdentificativo)[keyof typeof VolontariImportMatricolaProposalTipoIdentificativo];
 
 export const VolontariImportMatricolaProposalTipoIdentificativo = {
-  PERMANENTE: 'PERMANENTE',
-  TEMPORANEA: 'TEMPORANEA',
+  PERMANENTE: "PERMANENTE",
+  TEMPORANEA: "TEMPORANEA",
 } as const;
 
 export interface VolontariImportMatricolaProposal {
@@ -8462,7 +8485,9 @@ export interface VolontariImportMatricolaProposal {
 
 export type VolontariImportPreviewRowDatiOriginali = { [key: string]: unknown };
 
-export type VolontariImportPreviewRowDatiNormalizzati = { [key: string]: unknown };
+export type VolontariImportPreviewRowDatiNormalizzati = {
+  [key: string]: unknown;
+};
 
 export interface VolontariImportPreviewRow {
   /** @minimum 2 */
@@ -8480,15 +8505,15 @@ export interface VolontariImportPreviewRow {
   errori: string[];
   avvisi: string[];
   [key: string]: unknown;
- }
+}
 
-export type VolontariImportPreviewScopeTipo = typeof VolontariImportPreviewScopeTipo[keyof typeof VolontariImportPreviewScopeTipo];
-
+export type VolontariImportPreviewScopeTipo =
+  (typeof VolontariImportPreviewScopeTipo)[keyof typeof VolontariImportPreviewScopeTipo];
 
 export const VolontariImportPreviewScopeTipo = {
-  CENTRO: 'CENTRO',
-  AREA: 'AREA',
-  GLOBALE: 'GLOBALE',
+  CENTRO: "CENTRO",
+  AREA: "AREA",
+  GLOBALE: "GLOBALE",
 } as const;
 
 export interface VolontariImportPreview {
@@ -8520,12 +8545,13 @@ export interface VolontariImportPreview {
 /**
  * @nullable
  */
-export type VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario = typeof VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario[keyof typeof VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario] | null;
-
+export type VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario =
+  | (typeof VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario)[keyof typeof VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario]
+  | null;
 
 export const VolontariImportConfirmInputRigheItemCorrezioniTipoVolontario = {
-  PERMANENTE: 'PERMANENTE',
-  TEMPORANEO: 'TEMPORANEO',
+  PERMANENTE: "PERMANENTE",
+  TEMPORANEO: "TEMPORANEO",
 } as const;
 
 export type VolontariImportConfirmInputRigheItemCorrezioni = {
@@ -8568,20 +8594,20 @@ export type VolontariImportConfirmInputRigheItem = {
   numeroRiga: number;
   inclusa?: boolean;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   volontarioId?: number | null;
   creaNuovo?: boolean;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   ruoloVolontarioId?: number | null;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   centroAscoltoId?: number | null;
   creaRuolo?: boolean;
   correzioni?: VolontariImportConfirmInputRigheItemCorrezioni;
@@ -8594,44 +8620,46 @@ export interface VolontariImportConfirmInput {
   righe: VolontariImportConfirmInputRigheItem[];
 }
 
-export interface VolontariGenericWriteInput { [key: string]: unknown }
+export interface VolontariGenericWriteInput {
+  [key: string]: unknown;
+}
 
-export type VolontariRegisterGenerateInputTipo = typeof VolontariRegisterGenerateInputTipo[keyof typeof VolontariRegisterGenerateInputTipo];
-
+export type VolontariRegisterGenerateInputTipo =
+  (typeof VolontariRegisterGenerateInputTipo)[keyof typeof VolontariRegisterGenerateInputTipo];
 
 export const VolontariRegisterGenerateInputTipo = {
-  PDF: 'PDF',
-  XLSX: 'XLSX',
+  PDF: "PDF",
+  XLSX: "XLSX",
 } as const;
 
-export type VolontariRegisterGenerateInputFiltriTipo = typeof VolontariRegisterGenerateInputFiltriTipo[keyof typeof VolontariRegisterGenerateInputFiltriTipo];
-
+export type VolontariRegisterGenerateInputFiltriTipo =
+  (typeof VolontariRegisterGenerateInputFiltriTipo)[keyof typeof VolontariRegisterGenerateInputFiltriTipo];
 
 export const VolontariRegisterGenerateInputFiltriTipo = {
-  TUTTI: 'TUTTI',
-  PERMANENTE: 'PERMANENTE',
-  TEMPORANEO: 'TEMPORANEO',
+  TUTTI: "TUTTI",
+  PERMANENTE: "PERMANENTE",
+  TEMPORANEO: "TEMPORANEO",
 } as const;
 
-export type VolontariRegisterGenerateInputFiltriStato = typeof VolontariRegisterGenerateInputFiltriStato[keyof typeof VolontariRegisterGenerateInputFiltriStato];
-
+export type VolontariRegisterGenerateInputFiltriStato =
+  (typeof VolontariRegisterGenerateInputFiltriStato)[keyof typeof VolontariRegisterGenerateInputFiltriStato];
 
 export const VolontariRegisterGenerateInputFiltriStato = {
-  tutti: 'tutti',
-  attivi: 'attivi',
-  non_attivi: 'non_attivi',
+  tutti: "tutti",
+  attivi: "attivi",
+  non_attivi: "non_attivi",
 } as const;
 
-export type VolontariRegisterGenerateInputFiltriAssicurazione = typeof VolontariRegisterGenerateInputFiltriAssicurazione[keyof typeof VolontariRegisterGenerateInputFiltriAssicurazione];
-
+export type VolontariRegisterGenerateInputFiltriAssicurazione =
+  (typeof VolontariRegisterGenerateInputFiltriAssicurazione)[keyof typeof VolontariRegisterGenerateInputFiltriAssicurazione];
 
 export const VolontariRegisterGenerateInputFiltriAssicurazione = {
-  TEMPORANEA: 'TEMPORANEA',
-  MANCANTE: 'MANCANTE',
-  VALIDA: 'VALIDA',
-  IN_SCADENZA: 'IN_SCADENZA',
-  SCADUTA: 'SCADUTA',
-  NON_ANCORA_VALIDA: 'NON_ANCORA_VALIDA',
+  TEMPORANEA: "TEMPORANEA",
+  MANCANTE: "MANCANTE",
+  VALIDA: "VALIDA",
+  IN_SCADENZA: "IN_SCADENZA",
+  SCADUTA: "SCADUTA",
+  NON_ANCORA_VALIDA: "NON_ANCORA_VALIDA",
 } as const;
 
 export type VolontariRegisterGenerateInputFiltri = {
@@ -8654,24 +8682,24 @@ export interface VolontariRegisterGenerateInput {
   filtri?: VolontariRegisterGenerateInputFiltri;
 }
 
-export type VolontariRegisterCorrectionInputRettificheItemCampo = typeof VolontariRegisterCorrectionInputRettificheItemCampo[keyof typeof VolontariRegisterCorrectionInputRettificheItemCampo];
-
+export type VolontariRegisterCorrectionInputRettificheItemCampo =
+  (typeof VolontariRegisterCorrectionInputRettificheItemCampo)[keyof typeof VolontariRegisterCorrectionInputRettificheItemCampo];
 
 export const VolontariRegisterCorrectionInputRettificheItemCampo = {
-  matricola: 'matricola',
-  nome: 'nome',
-  cognome: 'cognome',
-  codiceFiscale: 'codiceFiscale',
-  dataNascita: 'dataNascita',
-  luogoNascita: 'luogoNascita',
-  indirizzoResidenza: 'indirizzoResidenza',
-  indirizzoDomicilio: 'indirizzoDomicilio',
-  tipoVolontario: 'tipoVolontario',
-  centroAscoltoId: 'centroAscoltoId',
-  centroAscoltoNome: 'centroAscoltoNome',
-  ruoloVolontarioId: 'ruoloVolontarioId',
-  ruoloNome: 'ruoloNome',
-  dataInizio: 'dataInizio',
+  matricola: "matricola",
+  nome: "nome",
+  cognome: "cognome",
+  codiceFiscale: "codiceFiscale",
+  dataNascita: "dataNascita",
+  luogoNascita: "luogoNascita",
+  indirizzoResidenza: "indirizzoResidenza",
+  indirizzoDomicilio: "indirizzoDomicilio",
+  tipoVolontario: "tipoVolontario",
+  centroAscoltoId: "centroAscoltoId",
+  centroAscoltoNome: "centroAscoltoNome",
+  ruoloVolontarioId: "ruoloVolontarioId",
+  ruoloNome: "ruoloNome",
+  dataInizio: "dataInizio",
 } as const;
 
 export type VolontariRegisterCorrectionInputRettificheItem = {
@@ -8686,30 +8714,29 @@ export interface VolontariRegisterCorrectionInput {
   motivo: string;
   dataEffettiva?: string;
   /**
-     * @minItems 1
-     * @maxItems 20
-     */
+   * @minItems 1
+   * @maxItems 20
+   */
   rettifiche: VolontariRegisterCorrectionInputRettificheItem[];
 }
 
-export type MezzoStato = typeof MezzoStato[keyof typeof MezzoStato];
-
+export type MezzoStato = (typeof MezzoStato)[keyof typeof MezzoStato];
 
 export const MezzoStato = {
-  disponibile: 'disponibile',
-  non_disponibile: 'non_disponibile',
-  manutenzione: 'manutenzione',
-  respinto: 'respinto',
-  ritirato: 'ritirato',
+  disponibile: "disponibile",
+  non_disponibile: "non_disponibile",
+  manutenzione: "manutenzione",
+  respinto: "respinto",
+  ritirato: "ritirato",
 } as const;
 
-export type MezzoStatoApprovazione = typeof MezzoStatoApprovazione[keyof typeof MezzoStatoApprovazione];
-
+export type MezzoStatoApprovazione =
+  (typeof MezzoStatoApprovazione)[keyof typeof MezzoStatoApprovazione];
 
 export const MezzoStatoApprovazione = {
-  in_attesa: 'in_attesa',
-  approvato: 'approvato',
-  respinto: 'respinto',
+  in_attesa: "in_attesa",
+  approvato: "approvato",
+  respinto: "respinto",
 } as const;
 
 export interface Mezzo {
@@ -8751,15 +8778,15 @@ export interface Mezzo {
   dataAggiornamento: string;
 }
 
-export type MezzoUpdateStato = typeof MezzoUpdateStato[keyof typeof MezzoUpdateStato];
-
+export type MezzoUpdateStato =
+  (typeof MezzoUpdateStato)[keyof typeof MezzoUpdateStato];
 
 export const MezzoUpdateStato = {
-  disponibile: 'disponibile',
-  non_disponibile: 'non_disponibile',
-  manutenzione: 'manutenzione',
-  respinto: 'respinto',
-  ritirato: 'ritirato',
+  disponibile: "disponibile",
+  non_disponibile: "non_disponibile",
+  manutenzione: "manutenzione",
+  respinto: "respinto",
+  ritirato: "ritirato",
 } as const;
 
 export interface MezzoUpdate {
@@ -8933,31 +8960,31 @@ export interface UdsPersonePerZonaReport {
   udsConCentro: number;
 }
 
-export type MensaStato = typeof MensaStato[keyof typeof MensaStato];
-
+export type MensaStato = (typeof MensaStato)[keyof typeof MensaStato];
 
 export const MensaStato = {
-  attivo: 'attivo',
-  inattivo: 'inattivo',
+  attivo: "attivo",
+  inattivo: "inattivo",
 } as const;
 
-export type MensaStatoServizio = typeof MensaStatoServizio[keyof typeof MensaStatoServizio];
-
+export type MensaStatoServizio =
+  (typeof MensaStatoServizio)[keyof typeof MensaStatoServizio];
 
 export const MensaStatoServizio = {
-  attivo: 'attivo',
-  inattivo: 'inattivo',
+  attivo: "attivo",
+  inattivo: "inattivo",
 } as const;
 
 /**
  * @nullable
  */
-export type MensaStatoMagazzino = typeof MensaStatoMagazzino[keyof typeof MensaStatoMagazzino] | null;
-
+export type MensaStatoMagazzino =
+  | (typeof MensaStatoMagazzino)[keyof typeof MensaStatoMagazzino]
+  | null;
 
 export const MensaStatoMagazzino = {
-  attivo: 'attivo',
-  inattivo: 'inattivo',
+  attivo: "attivo",
+  inattivo: "inattivo",
 } as const;
 
 export interface Mensa {
@@ -9001,12 +9028,12 @@ export interface Mensa {
   versione: string;
 }
 
-export type MensaInputStato = typeof MensaInputStato[keyof typeof MensaInputStato];
-
+export type MensaInputStato =
+  (typeof MensaInputStato)[keyof typeof MensaInputStato];
 
 export const MensaInputStato = {
-  attivo: 'attivo',
-  inattivo: 'inattivo',
+  attivo: "attivo",
+  inattivo: "inattivo",
 } as const;
 
 /**
@@ -9014,15 +9041,15 @@ export const MensaInputStato = {
  */
 export interface MensaInput {
   /**
-     * Facoltativo; se omesso viene generato automaticamente un codice MEN-NNN.
-     * @minLength 1
-     * @maxLength 30
-     */
+   * Facoltativo; se omesso viene generato automaticamente un codice MEN-NNN.
+   * @minLength 1
+   * @maxLength 30
+   */
   codice?: string;
   /**
-     * @minLength 1
-     * @maxLength 160
-     */
+   * @minLength 1
+   * @maxLength 160
+   */
   nome: string;
   /** Identificativo dell'Area; per utenti territoriali prevale sempre l'Area del profilo. */
   areaOperativaId: number;
@@ -9047,9 +9074,9 @@ export interface MensaInput {
 
 export interface MensaUpdate {
   /**
-     * @minLength 1
-     * @maxLength 160
-     */
+   * @minLength 1
+   * @maxLength 160
+   */
   nome?: string;
   /** @nullable */
   indirizzo?: string | null;
@@ -9069,14 +9096,14 @@ export interface MensaBeneficiarioSummary {
   areaOperativaId?: number | null;
 }
 
-export type MensaAbilitazioneStato = typeof MensaAbilitazioneStato[keyof typeof MensaAbilitazioneStato];
-
+export type MensaAbilitazioneStato =
+  (typeof MensaAbilitazioneStato)[keyof typeof MensaAbilitazioneStato];
 
 export const MensaAbilitazioneStato = {
-  attiva: 'attiva',
-  sospesa: 'sospesa',
-  revocata: 'revocata',
-  scaduta: 'scaduta',
+  attiva: "attiva",
+  sospesa: "sospesa",
+  revocata: "revocata",
+  scaduta: "scaduta",
 } as const;
 
 export interface MensaAbilitazione {
@@ -9102,16 +9129,16 @@ export interface MensaAbilitazione {
   versione: string;
 }
 
-export type MensaAbilitazioneRiepilogoBeneficiarioStato = typeof MensaAbilitazioneRiepilogoBeneficiarioStato[keyof typeof MensaAbilitazioneRiepilogoBeneficiarioStato];
-
+export type MensaAbilitazioneRiepilogoBeneficiarioStato =
+  (typeof MensaAbilitazioneRiepilogoBeneficiarioStato)[keyof typeof MensaAbilitazioneRiepilogoBeneficiarioStato];
 
 export const MensaAbilitazioneRiepilogoBeneficiarioStato = {
-  attiva: 'attiva',
-  programmata: 'programmata',
-  sospesa: 'sospesa',
-  revocata: 'revocata',
-  scaduta: 'scaduta',
-  non_abilitato: 'non_abilitato',
+  attiva: "attiva",
+  programmata: "programmata",
+  sospesa: "sospesa",
+  revocata: "revocata",
+  scaduta: "scaduta",
+  non_abilitato: "non_abilitato",
 } as const;
 
 export interface MensaAbilitazioneRiepilogoBeneficiario {
@@ -9130,14 +9157,14 @@ export interface MensaAbilitazioneInput {
   motivo?: string | null;
 }
 
-export type MensaStatoInputStato = typeof MensaStatoInputStato[keyof typeof MensaStatoInputStato];
-
+export type MensaStatoInputStato =
+  (typeof MensaStatoInputStato)[keyof typeof MensaStatoInputStato];
 
 export const MensaStatoInputStato = {
-  attiva: 'attiva',
-  sospesa: 'sospesa',
-  revocata: 'revocata',
-  scaduta: 'scaduta',
+  attiva: "attiva",
+  sospesa: "sospesa",
+  revocata: "revocata",
+  scaduta: "scaduta",
 } as const;
 
 export interface MensaStatoInput {
@@ -9147,14 +9174,14 @@ export interface MensaStatoInput {
   versione: string;
 }
 
-export type TesseraBeneficiarioStato = typeof TesseraBeneficiarioStato[keyof typeof TesseraBeneficiarioStato];
-
+export type TesseraBeneficiarioStato =
+  (typeof TesseraBeneficiarioStato)[keyof typeof TesseraBeneficiarioStato];
 
 export const TesseraBeneficiarioStato = {
-  attiva: 'attiva',
-  sospesa: 'sospesa',
-  revocata: 'revocata',
-  scaduta: 'scaduta',
+  attiva: "attiva",
+  sospesa: "sospesa",
+  revocata: "revocata",
+  scaduta: "scaduta",
 } as const;
 
 export interface TesseraBeneficiario {
@@ -9190,38 +9217,39 @@ export interface TesseraBeneficiarioAnagraficaInput {
   motivoSostituzione?: string | null;
 }
 
-export type MensaNuovaPersonaTemporaneaInputSesso = typeof MensaNuovaPersonaTemporaneaInputSesso[keyof typeof MensaNuovaPersonaTemporaneaInputSesso];
-
+export type MensaNuovaPersonaTemporaneaInputSesso =
+  (typeof MensaNuovaPersonaTemporaneaInputSesso)[keyof typeof MensaNuovaPersonaTemporaneaInputSesso];
 
 export const MensaNuovaPersonaTemporaneaInputSesso = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
 } as const;
 
 /**
  * @nullable
  */
-export type MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta = typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta[keyof typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta] | null;
-
+export type MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta =
+  | (typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta)[keyof typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta]
+  | null;
 
 export const MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
 } as const;
 
 export interface MensaNuovaPersonaTemporaneaInput {
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   nome: string;
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   cognome: string;
   sesso: MensaNuovaPersonaTemporaneaInputSesso;
   /** @nullable */
@@ -9229,14 +9257,14 @@ export interface MensaNuovaPersonaTemporaneaInput {
   /** @nullable */
   fasciaEtaPresunta?: MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta;
   /**
-     * @maxLength 20
-     * @nullable
-     */
+   * @maxLength 20
+   * @nullable
+   */
   telefono?: string | null;
   /**
-     * @maxLength 60
-     * @nullable
-     */
+   * @maxLength 60
+   * @nullable
+   */
   cittadinanza?: string | null;
   /** @nullable */
   allergie?: string | null;
@@ -9244,12 +9272,12 @@ export interface MensaNuovaPersonaTemporaneaInput {
   restrizioniAlimentari?: string | null;
 }
 
-export type MensaAccessoTemporaneoInputTipoServizio = typeof MensaAccessoTemporaneoInputTipoServizio[keyof typeof MensaAccessoTemporaneoInputTipoServizio];
-
+export type MensaAccessoTemporaneoInputTipoServizio =
+  (typeof MensaAccessoTemporaneoInputTipoServizio)[keyof typeof MensaAccessoTemporaneoInputTipoServizio];
 
 export const MensaAccessoTemporaneoInputTipoServizio = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;
 
 /**
@@ -9264,26 +9292,26 @@ export interface MensaAccessoTemporaneoInput {
   tipoServizio?: MensaAccessoTemporaneoInputTipoServizio;
   confermaDuplicato?: boolean;
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   idempotencyKey: string;
 }
 
-export type MensaAccessoInputModalitaAccesso = typeof MensaAccessoInputModalitaAccesso[keyof typeof MensaAccessoInputModalitaAccesso];
-
+export type MensaAccessoInputModalitaAccesso =
+  (typeof MensaAccessoInputModalitaAccesso)[keyof typeof MensaAccessoInputModalitaAccesso];
 
 export const MensaAccessoInputModalitaAccesso = {
-  tessera: 'tessera',
-  manuale: 'manuale',
+  tessera: "tessera",
+  manuale: "manuale",
 } as const;
 
-export type MensaAccessoInputTipoServizio = typeof MensaAccessoInputTipoServizio[keyof typeof MensaAccessoInputTipoServizio];
-
+export type MensaAccessoInputTipoServizio =
+  (typeof MensaAccessoInputTipoServizio)[keyof typeof MensaAccessoInputTipoServizio];
 
 export const MensaAccessoInputTipoServizio = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;
 
 export interface MensaAccessoInput {
@@ -9293,39 +9321,40 @@ export interface MensaAccessoInput {
   beneficiarioId?: number;
   tipoServizio?: MensaAccessoInputTipoServizio;
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   idempotencyKey: string;
 }
 
-export type MensaAccessoEsito = typeof MensaAccessoEsito[keyof typeof MensaAccessoEsito];
-
+export type MensaAccessoEsito =
+  (typeof MensaAccessoEsito)[keyof typeof MensaAccessoEsito];
 
 export const MensaAccessoEsito = {
-  consentito: 'consentito',
-  negato: 'negato',
-  consentito_eccezione: 'consentito_eccezione',
+  consentito: "consentito",
+  negato: "negato",
+  consentito_eccezione: "consentito_eccezione",
 } as const;
 
-export type MensaAccessoModalitaAccesso = typeof MensaAccessoModalitaAccesso[keyof typeof MensaAccessoModalitaAccesso];
-
+export type MensaAccessoModalitaAccesso =
+  (typeof MensaAccessoModalitaAccesso)[keyof typeof MensaAccessoModalitaAccesso];
 
 export const MensaAccessoModalitaAccesso = {
-  tessera: 'tessera',
-  manuale: 'manuale',
-  temporaneo: 'temporaneo',
+  tessera: "tessera",
+  manuale: "manuale",
+  temporaneo: "temporaneo",
 } as const;
 
 /**
  * @nullable
  */
-export type MensaAccessoTipoServizio = typeof MensaAccessoTipoServizio[keyof typeof MensaAccessoTipoServizio] | null;
-
+export type MensaAccessoTipoServizio =
+  | (typeof MensaAccessoTipoServizio)[keyof typeof MensaAccessoTipoServizio]
+  | null;
 
 export const MensaAccessoTipoServizio = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;
 
 export interface MensaAccesso {
@@ -9361,12 +9390,12 @@ export interface MensaAccesso {
   idempotentReplay?: boolean;
 }
 
-export type MensaPastoInputTipoServizio = typeof MensaPastoInputTipoServizio[keyof typeof MensaPastoInputTipoServizio];
-
+export type MensaPastoInputTipoServizio =
+  (typeof MensaPastoInputTipoServizio)[keyof typeof MensaPastoInputTipoServizio];
 
 export const MensaPastoInputTipoServizio = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;
 
 export interface MensaPastoInput {
@@ -9378,57 +9407,60 @@ export interface MensaPastoInput {
   /** @nullable */
   motivoOverride?: string | null;
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   idempotencyKey: string;
 }
 
-export type MensaPastoTipoServizio = typeof MensaPastoTipoServizio[keyof typeof MensaPastoTipoServizio];
-
+export type MensaPastoTipoServizio =
+  (typeof MensaPastoTipoServizio)[keyof typeof MensaPastoTipoServizio];
 
 export const MensaPastoTipoServizio = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;
 
 /**
  * @nullable
  */
-export type MensaPastoSessoSnapshot = typeof MensaPastoSessoSnapshot[keyof typeof MensaPastoSessoSnapshot] | null;
-
+export type MensaPastoSessoSnapshot =
+  | (typeof MensaPastoSessoSnapshot)[keyof typeof MensaPastoSessoSnapshot]
+  | null;
 
 export const MensaPastoSessoSnapshot = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
-  ND: 'ND',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
+  ND: "ND",
 } as const;
 
 /**
  * @nullable
  */
-export type MensaPastoFasciaEtaSnapshot = typeof MensaPastoFasciaEtaSnapshot[keyof typeof MensaPastoFasciaEtaSnapshot] | null;
-
+export type MensaPastoFasciaEtaSnapshot =
+  | (typeof MensaPastoFasciaEtaSnapshot)[keyof typeof MensaPastoFasciaEtaSnapshot]
+  | null;
 
 export const MensaPastoFasciaEtaSnapshot = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
 } as const;
 
 /**
  * @nullable
  */
-export type MensaPastoFasciaEtaOrigineSnapshot = typeof MensaPastoFasciaEtaOrigineSnapshot[keyof typeof MensaPastoFasciaEtaOrigineSnapshot] | null;
-
+export type MensaPastoFasciaEtaOrigineSnapshot =
+  | (typeof MensaPastoFasciaEtaOrigineSnapshot)[keyof typeof MensaPastoFasciaEtaOrigineSnapshot]
+  | null;
 
 export const MensaPastoFasciaEtaOrigineSnapshot = {
-  calcolata: 'calcolata',
-  presunta: 'presunta',
-  non_determinata: 'non_determinata',
+  calcolata: "calcolata",
+  presunta: "presunta",
+  non_determinata: "non_determinata",
 } as const;
 
 export interface MensaPasto {
@@ -9459,7 +9491,7 @@ export interface MensaPasto {
   operatore?: string;
   idempotentReplay?: boolean;
   [key: string]: unknown;
- }
+}
 
 export interface MensaEccezione {
   id: number;
@@ -9471,13 +9503,13 @@ export interface MensaEccezione {
   motivo: string;
   dataOra: string;
   [key: string]: unknown;
- }
+}
 
 export interface MensaEccezioneInput {
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   motivo: string;
 }
 
@@ -9493,18 +9525,18 @@ export interface MensaMagazzinoSummary {
 export interface AssegnazioneMensaInput {
   attiva: boolean;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   motivo: string;
 }
 
-export type MensaGiornataInputTipoServizio = typeof MensaGiornataInputTipoServizio[keyof typeof MensaGiornataInputTipoServizio];
-
+export type MensaGiornataInputTipoServizio =
+  (typeof MensaGiornataInputTipoServizio)[keyof typeof MensaGiornataInputTipoServizio];
 
 export const MensaGiornataInputTipoServizio = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;
 
 export interface MensaGiornataInput {
@@ -9563,20 +9595,20 @@ export interface MensaGiacenza {
   disponibileRealePrecisa?: QuantitaContabile;
 }
 
-export type MensaConsumoInputTipoServizio = typeof MensaConsumoInputTipoServizio[keyof typeof MensaConsumoInputTipoServizio];
-
+export type MensaConsumoInputTipoServizio =
+  (typeof MensaConsumoInputTipoServizio)[keyof typeof MensaConsumoInputTipoServizio];
 
 export const MensaConsumoInputTipoServizio = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;
 
-export type MensaConsumoInputCausale = typeof MensaConsumoInputCausale[keyof typeof MensaConsumoInputCausale];
-
+export type MensaConsumoInputCausale =
+  (typeof MensaConsumoInputCausale)[keyof typeof MensaConsumoInputCausale];
 
 export const MensaConsumoInputCausale = {
-  consumo: 'consumo',
-  scarto: 'scarto',
+  consumo: "consumo",
+  scarto: "scarto",
 } as const;
 
 export interface MensaConsumoInput {
@@ -9587,66 +9619,66 @@ export interface MensaConsumoInput {
   quantita: QuantitaContabile;
   causale: MensaConsumoInputCausale;
   /**
-     * Lotto obbligatorio quando richiesto dal Catalogo; negli altri casi FEFO comune.
-     * @nullable
-     */
+   * Lotto obbligatorio quando richiesto dal Catalogo; negli altri casi FEFO comune.
+   * @nullable
+   */
   lottoId?: number | null;
   /**
-     * Obbligatorio per scarto fisico; non rappresenta sfrido culinario.
-     * @maxLength 2000
-     * @nullable
-     */
+   * Obbligatorio per scarto fisico; non rappresenta sfrido culinario.
+   * @maxLength 2000
+   * @nullable
+   */
   motivo?: string | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   note?: string | null;
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   idempotencyKey: string;
 }
 
 export interface MensaStornoInput {
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   motivo: string;
 }
 
 export interface MensaChiusuraInput {
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   note?: string | null;
 }
 
 export interface MensaRiaperturaInput {
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   motivo: string;
 }
 
-export type MensaConsumoTipoServizio = typeof MensaConsumoTipoServizio[keyof typeof MensaConsumoTipoServizio];
-
+export type MensaConsumoTipoServizio =
+  (typeof MensaConsumoTipoServizio)[keyof typeof MensaConsumoTipoServizio];
 
 export const MensaConsumoTipoServizio = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;
 
-export type MensaConsumoCausale = typeof MensaConsumoCausale[keyof typeof MensaConsumoCausale];
-
+export type MensaConsumoCausale =
+  (typeof MensaConsumoCausale)[keyof typeof MensaConsumoCausale];
 
 export const MensaConsumoCausale = {
-  consumo: 'consumo',
-  scarto: 'scarto',
+  consumo: "consumo",
+  scarto: "scarto",
 } as const;
 
 export interface MensaConsumo {
@@ -9674,22 +9706,22 @@ export interface MensaConsumo {
   createdAt?: string;
   idempotentReplay?: boolean;
   [key: string]: unknown;
- }
+}
 
-export type MensaGiornataTipoServizio = typeof MensaGiornataTipoServizio[keyof typeof MensaGiornataTipoServizio];
-
+export type MensaGiornataTipoServizio =
+  (typeof MensaGiornataTipoServizio)[keyof typeof MensaGiornataTipoServizio];
 
 export const MensaGiornataTipoServizio = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;
 
-export type MensaGiornataStato = typeof MensaGiornataStato[keyof typeof MensaGiornataStato];
-
+export type MensaGiornataStato =
+  (typeof MensaGiornataStato)[keyof typeof MensaGiornataStato];
 
 export const MensaGiornataStato = {
-  aperta: 'aperta',
-  chiusa: 'chiusa',
+  aperta: "aperta",
+  chiusa: "chiusa",
 } as const;
 
 /**
@@ -9722,7 +9754,7 @@ export interface MensaGiornata {
   /** @nullable */
   snapshot?: MensaGiornataSnapshot;
   [key: string]: unknown;
- }
+}
 
 export interface MensaAccessiPage {
   items: MensaAccesso[];
@@ -9769,9 +9801,9 @@ export type MensaTrasferimentoInputRigheItem = {
   /** @nullable */
   note?: string | null;
   /**
-     * Lotto fisico selezionato; obbligatorio se il Prodotto lo richiede.
-     * @nullable
-     */
+   * Lotto fisico selezionato; obbligatorio se il Prodotto lo richiede.
+   * @nullable
+   */
   lottoId?: number | null;
 };
 
@@ -9780,9 +9812,9 @@ export interface MensaTrasferimentoInput {
   magazzinoOrigineId: number;
   dataRichiesta: string;
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   idempotencyKey: string;
   /** @nullable */
   trasportatoreNome?: string | null;
@@ -9807,7 +9839,9 @@ export interface MensaQuantitaPerUnitaMisura {
 /**
  * @nullable
  */
-export type MensaReportChiusurePrecedentiItemSnapshot = { [key: string]: unknown } | null;
+export type MensaReportChiusurePrecedentiItemSnapshot = {
+  [key: string]: unknown;
+} | null;
 
 export type MensaReportChiusurePrecedentiItem = {
   id: number;
@@ -9817,14 +9851,14 @@ export type MensaReportChiusurePrecedentiItem = {
   snapshot?: MensaReportChiusurePrecedentiItemSnapshot;
 };
 
-export type MensaReportDistribuzioneSessoItemChiave = typeof MensaReportDistribuzioneSessoItemChiave[keyof typeof MensaReportDistribuzioneSessoItemChiave];
-
+export type MensaReportDistribuzioneSessoItemChiave =
+  (typeof MensaReportDistribuzioneSessoItemChiave)[keyof typeof MensaReportDistribuzioneSessoItemChiave];
 
 export const MensaReportDistribuzioneSessoItemChiave = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
-  ND: 'ND',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
+  ND: "ND",
 } as const;
 
 export type MensaReportDistribuzioneSessoItem = {
@@ -9832,16 +9866,16 @@ export type MensaReportDistribuzioneSessoItem = {
   totale: number;
 };
 
-export type MensaReportDistribuzioneFasciaEtaItemChiave = typeof MensaReportDistribuzioneFasciaEtaItemChiave[keyof typeof MensaReportDistribuzioneFasciaEtaItemChiave];
-
+export type MensaReportDistribuzioneFasciaEtaItemChiave =
+  (typeof MensaReportDistribuzioneFasciaEtaItemChiave)[keyof typeof MensaReportDistribuzioneFasciaEtaItemChiave];
 
 export const MensaReportDistribuzioneFasciaEtaItemChiave = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
-  ND: 'ND',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
+  ND: "ND",
 } as const;
 
 export type MensaReportDistribuzioneFasciaEtaItem = {
@@ -9849,12 +9883,12 @@ export type MensaReportDistribuzioneFasciaEtaItem = {
   totale: number;
 };
 
-export type MensaReportDistribuzioneTipoServizioItemChiave = typeof MensaReportDistribuzioneTipoServizioItemChiave[keyof typeof MensaReportDistribuzioneTipoServizioItemChiave];
-
+export type MensaReportDistribuzioneTipoServizioItemChiave =
+  (typeof MensaReportDistribuzioneTipoServizioItemChiave)[keyof typeof MensaReportDistribuzioneTipoServizioItemChiave];
 
 export const MensaReportDistribuzioneTipoServizioItemChiave = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;
 
 export type MensaReportDistribuzioneTipoServizioItem = {
@@ -9862,14 +9896,14 @@ export type MensaReportDistribuzioneTipoServizioItem = {
   totale: number;
 };
 
-export type MensaReportBeneficiariDistintiPerSessoItemChiave = typeof MensaReportBeneficiariDistintiPerSessoItemChiave[keyof typeof MensaReportBeneficiariDistintiPerSessoItemChiave];
-
+export type MensaReportBeneficiariDistintiPerSessoItemChiave =
+  (typeof MensaReportBeneficiariDistintiPerSessoItemChiave)[keyof typeof MensaReportBeneficiariDistintiPerSessoItemChiave];
 
 export const MensaReportBeneficiariDistintiPerSessoItemChiave = {
-  M: 'M',
-  F: 'F',
-  ALTRO: 'ALTRO',
-  ND: 'ND',
+  M: "M",
+  F: "F",
+  ALTRO: "ALTRO",
+  ND: "ND",
 } as const;
 
 export type MensaReportBeneficiariDistintiPerSessoItem = {
@@ -9877,16 +9911,16 @@ export type MensaReportBeneficiariDistintiPerSessoItem = {
   totale: number;
 };
 
-export type MensaReportBeneficiariDistintiPerFasciaEtaItemChiave = typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave[keyof typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave];
-
+export type MensaReportBeneficiariDistintiPerFasciaEtaItemChiave =
+  (typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave)[keyof typeof MensaReportBeneficiariDistintiPerFasciaEtaItemChiave];
 
 export const MensaReportBeneficiariDistintiPerFasciaEtaItemChiave = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
-  non_determinata: 'non_determinata',
-  ND: 'ND',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
+  non_determinata: "non_determinata",
+  ND: "ND",
 } as const;
 
 export type MensaReportBeneficiariDistintiPerFasciaEtaItem = {
@@ -9933,7 +9967,7 @@ export interface MensaReport {
   mediaPastiGiorno: number;
   distribuzione: MensaReportDistribuzioneItem[];
   [key: string]: unknown;
- }
+}
 
 export interface Area {
   key: string;
@@ -9998,9 +10032,9 @@ export interface LoginInput {
 
 export interface ChangePasswordInput {
   /**
-     * Deve contenere almeno una lettera e un numero.
-     * @minLength 8
-     */
+   * Deve contenere almeno una lettera e un numero.
+   * @minLength 8
+   */
   newPassword: string;
 }
 
@@ -10013,9 +10047,9 @@ export interface ResetPasswordInput {
   /** @minLength 1 */
   token: string;
   /**
-     * Deve contenere almeno una lettera e un numero.
-     * @minLength 8
-     */
+   * Deve contenere almeno una lettera e un numero.
+   * @minLength 8
+   */
   newPassword: string;
   /** @minLength 1 */
   confirmPassword?: string;
@@ -10066,9 +10100,9 @@ export interface UtenteInput {
   /** @minLength 1 */
   email: string;
   /**
-     * Deve contenere almeno una lettera e un numero.
-     * @minLength 8
-     */
+   * Deve contenere almeno una lettera e un numero.
+   * @minLength 8
+   */
   password: string;
   /** @minLength 1 */
   nome: string;
@@ -10268,13 +10302,13 @@ export type FsePageParameter = number;
 
 export type FsePageSizeParameter = number;
 
-export type FseQueueStatoParameter = typeof FseQueueStatoParameter[keyof typeof FseQueueStatoParameter];
-
+export type FseQueueStatoParameter =
+  (typeof FseQueueStatoParameter)[keyof typeof FseQueueStatoParameter];
 
 export const FseQueueStatoParameter = {
-  DA_RENDICONTARE: 'DA_RENDICONTARE',
-  ARRETRATO_NON_RENDICONTATO: 'ARRETRATO_NON_RENDICONTATO',
-  BLOCCATO: 'BLOCCATO',
+  DA_RENDICONTARE: "DA_RENDICONTARE",
+  ARRETRATO_NON_RENDICONTATO: "ARRETRATO_NON_RENDICONTATO",
+  BLOCCATO: "BLOCCATO",
 } as const;
 
 export type FseQueueCanaleParameter = string;
@@ -10285,12 +10319,13 @@ export type FseQueueProdottoIdParameter = number;
 
 export type FseQueueQualityCodeParameter = string;
 
-export type FseDownloadRepresentationParameter = typeof FseDownloadRepresentationParameter[keyof typeof FseDownloadRepresentationParameter];
-
+export type FseDownloadRepresentationParameter =
+  (typeof FseDownloadRepresentationParameter)[keyof typeof FseDownloadRepresentationParameter];
 
 export const FseDownloadRepresentationParameter = {
-  FSE_CANONICAL_AUDIT_XLSX_V1: 'FSE_CANONICAL_AUDIT_XLSX_V1',
-  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1: 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1',
+  FSE_CANONICAL_AUDIT_XLSX_V1: "FSE_CANONICAL_AUDIT_XLSX_V1",
+  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1:
+    "SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1",
 } as const;
 
 /**
@@ -10348,95 +10383,95 @@ export type MapsDaParameter = string;
 export type MapsAParameter = string;
 
 export type ListRichiesteMagazzinoParams = {
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
-stato?: ListRichiesteMagazzinoStato;
-priorita?: ListRichiesteMagazzinoPriorita;
-/**
- * @minimum 1
- */
-areaOperativaId?: number;
-/**
- * @minimum 1
- */
-centroAscoltoId?: number;
-tipoDestinatario?: ListRichiesteMagazzinoTipoDestinatario;
-/**
- * @minimum 1
- */
-beneficiarioId?: number;
-/**
- * @minimum 1
- */
-enteDestinatarioId?: number;
-/**
- * @minimum 1
- */
-magazzinoDestinatarioId?: number;
-/**
- * @minimum 1
- */
-interventoId?: number;
-sorgente?: ListRichiesteMagazzinoSorgente;
-/**
- * @pattern ^\d{4}-\d{2}-\d{2}$
- */
-dataDa?: string;
-/**
- * @pattern ^\d{4}-\d{2}-\d{2}$
- */
-dataA?: string;
-/**
- * @minLength 2
- * @maxLength 80
- */
-ricerca?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  stato?: ListRichiesteMagazzinoStato;
+  priorita?: ListRichiesteMagazzinoPriorita;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+  tipoDestinatario?: ListRichiesteMagazzinoTipoDestinatario;
+  /**
+   * @minimum 1
+   */
+  beneficiarioId?: number;
+  /**
+   * @minimum 1
+   */
+  enteDestinatarioId?: number;
+  /**
+   * @minimum 1
+   */
+  magazzinoDestinatarioId?: number;
+  /**
+   * @minimum 1
+   */
+  interventoId?: number;
+  sorgente?: ListRichiesteMagazzinoSorgente;
+  /**
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
+  dataDa?: string;
+  /**
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
+  dataA?: string;
+  /**
+   * @minLength 2
+   * @maxLength 80
+   */
+  ricerca?: string;
 };
 
-export type ListRichiesteMagazzinoStato = typeof ListRichiesteMagazzinoStato[keyof typeof ListRichiesteMagazzinoStato];
-
+export type ListRichiesteMagazzinoStato =
+  (typeof ListRichiesteMagazzinoStato)[keyof typeof ListRichiesteMagazzinoStato];
 
 export const ListRichiesteMagazzinoStato = {
-  aperte: 'aperte',
-  inviata: 'inviata',
-  presa_in_carico: 'presa_in_carico',
-  chiusa: 'chiusa',
-  annullata: 'annullata',
+  aperte: "aperte",
+  inviata: "inviata",
+  presa_in_carico: "presa_in_carico",
+  chiusa: "chiusa",
+  annullata: "annullata",
 } as const;
 
-export type ListRichiesteMagazzinoPriorita = typeof ListRichiesteMagazzinoPriorita[keyof typeof ListRichiesteMagazzinoPriorita];
-
+export type ListRichiesteMagazzinoPriorita =
+  (typeof ListRichiesteMagazzinoPriorita)[keyof typeof ListRichiesteMagazzinoPriorita];
 
 export const ListRichiesteMagazzinoPriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;
 
-export type ListRichiesteMagazzinoTipoDestinatario = typeof ListRichiesteMagazzinoTipoDestinatario[keyof typeof ListRichiesteMagazzinoTipoDestinatario];
-
+export type ListRichiesteMagazzinoTipoDestinatario =
+  (typeof ListRichiesteMagazzinoTipoDestinatario)[keyof typeof ListRichiesteMagazzinoTipoDestinatario];
 
 export const ListRichiesteMagazzinoTipoDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
-  magazzino: 'magazzino',
+  beneficiario: "beneficiario",
+  ente: "ente",
+  magazzino: "magazzino",
 } as const;
 
-export type ListRichiesteMagazzinoSorgente = typeof ListRichiesteMagazzinoSorgente[keyof typeof ListRichiesteMagazzinoSorgente];
-
+export type ListRichiesteMagazzinoSorgente =
+  (typeof ListRichiesteMagazzinoSorgente)[keyof typeof ListRichiesteMagazzinoSorgente];
 
 export const ListRichiesteMagazzinoSorgente = {
-  beneficiario: 'beneficiario',
-  intervento_sociale: 'intervento_sociale',
-  operativa: 'operativa',
+  beneficiario: "beneficiario",
+  intervento_sociale: "intervento_sociale",
+  operativa: "operativa",
 } as const;
 
 export type GetDocumentoOperativoRichiesta200 = {
@@ -10444,477 +10479,477 @@ export type GetDocumentoOperativoRichiesta200 = {
 };
 
 export type ListProdottiParams = {
-categoria?: string;
-tipo?: string;
-search?: string;
+  categoria?: string;
+  tipo?: string;
+  search?: string;
 };
 
 export type ListCarichiParams = {
-magazzinoId?: number;
-origineCarico?: OrigineCarico;
-da?: string;
-a?: string;
+  magazzinoId?: number;
+  origineCarico?: OrigineCarico;
+  da?: string;
+  a?: string;
 };
 
 export type ListCaricoPraticheParams = {
-/**
- * @minimum 1
- */
-areaOperativaId: number;
-/**
- * @minimum 1
- */
-magazzinoId?: number;
-stato?: CaricoPraticaStato;
-q?: string;
-da?: string;
-a?: string;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId: number;
+  /**
+   * @minimum 1
+   */
+  magazzinoId?: number;
+  stato?: CaricoPraticaStato;
+  q?: string;
+  da?: string;
+  a?: string;
 };
 
 export type AnalyzeFsePracticeImportParams = {
-/**
- * @minimum 1
- */
-sourceRegistryId: number;
-/**
- * @minimum 1
- */
-areaOperativaId: number;
-/**
- * @minimum 1
- */
-magazzinoId: number;
-/**
- * @minimum 1
- */
-lottoLogicoId: number;
-/**
- * @minimum 1
- */
-caricoPraticaId?: number;
-/**
- * @minimum 1
- */
-sessionId?: number;
-modalita: FseImportMode;
-profilo: FseImportFileProfile;
-/**
- * @maxLength 255
- */
-nomeFile: string;
-/**
- * @maxLength 100
- */
-sheetName?: string;
-dataRiferimento?: string;
+  /**
+   * @minimum 1
+   */
+  sourceRegistryId: number;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId: number;
+  /**
+   * @minimum 1
+   */
+  magazzinoId: number;
+  /**
+   * @minimum 1
+   */
+  lottoLogicoId: number;
+  /**
+   * @minimum 1
+   */
+  caricoPraticaId?: number;
+  /**
+   * @minimum 1
+   */
+  sessionId?: number;
+  modalita: FseImportMode;
+  profilo: FseImportFileProfile;
+  /**
+   * @maxLength 255
+   */
+  nomeFile: string;
+  /**
+   * @maxLength 100
+   */
+  sheetName?: string;
+  dataRiferimento?: string;
 };
 
 export type ListFseImportSessionsParams = {
-/**
- * @minimum 1
- */
-magazzinoId: number;
+  /**
+   * @minimum 1
+   */
+  magazzinoId: number;
 };
 
 export type AnalyzeAgeaImportazioneParams = {
-/**
- * @minimum 1
- */
-magazzinoId: number;
-modalita: AgeaImportModalita;
-/**
- * @maxLength 255
- * @pattern .*\.xlsx$
- */
-nomeFile: string;
+  /**
+   * @minimum 1
+   */
+  magazzinoId: number;
+  modalita: AgeaImportModalita;
+  /**
+   * @maxLength 255
+   * @pattern .*\.xlsx$
+   */
+  nomeFile: string;
 };
 
 export type ListAgeaImportazioneRigheParams = {
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: number;
-stato?: string;
-fondo?: string;
-tipo?: AgeaTipoMovimento;
-/**
- * @maxLength 100
- */
-q?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: number;
+  stato?: string;
+  fondo?: string;
+  tipo?: AgeaTipoMovimento;
+  /**
+   * @maxLength 100
+   */
+  q?: string;
 };
 
 export type GetFseReportingPreviewParams = {
-/**
- * @minimum 1
- */
-magazzinoId: FseMagazzinoIdParameter;
-dataCompetenzaDa: FseDataDaParameter;
-dataCompetenzaA: FseDataAParameter;
-dataAsOf?: FseDataAsOfParameter;
-includeArretrati?: FseIncludeArretratiParameter;
+  /**
+   * @minimum 1
+   */
+  magazzinoId: FseMagazzinoIdParameter;
+  dataCompetenzaDa: FseDataDaParameter;
+  dataCompetenzaA: FseDataAParameter;
+  dataAsOf?: FseDataAsOfParameter;
+  includeArretrati?: FseIncludeArretratiParameter;
 };
 
 export type ListFseReportingEventsParams = {
-/**
- * @minimum 1
- */
-magazzinoId: FseMagazzinoIdParameter;
-dataCompetenzaDa: FseDataDaParameter;
-dataCompetenzaA: FseDataAParameter;
-includeArretrati?: FseIncludeArretratiParameter;
-/**
- * @minimum 1
- */
-page?: FsePageParameter;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: FsePageSizeParameter;
-statoRendicontazione?: FseQueueStatoParameter;
-canale?: FseQueueCanaleParameter;
-fondo?: FseQueueFondoParameter;
-/**
- * @minimum 1
- */
-prodottoId?: FseQueueProdottoIdParameter;
-qualityCode?: FseQueueQualityCodeParameter;
+  /**
+   * @minimum 1
+   */
+  magazzinoId: FseMagazzinoIdParameter;
+  dataCompetenzaDa: FseDataDaParameter;
+  dataCompetenzaA: FseDataAParameter;
+  includeArretrati?: FseIncludeArretratiParameter;
+  /**
+   * @minimum 1
+   */
+  page?: FsePageParameter;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: FsePageSizeParameter;
+  statoRendicontazione?: FseQueueStatoParameter;
+  canale?: FseQueueCanaleParameter;
+  fondo?: FseQueueFondoParameter;
+  /**
+   * @minimum 1
+   */
+  prodottoId?: FseQueueProdottoIdParameter;
+  qualityCode?: FseQueueQualityCodeParameter;
 };
 
 export type ListFseReportingLinesParams = {
-/**
- * @minimum 1
- */
-magazzinoId: FseMagazzinoIdParameter;
-dataCompetenzaDa: FseDataDaParameter;
-dataCompetenzaA: FseDataAParameter;
-includeArretrati?: FseIncludeArretratiParameter;
-/**
- * @minimum 1
- */
-page?: FsePageParameter;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: FsePageSizeParameter;
-statoRendicontazione?: FseQueueStatoParameter;
-canale?: FseQueueCanaleParameter;
-fondo?: FseQueueFondoParameter;
-/**
- * @minimum 1
- */
-prodottoId?: FseQueueProdottoIdParameter;
-qualityCode?: FseQueueQualityCodeParameter;
+  /**
+   * @minimum 1
+   */
+  magazzinoId: FseMagazzinoIdParameter;
+  dataCompetenzaDa: FseDataDaParameter;
+  dataCompetenzaA: FseDataAParameter;
+  includeArretrati?: FseIncludeArretratiParameter;
+  /**
+   * @minimum 1
+   */
+  page?: FsePageParameter;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: FsePageSizeParameter;
+  statoRendicontazione?: FseQueueStatoParameter;
+  canale?: FseQueueCanaleParameter;
+  fondo?: FseQueueFondoParameter;
+  /**
+   * @minimum 1
+   */
+  prodottoId?: FseQueueProdottoIdParameter;
+  qualityCode?: FseQueueQualityCodeParameter;
 };
 
 export type ListFseReportingQualityParams = {
-/**
- * @minimum 1
- */
-magazzinoId: FseMagazzinoIdParameter;
-dataCompetenzaDa: FseDataDaParameter;
-dataCompetenzaA: FseDataAParameter;
-includeArretrati?: FseIncludeArretratiParameter;
-/**
- * @minimum 1
- */
-page?: FsePageParameter;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: FsePageSizeParameter;
-statoRendicontazione?: FseQueueStatoParameter;
-canale?: FseQueueCanaleParameter;
-fondo?: FseQueueFondoParameter;
-/**
- * @minimum 1
- */
-prodottoId?: FseQueueProdottoIdParameter;
-qualityCode?: FseQueueQualityCodeParameter;
+  /**
+   * @minimum 1
+   */
+  magazzinoId: FseMagazzinoIdParameter;
+  dataCompetenzaDa: FseDataDaParameter;
+  dataCompetenzaA: FseDataAParameter;
+  includeArretrati?: FseIncludeArretratiParameter;
+  /**
+   * @minimum 1
+   */
+  page?: FsePageParameter;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: FsePageSizeParameter;
+  statoRendicontazione?: FseQueueStatoParameter;
+  canale?: FseQueueCanaleParameter;
+  fondo?: FseQueueFondoParameter;
+  /**
+   * @minimum 1
+   */
+  prodottoId?: FseQueueProdottoIdParameter;
+  qualityCode?: FseQueueQualityCodeParameter;
 };
 
 export type ListFseExportsParams = {
-/**
- * @minimum 1
- */
-page?: FsePageParameter;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: FsePageSizeParameter;
-/**
- * @minimum 1
- */
-magazzinoId?: FseOptionalMagazzinoIdParameter;
-dataCompetenzaDa?: FseOptionalDataDaParameter;
-dataCompetenzaA?: FseOptionalDataAParameter;
-/**
- * @maxLength 60
- */
-stato?: FseOptionalStatoParameter;
+  /**
+   * @minimum 1
+   */
+  page?: FsePageParameter;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: FsePageSizeParameter;
+  /**
+   * @minimum 1
+   */
+  magazzinoId?: FseOptionalMagazzinoIdParameter;
+  dataCompetenzaDa?: FseOptionalDataDaParameter;
+  dataCompetenzaA?: FseOptionalDataAParameter;
+  /**
+   * @maxLength 60
+   */
+  stato?: FseOptionalStatoParameter;
 };
 
 export type ListFseExportEventsParams = {
-/**
- * @minimum 1
- */
-page?: FsePageParameter;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: FsePageSizeParameter;
+  /**
+   * @minimum 1
+   */
+  page?: FsePageParameter;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: FsePageSizeParameter;
 };
 
 export type ListFseExportLinesParams = {
-/**
- * @minimum 1
- */
-page?: FsePageParameter;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: FsePageSizeParameter;
+  /**
+   * @minimum 1
+   */
+  page?: FsePageParameter;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: FsePageSizeParameter;
 };
 
 export type DownloadFseExportParams = {
-/**
- * Rappresentazione derivata dallo stesso snapshot immutabile
- */
-representation?: FseDownloadRepresentationParameter;
+  /**
+   * Rappresentazione derivata dallo stesso snapshot immutabile
+   */
+  representation?: FseDownloadRepresentationParameter;
 };
 
 export type ListFseReconciliationsParams = {
-/**
- * @minimum 1
- */
-page?: FsePageParameter;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: FsePageSizeParameter;
-/**
- * @minimum 1
- */
-magazzinoId?: FseOptionalMagazzinoIdParameter;
-dataCompetenzaDa?: FseOptionalDataDaParameter;
-dataCompetenzaA?: FseOptionalDataAParameter;
-/**
- * @maxLength 60
- */
-stato?: FseOptionalStatoParameter;
+  /**
+   * @minimum 1
+   */
+  page?: FsePageParameter;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: FsePageSizeParameter;
+  /**
+   * @minimum 1
+   */
+  magazzinoId?: FseOptionalMagazzinoIdParameter;
+  dataCompetenzaDa?: FseOptionalDataDaParameter;
+  dataCompetenzaA?: FseOptionalDataAParameter;
+  /**
+   * @maxLength 60
+   */
+  stato?: FseOptionalStatoParameter;
 };
 
 export type ListFseReconciliationLinesParams = {
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: number;
 };
 
 export type ListFseMonitoringParams = {
-/**
- * @minimum 1
- */
-page?: FsePageParameter;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: FsePageSizeParameter;
-/**
- * @minimum 1
- */
-magazzinoId?: FseOptionalMagazzinoIdParameter;
-dataCompetenzaDa?: FseOptionalDataDaParameter;
-dataCompetenzaA?: FseOptionalDataAParameter;
+  /**
+   * @minimum 1
+   */
+  page?: FsePageParameter;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: FsePageSizeParameter;
+  /**
+   * @minimum 1
+   */
+  magazzinoId?: FseOptionalMagazzinoIdParameter;
+  dataCompetenzaDa?: FseOptionalDataDaParameter;
+  dataCompetenzaA?: FseOptionalDataAParameter;
 };
 
 export type ListLottiLogiciParams = {
-/**
- * @minimum 1
- */
-areaOperativaId?: number;
-includeStorico?: boolean;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  includeStorico?: boolean;
 };
 
 export type ListLottiParams = {
-prodottoId?: number;
-magazzinoId?: number;
-inScadenza?: boolean;
-fondoOrigine?: FondoOrigine;
-/**
- * Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.
- */
-origineCaricoPresente?: OrigineCarico;
-/**
- * Include anche le partite con residuo zero; omesso mantiene il filtro storico sui soli residui positivi.
- */
-includeEsauriti?: boolean;
+  prodottoId?: number;
+  magazzinoId?: number;
+  inScadenza?: boolean;
+  fondoOrigine?: FondoOrigine;
+  /**
+   * Restituisce Partite alimentate almeno una volta da questa origine. Non attribuisce la quantità residua alla provenienza selezionata.
+   */
+  origineCaricoPresente?: OrigineCarico;
+  /**
+   * Include anche le partite con residuo zero; omesso mantiene il filtro storico sui soli residui positivi.
+   */
+  includeEsauriti?: boolean;
 };
 
 export type ListMovimentiParams = {
-tipo?: string;
-magazzinoId?: number;
-prodottoId?: number;
-centroAscoltoId?: number;
-da?: string;
-a?: string;
-fondoOrigine?: FondoOrigine;
-naturaContabile?: string;
-canaleOperativo?: string;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  tipo?: string;
+  magazzinoId?: number;
+  prodottoId?: number;
+  centroAscoltoId?: number;
+  da?: string;
+  a?: string;
+  fondoOrigine?: FondoOrigine;
+  naturaContabile?: string;
+  canaleOperativo?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
 export type ListGiacenzeParams = {
-/**
- * Area Operativa che delimita sempre la consultazione delle giacenze.
- * @minimum 1
- */
-areaOperativaId: number;
-/**
- * Magazzino opzionale, che deve appartenere all'Area Operativa richiesta.
- * @minimum 1
- */
-magazzinoId?: number;
-sottoscortaOnly?: boolean;
-fsePlusOnly?: boolean;
-prodottoId?: number;
-fondoOrigine?: FondoOrigine;
-scadenzaDa?: string;
-scadenzaA?: string;
+  /**
+   * Area Operativa che delimita sempre la consultazione delle giacenze.
+   * @minimum 1
+   */
+  areaOperativaId: number;
+  /**
+   * Magazzino opzionale, che deve appartenere all'Area Operativa richiesta.
+   * @minimum 1
+   */
+  magazzinoId?: number;
+  sottoscortaOnly?: boolean;
+  fsePlusOnly?: boolean;
+  prodottoId?: number;
+  fondoOrigine?: FondoOrigine;
+  scadenzaDa?: string;
+  scadenzaA?: string;
 };
 
 export type GetPreparazioneConsegneParams = {
-areaOperativaId?: number;
-magazzinoId?: number;
+  areaOperativaId?: number;
+  magazzinoId?: number;
 };
 
 export type ListTrasferimentiParams = {
-stato?: string;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  stato?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
 export type ListScarichiParams = {
-centroAscoltoId?: number;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  centroAscoltoId?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
 export type ListFornitoriParams = {
-areaOperativaId?: number;
+  areaOperativaId?: number;
 };
 
 export type ListApprovvigionamentiParams = {
-stato?: string;
-magazzinoId?: number;
-centroAscoltoId?: number;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  stato?: string;
+  magazzinoId?: number;
+  centroAscoltoId?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
 export type ListTurniParams = {
-da?: string;
-a?: string;
-centroAscoltoId?: number;
+  da?: string;
+  a?: string;
+  centroAscoltoId?: number;
 };
 
 export type ListBeneficiariParams = {
-search?: string;
-priorita?: string;
-domicilio?: boolean;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-zonaUdsId?: number;
-uds?: boolean;
-attivo?: boolean;
-/**
- * Filtra le anagrafiche complete o quelle provvisorie ancora da completare.
- */
-statoAnagrafica?: ListBeneficiariStatoAnagrafica;
-/**
- * Pagina richiesta, a partire da 1.
- * @minimum 1
- */
-page?: number;
-/**
- * Numero massimo di risultati per pagina.
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  search?: string;
+  priorita?: string;
+  domicilio?: boolean;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  zonaUdsId?: number;
+  uds?: boolean;
+  attivo?: boolean;
+  /**
+   * Filtra le anagrafiche complete o quelle provvisorie ancora da completare.
+   */
+  statoAnagrafica?: ListBeneficiariStatoAnagrafica;
+  /**
+   * Pagina richiesta, a partire da 1.
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * Numero massimo di risultati per pagina.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
-export type ListBeneficiariStatoAnagrafica = typeof ListBeneficiariStatoAnagrafica[keyof typeof ListBeneficiariStatoAnagrafica];
-
+export type ListBeneficiariStatoAnagrafica =
+  (typeof ListBeneficiariStatoAnagrafica)[keyof typeof ListBeneficiariStatoAnagrafica];
 
 export const ListBeneficiariStatoAnagrafica = {
-  provvisoria: 'provvisoria',
-  completa: 'completa',
+  provvisoria: "provvisoria",
+  completa: "completa",
 } as const;
 
 export type CercaBeneficiariSimiliParams = {
-/**
- * Free-text lookup over names in both orders, nickname, phone, beneficiary code and tax code; at least 2 characters
- * @minLength 2
- */
-search?: string;
-nome?: string;
-cognome?: string;
-soprannome?: string;
-telefono?: string;
-dataNascita?: string;
-/**
- * Obbligatorio per utenti globali; per utenti territoriali viene sempre usata la propria Area.
- * @minimum 1
- */
-areaOperativaId?: number;
-excludeId?: number;
+  /**
+   * Free-text lookup over names in both orders, nickname, phone, beneficiary code and tax code; at least 2 characters
+   * @minLength 2
+   */
+  search?: string;
+  nome?: string;
+  cognome?: string;
+  soprannome?: string;
+  telefono?: string;
+  dataNascita?: string;
+  /**
+   * Obbligatorio per utenti globali; per utenti territoriali viene sempre usata la propria Area.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  excludeId?: number;
 };
 
 export type CercaBeneficiariSimili400 = {
@@ -10927,702 +10962,702 @@ export type AuthorizeBeneficiariExport200 = {
 };
 
 export type ListInterventiParams = {
-beneficiarioId?: number;
-tipo?: string;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-/**
- * Filtra gli interventi in base ai Bisogni Pianificati collegati.
- */
-bisogni?: ListInterventiBisogni;
-stato?: InterventoStato;
-ambito?: InterventoAmbito;
-/**
- * Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.
- */
-includiStorici?: boolean;
-operatoreId?: number;
-priorita?: InterventoPriorita;
-/**
- * Estremo iniziale ISO 8601 con fuso dell'intervallo pianificato.
- */
-pianificataDa?: string;
-/**
- * Estremo finale ISO 8601 con fuso dell'intervallo pianificato.
- */
-pianificataA?: string;
-interventoPrecedenteId?: number;
-/**
- * Vista operativa Sociale; richiede ambito=sociale. Oggi e i relativi confini civili sono calcolati in Europe/Rome.
- */
-vista?: InterventoVista;
-/**
- * Ricerca beneficiario per nome, cognome, nome completo o codice.
- * @maxLength 120
- */
-ricerca?: string;
-/**
- * Data civile iniziale inclusiva Europe/Rome; deve essere usata insieme ad a.
- */
-da?: string;
-/**
- * Data civile finale inclusiva Europe/Rome; intervallo massimo 366 giorni.
- */
-a?: string;
-ordina?: ListInterventiOrdina;
-direzione?: ListInterventiDirezione;
-/**
- * Selezione conservativa dei record Sociali classificati o con ambito storico non determinato.
- */
-ambitoLegacy?: ListInterventiAmbitoLegacy;
-/**
- * @minimum 1
- */
-pagina?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-limite?: number;
+  beneficiarioId?: number;
+  tipo?: string;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  /**
+   * Filtra gli interventi in base ai Bisogni Pianificati collegati.
+   */
+  bisogni?: ListInterventiBisogni;
+  stato?: InterventoStato;
+  ambito?: InterventoAmbito;
+  /**
+   * Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.
+   */
+  includiStorici?: boolean;
+  operatoreId?: number;
+  priorita?: InterventoPriorita;
+  /**
+   * Estremo iniziale ISO 8601 con fuso dell'intervallo pianificato.
+   */
+  pianificataDa?: string;
+  /**
+   * Estremo finale ISO 8601 con fuso dell'intervallo pianificato.
+   */
+  pianificataA?: string;
+  interventoPrecedenteId?: number;
+  /**
+   * Vista operativa Sociale; richiede ambito=sociale. Oggi e i relativi confini civili sono calcolati in Europe/Rome.
+   */
+  vista?: InterventoVista;
+  /**
+   * Ricerca beneficiario per nome, cognome, nome completo o codice.
+   * @maxLength 120
+   */
+  ricerca?: string;
+  /**
+   * Data civile iniziale inclusiva Europe/Rome; deve essere usata insieme ad a.
+   */
+  da?: string;
+  /**
+   * Data civile finale inclusiva Europe/Rome; intervallo massimo 366 giorni.
+   */
+  a?: string;
+  ordina?: ListInterventiOrdina;
+  direzione?: ListInterventiDirezione;
+  /**
+   * Selezione conservativa dei record Sociali classificati o con ambito storico non determinato.
+   */
+  ambitoLegacy?: ListInterventiAmbitoLegacy;
+  /**
+   * @minimum 1
+   */
+  pagina?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  limite?: number;
 };
 
-export type ListInterventiBisogni = typeof ListInterventiBisogni[keyof typeof ListInterventiBisogni];
-
+export type ListInterventiBisogni =
+  (typeof ListInterventiBisogni)[keyof typeof ListInterventiBisogni];
 
 export const ListInterventiBisogni = {
-  aperti: 'aperti',
-  scaduti: 'scaduti',
-  nessuno: 'nessuno',
+  aperti: "aperti",
+  scaduti: "scaduti",
+  nessuno: "nessuno",
 } as const;
 
-export type ListInterventiOrdina = typeof ListInterventiOrdina[keyof typeof ListInterventiOrdina];
-
+export type ListInterventiOrdina =
+  (typeof ListInterventiOrdina)[keyof typeof ListInterventiOrdina];
 
 export const ListInterventiOrdina = {
-  data: 'data',
-  priorita: 'priorita',
-  beneficiario: 'beneficiario',
-  operatore: 'operatore',
+  data: "data",
+  priorita: "priorita",
+  beneficiario: "beneficiario",
+  operatore: "operatore",
 } as const;
 
-export type ListInterventiDirezione = typeof ListInterventiDirezione[keyof typeof ListInterventiDirezione];
-
+export type ListInterventiDirezione =
+  (typeof ListInterventiDirezione)[keyof typeof ListInterventiDirezione];
 
 export const ListInterventiDirezione = {
-  asc: 'asc',
-  desc: 'desc',
+  asc: "asc",
+  desc: "desc",
 } as const;
 
-export type ListInterventiAmbitoLegacy = typeof ListInterventiAmbitoLegacy[keyof typeof ListInterventiAmbitoLegacy];
-
+export type ListInterventiAmbitoLegacy =
+  (typeof ListInterventiAmbitoLegacy)[keyof typeof ListInterventiAmbitoLegacy];
 
 export const ListInterventiAmbitoLegacy = {
-  tutti: 'tutti',
-  classificati: 'classificati',
-  legacy: 'legacy',
+  tutti: "tutti",
+  classificati: "classificati",
+  legacy: "legacy",
 } as const;
 
 export type ListInterventiPaginaParams = {
-beneficiarioId?: number;
-tipo?: string;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-/**
- * Filtra gli interventi in base ai Bisogni Pianificati collegati.
- */
-bisogni?: ListInterventiPaginaBisogni;
-stato?: InterventoStato;
-ambito?: InterventoAmbito;
-/**
- * Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.
- */
-includiStorici?: boolean;
-operatoreId?: number;
-priorita?: InterventoPriorita;
-/**
- * Estremo iniziale ISO 8601 con fuso dell'intervallo pianificato.
- */
-pianificataDa?: string;
-/**
- * Estremo finale ISO 8601 con fuso dell'intervallo pianificato.
- */
-pianificataA?: string;
-interventoPrecedenteId?: number;
-/**
- * Vista operativa Sociale; richiede ambito=sociale. Oggi e i relativi confini civili sono calcolati in Europe/Rome.
- */
-vista?: InterventoVista;
-/**
- * Ricerca beneficiario per nome, cognome, nome completo o codice.
- * @maxLength 120
- */
-ricerca?: string;
-/**
- * Data civile iniziale inclusiva Europe/Rome; deve essere usata insieme ad a.
- */
-da?: string;
-/**
- * Data civile finale inclusiva Europe/Rome; intervallo massimo 366 giorni.
- */
-a?: string;
-ordina?: ListInterventiPaginaOrdina;
-direzione?: ListInterventiPaginaDirezione;
-/**
- * Selezione conservativa dei record Sociali classificati o con ambito storico non determinato.
- */
-ambitoLegacy?: ListInterventiPaginaAmbitoLegacy;
-/**
- * @minimum 1
- */
-pagina?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-limite?: number;
+  beneficiarioId?: number;
+  tipo?: string;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  /**
+   * Filtra gli interventi in base ai Bisogni Pianificati collegati.
+   */
+  bisogni?: ListInterventiPaginaBisogni;
+  stato?: InterventoStato;
+  ambito?: InterventoAmbito;
+  /**
+   * Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.
+   */
+  includiStorici?: boolean;
+  operatoreId?: number;
+  priorita?: InterventoPriorita;
+  /**
+   * Estremo iniziale ISO 8601 con fuso dell'intervallo pianificato.
+   */
+  pianificataDa?: string;
+  /**
+   * Estremo finale ISO 8601 con fuso dell'intervallo pianificato.
+   */
+  pianificataA?: string;
+  interventoPrecedenteId?: number;
+  /**
+   * Vista operativa Sociale; richiede ambito=sociale. Oggi e i relativi confini civili sono calcolati in Europe/Rome.
+   */
+  vista?: InterventoVista;
+  /**
+   * Ricerca beneficiario per nome, cognome, nome completo o codice.
+   * @maxLength 120
+   */
+  ricerca?: string;
+  /**
+   * Data civile iniziale inclusiva Europe/Rome; deve essere usata insieme ad a.
+   */
+  da?: string;
+  /**
+   * Data civile finale inclusiva Europe/Rome; intervallo massimo 366 giorni.
+   */
+  a?: string;
+  ordina?: ListInterventiPaginaOrdina;
+  direzione?: ListInterventiPaginaDirezione;
+  /**
+   * Selezione conservativa dei record Sociali classificati o con ambito storico non determinato.
+   */
+  ambitoLegacy?: ListInterventiPaginaAmbitoLegacy;
+  /**
+   * @minimum 1
+   */
+  pagina?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  limite?: number;
 };
 
-export type ListInterventiPaginaBisogni = typeof ListInterventiPaginaBisogni[keyof typeof ListInterventiPaginaBisogni];
-
+export type ListInterventiPaginaBisogni =
+  (typeof ListInterventiPaginaBisogni)[keyof typeof ListInterventiPaginaBisogni];
 
 export const ListInterventiPaginaBisogni = {
-  aperti: 'aperti',
-  scaduti: 'scaduti',
-  nessuno: 'nessuno',
+  aperti: "aperti",
+  scaduti: "scaduti",
+  nessuno: "nessuno",
 } as const;
 
-export type ListInterventiPaginaOrdina = typeof ListInterventiPaginaOrdina[keyof typeof ListInterventiPaginaOrdina];
-
+export type ListInterventiPaginaOrdina =
+  (typeof ListInterventiPaginaOrdina)[keyof typeof ListInterventiPaginaOrdina];
 
 export const ListInterventiPaginaOrdina = {
-  data: 'data',
-  priorita: 'priorita',
-  beneficiario: 'beneficiario',
-  operatore: 'operatore',
+  data: "data",
+  priorita: "priorita",
+  beneficiario: "beneficiario",
+  operatore: "operatore",
 } as const;
 
-export type ListInterventiPaginaDirezione = typeof ListInterventiPaginaDirezione[keyof typeof ListInterventiPaginaDirezione];
-
+export type ListInterventiPaginaDirezione =
+  (typeof ListInterventiPaginaDirezione)[keyof typeof ListInterventiPaginaDirezione];
 
 export const ListInterventiPaginaDirezione = {
-  asc: 'asc',
-  desc: 'desc',
+  asc: "asc",
+  desc: "desc",
 } as const;
 
-export type ListInterventiPaginaAmbitoLegacy = typeof ListInterventiPaginaAmbitoLegacy[keyof typeof ListInterventiPaginaAmbitoLegacy];
-
+export type ListInterventiPaginaAmbitoLegacy =
+  (typeof ListInterventiPaginaAmbitoLegacy)[keyof typeof ListInterventiPaginaAmbitoLegacy];
 
 export const ListInterventiPaginaAmbitoLegacy = {
-  tutti: 'tutti',
-  classificati: 'classificati',
-  legacy: 'legacy',
+  tutti: "tutti",
+  classificati: "classificati",
+  legacy: "legacy",
 } as const;
 
 export type GetInterventiRiepilogoVisteParams = {
-beneficiarioId?: number;
-/**
- * @maxLength 120
- */
-ricerca?: string;
-tipo?: string;
-priorita?: InterventoPriorita;
-operatoreId?: number;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-stato?: InterventoStato;
-ambitoLegacy?: GetInterventiRiepilogoVisteAmbitoLegacy;
-da?: string;
-a?: string;
+  beneficiarioId?: number;
+  /**
+   * @maxLength 120
+   */
+  ricerca?: string;
+  tipo?: string;
+  priorita?: InterventoPriorita;
+  operatoreId?: number;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  stato?: InterventoStato;
+  ambitoLegacy?: GetInterventiRiepilogoVisteAmbitoLegacy;
+  da?: string;
+  a?: string;
 };
 
-export type GetInterventiRiepilogoVisteAmbitoLegacy = typeof GetInterventiRiepilogoVisteAmbitoLegacy[keyof typeof GetInterventiRiepilogoVisteAmbitoLegacy];
-
+export type GetInterventiRiepilogoVisteAmbitoLegacy =
+  (typeof GetInterventiRiepilogoVisteAmbitoLegacy)[keyof typeof GetInterventiRiepilogoVisteAmbitoLegacy];
 
 export const GetInterventiRiepilogoVisteAmbitoLegacy = {
-  tutti: 'tutti',
-  classificati: 'classificati',
-  legacy: 'legacy',
+  tutti: "tutti",
+  classificati: "classificati",
+  legacy: "legacy",
 } as const;
 
 export type ListInterventiOperatoriParams = {
-centroAscoltoId?: number;
-areaOperativaId?: number;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
 };
 
 export type GetMaterialeDaPreparareParams = {
-periodo?: GetMaterialeDaPrepararePeriodo;
-/**
- * Data civile Europe/Rome, obbligatoria per periodo personalizzato.
- */
-da?: string;
-/**
- * Data civile Europe/Rome inclusiva; massimo 31 giorni.
- */
-a?: string;
-areaOperativaId?: number;
-centroAscoltoId?: number;
+  periodo?: GetMaterialeDaPrepararePeriodo;
+  /**
+   * Data civile Europe/Rome, obbligatoria per periodo personalizzato.
+   */
+  da?: string;
+  /**
+   * Data civile Europe/Rome inclusiva; massimo 31 giorni.
+   */
+  a?: string;
+  areaOperativaId?: number;
+  centroAscoltoId?: number;
 };
 
-export type GetMaterialeDaPrepararePeriodo = typeof GetMaterialeDaPrepararePeriodo[keyof typeof GetMaterialeDaPrepararePeriodo];
-
+export type GetMaterialeDaPrepararePeriodo =
+  (typeof GetMaterialeDaPrepararePeriodo)[keyof typeof GetMaterialeDaPrepararePeriodo];
 
 export const GetMaterialeDaPrepararePeriodo = {
-  oggi: 'oggi',
-  NUMBER_3: '3',
-  NUMBER_7: '7',
-  NUMBER_14: '14',
-  personalizzato: 'personalizzato',
+  oggi: "oggi",
+  NUMBER_3: "3",
+  NUMBER_7: "7",
+  NUMBER_14: "14",
+  personalizzato: "personalizzato",
 } as const;
 
 export type ListUdsDirectoryParams = {
-/**
- * @minLength 2
- * @maxLength 120
- */
-search?: string;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
-/**
- * Disponibile soltanto ai profili amministrativi globali.
- */
-areaOperativaId?: number;
-zonaUdsId?: number;
+  /**
+   * @minLength 2
+   * @maxLength 120
+   */
+  search?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * Disponibile soltanto ai profili amministrativi globali.
+   */
+  areaOperativaId?: number;
+  zonaUdsId?: number;
 };
 
 export type ListUdsLinkCandidatesParams = {
-/**
- * @minLength 2
- * @maxLength 120
- */
-search: string;
-/**
- * Disponibile soltanto ai profili amministrativi globali.
- * @minimum 1
- */
-areaOperativaId?: number;
+  /**
+   * @minLength 2
+   * @maxLength 120
+   */
+  search: string;
+  /**
+   * Disponibile soltanto ai profili amministrativi globali.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
 };
 
 export type ListConsegneParams = {
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-pageSize?: number;
-/**
- * Ricerca per codice, beneficiario o indirizzo
- */
-q?: string;
-stato?: string;
-data?: string;
-dataInizio?: string;
-dataFine?: string;
-beneficiarioId?: number;
-centroAscoltoId?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  pageSize?: number;
+  /**
+   * Ricerca per codice, beneficiario o indirizzo
+   */
+  q?: string;
+  stato?: string;
+  data?: string;
+  dataInizio?: string;
+  dataFine?: string;
+  beneficiarioId?: number;
+  centroAscoltoId?: number;
 };
 
 export type ExportConsegneParams = {
-q?: string;
-stato?: string;
-data?: string;
-dataInizio?: string;
-dataFine?: string;
-beneficiarioId?: number;
-centroAscoltoId?: number;
+  q?: string;
+  stato?: string;
+  data?: string;
+  dataInizio?: string;
+  dataFine?: string;
+  beneficiarioId?: number;
+  centroAscoltoId?: number;
 };
 
 export type ListAccessiEmporioParams = {
-dataDa?: string;
-dataA?: string;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-areaId?: number;
-magazzinoEmporioId?: number;
-statoAccessoEmporio?: AccessoEmporioStato;
-beneficiarioSearch?: string;
-/**
- * Pagina richiesta, indicizzata da 1
- * @minimum 1
- */
-page?: PageParamParameter;
-/**
- * Numero di record per pagina
- * @minimum 1
- * @maximum 100
- */
-limit?: LimitParamParameter;
-beneficiarioId?: number;
+  dataDa?: string;
+  dataA?: string;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  areaId?: number;
+  magazzinoEmporioId?: number;
+  statoAccessoEmporio?: AccessoEmporioStato;
+  beneficiarioSearch?: string;
+  /**
+   * Pagina richiesta, indicizzata da 1
+   * @minimum 1
+   */
+  page?: PageParamParameter;
+  /**
+   * Numero di record per pagina
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: LimitParamParameter;
+  beneficiarioId?: number;
 };
 
 export type GetEmporioAbilitazioniRiepilogoBeneficiariParams = {
-/**
- * Identificativi della pagina corrente, separati da virgola (massimo 100).
- */
-beneficiarioIds: string;
+  /**
+   * Identificativi della pagina corrente, separati da virgola (massimo 100).
+   */
+  beneficiarioIds: string;
 };
 
 export type SearchBeneficiariAccessiEmporioParams = {
-/**
- * Include risultati operativi minimi non pianificabili della stessa Area autorizzata, con motivi. Non autorizza la creazione di Accessi né l'accesso al dossier sociale.
- */
-includiNonPianificabili?: boolean;
-magazzinoEmporioId: number;
-codiceTessera?: string;
-search?: string;
-beneficiarioId?: number;
+  /**
+   * Include risultati operativi minimi non pianificabili della stessa Area autorizzata, con motivi. Non autorizza la creazione di Accessi né l'accesso al dossier sociale.
+   */
+  includiNonPianificabili?: boolean;
+  magazzinoEmporioId: number;
+  codiceTessera?: string;
+  search?: string;
+  beneficiarioId?: number;
 };
 
 export type ListSessioniCassaEmporioParams = {
-statoSessione?: SessioneCassaEmporioStato;
-magazzinoEmporioId?: number;
-areaOperativaId?: number;
-areaId?: number;
-data?: string;
-beneficiarioSearch?: string;
-/**
- * Pagina richiesta, indicizzata da 1
- * @minimum 1
- */
-page?: PageParamParameter;
-/**
- * Numero di record per pagina
- * @minimum 1
- * @maximum 100
- */
-limit?: LimitParamParameter;
+  statoSessione?: SessioneCassaEmporioStato;
+  magazzinoEmporioId?: number;
+  areaOperativaId?: number;
+  areaId?: number;
+  data?: string;
+  beneficiarioSearch?: string;
+  /**
+   * Pagina richiesta, indicizzata da 1
+   * @minimum 1
+   */
+  page?: PageParamParameter;
+  /**
+   * Numero di record per pagina
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: LimitParamParameter;
 };
 
 export type SearchBeneficiariCassaEmporioParams = {
-codiceTessera?: string;
-search?: string;
-data?: string;
-areaOperativaId?: number;
-areaId?: number;
-magazzinoEmporioId: number;
+  codiceTessera?: string;
+  search?: string;
+  data?: string;
+  areaOperativaId?: number;
+  areaId?: number;
+  magazzinoEmporioId: number;
 };
 
 export type SearchProdottiCassaEmporioParams = {
-search?: string;
-magazzinoEmporioId?: number;
+  search?: string;
+  magazzinoEmporioId?: number;
 };
 
 export type ListSpeseEmporioParams = {
-dataDa?: string;
-dataA?: string;
-beneficiarioSearch?: string;
-beneficiarioId?: number;
-magazzinoEmporioId?: number;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-areaId?: number;
-/**
- * Pagina richiesta, indicizzata da 1
- * @minimum 1
- */
-page?: PageParamParameter;
-/**
- * Numero di record per pagina
- * @minimum 1
- * @maximum 100
- */
-limit?: LimitParamParameter;
+  dataDa?: string;
+  dataA?: string;
+  beneficiarioSearch?: string;
+  beneficiarioId?: number;
+  magazzinoEmporioId?: number;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  areaId?: number;
+  /**
+   * Pagina richiesta, indicizzata da 1
+   * @minimum 1
+   */
+  page?: PageParamParameter;
+  /**
+   * Numero di record per pagina
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: LimitParamParameter;
 };
 
 export type ListEntiDestinatariParams = {
-attivo?: boolean;
-/**
- * Ricerca case-insensitive su denominazione, indirizzo, telefono ed email
- * @minLength 2
- * @maxLength 100
- */
-search?: string;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
-/**
- * @minimum 0
- */
-offset?: number;
+  attivo?: boolean;
+  /**
+   * Ricerca case-insensitive su denominazione, indirizzo, telefono ed email
+   * @minLength 2
+   * @maxLength 100
+   */
+  search?: string;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * @minimum 0
+   */
+  offset?: number;
 };
 
 export type ListDocumentiOperativiParams = {
-tipoAggregato?: ListDocumentiOperativiTipoAggregato;
-destinatario?: ListDocumentiOperativiDestinatario;
-stato?: string;
-/**
- * @minimum 1
- */
-areaOperativaId?: number;
-/**
- * @minimum 1
- */
-magazzinoId?: number;
-/**
- * @minimum 1
- */
-centroAscoltoId?: number;
-dataDa?: string;
-dataA?: string;
-/**
- * @minLength 1
- * @maxLength 120
- */
-ricerca?: string;
-sortBy?: ListDocumentiOperativiSortBy;
-sortDirection?: ListDocumentiOperativiSortDirection;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  tipoAggregato?: ListDocumentiOperativiTipoAggregato;
+  destinatario?: ListDocumentiOperativiDestinatario;
+  stato?: string;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  magazzinoId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+  dataDa?: string;
+  dataA?: string;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  ricerca?: string;
+  sortBy?: ListDocumentiOperativiSortBy;
+  sortDirection?: ListDocumentiOperativiSortDirection;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
-export type ListDocumentiOperativiTipoAggregato = typeof ListDocumentiOperativiTipoAggregato[keyof typeof ListDocumentiOperativiTipoAggregato];
-
+export type ListDocumentiOperativiTipoAggregato =
+  (typeof ListDocumentiOperativiTipoAggregato)[keyof typeof ListDocumentiOperativiTipoAggregato];
 
 export const ListDocumentiOperativiTipoAggregato = {
-  bolla: 'bolla',
-  trasferimento: 'trasferimento',
+  bolla: "bolla",
+  trasferimento: "trasferimento",
 } as const;
 
-export type ListDocumentiOperativiDestinatario = typeof ListDocumentiOperativiDestinatario[keyof typeof ListDocumentiOperativiDestinatario];
-
+export type ListDocumentiOperativiDestinatario =
+  (typeof ListDocumentiOperativiDestinatario)[keyof typeof ListDocumentiOperativiDestinatario];
 
 export const ListDocumentiOperativiDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
-  magazzino: 'magazzino',
+  beneficiario: "beneficiario",
+  ente: "ente",
+  magazzino: "magazzino",
 } as const;
 
-export type ListDocumentiOperativiSortBy = typeof ListDocumentiOperativiSortBy[keyof typeof ListDocumentiOperativiSortBy];
-
+export type ListDocumentiOperativiSortBy =
+  (typeof ListDocumentiOperativiSortBy)[keyof typeof ListDocumentiOperativiSortBy];
 
 export const ListDocumentiOperativiSortBy = {
-  dataDocumento: 'dataDocumento',
-  dataCreazione: 'dataCreazione',
-  numero: 'numero',
+  dataDocumento: "dataDocumento",
+  dataCreazione: "dataCreazione",
+  numero: "numero",
 } as const;
 
-export type ListDocumentiOperativiSortDirection = typeof ListDocumentiOperativiSortDirection[keyof typeof ListDocumentiOperativiSortDirection];
-
+export type ListDocumentiOperativiSortDirection =
+  (typeof ListDocumentiOperativiSortDirection)[keyof typeof ListDocumentiOperativiSortDirection];
 
 export const ListDocumentiOperativiSortDirection = {
-  asc: 'asc',
-  desc: 'desc',
+  asc: "asc",
+  desc: "desc",
 } as const;
 
 export type ExportDocumentiOperativiParams = {
-tipoAggregato?: ExportDocumentiOperativiTipoAggregato;
-destinatario?: ExportDocumentiOperativiDestinatario;
-stato?: string;
-/**
- * @minimum 1
- */
-areaOperativaId?: number;
-/**
- * @minimum 1
- */
-magazzinoId?: number;
-/**
- * @minimum 1
- */
-centroAscoltoId?: number;
-dataDa?: string;
-dataA?: string;
-/**
- * @minLength 1
- * @maxLength 120
- */
-ricerca?: string;
-sortBy?: ExportDocumentiOperativiSortBy;
-sortDirection?: ExportDocumentiOperativiSortDirection;
+  tipoAggregato?: ExportDocumentiOperativiTipoAggregato;
+  destinatario?: ExportDocumentiOperativiDestinatario;
+  stato?: string;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  magazzinoId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+  dataDa?: string;
+  dataA?: string;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  ricerca?: string;
+  sortBy?: ExportDocumentiOperativiSortBy;
+  sortDirection?: ExportDocumentiOperativiSortDirection;
 };
 
-export type ExportDocumentiOperativiTipoAggregato = typeof ExportDocumentiOperativiTipoAggregato[keyof typeof ExportDocumentiOperativiTipoAggregato];
-
+export type ExportDocumentiOperativiTipoAggregato =
+  (typeof ExportDocumentiOperativiTipoAggregato)[keyof typeof ExportDocumentiOperativiTipoAggregato];
 
 export const ExportDocumentiOperativiTipoAggregato = {
-  bolla: 'bolla',
-  trasferimento: 'trasferimento',
+  bolla: "bolla",
+  trasferimento: "trasferimento",
 } as const;
 
-export type ExportDocumentiOperativiDestinatario = typeof ExportDocumentiOperativiDestinatario[keyof typeof ExportDocumentiOperativiDestinatario];
-
+export type ExportDocumentiOperativiDestinatario =
+  (typeof ExportDocumentiOperativiDestinatario)[keyof typeof ExportDocumentiOperativiDestinatario];
 
 export const ExportDocumentiOperativiDestinatario = {
-  beneficiario: 'beneficiario',
-  ente: 'ente',
-  magazzino: 'magazzino',
+  beneficiario: "beneficiario",
+  ente: "ente",
+  magazzino: "magazzino",
 } as const;
 
-export type ExportDocumentiOperativiSortBy = typeof ExportDocumentiOperativiSortBy[keyof typeof ExportDocumentiOperativiSortBy];
-
+export type ExportDocumentiOperativiSortBy =
+  (typeof ExportDocumentiOperativiSortBy)[keyof typeof ExportDocumentiOperativiSortBy];
 
 export const ExportDocumentiOperativiSortBy = {
-  dataDocumento: 'dataDocumento',
-  dataCreazione: 'dataCreazione',
-  numero: 'numero',
+  dataDocumento: "dataDocumento",
+  dataCreazione: "dataCreazione",
+  numero: "numero",
 } as const;
 
-export type ExportDocumentiOperativiSortDirection = typeof ExportDocumentiOperativiSortDirection[keyof typeof ExportDocumentiOperativiSortDirection];
-
+export type ExportDocumentiOperativiSortDirection =
+  (typeof ExportDocumentiOperativiSortDirection)[keyof typeof ExportDocumentiOperativiSortDirection];
 
 export const ExportDocumentiOperativiSortDirection = {
-  asc: 'asc',
-  desc: 'desc',
+  asc: "asc",
+  desc: "desc",
 } as const;
 
 export type ListBolleParams = {
-stato?: string;
-magazzinoId?: number;
-centroAscoltoId?: number;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  stato?: string;
+  magazzinoId?: number;
+  centroAscoltoId?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
 export type GetMapsInterventiSocialiParams = {
-/**
- * Data civile iniziale Europe/Rome; default oggi
- */
-da?: MapsDaParameter;
-/**
- * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
- */
-a?: MapsAParameter;
+  /**
+   * Data civile iniziale Europe/Rome; default oggi
+   */
+  da?: MapsDaParameter;
+  /**
+   * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
+   */
+  a?: MapsAParameter;
 };
 
 export type GetMapsConsegneParams = {
-/**
- * Data civile iniziale Europe/Rome; default oggi
- */
-da?: MapsDaParameter;
-/**
- * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
- */
-a?: MapsAParameter;
+  /**
+   * Data civile iniziale Europe/Rome; default oggi
+   */
+  da?: MapsDaParameter;
+  /**
+   * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
+   */
+  a?: MapsAParameter;
 };
 
 export type GetMapsRitiriNonEffettuatiParams = {
-/**
- * Data civile iniziale Europe/Rome; default oggi
- */
-da?: MapsDaParameter;
-/**
- * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
- */
-a?: MapsAParameter;
+  /**
+   * Data civile iniziale Europe/Rome; default oggi
+   */
+  da?: MapsDaParameter;
+  /**
+   * Data civile finale Europe/Rome; default da + 7 giorni, massimo 31 giorni
+   */
+  a?: MapsAParameter;
 };
 
 export type ListZoneUdsParams = {
-areaOperativaId?: number;
-/**
- * Riservato ai profili amministrativi.
- */
-includiInattive?: boolean;
+  areaOperativaId?: number;
+  /**
+   * Riservato ai profili amministrativi.
+   */
+  includiInattive?: boolean;
 };
 
 export type ListSuperAdminAuditConfigurazioniParams = {
-/**
- * @minimum 1
- * @maximum 200
- */
-limit?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  limit?: number;
 };
 
 export type ListSuperAdminLogSistemaParams = {
-/**
- * Data/ora iniziale filtro log
- */
-dateFrom?: string;
-/**
- * Data/ora finale filtro log
- */
-dateTo?: string;
-/**
- * Ricerca per username o email snapshot
- */
-search?: string;
-/**
- * Filtro email snapshot
- */
-email?: string;
-eventType?: SystemLogEventType;
-eventStatus?: SystemLogEventStatus;
-ipAddress?: string;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
-/**
- * @minimum 0
- */
-offset?: number;
+  /**
+   * Data/ora iniziale filtro log
+   */
+  dateFrom?: string;
+  /**
+   * Data/ora finale filtro log
+   */
+  dateTo?: string;
+  /**
+   * Ricerca per username o email snapshot
+   */
+  search?: string;
+  /**
+   * Filtro email snapshot
+   */
+  email?: string;
+  eventType?: SystemLogEventType;
+  eventStatus?: SystemLogEventStatus;
+  ipAddress?: string;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * @minimum 0
+   */
+  offset?: number;
 };
 
 export type ListCreditoSolidaleMovimentiParams = {
-beneficiarioId?: number;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-tipoMovimento?: ListCreditoSolidaleMovimentiTipoMovimento;
-/**
- * @pattern ^\d{4}-(0[1-9]|1[0-2])$
- */
-periodoRiferimento?: string;
-annullato?: boolean;
+  beneficiarioId?: number;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  tipoMovimento?: ListCreditoSolidaleMovimentiTipoMovimento;
+  /**
+   * @pattern ^\d{4}-(0[1-9]|1[0-2])$
+   */
+  periodoRiferimento?: string;
+  annullato?: boolean;
 };
 
-export type ListCreditoSolidaleMovimentiTipoMovimento = typeof ListCreditoSolidaleMovimentiTipoMovimento[keyof typeof ListCreditoSolidaleMovimentiTipoMovimento];
-
+export type ListCreditoSolidaleMovimentiTipoMovimento =
+  (typeof ListCreditoSolidaleMovimentiTipoMovimento)[keyof typeof ListCreditoSolidaleMovimentiTipoMovimento];
 
 export const ListCreditoSolidaleMovimentiTipoMovimento = {
-  ricarica_mensile: 'ricarica_mensile',
-  ricarica_manuale: 'ricarica_manuale',
-  rettifica_positiva: 'rettifica_positiva',
-  rettifica_negativa: 'rettifica_negativa',
-  storno: 'storno',
-  consumo_spesa: 'consumo_spesa',
+  ricarica_mensile: "ricarica_mensile",
+  ricarica_manuale: "ricarica_manuale",
+  rettifica_positiva: "rettifica_positiva",
+  rettifica_negativa: "rettifica_negativa",
+  storno: "storno",
+  consumo_spesa: "consumo_spesa",
 } as const;
 
 export type ListCreditoSolidaleBeneficiariParams = {
-search?: string;
-centroAscoltoId?: number;
-/**
- * Identificativo tecnico legacy dell'Area
- */
-areaOperativaId?: number;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  search?: string;
+  centroAscoltoId?: number;
+  /**
+   * Identificativo tecnico legacy dell'Area
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
 export type RefreshCreditoSolidaleBeneficiario410 = {
@@ -11633,13 +11668,13 @@ export type CreateCreditoSolidaleRicaricaManuale410 = {
   error: string;
 };
 
-export type GetCreditoSolidaleRicaricaMensileStato200Stato = typeof GetCreditoSolidaleRicaricaMensileStato200Stato[keyof typeof GetCreditoSolidaleRicaricaMensileStato200Stato];
-
+export type GetCreditoSolidaleRicaricaMensileStato200Stato =
+  (typeof GetCreditoSolidaleRicaricaMensileStato200Stato)[keyof typeof GetCreditoSolidaleRicaricaMensileStato200Stato];
 
 export const GetCreditoSolidaleRicaricaMensileStato200Stato = {
-  non_avviata: 'non_avviata',
-  in_corso: 'in_corso',
-  completata: 'completata',
+  non_avviata: "non_avviata",
+  in_corso: "in_corso",
+  completata: "completata",
 } as const;
 
 export type GetCreditoSolidaleRicaricaMensileStato200EsitiItem = {
@@ -11666,67 +11701,67 @@ export type ExecuteCreditoSolidaleRicaricaMensile410 = {
 };
 
 export type ListVolontariParams = {
-centroAscoltoId?: number;
-search?: string;
-stato?: ListVolontariStato;
-tipoVolontario?: ListVolontariTipoVolontario;
-statoAssicurazione?: ListVolontariStatoAssicurazione;
-ruoloVolontarioId?: number;
-dataRiferimento?: string;
-scadenzaDa?: string;
-scadenzaA?: string;
-/**
- * @minimum 1
- * @maximum 120
- */
-scadutiDaMenoDiMesi?: number;
+  centroAscoltoId?: number;
+  search?: string;
+  stato?: ListVolontariStato;
+  tipoVolontario?: ListVolontariTipoVolontario;
+  statoAssicurazione?: ListVolontariStatoAssicurazione;
+  ruoloVolontarioId?: number;
+  dataRiferimento?: string;
+  scadenzaDa?: string;
+  scadenzaA?: string;
+  /**
+   * @minimum 1
+   * @maximum 120
+   */
+  scadutiDaMenoDiMesi?: number;
 };
 
-export type ListVolontariStato = typeof ListVolontariStato[keyof typeof ListVolontariStato];
-
+export type ListVolontariStato =
+  (typeof ListVolontariStato)[keyof typeof ListVolontariStato];
 
 export const ListVolontariStato = {
-  attivi: 'attivi',
-  non_attivi: 'non_attivi',
-  tutti: 'tutti',
+  attivi: "attivi",
+  non_attivi: "non_attivi",
+  tutti: "tutti",
 } as const;
 
-export type ListVolontariTipoVolontario = typeof ListVolontariTipoVolontario[keyof typeof ListVolontariTipoVolontario];
-
+export type ListVolontariTipoVolontario =
+  (typeof ListVolontariTipoVolontario)[keyof typeof ListVolontariTipoVolontario];
 
 export const ListVolontariTipoVolontario = {
-  PERMANENTE: 'PERMANENTE',
-  TEMPORANEO: 'TEMPORANEO',
+  PERMANENTE: "PERMANENTE",
+  TEMPORANEO: "TEMPORANEO",
 } as const;
 
-export type ListVolontariStatoAssicurazione = typeof ListVolontariStatoAssicurazione[keyof typeof ListVolontariStatoAssicurazione];
-
+export type ListVolontariStatoAssicurazione =
+  (typeof ListVolontariStatoAssicurazione)[keyof typeof ListVolontariStatoAssicurazione];
 
 export const ListVolontariStatoAssicurazione = {
-  TEMPORANEA: 'TEMPORANEA',
-  MANCANTE: 'MANCANTE',
-  VALIDA: 'VALIDA',
-  IN_SCADENZA: 'IN_SCADENZA',
-  SCADUTA: 'SCADUTA',
-  NON_ANCORA_VALIDA: 'NON_ANCORA_VALIDA',
+  TEMPORANEA: "TEMPORANEA",
+  MANCANTE: "MANCANTE",
+  VALIDA: "VALIDA",
+  IN_SCADENZA: "IN_SCADENZA",
+  SCADUTA: "SCADUTA",
+  NON_ANCORA_VALIDA: "NON_ANCORA_VALIDA",
 } as const;
 
 export type GetVolontariCaricoParams = {
-/**
- * Data del turno (YYYY-MM-DD)
- */
-data: string;
-excludeConsegnaId?: number;
-fascia: GetVolontariCaricoFascia;
+  /**
+   * Data del turno (YYYY-MM-DD)
+   */
+  data: string;
+  excludeConsegnaId?: number;
+  fascia: GetVolontariCaricoFascia;
 };
 
-export type GetVolontariCaricoFascia = typeof GetVolontariCaricoFascia[keyof typeof GetVolontariCaricoFascia];
-
+export type GetVolontariCaricoFascia =
+  (typeof GetVolontariCaricoFascia)[keyof typeof GetVolontariCaricoFascia];
 
 export const GetVolontariCaricoFascia = {
-  '09-13': '09-13',
-  '14-18': '14-18',
-  '18-20': '18-20',
+  "09-13": "09-13",
+  "14-18": "14-18",
+  "18-20": "18-20",
 } as const;
 
 export type GetVolontariCarico200Item = {
@@ -11741,13 +11776,13 @@ export type PreviewBulkVolontariInsurance200 = {
 export type GetVolontarioDossier200 = { [key: string]: unknown };
 
 export type AnalyzeVolontariImportParams = {
-centroAscoltoId?: number;
+  centroAscoltoId?: number;
 };
 
 export type ConfirmVolontariImport200 = { [key: string]: unknown };
 
 export type GetVolontarioParams = {
-dataRiferimento?: string;
+  dataRiferimento?: string;
 };
 
 export type DeleteVolontario200 = {
@@ -11761,476 +11796,477 @@ export type DeleteMezzo200 = {
 };
 
 export type ReportGiacenzePerMagazzinoParams = {
-magazzinoId?: number;
-areaOperativaId?: number;
+  magazzinoId?: number;
+  areaOperativaId?: number;
 };
 
 export type ReportConsegnePerMeseParams = {
-anno?: number;
-da?: string;
-a?: string;
-magazzinoId?: number;
-centroAscoltoId?: number;
-areaOperativaId?: number;
+  anno?: number;
+  da?: string;
+  a?: string;
+  magazzinoId?: number;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
 };
 
 export type ReportConsegnePerCentroParams = {
-da?: string;
-a?: string;
-areaOperativaId?: number;
+  da?: string;
+  a?: string;
+  areaOperativaId?: number;
 };
 
 export type ReportAllocazioneMezziParams = {
-da?: string;
-a?: string;
-centroAscoltoId?: number;
-areaOperativaId?: number;
+  da?: string;
+  a?: string;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
 };
 
 export type ReportFsePlusParams = {
-anno?: number;
-areaOperativaId?: number;
+  anno?: number;
+  areaOperativaId?: number;
 };
 
 export type GetReportDashboardGeneraleParams = {
-/**
- * Data civile iniziale Europe/Rome (YYYY-MM-DD)
- */
-da?: ReportDaParameter;
-/**
- * Data civile finale Europe/Rome (YYYY-MM-DD)
- */
-a?: ReportAParameter;
-/**
- * @minimum 2000
- * @maximum 2100
- */
-anno?: ReportAnnoParameter;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
-/**
- * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
- */
-centroAscoltoId?: ReportCentroIdParameter;
-magazzinoId?: ReportMagazzinoIdParameter;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * @minimum 2000
+   * @maximum 2100
+   */
+  anno?: ReportAnnoParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  magazzinoId?: ReportMagazzinoIdParameter;
 };
 
 export type GetReportPacchiParams = {
-/**
- * Data civile iniziale Europe/Rome (YYYY-MM-DD)
- */
-da?: ReportDaParameter;
-/**
- * Data civile finale Europe/Rome (YYYY-MM-DD)
- */
-a?: ReportAParameter;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
-/**
- * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
- */
-centroAscoltoId?: ReportCentroIdParameter;
-magazzinoId?: ReportMagazzinoIdParameter;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  magazzinoId?: ReportMagazzinoIdParameter;
 };
 
 export type GetReportCentroAscoltoParams = {
-/**
- * Data civile iniziale Europe/Rome (YYYY-MM-DD)
- */
-da?: ReportDaParameter;
-/**
- * Data civile finale Europe/Rome (YYYY-MM-DD)
- */
-a?: ReportAParameter;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
-/**
- * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
- */
-centroAscoltoId?: ReportCentroIdParameter;
-zonaUdsId?: ReportZonaUdsIdParameter;
-operatoreId?: ReportOperatoreIdParameter;
-tipoIntervento?: ReportTipoInterventoParameter;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  zonaUdsId?: ReportZonaUdsIdParameter;
+  operatoreId?: ReportOperatoreIdParameter;
+  tipoIntervento?: ReportTipoInterventoParameter;
 };
 
 export type GetReportEmporioParams = {
-/**
- * Data civile iniziale Europe/Rome (YYYY-MM-DD)
- */
-da?: ReportDaParameter;
-/**
- * Data civile finale Europe/Rome (YYYY-MM-DD)
- */
-a?: ReportAParameter;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
-/**
- * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
- */
-centroAscoltoId?: ReportCentroIdParameter;
-magazzinoId?: ReportMagazzinoIdParameter;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  magazzinoId?: ReportMagazzinoIdParameter;
 };
 
 export type GetReportMensaIntegratoParams = {
-/**
- * Data civile iniziale Europe/Rome (YYYY-MM-DD)
- */
-da?: ReportDaParameter;
-/**
- * Data civile finale Europe/Rome (YYYY-MM-DD)
- */
-a?: ReportAParameter;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
-/**
- * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
- */
-centroAscoltoId?: ReportCentroIdParameter;
-magazzinoId?: ReportMagazzinoIdParameter;
-mensaId?: ReportMensaIdParameter;
-operatoreId?: ReportOperatoreIdParameter;
-tipoServizio?: ReportTipoServizioParameter;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  magazzinoId?: ReportMagazzinoIdParameter;
+  mensaId?: ReportMensaIdParameter;
+  operatoreId?: ReportOperatoreIdParameter;
+  tipoServizio?: ReportTipoServizioParameter;
 };
 
 export type GetReportUdsIntegratoParams = {
-/**
- * Data civile iniziale Europe/Rome (YYYY-MM-DD)
- */
-da?: ReportDaParameter;
-/**
- * Data civile finale Europe/Rome (YYYY-MM-DD)
- */
-a?: ReportAParameter;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
-/**
- * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
- */
-centroAscoltoId?: ReportCentroIdParameter;
-zonaUdsId?: ReportZonaUdsIdParameter;
-operatoreId?: ReportOperatoreIdParameter;
-tipoIntervento?: ReportTipoInterventoParameter;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  zonaUdsId?: ReportZonaUdsIdParameter;
+  operatoreId?: ReportOperatoreIdParameter;
+  tipoIntervento?: ReportTipoInterventoParameter;
 };
 
 export type GetReportMagazzinoLogisticaParams = {
-/**
- * Data civile iniziale Europe/Rome (YYYY-MM-DD)
- */
-da?: ReportDaParameter;
-/**
- * Data civile finale Europe/Rome (YYYY-MM-DD)
- */
-a?: ReportAParameter;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
-/**
- * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
- */
-centroAscoltoId?: ReportCentroIdParameter;
-magazzinoId?: ReportMagazzinoIdParameter;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  magazzinoId?: ReportMagazzinoIdParameter;
 };
 
 export type GetReportFsePlusIntegratoParams = {
-/**
- * @minimum 2000
- * @maximum 2100
- */
-anno?: ReportAnnoParameter;
-/**
- * Data civile iniziale Europe/Rome (YYYY-MM-DD)
- */
-da?: ReportDaParameter;
-/**
- * Data civile finale Europe/Rome (YYYY-MM-DD)
- */
-a?: ReportAParameter;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
-/**
- * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
- */
-centroAscoltoId?: ReportCentroIdParameter;
-magazzinoId?: ReportMagazzinoIdParameter;
+  /**
+   * @minimum 2000
+   * @maximum 2100
+   */
+  anno?: ReportAnnoParameter;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  magazzinoId?: ReportMagazzinoIdParameter;
 };
 
 export type GetReportDrilldownParams = {
-section: GetReportDrilldownSection;
-metric: string;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-pageSize?: number;
-/**
- * Data civile iniziale Europe/Rome (YYYY-MM-DD)
- */
-da?: ReportDaParameter;
-/**
- * Data civile finale Europe/Rome (YYYY-MM-DD)
- */
-a?: ReportAParameter;
-/**
- * @minimum 2000
- * @maximum 2100
- */
-anno?: ReportAnnoParameter;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
-/**
- * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
- */
-centroAscoltoId?: ReportCentroIdParameter;
-magazzinoId?: ReportMagazzinoIdParameter;
-mensaId?: ReportMensaIdParameter;
-zonaUdsId?: ReportZonaUdsIdParameter;
-operatoreId?: ReportOperatoreIdParameter;
-tipoIntervento?: ReportTipoInterventoParameter;
-tipoServizio?: ReportTipoServizioParameter;
+  section: GetReportDrilldownSection;
+  metric: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  pageSize?: number;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * @minimum 2000
+   * @maximum 2100
+   */
+  anno?: ReportAnnoParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  magazzinoId?: ReportMagazzinoIdParameter;
+  mensaId?: ReportMensaIdParameter;
+  zonaUdsId?: ReportZonaUdsIdParameter;
+  operatoreId?: ReportOperatoreIdParameter;
+  tipoIntervento?: ReportTipoInterventoParameter;
+  tipoServizio?: ReportTipoServizioParameter;
 };
 
-export type GetReportDrilldownSection = typeof GetReportDrilldownSection[keyof typeof GetReportDrilldownSection];
-
+export type GetReportDrilldownSection =
+  (typeof GetReportDrilldownSection)[keyof typeof GetReportDrilldownSection];
 
 export const GetReportDrilldownSection = {
-  generale: 'generale',
-  pacchi: 'pacchi',
-  'centro-ascolto': 'centro-ascolto',
-  emporio: 'emporio',
-  mensa: 'mensa',
-  uds: 'uds',
-  'magazzino-logistica': 'magazzino-logistica',
-  'fse-plus': 'fse-plus',
+  generale: "generale",
+  pacchi: "pacchi",
+  "centro-ascolto": "centro-ascolto",
+  emporio: "emporio",
+  mensa: "mensa",
+  uds: "uds",
+  "magazzino-logistica": "magazzino-logistica",
+  "fse-plus": "fse-plus",
 } as const;
 
 export type GetReportFilterOptionsParams = {
-section: GetReportFilterOptionsSection;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
+  section: GetReportFilterOptionsSection;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
 };
 
-export type GetReportFilterOptionsSection = typeof GetReportFilterOptionsSection[keyof typeof GetReportFilterOptionsSection];
-
+export type GetReportFilterOptionsSection =
+  (typeof GetReportFilterOptionsSection)[keyof typeof GetReportFilterOptionsSection];
 
 export const GetReportFilterOptionsSection = {
-  generale: 'generale',
-  pacchi: 'pacchi',
-  'centro-ascolto': 'centro-ascolto',
-  emporio: 'emporio',
-  mensa: 'mensa',
-  uds: 'uds',
-  'magazzino-logistica': 'magazzino-logistica',
-  'fse-plus': 'fse-plus',
+  generale: "generale",
+  pacchi: "pacchi",
+  "centro-ascolto": "centro-ascolto",
+  emporio: "emporio",
+  mensa: "mensa",
+  uds: "uds",
+  "magazzino-logistica": "magazzino-logistica",
+  "fse-plus": "fse-plus",
 } as const;
 
 export type ReportUdsInterventiPerMeseParams = {
-da?: string;
-a?: string;
-areaOperativaId?: number;
-zonaUdsId?: number;
+  da?: string;
+  a?: string;
+  areaOperativaId?: number;
+  zonaUdsId?: number;
 };
 
 export type ReportUdsInterventiGiornalieriParams = {
-/**
- * Start date (ISO YYYY-MM-DD). For a single day, omit "a".
- */
-da: string;
-/**
- * End date (ISO YYYY-MM-DD). Defaults to "da" (single day) when absent.
- */
-a?: string;
-areaOperativaId?: number;
-zonaUdsId?: number;
+  /**
+   * Start date (ISO YYYY-MM-DD). For a single day, omit "a".
+   */
+  da: string;
+  /**
+   * End date (ISO YYYY-MM-DD). Defaults to "da" (single day) when absent.
+   */
+  a?: string;
+  areaOperativaId?: number;
+  zonaUdsId?: number;
 };
 
 export type ReportUdsInterventiPerTipoParams = {
-da?: string;
-a?: string;
-areaOperativaId?: number;
-zonaUdsId?: number;
+  da?: string;
+  a?: string;
+  areaOperativaId?: number;
+  zonaUdsId?: number;
 };
 
 export type ReportUdsInterventiPerZonaParams = {
-da?: string;
-a?: string;
-areaOperativaId?: number;
-zonaUdsId?: number;
+  da?: string;
+  a?: string;
+  areaOperativaId?: number;
+  zonaUdsId?: number;
 };
 
 export type ReportUdsPersonePerZonaParams = {
-areaOperativaId?: number;
-zonaUdsId?: number;
+  areaOperativaId?: number;
+  zonaUdsId?: number;
 };
 
 export type ListMenseParams = {
-/**
- * Identificativo dell'Area Operativa usata come confine organizzativo dei dati.
- */
-areaOperativaId?: number;
-attiva?: boolean;
+  /**
+   * Identificativo dell'Area Operativa usata come confine organizzativo dei dati.
+   */
+  areaOperativaId?: number;
+  attiva?: boolean;
 };
 
 export type SearchMensaBeneficiariParams = {
-/**
- * @minLength 2
- */
-search: string;
+  /**
+   * @minLength 2
+   */
+  search: string;
 };
 
 export type ListMensaAbilitazioniParams = {
-beneficiarioId?: number;
-mensaId?: number;
+  beneficiarioId?: number;
+  mensaId?: number;
 };
 
 export type GetMensaAbilitazioniRiepilogoBeneficiariParams = {
-/**
- * ID positivi separati da virgola, deduplicati dal server; massimo 500.
- */
-beneficiarioIds?: string;
+  /**
+   * ID positivi separati da virgola, deduplicati dal server; massimo 500.
+   */
+  beneficiarioIds?: string;
 };
 
 export type ListTessereBeneficiarioParams = {
-beneficiarioId: number;
+  beneficiarioId: number;
 };
 
 export type ListAccessiMensaParams = {
-mensaId?: number;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: number;
+  mensaId?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: number;
 };
 
 export type ListPastiMensaParams = {
-mensaId?: number;
-data?: string;
-tipoServizio?: string;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: number;
+  mensaId?: number;
+  data?: string;
+  tipoServizio?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: number;
 };
 
 export type ListEccezioniMensaParams = {
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: number;
 };
 
 export type ListGiacenzeMensaParams = {
-magazzinoId: number;
+  magazzinoId: number;
 };
 
 export type ListLottiMensaParams = {
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: number;
-/**
- * @maxLength 100
- */
-search?: string;
-/**
- * Solo scarto dal proprio Magazzino Mensa, con grant consumo.
- */
-includeExpired?: boolean;
-mensaId: number;
-magazzinoId: number;
-prodottoId: number;
-dataRichiesta?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: number;
+  /**
+   * @maxLength 100
+   */
+  search?: string;
+  /**
+   * Solo scarto dal proprio Magazzino Mensa, con grant consumo.
+   */
+  includeExpired?: boolean;
+  mensaId: number;
+  magazzinoId: number;
+  prodottoId: number;
+  dataRichiesta?: string;
 };
 
 export type ListTrasferimentiMensaParams = {
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: number;
 };
 
-export type ListTrasferimentiMensa200 = { [key: string]: unknown }[] | MensaTrasferimentiPage;
+export type ListTrasferimentiMensa200 =
+  | { [key: string]: unknown }[]
+  | MensaTrasferimentiPage;
 
 export type CreateTrasferimentoMensa200 = { [key: string]: unknown };
 
 export type CreateTrasferimentoMensa201 = { [key: string]: unknown };
 
 export type ListConsumiMensaParams = {
-mensaId?: number;
-data?: string;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: number;
+  mensaId?: number;
+  data?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: number;
 };
 
 export type ListGiornateMensaParams = {
-mensaId?: number;
-data?: string;
+  mensaId?: number;
+  data?: string;
 };
 
 export type GetMensaReportParams = {
-dal: string;
-al: string;
-mensaId?: number;
-tipoServizio?: string;
+  dal: string;
+  al: string;
+  mensaId?: number;
+  tipoServizio?: string;
 };
 
 export type ListUtentiParams = {
-areaOperativaId?: number;
-matricola?: string;
-query?: string;
+  areaOperativaId?: number;
+  matricola?: string;
+  query?: string;
 };
-

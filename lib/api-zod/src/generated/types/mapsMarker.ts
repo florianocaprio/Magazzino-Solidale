@@ -5,10 +5,10 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MapsLayerCode } from './mapsLayerCode';
-import type { MapsMarkerActionsItem } from './mapsMarkerActionsItem';
-import type { MapsMarkerEntityType } from './mapsMarkerEntityType';
-import type { MapsMarkerLocationStatus } from './mapsMarkerLocationStatus';
+import type { MapsLayerCode } from "./mapsLayerCode";
+import type { MapsMarkerActionsItem } from "./mapsMarkerActionsItem";
+import type { MapsMarkerEntityType } from "./mapsMarkerEntityType";
+import type { MapsMarkerLocationStatus } from "./mapsMarkerLocationStatus";
 
 /**
  * DTO geografico minimizzato; non contiene dati sociali o anagrafici

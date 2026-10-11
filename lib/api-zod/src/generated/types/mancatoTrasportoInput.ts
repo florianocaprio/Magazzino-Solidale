@@ -8,15 +8,15 @@
 
 export interface MancatoTrasportoInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   motivo: string;
 }

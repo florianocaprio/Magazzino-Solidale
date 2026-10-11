@@ -5,25 +5,25 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { FondoOrigine } from './fondoOrigine';
+import type { FondoOrigine } from "./fondoOrigine";
 
 export type ListMovimentiParams = {
-tipo?: string;
-magazzinoId?: number;
-prodottoId?: number;
-centroAscoltoId?: number;
-da?: string;
-a?: string;
-fondoOrigine?: FondoOrigine;
-naturaContabile?: string;
-canaleOperativo?: string;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  tipo?: string;
+  magazzinoId?: number;
+  prodottoId?: number;
+  centroAscoltoId?: number;
+  da?: string;
+  a?: string;
+  fondoOrigine?: FondoOrigine;
+  naturaContabile?: string;
+  canaleOperativo?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };

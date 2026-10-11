@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { InterventoDocumentoInput } from './interventoDocumentoInput';
-import type { InterventoMaterialeInput } from './interventoMaterialeInput';
-import type { InterventoSuccessivoInput } from './interventoSuccessivoInput';
+import type { InterventoDocumentoInput } from "./interventoDocumentoInput";
+import type { InterventoMaterialeInput } from "./interventoMaterialeInput";
+import type { InterventoSuccessivoInput } from "./interventoSuccessivoInput";
 
 export type InterventoSuccessivoOperativoInput = InterventoSuccessivoInput & {
   operatoreId?: number;

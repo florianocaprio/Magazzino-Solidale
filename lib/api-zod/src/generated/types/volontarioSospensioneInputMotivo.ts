@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontarioSospensioneInputMotivo = typeof VolontarioSospensioneInputMotivo[keyof typeof VolontarioSospensioneInputMotivo];
-
+export type VolontarioSospensioneInputMotivo =
+  (typeof VolontarioSospensioneInputMotivo)[keyof typeof VolontarioSospensioneInputMotivo];
 
 export const VolontarioSospensioneInputMotivo = {
-  indisponibilita_temporanea: 'indisponibilita_temporanea',
-  dimissioni_cessazione: 'dimissioni_cessazione',
-  sospensione_organizzativa: 'sospensione_organizzativa',
-  altro: 'altro',
+  indisponibilita_temporanea: "indisponibilita_temporanea",
+  dimissioni_cessazione: "dimissioni_cessazione",
+  sospensione_organizzativa: "sospensione_organizzativa",
+  altro: "altro",
 } as const;

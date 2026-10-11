@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type CaricoMagazzinoStato = typeof CaricoMagazzinoStato[keyof typeof CaricoMagazzinoStato];
-
+export type CaricoMagazzinoStato =
+  (typeof CaricoMagazzinoStato)[keyof typeof CaricoMagazzinoStato];
 
 export const CaricoMagazzinoStato = {
-  confermato: 'confermato',
-  stornato: 'stornato',
+  confermato: "confermato",
+  stornato: "stornato",
 } as const;

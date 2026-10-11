@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { CaricoMagazzinoStato } from './caricoMagazzinoStato';
-import type { OrigineCarico } from './origineCarico';
+import type { CaricoMagazzinoStato } from "./caricoMagazzinoStato";
+import type { OrigineCarico } from "./origineCarico";
 
 export interface CaricoMagazzino {
   id: number;

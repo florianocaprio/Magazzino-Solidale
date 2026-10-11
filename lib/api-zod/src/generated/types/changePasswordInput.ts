@@ -8,8 +8,8 @@
 
 export interface ChangePasswordInput {
   /**
-     * Deve contenere almeno una lettera e un numero.
-     * @minLength 8
-     */
+   * Deve contenere almeno una lettera e un numero.
+   * @minLength 8
+   */
   newPassword: string;
 }

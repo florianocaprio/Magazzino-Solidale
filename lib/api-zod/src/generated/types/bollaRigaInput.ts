@@ -5,13 +5,13 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { QuantitaContabile } from './quantitaContabile';
+import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface BollaRigaInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;

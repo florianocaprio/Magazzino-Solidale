@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type SessioneCassaEmporioStato = typeof SessioneCassaEmporioStato[keyof typeof SessioneCassaEmporioStato];
-
+export type SessioneCassaEmporioStato =
+  (typeof SessioneCassaEmporioStato)[keyof typeof SessioneCassaEmporioStato];
 
 export const SessioneCassaEmporioStato = {
-  aperta: 'aperta',
-  sospesa: 'sospesa',
-  annullata: 'annullata',
-  pronta_per_chiusura: 'pronta_per_chiusura',
-  chiusa: 'chiusa',
+  aperta: "aperta",
+  sospesa: "sospesa",
+  annullata: "annullata",
+  pronta_per_chiusura: "pronta_per_chiusura",
+  chiusa: "chiusa",
 } as const;

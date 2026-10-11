@@ -6,10 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseDownloadRepresentationParameter = typeof FseDownloadRepresentationParameter[keyof typeof FseDownloadRepresentationParameter];
-
+export type FseDownloadRepresentationParameter =
+  (typeof FseDownloadRepresentationParameter)[keyof typeof FseDownloadRepresentationParameter];
 
 export const FseDownloadRepresentationParameter = {
-  FSE_CANONICAL_AUDIT_XLSX_V1: 'FSE_CANONICAL_AUDIT_XLSX_V1',
-  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1: 'SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1',
+  FSE_CANONICAL_AUDIT_XLSX_V1: "FSE_CANONICAL_AUDIT_XLSX_V1",
+  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1:
+    "SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1",
 } as const;

@@ -7,5 +7,5 @@
  */
 
 export type ListGiacenzeMensaParams = {
-magazzinoId: number;
+  magazzinoId: number;
 };

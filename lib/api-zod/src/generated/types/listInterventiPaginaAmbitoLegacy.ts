@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListInterventiPaginaAmbitoLegacy = typeof ListInterventiPaginaAmbitoLegacy[keyof typeof ListInterventiPaginaAmbitoLegacy];
-
+export type ListInterventiPaginaAmbitoLegacy =
+  (typeof ListInterventiPaginaAmbitoLegacy)[keyof typeof ListInterventiPaginaAmbitoLegacy];
 
 export const ListInterventiPaginaAmbitoLegacy = {
-  tutti: 'tutti',
-  classificati: 'classificati',
-  legacy: 'legacy',
+  tutti: "tutti",
+  classificati: "classificati",
+  legacy: "legacy",
 } as const;

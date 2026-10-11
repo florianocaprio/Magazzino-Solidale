@@ -5,21 +5,21 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { RientroTrasportoRigaInput } from './rientroTrasportoRigaInput';
+import type { RientroTrasportoRigaInput } from "./rientroTrasportoRigaInput";
 
 export interface RientroTrasportoInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /** @minimum 1 */
   versione: number;
   dataRientro?: Date;
   /**
-     * @maxLength 1000
-     * @nullable
-     */
+   * @maxLength 1000
+   * @nullable
+   */
   note?: string | null;
   /** @minItems 1 */
   righe: RientroTrasportoRigaInput[];

@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MaterialeDaPreparareFusoOrario } from './materialeDaPreparareFusoOrario';
-import type { MaterialeDaPreparareGruppo } from './materialeDaPreparareGruppo';
+import type { MaterialeDaPreparareFusoOrario } from "./materialeDaPreparareFusoOrario";
+import type { MaterialeDaPreparareGruppo } from "./materialeDaPreparareGruppo";
 
 export interface MaterialeDaPreparare {
   da: Date;

@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiariFseImportResolutionAzione = typeof BeneficiariFseImportResolutionAzione[keyof typeof BeneficiariFseImportResolutionAzione];
-
+export type BeneficiariFseImportResolutionAzione =
+  (typeof BeneficiariFseImportResolutionAzione)[keyof typeof BeneficiariFseImportResolutionAzione];
 
 export const BeneficiariFseImportResolutionAzione = {
-  crea: 'crea',
-  collega: 'collega',
+  crea: "crea",
+  collega: "collega",
 } as const;

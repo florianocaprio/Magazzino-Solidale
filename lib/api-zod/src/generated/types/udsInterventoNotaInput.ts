@@ -9,8 +9,8 @@
 export interface UdsInterventoNotaInput {
   versione: Date;
   /**
-     * @maxLength 4000
-     * @nullable
-     */
+   * @maxLength 4000
+   * @nullable
+   */
   noteUds?: string | null;
 }

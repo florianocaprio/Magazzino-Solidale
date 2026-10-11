@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MapsRouteProvider = typeof MapsRouteProvider[keyof typeof MapsRouteProvider];
-
+export type MapsRouteProvider =
+  (typeof MapsRouteProvider)[keyof typeof MapsRouteProvider];
 
 export const MapsRouteProvider = {
-  'openstreetmap-directions': 'openstreetmap-directions',
+  "openstreetmap-directions": "openstreetmap-directions",
 } as const;

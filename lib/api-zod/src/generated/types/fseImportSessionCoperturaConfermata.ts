@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseImportSessionCoperturaConfermata = typeof FseImportSessionCoperturaConfermata[keyof typeof FseImportSessionCoperturaConfermata];
-
+export type FseImportSessionCoperturaConfermata =
+  (typeof FseImportSessionCoperturaConfermata)[keyof typeof FseImportSessionCoperturaConfermata];
 
 export const FseImportSessionCoperturaConfermata = {
   NUMBER_0: 0,

@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ScaricoInputCausale = typeof ScaricoInputCausale[keyof typeof ScaricoInputCausale];
-
+export type ScaricoInputCausale =
+  (typeof ScaricoInputCausale)[keyof typeof ScaricoInputCausale];
 
 export const ScaricoInputCausale = {
-  deteriorata: 'deteriorata',
-  rubata: 'rubata',
-  scaduta: 'scaduta',
-  consegna_beneficiario: 'consegna_beneficiario',
-  altro: 'altro',
+  deteriorata: "deteriorata",
+  rubata: "rubata",
+  scaduta: "scaduta",
+  consegna_beneficiario: "consegna_beneficiario",
+  altro: "altro",
 } as const;

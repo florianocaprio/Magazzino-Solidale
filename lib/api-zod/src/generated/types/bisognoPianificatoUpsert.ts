@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BisognoPianificatoUpsertPriorita } from './bisognoPianificatoUpsertPriorita';
-import type { BisognoPianificatoUpsertStato } from './bisognoPianificatoUpsertStato';
-import type { BisognoPianificatoUpsertTipo } from './bisognoPianificatoUpsertTipo';
+import type { BisognoPianificatoUpsertPriorita } from "./bisognoPianificatoUpsertPriorita";
+import type { BisognoPianificatoUpsertStato } from "./bisognoPianificatoUpsertStato";
+import type { BisognoPianificatoUpsertTipo } from "./bisognoPianificatoUpsertTipo";
 
 export interface BisognoPianificatoUpsert {
   id?: number;
@@ -15,22 +15,22 @@ export interface BisognoPianificatoUpsert {
   versione?: number;
   tipo: BisognoPianificatoUpsertTipo;
   /**
-     * @minLength 1
-     * @maxLength 500
-     */
+   * @minLength 1
+   * @maxLength 500
+   */
   descrizione: string;
   stato: BisognoPianificatoUpsertStato;
   /** @nullable */
   dataPrevista?: string | null;
   priorita: BisognoPianificatoUpsertPriorita;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   note?: string | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   motivo?: string | null;
 }

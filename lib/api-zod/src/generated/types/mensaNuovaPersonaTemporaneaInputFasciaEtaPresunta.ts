@@ -9,12 +9,13 @@
 /**
  * @nullable
  */
-export type MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta = typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta[keyof typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta] | null;
-
+export type MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta =
+  | (typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta)[keyof typeof MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta]
+  | null;
 
 export const MensaNuovaPersonaTemporaneaInputFasciaEtaPresunta = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
 } as const;

@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ExportDocumentiOperativiSortDirection = typeof ExportDocumentiOperativiSortDirection[keyof typeof ExportDocumentiOperativiSortDirection];
-
+export type ExportDocumentiOperativiSortDirection =
+  (typeof ExportDocumentiOperativiSortDirection)[keyof typeof ExportDocumentiOperativiSortDirection];
 
 export const ExportDocumentiOperativiSortDirection = {
-  asc: 'asc',
-  desc: 'desc',
+  asc: "asc",
+  desc: "desc",
 } as const;

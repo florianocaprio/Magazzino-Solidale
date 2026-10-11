@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ConsegnaDaBollaInputTipoConsegna = typeof ConsegnaDaBollaInputTipoConsegna[keyof typeof ConsegnaDaBollaInputTipoConsegna];
-
+export type ConsegnaDaBollaInputTipoConsegna =
+  (typeof ConsegnaDaBollaInputTipoConsegna)[keyof typeof ConsegnaDaBollaInputTipoConsegna];
 
 export const ConsegnaDaBollaInputTipoConsegna = {
-  in_sede: 'in_sede',
-  domicilio: 'domicilio',
+  in_sede: "in_sede",
+  domicilio: "domicilio",
 } as const;

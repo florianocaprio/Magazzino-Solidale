@@ -7,6 +7,6 @@
  */
 
 export type ListMensaAbilitazioniParams = {
-beneficiarioId?: number;
-mensaId?: number;
+  beneficiarioId?: number;
+  mensaId?: number;
 };

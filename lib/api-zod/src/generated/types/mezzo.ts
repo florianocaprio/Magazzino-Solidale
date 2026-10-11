@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MezzoStato } from './mezzoStato';
-import type { MezzoStatoApprovazione } from './mezzoStatoApprovazione';
+import type { MezzoStato } from "./mezzoStato";
+import type { MezzoStatoApprovazione } from "./mezzoStatoApprovazione";
 
 export interface Mezzo {
   id: number;

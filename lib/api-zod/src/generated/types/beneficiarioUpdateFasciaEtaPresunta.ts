@@ -10,12 +10,13 @@
  * Fascia d'età stimata dall'operatore; null indica che non è determinata.
  * @nullable
  */
-export type BeneficiarioUpdateFasciaEtaPresunta = typeof BeneficiarioUpdateFasciaEtaPresunta[keyof typeof BeneficiarioUpdateFasciaEtaPresunta] | null;
-
+export type BeneficiarioUpdateFasciaEtaPresunta =
+  | (typeof BeneficiarioUpdateFasciaEtaPresunta)[keyof typeof BeneficiarioUpdateFasciaEtaPresunta]
+  | null;
 
 export const BeneficiarioUpdateFasciaEtaPresunta = {
-  '0_17': '0_17',
-  '18_29': '18_29',
-  '30_64': '30_64',
-  '65_plus': '65_plus',
+  "0_17": "0_17",
+  "18_29": "18_29",
+  "30_64": "30_64",
+  "65_plus": "65_plus",
 } as const;

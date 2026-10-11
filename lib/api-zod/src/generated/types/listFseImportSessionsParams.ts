@@ -7,8 +7,8 @@
  */
 
 export type ListFseImportSessionsParams = {
-/**
- * @minimum 1
- */
-magazzinoId: number;
+  /**
+   * @minimum 1
+   */
+  magazzinoId: number;
 };

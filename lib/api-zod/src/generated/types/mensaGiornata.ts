@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaGiornataSnapshot } from './mensaGiornataSnapshot';
-import type { MensaGiornataStato } from './mensaGiornataStato';
-import type { MensaGiornataTipoServizio } from './mensaGiornataTipoServizio';
+import type { MensaGiornataSnapshot } from "./mensaGiornataSnapshot";
+import type { MensaGiornataStato } from "./mensaGiornataStato";
+import type { MensaGiornataTipoServizio } from "./mensaGiornataTipoServizio";
 
 export interface MensaGiornata {
   id: number;
@@ -34,4 +34,4 @@ export interface MensaGiornata {
   /** @nullable */
   snapshot?: MensaGiornataSnapshot;
   [key: string]: unknown;
- }
+}

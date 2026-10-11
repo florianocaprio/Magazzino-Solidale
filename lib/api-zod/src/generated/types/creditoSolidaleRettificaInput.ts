@@ -8,14 +8,14 @@
 
 export interface CreditoSolidaleRettificaInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   /**
-     * @minimum -99999999
-     * @maximum 99999999
-     */
+   * @minimum -99999999
+   * @maximum 99999999
+   */
   variazioneCredito: number;
   motivo: string;
   /** @nullable */

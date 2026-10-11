@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type CreditoSolidaleConfigurazioneInputCreditoSolidaleStato = typeof CreditoSolidaleConfigurazioneInputCreditoSolidaleStato[keyof typeof CreditoSolidaleConfigurazioneInputCreditoSolidaleStato];
-
+export type CreditoSolidaleConfigurazioneInputCreditoSolidaleStato =
+  (typeof CreditoSolidaleConfigurazioneInputCreditoSolidaleStato)[keyof typeof CreditoSolidaleConfigurazioneInputCreditoSolidaleStato];
 
 export const CreditoSolidaleConfigurazioneInputCreditoSolidaleStato = {
-  non_abilitato: 'non_abilitato',
-  attivo: 'attivo',
-  sospeso: 'sospeso',
-  revocato: 'revocato',
+  non_abilitato: "non_abilitato",
+  attivo: "attivo",
+  sospeso: "sospeso",
+  revocato: "revocato",
 } as const;

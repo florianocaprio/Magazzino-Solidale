@@ -6,17 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ReportKpiUnit = typeof ReportKpiUnit[keyof typeof ReportKpiUnit];
-
+export type ReportKpiUnit = (typeof ReportKpiUnit)[keyof typeof ReportKpiUnit];
 
 export const ReportKpiUnit = {
-  count: 'count',
-  pieces: 'pieces',
-  kgLt: 'kgLt',
-  percentage: 'percentage',
-  credit: 'credit',
-  days: 'days',
-  average: 'average',
-  quantity: 'quantity',
-  kg: 'kg',
+  count: "count",
+  pieces: "pieces",
+  kgLt: "kgLt",
+  percentage: "percentage",
+  credit: "credit",
+  days: "days",
+  average: "average",
+  quantity: "quantity",
+  kg: "kg",
 } as const;

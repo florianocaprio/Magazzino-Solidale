@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { QuantitaContabile } from './quantitaContabile';
+import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface RientroTrasportoRigaInput {
   /** @minimum 1 */
@@ -16,8 +16,8 @@ export interface RientroTrasportoRigaInput {
   mancante?: QuantitaContabile;
   rubata?: QuantitaContabile;
   /**
-     * @maxLength 500
-     * @nullable
-     */
+   * @maxLength 500
+   * @nullable
+   */
   nota?: string | null;
 }

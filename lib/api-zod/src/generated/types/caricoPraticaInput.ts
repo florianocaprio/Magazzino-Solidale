@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { CaricoPraticaRigaInput } from './caricoPraticaRigaInput';
-import type { OrigineCaricoManuale } from './origineCaricoManuale';
+import type { CaricoPraticaRigaInput } from "./caricoPraticaRigaInput";
+import type { OrigineCaricoManuale } from "./origineCaricoManuale";
 
 export interface CaricoPraticaInput {
   /** @minimum 1 */
@@ -20,14 +20,14 @@ export interface CaricoPraticaInput {
   /** @minLength 1 */
   descrizione: string;
   /**
-     * @minimum 1
-     * @nullable
-     */
+   * @minimum 1
+   * @nullable
+   */
   fornitoreId?: number | null;
   /**
-     * @maxLength 100
-     * @nullable
-     */
+   * @maxLength 100
+   * @nullable
+   */
   numeroDocumento?: string | null;
   /** @nullable */
   dataDocumento?: Date | null;

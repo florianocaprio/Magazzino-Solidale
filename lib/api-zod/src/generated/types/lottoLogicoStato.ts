@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type LottoLogicoStato = typeof LottoLogicoStato[keyof typeof LottoLogicoStato];
-
+export type LottoLogicoStato =
+  (typeof LottoLogicoStato)[keyof typeof LottoLogicoStato];
 
 export const LottoLogicoStato = {
-  aperto: 'aperto',
-  chiuso: 'chiuso',
-  archiviato: 'archiviato',
+  aperto: "aperto",
+  chiuso: "chiuso",
+  archiviato: "archiviato",
 } as const;

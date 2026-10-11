@@ -16,4 +16,4 @@ export interface MensaEccezione {
   motivo: string;
   dataOra: Date;
   [key: string]: unknown;
- }
+}

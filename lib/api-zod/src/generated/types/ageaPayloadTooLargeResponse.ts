@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { AgeaErrorResponse } from './ageaErrorResponse';
+import type { AgeaErrorResponse } from "./ageaErrorResponse";
 
 /**
  * Limite di 10 MB superato

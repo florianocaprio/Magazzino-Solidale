@@ -6,14 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseImportSessionState = typeof FseImportSessionState[keyof typeof FseImportSessionState];
-
+export type FseImportSessionState =
+  (typeof FseImportSessionState)[keyof typeof FseImportSessionState];
 
 export const FseImportSessionState = {
-  IN_ANALISI: 'IN_ANALISI',
-  DA_COMPLETARE: 'DA_COMPLETARE',
-  PRONTA: 'PRONTA',
-  IN_PRATICA: 'IN_PRATICA',
-  REGISTRATA: 'REGISTRATA',
-  ANNULLATA: 'ANNULLATA',
+  IN_ANALISI: "IN_ANALISI",
+  DA_COMPLETARE: "DA_COMPLETARE",
+  PRONTA: "PRONTA",
+  IN_PRATICA: "IN_PRATICA",
+  REGISTRATA: "REGISTRATA",
+  ANNULLATA: "ANNULLATA",
 } as const;

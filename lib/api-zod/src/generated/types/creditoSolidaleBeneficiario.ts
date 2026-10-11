@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { CreditoSolidaleBeneficiarioCreditoSolidaleStato } from './creditoSolidaleBeneficiarioCreditoSolidaleStato';
+import type { CreditoSolidaleBeneficiarioCreditoSolidaleStato } from "./creditoSolidaleBeneficiarioCreditoSolidaleStato";
 
 export interface CreditoSolidaleBeneficiario {
   id: number;
@@ -19,9 +19,9 @@ export interface CreditoSolidaleBeneficiario {
   /** @nullable */
   centroAscoltoNome?: string | null;
   /**
-     * Identificativo tecnico legacy dell'Area.
-     * @nullable
-     */
+   * Identificativo tecnico legacy dell'Area.
+   * @nullable
+   */
   areaOperativaId?: number | null;
   /** @nullable */
   areaOperativaNome?: string | null;

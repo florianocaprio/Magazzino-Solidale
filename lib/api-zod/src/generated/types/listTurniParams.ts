@@ -7,7 +7,7 @@
  */
 
 export type ListTurniParams = {
-da?: string;
-a?: string;
-centroAscoltoId?: number;
+  da?: string;
+  a?: string;
+  centroAscoltoId?: number;
 };

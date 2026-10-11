@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseOpcReturnInputModalitaSelezione = typeof FseOpcReturnInputModalitaSelezione[keyof typeof FseOpcReturnInputModalitaSelezione];
-
+export type FseOpcReturnInputModalitaSelezione =
+  (typeof FseOpcReturnInputModalitaSelezione)[keyof typeof FseOpcReturnInputModalitaSelezione];
 
 export const FseOpcReturnInputModalitaSelezione = {
-  FEFO: 'FEFO',
-  PARTITA_ESATTA: 'PARTITA_ESATTA',
+  FEFO: "FEFO",
+  PARTITA_ESATTA: "PARTITA_ESATTA",
 } as const;

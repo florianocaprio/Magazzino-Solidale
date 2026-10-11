@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseImportFileFormato = typeof FseImportFileFormato[keyof typeof FseImportFileFormato];
-
+export type FseImportFileFormato =
+  (typeof FseImportFileFormato)[keyof typeof FseImportFileFormato];
 
 export const FseImportFileFormato = {
-  XLSX: 'XLSX',
-  XLS: 'XLS',
-  CSV: 'CSV',
+  XLSX: "XLSX",
+  XLS: "XLS",
+  CSV: "CSV",
 } as const;

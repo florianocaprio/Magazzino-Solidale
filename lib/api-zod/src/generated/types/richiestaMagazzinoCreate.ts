@@ -5,16 +5,16 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { RichiestaMagazzinoCreateModalitaPreferita } from './richiestaMagazzinoCreateModalitaPreferita';
-import type { RichiestaMagazzinoCreatePriorita } from './richiestaMagazzinoCreatePriorita';
-import type { RichiestaMagazzinoCreateSorgente } from './richiestaMagazzinoCreateSorgente';
-import type { RichiestaMagazzinoCreateTipoDestinatario } from './richiestaMagazzinoCreateTipoDestinatario';
+import type { RichiestaMagazzinoCreateModalitaPreferita } from "./richiestaMagazzinoCreateModalitaPreferita";
+import type { RichiestaMagazzinoCreatePriorita } from "./richiestaMagazzinoCreatePriorita";
+import type { RichiestaMagazzinoCreateSorgente } from "./richiestaMagazzinoCreateSorgente";
+import type { RichiestaMagazzinoCreateTipoDestinatario } from "./richiestaMagazzinoCreateTipoDestinatario";
 
 export interface RichiestaMagazzinoCreate {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   idempotencyKey: string;
   tipoDestinatario: RichiestaMagazzinoCreateTipoDestinatario;
   /** @minimum 1 */
@@ -31,20 +31,20 @@ export interface RichiestaMagazzinoCreate {
   centroAscoltoId?: number;
   sorgente: RichiestaMagazzinoCreateSorgente;
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   bisogno: string;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   noteOperative?: string | null;
   priorita?: RichiestaMagazzinoCreatePriorita;
   /**
-     * @nullable
-     * @pattern ^\d{4}-\d{2}-\d{2}$
-     */
+   * @nullable
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
   dataDesiderata?: string | null;
   modalitaPreferita?: RichiestaMagazzinoCreateModalitaPreferita;
 }

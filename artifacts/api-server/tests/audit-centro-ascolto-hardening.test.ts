@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import express, { type Express } from "express";
+import { type Express } from "express";
 import request from "supertest";
 import {
   beneficiariTable,
@@ -17,10 +17,13 @@ import {
   scarichiTable,
   scaricoRigheTable,
   utentiTable,
+  ruoliTable,
   operazioniDistribuzioneMagazzinoTable,
 } from "@workspace/db";
 import { eq, inArray, sum } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
+import { createPersistedSocialActor } from "./persisted-social-actor";
+import { makeScopedApp } from "./scope-helpers";
 
 const rnd = () => Math.random().toString(36).slice(2, 10);
 const ALL_SOCIAL_PERMISSIONS = [
@@ -35,6 +38,7 @@ const ids = {
   centri: [] as number[],
   beneficiari: [] as number[],
   utenti: [] as number[],
+  ruoli: [] as number[],
   interventi: [] as number[],
   prodotti: [] as number[],
   magazzini: [] as number[],
@@ -49,41 +53,38 @@ let beneficiarioA: number;
 let beneficiarioAreaNull: number;
 let beneficiarioCentroNull: number;
 let beneficiarioUds: number;
-let operatoreId: number;
 let prodottoId: number;
 let magazzinoA: number;
 let magazzinoB: number;
 let magazzinoCentroB: number;
 let magazzinoInattivo: number;
 
-function app(
-  options: {
-    areaOperativaId?: number | null;
-    centroId?: number | null;
-    aree?: string[];
-    permessi?: string[];
-    isAdmin?: boolean;
-  } = {},
-): Express {
-  const server = express();
-  server.use(express.json());
-  server.use((req, _res, next) => {
-    (req as unknown as { user: Record<string, unknown> }).user = {
-      id: operatoreId,
-      areaOperativaId:
-        options.areaOperativaId === undefined ? areaA : options.areaOperativaId,
-      centroAscoltoId:
-        options.centroId === undefined ? centroA : options.centroId,
-      zonaUdsId: null,
-      aree: options.aree ?? ["sociale"],
-      permessi: options.permessi ?? ALL_SOCIAL_PERMISSIONS,
-      isAdmin: options.isAdmin ?? false,
-      isSuperAdmin: false,
-    };
-    next();
-  });
-  server.use(interventiRouter);
-  return server;
+type ActorOptions = {
+  areaOperativaId?: number | null;
+  centroId?: number | null;
+  aree?: string[];
+  permessi?: string[];
+  isAdmin?: boolean;
+};
+const actors = new Map<
+  string,
+  Awaited<ReturnType<typeof createPersistedSocialActor>>
+>();
+function actorInput(options: ActorOptions = {}) {
+  return {
+    areaOperativaId:
+      options.areaOperativaId === undefined ? areaA : options.areaOperativaId,
+    centroAscoltoId:
+      options.centroId === undefined ? centroA : options.centroId,
+    aree: options.aree ?? ["sociale"],
+    permessi: options.permessi ?? ALL_SOCIAL_PERMISSIONS,
+    isAdmin: options.isAdmin ?? false,
+  };
+}
+function app(options: ActorOptions = {}): Express {
+  const actor = actors.get(JSON.stringify(actorInput(options)));
+  if (!actor) throw new Error("Fixture attore non preparata");
+  return makeScopedApp(interventiRouter, actor);
 }
 
 const inventoryApp = () => app({ aree: ["sociale", "magazzino"] });
@@ -156,19 +157,32 @@ beforeAll(async () => {
     .returning({ id: centriAscoltoTable.id });
   [centroA, centroB] = centri.map((row) => row.id);
   ids.centri.push(centroA, centroB);
-  const [utente] = await db
-    .insert(utentiTable)
-    .values({
-      username: `audit_cda_${rnd()}`,
-      passwordHash: "test",
-      nome: "Operatore Audit",
-      attivo: true,
+  for (const options of [
+    {},
+    { aree: ["sociale", "magazzino"] },
+    { permessi: [] },
+    { permessi: ["sociale.interventi.view"] },
+    {
+      permessi: [
+        "sociale.interventi.view",
+        "sociale.interventi.complete",
+        "sociale.interventi.create",
+      ],
+    },
+    { areaOperativaId: null, centroId: null, isAdmin: true, permessi: [] },
+    {
       areaOperativaId: areaA,
-      centroAscoltoId: centroA,
-    })
-    .returning({ id: utentiTable.id });
-  operatoreId = utente.id;
-  ids.utenti.push(utente.id);
+      centroId: null,
+      aree: ["uds"],
+      permessi: ["uds.interventi.view"],
+    },
+  ]) {
+    const input = actorInput(options);
+    const actor = await createPersistedSocialActor(input);
+    actors.set(JSON.stringify(input), actor);
+    ids.utenti.push(actor.id);
+    ids.ruoli.push(actor.ruoloId);
+  }
   const persone = await db
     .insert(beneficiariTable)
     .values([
@@ -319,6 +333,7 @@ afterAll(async () => {
     .delete(beneficiariTable)
     .where(inArray(beneficiariTable.id, ids.beneficiari));
   await db.delete(utentiTable).where(inArray(utentiTable.id, ids.utenti));
+  await db.delete(ruoliTable).where(inArray(ruoliTable.id, ids.ruoli));
   await db
     .delete(centriAscoltoTable)
     .where(inArray(centriAscoltoTable.id, ids.centri));

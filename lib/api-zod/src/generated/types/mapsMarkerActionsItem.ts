@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MapsMarkerActionsItem = typeof MapsMarkerActionsItem[keyof typeof MapsMarkerActionsItem];
-
+export type MapsMarkerActionsItem =
+  (typeof MapsMarkerActionsItem)[keyof typeof MapsMarkerActionsItem];
 
 export const MapsMarkerActionsItem = {
-  open: 'open',
-  route: 'route',
-  convert_delivery: 'convert_delivery',
+  open: "open",
+  route: "route",
+  convert_delivery: "convert_delivery",
 } as const;

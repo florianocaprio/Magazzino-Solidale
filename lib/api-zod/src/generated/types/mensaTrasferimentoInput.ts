@@ -5,16 +5,16 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaTrasferimentoInputRigheItem } from './mensaTrasferimentoInputRigheItem';
+import type { MensaTrasferimentoInputRigheItem } from "./mensaTrasferimentoInputRigheItem";
 
 export interface MensaTrasferimentoInput {
   mensaId: number;
   magazzinoOrigineId: number;
   dataRichiesta: Date;
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   idempotencyKey: string;
   /** @nullable */
   trasportatoreNome?: string | null;

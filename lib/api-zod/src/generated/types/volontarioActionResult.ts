@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioActionResultCopertura } from './volontarioActionResultCopertura';
-import type { VolontarioOperationalState } from './volontarioOperationalState';
+import type { VolontarioActionResultCopertura } from "./volontarioActionResultCopertura";
+import type { VolontarioOperationalState } from "./volontarioOperationalState";
 
 export interface VolontarioActionResult {
   /** @minimum 1 */

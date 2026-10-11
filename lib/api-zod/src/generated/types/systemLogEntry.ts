@@ -5,9 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { SystemLogEntryDetails } from './systemLogEntryDetails';
-import type { SystemLogEventStatus } from './systemLogEventStatus';
-import type { SystemLogEventType } from './systemLogEventType';
+import type { SystemLogEntryDetails } from "./systemLogEntryDetails";
+import type { SystemLogEventStatus } from "./systemLogEventStatus";
+import type { SystemLogEventType } from "./systemLogEventType";
 
 export interface SystemLogEntry {
   id: number;

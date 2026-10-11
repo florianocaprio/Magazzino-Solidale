@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MapsMarkerLocationStatus = typeof MapsMarkerLocationStatus[keyof typeof MapsMarkerLocationStatus];
-
+export type MapsMarkerLocationStatus =
+  (typeof MapsMarkerLocationStatus)[keyof typeof MapsMarkerLocationStatus];
 
 export const MapsMarkerLocationStatus = {
-  resolved: 'resolved',
-  pending: 'pending',
-  not_found: 'not_found',
-  error: 'error',
+  resolved: "resolved",
+  pending: "pending",
+  not_found: "not_found",
+  error: "error",
 } as const;

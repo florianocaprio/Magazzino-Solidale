@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontarioIdentifierOrigine = typeof VolontarioIdentifierOrigine[keyof typeof VolontarioIdentifierOrigine];
-
+export type VolontarioIdentifierOrigine =
+  (typeof VolontarioIdentifierOrigine)[keyof typeof VolontarioIdentifierOrigine];
 
 export const VolontarioIdentifierOrigine = {
-  GENERATA: 'GENERATA',
-  IMPORTATA: 'IMPORTATA',
-  CONVERSIONE: 'CONVERSIONE',
-  BACKFILL: 'BACKFILL',
+  GENERATA: "GENERATA",
+  IMPORTATA: "IMPORTATA",
+  CONVERSIONE: "CONVERSIONE",
+  BACKFILL: "BACKFILL",
 } as const;

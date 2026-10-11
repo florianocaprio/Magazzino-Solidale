@@ -7,19 +7,19 @@
  */
 
 export type ListCreditoSolidaleBeneficiariParams = {
-search?: string;
-centroAscoltoId?: number;
-/**
- * Identificativo tecnico legacy dell'Area
- */
-areaOperativaId?: number;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-limit?: number;
+  search?: string;
+  centroAscoltoId?: number;
+  /**
+   * Identificativo tecnico legacy dell'Area
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };

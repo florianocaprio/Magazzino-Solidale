@@ -6,4 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type InterventoAvviso = 'scaduto' | 'oggi' | 'imminente' | 'prossimo' | null;
+export type InterventoAvviso =
+  | "scaduto"
+  | "oggi"
+  | "imminente"
+  | "prossimo"
+  | null;

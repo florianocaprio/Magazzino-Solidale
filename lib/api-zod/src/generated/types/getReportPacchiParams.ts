@@ -5,28 +5,28 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { ReportAParameter } from './reportAParameter';
-import type { ReportAreaOperativaIdParameter } from './reportAreaOperativaIdParameter';
-import type { ReportCentroIdParameter } from './reportCentroIdParameter';
-import type { ReportDaParameter } from './reportDaParameter';
-import type { ReportMagazzinoIdParameter } from './reportMagazzinoIdParameter';
+import type { ReportAParameter } from "./reportAParameter";
+import type { ReportAreaOperativaIdParameter } from "./reportAreaOperativaIdParameter";
+import type { ReportCentroIdParameter } from "./reportCentroIdParameter";
+import type { ReportDaParameter } from "./reportDaParameter";
+import type { ReportMagazzinoIdParameter } from "./reportMagazzinoIdParameter";
 
 export type GetReportPacchiParams = {
-/**
- * Data civile iniziale Europe/Rome (YYYY-MM-DD)
- */
-da?: ReportDaParameter;
-/**
- * Data civile finale Europe/Rome (YYYY-MM-DD)
- */
-a?: ReportAParameter;
-/**
- * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
- */
-areaOperativaId?: ReportAreaOperativaIdParameter;
-/**
- * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
- */
-centroAscoltoId?: ReportCentroIdParameter;
-magazzinoId?: ReportMagazzinoIdParameter;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  magazzinoId?: ReportMagazzinoIdParameter;
 };

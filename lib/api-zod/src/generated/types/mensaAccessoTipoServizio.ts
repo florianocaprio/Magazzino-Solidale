@@ -9,10 +9,11 @@
 /**
  * @nullable
  */
-export type MensaAccessoTipoServizio = typeof MensaAccessoTipoServizio[keyof typeof MensaAccessoTipoServizio] | null;
-
+export type MensaAccessoTipoServizio =
+  | (typeof MensaAccessoTipoServizio)[keyof typeof MensaAccessoTipoServizio]
+  | null;
 
 export const MensaAccessoTipoServizio = {
-  pranzo: 'pranzo',
-  cena: 'cena',
+  pranzo: "pranzo",
+  cena: "cena",
 } as const;

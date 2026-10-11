@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { AuditConfigurazioneValoreNuovo } from './auditConfigurazioneValoreNuovo';
-import type { AuditConfigurazioneValorePrecedente } from './auditConfigurazioneValorePrecedente';
+import type { AuditConfigurazioneValoreNuovo } from "./auditConfigurazioneValoreNuovo";
+import type { AuditConfigurazioneValorePrecedente } from "./auditConfigurazioneValorePrecedente";
 
 export interface AuditConfigurazione {
   id: number;

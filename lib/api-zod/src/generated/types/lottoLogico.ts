@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { LottoLogicoStato } from './lottoLogicoStato';
-import type { QuantitaContabile } from './quantitaContabile';
+import type { LottoLogicoStato } from "./lottoLogicoStato";
+import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface LottoLogico {
   id: number;

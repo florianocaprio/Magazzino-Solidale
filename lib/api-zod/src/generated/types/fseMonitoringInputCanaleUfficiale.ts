@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseMonitoringInputCanaleUfficiale = typeof FseMonitoringInputCanaleUfficiale[keyof typeof FseMonitoringInputCanaleUfficiale];
-
+export type FseMonitoringInputCanaleUfficiale =
+  (typeof FseMonitoringInputCanaleUfficiale)[keyof typeof FseMonitoringInputCanaleUfficiale];
 
 export const FseMonitoringInputCanaleUfficiale = {
-  PACCHI: 'PACCHI',
-  MENSA: 'MENSA',
-  STRADA: 'STRADA',
+  PACCHI: "PACCHI",
+  MENSA: "MENSA",
+  STRADA: "STRADA",
 } as const;

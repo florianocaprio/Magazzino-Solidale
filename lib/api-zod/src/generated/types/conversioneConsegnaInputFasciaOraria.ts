@@ -9,11 +9,12 @@
 /**
  * @nullable
  */
-export type ConversioneConsegnaInputFasciaOraria = typeof ConversioneConsegnaInputFasciaOraria[keyof typeof ConversioneConsegnaInputFasciaOraria] | null;
-
+export type ConversioneConsegnaInputFasciaOraria =
+  | (typeof ConversioneConsegnaInputFasciaOraria)[keyof typeof ConversioneConsegnaInputFasciaOraria]
+  | null;
 
 export const ConversioneConsegnaInputFasciaOraria = {
-  Mattina: 'Mattina',
-  Pomeriggio: 'Pomeriggio',
-  Sera: 'Sera',
+  Mattina: "Mattina",
+  Pomeriggio: "Pomeriggio",
+  Sera: "Sera",
 } as const;

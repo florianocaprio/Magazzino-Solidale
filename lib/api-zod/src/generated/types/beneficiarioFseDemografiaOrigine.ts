@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiarioFseDemografiaOrigine = typeof BeneficiarioFseDemografiaOrigine[keyof typeof BeneficiarioFseDemografiaOrigine];
-
+export type BeneficiarioFseDemografiaOrigine =
+  (typeof BeneficiarioFseDemografiaOrigine)[keyof typeof BeneficiarioFseDemografiaOrigine];
 
 export const BeneficiarioFseDemografiaOrigine = {
-  anagrafica_calcolata: 'anagrafica_calcolata',
-  snapshot_fse: 'snapshot_fse',
+  anagrafica_calcolata: "anagrafica_calcolata",
+  snapshot_fse: "snapshot_fse",
 } as const;

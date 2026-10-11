@@ -7,15 +7,15 @@
  */
 
 export type ListConsumiMensaParams = {
-mensaId?: number;
-data?: Date;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 200
- */
-pageSize?: number;
+  mensaId?: number;
+  data?: Date;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: number;
 };

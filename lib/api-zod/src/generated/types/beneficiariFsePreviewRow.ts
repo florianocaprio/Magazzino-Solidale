@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BeneficiariFseDuplicateCandidate } from './beneficiariFseDuplicateCandidate';
-import type { BeneficiariFsePreviewRowClassificazione } from './beneficiariFsePreviewRowClassificazione';
+import type { BeneficiariFseDuplicateCandidate } from "./beneficiariFseDuplicateCandidate";
+import type { BeneficiariFsePreviewRowClassificazione } from "./beneficiariFsePreviewRowClassificazione";
 
 export interface BeneficiariFsePreviewRow {
   numeroRiga: number;

@@ -6,14 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type CreditoSolidaleMovimentoTipoMovimento = typeof CreditoSolidaleMovimentoTipoMovimento[keyof typeof CreditoSolidaleMovimentoTipoMovimento];
-
+export type CreditoSolidaleMovimentoTipoMovimento =
+  (typeof CreditoSolidaleMovimentoTipoMovimento)[keyof typeof CreditoSolidaleMovimentoTipoMovimento];
 
 export const CreditoSolidaleMovimentoTipoMovimento = {
-  ricarica_mensile: 'ricarica_mensile',
-  ricarica_manuale: 'ricarica_manuale',
-  rettifica_positiva: 'rettifica_positiva',
-  rettifica_negativa: 'rettifica_negativa',
-  storno: 'storno',
-  consumo_spesa: 'consumo_spesa',
+  ricarica_mensile: "ricarica_mensile",
+  ricarica_manuale: "ricarica_manuale",
+  rettifica_positiva: "rettifica_positiva",
+  rettifica_negativa: "rettifica_negativa",
+  storno: "storno",
+  consumo_spesa: "consumo_spesa",
 } as const;

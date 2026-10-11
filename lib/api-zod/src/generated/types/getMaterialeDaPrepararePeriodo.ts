@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetMaterialeDaPrepararePeriodo = typeof GetMaterialeDaPrepararePeriodo[keyof typeof GetMaterialeDaPrepararePeriodo];
-
+export type GetMaterialeDaPrepararePeriodo =
+  (typeof GetMaterialeDaPrepararePeriodo)[keyof typeof GetMaterialeDaPrepararePeriodo];
 
 export const GetMaterialeDaPrepararePeriodo = {
-  oggi: 'oggi',
-  NUMBER_3: '3',
-  NUMBER_7: '7',
-  NUMBER_14: '14',
-  personalizzato: 'personalizzato',
+  oggi: "oggi",
+  NUMBER_3: "3",
+  NUMBER_7: "7",
+  NUMBER_14: "14",
+  personalizzato: "personalizzato",
 } as const;

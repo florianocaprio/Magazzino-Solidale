@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type VolontariRegisterGenerateInputFiltriStato = typeof VolontariRegisterGenerateInputFiltriStato[keyof typeof VolontariRegisterGenerateInputFiltriStato];
-
+export type VolontariRegisterGenerateInputFiltriStato =
+  (typeof VolontariRegisterGenerateInputFiltriStato)[keyof typeof VolontariRegisterGenerateInputFiltriStato];
 
 export const VolontariRegisterGenerateInputFiltriStato = {
-  tutti: 'tutti',
-  attivi: 'attivi',
-  non_attivi: 'non_attivi',
+  tutti: "tutti",
+  attivi: "attivi",
+  non_attivi: "non_attivi",
 } as const;

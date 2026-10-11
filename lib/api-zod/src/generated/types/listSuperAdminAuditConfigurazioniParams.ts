@@ -7,9 +7,9 @@
  */
 
 export type ListSuperAdminAuditConfigurazioniParams = {
-/**
- * @minimum 1
- * @maximum 200
- */
-limit?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  limit?: number;
 };

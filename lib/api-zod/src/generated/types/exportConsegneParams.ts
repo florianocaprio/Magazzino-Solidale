@@ -7,11 +7,11 @@
  */
 
 export type ExportConsegneParams = {
-q?: string;
-stato?: string;
-data?: string;
-dataInizio?: string;
-dataFine?: string;
-beneficiarioId?: number;
-centroAscoltoId?: number;
+  q?: string;
+  stato?: string;
+  data?: string;
+  dataInizio?: string;
+  dataFine?: string;
+  beneficiarioId?: number;
+  centroAscoltoId?: number;
 };

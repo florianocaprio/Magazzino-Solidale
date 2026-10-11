@@ -5,23 +5,23 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { GetInterventiRiepilogoVisteAmbitoLegacy } from './getInterventiRiepilogoVisteAmbitoLegacy';
-import type { InterventoPriorita } from './interventoPriorita';
-import type { InterventoStato } from './interventoStato';
+import type { GetInterventiRiepilogoVisteAmbitoLegacy } from "./getInterventiRiepilogoVisteAmbitoLegacy";
+import type { InterventoPriorita } from "./interventoPriorita";
+import type { InterventoStato } from "./interventoStato";
 
 export type GetInterventiRiepilogoVisteParams = {
-beneficiarioId?: number;
-/**
- * @maxLength 120
- */
-ricerca?: string;
-tipo?: string;
-priorita?: InterventoPriorita;
-operatoreId?: number;
-centroAscoltoId?: number;
-areaOperativaId?: number;
-stato?: InterventoStato;
-ambitoLegacy?: GetInterventiRiepilogoVisteAmbitoLegacy;
-da?: Date;
-a?: Date;
+  beneficiarioId?: number;
+  /**
+   * @maxLength 120
+   */
+  ricerca?: string;
+  tipo?: string;
+  priorita?: InterventoPriorita;
+  operatoreId?: number;
+  centroAscoltoId?: number;
+  areaOperativaId?: number;
+  stato?: InterventoStato;
+  ambitoLegacy?: GetInterventiRiepilogoVisteAmbitoLegacy;
+  da?: Date;
+  a?: Date;
 };

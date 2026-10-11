@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type CaricoPraticaTipoPratica = typeof CaricoPraticaTipoPratica[keyof typeof CaricoPraticaTipoPratica];
-
+export type CaricoPraticaTipoPratica =
+  (typeof CaricoPraticaTipoPratica)[keyof typeof CaricoPraticaTipoPratica];
 
 export const CaricoPraticaTipoPratica = {
-  ORDINARIA: 'ORDINARIA',
-  SALDO_INIZIALE: 'SALDO_INIZIALE',
+  ORDINARIA: "ORDINARIA",
+  SALDO_INIZIALE: "SALDO_INIZIALE",
 } as const;

@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FseMonitoringInputFonte = typeof FseMonitoringInputFonte[keyof typeof FseMonitoringInputFonte];
-
+export type FseMonitoringInputFonte =
+  (typeof FseMonitoringInputFonte)[keyof typeof FseMonitoringInputFonte];
 
 export const FseMonitoringInputFonte = {
-  RILEVAZIONE_MANUALE_VERIFICATA: 'RILEVAZIONE_MANUALE_VERIFICATA',
-  DERIVAZIONE_STRUTTURATA: 'DERIVAZIONE_STRUTTURATA',
+  RILEVAZIONE_MANUALE_VERIFICATA: "RILEVAZIONE_MANUALE_VERIFICATA",
+  DERIVAZIONE_STRUTTURATA: "DERIVAZIONE_STRUTTURATA",
 } as const;

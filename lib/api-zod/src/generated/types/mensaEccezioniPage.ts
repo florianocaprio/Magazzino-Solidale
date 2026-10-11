@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaEccezione } from './mensaEccezione';
+import type { MensaEccezione } from "./mensaEccezione";
 
 export interface MensaEccezioniPage {
   items: MensaEccezione[];

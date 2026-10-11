@@ -13,7 +13,7 @@ export interface NucleoFamiliareUpdate {
   cognome?: string | null;
   /** @nullable */
   dataNascita?: Date | null;
-  sesso?: 'M' | 'F' | 'ALTRO' | null;
+  sesso?: "M" | "F" | "ALTRO" | null;
   /** @nullable */
   areaProvenienza?: string | null;
   /** @nullable */

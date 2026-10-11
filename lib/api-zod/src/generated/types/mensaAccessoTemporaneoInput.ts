@@ -5,8 +5,8 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaAccessoTemporaneoInputTipoServizio } from './mensaAccessoTemporaneoInputTipoServizio';
-import type { MensaNuovaPersonaTemporaneaInput } from './mensaNuovaPersonaTemporaneaInput';
+import type { MensaAccessoTemporaneoInputTipoServizio } from "./mensaAccessoTemporaneoInputTipoServizio";
+import type { MensaNuovaPersonaTemporaneaInput } from "./mensaNuovaPersonaTemporaneaInput";
 
 /**
  * Indicare esattamente uno tra beneficiarioId e nuovaPersona. L'autorizzazione vale solo per la data civile corrente Europe/Rome.
@@ -20,8 +20,8 @@ export interface MensaAccessoTemporaneoInput {
   tipoServizio?: MensaAccessoTemporaneoInputTipoServizio;
   confermaDuplicato?: boolean;
   /**
-     * @minLength 1
-     * @maxLength 80
-     */
+   * @minLength 1
+   * @maxLength 80
+   */
   idempotencyKey: string;
 }

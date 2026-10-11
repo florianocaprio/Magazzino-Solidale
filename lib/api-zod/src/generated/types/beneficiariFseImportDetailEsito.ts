@@ -6,14 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeneficiariFseImportDetailEsito = typeof BeneficiariFseImportDetailEsito[keyof typeof BeneficiariFseImportDetailEsito];
-
+export type BeneficiariFseImportDetailEsito =
+  (typeof BeneficiariFseImportDetailEsito)[keyof typeof BeneficiariFseImportDetailEsito];
 
 export const BeneficiariFseImportDetailEsito = {
-  creato: 'creato',
-  collegato: 'collegato',
-  aggiornato: 'aggiornato',
-  invariato: 'invariato',
-  conflitto: 'conflitto',
-  errore: 'errore',
+  creato: "creato",
+  collegato: "collegato",
+  aggiornato: "aggiornato",
+  invariato: "invariato",
+  conflitto: "conflitto",
+  errore: "errore",
 } as const;

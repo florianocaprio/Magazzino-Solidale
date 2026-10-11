@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type InterventoPriorita = typeof InterventoPriorita[keyof typeof InterventoPriorita];
-
+export type InterventoPriorita =
+  (typeof InterventoPriorita)[keyof typeof InterventoPriorita];
 
 export const InterventoPriorita = {
-  bassa: 'bassa',
-  normale: 'normale',
-  alta: 'alta',
-  urgente: 'urgente',
+  bassa: "bassa",
+  normale: "normale",
+  alta: "alta",
+  urgente: "urgente",
 } as const;

@@ -5,7 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { VolontarioKnownConflictResponseCode } from './volontarioKnownConflictResponseCode';
+import type { VolontarioKnownConflictResponseCode } from "./volontarioKnownConflictResponseCode";
 
 export interface VolontarioKnownConflictResponse {
   error: string;

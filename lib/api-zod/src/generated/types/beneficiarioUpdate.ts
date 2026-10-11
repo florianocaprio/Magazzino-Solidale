@@ -5,10 +5,10 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { BeneficiarioUpdateFasciaEtaPresunta } from './beneficiarioUpdateFasciaEtaPresunta';
-import type { BeneficiarioUpdatePriorita } from './beneficiarioUpdatePriorita';
-import type { BeneficiarioUpdateSesso } from './beneficiarioUpdateSesso';
-import type { BeneficiarioUpdateStatoAnagrafica } from './beneficiarioUpdateStatoAnagrafica';
+import type { BeneficiarioUpdateFasciaEtaPresunta } from "./beneficiarioUpdateFasciaEtaPresunta";
+import type { BeneficiarioUpdatePriorita } from "./beneficiarioUpdatePriorita";
+import type { BeneficiarioUpdateSesso } from "./beneficiarioUpdateSesso";
+import type { BeneficiarioUpdateStatoAnagrafica } from "./beneficiarioUpdateStatoAnagrafica";
 
 export interface BeneficiarioUpdate {
   /** @nullable */
@@ -20,9 +20,9 @@ export interface BeneficiarioUpdate {
   /** @nullable */
   dataNascita?: Date | null;
   /**
-     * Fascia d'età stimata dall'operatore; null indica che non è determinata.
-     * @nullable
-     */
+   * Fascia d'età stimata dall'operatore; null indica che non è determinata.
+   * @nullable
+   */
   fasciaEtaPresunta?: BeneficiarioUpdateFasciaEtaPresunta;
   cittadinanza?: string;
   residenza?: string;

@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListInterventiPaginaBisogni = typeof ListInterventiPaginaBisogni[keyof typeof ListInterventiPaginaBisogni];
-
+export type ListInterventiPaginaBisogni =
+  (typeof ListInterventiPaginaBisogni)[keyof typeof ListInterventiPaginaBisogni];
 
 export const ListInterventiPaginaBisogni = {
-  aperti: 'aperti',
-  scaduti: 'scaduti',
-  nessuno: 'nessuno',
+  aperti: "aperti",
+  scaduti: "scaduti",
+  nessuno: "nessuno",
 } as const;

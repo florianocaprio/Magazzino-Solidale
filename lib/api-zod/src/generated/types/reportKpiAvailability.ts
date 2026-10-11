@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ReportKpiAvailability = typeof ReportKpiAvailability[keyof typeof ReportKpiAvailability];
-
+export type ReportKpiAvailability =
+  (typeof ReportKpiAvailability)[keyof typeof ReportKpiAvailability];
 
 export const ReportKpiAvailability = {
-  ok: 'ok',
-  derivable: 'derivable',
-  missing: 'missing',
+  ok: "ok",
+  derivable: "derivable",
+  missing: "missing",
 } as const;
