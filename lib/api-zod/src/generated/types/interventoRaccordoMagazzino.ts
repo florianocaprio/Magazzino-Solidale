@@ -10,6 +10,8 @@ export interface InterventoRaccordoMagazzino {
   richiestaId: number;
   richiestaCodice: string;
   richiestaStato: string;
+  /** Più richieste attive visibili; non assumere un'unica lavorazione. */
+  ambiguo?: boolean;
   /** @nullable */
   bollaId?: number | null;
   /** @nullable */

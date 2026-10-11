@@ -378,6 +378,8 @@ export async function creaScaricoInventariale(
         entitaId: scarico.id,
         documentoTipo: "scarico",
         documentoId: scarico.id,
+        areaOperativaIdSnapshot:
+          input.operazioneDistribuzione?.areaOperativaIdSnapshot,
         centroAscoltoIdSnapshot: input.centroAscoltoId,
         magazzinoIdSnapshot: input.magazzinoId,
         dataOperativa: input.dataScarico,
@@ -387,8 +389,24 @@ export async function creaScaricoInventariale(
             causale: input.causale,
             numeroRighe: input.righe.length,
             documentoRiferimento: input.documentoRiferimento,
+            ...(input.source?.dominioOrigine === "SOCIALE"
+              ? {
+                  interventoId: input.source.entitaOrigineId,
+                  righe: input.righe.map((row) => ({
+                    prodottoId: row.prodottoId,
+                    quantita: InventoryDecimal.parse(row.quantita).toDb(),
+                    unitaMisura: row.unitaMisura,
+                  })),
+                }
+              : {}),
           },
-          ["causale", "numeroRighe", "documentoRiferimento"],
+          [
+            "causale",
+            "numeroRighe",
+            "documentoRiferimento",
+            "interventoId",
+            "righe",
+          ],
         ),
       })
     : null;

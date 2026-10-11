@@ -9,10 +9,7 @@ import type {
   InterventoPriorita,
   InterventoStoricoStato,
 } from "@workspace/api-client-react";
-import {
-  useListRichiesteMagazzino,
-  getListRichiesteMagazzinoQueryKey,
-} from "@workspace/api-client-react";
+import { RaccordoMagazzinoBadge } from "./interventi-sociali-workspace";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useConfigurazioneAmbienteFlags } from "@/lib/use-moduli";
@@ -76,6 +73,7 @@ interface Props {
   operatori?: InterventoOperatore[];
   isLoading?: boolean;
   isPending?: boolean;
+  readUnavailable?: boolean;
   canUpdate?: boolean;
   canComplete?: boolean;
   canCancel?: boolean;
@@ -134,6 +132,7 @@ export function InterventoSocialeDetailSheet({
   operatori = [],
   isLoading = false,
   isPending = false,
+  readUnavailable = false,
   canUpdate = true,
   canComplete = true,
   canCancel = true,
@@ -154,17 +153,6 @@ export function InterventoSocialeDetailSheet({
     hasPermission("richieste_magazzino.view") &&
     isModuloAttivo("MAGAZZINO_SOLIDALE") &&
     isModuloAttivo("CENTRO_ASCOLTO");
-  const requestParams = {
-    interventoId: intervento?.id,
-    stato: "aperte" as const,
-    limit: 1,
-  };
-  const interventionRequests = useListRichiesteMagazzino(requestParams, {
-    query: {
-      queryKey: getListRichiesteMagazzinoQueryKey(requestParams),
-      enabled: canViewRequests && open && intervento != null,
-    },
-  });
   const [attivita, setAttivita] = useState<InterventoAttivitaInput[]>([]);
   const [documenti, setDocumenti] = useState<InterventoDocumentoInput[]>([]);
   const [risultato, setRisultato] = useState("");
@@ -292,6 +280,11 @@ export function InterventoSocialeDetailSheet({
                 : t("interventi.operational.planningDescription")}
           </SheetDescription>
         </SheetHeader>
+        {readUnavailable && (
+          <p role="status" className="mt-4 text-sm text-amber-800">
+            {t("interventi.readUnavailable")}
+          </p>
+        )}
         {isLoading || !intervento || !operativita ? (
           <div className="mt-6 space-y-3">
             {Array.from({ length: 8 }, (_, index) => (
@@ -303,6 +296,16 @@ export function InterventoSocialeDetailSheet({
             className="mt-6 space-y-6"
             data-testid="intervento-operational-workspace"
           >
+            {intervento.provenienza && (
+              <p className="text-sm text-muted-foreground">
+                {t(`interventi.provenance.${intervento.provenienza}`)}
+              </p>
+            )}
+            {!canViewRequests && (
+              <p className="text-sm text-muted-foreground">
+                {t("interventi.magazzino.notConsultable")}
+              </p>
+            )}
             <section className="rounded-lg border p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -484,43 +487,26 @@ export function InterventoSocialeDetailSheet({
                 <h3 className="font-semibold">
                   {t("richiesteMagazzino.interventionSection")}
                 </h3>
-                {interventionRequests.data?.items[0] ? (
+                <RaccordoMagazzinoBadge
+                  raccordo={intervento.raccordoMagazzino}
+                />
+                {intervento.raccordoMagazzino ? (
                   <div className="flex flex-wrap items-center gap-3">
                     <span>
-                      {interventionRequests.data.items[0].codice} —{" "}
+                      {intervento.raccordoMagazzino.richiestaCodice} —{" "}
                       {t(
-                        `richiesteMagazzino.${interventionRequests.data.items[0].stato}`,
+                        `richiesteMagazzino.${intervento.raccordoMagazzino.richiestaStato}`,
                       )}
                     </span>
-                    {interventionRequests.data.items[0].documentoCorrente && (
-                      <span className="text-sm text-muted-foreground">
-                        {interventionRequests.data.items[0].documentoCorrente
-                          ?.codice ??
-                          t("richiesteMagazzino.currentDocument")}{" "}
-                        ·{" "}
-                        {t(
-                          `richiesteMagazzino.progress.${interventionRequests.data.items[0].documentoCorrente?.avanzamento}`,
-                        )}
-                      </span>
-                    )}
                     <Button asChild size="sm" variant="outline">
                       <Link
-                        href={`/richieste-magazzino?richiestaId=${interventionRequests.data.items[0].id}`}
+                        href={`/richieste-magazzino?richiestaId=${intervento.raccordoMagazzino.richiestaId}`}
                       >
                         {t("richiesteMagazzino.openExisting")}
                       </Link>
                     </Button>
                   </div>
-                ) : intervento.raccordoMagazzino ? (
-                  <p className="text-sm">
-                    {intervento.raccordoMagazzino.richiestaCodice} ·{" "}
-                    {t(
-                      `richiesteMagazzino.${intervento.raccordoMagazzino.richiestaStato}`,
-                    )}
-                  </p>
-                ) : hasPermission("richieste_magazzino.create") &&
-                  !interventionRequests.isLoading &&
-                  !interventionRequests.isError ? (
+                ) : hasPermission("richieste_magazzino.create") ? (
                   <Button asChild size="sm" variant="outline">
                     <Link
                       href={`/richieste-magazzino?interventoId=${intervento.id}&beneficiarioId=${intervento.beneficiarioId}`}
@@ -528,9 +514,17 @@ export function InterventoSocialeDetailSheet({
                       {t("richiesteMagazzino.sendFromIntervention")}
                     </Link>
                   </Button>
-                ) : interventionRequests.isError ? (
-                  <p role="alert">{t("richiesteMagazzino.loadError")}</p>
-                ) : null}
+                ) : (
+                  <p>{t("interventi.magazzino.noVisibleLink")}</p>
+                )}
+                {intervento.raccordoMagazzino &&
+                  !["annullata", "chiusa"].includes(
+                    intervento.raccordoMagazzino.richiestaStato,
+                  ) && (
+                    <p role="status" className="rounded-md border p-3 text-sm">
+                      {t("interventi.magazzino.independentClosure")}
+                    </p>
+                  )}
                 {intervento.raccordoMagazzino?.bollaId != null && (
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <Badge variant="outline">

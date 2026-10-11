@@ -4154,10 +4154,24 @@ export interface NucleoFamiliare {
   note?: string | null;
 }
 
+/**
+ * Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.
+ */
+export type InterventoProvenienza = typeof InterventoProvenienza[keyof typeof InterventoProvenienza];
+
+
+export const InterventoProvenienza = {
+  sociale: 'sociale',
+  derivato_bolla: 'derivato_bolla',
+  legacy_non_classificato: 'legacy_non_classificato',
+} as const;
+
 export interface InterventoRaccordoMagazzino {
   richiestaId: number;
   richiestaCodice: string;
   richiestaStato: string;
+  /** Più richieste attive visibili; non assumere un'unica lavorazione. */
+  ambiguo?: boolean;
   /** @nullable */
   bollaId?: number | null;
   /** @nullable */
@@ -4213,6 +4227,8 @@ export const InterventoPriorita = {
 export type InterventoAvviso = 'scaduto' | 'oggi' | 'imminente' | 'prossimo' | null;
 
 export interface Intervento {
+  /** Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico. */
+  provenienza?: InterventoProvenienza;
   id: number;
   beneficiarioId: number;
   /** @nullable */
@@ -5874,6 +5890,13 @@ export interface InterventoOperatore {
   id: number;
   nome: string;
   codice: string;
+}
+
+export interface InterventiPagina {
+  items: Intervento[];
+  total: number;
+  pagina: number;
+  limite: number;
 }
 
 /**
@@ -10994,6 +11017,102 @@ export type ListInterventiAmbitoLegacy = typeof ListInterventiAmbitoLegacy[keyof
 
 
 export const ListInterventiAmbitoLegacy = {
+  tutti: 'tutti',
+  classificati: 'classificati',
+  legacy: 'legacy',
+} as const;
+
+export type ListInterventiPaginaParams = {
+beneficiarioId?: number;
+tipo?: string;
+centroAscoltoId?: number;
+areaOperativaId?: number;
+/**
+ * Filtra gli interventi in base ai Bisogni Pianificati collegati.
+ */
+bisogni?: ListInterventiPaginaBisogni;
+stato?: InterventoStato;
+ambito?: InterventoAmbito;
+/**
+ * Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.
+ */
+includiStorici?: boolean;
+operatoreId?: number;
+priorita?: InterventoPriorita;
+/**
+ * Estremo iniziale ISO 8601 con fuso dell'intervallo pianificato.
+ */
+pianificataDa?: string;
+/**
+ * Estremo finale ISO 8601 con fuso dell'intervallo pianificato.
+ */
+pianificataA?: string;
+interventoPrecedenteId?: number;
+/**
+ * Vista operativa Sociale; richiede ambito=sociale. Oggi e i relativi confini civili sono calcolati in Europe/Rome.
+ */
+vista?: InterventoVista;
+/**
+ * Ricerca beneficiario per nome, cognome, nome completo o codice.
+ * @maxLength 120
+ */
+ricerca?: string;
+/**
+ * Data civile iniziale inclusiva Europe/Rome; deve essere usata insieme ad a.
+ */
+da?: string;
+/**
+ * Data civile finale inclusiva Europe/Rome; intervallo massimo 366 giorni.
+ */
+a?: string;
+ordina?: ListInterventiPaginaOrdina;
+direzione?: ListInterventiPaginaDirezione;
+/**
+ * Selezione conservativa dei record Sociali classificati o con ambito storico non determinato.
+ */
+ambitoLegacy?: ListInterventiPaginaAmbitoLegacy;
+/**
+ * @minimum 1
+ */
+pagina?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+limite?: number;
+};
+
+export type ListInterventiPaginaBisogni = typeof ListInterventiPaginaBisogni[keyof typeof ListInterventiPaginaBisogni];
+
+
+export const ListInterventiPaginaBisogni = {
+  aperti: 'aperti',
+  scaduti: 'scaduti',
+  nessuno: 'nessuno',
+} as const;
+
+export type ListInterventiPaginaOrdina = typeof ListInterventiPaginaOrdina[keyof typeof ListInterventiPaginaOrdina];
+
+
+export const ListInterventiPaginaOrdina = {
+  data: 'data',
+  priorita: 'priorita',
+  beneficiario: 'beneficiario',
+  operatore: 'operatore',
+} as const;
+
+export type ListInterventiPaginaDirezione = typeof ListInterventiPaginaDirezione[keyof typeof ListInterventiPaginaDirezione];
+
+
+export const ListInterventiPaginaDirezione = {
+  asc: 'asc',
+  desc: 'desc',
+} as const;
+
+export type ListInterventiPaginaAmbitoLegacy = typeof ListInterventiPaginaAmbitoLegacy[keyof typeof ListInterventiPaginaAmbitoLegacy];
+
+
+export const ListInterventiPaginaAmbitoLegacy = {
   tutti: 'tutti',
   classificati: 'classificati',
   legacy: 'legacy',

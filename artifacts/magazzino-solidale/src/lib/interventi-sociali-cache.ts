@@ -5,6 +5,8 @@ import {
   getListInterventiOperatoriQueryKey,
   getListInterventiQueryKey,
   getListInterventoStoricoStatiQueryKey,
+  getListInterventiPaginaQueryKey,
+  getListBisogniPianificatiQueryKey,
 } from "@workspace/api-client-react";
 
 interface QueryInvalidator {
@@ -18,6 +20,9 @@ export async function invalidateInterventiSociali(
   interventoId?: number,
 ): Promise<void> {
   const invalidations = [
+    queryClient.invalidateQueries({
+      queryKey: getListInterventiPaginaQueryKey(),
+    }),
     queryClient.invalidateQueries({ queryKey: getListInterventiQueryKey() }),
     queryClient.invalidateQueries({
       queryKey: getGetInterventiRiepilogoVisteQueryKey(),
@@ -28,6 +33,9 @@ export async function invalidateInterventiSociali(
   ];
   if (interventoId != null) {
     invalidations.push(
+      queryClient.invalidateQueries({
+        queryKey: getListBisogniPianificatiQueryKey(interventoId),
+      }),
       queryClient.invalidateQueries({
         queryKey: getGetInterventoQueryKey(interventoId),
       }),

@@ -35,6 +35,7 @@ import {
   type InterventiSocialiVista,
 } from "@/lib/interventi-sociali-filters";
 import { cn } from "@/lib/utils";
+import { interventoLogisticLabel } from "@/lib/interventi-logistics";
 
 interface NamedOption {
   id: number;
@@ -109,25 +110,14 @@ function LegacyBadge({ legacy }: { legacy: boolean }) {
   ) : null;
 }
 
-function RaccordoMagazzinoBadge({
+export function RaccordoMagazzinoBadge({
   raccordo,
 }: {
   raccordo: Intervento["raccordoMagazzino"];
 }) {
   const { t } = useTranslation();
   if (!raccordo) return null;
-  const key =
-    raccordo.consegnaStato === "effettuata"
-      ? "deliveryDone"
-      : raccordo.consegnaId != null
-        ? "deliveryPlanned"
-        : raccordo.bollaStato === "confermato"
-          ? "readyToPlan"
-          : raccordo.bollaStato === "bozza"
-            ? "preparingBolla"
-            : raccordo.richiestaStato === "presa_in_carico"
-              ? "preparingBolla"
-              : "requestSent";
+  const key = interventoLogisticLabel(raccordo);
   return (
     <Badge variant="outline" className="mt-1 block w-fit">
       {t(`interventi.magazzino.${key}`)}

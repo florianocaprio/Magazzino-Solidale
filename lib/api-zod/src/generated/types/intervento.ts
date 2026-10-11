@@ -8,10 +8,13 @@
 import type { InterventoAmbito } from './interventoAmbito';
 import type { InterventoAvviso } from './interventoAvviso';
 import type { InterventoPriorita } from './interventoPriorita';
+import type { InterventoProvenienza } from './interventoProvenienza';
 import type { InterventoRaccordoMagazzino } from './interventoRaccordoMagazzino';
 import type { InterventoStato } from './interventoStato';
 
 export interface Intervento {
+  /** Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico. */
+  provenienza?: InterventoProvenienza;
   id: number;
   beneficiarioId: number;
   /** @nullable */

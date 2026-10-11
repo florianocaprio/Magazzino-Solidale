@@ -13,6 +13,7 @@ import {
   pool,
   utentiTable,
   zoneUdsTable,
+  ruoliTable,
 } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
@@ -28,6 +29,7 @@ const beneficiarioIds: number[] = [];
 const centroIds: number[] = [];
 const zonaIds: number[] = [];
 const areaOperativaIds: number[] = [];
+const fixtureRoles = new Map<string, number>();
 
 let operatoreId: number;
 let areaOperativaRoma: number;
@@ -50,10 +52,11 @@ function makeApp(
   centroAscoltoId: number | null = centroRoma,
   zonaUdsId: number | null = zonaRoma,
   aree: string[] = ["sociale", "uds"],
+  isAdmin = false,
 ): Express {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => {
+  app.use(async (req, _res, next) => {
     (
       req as unknown as {
         user: {
@@ -92,6 +95,31 @@ function makeApp(
           : []),
       ],
     };
+    req.user!.isAdmin = isAdmin;
+    // Match the existing route fixture to current persisted RBAC; real-session
+    // security and revocation races are covered separately in m63-interventi.
+    const key = `${aree.join(",")}:${isAdmin}`;
+    if (!fixtureRoles.has(key)) {
+      const [role] = await db
+        .insert(ruoliTable)
+        .values({
+          nome: `M63 workflow ${rnd()}`,
+          aree,
+          permessi: req.user!.permessi,
+          isAdmin,
+        })
+        .returning();
+      fixtureRoles.set(key, role.id);
+    }
+    await db
+      .update(utentiTable)
+      .set({
+        ruoloId: fixtureRoles.get(key)!,
+        areaOperativaId,
+        centroAscoltoId,
+        zonaUdsId,
+      })
+      .where(eq(utentiTable.id, operatoreId));
     next();
   });
   app.use(interventiRouter);
@@ -261,6 +289,10 @@ afterAll(async () => {
       .where(inArray(beneficiariTable.id, beneficiarioIds));
   }
   await db.delete(utentiTable).where(eq(utentiTable.id, operatoreId));
+  if (fixtureRoles.size)
+    await db
+      .delete(ruoliTable)
+      .where(inArray(ruoliTable.id, [...fixtureRoles.values()]));
   if (zonaIds.length > 0) {
     await db.delete(zoneUdsTable).where(inArray(zoneUdsTable.id, zonaIds));
   }
@@ -684,7 +716,7 @@ describe("workflow degli interventi", () => {
         beneficiarioId: socialeAltroCentroRoma,
         interventoPrecedenteId: first.body.id,
       },
-      makeApp(null, null, null),
+      makeApp(null, null, null, ["sociale", "uds"], true),
     );
     expect(crossBeneficiary.status).toBe(400);
 
@@ -913,7 +945,7 @@ describe("visibilità territoriale del workflow", () => {
 
     const global = await createWorkflow(
       { beneficiarioId: socialeMilano, ambito: "sociale" },
-      makeApp(null, null, null),
+      makeApp(null, null, null, ["sociale", "uds"], true),
     );
     expect(global.status).toBe(201);
   });

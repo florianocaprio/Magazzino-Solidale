@@ -72,6 +72,8 @@ let destinationId: number;
 let productId: number;
 let operatorId: number;
 let centreOperatorId: number;
+let legacySocialId: number;
+let legacyMixedId: number;
 
 function centreDeliveryApp() {
   return makeScopedApp(consegneRouter, {
@@ -103,7 +105,7 @@ function app(permissions = grants, userId = operatorId) {
 
 function socialApp(warehouse = false) {
   return makeScopedApp(interventiRouter, {
-    id: operatorId,
+    id: warehouse ? legacyMixedId : legacySocialId,
     username: `m5b-${suffix}`,
     centroAscoltoId: centreId,
     areaOperativaId: areaId,
@@ -357,6 +359,33 @@ beforeAll(async () => {
     .update(utentiTable)
     .set({ areaOperativaId: areaId })
     .where(eq(utentiTable.id, centreOperatorId));
+  // Explicit profiles for the legacy path, no promotion of the M4 operator.
+  // M63 rereads these roles inside the command instead of trusting injected grants.
+  for (const mixed of [false, true]) {
+    const [legacyRole] = await db
+      .insert(ruoliTable)
+      .values({
+        nome: `M63 legacy ${mixed} ${suffix}`,
+        aree: mixed ? ["sociale", "magazzino"] : ["sociale"],
+        permessi: [
+          "sociale.interventi.view",
+          "sociale.interventi.update",
+          "sociale.interventi.complete",
+        ],
+      })
+      .returning();
+    scope.ruoloIds.push(legacyRole.id);
+    const id = await createUtente(scope, {
+      ruoloId: legacyRole.id,
+      centroId: centreId,
+    });
+    await db
+      .update(utentiTable)
+      .set({ areaOperativaId: areaId })
+      .where(eq(utentiTable.id, id));
+    if (mixed) legacyMixedId = id;
+    else legacySocialId = id;
+  }
 });
 
 afterAll(async () => {

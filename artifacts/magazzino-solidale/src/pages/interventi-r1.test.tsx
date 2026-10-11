@@ -19,12 +19,17 @@ vi.mock("react-i18next", () => ({
 }));
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
-    user: { id: 4, areaOperativaId: 3, centroAscoltoId: 12 },
+    user: { id: 4, areaOperativaId: 3, centroAscoltoId: 12, aree: ["sociale"] },
     hasPermission: () => true,
   }),
 }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
-vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({}) }));
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({
+    cancelQueries: vi.fn().mockResolvedValue(undefined),
+    removeQueries: vi.fn(),
+  }),
+}));
 vi.mock("@/lib/interventi-sociali-cache", () => ({
   invalidateInterventiSociali: vi.fn().mockResolvedValue(undefined),
 }));
@@ -152,6 +157,11 @@ vi.mock("@workspace/api-client-react", () => {
     useListCentriAscolto: empty,
     useListAreeOperative: empty,
     useListInterventi: empty,
+    useListInterventiPagina: () => ({
+      data: { items: [], total: 0 },
+      isLoading: false,
+    }),
+    getListInterventiPaginaQueryKey: key,
     useListInterventiOperatori: empty,
     useListTipiIntervento: empty,
     useCreateIntervento: () => ({

@@ -111,6 +111,40 @@ describe("ExportButtons", () => {
     await openMenu(button);
     expect(button.dataset.state).toBe("open");
   });
+  it("M63 rivalida dopo il branding PDF e non scarica dopo un diniego", async () => {
+    let ready!: (value: { branding: object }) => void;
+    mocks.loadBranding.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          ready = resolve;
+        }),
+    );
+    const denied = Object.assign(new Error("Revoca"), { status: 403 });
+    const beforeExport = vi.fn().mockRejectedValue(denied),
+      onError = vi.fn();
+    await act(async () =>
+      root.render(
+        <ExportButtons<Row>
+          rows={[{ id: 1, nome: "Sintetico" }]}
+          columns={[]}
+          title="Interventi"
+          filename="interventi"
+          beforeExport={beforeExport}
+          onError={onError}
+        />,
+      ),
+    );
+    await openMenu(trigger());
+    await act(async () => menuItem("common.exportPdf").click());
+    expect(beforeExport).not.toHaveBeenCalled();
+    await act(async () => {
+      ready({ branding: {} });
+    });
+    expect(beforeExport).toHaveBeenCalledTimes(1);
+    expect(mocks.exportToPdf).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(denied);
+    expect(trigger().disabled).toBe(false);
+  });
 
   it("mostra il pending e impedisce esportazioni duplicate", async () => {
     let resolveRows: ((rows: Row[]) => void) | undefined;

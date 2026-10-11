@@ -3972,7 +3972,7 @@ paths:
     get:
       operationId: listInterventi
       tags: [interventi]
-      parameters:
+      parameters: &interventiListParameters
         - name: beneficiarioId
           in: query
           schema:
@@ -4110,6 +4110,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Intervento"
+
+  /interventi/pagina:
+    get:
+      operationId: listInterventiPagina
+      tags: [interventi]
+      description: Stessi filtri e scope dell'elenco array, con totale e navigazione. Il totale non garantisce uno snapshot fra richieste successive.
+      parameters: *interventiListParameters
+      responses:
+        "200":
+          description: Pagina di Interventi autorizzati.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterventiPagina"
 
   /interventi/riepilogo-viste:
     get:
@@ -17259,6 +17273,11 @@ components:
         richiestaId: { type: integer }
         richiestaCodice: { type: string }
         richiestaStato: { type: string }
+        ambiguo:
+          {
+            type: boolean,
+            description: Più richieste attive visibili; non assumere un'unica lavorazione.,
+          }
         bollaId: { type: [integer, "null"] }
         bollaNumero: { type: [string, "null"] }
         bollaStato: { type: [string, "null"] }
@@ -17268,9 +17287,24 @@ components:
         fasciaOraria: { type: [string, "null"] }
       required: [richiestaId, richiestaCodice, richiestaStato]
 
+    InterventiPagina:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Intervento" }
+        total: { type: integer }
+        pagina: { type: integer }
+        limite: { type: integer }
+      required: [items, total, pagina, limite]
+
     Intervento:
       type: object
       properties:
+        provenienza:
+          type: string
+          enum: [sociale, derivato_bolla, legacy_non_classificato]
+          description: Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.
         id:
           type: integer
         beneficiarioId:

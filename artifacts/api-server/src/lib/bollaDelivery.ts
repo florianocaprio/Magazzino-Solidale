@@ -17,6 +17,9 @@ import {
   prenotazioniMagazzinoTable,
   prodottiTable,
   speseEmporioTable,
+  auditEventiTable,
+  richiesteMagazzinoTable,
+  richiesteMagazzinoDocumentiTable,
 } from "@workspace/db";
 import { and, asc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { dataCivileEuropeRome } from "./interventiWorkflow";
@@ -150,14 +153,38 @@ export async function lockLotto(
   return lotto;
 }
 
-async function syncInterventoBollaTx(tx: Tx, bollaId: number) {
+async function syncInterventoBollaTx(
+  tx: Tx,
+  bollaId: number,
+  audit: AuditCommandContext,
+) {
+  // All callers, including the legacy adapter, serialize on the document.
+  await lockBolla(tx, bollaId);
   const [bolla] = await tx
     .select()
     .from(bolleTable)
     .where(eq(bolleTable.id, bollaId));
   if (!bolla) return;
+  if (bolla.stato !== "consegnato") return;
   if (bolla.tipoDestinatario !== "beneficiario" || bolla.beneficiarioId == null)
     return;
+  const [originale] = await tx
+    .select({ id: richiesteMagazzinoTable.interventoId })
+    .from(richiesteMagazzinoDocumentiTable)
+    .innerJoin(
+      richiesteMagazzinoTable,
+      eq(
+        richiesteMagazzinoDocumentiTable.richiestaId,
+        richiesteMagazzinoTable.id,
+      ),
+    )
+    .where(
+      and(
+        eq(richiesteMagazzinoDocumentiTable.bollaId, bollaId),
+        sql`${richiesteMagazzinoTable.interventoId} is not null`,
+      ),
+    );
+  if (originale) return;
 
   const righe = await tx
     .select({ tipoProdotto: prodottiTable.tipoProdotto })
@@ -184,37 +211,42 @@ async function syncInterventoBollaTx(tx: Tx, bollaId: number) {
   const descLabels = etichette.map((e) => LABEL_INTERVENTO[e] ?? e).join(", ");
   const descrizione = `Consegna automatica da bolla ${bolla.numeroBolla}: ${descLabels}`;
 
-  if (esistente) {
-    await tx
-      .update(interventiTable)
-      .set({
+  // Existing rows can contain operator-owned social content. Neither the
+  // description nor a null ambito proves that logistics owns those fields.
+  if (esistente) return;
+  {
+    const [created] = await tx
+      .insert(interventiTable)
+      .values({
+        beneficiarioId: bolla.beneficiarioId,
+        bollaId,
+        dataIntervento: bolla.dataBolla,
         tipoIntervento,
         descrizione,
-        beneficiarioId: bolla.beneficiarioId,
-        dataIntervento: bolla.dataBolla,
         operatoreId: bolla.operatoreId,
-        areaOperativaIdSnapshot:
-          esistente.areaOperativaIdSnapshot ?? bolla.areaOperativaIdSnapshot,
-        centroAscoltoIdSnapshot:
-          esistente.centroAscoltoIdSnapshot ?? bolla.centroAscoltoIdSnapshot,
+        areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
+        centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
       })
-      .where(eq(interventiTable.id, esistente.id));
-  } else {
-    await tx.insert(interventiTable).values({
-      beneficiarioId: bolla.beneficiarioId,
-      bollaId,
-      dataIntervento: bolla.dataBolla,
-      tipoIntervento,
-      descrizione,
-      operatoreId: bolla.operatoreId,
+      .returning();
+    await recordAuditEvent(tx, {
+      command: audit,
+      azione: "INTERVENTO_DERIVATO_BOLLA_CREATO",
+      entitaTipo: "intervento",
+      entitaId: created.id,
+      documentoTipo: "bolla",
+      documentoId: bollaId,
       areaOperativaIdSnapshot: bolla.areaOperativaIdSnapshot,
       centroAscoltoIdSnapshot: bolla.centroAscoltoIdSnapshot,
+      dataOperativa: bolla.dataBolla,
     });
   }
 }
 
-export async function syncInterventoBolla(bollaId: number) {
-  await db.transaction((tx) => syncInterventoBollaTx(tx, bollaId));
+export async function syncInterventoBolla(
+  bollaId: number,
+  audit: AuditCommandContext,
+) {
+  await db.transaction((tx) => syncInterventoBollaTx(tx, bollaId, audit));
 }
 
 export async function annullaInterventoDaBollaTx(
@@ -226,7 +258,18 @@ export async function annullaInterventoDaBollaTx(
   const [intervento] = await tx
     .select()
     .from(interventiTable)
-    .where(eq(interventiTable.bollaId, bollaId))
+    .where(
+      and(
+        eq(interventiTable.bollaId, bollaId),
+        sql`exists (
+      select 1 from ${auditEventiTable} where ${auditEventiTable.entitaTipo} = 'intervento'
+      and ${auditEventiTable.entitaId} = ${interventiTable.id}
+      and ${auditEventiTable.azione} = 'INTERVENTO_DERIVATO_BOLLA_CREATO'
+      and ${auditEventiTable.documentoTipo} = 'bolla' and ${auditEventiTable.documentoId} = ${bollaId}
+    )`,
+        sql`not exists (select 1 from ${richiesteMagazzinoTable} where ${richiesteMagazzinoTable.interventoId} = ${interventiTable.id})`,
+      ),
+    )
     .for("update");
   if (!intervento || intervento.stato === "annullato") return;
 
@@ -949,7 +992,7 @@ export async function completeBollaDelivery(opts: {
       });
       if (isBeneficiario) {
         await syncConsegnaDaBollaTx(tx, current, lockedConsegna);
-        await syncInterventoBollaTx(tx, opts.bollaId);
+        await syncInterventoBollaTx(tx, opts.bollaId, opts.audit);
       }
       if (opts.documentCommand) {
         await storeDocumentCommand(tx, {
@@ -1088,7 +1131,7 @@ export async function completeBollaDelivery(opts: {
         lockedConsegna,
       );
       if (linkedRequest?.richiesta.interventoId == null)
-        await syncInterventoBollaTx(tx, opts.bollaId);
+        await syncInterventoBollaTx(tx, opts.bollaId, opts.audit);
     }
     if (linkedRequest)
       await closeDeliveredRequestTx(

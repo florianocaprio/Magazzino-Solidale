@@ -210,6 +210,16 @@ describe("InterventoSocialeDetailSheet", () => {
             stato: "pianificato",
             ambito: "sociale",
             ambitoLegacy: false,
+            raccordoMagazzino: {
+              richiestaId: 8,
+              richiestaCodice: "RM-8",
+              richiestaStato: "presa_in_carico",
+              bollaId: 8,
+              bollaNumero: "B-8",
+              bollaStato: "confermato",
+              consegnaId: null,
+              consegnaStato: null,
+            },
           }}
           operativita={{ ...operativita, stato: "pianificato" }}
           onOpenChange={vi.fn()}
@@ -222,9 +232,10 @@ describe("InterventoSocialeDetailSheet", () => {
     );
     expect(section?.textContent).toContain("RM-8");
     expect(section?.textContent).toContain("B-8");
-    expect(section?.textContent).toContain(
-      "richiesteMagazzino.progress.pronta",
+    expect(document.body.textContent).toContain(
+      "interventi.magazzino.independentClosure",
     );
+    expect(section?.textContent).toContain("interventi.magazzino.readyToPlan");
     expect(
       document.querySelector('a[href="/richieste-magazzino?richiestaId=8"]'),
     ).not.toBeNull();

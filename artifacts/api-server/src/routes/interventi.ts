@@ -4,6 +4,9 @@ import {
   bisogniPianificatiTable,
   bisogniPianificatiStoricoTable,
   centriAscoltoTable,
+  areeOperativeTable,
+  zoneUdsTable,
+  auditEventiTable,
   db,
   interventiAttivitaTable,
   interventiDocumentiTable,
@@ -80,6 +83,7 @@ import {
   type InterventoVista,
 } from "../lib/interventiViste";
 import type { PermissionKey } from "../lib/permissions";
+import { selectInterventoRaccordo } from "../lib/interventiLogistics";
 import {
   creaScaricoInventariale,
   InventoryError,
@@ -106,10 +110,54 @@ import {
   requireCurrentM5bActor,
 } from "../lib/m5bRequestAccess";
 import { CurrentCommandActorError } from "../lib/currentCommandActor";
+import { auditContextFromRequest } from "../lib/auditEvent";
+import {
+  canReadSocialSubject,
+  socialSubjectPredicate,
+  socialTerritory,
+  requireCurrentSocialActor,
+  type SocialActor,
+} from "../lib/interventiSocialAccess";
 
 const router: IRouter = Router();
 
 router.use("/interventi", requireAnyModulo(["CENTRO_ASCOLTO", "UDS"]));
+
+const socialActors = new WeakMap<Request, SocialActor>();
+router.use("/interventi", async (req, _res, next) => {
+  if (req.user) {
+    const user = req.user;
+    const [[area], [centro], [zona]] = await Promise.all([
+      user.areaOperativaId == null
+        ? []
+        : db
+            .select()
+            .from(areeOperativeTable)
+            .where(eq(areeOperativeTable.id, user.areaOperativaId)),
+      user.centroAscoltoId == null
+        ? []
+        : db
+            .select()
+            .from(centriAscoltoTable)
+            .where(eq(centriAscoltoTable.id, user.centroAscoltoId)),
+      user.zonaUdsId == null
+        ? []
+        : db
+            .select()
+            .from(zoneUdsTable)
+            .where(eq(zoneUdsTable.id, user.zonaUdsId)),
+    ]);
+    socialActors.set(req, {
+      ...user,
+      areaOperativaAttiva: area?.attivo ?? false,
+      centroAscoltoAttivo: centro?.attivo ?? false,
+      centroAscoltoAreaOperativaId: centro?.areaOperativaId ?? null,
+      zonaAttiva: zona?.attivo ?? false,
+      zonaAreaOperativaId: zona?.areaOperativaId ?? null,
+    });
+  }
+  next();
+});
 
 const BISOGNO_TIPI = ["richiesta", "azione"] as const;
 const BISOGNO_STATI = [
@@ -227,6 +275,98 @@ class RouteError extends Error {
   ) {
     super(message);
   }
+}
+
+/** Actor/role/territory -> graph -> material delegation -> Intervention -> beneficiary.
+ * M5 takes actor and material locks in this same order. The graph lock only
+ * serializes social relationship writers for one beneficiary, not inventory.
+ */
+async function runInterventoCommand<T>(
+  req: Request,
+  ambito: string | null,
+  permissions: SocialInterventoPermission[],
+  command: (tx: DbTransaction) => Promise<T>,
+  newBeneficiarioId?: number,
+): Promise<T> {
+  if (ambito === "uds")
+    return db.transaction(async (tx) => {
+      const id = parsePositiveInteger(req.params.id ?? req.params.interventoId);
+      const [row] =
+        id == null
+          ? []
+          : await tx
+              .select({ beneficiarioId: interventiTable.beneficiarioId })
+              .from(interventiTable)
+              .where(eq(interventiTable.id, id));
+      const beneficiaryId = row?.beneficiarioId ?? newBeneficiarioId;
+      if (beneficiaryId != null)
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext('m63.intervento.catena'), ${beneficiaryId})`,
+        );
+      return command(tx);
+    });
+  return db.transaction(async (tx) => {
+    const actor = await requireCurrentSocialActor(
+      tx,
+      req.user!.id,
+      permissions[0],
+    );
+    for (const permission of permissions) {
+      if (!actor.isAdmin && !actor.permessi?.includes(permission))
+        throw new CurrentCommandActorError(
+          "Permesso Interventi Sociali non più disponibile",
+        );
+    }
+    const [identity] = await tx
+      .select({
+        username: utentiTable.username,
+        matricola: utentiTable.matricola,
+      })
+      .from(utentiTable)
+      .where(eq(utentiTable.id, actor.id));
+    req.user = { ...req.user!, ...actor, ...identity };
+    socialActors.set(req, actor);
+    const id = parsePositiveInteger(req.params.id ?? req.params.interventoId);
+    const [before] =
+      id == null
+        ? []
+        : await tx
+            .select()
+            .from(interventiTable)
+            .where(eq(interventiTable.id, id));
+    const beneficiaryId = before?.beneficiarioId ?? newBeneficiarioId;
+    if (beneficiaryId == null)
+      throw new RouteError(404, "Intervento non trovato");
+    // Every social writer participates, including PATCH of type/planning.
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext('m63.intervento.catena'), ${beneficiaryId})`,
+    );
+    if (id != null && hasOwn(req.body, "materiali"))
+      await lockInterventionMaterialPath(tx, id);
+    if (id != null) {
+      const [current] = await tx
+        .select()
+        .from(interventiTable)
+        .where(eq(interventiTable.id, id))
+        .for("update");
+      if (
+        !current ||
+        current.beneficiarioId !== beneficiaryId ||
+        current.ambito === "uds"
+      )
+        throw new RouteError(409, "Il contesto dell'Intervento è cambiato");
+    }
+    const beneficiary = await lockBeneficiaryReportingContextTx(
+      tx,
+      beneficiaryId,
+    );
+    if (
+      !canAccessSensitiveSocialBeneficiary(beneficiary, req) ||
+      (id == null && !beneficiary.attivo)
+    )
+      throw new RouteError(403, "Beneficiario non più accessibile");
+    return command(tx);
+  });
 }
 
 function hasSocialInterventoPermission(
@@ -605,10 +745,19 @@ function normalizeBisogno(
 
 function cleanInterventoBody(
   input: Record<string, unknown>,
+  current?: InterventoRow,
 ): Record<string, unknown> {
+  if (
+    hasOwn(input, "bollaId") &&
+    (input.bollaId ?? null) !== (current?.bollaId ?? null)
+  ) {
+    throw new RouteError(
+      400,
+      "Il collegamento Bolla è governato dal percorso documentale e non è modificabile dall'Intervento",
+    );
+  }
   const allowed = [
     "beneficiarioId",
-    "bollaId",
     "dataIntervento",
     "tipoIntervento",
     "descrizione",
@@ -825,6 +974,47 @@ function formatInterventoListItem(
 }
 
 /** One scoped query for the whole visible page; never fetch social content per row. */
+async function provenienzeInterventi(
+  rows: Array<{ id: number; bollaId: number | null; ambito: string | null }>,
+) {
+  const result = new Map<
+    number,
+    "sociale" | "derivato_bolla" | "legacy_non_classificato"
+  >();
+  if (!rows.length) return result;
+  const proofs = await db
+    .select({
+      id: auditEventiTable.entitaId,
+      bollaId: auditEventiTable.documentoId,
+    })
+    .from(auditEventiTable)
+    .where(
+      and(
+        eq(auditEventiTable.entitaTipo, "intervento"),
+        eq(auditEventiTable.azione, "INTERVENTO_DERIVATO_BOLLA_CREATO"),
+        eq(auditEventiTable.documentoTipo, "bolla"),
+        inArray(
+          auditEventiTable.entitaId,
+          rows.map((row) => row.id),
+        ),
+      ),
+    );
+  for (const row of rows)
+    result.set(
+      row.id,
+      row.bollaId == null
+        ? row.ambito === "sociale"
+          ? "sociale"
+          : "legacy_non_classificato"
+        : proofs.some(
+              (proof) => proof.id === row.id && proof.bollaId === row.bollaId,
+            )
+          ? "derivato_bolla"
+          : "legacy_non_classificato",
+    );
+  return result;
+}
+
 async function raccordiMagazzinoFor(req: Request, ids: number[]) {
   const result = new Map<
     number,
@@ -839,6 +1029,7 @@ async function raccordiMagazzinoFor(req: Request, ids: number[]) {
       consegnaStato: string | null;
       dataPrevista: string | null;
       fasciaOraria: string | null;
+      ambiguo: boolean;
     }
   >();
   if (ids.length === 0 || !req.user) return result;
@@ -894,8 +1085,12 @@ async function raccordiMagazzinoFor(req: Request, ids: number[]) {
         );
       for (const row of rows) {
         if (row.interventoId != null && !result.has(row.interventoId)) {
-          const { interventoId: _interventoId, ...summary } = row;
-          result.set(row.interventoId, summary);
+          const summary = selectInterventoRaccordo(
+            rows.filter(
+              (candidate) => candidate.interventoId === row.interventoId,
+            ),
+          );
+          if (summary) result.set(row.interventoId, summary);
         }
       }
       return result;
@@ -1414,6 +1609,7 @@ async function replaceOperativita(
       sequence += 1;
       try {
         await creaScaricoInventariale(tx, {
+          audit: auditContextFromRequest(req),
           codice: `INT-${interventoId}-${now.getTime().toString(36)}-${sequence}`,
           magazzinoId,
           centroAscoltoId: intervento.centroAscoltoIdSnapshot,
@@ -1525,6 +1721,7 @@ async function summariesFor(
 
 async function successoriFor(
   interventoIds: number[],
+  req: Request,
 ): Promise<Map<number, number[]>> {
   const result = new Map<number, number[]>();
   if (interventoIds.length === 0) return result;
@@ -1532,12 +1729,31 @@ async function successoriFor(
     .select({
       id: interventiTable.id,
       precedenteId: interventiTable.interventoPrecedenteId,
+      ambito: interventiTable.ambito,
+      areaOperativaIdSnapshot: interventiTable.areaOperativaIdSnapshot,
+      beneficiario: beneficiariTable,
     })
     .from(interventiTable)
+    .innerJoin(
+      beneficiariTable,
+      eq(interventiTable.beneficiarioId, beneficiariTable.id),
+    )
     .where(inArray(interventiTable.interventoPrecedenteId, interventoIds))
     .orderBy(interventiTable.id);
   for (const row of rows) {
     if (row.precedenteId == null) continue;
+    const visible =
+      row.ambito === "uds"
+        ? canUseInterventoArea(req, "uds") &&
+          hasUdsInterventoPermission(req, "uds.interventi.view") &&
+          canAccessUdsInterventoTerritory(
+            req,
+            row,
+            row.beneficiario.areaOperativaId,
+          )
+        : hasSocialInterventoPermission(req, "sociale.interventi.view") &&
+          canAccessSensitiveSocialBeneficiary(row.beneficiario, req);
+    if (!visible) continue;
     const current = result.get(row.precedenteId) ?? [];
     current.push(row.id);
     result.set(row.precedenteId, current);
@@ -1603,7 +1819,7 @@ function isTerritoriallyScoped(req: Request): boolean {
 }
 
 function canAccessUnassignedSocialFolder(req: Request): boolean {
-  return req.user?.isAdmin === true || req.user?.isSuperAdmin === true;
+  return socialTerritory(socialActors.get(req)) === "global";
 }
 
 /** Cartelle Sociali prive di Area o Centro restano visibili solo globalmente. */
@@ -1611,23 +1827,7 @@ function canAccessSensitiveSocialBeneficiary(
   beneficiario: BeneficiarioAccess,
   req: Request,
 ): boolean {
-  if (!canUseInterventoArea(req, "sociale")) return false;
-  if (
-    beneficiario.areaOperativaId == null ||
-    beneficiario.centroAscoltoId == null
-  ) {
-    return !isTerritoriallyScoped(req) && canAccessUnassignedSocialFolder(req);
-  }
-  if (!isTerritoriallyScoped(req)) return true;
-  const callerAreaOperativa = callerAreaOperativaId(req);
-  const callerCentro = callerCentroId(req);
-  const callerZona = callerZonaUdsId(req);
-  return (
-    (callerAreaOperativa == null ||
-      beneficiario.areaOperativaId === callerAreaOperativa) &&
-    (callerCentro == null || beneficiario.centroAscoltoId === callerCentro) &&
-    (callerZona == null || beneficiario.zonaUdsId === callerZona)
-  );
+  return canReadSocialSubject(socialActors.get(req), beneficiario);
 }
 
 async function canCreateForAmbito(
@@ -1647,8 +1847,21 @@ async function canAssignSocialOperator(
   operatoreId: number,
   beneficiarioId: number,
   req: Request,
+  executor: typeof db | DbTransaction = db,
 ): Promise<boolean> {
-  const [target] = await db
+  if (executor !== db) {
+    try {
+      await requireCurrentSocialActor(
+        executor as DbTransaction,
+        operatoreId,
+        "sociale.interventi.view",
+      );
+    } catch (error) {
+      if (error instanceof CurrentCommandActorError) return false;
+      throw error;
+    }
+  }
+  const [target] = await executor
     .select({
       id: utentiTable.id,
       attivo: utentiTable.attivo,
@@ -1658,28 +1871,45 @@ async function canAssignSocialOperator(
       zonaUdsId: utentiTable.zonaUdsId,
       roleAree: ruoliTable.aree,
       roleAdmin: ruoliTable.isAdmin,
+      permessi: ruoliTable.permessi,
+      areaOperativaAttiva: areeOperativeTable.attivo,
+      centroAscoltoAttivo: centriAscoltoTable.attivo,
+      centroAscoltoAreaOperativaId: centriAscoltoTable.areaOperativaId,
+      zonaAttiva: zoneUdsTable.attivo,
+      zonaAreaOperativaId: zoneUdsTable.areaOperativaId,
     })
     .from(utentiTable)
     .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
+    .leftJoin(
+      areeOperativeTable,
+      eq(utentiTable.areaOperativaId, areeOperativeTable.id),
+    )
+    .leftJoin(
+      centriAscoltoTable,
+      eq(utentiTable.centroAscoltoId, centriAscoltoTable.id),
+    )
+    .leftJoin(zoneUdsTable, eq(utentiTable.zonaUdsId, zoneUdsTable.id))
     .where(eq(utentiTable.id, operatoreId))
     .limit(1);
   if (!target?.attivo) return false;
-  if (target.id === req.user!.id) return true;
-  if (target.id !== req.user!.id) {
-    const hasSocialArea =
-      target.isSuperAdmin ||
-      target.roleAdmin === true ||
-      target.roleAree?.includes("sociale") === true;
-    if (!hasSocialArea) return false;
-  }
-  const beneficiary = await beneficiarioAccess(beneficiarioId);
+  const [beneficiary] = await executor
+    .select()
+    .from(beneficiariTable)
+    .where(eq(beneficiariTable.id, beneficiarioId));
   if (!beneficiary) return false;
   return (
-    (target.areaOperativaId == null ||
-      target.areaOperativaId === beneficiary.areaOperativaId) &&
-    (target.centroAscoltoId == null ||
-      target.centroAscoltoId === beneficiary.centroAscoltoId) &&
-    (target.zonaUdsId == null || target.zonaUdsId === beneficiary.zonaUdsId)
+    Boolean(
+      target.roleAdmin || target.permessi?.includes("sociale.interventi.view"),
+    ) &&
+    canReadSocialSubject(
+      {
+        ...target,
+        isAdmin: target.roleAdmin === true,
+        aree: target.roleAree,
+        zonaAttiva: target.zonaAttiva === true,
+      },
+      beneficiary,
+    )
   );
 }
 
@@ -1807,10 +2037,10 @@ async function displayDetailsForIntervento(interventoId: number) {
   };
 }
 
-async function formattedInterventoFor(row: InterventoRow) {
+async function formattedInterventoFor(row: InterventoRow, req: Request) {
   const [needs, successori, display] = await Promise.all([
     orderedBisogni([row.id]),
-    successoriFor([row.id]),
+    successoriFor([row.id], req),
     displayDetailsForIntervento(row.id),
   ]);
   return formatIntervento(
@@ -1971,6 +2201,7 @@ async function validateInterventoPrecedente(
   precedenteId: number | null,
   beneficiarioId: number,
   currentId: number | null = null,
+  executor: typeof db | DbTransaction = db,
 ): Promise<void> {
   if (precedenteId == null) return;
   if (currentId != null && precedenteId === currentId) {
@@ -1983,7 +2214,7 @@ async function validateInterventoPrecedente(
       throw new RouteError(400, "Il collegamento creerebbe una catena ciclica");
     }
     visited.add(cursor);
-    const [row] = await db
+    const [row] = await executor
       .select({
         beneficiarioId: interventiTable.beneficiarioId,
         precedenteId: interventiTable.interventoPrecedenteId,
@@ -2018,11 +2249,68 @@ function formatStoricoStato(
   };
 }
 
+async function assertSuccessorUnique(
+  tx: DbTransaction,
+  input: {
+    beneficiarioId: number;
+    interventoPrecedenteId?: number | null;
+    tipoIntervento: string;
+    dataOraPianificata?: Date | null;
+    stato?: string;
+  },
+  currentId: number | null = null,
+) {
+  await validateInterventoPrecedente(
+    input.interventoPrecedenteId ?? null,
+    input.beneficiarioId,
+    currentId,
+    tx,
+  );
+  if (input.interventoPrecedenteId == null) return;
+  // Historical duplicates must still be closable. The uniqueness rule only
+  // applies when this command would leave/create an active successor.
+  if (
+    input.stato &&
+    !["da_pianificare", "pianificato", "in_corso"].includes(input.stato)
+  )
+    return;
+  const [duplicate] = await tx
+    .select({ id: interventiTable.id })
+    .from(interventiTable)
+    .where(
+      and(
+        eq(
+          interventiTable.interventoPrecedenteId,
+          input.interventoPrecedenteId,
+        ),
+        eq(interventiTable.tipoIntervento, input.tipoIntervento),
+        input.dataOraPianificata == null
+          ? isNull(interventiTable.dataOraPianificata)
+          : eq(interventiTable.dataOraPianificata, input.dataOraPianificata),
+        inArray(interventiTable.stato, [
+          "da_pianificare",
+          "pianificato",
+          "in_corso",
+        ]),
+        currentId == null ? undefined : ne(interventiTable.id, currentId),
+      ),
+    )
+    .limit(1);
+  if (duplicate)
+    throw new RouteError(
+      409,
+      "Esiste già un intervento successivo con la stessa pianificazione",
+    );
+}
+
 function sendRouteError(
   error: unknown,
   res: { status: (status: number) => { json: (body: unknown) => void } },
 ) {
-  if (error instanceof M5bDelegationError) {
+  if (
+    error instanceof M5bDelegationError ||
+    error instanceof CurrentCommandActorError
+  ) {
     res.status(error.status).json({ error: error.message });
     return true;
   }
@@ -2069,7 +2357,7 @@ function socialScopeConditions(
     throw new RouteError(403, "Ambito sociale non consentito");
   }
   requireSocialInterventoPermission(req, "sociale.interventi.view");
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [socialSubjectPredicate(socialActors.get(req))];
   const callerCentro = callerCentroId(req);
   const callerAreaOperativa = callerAreaOperativaId(req);
   const callerZona = callerZonaUdsId(req);
@@ -2268,6 +2556,7 @@ function interventiOrderBy(
         asc(prioritaOrdineSql()),
         asc(beneficiariTable.cognome),
         asc(beneficiariTable.nome),
+        asc(interventiTable.id),
       ];
     case "in_corso":
       return [
@@ -2294,7 +2583,7 @@ function interventiOrderBy(
   }
 }
 
-router.get("/interventi", async (req, res) => {
+router.get(["/interventi", "/interventi/pagina"], async (req, res) => {
   const {
     beneficiarioId,
     tipo,
@@ -2681,6 +2970,13 @@ router.get("/interventi", async (req, res) => {
     res.status(400).json({ error: "pagina o limite non validi" });
     return;
   }
+  // Apply the same social policy to mixed/legacy callers without changing UDS.
+  conditions.push(
+    or(
+      eq(interventiTable.ambito, "uds"),
+      socialSubjectPredicate(socialActors.get(req)),
+    )!,
+  );
   const orderBy = interventiOrderBy(
     parsedVista,
     parsedOrdinamento,
@@ -2721,34 +3017,52 @@ router.get("/interventi", async (req, res) => {
     .offset((parsedPage - 1) * parsedLimit);
 
   const summaries = await summariesFor(rows.map((row) => row.i.id));
-  const successori = await successoriFor(rows.map((row) => row.i.id));
+  const provenance = await provenienzeInterventi(rows.map((row) => row.i));
+  const successori = await successoriFor(
+    rows.map((row) => row.i.id),
+    req,
+  );
   const raccordi = await raccordiMagazzinoFor(
     req,
     rows.map((row) => row.i.id),
   );
-  res.json(
-    rows.map((row) => ({
-      ...(ambito === "uds" ? formatIntervento : formatInterventoListItem)(
-        row.i,
-        summaries.get(row.i.id) ?? emptySummary(),
-        row.cognome && row.nome ? `${row.cognome} ${row.nome}` : null,
-        row.operatoreMatricola ?? row.operatoreUsername ?? null,
-        successori.get(row.i.id) ?? [],
-        {
-          beneficiarioCodice: row.codice,
-          nucleoFamiliareSintesi: nucleoFamiliareSintesi(row),
-          centroAscoltoId: row.centroAscoltoId,
-          centroAscoltoNome: row.centroAscoltoNome,
-          areaOperativaId: row.areaOperativaId,
-          operatoreNome:
-            [row.operatoreNome, row.operatoreCognome]
-              .filter(Boolean)
-              .join(" ") || null,
-        },
-      ),
-      raccordoMagazzino: raccordi.get(row.i.id) ?? null,
-    })),
-  );
+  const items = rows.map((row) => ({
+    ...(ambito === "uds" ? formatIntervento : formatInterventoListItem)(
+      row.i,
+      summaries.get(row.i.id) ?? emptySummary(),
+      row.cognome && row.nome ? `${row.cognome} ${row.nome}` : null,
+      row.operatoreMatricola ?? row.operatoreUsername ?? null,
+      successori.get(row.i.id) ?? [],
+      {
+        beneficiarioCodice: row.codice,
+        nucleoFamiliareSintesi: nucleoFamiliareSintesi(row),
+        centroAscoltoId: row.centroAscoltoId,
+        centroAscoltoNome: row.centroAscoltoNome,
+        areaOperativaId: row.areaOperativaId,
+        operatoreNome:
+          [row.operatoreNome, row.operatoreCognome].filter(Boolean).join(" ") ||
+          null,
+      },
+    ),
+    raccordoMagazzino: raccordi.get(row.i.id) ?? null,
+    provenienza: provenance.get(row.i.id),
+  }));
+  if (req.path.endsWith("/pagina")) {
+    const [count] = await db
+      .select({ total: sql<number>`count(*)`.mapWith(Number) })
+      .from(interventiTable)
+      .leftJoin(
+        beneficiariTable,
+        eq(interventiTable.beneficiarioId, beneficiariTable.id),
+      )
+      .where(and(...conditions));
+    res.json({
+      items,
+      total: count.total,
+      pagina: parsedPage,
+      limite: parsedLimit,
+    });
+  } else res.json(items);
 });
 
 router.get(
@@ -2824,6 +3138,12 @@ router.get(
       res.status(403).json({ error: "Ambito sociale non consentito" });
       return;
     }
+    if (socialTerritory(socialActors.get(req)) === "none") {
+      res
+        .status(403)
+        .json({ error: "Assegnazione territoriale sociale non disponibile" });
+      return;
+    }
     const callerAreaOperativa = callerAreaOperativaId(req);
     const callerCentro = callerCentroId(req);
     const selectedAreaOperativa =
@@ -2862,10 +3182,39 @@ router.get(
     const conditions: SQL[] = [
       eq(utentiTable.attivo, true),
       or(
-        eq(utentiTable.id, req.user!.id),
-        eq(utentiTable.isSuperAdmin, true),
         eq(ruoliTable.isAdmin, true),
-        sql`${ruoliTable.aree} ? 'sociale'`,
+        and(
+          sql`${ruoliTable.aree} ? 'sociale'`,
+          sql`${ruoliTable.permessi} ? 'sociale.interventi.view'`,
+        ),
+      )!,
+      or(
+        and(
+          eq(ruoliTable.isAdmin, true),
+          isNull(utentiTable.areaOperativaId),
+          isNull(utentiTable.centroAscoltoId),
+          isNull(utentiTable.zonaUdsId),
+        ),
+        and(
+          eq(areeOperativeTable.attivo, true),
+          or(
+            isNull(utentiTable.centroAscoltoId),
+            and(
+              eq(centriAscoltoTable.attivo, true),
+              eq(
+                centriAscoltoTable.areaOperativaId,
+                utentiTable.areaOperativaId,
+              ),
+            ),
+          ),
+          or(
+            isNull(utentiTable.zonaUdsId),
+            and(
+              eq(zoneUdsTable.attivo, true),
+              eq(zoneUdsTable.areaOperativaId, utentiTable.areaOperativaId),
+            ),
+          ),
+        ),
       )!,
       or(
         eq(utentiTable.areaOperativaId, selectedAreaOperativa),
@@ -2890,6 +3239,15 @@ router.get(
       })
       .from(utentiTable)
       .leftJoin(ruoliTable, eq(utentiTable.ruoloId, ruoliTable.id))
+      .leftJoin(
+        areeOperativeTable,
+        eq(utentiTable.areaOperativaId, areeOperativeTable.id),
+      )
+      .leftJoin(
+        centriAscoltoTable,
+        eq(utentiTable.centroAscoltoId, centriAscoltoTable.id),
+      )
+      .leftJoin(zoneUdsTable, eq(utentiTable.zonaUdsId, zoneUdsTable.id))
       .where(and(...conditions))
       .orderBy(utentiTable.nome, utentiTable.cognome, utentiTable.id);
     res.json(
@@ -2913,6 +3271,7 @@ router.post("/interventi", async (req, res) => {
   const body = req.body as Record<string, unknown>;
   let workflow: WorkflowCreateResult;
   try {
+    cleanInterventoBody(body);
     workflow = workflowCreateValues(body);
   } catch (error) {
     if (sendRouteError(error, res)) return;
@@ -3009,57 +3368,84 @@ router.post("/interventi", async (req, res) => {
     throw error;
   }
 
-  const { intervento, bisogniCreati } = await db.transaction(async (tx) => {
-    const [created] = await tx
-      .insert(interventiTable)
-      .values({
-        ...cleanInterventoBody(body),
-        ...workflow.values,
-        beneficiarioId,
-        interventoPrecedenteId,
-        operatoreId: assignedOperatorId,
-        ...(workflow.values.ambito === "uds" && creationBeneficiario
-          ? {
-              areaOperativaIdSnapshot: creationBeneficiario.areaOperativaId,
-              zonaUdsIdSnapshot: creationBeneficiario.zonaUdsId,
-            }
-          : {}),
-      } as never)
-      .returning();
-    await tx.insert(interventiStoricoStatiTable).values({
-      interventoId: created.id,
-      statoPrecedente: null,
-      statoNuovo: created.stato,
-      operatoreId: req.user!.id,
-      dataTransizione: workflow.values.dataAggiornamento!,
-      motivo: workflow.legacy ? "Creazione da payload legacy" : null,
-    });
-    const createdNeeds =
-      normalizedBisogni.length > 0
-        ? await tx
-            .insert(bisogniPianificatiTable)
-            .values(
-              normalizedBisogni.map((item) => ({
-                ...item,
-                interventoId: created.id,
-              })),
-            )
-            .returning()
-        : [];
-    for (const need of createdNeeds) {
-      await appendBisognoHistory(
-        tx,
-        null,
-        need,
-        req.user!.id,
-        "Creazione contestuale all'intervento",
-      );
-    }
-    return { intervento: created, bisogniCreati: createdNeeds };
-  });
-  res
-    .status(201)
-    .json(formatIntervento(intervento, summarizeBisogni(bisogniCreati)));
+  try {
+    const { intervento, bisogniCreati } = await runInterventoCommand(
+      req,
+      workflow.values.ambito ?? null,
+      ["sociale.interventi.create"],
+      async (tx) => {
+        await assertSuccessorUnique(tx, {
+          beneficiarioId,
+          interventoPrecedenteId,
+          tipoIntervento: String(body.tipoIntervento ?? ""),
+          dataOraPianificata: workflow.values.dataOraPianificata,
+        });
+        if (
+          workflow.values.ambito !== "uds" &&
+          !(await canAssignSocialOperator(
+            assignedOperatorId,
+            beneficiarioId,
+            req,
+            tx,
+          ))
+        )
+          throw new RouteError(403, "Operatore assegnato non più accessibile");
+        const [created] = await tx
+          .insert(interventiTable)
+          .values({
+            ...cleanInterventoBody(body),
+            ...workflow.values,
+            beneficiarioId,
+            interventoPrecedenteId,
+            operatoreId: assignedOperatorId,
+            ...(workflow.values.ambito === "uds" && creationBeneficiario
+              ? {
+                  areaOperativaIdSnapshot: creationBeneficiario.areaOperativaId,
+                  zonaUdsIdSnapshot: creationBeneficiario.zonaUdsId,
+                }
+              : {}),
+          } as never)
+          .returning();
+        await tx.insert(interventiStoricoStatiTable).values({
+          interventoId: created.id,
+          statoPrecedente: null,
+          statoNuovo: created.stato,
+          operatoreId: req.user!.id,
+          dataTransizione: workflow.values.dataAggiornamento!,
+          motivo: workflow.legacy ? "Creazione da payload legacy" : null,
+        });
+        const createdNeeds =
+          normalizedBisogni.length > 0
+            ? await tx
+                .insert(bisogniPianificatiTable)
+                .values(
+                  normalizedBisogni.map((item) => ({
+                    ...item,
+                    interventoId: created.id,
+                  })),
+                )
+                .returning()
+            : [];
+        for (const need of createdNeeds) {
+          await appendBisognoHistory(
+            tx,
+            null,
+            need,
+            req.user!.id,
+            "Creazione contestuale all'intervento",
+          );
+        }
+        return { intervento: created, bisogniCreati: createdNeeds };
+      },
+      beneficiarioId,
+    );
+    res
+      .status(201)
+      .json(formatIntervento(intervento, summarizeBisogni(bisogniCreati)));
+  } catch (error) {
+    if (sendRouteError(error, res)) return;
+    throw error;
+  }
 });
 
 router.get(
@@ -3269,7 +3655,7 @@ router.get("/interventi/:id", async (req, res) => {
   try {
     const row = await requireAccessibleIntervento(id, req);
     const needs = await orderedBisogni([row.id]);
-    const successori = await successoriFor([row.id]);
+    const successori = await successoriFor([row.id], req);
     const display = await displayDetailsForIntervento(row.id);
     const raccordi = await raccordiMagazzinoFor(req, [row.id]);
     res.json({
@@ -3282,6 +3668,7 @@ router.get("/interventi/:id", async (req, res) => {
         display?.details,
       ),
       raccordoMagazzino: raccordi.get(row.id) ?? null,
+      provenienza: (await provenienzeInterventi([row])).get(row.id),
     });
   } catch (error) {
     if (sendRouteError(error, res)) return;
@@ -3332,67 +3719,75 @@ router.patch("/interventi/:id/materiali/:materialeId", async (req, res) => {
       "sociale.interventi.update",
     );
     const now = new Date();
-    const updated = await db.transaction(async (tx) => {
-      const [intervento] = await tx
-        .select()
-        .from(interventiTable)
-        .where(eq(interventiTable.id, id))
-        .for("update");
-      if (!intervento) throw new RouteError(404, "Intervento non trovato");
-      if (!canManageLegacyInventoryMaterials(req, intervento.ambito)) {
-        throw new RouteError(
-          403,
-          "Preparazione materiali riservata al Magazzino",
-        );
-      }
-      if (!["pianificato", "in_corso"].includes(intervento.stato))
-        throw new RouteError(
-          409,
-          "Lo stato di preparazione non è modificabile per questo intervento",
-        );
-      const [materiale] = await tx
-        .select()
-        .from(interventiMaterialiTable)
-        .where(
-          and(
-            eq(interventiMaterialiTable.id, materialeId),
-            eq(interventiMaterialiTable.interventoId, id),
-          ),
+    const updated = await runInterventoCommand(
+      req,
+      "sociale",
+      ["sociale.interventi.update"],
+      async (tx) => {
+        const [intervento] = await tx
+          .select()
+          .from(interventiTable)
+          .where(eq(interventiTable.id, id))
+          .for("update");
+        if (!intervento) throw new RouteError(404, "Intervento non trovato");
+        if (!canManageLegacyInventoryMaterials(req, intervento.ambito)) {
+          throw new RouteError(
+            403,
+            "Preparazione materiali riservata al Magazzino",
+          );
+        }
+        if (!["pianificato", "in_corso"].includes(intervento.stato))
+          throw new RouteError(
+            409,
+            "Lo stato di preparazione non è modificabile per questo intervento",
+          );
+        const [materiale] = await tx
+          .select()
+          .from(interventiMaterialiTable)
+          .where(
+            and(
+              eq(interventiMaterialiTable.id, materialeId),
+              eq(interventiMaterialiTable.interventoId, id),
+            ),
+          )
+          .for("update");
+        if (!materiale)
+          throw new RouteError(
+            404,
+            "Materiale non appartenente all'intervento",
+          );
+        if (
+          materiale.statoPreparazione === "annullato" ||
+          materiale.statoPreparazione === "consegnato"
         )
-        .for("update");
-      if (!materiale)
-        throw new RouteError(404, "Materiale non appartenente all'intervento");
-      if (
-        materiale.statoPreparazione === "annullato" ||
-        materiale.statoPreparazione === "consegnato"
-      )
-        throw new RouteError(409, "Il materiale non è più preparabile");
-      if (materiale.dataAggiornamento.getTime() !== expected.getTime())
-        throw new RouteError(
-          409,
-          "Il materiale è stato modificato da un altro operatore",
-        );
-      const [row] = await tx
-        .update(interventiMaterialiTable)
-        .set({
-          statoPreparazione: body.statoPreparazione as MaterialeStato,
-          dataAggiornamento: now,
-        })
-        .where(
-          and(
-            eq(interventiMaterialiTable.id, materialeId),
-            eq(interventiMaterialiTable.interventoId, id),
-            eq(interventiMaterialiTable.dataAggiornamento, expected),
-          ),
-        )
-        .returning();
-      if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
-      await tx
-        .update(interventiTable)
-        .set({ dataAggiornamento: now })
-        .where(eq(interventiTable.id, id));
-      return row;
-    });
+          throw new RouteError(409, "Il materiale non è più preparabile");
+        if (materiale.dataAggiornamento.getTime() !== expected.getTime())
+          throw new RouteError(
+            409,
+            "Il materiale è stato modificato da un altro operatore",
+          );
+        const [row] = await tx
+          .update(interventiMaterialiTable)
+          .set({
+            statoPreparazione: body.statoPreparazione as MaterialeStato,
+            dataAggiornamento: now,
+          })
+          .where(
+            and(
+              eq(interventiMaterialiTable.id, materialeId),
+              eq(interventiMaterialiTable.interventoId, id),
+              eq(interventiMaterialiTable.dataAggiornamento, expected),
+            ),
+          )
+          .returning();
+        if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
+        await tx
+          .update(interventiTable)
+          .set({ dataAggiornamento: now })
+          .where(eq(interventiTable.id, id));
+        return row;
+      },
+    );
     res.json(formatMateriale(updated));
   } catch (error) {
     if (sendRouteError(error, res)) return;
@@ -3421,49 +3816,54 @@ router.post("/interventi/:id/avvia", async (req, res) => {
       "sociale",
       "sociale.interventi.complete",
     );
-    const updated = await db.transaction(async (tx) => {
-      const [current] = await tx
-        .select()
-        .from(interventiTable)
-        .where(eq(interventiTable.id, id))
-        .for("update");
-      if (!current) throw new RouteError(404, "Intervento non trovato");
-      assertExpectedVersion(body, current);
-      if (!isInterventoStato(current.stato))
-        throw new RouteError(409, "Stato corrente non riconosciuto");
-      if (!["da_pianificare", "pianificato"].includes(current.stato)) {
-        throw new RouteError(
-          409,
-          "L'intervento è già stato avviato o non è avviabile",
-        );
-      }
-      const [row] = await tx
-        .update(interventiTable)
-        .set({
-          stato: "in_corso",
-          dataOraAvvio: now,
-          dataIntervento: current.dataIntervento ?? dataCivileEuropeRome(now),
-          dataAggiornamento: now,
-        })
-        .where(
-          and(
-            eq(interventiTable.id, id),
-            eq(interventiTable.stato, current.stato),
-          ),
-        )
-        .returning();
-      if (!row) throw new RouteError(409, "Avvio concorrente rilevato");
-      await tx.insert(interventiStoricoStatiTable).values({
-        interventoId: id,
-        statoPrecedente: current.stato,
-        statoNuovo: "in_corso",
-        operatoreId: req.user!.id,
-        dataTransizione: now,
-        motivo: null,
-      });
-      return row;
-    });
-    res.json(await formattedInterventoFor(updated));
+    const updated = await runInterventoCommand(
+      req,
+      "sociale",
+      ["sociale.interventi.complete"],
+      async (tx) => {
+        const [current] = await tx
+          .select()
+          .from(interventiTable)
+          .where(eq(interventiTable.id, id))
+          .for("update");
+        if (!current) throw new RouteError(404, "Intervento non trovato");
+        assertExpectedVersion(body, current);
+        if (!isInterventoStato(current.stato))
+          throw new RouteError(409, "Stato corrente non riconosciuto");
+        if (!["da_pianificare", "pianificato"].includes(current.stato)) {
+          throw new RouteError(
+            409,
+            "L'intervento è già stato avviato o non è avviabile",
+          );
+        }
+        const [row] = await tx
+          .update(interventiTable)
+          .set({
+            stato: "in_corso",
+            dataOraAvvio: now,
+            dataIntervento: current.dataIntervento ?? dataCivileEuropeRome(now),
+            dataAggiornamento: now,
+          })
+          .where(
+            and(
+              eq(interventiTable.id, id),
+              eq(interventiTable.stato, current.stato),
+            ),
+          )
+          .returning();
+        if (!row) throw new RouteError(409, "Avvio concorrente rilevato");
+        await tx.insert(interventiStoricoStatiTable).values({
+          interventoId: id,
+          statoPrecedente: current.stato,
+          statoNuovo: "in_corso",
+          operatoreId: req.user!.id,
+          dataTransizione: now,
+          motivo: null,
+        });
+        return row;
+      },
+    );
+    res.json(await formattedInterventoFor(updated, req));
   } catch (error) {
     if (sendRouteError(error, res)) return;
     res.status(400).json({
@@ -3487,49 +3887,59 @@ router.post("/interventi/:id/salva-operativita", async (req, res) => {
       "sociale.interventi.update",
     );
     const now = new Date();
-    const updated = await db.transaction(async (tx) => {
-      if (hasOwn(body, "materiali")) await lockInterventionMaterialPath(tx, id);
-      const [current] = await tx
-        .select()
-        .from(interventiTable)
-        .where(eq(interventiTable.id, id))
-        .for("update");
-      if (!current) throw new RouteError(404, "Intervento non trovato");
-      assertExpectedVersion(body, current);
-      if (
-        !["da_pianificare", "pianificato", "in_corso"].includes(current.stato)
-      ) {
-        throw new RouteError(
-          409,
-          "Un intervento terminale è consultabile in sola lettura",
-        );
-      }
-      const effectiveCurrent = hasOwn(body, "materiali")
-        ? await snapshotInterventoReportingContext(tx, current, req)
-        : current;
-      await replaceOperativita(tx, effectiveCurrent, body, req, now);
-      const updates: Partial<typeof interventiTable.$inferInsert> = {
-        dataAggiornamento: now,
-      };
-      if (hasOwn(body, "risultato"))
-        updates.risultato = nullableText(body.risultato, "Il risultato", 4000);
-      if (hasOwn(body, "esito"))
-        updates.esito = nullableText(body.esito, "L'esito", 4000);
-      if (hasOwn(body, "note"))
-        updates.note = nullableText(body.note, "Le note", 4000);
-      const [row] = await tx
-        .update(interventiTable)
-        .set(updates)
-        .where(
-          and(
-            eq(interventiTable.id, id),
-            eq(interventiTable.stato, current.stato),
-          ),
-        )
-        .returning();
-      if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
-      return row;
-    });
+    const updated = await runInterventoCommand(
+      req,
+      "sociale",
+      ["sociale.interventi.update"],
+      async (tx) => {
+        if (hasOwn(body, "materiali"))
+          await lockInterventionMaterialPath(tx, id);
+        const [current] = await tx
+          .select()
+          .from(interventiTable)
+          .where(eq(interventiTable.id, id))
+          .for("update");
+        if (!current) throw new RouteError(404, "Intervento non trovato");
+        assertExpectedVersion(body, current);
+        if (
+          !["da_pianificare", "pianificato", "in_corso"].includes(current.stato)
+        ) {
+          throw new RouteError(
+            409,
+            "Un intervento terminale è consultabile in sola lettura",
+          );
+        }
+        const effectiveCurrent = hasOwn(body, "materiali")
+          ? await snapshotInterventoReportingContext(tx, current, req)
+          : current;
+        await replaceOperativita(tx, effectiveCurrent, body, req, now);
+        const updates: Partial<typeof interventiTable.$inferInsert> = {
+          dataAggiornamento: now,
+        };
+        if (hasOwn(body, "risultato"))
+          updates.risultato = nullableText(
+            body.risultato,
+            "Il risultato",
+            4000,
+          );
+        if (hasOwn(body, "esito"))
+          updates.esito = nullableText(body.esito, "L'esito", 4000);
+        if (hasOwn(body, "note"))
+          updates.note = nullableText(body.note, "Le note", 4000);
+        const [row] = await tx
+          .update(interventiTable)
+          .set(updates)
+          .where(
+            and(
+              eq(interventiTable.id, id),
+              eq(interventiTable.stato, current.stato),
+            ),
+          )
+          .returning();
+        if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
+        return row;
+      },
+    );
     res.json(await operativitaFor(updated));
   } catch (error) {
     if (sendRouteError(error, res)) return;
@@ -3611,156 +4021,180 @@ router.post("/interventi/:id/concludi", async (req, res) => {
         ? optionalPositiveInteger(successivoInput.operatoreId, "operatoreId")
         : req.user!.id;
     }
-    const result = await db.transaction(async (tx) => {
-      if (hasOwn(body, "materiali")) await lockInterventionMaterialPath(tx, id);
-      const [current] = await tx
-        .select()
-        .from(interventiTable)
-        .where(eq(interventiTable.id, id))
-        .for("update");
-      if (!current) throw new RouteError(404, "Intervento non trovato");
-      assertExpectedVersion(body, current);
-      if (current.stato !== "in_corso") {
-        throw new RouteError(
-          409,
-          "L'intervento non è in corso o è già concluso",
-        );
-      }
-      if (current.dataOraAvvio == null)
-        throw new RouteError(409, "L'intervento non risulta avviato");
-      if (conclusionDate < current.dataOraAvvio)
-        throw new RouteError(400, "La conclusione non può precedere l'avvio");
-
-      const risultato = hasOwn(body, "risultato")
-        ? nullableText(body.risultato, "Il risultato", 4000)
-        : current.risultato;
-      const esito = hasOwn(body, "esito")
-        ? nullableText(body.esito, "L'esito", 4000)
-        : current.esito;
-      if (risultato == null && esito == null) {
-        throw new RouteError(
-          400,
-          "Inserire almeno un risultato o un esito finale",
-        );
-      }
-      const effectiveCurrent = await snapshotInterventoReportingContext(
-        tx,
-        current,
-        req,
-      );
-      await replaceOperativita(tx, effectiveCurrent, body, req, conclusionDate);
-      const [concluso] = await tx
-        .update(interventiTable)
-        .set({
-          stato: "concluso",
-          risultato,
-          esito,
-          note: hasOwn(body, "note")
-            ? nullableText(body.note, "Le note", 4000)
-            : current.note,
-          dataOraConclusione: conclusionDate,
-          dataAggiornamento: conclusionDate,
-          areaOperativaIdSnapshot: effectiveCurrent.areaOperativaIdSnapshot,
-          centroAscoltoIdSnapshot: effectiveCurrent.centroAscoltoIdSnapshot,
-        })
-        .where(
-          and(
-            eq(interventiTable.id, id),
-            eq(interventiTable.stato, "in_corso"),
-          ),
-        )
-        .returning();
-      if (!concluso)
-        throw new RouteError(409, "Conclusione concorrente rilevata");
-      await tx.insert(interventiStoricoStatiTable).values({
-        interventoId: id,
-        statoPrecedente: "in_corso",
-        statoNuovo: "concluso",
-        operatoreId: req.user!.id,
-        dataTransizione: conclusionDate,
-        motivo: null,
-      });
-
-      let successivo: InterventoRow | null = null;
-      if (successivoInput && successivoWorkflow && successivoOperatoreId) {
-        if (
-          !(await canAssignSocialOperator(
-            successivoOperatoreId,
-            current.beneficiarioId,
-            req,
-          ))
-        ) {
-          throw new RouteError(403, "Operatore del successivo non accessibile");
-        }
-        const [duplicate] = await tx
-          .select({ id: interventiTable.id })
+    if (successivoInput) cleanInterventoBody(successivoInput);
+    const result = await runInterventoCommand(
+      req,
+      accessibleIntervento.ambito,
+      [
+        "sociale.interventi.complete",
+        ...(containsOperationalChanges(body) ||
+        (successivoInput && containsOperationalChanges(successivoInput))
+          ? ["sociale.interventi.update" as const]
+          : []),
+        ...(successivoInput ? ["sociale.interventi.create" as const] : []),
+      ],
+      async (tx) => {
+        if (hasOwn(body, "materiali"))
+          await lockInterventionMaterialPath(tx, id);
+        const [current] = await tx
+          .select()
           .from(interventiTable)
-          .where(
-            and(
-              eq(interventiTable.interventoPrecedenteId, id),
-              inArray(interventiTable.stato, [
-                "da_pianificare",
-                "pianificato",
-                "in_corso",
-              ]),
-            ),
-          )
-          .limit(1);
-        if (duplicate)
+          .where(eq(interventiTable.id, id))
+          .for("update");
+        if (!current) throw new RouteError(404, "Intervento non trovato");
+        assertExpectedVersion(body, current);
+        if (current.stato !== "in_corso") {
           throw new RouteError(
             409,
-            "Esiste già un intervento successivo attivo",
+            "L'intervento non è in corso o è già concluso",
           );
-        [successivo] = await tx
-          .insert(interventiTable)
-          .values({
-            ...cleanInterventoBody(successivoInput),
-            ...successivoWorkflow.values,
-            beneficiarioId: current.beneficiarioId,
-            interventoPrecedenteId: id,
-            operatoreId: successivoOperatoreId,
-            risultato: null,
-            esito: null,
-          } as never)
-          .returning();
-        await tx.insert(interventiStoricoStatiTable).values({
-          interventoId: successivo.id,
-          statoPrecedente: null,
-          statoNuovo: successivo.stato,
-          operatoreId: req.user!.id,
-          dataTransizione: conclusionDate,
-          motivo: "Creato contestualmente alla conclusione del precedente",
-        });
-        const effectiveSuccessivo = await snapshotInterventoReportingContext(
+        }
+        if (current.dataOraAvvio == null)
+          throw new RouteError(409, "L'intervento non risulta avviato");
+        if (conclusionDate < current.dataOraAvvio)
+          throw new RouteError(400, "La conclusione non può precedere l'avvio");
+
+        const risultato = hasOwn(body, "risultato")
+          ? nullableText(body.risultato, "Il risultato", 4000)
+          : current.risultato;
+        const esito = hasOwn(body, "esito")
+          ? nullableText(body.esito, "L'esito", 4000)
+          : current.esito;
+        if (risultato == null && esito == null) {
+          throw new RouteError(
+            400,
+            "Inserire almeno un risultato o un esito finale",
+          );
+        }
+        const effectiveCurrent = await snapshotInterventoReportingContext(
           tx,
-          successivo,
+          current,
           req,
         );
         await replaceOperativita(
           tx,
-          effectiveSuccessivo,
-          {
-            ...(hasOwn(successivoInput, "attivita")
-              ? { attivita: successivoInput.attivita }
-              : {}),
-            ...(hasOwn(successivoInput, "materiali")
-              ? { materiali: successivoInput.materiali }
-              : {}),
-            ...(hasOwn(successivoInput, "documenti")
-              ? { documenti: successivoInput.documenti }
-              : {}),
-          },
+          effectiveCurrent,
+          body,
           req,
           conclusionDate,
         );
-      }
-      return { concluso, successivo };
-    });
+        const [concluso] = await tx
+          .update(interventiTable)
+          .set({
+            stato: "concluso",
+            risultato,
+            esito,
+            note: hasOwn(body, "note")
+              ? nullableText(body.note, "Le note", 4000)
+              : current.note,
+            dataOraConclusione: conclusionDate,
+            dataAggiornamento: conclusionDate,
+            areaOperativaIdSnapshot: effectiveCurrent.areaOperativaIdSnapshot,
+            centroAscoltoIdSnapshot: effectiveCurrent.centroAscoltoIdSnapshot,
+          })
+          .where(
+            and(
+              eq(interventiTable.id, id),
+              eq(interventiTable.stato, "in_corso"),
+            ),
+          )
+          .returning();
+        if (!concluso)
+          throw new RouteError(409, "Conclusione concorrente rilevata");
+        await tx.insert(interventiStoricoStatiTable).values({
+          interventoId: id,
+          statoPrecedente: "in_corso",
+          statoNuovo: "concluso",
+          operatoreId: req.user!.id,
+          dataTransizione: conclusionDate,
+          motivo: null,
+        });
+
+        let successivo: InterventoRow | null = null;
+        if (successivoInput && successivoWorkflow && successivoOperatoreId) {
+          if (
+            !(await canAssignSocialOperator(
+              successivoOperatoreId,
+              current.beneficiarioId,
+              req,
+              tx,
+            ))
+          ) {
+            throw new RouteError(
+              403,
+              "Operatore del successivo non accessibile",
+            );
+          }
+          const [duplicate] = await tx
+            .select({ id: interventiTable.id })
+            .from(interventiTable)
+            .where(
+              and(
+                eq(interventiTable.interventoPrecedenteId, id),
+                inArray(interventiTable.stato, [
+                  "da_pianificare",
+                  "pianificato",
+                  "in_corso",
+                ]),
+              ),
+            )
+            .limit(1);
+          if (duplicate)
+            throw new RouteError(
+              409,
+              "Esiste già un intervento successivo attivo",
+            );
+          [successivo] = await tx
+            .insert(interventiTable)
+            .values({
+              ...cleanInterventoBody(successivoInput),
+              ...successivoWorkflow.values,
+              beneficiarioId: current.beneficiarioId,
+              interventoPrecedenteId: id,
+              operatoreId: successivoOperatoreId,
+              risultato: null,
+              esito: null,
+            } as never)
+            .returning();
+          await tx.insert(interventiStoricoStatiTable).values({
+            interventoId: successivo.id,
+            statoPrecedente: null,
+            statoNuovo: successivo.stato,
+            operatoreId: req.user!.id,
+            dataTransizione: conclusionDate,
+            motivo: "Creato contestualmente alla conclusione del precedente",
+          });
+          const effectiveSuccessivo = await snapshotInterventoReportingContext(
+            tx,
+            successivo,
+            req,
+          );
+          await replaceOperativita(
+            tx,
+            effectiveSuccessivo,
+            {
+              ...(hasOwn(successivoInput, "attivita")
+                ? { attivita: successivoInput.attivita }
+                : {}),
+              ...(hasOwn(successivoInput, "materiali")
+                ? { materiali: successivoInput.materiali }
+                : {}),
+              ...(hasOwn(successivoInput, "documenti")
+                ? { documenti: successivoInput.documenti }
+                : {}),
+            },
+            req,
+            conclusionDate,
+          );
+        }
+        return { concluso, successivo };
+      },
+    );
     res.json({
-      intervento: await formattedInterventoFor(result.concluso),
+      intervento: await formattedInterventoFor(result.concluso, req),
       operativita: await operativitaFor(result.concluso),
       successivo: result.successivo
-        ? await formattedInterventoFor(result.successivo)
+        ? await formattedInterventoFor(result.successivo, req)
         : null,
     });
   } catch (error) {
@@ -3793,44 +4227,53 @@ router.post("/interventi/:id/annulla", async (req, res) => {
       "sociale",
       "sociale.interventi.cancel",
     );
-    const updated = await db.transaction(async (tx) => {
-      const [current] = await tx
-        .select()
-        .from(interventiTable)
-        .where(eq(interventiTable.id, id))
-        .for("update");
-      if (!current) throw new RouteError(404, "Intervento non trovato");
-      assertExpectedVersion(body, current);
-      if (
-        !["da_pianificare", "pianificato", "in_corso"].includes(current.stato)
-      )
-        throw new RouteError(409, "L'intervento è già in uno stato terminale");
-      const [row] = await tx
-        .update(interventiTable)
-        .set({
-          stato: "annullato",
-          motivoAnnullamento: motivo,
-          dataAggiornamento: now,
-        })
-        .where(
-          and(
-            eq(interventiTable.id, id),
-            eq(interventiTable.stato, current.stato),
-          ),
+    const updated = await runInterventoCommand(
+      req,
+      "sociale",
+      ["sociale.interventi.cancel"],
+      async (tx) => {
+        const [current] = await tx
+          .select()
+          .from(interventiTable)
+          .where(eq(interventiTable.id, id))
+          .for("update");
+        if (!current) throw new RouteError(404, "Intervento non trovato");
+        assertExpectedVersion(body, current);
+        if (
+          !["da_pianificare", "pianificato", "in_corso"].includes(current.stato)
         )
-        .returning();
-      if (!row) throw new RouteError(409, "Annullamento concorrente rilevato");
-      await tx.insert(interventiStoricoStatiTable).values({
-        interventoId: id,
-        statoPrecedente: current.stato,
-        statoNuovo: "annullato",
-        operatoreId: req.user!.id,
-        dataTransizione: now,
-        motivo,
-      });
-      return row;
-    });
-    res.json(await formattedInterventoFor(updated));
+          throw new RouteError(
+            409,
+            "L'intervento è già in uno stato terminale",
+          );
+        const [row] = await tx
+          .update(interventiTable)
+          .set({
+            stato: "annullato",
+            motivoAnnullamento: motivo,
+            dataAggiornamento: now,
+          })
+          .where(
+            and(
+              eq(interventiTable.id, id),
+              eq(interventiTable.stato, current.stato),
+            ),
+          )
+          .returning();
+        if (!row)
+          throw new RouteError(409, "Annullamento concorrente rilevato");
+        await tx.insert(interventiStoricoStatiTable).values({
+          interventoId: id,
+          statoPrecedente: current.stato,
+          statoNuovo: "annullato",
+          operatoreId: req.user!.id,
+          dataTransizione: now,
+          motivo,
+        });
+        return row;
+      },
+    );
+    res.json(await formattedInterventoFor(updated, req));
   } catch (error) {
     if (sendRouteError(error, res)) return;
     res.status(400).json({
@@ -3857,46 +4300,51 @@ router.post("/interventi/:id/mancata-presentazione", async (req, res) => {
       "sociale",
       "sociale.interventi.cancel",
     );
-    const updated = await db.transaction(async (tx) => {
-      const [current] = await tx
-        .select()
-        .from(interventiTable)
-        .where(eq(interventiTable.id, id))
-        .for("update");
-      if (!current) throw new RouteError(404, "Intervento non trovato");
-      assertExpectedVersion(body, current);
-      if (current.stato !== "pianificato")
-        throw new RouteError(
-          409,
-          "La mancata presentazione richiede un intervento pianificato",
-        );
-      const [row] = await tx
-        .update(interventiTable)
-        .set({
-          stato: "mancata_presentazione",
-          dataOraAvvio: null,
-          note: nota ?? current.note,
-          dataAggiornamento: now,
-        })
-        .where(
-          and(
-            eq(interventiTable.id, id),
-            eq(interventiTable.stato, "pianificato"),
-          ),
-        )
-        .returning();
-      if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
-      await tx.insert(interventiStoricoStatiTable).values({
-        interventoId: id,
-        statoPrecedente: "pianificato",
-        statoNuovo: "mancata_presentazione",
-        operatoreId: req.user!.id,
-        dataTransizione: now,
-        motivo: nota,
-      });
-      return row;
-    });
-    res.json(await formattedInterventoFor(updated));
+    const updated = await runInterventoCommand(
+      req,
+      "sociale",
+      ["sociale.interventi.cancel"],
+      async (tx) => {
+        const [current] = await tx
+          .select()
+          .from(interventiTable)
+          .where(eq(interventiTable.id, id))
+          .for("update");
+        if (!current) throw new RouteError(404, "Intervento non trovato");
+        assertExpectedVersion(body, current);
+        if (current.stato !== "pianificato")
+          throw new RouteError(
+            409,
+            "La mancata presentazione richiede un intervento pianificato",
+          );
+        const [row] = await tx
+          .update(interventiTable)
+          .set({
+            stato: "mancata_presentazione",
+            dataOraAvvio: null,
+            note: nota ?? current.note,
+            dataAggiornamento: now,
+          })
+          .where(
+            and(
+              eq(interventiTable.id, id),
+              eq(interventiTable.stato, "pianificato"),
+            ),
+          )
+          .returning();
+        if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
+        await tx.insert(interventiStoricoStatiTable).values({
+          interventoId: id,
+          statoPrecedente: "pianificato",
+          statoNuovo: "mancata_presentazione",
+          operatoreId: req.user!.id,
+          dataTransizione: now,
+          motivo: nota,
+        });
+        return row;
+      },
+    );
+    res.json(await formattedInterventoFor(updated, req));
   } catch (error) {
     if (sendRouteError(error, res)) return;
     res.status(400).json({
@@ -4071,135 +4519,164 @@ router.patch("/interventi/:id", async (req, res) => {
   }
 
   try {
-    const row = await db.transaction(async (tx) => {
-      const [current] = await tx
-        .select()
-        .from(interventiTable)
-        .where(eq(interventiTable.id, id))
-        .for("update");
-      if (!current) throw new RouteError(404, "Intervento non trovato");
-      const expectedVersion = assertExpectedVersion(body, current);
-      if (
-        ["concluso", "annullato", "mancata_presentazione"].includes(
-          current.stato,
-        ) &&
-        !isNeedsOnlyPatch
-      ) {
-        throw new RouteError(
-          409,
-          "Un intervento terminale è storico e consultabile in sola lettura",
-        );
-      }
-      if (current.beneficiarioId !== targetBeneficiarioId) {
-        throw new RouteError(
-          409,
-          "Il beneficiario di una cartella già operativa non può essere modificato",
-        );
-      }
-      if (
-        hasOwn(body, "operatoreId") &&
-        !["da_pianificare", "pianificato"].includes(current.stato)
-      ) {
-        throw new RouteError(
-          409,
-          "L'operatore può essere modificato soltanto prima dell'avvio",
-        );
-      }
-      let updated = current;
-      if (!isNeedsOnlyPatch) {
-        [updated] = await tx
-          .update(interventiTable)
-          .set({
-            ...cleanInterventoBody(body),
-            ...workflowUpdates,
-            beneficiarioId: targetBeneficiarioId,
-          } as never)
-          .where(
-            and(
-              eq(interventiTable.id, id),
-              eq(interventiTable.dataAggiornamento, expectedVersion),
-            ),
-          )
-          .returning();
-        if (!updated)
-          throw new RouteError(409, "Modifica concorrente rilevata");
-      }
-
-      for (const item of (bisogniInput as BisognoInput[] | undefined) ?? []) {
-        const bisognoId =
-          item.id == null ? null : parsePositiveInteger(item.id);
-        if (item.id != null && bisognoId == null) {
-          throw new RouteError(400, "id del Bisogno Pianificato non valido");
+    const row = await runInterventoCommand(
+      req,
+      existing.ambito,
+      ["sociale.interventi.update"],
+      async (tx) => {
+        const [current] = await tx
+          .select()
+          .from(interventiTable)
+          .where(eq(interventiTable.id, id))
+          .for("update");
+        if (!current) throw new RouteError(404, "Intervento non trovato");
+        const expectedVersion = assertExpectedVersion(body, current);
+        cleanInterventoBody(body, current);
+        if (
+          workflowUpdates.operatoreId != null &&
+          !(await canAssignSocialOperator(
+            workflowUpdates.operatoreId,
+            current.beneficiarioId,
+            req,
+            tx,
+          ))
+        )
+          throw new RouteError(403, "Operatore assegnato non più accessibile");
+        if (!isNeedsOnlyPatch)
+          await assertSuccessorUnique(
+            tx,
+            {
+              ...current,
+              ...workflowUpdates,
+              tipoIntervento:
+                typeof body.tipoIntervento === "string"
+                  ? body.tipoIntervento
+                  : current.tipoIntervento,
+            },
+            current.id,
+          );
+        if (
+          ["concluso", "annullato", "mancata_presentazione"].includes(
+            current.stato,
+          ) &&
+          !isNeedsOnlyPatch
+        ) {
+          throw new RouteError(
+            409,
+            "Un intervento terminale è storico e consultabile in sola lettura",
+          );
         }
-        if (bisognoId == null) {
-          const [createdNeed] = await tx
-            .insert(bisogniPianificatiTable)
-            .values({
-              ...normalizeBisogno(item),
-              interventoId: id,
-            })
+        if (current.beneficiarioId !== targetBeneficiarioId) {
+          throw new RouteError(
+            409,
+            "Il beneficiario di una cartella già operativa non può essere modificato",
+          );
+        }
+        if (
+          hasOwn(body, "operatoreId") &&
+          !["da_pianificare", "pianificato"].includes(current.stato)
+        ) {
+          throw new RouteError(
+            409,
+            "L'operatore può essere modificato soltanto prima dell'avvio",
+          );
+        }
+        let updated = current;
+        if (!isNeedsOnlyPatch) {
+          [updated] = await tx
+            .update(interventiTable)
+            .set({
+              ...cleanInterventoBody(body, current),
+              ...workflowUpdates,
+              beneficiarioId: targetBeneficiarioId,
+            } as never)
+            .where(
+              and(
+                eq(interventiTable.id, id),
+                eq(interventiTable.dataAggiornamento, expectedVersion),
+              ),
+            )
             .returning();
+          if (!updated)
+            throw new RouteError(409, "Modifica concorrente rilevata");
+        }
+
+        for (const item of (bisogniInput as BisognoInput[] | undefined) ?? []) {
+          const bisognoId =
+            item.id == null ? null : parsePositiveInteger(item.id);
+          if (item.id != null && bisognoId == null) {
+            throw new RouteError(400, "id del Bisogno Pianificato non valido");
+          }
+          if (bisognoId == null) {
+            const [createdNeed] = await tx
+              .insert(bisogniPianificatiTable)
+              .values({
+                ...normalizeBisogno(item),
+                interventoId: id,
+              })
+              .returning();
+            await appendBisognoHistory(
+              tx,
+              null,
+              createdNeed,
+              req.user!.id,
+              bisognoMotivo(item) ?? "Creazione contestuale all'intervento",
+            );
+            continue;
+          }
+          const [existingNeed] = await tx
+            .select()
+            .from(bisogniPianificatiTable)
+            .where(
+              and(
+                eq(bisogniPianificatiTable.id, bisognoId),
+                eq(bisogniPianificatiTable.interventoId, id),
+              ),
+            )
+            .for("update");
+          if (!existingNeed) {
+            throw new RouteError(
+              404,
+              "Bisogno Pianificato non appartenente all'intervento",
+            );
+          }
+          const expectedVersion = expectedBisognoVersion(item);
+          if (expectedVersion !== existingNeed.versione) {
+            throw new RouteError(
+              409,
+              "Il Bisogno Pianificato è stato modificato da un altro operatore",
+            );
+          }
+          const [updatedNeed] = await tx
+            .update(bisogniPianificatiTable)
+            .set({
+              ...normalizeBisogno(item, existingNeed),
+              versione: existingNeed.versione + 1,
+            })
+            .where(
+              and(
+                eq(bisogniPianificatiTable.id, bisognoId),
+                eq(bisogniPianificatiTable.versione, expectedVersion),
+              ),
+            )
+            .returning();
+          if (!updatedNeed) {
+            throw new RouteError(
+              409,
+              "Il Bisogno Pianificato è stato modificato da un altro operatore",
+            );
+          }
           await appendBisognoHistory(
             tx,
-            null,
-            createdNeed,
+            existingNeed,
+            updatedNeed,
             req.user!.id,
-            bisognoMotivo(item) ?? "Creazione contestuale all'intervento",
-          );
-          continue;
-        }
-        const [existingNeed] = await tx
-          .select()
-          .from(bisogniPianificatiTable)
-          .where(
-            and(
-              eq(bisogniPianificatiTable.id, bisognoId),
-              eq(bisogniPianificatiTable.interventoId, id),
-            ),
-          )
-          .for("update");
-        if (!existingNeed) {
-          throw new RouteError(
-            404,
-            "Bisogno Pianificato non appartenente all'intervento",
+            bisognoMotivo(item),
           );
         }
-        const expectedVersion = expectedBisognoVersion(item);
-        if (expectedVersion !== existingNeed.versione) {
-          throw new RouteError(
-            409,
-            "Il Bisogno Pianificato è stato modificato da un altro operatore",
-          );
-        }
-        const [updatedNeed] = await tx
-          .update(bisogniPianificatiTable)
-          .set({
-            ...normalizeBisogno(item, existingNeed),
-            versione: existingNeed.versione + 1,
-          })
-          .where(
-            and(
-              eq(bisogniPianificatiTable.id, bisognoId),
-              eq(bisogniPianificatiTable.versione, expectedVersion),
-            ),
-          )
-          .returning();
-        if (!updatedNeed) {
-          throw new RouteError(
-            409,
-            "Il Bisogno Pianificato è stato modificato da un altro operatore",
-          );
-        }
-        await appendBisognoHistory(
-          tx,
-          existingNeed,
-          updatedNeed,
-          req.user!.id,
-          bisognoMotivo(item),
-        );
-      }
-      return updated;
-    });
+        return updated;
+      },
+    );
     const needs = await orderedBisogni([id]);
     res.json(formatIntervento(row, summarizeBisogni(needs)));
   } catch (error) {
@@ -4240,112 +4717,123 @@ router.post("/interventi/:id/transizioni", async (req, res) => {
   }
 
   try {
-    await requireAccessibleIntervento(
+    const accessibleIntervento = await requireAccessibleIntervento(
       id,
       req,
       null,
       "sociale.interventi.update",
     );
-    const updated = await db.transaction(async (tx) => {
-      const [current] = await tx
-        .select()
-        .from(interventiTable)
-        .where(eq(interventiTable.id, id))
-        .for("update");
-      if (!current) throw new RouteError(404, "Intervento non trovato");
-      const expectedVersion = assertExpectedVersion(body, current);
-      if (!isInterventoStato(current.stato)) {
-        throw new RouteError(409, "Stato corrente non riconosciuto");
-      }
-      const target = body.stato as InterventoStato;
-      const isSocialWorkflow = current.ambito !== "uds";
-      if (
-        isSocialWorkflow &&
-        target !== "da_pianificare" &&
-        target !== "pianificato"
-      ) {
-        throw new RouteError(
-          409,
-          "Per avviare, concludere, annullare o registrare una mancata presentazione usa il comando dedicato",
-        );
-      }
-      if (!canTransitionIntervento(current.stato, target)) {
-        throw new RouteError(
-          409,
-          `Transizione da ${current.stato} a ${target} non consentita`,
-        );
-      }
-
-      const updates: Partial<typeof interventiTable.$inferInsert> = {
-        stato: target,
-        dataAggiornamento: transitionDate,
-      };
-      if (target === "pianificato") {
-        updates.dataOraPianificata = plannedDate ?? current.dataOraPianificata;
-        if (updates.dataOraPianificata == null) {
-          throw new RouteError(
-            400,
-            "La transizione a pianificato richiede data e ora pianificate",
-          );
+    const updated = await runInterventoCommand(
+      req,
+      accessibleIntervento.ambito,
+      ["sociale.interventi.update"],
+      async (tx) => {
+        const [current] = await tx
+          .select()
+          .from(interventiTable)
+          .where(eq(interventiTable.id, id))
+          .for("update");
+        if (!current) throw new RouteError(404, "Intervento non trovato");
+        const expectedVersion = assertExpectedVersion(body, current);
+        if (!isInterventoStato(current.stato)) {
+          throw new RouteError(409, "Stato corrente non riconosciuto");
         }
-      }
-      if (target === "da_pianificare") {
-        updates.dataOraPianificata = null;
-      }
-      if (target === "in_corso") {
-        updates.dataOraAvvio = transitionDate;
-        if (current.dataIntervento == null) {
-          updates.dataIntervento = dataCivileEuropeRome(transitionDate);
-        }
-      }
-      if (target === "concluso") {
-        if (current.dataOraAvvio == null) {
+        const target = body.stato as InterventoStato;
+        const isSocialWorkflow = current.ambito !== "uds";
+        if (
+          isSocialWorkflow &&
+          target !== "da_pianificare" &&
+          target !== "pianificato"
+        ) {
           throw new RouteError(
             409,
-            "Un intervento deve essere avviato prima della conclusione",
+            "Per avviare, concludere, annullare o registrare una mancata presentazione usa il comando dedicato",
           );
         }
-        if (transitionDate < current.dataOraAvvio) {
-          throw new RouteError(400, "La conclusione non può precedere l'avvio");
-        }
-        updates.dataOraConclusione = transitionDate;
-      }
-      if (target === "annullato") {
-        if (motivo == null) {
+        if (!canTransitionIntervento(current.stato, target)) {
           throw new RouteError(
-            400,
-            "Il motivo dell'annullamento è obbligatorio",
+            409,
+            `Transizione da ${current.stato} a ${target} non consentita`,
           );
         }
-        updates.motivoAnnullamento = motivo;
-      }
-      if (target === "mancata_presentazione") {
-        updates.dataOraAvvio = null;
-      }
 
-      const [row] = await tx
-        .update(interventiTable)
-        .set(updates)
-        .where(
-          and(
-            eq(interventiTable.id, id),
-            eq(interventiTable.dataAggiornamento, expectedVersion),
-          ),
-        )
-        .returning();
-      if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
-      await tx.insert(interventiStoricoStatiTable).values({
-        interventoId: id,
-        statoPrecedente: current.stato,
-        statoNuovo: target,
-        operatoreId: req.user!.id,
-        dataTransizione: transitionDate,
-        motivo,
-      });
-      return row;
-    });
+        const updates: Partial<typeof interventiTable.$inferInsert> = {
+          stato: target,
+          dataAggiornamento: transitionDate,
+        };
+        if (target === "pianificato") {
+          updates.dataOraPianificata =
+            plannedDate ?? current.dataOraPianificata;
+          if (updates.dataOraPianificata == null) {
+            throw new RouteError(
+              400,
+              "La transizione a pianificato richiede data e ora pianificate",
+            );
+          }
+        }
+        if (target === "da_pianificare") {
+          updates.dataOraPianificata = null;
+        }
+        if (target === "in_corso") {
+          updates.dataOraAvvio = transitionDate;
+          if (current.dataIntervento == null) {
+            updates.dataIntervento = dataCivileEuropeRome(transitionDate);
+          }
+        }
+        if (target === "concluso") {
+          if (current.dataOraAvvio == null) {
+            throw new RouteError(
+              409,
+              "Un intervento deve essere avviato prima della conclusione",
+            );
+          }
+          if (transitionDate < current.dataOraAvvio) {
+            throw new RouteError(
+              400,
+              "La conclusione non può precedere l'avvio",
+            );
+          }
+          updates.dataOraConclusione = transitionDate;
+        }
+        if (target === "annullato") {
+          if (motivo == null) {
+            throw new RouteError(
+              400,
+              "Il motivo dell'annullamento è obbligatorio",
+            );
+          }
+          updates.motivoAnnullamento = motivo;
+        }
+        if (target === "mancata_presentazione") {
+          updates.dataOraAvvio = null;
+        }
+
+        await assertSuccessorUnique(tx, { ...current, ...updates }, current.id);
+
+        const [row] = await tx
+          .update(interventiTable)
+          .set(updates)
+          .where(
+            and(
+              eq(interventiTable.id, id),
+              eq(interventiTable.dataAggiornamento, expectedVersion),
+            ),
+          )
+          .returning();
+        if (!row) throw new RouteError(409, "Modifica concorrente rilevata");
+        await tx.insert(interventiStoricoStatiTable).values({
+          interventoId: id,
+          statoPrecedente: current.stato,
+          statoNuovo: target,
+          operatoreId: req.user!.id,
+          dataTransizione: transitionDate,
+          motivo,
+        });
+        return row;
+      },
+    );
     const needs = await orderedBisogni([id]);
-    const successori = await successoriFor([id]);
+    const successori = await successoriFor([id], req);
     res.json(
       formatIntervento(
         updated,
@@ -4395,6 +4883,7 @@ router.post("/interventi/:id/successivi", async (req, res) => {
     return;
   }
   try {
+    cleanInterventoBody(body);
     const precedente = await requireAccessibleIntervento(
       precedenteId,
       req,
@@ -4425,64 +4914,45 @@ router.post("/interventi/:id/successivi", async (req, res) => {
     if (typeof tipoIntervento !== "string" || !tipoIntervento.trim()) {
       throw new RouteError(400, "tipoIntervento è obbligatorio");
     }
-    const duplicateConditions: SQL[] = [
-      eq(interventiTable.interventoPrecedenteId, precedenteId),
-      eq(interventiTable.tipoIntervento, tipoIntervento),
-      inArray(interventiTable.stato, [
-        "da_pianificare",
-        "pianificato",
-        "in_corso",
-      ]),
-    ];
-    if (workflow.values.dataOraPianificata == null) {
-      duplicateConditions.push(isNull(interventiTable.dataOraPianificata));
-    } else {
-      duplicateConditions.push(
-        eq(
-          interventiTable.dataOraPianificata,
-          workflow.values.dataOraPianificata,
-        ),
-      );
-    }
-    const [duplicate] = await db
-      .select({ id: interventiTable.id })
-      .from(interventiTable)
-      .where(and(...duplicateConditions))
-      .limit(1);
-    if (duplicate) {
-      throw new RouteError(
-        409,
-        "Esiste già un intervento successivo con la stessa pianificazione",
-      );
-    }
-
-    const created = await db.transaction(async (tx) => {
-      const [row] = await tx
-        .insert(interventiTable)
-        .values({
-          ...cleanInterventoBody(body),
-          ...workflow.values,
+    const created = await runInterventoCommand(
+      req,
+      workflow.values.ambito ?? null,
+      ["sociale.interventi.create", "sociale.interventi.view"],
+      async (tx) => {
+        await assertSuccessorUnique(tx, {
           beneficiarioId: precedente.beneficiarioId,
           interventoPrecedenteId: precedenteId,
+          tipoIntervento,
+          dataOraPianificata: workflow.values.dataOraPianificata,
+        });
+        const [row] = await tx
+          .insert(interventiTable)
+          .values({
+            ...cleanInterventoBody(body),
+            ...workflow.values,
+            beneficiarioId: precedente.beneficiarioId,
+            interventoPrecedenteId: precedenteId,
+            operatoreId: req.user!.id,
+            ...(workflow.values.ambito === "uds" && successorBeneficiario
+              ? {
+                  areaOperativaIdSnapshot:
+                    successorBeneficiario.areaOperativaId,
+                  zonaUdsIdSnapshot: successorBeneficiario.zonaUdsId,
+                }
+              : {}),
+          } as never)
+          .returning();
+        await tx.insert(interventiStoricoStatiTable).values({
+          interventoId: row.id,
+          statoPrecedente: null,
+          statoNuovo: row.stato,
           operatoreId: req.user!.id,
-          ...(workflow.values.ambito === "uds" && successorBeneficiario
-            ? {
-                areaOperativaIdSnapshot: successorBeneficiario.areaOperativaId,
-                zonaUdsIdSnapshot: successorBeneficiario.zonaUdsId,
-              }
-            : {}),
-        } as never)
-        .returning();
-      await tx.insert(interventiStoricoStatiTable).values({
-        interventoId: row.id,
-        statoPrecedente: null,
-        statoNuovo: row.stato,
-        operatoreId: req.user!.id,
-        dataTransizione: workflow.values.dataAggiornamento!,
-        motivo: "Creazione come intervento successivo",
-      });
-      return row;
-    });
+          dataTransizione: workflow.values.dataAggiornamento!,
+          motivo: "Creazione come intervento successivo",
+        });
+        return row;
+      },
+    );
     res.status(201).json(formatIntervento(created, emptySummary()));
   } catch (error) {
     if (sendRouteError(error, res)) return;
@@ -4518,22 +4988,30 @@ router.post(
       return;
     }
     try {
-      await requireManageableInterventoNeeds(interventoId, req);
+      const accessibleIntervento = await requireManageableInterventoNeeds(
+        interventoId,
+        req,
+      );
       const input = req.body as BisognoInput;
-      const row = await db.transaction(async (tx) => {
-        const [created] = await tx
-          .insert(bisogniPianificatiTable)
-          .values({ ...normalizeBisogno(input), interventoId })
-          .returning();
-        await appendBisognoHistory(
-          tx,
-          null,
-          created,
-          req.user!.id,
-          bisognoMotivo(input) ?? "Creazione",
-        );
-        return created;
-      });
+      const row = await runInterventoCommand(
+        req,
+        accessibleIntervento.ambito,
+        ["sociale.interventi.update"],
+        async (tx) => {
+          const [created] = await tx
+            .insert(bisogniPianificatiTable)
+            .values({ ...normalizeBisogno(input), interventoId })
+            .returning();
+          await appendBisognoHistory(
+            tx,
+            null,
+            created,
+            req.user!.id,
+            bisognoMotivo(input) ?? "Creazione",
+          );
+          return created;
+        },
+      );
       res.status(201).json(formatBisogno(row));
     } catch (error) {
       if (sendRouteError(error, res)) return;
@@ -4552,59 +5030,67 @@ router.patch(
       return;
     }
     try {
-      await requireManageableInterventoNeeds(interventoId, req);
+      const accessibleIntervento = await requireManageableInterventoNeeds(
+        interventoId,
+        req,
+      );
       const input = req.body as BisognoInput;
       const expectedVersion = expectedBisognoVersion(input);
-      const row = await db.transaction(async (tx) => {
-        const [existing] = await tx
-          .select()
-          .from(bisogniPianificatiTable)
-          .where(
-            and(
-              eq(bisogniPianificatiTable.id, bisognoId),
-              eq(bisogniPianificatiTable.interventoId, interventoId),
-            ),
-          )
-          .for("update");
-        if (!existing)
-          throw new RouteError(
-            404,
-            "Bisogno Pianificato non appartenente all'intervento",
+      const row = await runInterventoCommand(
+        req,
+        accessibleIntervento.ambito,
+        ["sociale.interventi.update"],
+        async (tx) => {
+          const [existing] = await tx
+            .select()
+            .from(bisogniPianificatiTable)
+            .where(
+              and(
+                eq(bisogniPianificatiTable.id, bisognoId),
+                eq(bisogniPianificatiTable.interventoId, interventoId),
+              ),
+            )
+            .for("update");
+          if (!existing)
+            throw new RouteError(
+              404,
+              "Bisogno Pianificato non appartenente all'intervento",
+            );
+          if (existing.versione !== expectedVersion) {
+            throw new RouteError(
+              409,
+              "Il Bisogno Pianificato è stato modificato da un altro operatore",
+            );
+          }
+          const [updated] = await tx
+            .update(bisogniPianificatiTable)
+            .set({
+              ...normalizeBisogno(input, existing),
+              versione: existing.versione + 1,
+            })
+            .where(
+              and(
+                eq(bisogniPianificatiTable.id, bisognoId),
+                eq(bisogniPianificatiTable.versione, expectedVersion),
+              ),
+            )
+            .returning();
+          if (!updated) {
+            throw new RouteError(
+              409,
+              "Il Bisogno Pianificato è stato modificato da un altro operatore",
+            );
+          }
+          await appendBisognoHistory(
+            tx,
+            existing,
+            updated,
+            req.user!.id,
+            bisognoMotivo(input),
           );
-        if (existing.versione !== expectedVersion) {
-          throw new RouteError(
-            409,
-            "Il Bisogno Pianificato è stato modificato da un altro operatore",
-          );
-        }
-        const [updated] = await tx
-          .update(bisogniPianificatiTable)
-          .set({
-            ...normalizeBisogno(input, existing),
-            versione: existing.versione + 1,
-          })
-          .where(
-            and(
-              eq(bisogniPianificatiTable.id, bisognoId),
-              eq(bisogniPianificatiTable.versione, expectedVersion),
-            ),
-          )
-          .returning();
-        if (!updated) {
-          throw new RouteError(
-            409,
-            "Il Bisogno Pianificato è stato modificato da un altro operatore",
-          );
-        }
-        await appendBisognoHistory(
-          tx,
-          existing,
-          updated,
-          req.user!.id,
-          bisognoMotivo(input),
-        );
-        return updated;
-      });
+          return updated;
+        },
+      );
       res.json(formatBisogno(row));
     } catch (error) {
       if (sendRouteError(error, res)) return;

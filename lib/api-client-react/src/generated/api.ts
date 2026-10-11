@@ -253,6 +253,7 @@ import type {
   ImpostazioniModuliUpdate,
   ImpostazioniStampa,
   ImpostazioniStampaUpdate,
+  InterventiPagina,
   InterventiRiepilogoViste,
   Intervento,
   InterventoAnnullamentoInput,
@@ -299,6 +300,7 @@ import type {
   ListGiacenzeParams,
   ListGiornateMensaParams,
   ListInterventiOperatoriParams,
+  ListInterventiPaginaParams,
   ListInterventiParams,
   ListLottiLogiciParams,
   ListLottiMensaParams,
@@ -12064,6 +12066,87 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCreateInterventoMutationOptions(options));
     }
+
+export const getListInterventiPaginaUrl = (params?: ListInterventiPaginaParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/interventi/pagina?${stringifiedParams}` : `/api/interventi/pagina`
+}
+
+/**
+ * Stessi filtri e scope dell'elenco array, con totale e navigazione. Il totale non garantisce uno snapshot fra richieste successive.
+ */
+export const listInterventiPagina = async (params?: ListInterventiPaginaParams, options?: RequestInit): Promise<InterventiPagina> => {
+
+  return customFetch<InterventiPagina>(getListInterventiPaginaUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInterventiPaginaQueryKey = (params?: ListInterventiPaginaParams,) => {
+    return [
+    `/api/interventi/pagina`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListInterventiPaginaQueryOptions = <TData = Awaited<ReturnType<typeof listInterventiPagina>>, TError = ErrorType<unknown>>(params?: ListInterventiPaginaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInterventiPagina>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInterventiPaginaQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInterventiPagina>>> = ({ signal }) => listInterventiPagina(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInterventiPagina>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInterventiPaginaQueryResult = NonNullable<Awaited<ReturnType<typeof listInterventiPagina>>>
+export type ListInterventiPaginaQueryError = ErrorType<unknown>
+
+
+
+export function useListInterventiPagina<TData = Awaited<ReturnType<typeof listInterventiPagina>>, TError = ErrorType<unknown>>(
+ params?: ListInterventiPaginaParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInterventiPagina>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInterventiPaginaQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetInterventiRiepilogoVisteUrl = (params?: GetInterventiRiepilogoVisteParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -29,6 +29,7 @@ export interface InterventiSocialiFilters {
   direzione: "asc" | "desc";
   mese: string;
   giorno: string;
+  pagina: number;
 }
 
 const PRIORITA = new Set(["bassa", "normale", "alta", "urgente"]);
@@ -67,6 +68,7 @@ export function defaultInterventiSocialiFilters(
     direzione: "asc",
     mese: today.slice(0, 7),
     giorno: today,
+    pagina: 1,
   };
 }
 
@@ -115,6 +117,7 @@ export function parseInterventiSocialiFilters(
     direzione: params.get("direzione") === "desc" ? "desc" : "asc",
     mese: /^\d{4}-(0[1-9]|1[0-2])$/.test(mese) ? mese : defaults.mese,
     giorno: isCivilDate(giorno) ? giorno : defaults.giorno,
+    pagina: Math.max(1, Number(positiveId(params.get("pagina"))) || 1),
   };
 }
 
@@ -123,6 +126,7 @@ export function serializeInterventiSocialiFilters(
 ): string {
   const params = new URLSearchParams();
   params.set("vista", filters.vista);
+  if (filters.pagina > 1) params.set("pagina", String(filters.pagina));
   if (filters.modo !== "elenco") params.set("modo", filters.modo);
   if (filters.ricerca) params.set("q", filters.ricerca);
   if (filters.tipo) params.set("tipo", filters.tipo);
@@ -164,6 +168,7 @@ export function focusInterventiSocialiFilters(
   return {
     ...filters,
     vista,
+    pagina: 1,
     modo: "elenco",
     ricerca: "",
     tipo: "",

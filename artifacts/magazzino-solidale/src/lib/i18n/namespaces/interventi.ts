@@ -1,5 +1,30 @@
 const fase53BEn = {
+  readUnavailable:
+    "Unable to refresh the data. Any displayed data may be out of date; this is not an access denial.",
+  accessDenied:
+    "Intervention access is no longer available. Refresh your session before trying again.",
+  pagination: "Intervention pages",
+  previousPage: "Previous",
+  nextPage: "Next",
+  pageTotal: "Page {{page}} · {{total}} results",
+  calendarPartial:
+    "This calendar shows only the current page. Browse the other pages to see all appointments in this interval.",
+  exportAllFiltered: "Social interventions — all filtered results",
+  liveResults:
+    "Live results: changes during browsing or export may affect their order and total.",
+  provenance: {
+    sociale: "Social intervention",
+    derivato_bolla: "Logistic record derived from a delivery note",
+    legacy_non_classificato: "Legacy record — origin not verified",
+  },
   magazzino: {
+    ambiguous: "Multiple active requests — check the history",
+    requestCancelled: "Request cancelled",
+    requestClosed: "Request closed",
+    noVisibleLink: "No visible logistics link",
+    notConsultable: "Logistics consultation unavailable",
+    independentClosure:
+      "Concluding, cancelling or recording a no-show only updates the Social intervention. The warehouse request and logistics continue independently.",
     requestSent: "Request sent",
     preparingBolla: "In preparation",
     readyToPlan: "Delivery note ready · Delivery to plan",
@@ -231,7 +256,33 @@ const fase53BEn = {
 const fase53B = {
   it: {
     ...fase53BEn,
+    accessDenied:
+      "Accesso all'Intervento non più disponibile. Aggiorna la sessione prima di riprovare.",
+    readUnavailable:
+      "Impossibile aggiornare i dati. Gli eventuali dati mostrati potrebbero non essere aggiornati: non è un diniego di accesso.",
+    pagination: "Pagine Interventi",
+    previousPage: "Precedente",
+    nextPage: "Successiva",
+    pageTotal: "Pagina {{page}} · {{total}} risultati",
+    calendarPartial:
+      "Il calendario mostra solo la pagina corrente. Consulta le altre pagine per vedere tutti gli appuntamenti nell'intervallo.",
+    exportAllFiltered: "Interventi sociali — tutti i risultati filtrati",
+    liveResults:
+      "Dati aggiornati durante la consultazione: eventuali modifiche possono cambiare ordine e totale, anche durante l'esportazione.",
+    provenance: {
+      sociale: "Intervento sociale",
+      derivato_bolla: "Registrazione logistica derivata da Bolla",
+      legacy_non_classificato:
+        "Registrazione legacy — provenienza non verificata",
+    },
     magazzino: {
+      ambiguous: "Più richieste attive — verificare lo storico",
+      requestCancelled: "Richiesta annullata",
+      requestClosed: "Richiesta chiusa",
+      noVisibleLink: "Nessun raccordo logistico visibile",
+      notConsultable: "Consultazione logistica non disponibile",
+      independentClosure:
+        "Conclusione, annullamento e mancata presentazione aggiornano solo l'Intervento sociale. La Richiesta al Magazzino e la logistica proseguono indipendentemente.",
       requestSent: "Richiesta inviata",
       preparingBolla: "In preparazione",
       readyToPlan: "Bolla pronta · Consegna da pianificare",

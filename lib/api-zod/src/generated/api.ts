@@ -6252,6 +6252,7 @@ export const GetBeneficiarioResponse = zod.object({
   "note": zod.string().nullish()
 })).optional(),
   "interventi": zod.array(zod.object({
+  "provenienza": zod.enum(['sociale', 'derivato_bolla', 'legacy_non_classificato']).optional().describe('Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.'),
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
@@ -6262,6 +6263,7 @@ export const GetBeneficiarioResponse = zod.object({
   "richiestaId": zod.number(),
   "richiestaCodice": zod.string(),
   "richiestaStato": zod.string(),
+  "ambiguo": zod.boolean().optional().describe('Più richieste attive visibili; non assumere un\'unica lavorazione.'),
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
@@ -6703,6 +6705,7 @@ export const ListInterventiQueryParams = zod.object({
 })
 
 export const ListInterventiResponseItem = zod.object({
+  "provenienza": zod.enum(['sociale', 'derivato_bolla', 'legacy_non_classificato']).optional().describe('Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.'),
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
@@ -6713,6 +6716,7 @@ export const ListInterventiResponseItem = zod.object({
   "richiestaId": zod.number(),
   "richiestaCodice": zod.string(),
   "richiestaStato": zod.string(),
+  "ambiguo": zod.boolean().optional().describe('Più richieste attive visibili; non assumere un\'unica lavorazione.'),
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
@@ -6813,6 +6817,112 @@ export const CreateInterventoBody = zod.object({
   "note": zod.string().max(createInterventoBodyBisogniPianificatiItemNoteMax).nullish(),
   "motivo": zod.string().max(createInterventoBodyBisogniPianificatiItemMotivoMax).nullish()
 })).optional()
+})
+
+
+/**
+ * Stessi filtri e scope dell'elenco array, con totale e navigazione. Il totale non garantisce uno snapshot fra richieste successive.
+ */
+export const listInterventiPaginaQueryIncludiStoriciDefault = false;
+export const listInterventiPaginaQueryRicercaMax = 120;
+
+export const listInterventiPaginaQueryPaginaDefault = 1;
+
+export const listInterventiPaginaQueryLimiteDefault = 200;
+export const listInterventiPaginaQueryLimiteMax = 200;
+
+
+
+export const ListInterventiPaginaQueryParams = zod.object({
+  "beneficiarioId": zod.coerce.number().optional(),
+  "tipo": zod.coerce.string().optional(),
+  "centroAscoltoId": zod.coerce.number().optional(),
+  "areaOperativaId": zod.coerce.number().optional(),
+  "bisogni": zod.enum(['aperti', 'scaduti', 'nessuno']).optional().describe('Filtra gli interventi in base ai Bisogni Pianificati collegati.'),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).optional(),
+  "ambito": zod.enum(['sociale', 'uds']).optional(),
+  "includiStorici": zod.coerce.boolean().default(listInterventiPaginaQueryIncludiStoriciDefault).describe('Se true e ambito è valorizzato, include anche gli interventi storici non classificati (ambito null). Il filtro di ambito resta esatto quando è omesso o false.'),
+  "operatoreId": zod.coerce.number().optional(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']).optional(),
+  "pianificataDa": zod.date().optional().describe('Estremo iniziale ISO 8601 con fuso dell\'intervallo pianificato.'),
+  "pianificataA": zod.date().optional().describe('Estremo finale ISO 8601 con fuso dell\'intervallo pianificato.'),
+  "interventoPrecedenteId": zod.coerce.number().optional(),
+  "vista": zod.enum(['da_pianificare', 'pianificati', 'oggi', 'in_corso', 'conclusi', 'annullati']).optional().describe('Vista operativa Sociale; richiede ambito=sociale. Oggi e i relativi confini civili sono calcolati in Europe\/Rome.'),
+  "ricerca": zod.coerce.string().max(listInterventiPaginaQueryRicercaMax).optional().describe('Ricerca beneficiario per nome, cognome, nome completo o codice.'),
+  "da": zod.date().optional().describe('Data civile iniziale inclusiva Europe\/Rome; deve essere usata insieme ad a.'),
+  "a": zod.date().optional().describe('Data civile finale inclusiva Europe\/Rome; intervallo massimo 366 giorni.'),
+  "ordina": zod.enum(['data', 'priorita', 'beneficiario', 'operatore']).optional(),
+  "direzione": zod.enum(['asc', 'desc']).optional(),
+  "ambitoLegacy": zod.enum(['tutti', 'classificati', 'legacy']).optional().describe('Selezione conservativa dei record Sociali classificati o con ambito storico non determinato.'),
+  "pagina": zod.coerce.number().min(1).default(listInterventiPaginaQueryPaginaDefault),
+  "limite": zod.coerce.number().min(1).max(listInterventiPaginaQueryLimiteMax).default(listInterventiPaginaQueryLimiteDefault)
+})
+
+export const ListInterventiPaginaResponse = zod.object({
+  "items": zod.array(zod.object({
+  "provenienza": zod.enum(['sociale', 'derivato_bolla', 'legacy_non_classificato']).optional().describe('Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.'),
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string().nullish(),
+  "beneficiarioCodice": zod.string().nullable(),
+  "nucleoFamiliareSintesi": zod.string().nullable(),
+  "bollaId": zod.number().nullish(),
+  "raccordoMagazzino": zod.union([zod.object({
+  "richiestaId": zod.number(),
+  "richiestaCodice": zod.string(),
+  "richiestaStato": zod.string(),
+  "ambiguo": zod.boolean().optional().describe('Più richieste attive visibili; non assumere un\'unica lavorazione.'),
+  "bollaId": zod.number().nullish(),
+  "bollaNumero": zod.string().nullish(),
+  "bollaStato": zod.string().nullish(),
+  "consegnaId": zod.number().nullish(),
+  "consegnaStato": zod.string().nullish(),
+  "dataPrevista": zod.coerce.date().nullish(),
+  "fasciaOraria": zod.string().nullish()
+}),zod.null()]).optional(),
+  "operatoreId": zod.number().nullish(),
+  "operatoreCodice": zod.string().nullish(),
+  "operatoreNome": zod.string().nullable(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "areaOperativaId": zod.number().nullable(),
+  "areaOperativaIdSnapshot": zod.number().nullish(),
+  "zonaUdsIdSnapshot": zod.number().nullish(),
+  "dataIntervento": zod.coerce.date().nullable(),
+  "tipoIntervento": zod.string(),
+  "descrizione": zod.string().nullish(),
+  "risultato": zod.string().nullish(),
+  "esito": zod.string().nullish(),
+  "prossimAzione": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "noteUds": zod.string().nullish(),
+  "dataFollowup": zod.string().nullish(),
+  "scadenzaIsee": zod.string().nullish(),
+  "scadenzaRinnovo": zod.string().nullish(),
+  "scadenzaAutodichiarazioneIndigenza": zod.string().nullish(),
+  "stato": zod.enum(['da_pianificare', 'pianificato', 'in_corso', 'concluso', 'annullato', 'mancata_presentazione']).describe('Stato canonico del ciclo di vita dell\'intervento.'),
+  "ambito": zod.union([zod.enum(['sociale', 'uds']).describe('Ambito esplicito; i record storici non classificabili mantengono null.'),zod.null()]),
+  "ambitoLegacy": zod.boolean(),
+  "priorita": zod.enum(['bassa', 'normale', 'alta', 'urgente']),
+  "dataOraPianificata": zod.coerce.date().nullable(),
+  "dataOraAvvio": zod.coerce.date().nullable(),
+  "dataOraConclusione": zod.coerce.date().nullable(),
+  "avviso": zod.union([zod.enum(['scaduto', 'oggi', 'imminente', 'prossimo']),zod.null()]),
+  "interventoPrecedenteId": zod.number().nullable(),
+  "successoriIds": zod.array(zod.number()).optional(),
+  "numeroSuccessori": zod.number(),
+  "sede": zod.string().nullable(),
+  "motivoAnnullamento": zod.string().nullish(),
+  "dataCreazione": zod.coerce.date(),
+  "dataAggiornamento": zod.coerce.date().nullable(),
+  "bisogniPianificatiTotale": zod.number(),
+  "bisogniPianificatiAperti": zod.number(),
+  "bisogniPianificatiScaduti": zod.number(),
+  "bisogniPianificatiProssimaScadenza": zod.string().nullable()
+})),
+  "total": zod.number(),
+  "pagina": zod.number(),
+  "limite": zod.number()
 })
 
 
@@ -6930,6 +7040,7 @@ export const GetInterventoParams = zod.object({
 })
 
 export const GetInterventoResponse = zod.object({
+  "provenienza": zod.enum(['sociale', 'derivato_bolla', 'legacy_non_classificato']).optional().describe('Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.'),
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
@@ -6940,6 +7051,7 @@ export const GetInterventoResponse = zod.object({
   "richiestaId": zod.number(),
   "richiestaCodice": zod.string(),
   "richiestaStato": zod.string(),
+  "ambiguo": zod.boolean().optional().describe('Più richieste attive visibili; non assumere un\'unica lavorazione.'),
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
@@ -7037,6 +7149,7 @@ export const UpdateInterventoBody = zod.object({
 })
 
 export const UpdateInterventoResponse = zod.object({
+  "provenienza": zod.enum(['sociale', 'derivato_bolla', 'legacy_non_classificato']).optional().describe('Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.'),
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
@@ -7047,6 +7160,7 @@ export const UpdateInterventoResponse = zod.object({
   "richiestaId": zod.number(),
   "richiestaCodice": zod.string(),
   "richiestaStato": zod.string(),
+  "ambiguo": zod.boolean().optional().describe('Più richieste attive visibili; non assumere un\'unica lavorazione.'),
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
@@ -7203,6 +7317,7 @@ export const AvviaInterventoBody = zod.object({
 })
 
 export const AvviaInterventoResponse = zod.object({
+  "provenienza": zod.enum(['sociale', 'derivato_bolla', 'legacy_non_classificato']).optional().describe('Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.'),
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
@@ -7213,6 +7328,7 @@ export const AvviaInterventoResponse = zod.object({
   "richiestaId": zod.number(),
   "richiestaCodice": zod.string(),
   "richiestaStato": zod.string(),
+  "ambiguo": zod.boolean().optional().describe('Più richieste attive visibili; non assumere un\'unica lavorazione.'),
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
@@ -7510,6 +7626,7 @@ export const concludiInterventoResponseOperativitaMaterialiItemQuantitaConsegnat
 
 export const ConcludiInterventoResponse = zod.object({
   "intervento": zod.object({
+  "provenienza": zod.enum(['sociale', 'derivato_bolla', 'legacy_non_classificato']).optional().describe('Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.'),
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
@@ -7520,6 +7637,7 @@ export const ConcludiInterventoResponse = zod.object({
   "richiestaId": zod.number(),
   "richiestaCodice": zod.string(),
   "richiestaStato": zod.string(),
+  "ambiguo": zod.boolean().optional().describe('Più richieste attive visibili; non assumere un\'unica lavorazione.'),
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
@@ -7612,6 +7730,7 @@ export const ConcludiInterventoResponse = zod.object({
 }))
 }),
   "successivo": zod.union([zod.object({
+  "provenienza": zod.enum(['sociale', 'derivato_bolla', 'legacy_non_classificato']).optional().describe('Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.'),
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
@@ -7622,6 +7741,7 @@ export const ConcludiInterventoResponse = zod.object({
   "richiestaId": zod.number(),
   "richiestaCodice": zod.string(),
   "richiestaStato": zod.string(),
+  "ambiguo": zod.boolean().optional().describe('Più richieste attive visibili; non assumere un\'unica lavorazione.'),
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
@@ -7691,6 +7811,7 @@ export const AnnullaInterventoBody = zod.object({
 })
 
 export const AnnullaInterventoResponse = zod.object({
+  "provenienza": zod.enum(['sociale', 'derivato_bolla', 'legacy_non_classificato']).optional().describe('Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.'),
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
@@ -7701,6 +7822,7 @@ export const AnnullaInterventoResponse = zod.object({
   "richiestaId": zod.number(),
   "richiestaCodice": zod.string(),
   "richiestaStato": zod.string(),
+  "ambiguo": zod.boolean().optional().describe('Più richieste attive visibili; non assumere un\'unica lavorazione.'),
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
@@ -7769,6 +7891,7 @@ export const RegistraMancataPresentazioneBody = zod.object({
 })
 
 export const RegistraMancataPresentazioneResponse = zod.object({
+  "provenienza": zod.enum(['sociale', 'derivato_bolla', 'legacy_non_classificato']).optional().describe('Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.'),
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
@@ -7779,6 +7902,7 @@ export const RegistraMancataPresentazioneResponse = zod.object({
   "richiestaId": zod.number(),
   "richiestaCodice": zod.string(),
   "richiestaStato": zod.string(),
+  "ambiguo": zod.boolean().optional().describe('Più richieste attive visibili; non assumere un\'unica lavorazione.'),
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),
@@ -7849,6 +7973,7 @@ export const TransitionInterventoBody = zod.object({
 })
 
 export const TransitionInterventoResponse = zod.object({
+  "provenienza": zod.enum(['sociale', 'derivato_bolla', 'legacy_non_classificato']).optional().describe('Proiezione conservativa; la derivazione richiede un evento audit esplicito, nessun backfill storico.'),
   "id": zod.number(),
   "beneficiarioId": zod.number(),
   "beneficiarioNome": zod.string().nullish(),
@@ -7859,6 +7984,7 @@ export const TransitionInterventoResponse = zod.object({
   "richiestaId": zod.number(),
   "richiestaCodice": zod.string(),
   "richiestaStato": zod.string(),
+  "ambiguo": zod.boolean().optional().describe('Più richieste attive visibili; non assumere un\'unica lavorazione.'),
   "bollaId": zod.number().nullish(),
   "bollaNumero": zod.string().nullish(),
   "bollaStato": zod.string().nullish(),

@@ -20,6 +20,8 @@ import {
   utentiTable,
   zoneUdsTable,
   operazioniDistribuzioneMagazzinoTable,
+  ruoliTable,
+  auditEventiTable,
 } from "@workspace/db";
 import { and, eq, inArray, like } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
@@ -51,6 +53,7 @@ let prodottoId: number;
 let magazzinoId: number;
 let tipologiaId: number;
 let zonaRoma: number;
+const fixtureRoles = new Map<string, number>();
 
 function makeApp(
   options: {
@@ -62,7 +65,7 @@ function makeApp(
 ): Express {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => {
+  app.use(async (req, _res, next) => {
     (
       req as unknown as {
         user: {
@@ -94,6 +97,25 @@ function makeApp(
       isAdmin: false,
       isSuperAdmin: false,
     };
+    // This legacy route fixture is not an authentication test. Match its
+    // persisted role to the advertised profile: protected commands now reload it.
+    const aree = options.aree ?? ["sociale"];
+    const key = aree.join(",");
+    if (!fixtureRoles.has(key)) {
+      const [role] = await db
+        .insert(ruoliTable)
+        .values({
+          nome: `M63 fixture ${rnd()}`,
+          aree,
+          permessi: req.user!.permessi,
+        })
+        .returning();
+      fixtureRoles.set(key, role.id);
+    }
+    await db
+      .update(utentiTable)
+      .set({ ruoloId: fixtureRoles.get(key)! })
+      .where(inArray(utentiTable.id, ids.utenti));
     next();
   });
   app.use(interventiRouter);
@@ -314,6 +336,10 @@ afterAll(async () => {
     .delete(beneficiariTable)
     .where(inArray(beneficiariTable.id, ids.beneficiari));
   await db.delete(utentiTable).where(inArray(utentiTable.id, ids.utenti));
+  if (fixtureRoles.size)
+    await db
+      .delete(ruoliTable)
+      .where(inArray(ruoliTable.id, [...fixtureRoles.values()]));
   await db
     .delete(centriAscoltoTable)
     .where(inArray(centriAscoltoTable.id, ids.centri));
@@ -516,7 +542,22 @@ describe("gestione operativa degli interventi Sociali", () => {
       .where(eq(movimentiTable.operazioneDistribuzioneId, operation.id));
     expect(movement).toMatchObject({
       operatoreId: operatoreRoma,
-      auditEventoId: null,
+      auditEventoId: expect.any(Number),
+    });
+    const [audit] = await db
+      .select()
+      .from(auditEventiTable)
+      .where(eq(auditEventiTable.id, movement.auditEventoId!));
+    expect(audit).toMatchObject({
+      azione: "SCARICO_MAGAZZINO_CREATO",
+      actorUserId: operatoreRoma,
+      areaOperativaIdSnapshot: roma,
+      centroAscoltoIdSnapshot: centroRoma,
+      magazzinoIdSnapshot: magazzinoId,
+    });
+    expect(audit.metadata).toMatchObject({
+      interventoId: id,
+      righe: expect.any(Array),
     });
 
     const invalid = await request(makeApp({ aree: ["sociale", "magazzino"] }))

@@ -81,7 +81,8 @@ function makeApp(
       }
     ).user = {
       id: options.userId ?? operatoreRoma,
-      areaOperativaId: options.areaOperativaId === undefined ? roma : options.areaOperativaId,
+      areaOperativaId:
+        options.areaOperativaId === undefined ? roma : options.areaOperativaId,
       centroAscoltoId:
         options.centroId === undefined ? centroRoma : options.centroId,
       zonaUdsId: null,
@@ -146,7 +147,11 @@ async function createBeneficiario(input: {
     })
     .returning({ id: beneficiariTable.id });
   ids.beneficiari.push(row.id);
-  if (input.areaOperativaId === roma && input.centroId === centroRoma && !input.uds) {
+  if (
+    input.areaOperativaId === roma &&
+    input.centroId === centroRoma &&
+    !input.uds
+  ) {
     codiceRoma = codice;
   }
   return row.id;
@@ -200,7 +205,17 @@ beforeAll(async () => {
 
   const [role] = await db
     .insert(ruoliTable)
-    .values({ nome: `Sociale 53B ${rnd()}`, aree: ["sociale"] })
+    .values({
+      nome: `Sociale 53B ${rnd()}`,
+      aree: ["sociale"],
+      permessi: [
+        "sociale.interventi.view",
+        "sociale.interventi.create",
+        "sociale.interventi.update",
+        "sociale.interventi.complete",
+        "sociale.interventi.cancel",
+      ],
+    })
     .returning({ id: ruoliTable.id });
   ids.ruoli.push(role.id);
 
@@ -336,14 +351,12 @@ afterAll(async () => {
       .from(bisogniPianificatiTable)
       .where(inArray(bisogniPianificatiTable.interventoId, ids.interventi));
     if (needs.length > 0) {
-      await db
-        .delete(bisogniPianificatiStoricoTable)
-        .where(
-          inArray(
-            bisogniPianificatiStoricoTable.bisognoId,
-            needs.map((need) => need.id),
-          ),
-        );
+      await db.delete(bisogniPianificatiStoricoTable).where(
+        inArray(
+          bisogniPianificatiStoricoTable.bisognoId,
+          needs.map((need) => need.id),
+        ),
+      );
     }
     await db
       .delete(bisogniPianificatiTable)
@@ -368,7 +381,9 @@ afterAll(async () => {
       .delete(centriAscoltoTable)
       .where(inArray(centriAscoltoTable.id, ids.centri));
   if (ids.areaOperativa.length)
-    await db.delete(areeOperativeTable).where(inArray(areeOperativeTable.id, ids.areaOperativa));
+    await db
+      .delete(areeOperativeTable)
+      .where(inArray(areeOperativeTable.id, ids.areaOperativa));
   await pool.end();
 });
 
@@ -553,8 +568,10 @@ describe("viste operative degli interventi Sociali", () => {
     expect(classified.body).toHaveLength(1); // il centro inviato viene ignorato per l'operatore territorialmente bloccato
   });
 
-  it("un globale filtra per area operativa senza vedere Milano o UDS", async () => {
-    const response = await request(makeApp({ areaOperativaId: null, centroId: null }))
+  it("uno scope Area esplicito filtra senza vedere Milano o UDS (null non è globale)", async () => {
+    const response = await request(
+      makeApp({ areaOperativaId: roma, centroId: null }),
+    )
       .get("/interventi")
       .query({
         ambito: "sociale",
@@ -606,10 +623,10 @@ describe("creazione dal menu unico", () => {
     expect(response.body.map((row: { id: number }) => row.id)).not.toContain(
       operatoreMilano,
     );
-    const globalMissingAreaOperativa = await request(
+    const ordinaryMissingAreaOperativa = await request(
       makeApp({ areaOperativaId: null, centroId: null }),
     ).get("/interventi/operatori");
-    expect(globalMissingAreaOperativa.status).toBe(400);
+    expect(ordinaryMissingAreaOperativa.status).toBe(403);
   });
 
   it("crea da pianificare e pianificato con ambito Sociale e storico iniziale", async () => {

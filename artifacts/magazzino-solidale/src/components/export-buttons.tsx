@@ -25,6 +25,7 @@ type ExportButtonsProps<T> = {
   variant?: "outline" | "default" | "secondary";
   loadRows?: () => Promise<T[]>;
   beforeExport?: (format: "xlsx" | "pdf", exportRows: T[]) => Promise<void>;
+  onError?: (error: unknown) => void;
 };
 
 export function ExportButtons<T>({
@@ -40,6 +41,7 @@ export function ExportButtons<T>({
   variant = "outline",
   loadRows,
   beforeExport,
+  onError,
 }: ExportButtonsProps<T>) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -57,8 +59,8 @@ export function ExportButtons<T>({
     try {
       const exportRows = await resolveRows();
       if (exportRows.length === 0) return;
-      await beforeExport?.("pdf", exportRows);
       const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
+      await beforeExport?.("pdf", exportRows);
       await exportToPdf({
         filename,
         title,
@@ -69,6 +71,9 @@ export function ExportButtons<T>({
         generatedBy,
         branding: { ...branding, logoDataUrl },
       });
+    } catch (error) {
+      if (!onError) throw error;
+      onError(error);
     } finally {
       exportInFlight.current = false;
       setExportLoading(false);
@@ -84,6 +89,9 @@ export function ExportButtons<T>({
       if (exportRows.length === 0) return;
       await beforeExport?.("xlsx", exportRows);
       exportToXlsx(filename, sheetName ?? title, exportRows, columns);
+    } catch (error) {
+      if (!onError) throw error;
+      onError(error);
     } finally {
       exportInFlight.current = false;
       setExportLoading(false);

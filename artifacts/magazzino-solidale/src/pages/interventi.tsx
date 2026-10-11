@@ -1,11 +1,12 @@
 import {
+  getCurrentUser,
+  listInterventiOperatori,
   getGetInterventiRiepilogoVisteQueryKey,
   getGetInterventoOperativitaQueryKey,
   getGetInterventoQueryKey,
   getListBeneficiariQueryKey,
   getListBisogniPianificatiQueryKey,
   getListInterventiOperatoriQueryKey,
-  getListInterventiQueryKey,
   getListInterventoStoricoStatiQueryKey,
   getListAreeOperativeQueryKey,
   useCreateIntervento,
@@ -19,7 +20,9 @@ import {
   useListBisogniPianificati,
   useListCentriAscolto,
   useListAreeOperative,
-  useListInterventi,
+  useListInterventiPagina,
+  listInterventiPagina,
+  getListInterventiPaginaQueryKey,
   useListInterventiOperatori,
   useListInterventoStoricoStati,
   useListTipiIntervento,
@@ -56,6 +59,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import {
+  interventiIdentity,
+  isInterventoReadDenied,
+  useInterventiAccess,
+} from "@/hooks/use-interventi-access";
 import { monthRange, todayEuropeRome } from "@/lib/europe-rome";
 import { invalidateInterventiSociali } from "@/lib/interventi-sociali-cache";
 import {
@@ -100,10 +108,17 @@ function calendarInterval(filters: InterventiSocialiFilters): {
 }
 
 export default function Interventi() {
+  const { user } = useAuth();
+  const identity = interventiIdentity(user);
+  return <InterventiSession key={identity} identity={identity} />;
+}
+
+function InterventiSession({ identity }: { identity: string }) {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const access = useInterventiAccess(identity);
   const [filters, setFiltersState] = useState(() =>
     parseInterventiSocialiFilters(window.location.search),
   );
@@ -127,7 +142,19 @@ export default function Interventi() {
   const debouncedSearch = useDebouncedValue(filters.ricerca, 300);
   const debouncedBeneficiarySearch = useDebouncedValue(beneficiarySearch, 250);
 
-  const isGlobal = user?.areaOperativaId == null;
+  const isGlobal = Boolean(
+    user?.isAdmin &&
+    user.areaOperativaId == null &&
+    user.centroAscoltoId == null &&
+    user.zonaUdsId == null,
+  );
+  const canRead =
+    Boolean(
+      user &&
+      (user.isAdmin || user.aree?.includes("sociale")) &&
+      hasPermission("sociale.interventi.view") &&
+      (isGlobal || user.areaOperativaId != null),
+    ) && !access.blocked;
   const lockedCentroId = user?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const areaOperativaRequired = isGlobal && !filters.areaOperativaId;
@@ -153,6 +180,15 @@ export default function Interventi() {
   }, []);
 
   const setFilters = (next: InterventiSocialiFilters) => {
+    if (
+      Object.keys(next).some(
+        (key) =>
+          key !== "pagina" &&
+          next[key as keyof typeof next] !==
+            filters[key as keyof typeof filters],
+      )
+    )
+      next = { ...next, pagina: 1 };
     setFiltersState(next);
     const params = new URLSearchParams(serializeInterventiSocialiFilters(next));
     if (selectedInterventoId != null) {
@@ -206,6 +242,8 @@ export default function Interventi() {
     vista: filters.vista,
     ordina: filters.ordina === "default" ? undefined : filters.ordina,
     direzione: filters.ordina === "default" ? undefined : filters.direzione,
+    pagina: filters.pagina,
+    limite: 50,
   };
   const summaryParams: GetInterventiRiepilogoVisteParams = {
     ricerca: debouncedSearch || undefined,
@@ -220,18 +258,22 @@ export default function Interventi() {
     ambitoLegacy: filters.ambitoLegacy,
     ...(filters.da && filters.a ? { da: filters.da, a: filters.a } : {}),
   };
-  const queryEnabled = !areaOperativaRequired && interval.valid;
+  const queryEnabled = canRead && !areaOperativaRequired && interval.valid;
 
-  const interventiQuery = useListInterventi(listParams, {
+  const interventiQuery = useListInterventiPagina(listParams, {
     query: {
-      queryKey: getListInterventiQueryKey(listParams),
+      queryKey: access.key(getListInterventiPaginaQueryKey(listParams)),
       enabled: queryEnabled,
+      retry: false,
     },
   });
   const summaryQuery = useGetInterventiRiepilogoViste(summaryParams, {
     query: {
-      queryKey: getGetInterventiRiepilogoVisteQueryKey(summaryParams),
+      queryKey: access.key(
+        getGetInterventiRiepilogoVisteQueryKey(summaryParams),
+      ),
       enabled:
+        canRead &&
         !areaOperativaRequired &&
         (!filters.da || !filters.a || filters.da <= filters.a),
     },
@@ -242,8 +284,8 @@ export default function Interventi() {
   };
   const operatorsQuery = useListInterventiOperatori(operatorParams, {
     query: {
-      queryKey: getListInterventiOperatoriQueryKey(operatorParams),
-      enabled: !areaOperativaRequired,
+      queryKey: access.key(getListInterventiOperatoriQueryKey(operatorParams)),
+      enabled: canRead && !areaOperativaRequired,
     },
   });
   const beneficiaryParams = {
@@ -254,8 +296,8 @@ export default function Interventi() {
   };
   const beneficiariesQuery = useListBeneficiari(beneficiaryParams, {
     query: {
-      queryKey: getListBeneficiariQueryKey(beneficiaryParams),
-      enabled: !areaOperativaRequired,
+      queryKey: access.key(getListBeneficiariQueryKey(beneficiaryParams)),
+      enabled: canRead && !areaOperativaRequired,
     },
   });
   const areaOperativaQuery = useListAreeOperative({
@@ -267,26 +309,30 @@ export default function Interventi() {
   const detailId = selectedInterventoId ?? 0;
   const detailQuery = useGetIntervento(detailId, {
     query: {
-      queryKey: getGetInterventoQueryKey(detailId),
-      enabled: selectedInterventoId != null,
+      queryKey: access.key(getGetInterventoQueryKey(detailId)),
+      enabled: canRead && selectedInterventoId != null,
+      retry: false,
     },
   });
   const operationalQuery = useGetInterventoOperativita(detailId, {
     query: {
-      queryKey: getGetInterventoOperativitaQueryKey(detailId),
-      enabled: selectedInterventoId != null,
+      queryKey: access.key(getGetInterventoOperativitaQueryKey(detailId)),
+      enabled: canRead && selectedInterventoId != null,
+      retry: false,
     },
   });
   const historyQuery = useListInterventoStoricoStati(detailId, {
     query: {
-      queryKey: getListInterventoStoricoStatiQueryKey(detailId),
-      enabled: selectedInterventoId != null,
+      queryKey: access.key(getListInterventoStoricoStatiQueryKey(detailId)),
+      enabled: canRead && selectedInterventoId != null,
+      retry: false,
     },
   });
   const needsQuery = useListBisogniPianificati(detailId, {
     query: {
-      queryKey: getListBisogniPianificatiQueryKey(detailId),
-      enabled: selectedInterventoId != null,
+      queryKey: access.key(getListBisogniPianificatiQueryKey(detailId)),
+      enabled: canRead && selectedInterventoId != null,
+      retry: false,
     },
   });
   const createIntervento = useCreateIntervento();
@@ -295,6 +341,25 @@ export default function Interventi() {
   const concludiIntervento = useConcludiIntervento();
   const annullaIntervento = useAnnullaIntervento();
   const mancataPresentazione = useRegistraMancataPresentazione();
+  const protectedReads = [
+    interventiQuery,
+    summaryQuery,
+    operatorsQuery,
+    beneficiariesQuery,
+    detailQuery,
+    operationalQuery,
+    historyQuery,
+    needsQuery,
+  ];
+  const readDenied = protectedReads.some((query) =>
+    isInterventoReadDenied(query.error),
+  );
+  const readUnavailable = protectedReads.some(
+    (query) => query.error && !isInterventoReadDenied(query.error),
+  );
+  useEffect(() => {
+    if (readDenied && !access.blocked) access.revoke();
+  }, [readDenied, access.blocked]);
 
   const openForm = (mode: InterventoSocialeCreateMode) => {
     setFormMode(mode);
@@ -348,10 +413,7 @@ export default function Interventi() {
     };
     toast({
       title: t("interventi.operational.operationError"),
-      description:
-        candidate.status === 409
-          ? "L’intervento è stato modificato da un altro operatore. Aggiorna i dati prima di riprovare."
-          : (candidate.data?.error ?? candidate.message),
+      description: candidate.data?.error ?? candidate.message,
       variant: "destructive",
     });
   };
@@ -395,7 +457,7 @@ export default function Interventi() {
     }
   };
 
-  const interventi = interventiQuery.data ?? [];
+  const interventi = interventiQuery.data?.items ?? [];
   const allCenters = centersQuery.data ?? [];
   const centers = allCenters.filter((center) => {
     if (isCentroLocked) return center.id === lockedCentroId;
@@ -405,6 +467,13 @@ export default function Interventi() {
       center.areaOperativaId === effectiveAreaOperativaId
     );
   });
+
+  if (!canRead || readDenied)
+    return (
+      <p role="alert" className="p-6 text-destructive">
+        {t("interventi.accessDenied")}
+      </p>
+    );
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-6 p-4 sm:p-6">
@@ -421,6 +490,50 @@ export default function Interventi() {
           {canCreate && (
             <ExportButtons
               rows={interventi}
+              disabled={!queryEnabled || interventiQuery.isError}
+              loadRows={async () => {
+                const rows: Intervento[] = [];
+                const seen = new Set<number>();
+                for (let pagina = 1; ; pagina++) {
+                  access.assertCurrent();
+                  const page = await listInterventiPagina({
+                    ...listParams,
+                    pagina,
+                    limite: 200,
+                  });
+                  access.assertCurrent();
+                  for (const row of page.items) {
+                    if (!seen.has(row.id)) {
+                      rows.push(row);
+                      seen.add(row.id);
+                    }
+                  }
+                  if (page.items.length < page.limite) break;
+                }
+                return rows;
+              }}
+              beforeExport={async () => {
+                access.assertCurrent();
+                const current = await getCurrentUser();
+                if (interventiIdentity(current) !== identity)
+                  throw Object.assign(new Error(t("interventi.accessDenied")), {
+                    status: 403,
+                  });
+                // This scoped read denies inactive/incoherent assignments; an
+                // empty legacy list alone is not evidence of continuing access.
+                await listInterventiOperatori(operatorParams);
+                access.assertCurrent();
+              }}
+              onError={(error) => {
+                if (isInterventoReadDenied(error)) access.revoke();
+                toast({
+                  title: t("common.error"),
+                  description: isInterventoReadDenied(error)
+                    ? t("interventi.accessDenied")
+                    : t("interventi.readUnavailable"),
+                  variant: "destructive",
+                });
+              }}
               columns={[
                 {
                   header: t("interventi.beneficiario"),
@@ -445,7 +558,8 @@ export default function Interventi() {
                 },
               ]}
               filename="interventi-sociali"
-              title={t("interventi.exportTitle")}
+              title={t("interventi.exportAllFiltered")}
+              subtitle={t("interventi.liveResults")}
               orientation="landscape"
             />
           )}
@@ -502,6 +616,41 @@ export default function Interventi() {
         onReset={() => setFilters(clearInterventiSocialiFilters(filters))}
         onOpenIntervento={(intervento) => openIntervento(intervento.id)}
       />
+      <nav
+        aria-label={t("interventi.pagination")}
+        className="flex flex-wrap items-center gap-3"
+      >
+        <Button
+          variant="outline"
+          disabled={filters.pagina <= 1 || interventiQuery.isFetching}
+          onClick={() => setFilters({ ...filters, pagina: filters.pagina - 1 })}
+        >
+          {t("interventi.previousPage")}
+        </Button>
+        <span>
+          {t("interventi.pageTotal", {
+            page: filters.pagina,
+            total: interventiQuery.data?.total ?? 0,
+          })}
+        </span>
+        <Button
+          variant="outline"
+          disabled={
+            filters.pagina * 50 >= (interventiQuery.data?.total ?? 0) ||
+            interventiQuery.isFetching
+          }
+          onClick={() => setFilters({ ...filters, pagina: filters.pagina + 1 })}
+        >
+          {t("interventi.nextPage")}
+        </Button>
+        {filters.modo === "calendario" &&
+          (interventiQuery.data?.total ?? 0) > 50 && (
+            <p role="status">{t("interventi.calendarPartial")}</p>
+          )}
+      </nav>
+      <p className="text-xs text-muted-foreground">
+        {t("interventi.liveResults")}
+      </p>
 
       <InterventoSocialeFormSheet
         open={formOpen && canCreate}
@@ -518,6 +667,8 @@ export default function Interventi() {
       />
 
       <InterventoSocialeDetailSheet
+        readUnavailable={readUnavailable}
+        key={`${identity}:${detailId}`}
         open={selectedInterventoId != null}
         intervento={detailQuery.data}
         operativita={operationalQuery.data}
