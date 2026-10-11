@@ -1108,9 +1108,13 @@ describe("Cassa Emporio", () => {
       ).toBe(400);
       const topup = await request(c.server)
         .post(
-          `/credito-solidale/beneficiari/${c.fixture.beneficiarioId}/ricarica-manuale`,
+          `/credito-solidale/beneficiari/${c.fixture.beneficiarioId}/rettifica`,
         )
-        .send({ variazioneCredito: amount, motivo: "Vietato frazionario" });
+        .send({
+          idempotencyKey: crypto.randomUUID(),
+          variazioneCredito: amount,
+          motivo: "Vietato frazionario",
+        });
       expect(topup.status, topup.text).toBe(400);
       const product = await request(c.server)
         .patch(`/prodotti/${c.product}`)
@@ -3514,38 +3518,23 @@ describe("Cassa Emporio", () => {
     expect(ready.status).toBe(200);
   });
 
-  it("aggiorna il Credito Solidale da Cassa usando la quota mensile senza duplicare il periodo", async () => {
+  it("Cassa non forza la ricarica mensile: refresh dismesso e lettura senza effetti", async () => {
     const fixture = await createFixture({ saldo: "0.00" });
     const sessione = await openSession(fixture.accessoId);
-    expect(sessione.body.saldoCreditoIniziale).toBe(0);
-
-    const first = await request(makeApp())
-      .post(
-        `/credito-solidale/beneficiari/${fixture.beneficiarioId}/refresh-credito`,
-      )
-      .send({ periodoRiferimento: "2026-07" });
-    expect(first.status).toBe(201);
-    expect(first.body.ricaricaEseguita).toBe(true);
-    expect(first.body.movimento.tipoMovimento).toBe("ricarica_mensile");
-    expect(first.body.movimento.variazioneCredito).toBe(25);
-    expect(first.body.saldo.saldoAttuale).toBe(25);
-
-    const refreshedSessione = await request(makeApp()).get(
-      `/cassa-emporio/sessioni/${sessione.body.id}`,
-    );
-    expect(refreshedSessione.status).toBe(200);
-    expect(refreshedSessione.body.saldoCreditoIniziale).toBe(25);
-    expect(refreshedSessione.body.creditoResiduoPrevisto).toBe(25);
-
-    const second = await request(makeApp())
-      .post(
-        `/credito-solidale/beneficiari/${fixture.beneficiarioId}/refresh-credito`,
-      )
-      .send({ periodoRiferimento: "2026-07" });
-    expect(second.status).toBe(200);
-    expect(second.body.ricaricaEseguita).toBe(false);
-    expect(second.body.movimento).toBeNull();
-    expect(second.body.saldo.saldoAttuale).toBe(25);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await request(makeApp())
+        .post(
+          `/credito-solidale/beneficiari/${fixture.beneficiarioId}/refresh-credito`,
+        )
+        .send({ periodoRiferimento: "2026-07" });
+      expect(res.status).toBe(410);
+      const detail = await request(makeApp()).get(
+        `/cassa-emporio/sessioni/${sessione.body.id}`,
+      );
+      expect(detail.status).toBe(200);
+      expect(detail.body.saldoCreditoIniziale).toBe(0);
+      expect(detail.body.creditoResiduoPrevisto).toBe(0);
+    }
   });
 
   it("pronta_per_chiusura non crea movimenti, non scala saldo, non scarica giacenza, non crea bolle o scarichi", async () => {

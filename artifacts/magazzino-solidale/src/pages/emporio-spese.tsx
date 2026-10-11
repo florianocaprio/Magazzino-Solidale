@@ -52,6 +52,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { RequiredField } from "@/components/ui/required-field";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { speseEmporioCapabilities } from "@/lib/emporio-permissions";
@@ -244,6 +245,7 @@ function EmporioSpese() {
     tipoRettifica === "reso_non_distribuibile";
   const recoveryStorageKey = `emporio-rettifica:${user?.id}:${selectedId}`;
   const [motivoStorno, setMotivoStorno] = useState("");
+  const [stornoSubmitted, setStornoSubmitted] = useState(false);
   const [confermaStorno, setConfermaStorno] = useState(false);
   const [quantitaStorno, setQuantitaStorno] = useState<Record<number, number>>(
     {},
@@ -305,6 +307,7 @@ function EmporioSpese() {
     setImportoRettifica("");
     setErroreRettifica("");
     setMotivoStorno("");
+    setStornoSubmitted(false);
     setConfermaStorno(false);
     setQuantitaStorno(
       Object.fromEntries(
@@ -372,6 +375,7 @@ function EmporioSpese() {
   };
 
   const submitStorno = async () => {
+    setStornoSubmitted(true);
     if (
       !dettaglio ||
       !motivoStorno.trim() ||
@@ -935,15 +939,22 @@ function EmporioSpese() {
                 <p role="alert">{t("speseEmporio.legacyNonConforme")}</p>
               )}
               {!physical && (
-                <Input
-                  aria-label={t("speseEmporio.importo")}
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={importoRettifica}
-                  onChange={(event) => setImportoRettifica(event.target.value)}
-                  disabled={esitoIncerto}
-                />
+                <RequiredField
+                  label={t("speseEmporio.importo")}
+                  missing={stornoSubmitted && !importoRettifica.trim()}
+                >
+                  <Input
+                    aria-label={t("speseEmporio.importo")}
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={importoRettifica}
+                    onChange={(event) =>
+                      setImportoRettifica(event.target.value)
+                    }
+                    disabled={esitoIncerto}
+                  />
+                </RequiredField>
               )}
               {physical && (
                 <div className="max-h-64 space-y-2 overflow-auto">
@@ -1000,20 +1011,41 @@ function EmporioSpese() {
                   ? t("speseEmporio.frazioneBloccata")
                   : formatCredito(creditoRestituitoPrevisto)}
               </div>
-              <Textarea
-                value={motivoStorno}
-                disabled={esitoIncerto}
-                onChange={(event) => setMotivoStorno(event.target.value)}
-                placeholder="Motivo obbligatorio dello storno"
-              />
-              <label className="flex items-start gap-2 rounded-md border p-3">
+              <RequiredField
+                label={t("creditoSolidale.motivo")}
+                missing={stornoSubmitted && !motivoStorno.trim()}
+              >
+                <Textarea
+                  value={motivoStorno}
+                  disabled={esitoIncerto}
+                  onChange={(event) => setMotivoStorno(event.target.value)}
+                  placeholder="Motivo obbligatorio dello storno"
+                />
+              </RequiredField>
+              <label
+                className={`flex items-start gap-2 rounded-md border p-3 ${stornoSubmitted && !confermaStorno ? "border-red-600" : ""}`}
+              >
                 <input
                   type="checkbox"
+                  aria-invalid={stornoSubmitted && !confermaStorno}
+                  aria-describedby={
+                    stornoSubmitted && !confermaStorno
+                      ? "rettifica-spesa-conferma-error"
+                      : undefined
+                  }
                   checked={confermaStorno}
                   onChange={(event) => setConfermaStorno(event.target.checked)}
                 />
                 <span>{t("speseEmporio.confermaEffetti")}</span>
               </label>
+              {stornoSubmitted && !confermaStorno && (
+                <p
+                  id="rettifica-spesa-conferma-error"
+                  className="text-sm text-destructive"
+                >
+                  {t("common.requiredField")}
+                </p>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -1032,11 +1064,13 @@ function EmporioSpese() {
                 void submitStorno();
               }}
               disabled={
-                !motivoStorno.trim() ||
-                !confermaStorno ||
                 (physical && righeStorno.length === 0) ||
-                creditoRestituitoPrevisto == null ||
-                (!physical && creditoRestituitoPrevisto <= 0) ||
+                ((physical || !!importoRettifica.trim()) &&
+                  creditoRestituitoPrevisto == null) ||
+                (!physical &&
+                  !!importoRettifica.trim() &&
+                  creditoRestituitoPrevisto != null &&
+                  creditoRestituitoPrevisto <= 0) ||
                 dettaglio?.creditoConforme === false ||
                 esitoIncerto ||
                 stornaSpesa.isPending

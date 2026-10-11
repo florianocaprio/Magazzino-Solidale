@@ -43,7 +43,7 @@ const formSchema = z.object({
   fornitoreId: z.coerce.number().positive(),
   magazzinoId: z.coerce.number().positive(),
   centroAscoltoId: z.coerce.number().optional(),
-  dataRichiesta: z.string().min(1),
+  dataRichiesta: z.string().trim().min(1),
   dataPrevista: z.string().optional(),
   note: z.string().optional(),
 });

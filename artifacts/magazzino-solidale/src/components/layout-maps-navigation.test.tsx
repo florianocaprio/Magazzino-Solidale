@@ -3,6 +3,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  userId: 1,
+  location: "/",
   isAdmin: false,
   isSuperAdmin: false,
   areas: new Set<string>(),
@@ -14,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
     user: {
+      id: mocks.userId,
       isAdmin: mocks.isAdmin,
       isSuperAdmin: mocks.isSuperAdmin,
       nome: "Utente",
@@ -71,7 +74,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("wouter", () => ({
-  useLocation: () => ["/"],
+  useLocation: () => [mocks.location],
   Link: ({
     href,
     children,
@@ -101,6 +104,15 @@ function groupLinks(label: string): HTMLAnchorElement[] {
   );
 }
 
+async function expandGroup(label: string) {
+  const trigger = sidebarGroup(label)?.querySelector<HTMLButtonElement>(
+    '[data-slot="sidebar-group-label"]',
+  );
+  if (trigger?.getAttribute("aria-expanded") === "false") {
+    await act(async () => trigger.click());
+  }
+}
+
 describe("Sidebar - Mappa Operativa", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -110,6 +122,8 @@ describe("Sidebar - Mappa Operativa", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     mocks.isAdmin = false;
+    mocks.userId = 1;
+    mocks.location = "/";
     mocks.isSuperAdmin = false;
     mocks.areas = new Set();
     mocks.permissions = new Set();
@@ -136,6 +150,48 @@ describe("Sidebar - Mappa Operativa", () => {
     );
   };
 
+  it("all'accesso lascia chiusi tutti i gruppi, anche quello della pagina corrente", async () => {
+    mocks.isAdmin = true;
+    mocks.location = "/volontari";
+    await renderLayout();
+    const triggers = document.querySelectorAll(
+      '[data-slot="sidebar-group-label"]',
+    );
+    expect(triggers.length).toBeGreaterThan(1);
+    for (const trigger of triggers) {
+      expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    }
+    expect(groupLinks("Logistica")).toHaveLength(0);
+  });
+
+  it("apre soltanto il gruppo richiesto, mantenendolo durante la navigazione", async () => {
+    mocks.isAdmin = true;
+    await renderLayout();
+    await expandGroup("Logistica");
+    expect(groupLinks("Logistica").length).toBeGreaterThan(0);
+    expect(groupLinks("Generale")).toHaveLength(0);
+    mocks.location = "/volontari";
+    await renderLayout();
+    expect(groupLinks("Logistica").length).toBeGreaterThan(0);
+    expect(groupLinks("Generale")).toHaveLength(0);
+    await act(async () =>
+      sidebarGroup("Logistica")
+        ?.querySelector<HTMLButtonElement>('[data-slot="sidebar-group-label"]')
+        ?.click(),
+    );
+    expect(groupLinks("Logistica")).toHaveLength(0);
+  });
+
+  it("non eredita i gruppi aperti quando cambia l'utente", async () => {
+    mocks.isAdmin = true;
+    await renderLayout();
+    await expandGroup("Logistica");
+    expect(groupLinks("Logistica").length).toBeGreaterThan(0);
+    mocks.userId = 2;
+    await renderLayout();
+    expect(groupLinks("Logistica")).toHaveLength(0);
+  });
+
   it("mostra al SuperAdmin Mappa Operativa come ultima voce di Logistica", async () => {
     mocks.isAdmin = true;
     mocks.isSuperAdmin = true;
@@ -143,6 +199,8 @@ describe("Sidebar - Mappa Operativa", () => {
     mocks.mapsLayerCount = 1;
     await renderLayout();
 
+    await expandGroup("Logistica");
+    await expandGroup("Generale");
     const links = groupLinks("Logistica");
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       "Volontari",
@@ -165,6 +223,7 @@ describe("Sidebar - Mappa Operativa", () => {
     mocks.mapsLayerCount = 1;
     await renderLayout();
 
+    await expandGroup("Logistica");
     const maps = groupLinks("Logistica").find((link) =>
       link.textContent?.includes("Mappa Operativa"),
     );
@@ -176,6 +235,7 @@ describe("Sidebar - Mappa Operativa", () => {
     mocks.areas = new Set(["logistica"]);
     await renderLayout();
 
+    await expandGroup("Logistica");
     expect(document.body.textContent).not.toContain("Mappa Operativa");
   });
 
@@ -185,6 +245,7 @@ describe("Sidebar - Mappa Operativa", () => {
     mocks.mapsLayerCount = 1;
     await renderLayout();
 
+    await expandGroup("Logistica");
     expect(groupLinks("Logistica").at(-1)?.getAttribute("href")).toBe("/maps");
     expect(document.body.textContent).toContain("Mappa Operativa");
   });
@@ -204,6 +265,7 @@ describe("Sidebar - Mappa Operativa", () => {
       mocks.mapsLayerCount = 1;
       await renderLayout();
 
+      await expandGroup("Logistica");
       expect(document.body.textContent).not.toContain("Mappa Operativa");
     },
   );

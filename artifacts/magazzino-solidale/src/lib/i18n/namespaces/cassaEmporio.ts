@@ -59,7 +59,7 @@ const it = {
   preparaChiusura: "Prepara chiusura",
   sessioneProntaPerChiusura: "Sessione pronta per la chiusura.",
   saldoInsufficiente:
-    "Saldo Credito Solidale insufficiente. Riduci il carrello o effettua una ricarica prima della chiusura.",
+    "Saldo Credito Solidale insufficiente. Riduci il carrello prima della chiusura. Per una variazione straordinaria rivolgiti a un operatore autorizzato alla rettifica credito.",
   prodottoNonTrovato:
     "Prodotto non trovato. Verifica il codice a barre o cerca il prodotto per nome.",
   prodottoAmbiguo:

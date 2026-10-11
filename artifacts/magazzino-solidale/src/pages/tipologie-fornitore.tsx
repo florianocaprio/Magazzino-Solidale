@@ -22,7 +22,7 @@ import { useTranslation } from "react-i18next";
 
 function makeSchema(t: (k: string) => string) {
   return z.object({
-    nome: z.string().min(1, t("common.requiredField")),
+    nome: z.string().trim().min(1, t("common.requiredField")),
     attivo: z.boolean().default(true),
   });
 }

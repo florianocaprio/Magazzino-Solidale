@@ -23,7 +23,7 @@ import { errorMessage } from "@/lib/api-error";
 
 function makeSchema(t: (k: string) => string) {
   return z.object({
-    nome: z.string().min(1, t("common.requiredField")),
+    nome: z.string().trim().min(1, t("common.requiredField")),
     provincia: z.string().optional(),
     sigla: z.string().max(2).optional(),
     codiceMatricola: z.string().max(8).regex(/^[A-Za-z0-9]*$/).optional(),

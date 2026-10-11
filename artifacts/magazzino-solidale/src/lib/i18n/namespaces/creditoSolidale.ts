@@ -1,6 +1,50 @@
 const it = {
+  campoObbligatorio: "Campo obbligatorio",
+  rettificaCredito: "Rettifica credito",
+  rettificaDescrizione:
+    "Scegli se aggiungere o ridurre il saldo. Non è uno storno della Spesa.",
+  operazione: "Operazione",
+  scegliOperazione: "Scegli l’operazione",
+  aggiungiCredito: "Aggiungi credito",
+  riduciCredito: "Riduci credito",
+  quantitaCrediti: "Quantità di crediti",
+  quantitaInteraPositiva:
+    "Inserisci un numero intero positivo, massimo 99.999.999.",
+  saldoPrevisto: "Saldo risultante previsto",
+  saldoConfermato: "Saldo confermato: {{saldo}}",
+  esitoIncerto:
+    "Risposta non disponibile. Recupera l’esito prima di ripetere la rettifica.",
+  esitoAssente:
+    "Nessuna rettifica registrata: puoi riprovare la stessa operazione.",
+  recuperaEsito: "Recupera esito",
+  ricaricaAutomatica: "Ricarica mensile automatica",
+  ricaricaCalendario:
+    "La quota assegnata viene aggiunta al saldo il primo giorno di ogni mese (Europe/Rome). Nessun comando manuale.",
+  recuperoNonDeciso:
+    "Le lavorazioni già avviate vengono riprese. Se il sistema era spento alla scadenza, il recupero della mensilità non avviata è una decisione ancora da definire: nessun accredito retroattivo automatico.",
+  statoNonDisponibile: "Stato dell’elaborazione non disponibile.",
+  job: {
+    non_avviata: "Non avviata",
+    in_corso: "In corso",
+    completata: "Completata",
+    pendente: "Da elaborare",
+    elaborato: "Elaborati",
+    gia_elaborato: "Già elaborati",
+    escluso: "Esclusi",
+    errore: "Errori da riprendere",
+  },
+  cause: {
+    mensilita_gia_eseguita: "mensilità già eseguita",
+    beneficiario_credito_non_attivo: "beneficiario o credito non attivo",
+    diritto_emporio_non_valido: "diritto Emporio non valido",
+    territorio_non_coerente: "territorio non coerente",
+    quota_o_saldo_non_conforme: "quota o saldo non conforme",
+    quota_non_assegnata: "quota non assegnata",
+    elaborazione_non_completata: "elaborazione non completata",
+  },
   title: "Politiche Credito Solidale",
-  subtitle: "Configura le regole usate per calcolare la quota mensile suggerita.",
+  subtitle:
+    "Configura le regole usate per calcolare la quota mensile suggerita.",
   newPolicy: "Nuova politica",
   editPolicy: "Modifica politica",
   noPolicies: "Nessuna politica configurata.",
@@ -12,7 +56,8 @@ const it = {
   centerScope: "Centro",
   activePolicy: "Politica attiva",
   automaticFuture: "Ricarica automatica abilitata",
-  automaticFutureHint: "Flag preparatorio: la ricarica effettiva sarà gestita in una fase successiva.",
+  automaticFutureHint:
+    "Flag preparatorio: la ricarica effettiva sarà gestita in una fase successiva.",
   formula: "Formula",
   creditoBaseNucleo: "Base nucleo",
   creditoPerComponente: "Quota per componente",
@@ -30,20 +75,23 @@ const it = {
   openMenu: "Apri menu",
   deactivate: "Disattiva",
   deactivateTitle: "Disattiva politica",
-  deactivateDescription: "La politica non sarà più usata per i nuovi calcoli. Le simulazioni già visualizzate non vengono storicizzate.",
+  deactivateDescription:
+    "La politica non sarà più usata per i nuovi calcoli. Le simulazioni già visualizzate non vengono storicizzate.",
   toastCreated: "Politica Credito Solidale creata",
   toastUpdated: "Politica Credito Solidale aggiornata",
   toastDeactivated: "Politica Credito Solidale disattivata",
   saveError: "Impossibile salvare la politica Credito Solidale",
   deactivateError: "Impossibile disattivare la politica Credito Solidale",
-  maxMustBeGreater: "Il massimo mensile deve essere maggiore o uguale al minimo.",
+  maxMustBeGreater:
+    "Il massimo mensile deve essere maggiore o uguale al minimo.",
   dayRange: "Il giorno deve essere compreso tra 1 e 28.",
   selectAreaOperativa: "Seleziona Area Operativa",
   selectCenter: "Seleziona centro",
   allAreeOperative: "Tutte le Aree Operative",
   allCenters: "Tutti i centri",
   simulationTitle: "Credito mensile suggerito",
-  simulationSubtitle: "Questo totale è una simulazione della quota mensile suggerita. La ricarica effettiva sarà gestita in una fase successiva.",
+  simulationSubtitle:
+    "Questo totale è una simulazione della quota mensile suggerita. La ricarica effettiva sarà gestita in una fase successiva.",
   politicaApplicata: "Politica applicata",
   totaleSuggerito: "Totale suggerito",
   totalePrimaDeiLimiti: "Totale prima dei limiti",
@@ -56,8 +104,10 @@ const it = {
   arrotondamentoApplicato: "Arrotondamento",
   calculateError: "Impossibile calcolare il Credito Solidale suggerito",
   saldoPageTitle: "Crediti e saldo",
-  saldoPageSubtitle: "Saldi e movimenti Credito Solidale dei beneficiari abilitati.",
-  readOnlyDisabled: "Il modulo Emporio Solidale è disabilitato. I saldi e i movimenti sono consultabili in sola lettura.",
+  saldoPageSubtitle:
+    "Saldi e movimenti Credito Solidale dei beneficiari abilitati.",
+  readOnlyDisabled:
+    "Il modulo Emporio Solidale è disabilitato. I saldi e i movimenti sono consultabili in sola lettura.",
   saldoCreditoSolidale: "Saldo Credito Solidale",
   movimentiCreditoSolidale: "Movimenti Credito Solidale",
   ricaricaCreditoSolidale: "Ricarica Credito Solidale",
@@ -85,7 +135,8 @@ const it = {
   tuttiEmpori: "Tutti gli empori",
   filters: "Filtri",
   cercaBeneficiario: "Cerca beneficiario",
-  cercaBeneficiarioNomeCodiceBarcode: "Cerca beneficiario per nome, codice o codice a barre",
+  cercaBeneficiarioNomeCodiceBarcode:
+    "Cerca beneficiario per nome, codice o codice a barre",
   soloSaldoPositivo: "Solo saldo positivo",
   soloQuotaAssegnata: "Solo quota assegnata",
   saldoAttuale: "Saldo attuale",
@@ -107,10 +158,10 @@ const it = {
   esclusi: "Esclusi",
   creditoDaRicaricare: "Credito Solidale da ricaricare",
   creditoRicaricato: "Credito Solidale ricaricato",
-  saldoPrevisto: "Saldo previsto",
   motivoEsclusione: "Motivo esclusione",
   confermaEsecuzioneTitle: "Conferma ricarica mensile",
-  confermaEsecuzioneDescription: "La ricarica mensile crea movimenti Credito Solidale solo per i beneficiari ricaricabili e salta quelli già ricaricati per il periodo selezionato.",
+  confermaEsecuzioneDescription:
+    "La ricarica mensile crea movimenti Credito Solidale solo per i beneficiari ricaricabili e salta quelli già ricaricati per il periodo selezionato.",
   conferma: "Conferma",
   annulla: "Annulla",
   salvaRicarica: "Salva ricarica",
@@ -129,7 +180,8 @@ const it = {
   stornaMovimento: "Storna movimento",
   motivoStorno: "Motivo dello storno",
   confermaStornoTitle: "Storna movimento Credito Solidale",
-  confermaStornoDescription: "Lo storno crea un movimento contrario e mantiene lo storico contabile.",
+  confermaStornoDescription:
+    "Lo storno crea un movimento contrario e mantiene lo storico contabile.",
   stornoCompletato: "Movimento Credito Solidale stornato",
   stato: {
     non_abilitato: "Non abilitato",

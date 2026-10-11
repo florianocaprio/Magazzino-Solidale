@@ -7673,6 +7673,8 @@ paths:
 
   /credito-solidale/beneficiari/{beneficiarioId}/refresh-credito:
     post:
+      deprecated: true
+      description: Comando dismesso. Ricarica solo automatica; usare Rettifica credito per variazioni straordinarie.
       operationId: refreshCreditoSolidaleBeneficiario
       tags: [credito-solidale]
       parameters:
@@ -7688,18 +7690,15 @@ paths:
             schema:
               $ref: "#/components/schemas/CreditoSolidaleRefreshInput"
       responses:
-        "200":
-          description: Credito Solidale già aggiornato per il periodo
+        "410":
+          description: Comando dismesso, nessun accredito
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreditoSolidaleRefreshResult"
-        "201":
-          description: Credito Solidale aggiornato con ricarica mensile
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CreditoSolidaleRefreshResult"
+                type: object
+                required: [error]
+                properties:
+                  error: { type: string }
 
   /credito-solidale/beneficiari/{beneficiarioId}/movimenti:
     get:
@@ -7723,6 +7722,8 @@ paths:
 
   /credito-solidale/beneficiari/{beneficiarioId}/ricarica-manuale:
     post:
+      deprecated: true
+      description: Comando dismesso. Ricarica solo automatica; usare Rettifica credito per variazioni straordinarie.
       operationId: createCreditoSolidaleRicaricaManuale
       tags: [credito-solidale]
       parameters:
@@ -7738,12 +7739,15 @@ paths:
             schema:
               $ref: "#/components/schemas/CreditoSolidaleRicaricaManualeInput"
       responses:
-        "201":
-          description: Movimento Credito Solidale creato
+        "410":
+          description: Comando dismesso, nessun accredito
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreditoSolidaleMovimento"
+                type: object
+                required: [error]
+                properties:
+                  error: { type: string }
 
   /credito-solidale/beneficiari/{beneficiarioId}/rettifica:
     post:
@@ -7768,6 +7772,63 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreditoSolidaleMovimento"
+
+  /credito-solidale/beneficiari/{beneficiarioId}/rettifiche/{idempotencyKey}/esito:
+    get:
+      operationId: getCreditoSolidaleRettificaEsito
+      tags: [credito-solidale]
+      parameters:
+        - {
+            name: beneficiarioId,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: idempotencyKey,
+            in: path,
+            required: true,
+            schema: { type: string },
+          }
+      responses:
+        "200":
+          description: Esito autorizzato già contabilizzato, nessuna nuova scrittura
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreditoSolidaleMovimento" }
+        "404":
+          description: Nessun esito disponibile per questa intenzione
+
+  /credito-solidale/ricariche-mensili/stato:
+    get:
+      operationId: getCreditoSolidaleRicaricaMensileStato
+      tags: [credito-solidale]
+      responses:
+        "200":
+          description: Stato in sola lettura, esiti limitati al perimetro corrente
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [periodo, calendario, stato, recuperoDaDecidere, esiti]
+                properties:
+                  periodo: { type: string }
+                  calendario: { type: string }
+                  stato:
+                    { type: string, enum: [non_avviata, in_corso, completata] }
+                  avviataAt: { type: [string, "null"] }
+                  completataAt: { type: [string, "null"] }
+                  recuperoDaDecidere: { type: boolean }
+                  esiti:
+                    type: array
+                    items:
+                      type: object
+                      required: [stato, causa, numero]
+                      properties:
+                        stato: { type: string }
+                        causa: { type: [string, "null"] }
+                        numero: { type: integer }
 
   /credito-solidale/movimenti/{id}/storno:
     post:
@@ -7813,6 +7874,8 @@ paths:
 
   /credito-solidale/ricariche-mensili/esegui:
     post:
+      deprecated: true
+      description: Comando dismesso. Ricarica solo automatica; usare Rettifica credito per variazioni straordinarie.
       operationId: executeCreditoSolidaleRicaricaMensile
       tags: [credito-solidale]
       requestBody:
@@ -7822,12 +7885,15 @@ paths:
             schema:
               $ref: "#/components/schemas/CreditoSolidaleRicaricaMensileEsecuzioneInput"
       responses:
-        "200":
-          description: Esecuzione ricarica mensile Credito Solidale
+        "410":
+          description: Comando dismesso, nessun accredito
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreditoSolidaleRicaricaMensileEsecuzione"
+                type: object
+                required: [error]
+                properties:
+                  error: { type: string }
 
   /volontari:
     get:
@@ -15675,9 +15741,14 @@ components:
         giornoRicaricaMensile:
           type: integer
           minimum: 1
-          maximum: 28
+          maximum: 1
+          deprecated: true
+          description: Calendario automatico fisso al primo del mese; omettere nei nuovi client.
         ricaricaAutomaticaAbilitata:
           type: boolean
+          enum: [true]
+          deprecated: true
+          description: Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.
         arrotondamento:
           type: string
           enum: [nessuno, intero_superiore, intero_inferiore, intero_piu_vicino]
@@ -15724,9 +15795,14 @@ components:
         giornoRicaricaMensile:
           type: integer
           minimum: 1
-          maximum: 28
+          maximum: 1
+          deprecated: true
+          description: Calendario automatico fisso al primo del mese; omettere nei nuovi client.
         ricaricaAutomaticaAbilitata:
           type: boolean
+          enum: [true]
+          deprecated: true
+          description: Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.
         arrotondamento:
           type: string
           enum: [nessuno, intero_superiore, intero_inferiore, intero_piu_vicino]
@@ -16042,6 +16118,10 @@ components:
     CreditoSolidaleRettificaInput:
       type: object
       properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 120
         variazioneCredito:
           type: integer
           minimum: -99999999
@@ -16050,7 +16130,7 @@ components:
           type: string
         note:
           type: ["string", "null"]
-      required: [variazioneCredito, motivo]
+      required: [variazioneCredito, motivo, idempotencyKey]
 
     CreditoSolidaleStornoInput:
       type: object

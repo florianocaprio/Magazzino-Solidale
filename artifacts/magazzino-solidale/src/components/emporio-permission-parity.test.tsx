@@ -43,6 +43,20 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
+  useGetCreditoSolidaleRicaricaMensileStato: () => ({
+    data: {
+      periodo: "2026-10",
+      stato: "non_avviata",
+      esiti: [],
+      recuperoDaDecidere: true,
+    },
+    isError: false,
+  }),
+  getGetCreditoSolidaleRicaricaMensileStatoQueryKey: () => [
+    "credito",
+    "mensile",
+    "stato",
+  ],
   getListBeneficiariQueryKey: () => ["beneficiari"],
   getListCreditoSolidaleBeneficiarioMovimentiQueryKey: () => [
     "credito",
@@ -166,11 +180,11 @@ describe("parità permessi UI Credito e Accessi Emporio", () => {
     expect(mocks.executeMonthly).not.toHaveBeenCalled();
   });
 
-  it("credito.adjust abilita ricarica e rettifica, senza concedere l'esecuzione mensile", async () => {
+  it("credito.adjust abilita soltanto rettifica, mai ricarica manuale", async () => {
     mocks.permissions.add("credito.adjust");
     await act(async () => root.render(<EmporioCreditiSaldo />));
 
-    expect(document.body.textContent).toContain(
+    expect(document.body.textContent).not.toContain(
       "creditoSolidale.ricaricaCreditoSolidale",
     );
     expect(document.body.textContent).toContain(
@@ -181,24 +195,16 @@ describe("parità permessi UI Credito e Accessi Emporio", () => {
     );
   });
 
-  it("esegue la ricarica mensile una sola volta e solo dopo conferma", async () => {
+  it("nessuna esecuzione mensile nemmeno con grant storico, solo informazioni", async () => {
     mocks.permissions.add("credito.monthly.execute");
     await act(async () => root.render(<EmporioCreditiSaldo />));
-
-    const executeButton = Array.from(document.querySelectorAll("button")).find(
-      (button) =>
-        button.textContent?.includes("creditoSolidale.eseguiRicaricaMensile"),
+    expect(document.body.textContent).not.toContain(
+      "creditoSolidale.eseguiRicaricaMensile",
     );
-    expect(executeButton).toBeDefined();
-    expect(mocks.executeMonthly).not.toHaveBeenCalled();
-
-    await act(async () => executeButton?.click());
-    expect(mocks.executeMonthly).not.toHaveBeenCalled();
-    const confirm = Array.from(document.querySelectorAll("button")).find(
-      (button) => button.textContent?.trim() === "creditoSolidale.conferma",
+    expect(document.body.textContent).toContain(
+      "creditoSolidale.ricaricaAutomatica",
     );
-    await act(async () => confirm?.click());
-    expect(mocks.executeMonthly).toHaveBeenCalledTimes(1);
+    expect(mocks.executeMonthly).not.toHaveBeenCalled();
   });
 
   it("Accessi view-only non mostra controlli manage; il grant manage li abilita", async () => {

@@ -792,8 +792,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <SidebarContent>
             {Object.entries(groupedNav).map(([group, items]) => (
               <Collapsible
-                key={group}
-                defaultOpen
+                key={`${user?.id}:${group}`}
+                defaultOpen={false}
                 className="group/collapsible"
               >
                 <SidebarGroup>

@@ -1,3 +1,4 @@
+import { RequiredField } from "@/components/ui/required-field";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
@@ -355,6 +356,7 @@ function EmporioAccessi() {
   };
 
   const openCreate = () => {
+    setSubmitted(false);
     setEditing({ mode: "create" });
     setBeneficiarioSearch("");
     setSearchTerm("");
@@ -370,6 +372,7 @@ function EmporioAccessi() {
   };
 
   const openEdit = (accesso: AccessoEmporio) => {
+    setSubmitted(false);
     const start = accesso.dataOraInizio
       ? new Date(accesso.dataOraInizio)
       : new Date();
@@ -391,7 +394,10 @@ function EmporioAccessi() {
     });
   };
 
+  const [submitted, setSubmitted] = useState(false);
+  const [cancelSubmitted, setCancelSubmitted] = useState(false);
   const submit = () => {
+    setSubmitted(true);
     if (!canManage) return;
     if (!emporioAbilitato) {
       toast({
@@ -910,9 +916,14 @@ function EmporioAccessi() {
               }}
               disabled={!emporioAbilitato || empori.length === 0}
             >
-              <SelectTrigger aria-label={t("accessiEmporio.emporio")}>
-                <SelectValue placeholder={t("accessiEmporio.emporio")} />
-              </SelectTrigger>
+              <RequiredField
+                label={t("accessiEmporio.emporio")}
+                missing={submitted && !form.magazzinoEmporioId}
+              >
+                <SelectTrigger aria-label={t("accessiEmporio.emporio")}>
+                  <SelectValue placeholder={t("accessiEmporio.emporio")} />
+                </SelectTrigger>
+              </RequiredField>
               <SelectContent>
                 {empori.map((m) => (
                   <SelectItem key={m.id} value={String(m.id)}>
@@ -933,25 +944,35 @@ function EmporioAccessi() {
                 {t("accessiEmporio.cercaBeneficiario")}
               </label>
               <div className="flex gap-2">
-                <Input
-                  placeholder={t("accessiEmporio.cercaBeneficiarioPlaceholder")}
-                  value={beneficiarioSearch}
-                  onChange={(event) => {
-                    setCardSearch(false);
-                    setSubmittedSearch("");
-                    setBeneficiarioSearch(event.target.value);
-                    setForm((current) => ({ ...current, beneficiarioId: "" }));
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && beneficiarioSearch.trim()) {
-                      event.preventDefault();
+                <RequiredField
+                  label={t("accessiEmporio.beneficiario")}
+                  missing={submitted && !form.beneficiarioId}
+                >
+                  <Input
+                    placeholder={t(
+                      "accessiEmporio.cercaBeneficiarioPlaceholder",
+                    )}
+                    value={beneficiarioSearch}
+                    onChange={(event) => {
                       setCardSearch(false);
-                      setSubmittedSearch(beneficiarioSearch.trim());
-                      setSearchTerm(beneficiarioSearch.trim());
-                    }
-                  }}
-                  disabled={!emporioAbilitato || !form.magazzinoEmporioId}
-                />
+                      setSubmittedSearch("");
+                      setBeneficiarioSearch(event.target.value);
+                      setForm((current) => ({
+                        ...current,
+                        beneficiarioId: "",
+                      }));
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && beneficiarioSearch.trim()) {
+                        event.preventDefault();
+                        setCardSearch(false);
+                        setSubmittedSearch(beneficiarioSearch.trim());
+                        setSearchTerm(beneficiarioSearch.trim());
+                      }
+                    }}
+                    disabled={!emporioAbilitato || !form.magazzinoEmporioId}
+                  />
+                </RequiredField>
                 <BarcodeScannerButton
                   disabled={!emporioAbilitato || !form.magazzinoEmporioId}
                   onScan={(value) => {
@@ -1026,28 +1047,38 @@ function EmporioAccessi() {
               </p>
             )}
             <div className="grid grid-cols-3 gap-3">
-              <Input
-                type="date"
-                value={form.data}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    data: event.target.value,
-                  }))
-                }
-                disabled={!emporioAbilitato}
-              />
-              <Input
-                type="time"
-                value={form.oraInizio}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    oraInizio: event.target.value,
-                  }))
-                }
-                disabled={!emporioAbilitato}
-              />
+              <RequiredField
+                label={t("common.date")}
+                missing={submitted && !form.data}
+              >
+                <Input
+                  type="date"
+                  value={form.data}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      data: event.target.value,
+                    }))
+                  }
+                  disabled={!emporioAbilitato}
+                />
+              </RequiredField>
+              <RequiredField
+                label={t("accessiEmporio.oraInizio")}
+                missing={submitted && !form.oraInizio}
+              >
+                <Input
+                  type="time"
+                  value={form.oraInizio}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      oraInizio: event.target.value,
+                    }))
+                  }
+                  disabled={!emporioAbilitato}
+                />
+              </RequiredField>
               <Input
                 type="time"
                 value={form.oraFine}
@@ -1090,12 +1121,7 @@ function EmporioAccessi() {
             <Button
               onClick={submit}
               disabled={
-                !emporioAbilitato ||
-                pending ||
-                !beneficiarioSelezionato ||
-                !!eligibilityError ||
-                beneficiariQuery.isFetching ||
-                !form.magazzinoEmporioId
+                !emporioAbilitato || pending || beneficiariQuery.isFetching
               }
             >
               {t("common.save")}
@@ -1112,23 +1138,29 @@ function EmporioAccessi() {
           <DialogHeader>
             <DialogTitle>{t("accessiEmporio.annullaAccesso")}</DialogTitle>
           </DialogHeader>
-          <Textarea
-            rows={3}
-            placeholder={t("accessiEmporio.motivoAnnullamento")}
-            value={motivoAnnullamento}
-            onChange={(event) => setMotivoAnnullamento(event.target.value)}
-          />
+          <RequiredField
+            label={t("accessiEmporio.motivoAnnullamento")}
+            missing={cancelSubmitted && !motivoAnnullamento.trim()}
+          >
+            <Textarea
+              rows={3}
+              placeholder={t("accessiEmporio.motivoAnnullamento")}
+              value={motivoAnnullamento}
+              onChange={(event) => setMotivoAnnullamento(event.target.value)}
+            />
+          </RequiredField>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAnnullando(null)}>
               {t("common.cancel")}
             </Button>
             <Button
               variant="destructive"
-              disabled={!motivoAnnullamento.trim() || pending || !annullando}
-              onClick={() =>
-                annullando &&
-                changeStatus(annullando, "annullato", motivoAnnullamento)
-              }
+              disabled={pending || !annullando}
+              onClick={() => {
+                setCancelSubmitted(true);
+                if (annullando && motivoAnnullamento.trim())
+                  changeStatus(annullando, "annullato", motivoAnnullamento);
+              }}
             >
               {t("accessiEmporio.annullaAccesso")}
             </Button>

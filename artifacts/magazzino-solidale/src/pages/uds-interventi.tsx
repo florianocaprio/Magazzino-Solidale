@@ -126,8 +126,8 @@ function makeSchema(t: (k: string) => string) {
       }
     });
   return z.object({
-    dataIntervento: z.string().min(1, t("common.requiredField")),
-    tipoIntervento: z.string().min(1, t("common.requiredField")),
+    dataIntervento: z.string().trim().min(1, t("common.requiredField")),
+    tipoIntervento: z.string().trim().min(1, t("common.requiredField")),
     descrizione: z.string().optional(),
     note: z.string().optional(),
     motivoRettifica: z.string().max(2000).optional(),

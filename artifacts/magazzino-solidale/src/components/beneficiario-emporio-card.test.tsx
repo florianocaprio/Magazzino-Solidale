@@ -71,7 +71,12 @@ async function mount() {
 it("T08: absent right displays NON ABILITATO and requires an explicit motive", async () => {
   await mount();
   expect(host.textContent).toContain("emporioServizio.non_abilitato");
-  expect(host.querySelector<HTMLButtonElement>("button")!.disabled).toBe(true);
+  expect(host.querySelector<HTMLButtonElement>("button")!.disabled).toBe(false);
+  await act(() => host.querySelector<HTMLButtonElement>("button")!.click());
+  expect(host.querySelector("input")?.getAttribute("aria-invalid")).toBe(
+    "true",
+  );
+  expect(host.textContent).toContain("common.requiredField");
   expect(host.querySelectorAll("button")).toHaveLength(1);
   expect(mocks.mutate).not.toHaveBeenCalled();
 });

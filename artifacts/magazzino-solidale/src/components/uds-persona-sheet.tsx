@@ -79,8 +79,8 @@ const NO_FASCIA_ETA = "__non_determinata__";
 function makeSchema(t: (key: string) => string, isGlobal: boolean) {
   return z
     .object({
-      nome: z.string().min(1, t("common.requiredField")),
-      cognome: z.string().min(1, t("common.requiredField")),
+      nome: z.string().trim().min(1, t("common.requiredField")),
+      cognome: z.string().trim().min(1, t("common.requiredField")),
       soprannome: z.string().optional(),
       codiceFiscale: z.string().optional(),
       dataNascita: z
@@ -91,9 +91,9 @@ function makeSchema(t: (key: string) => string, isGlobal: boolean) {
           "La data di nascita non può essere successiva alla data odierna.",
         ),
       fasciaEtaPresunta: z.string().optional(),
-      sesso: z.string().min(1, t("beneficiari.sessoRequired")),
+      sesso: z.string().trim().min(1, t("beneficiari.sessoRequired")),
       cittadinanza: z.string().optional(),
-      areaProvenienza: z.string().min(1, t("common.requiredField")),
+      areaProvenienza: z.string().trim().min(1, t("common.requiredField")),
       residenza: z.string().optional(),
       domicilio: z.string().optional(),
       telefono: z.string().optional(),

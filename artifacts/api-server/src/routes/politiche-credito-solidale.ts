@@ -58,7 +58,7 @@ const DECIMAL_KEYS = [
 
 const NOT_FOUND_MSG = "Politica Credito Solidale non trovata.";
 const DAY_MSG =
-  "Il giorno di ricarica mensile deve essere compreso tra 1 e 28.";
+  "La ricarica mensile automatica avviene esclusivamente il primo del mese.";
 const MAX_MSG =
   "Il credito massimo mensile deve essere maggiore o uguale al minimo.";
 const ROUNDING_MSG = "Tipo di arrotondamento non valido.";
@@ -207,16 +207,20 @@ function parseBody(
       body.giornoRicaricaMensile == null || body.giornoRicaricaMensile === ""
         ? 1
         : Number(body.giornoRicaricaMensile);
-    if (!Number.isInteger(giorno) || giorno < 1 || giorno > 28)
-      return { error: DAY_MSG };
+    if (giorno !== 1) return { error: DAY_MSG };
     values.giornoRicaricaMensile = giorno;
   }
 
   const ricaricaAutomaticaAbilitata = optionalBool(
     body.ricaricaAutomaticaAbilitata,
     partial,
-    false,
+    true,
   );
+  if (ricaricaAutomaticaAbilitata === false)
+    return {
+      error:
+        "La ricarica mensile è automatica il primo del mese e non è disattivabile dalla politica.",
+    };
   if (ricaricaAutomaticaAbilitata !== undefined)
     values.ricaricaAutomaticaAbilitata = ricaricaAutomaticaAbilitata;
 

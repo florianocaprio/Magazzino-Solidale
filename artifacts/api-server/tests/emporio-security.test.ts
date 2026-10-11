@@ -581,13 +581,8 @@ describe("M6.2-A — confini, replay e transazioni", () => {
     const response = await f.agent
       .post("/api/credito-solidale/ricariche-mensili/esegui")
       .send({ periodoRiferimento: "2026-12" });
-    expect(response.status, response.text).toBe(200);
-    expect(response.body.creati).toBe(1);
-    expect(
-      response.body.movimentiCreati.map(
-        (m: { beneficiarioId: number }) => m.beneficiarioId,
-      ),
-    ).toEqual([f.beneficiary.id]);
+    // F1: il comando pubblico non è più operativo, nemmeno con il grant storico.
+    expect(response.status, response.text).toBe(410);
     expect(
       (
         await db

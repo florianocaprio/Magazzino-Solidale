@@ -100,10 +100,10 @@ const makeFormSchema = (
 
   return z.object({
     codice: z.string().optional(),
-    nome: z.string().min(2, t("prodotti.errNomeShort")),
+    nome: z.string().trim().min(2, t("prodotti.errNomeShort")),
     descrizione: z.string().optional(),
-    tipoProdotto: z.string().min(1, t("common.requiredField")),
-    unitaMisura: z.string().min(1, t("common.requiredField")),
+    tipoProdotto: z.string().trim().min(1, t("common.requiredField")),
+    unitaMisura: z.string().trim().min(1, t("common.requiredField")),
     codiceBarre: z.string().optional(),
     quantitaFrazionabile: z.boolean().default(false),
     lottoFisicoObbligatorio: z.boolean().default(false),

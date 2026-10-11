@@ -14,52 +14,116 @@ import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { HeartHandshake, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  HeartHandshake,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { EMPORIO_DISABLED_MESSAGE, useModuloFlags } from "@/lib/use-moduli";
 
 const NONE = "__none__";
-const ROUNDING_VALUES = ["nessuno", "intero_superiore", "intero_inferiore", "intero_piu_vicino"] as const;
+const ROUNDING_VALUES = [
+  "nessuno",
+  "intero_superiore",
+  "intero_inferiore",
+  "intero_piu_vicino",
+] as const;
 
 function makeSchema(t: (k: string) => string) {
-  return z.object({
-    nome: z.string().min(1, t("common.requiredField")),
-    descrizione: z.string().optional().default(""),
-    centroAscoltoId: z.string().default(NONE),
-    areaOperativaId: z.string().default(NONE),
-    attiva: z.boolean().default(true),
-    creditoBaseNucleo: z.coerce.number().int().min(0).max(99_999_999),
-    creditoPerComponente: z.coerce.number().int().min(0).max(99_999_999),
-    bonusMinore: z.coerce.number().int().min(0).max(99_999_999),
-    bonusAnziano: z.coerce.number().int().min(0).max(99_999_999),
-    bonusDisabile: z.coerce.number().int().min(0).max(99_999_999),
-    creditoMinimoMensile: z.coerce.number().int().min(0).max(99_999_999),
-    creditoMassimoMensile: z.string().optional().default(""),
-    giornoRicaricaMensile: z.coerce.number().int().min(1, t("creditoSolidale.dayRange")).max(28, t("creditoSolidale.dayRange")),
-    ricaricaAutomaticaAbilitata: z.boolean().default(false),
-    arrotondamento: z.enum(ROUNDING_VALUES).default("nessuno"),
-    note: z.string().optional().default(""),
-  }).refine((data) => {
-    if (!data.creditoMassimoMensile?.trim()) return true;
-    const max = Number(data.creditoMassimoMensile.replace(",", "."));
-    return Number.isSafeInteger(max) && max <= 99_999_999 && max >= data.creditoMinimoMensile;
-  }, {
-    message: t("creditoSolidale.maxMustBeGreater"),
-    path: ["creditoMassimoMensile"],
-  });
+  return z
+    .object({
+      nome: z.string().trim().min(1, t("common.requiredField")),
+      descrizione: z.string().optional().default(""),
+      centroAscoltoId: z.string().default(NONE),
+      areaOperativaId: z.string().default(NONE),
+      attiva: z.boolean().default(true),
+      creditoBaseNucleo: z.coerce.number().int().min(0).max(99_999_999),
+      creditoPerComponente: z.coerce.number().int().min(0).max(99_999_999),
+      bonusMinore: z.coerce.number().int().min(0).max(99_999_999),
+      bonusAnziano: z.coerce.number().int().min(0).max(99_999_999),
+      bonusDisabile: z.coerce.number().int().min(0).max(99_999_999),
+      creditoMinimoMensile: z.coerce.number().int().min(0).max(99_999_999),
+      creditoMassimoMensile: z.string().optional().default(""),
+      giornoRicaricaMensile: z.coerce
+        .number()
+        .int()
+        .min(1, t("creditoSolidale.dayRange"))
+        .max(28, t("creditoSolidale.dayRange")),
+      ricaricaAutomaticaAbilitata: z.boolean().default(false),
+      arrotondamento: z.enum(ROUNDING_VALUES).default("nessuno"),
+      note: z.string().optional().default(""),
+    })
+    .refine(
+      (data) => {
+        if (!data.creditoMassimoMensile?.trim()) return true;
+        const max = Number(data.creditoMassimoMensile.replace(",", "."));
+        return (
+          Number.isSafeInteger(max) &&
+          max <= 99_999_999 &&
+          max >= data.creditoMinimoMensile
+        );
+      },
+      {
+        message: t("creditoSolidale.maxMustBeGreater"),
+        path: ["creditoMassimoMensile"],
+      },
+    );
 }
 
 type FormValues = z.infer<ReturnType<typeof makeSchema>>;
@@ -97,9 +161,12 @@ const nullable = (v: string | undefined): string | null => {
   return trimmed ? trimmed : null;
 };
 
-const optionalId = (v: string): number | null => v === NONE ? null : Number(v);
+const optionalId = (v: string): number | null =>
+  v === NONE ? null : Number(v);
 const formatQuota = (v: number | null | undefined): string =>
-  v == null ? "-" : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(v);
+  v == null
+    ? "-"
+    : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(v);
 
 export default function PoliticheCreditoSolidale() {
   const { t } = useTranslation();
@@ -124,11 +191,16 @@ export default function PoliticheCreditoSolidale() {
     defaultValues,
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListPoliticheCreditoSolidaleQueryKey() });
+  const invalidate = () =>
+    queryClient.invalidateQueries({
+      queryKey: getListPoliticheCreditoSolidaleQueryKey(),
+    });
 
   const scopeLabel = (p: PoliticaCreditoSolidale) => {
-    if (p.centroAscoltoNome) return `${t("creditoSolidale.centerScope")}: ${p.centroAscoltoNome}`;
-    if (p.areaOperativaNome) return `${t("creditoSolidale.areaOperativaScope")}: ${p.areaOperativaNome}`;
+    if (p.centroAscoltoNome)
+      return `${t("creditoSolidale.centerScope")}: ${p.centroAscoltoNome}`;
+    if (p.areaOperativaNome)
+      return `${t("creditoSolidale.areaOperativaScope")}: ${p.areaOperativaNome}`;
     return t("creditoSolidale.globalScope");
   };
 
@@ -143,8 +215,10 @@ export default function PoliticheCreditoSolidale() {
     form.reset({
       nome: p.nome,
       descrizione: p.descrizione ?? "",
-      centroAscoltoId: p.centroAscoltoId == null ? NONE : String(p.centroAscoltoId),
-      areaOperativaId: p.areaOperativaId == null ? NONE : String(p.areaOperativaId),
+      centroAscoltoId:
+        p.centroAscoltoId == null ? NONE : String(p.centroAscoltoId),
+      areaOperativaId:
+        p.areaOperativaId == null ? NONE : String(p.areaOperativaId),
       attiva: p.attiva,
       creditoBaseNucleo: p.creditoBaseNucleo,
       creditoPerComponente: p.creditoPerComponente,
@@ -152,7 +226,8 @@ export default function PoliticheCreditoSolidale() {
       bonusAnziano: p.bonusAnziano,
       bonusDisabile: p.bonusDisabile,
       creditoMinimoMensile: p.creditoMinimoMensile,
-      creditoMassimoMensile: p.creditoMassimoMensile == null ? "" : String(p.creditoMassimoMensile),
+      creditoMassimoMensile:
+        p.creditoMassimoMensile == null ? "" : String(p.creditoMassimoMensile),
       giornoRicaricaMensile: p.giornoRicaricaMensile,
       ricaricaAutomaticaAbilitata: p.ricaricaAutomaticaAbilitata,
       arrotondamento: p.arrotondamento,
@@ -174,71 +249,97 @@ export default function PoliticheCreditoSolidale() {
       bonusAnziano: data.bonusAnziano,
       bonusDisabile: data.bonusDisabile,
       creditoMinimoMensile: data.creditoMinimoMensile,
-      creditoMassimoMensile: data.creditoMassimoMensile?.trim() ? Number(data.creditoMassimoMensile.replace(",", ".")) : null,
-      giornoRicaricaMensile: data.giornoRicaricaMensile,
-      ricaricaAutomaticaAbilitata: data.ricaricaAutomaticaAbilitata,
+      creditoMassimoMensile: data.creditoMassimoMensile?.trim()
+        ? Number(data.creditoMassimoMensile.replace(",", "."))
+        : null,
       arrotondamento: data.arrotondamento,
       note: nullable(data.note),
     };
 
     if (editing) {
-      updatePolitica.mutate({ id: editing.id, data: payload }, {
-        onSuccess: () => {
-          invalidate();
-          toast({ title: t("creditoSolidale.toastUpdated") });
-          setIsFormOpen(false);
+      updatePolitica.mutate(
+        { id: editing.id, data: payload },
+        {
+          onSuccess: () => {
+            invalidate();
+            toast({ title: t("creditoSolidale.toastUpdated") });
+            setIsFormOpen(false);
+          },
+          onError: (err) =>
+            toast({
+              title: t("creditoSolidale.title"),
+              description: extractError(err, t("creditoSolidale.saveError")),
+              variant: "destructive",
+            }),
         },
-        onError: (err) => toast({
-          title: t("creditoSolidale.title"),
-          description: extractError(err, t("creditoSolidale.saveError")),
-          variant: "destructive",
-        }),
-      });
+      );
       return;
     }
 
-    createPolitica.mutate({ data: payload }, {
-      onSuccess: () => {
-        invalidate();
-        toast({ title: t("creditoSolidale.toastCreated") });
-        setIsFormOpen(false);
+    createPolitica.mutate(
+      { data: payload },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: t("creditoSolidale.toastCreated") });
+          setIsFormOpen(false);
+        },
+        onError: (err) =>
+          toast({
+            title: t("creditoSolidale.title"),
+            description: extractError(err, t("creditoSolidale.saveError")),
+            variant: "destructive",
+          }),
       },
-      onError: (err) => toast({
-        title: t("creditoSolidale.title"),
-        description: extractError(err, t("creditoSolidale.saveError")),
-        variant: "destructive",
-      }),
-    });
+    );
   };
 
   const handleDeactivate = () => {
     if (!deactivatingId) return;
-    deletePolitica.mutate({ id: deactivatingId }, {
-      onSuccess: () => {
-        invalidate();
-        toast({ title: t("creditoSolidale.toastDeactivated") });
-        setDeactivatingId(null);
+    deletePolitica.mutate(
+      { id: deactivatingId },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: t("creditoSolidale.toastDeactivated") });
+          setDeactivatingId(null);
+        },
+        onError: (err) => {
+          toast({
+            title: t("creditoSolidale.deactivateTitle"),
+            description: extractError(
+              err,
+              t("creditoSolidale.deactivateError"),
+            ),
+            variant: "destructive",
+          });
+          setDeactivatingId(null);
+        },
       },
-      onError: (err) => {
-        toast({
-          title: t("creditoSolidale.deactivateTitle"),
-          description: extractError(err, t("creditoSolidale.deactivateError")),
-          variant: "destructive",
-        });
-        setDeactivatingId(null);
-      },
-    });
+    );
   };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("creditoSolidale.title")}</h1>
-          <p className="text-muted-foreground">{t("creditoSolidale.subtitle")}</p>
-          {!emporioAbilitato && <p className="text-sm text-muted-foreground mt-1">{EMPORIO_DISABLED_MESSAGE}</p>}
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("creditoSolidale.title")}
+          </h1>
+          <p className="text-muted-foreground">
+            {t("creditoSolidale.subtitle")}
+          </p>
+          {!emporioAbilitato && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {EMPORIO_DISABLED_MESSAGE}
+            </p>
+          )}
         </div>
-        <Button onClick={resetForCreate} className="gap-2" disabled={!emporioAbilitato}>
+        <Button
+          onClick={resetForCreate}
+          className="gap-2"
+          disabled={!emporioAbilitato}
+        >
           <Plus className="h-4 w-4" /> {t("creditoSolidale.newPolicy")}
         </Button>
       </div>
@@ -251,68 +352,112 @@ export default function PoliticheCreditoSolidale() {
                 <TableHead>{t("creditoSolidale.policyName")}</TableHead>
                 <TableHead>{t("creditoSolidale.scope")}</TableHead>
                 <TableHead>{t("creditoSolidale.formula")}</TableHead>
-                <TableHead className="text-center">{t("creditoSolidale.giornoRicaricaMensile")}</TableHead>
-                <TableHead className="text-center">{t("creditoSolidale.status")}</TableHead>
+                <TableHead className="text-center">
+                  {t("creditoSolidale.giornoRicaricaMensile")}
+                </TableHead>
+                <TableHead className="text-center">
+                  {t("creditoSolidale.status")}
+                </TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                Array(3).fill(0).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-5 w-44" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-36" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-64" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-10 mx-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-16 mx-auto rounded-full" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
-                  </TableRow>
-                ))
+                Array(3)
+                  .fill(0)
+                  .map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <Skeleton className="h-5 w-44" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-36" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-64" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-10 mx-auto" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-6 w-16 mx-auto rounded-full" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-8 w-8 rounded-md" />
+                      </TableCell>
+                    </TableRow>
+                  ))
               ) : politiche?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={6}
+                    className="h-32 text-center text-muted-foreground"
+                  >
                     {t("creditoSolidale.noPolicies")}
                   </TableCell>
                 </TableRow>
-              ) : politiche?.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2 font-medium">
-                      <HeartHandshake className="h-4 w-4 text-muted-foreground" />
-                      {p.nome}
-                    </div>
-                    {p.descrizione ? <p className="mt-1 text-xs text-muted-foreground">{p.descrizione}</p> : null}
-                  </TableCell>
-                  <TableCell>{scopeLabel(p)}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {t("creditoSolidale.creditoBaseNucleo")} {formatQuota(p.creditoBaseNucleo)} · {t("creditoSolidale.creditoPerComponente")} {formatQuota(p.creditoPerComponente)}
-                  </TableCell>
-                  <TableCell className="text-center">{p.giornoRicaricaMensile}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="outline" className={p.attiva ? "bg-green-500/10 text-green-700 border-none" : "bg-muted text-muted-foreground"}>
-                      {p.attiva ? t("common.active") : t("common.inactive")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">{t("creditoSolidale.openMenu")}</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => resetForEdit(p)}>
-                          <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeactivatingId(p.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> {t("creditoSolidale.deactivate")}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
+              ) : (
+                politiche?.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2 font-medium">
+                        <HeartHandshake className="h-4 w-4 text-muted-foreground" />
+                        {p.nome}
+                      </div>
+                      {p.descrizione ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {p.descrizione}
+                        </p>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>{scopeLabel(p)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {t("creditoSolidale.creditoBaseNucleo")}{" "}
+                      {formatQuota(p.creditoBaseNucleo)} ·{" "}
+                      {t("creditoSolidale.creditoPerComponente")}{" "}
+                      {formatQuota(p.creditoPerComponente)}
+                    </TableCell>
+                    <TableCell className="text-center">1</TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        variant="outline"
+                        className={
+                          p.attiva
+                            ? "bg-green-500/10 text-green-700 border-none"
+                            : "bg-muted text-muted-foreground"
+                        }
+                      >
+                        {p.attiva ? t("common.active") : t("common.inactive")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">
+                              {t("creditoSolidale.openMenu")}
+                            </span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => resetForEdit(p)}>
+                            <Pencil className="mr-2 h-4 w-4" />{" "}
+                            {t("common.edit")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setDeactivatingId(p.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />{" "}
+                            {t("creditoSolidale.deactivate")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -321,111 +466,246 @@ export default function PoliticheCreditoSolidale() {
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editing ? t("creditoSolidale.editPolicy") : t("creditoSolidale.newPolicy")}</SheetTitle>
+            <SheetTitle>
+              {editing
+                ? t("creditoSolidale.editPolicy")
+                : t("creditoSolidale.newPolicy")}
+            </SheetTitle>
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-5"
+              >
                 <div className="grid gap-4 md:grid-cols-2">
-                  <FormField control={form.control} name="nome" render={({ field }) => (
-                    <FormItem><FormLabel>{t("creditoSolidale.policyName")}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="giornoRicaricaMensile" render={({ field }) => (
-                    <FormItem><FormLabel>{t("creditoSolidale.giornoRicaricaMensile")}</FormLabel><FormControl><Input type="number" min={1} max={28} {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
+                  <FormField
+                    control={form.control}
+                    name="nome"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("creditoSolidale.policyName")}</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
-                <FormField control={form.control} name="descrizione" render={({ field }) => (
-                  <FormItem><FormLabel>{t("creditoSolidale.description")}</FormLabel><FormControl><Textarea rows={2} {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="descrizione"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("creditoSolidale.description")}</FormLabel>
+                      <FormControl>
+                        <Textarea rows={2} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("creditoSolidale.selectAreaOperativa")}</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value={NONE}>{t("creditoSolidale.allAreeOperative")}</SelectItem>
-                          {areaOperativa?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("creditoSolidale.selectCenter")}</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value={NONE}>{t("creditoSolidale.allCenters")}</SelectItem>
-                          {centri?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
+                  <FormField
+                    control={form.control}
+                    name="areaOperativaId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t("creditoSolidale.selectAreaOperativa")}
+                        </FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value={NONE}>
+                              {t("creditoSolidale.allAreeOperative")}
+                            </SelectItem>
+                            {areaOperativa?.map((c) => (
+                              <SelectItem key={c.id} value={String(c.id)}>
+                                {c.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="centroAscoltoId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t("creditoSolidale.selectCenter")}
+                        </FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value={NONE}>
+                              {t("creditoSolidale.allCenters")}
+                            </SelectItem>
+                            {centri?.map((c) => (
+                              <SelectItem key={c.id} value={String(c.id)}>
+                                {c.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">
-                  {(["creditoBaseNucleo", "creditoPerComponente", "bonusMinore", "bonusAnziano", "bonusDisabile", "creditoMinimoMensile"] as const).map((name) => (
-                    <FormField key={name} control={form.control} name={name} render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t(`creditoSolidale.${name}`)}</FormLabel>
-                        <FormControl><Input type="number" min={0} step="1" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
+                  {(
+                    [
+                      "creditoBaseNucleo",
+                      "creditoPerComponente",
+                      "bonusMinore",
+                      "bonusAnziano",
+                      "bonusDisabile",
+                      "creditoMinimoMensile",
+                    ] as const
+                  ).map((name) => (
+                    <FormField
+                      key={name}
+                      control={form.control}
+                      name={name}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t(`creditoSolidale.${name}`)}</FormLabel>
+                          <FormControl>
+                            <Input type="number" min={0} step="1" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   ))}
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <FormField control={form.control} name="creditoMassimoMensile" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("creditoSolidale.creditoMassimoMensile")}</FormLabel>
-                      <FormControl><Input type="number" min={0} step="1" placeholder={t("creditoSolidale.noMaximum")} {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="arrotondamento" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("creditoSolidale.arrotondamento")}</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {ROUNDING_VALUES.map((value) => (
-                            <SelectItem key={value} value={value}>{t(`creditoSolidale.rounding.${value}`)}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
+                  <FormField
+                    control={form.control}
+                    name="creditoMassimoMensile"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t("creditoSolidale.creditoMassimoMensile")}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="1"
+                            placeholder={t("creditoSolidale.noMaximum")}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="arrotondamento"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t("creditoSolidale.arrotondamento")}
+                        </FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {ROUNDING_VALUES.map((value) => (
+                              <SelectItem key={value} value={value}>
+                                {t(`creditoSolidale.rounding.${value}`)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <FormField control={form.control} name="attiva" render={({ field }) => (
-                    <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                      <FormLabel className="m-0">{t("creditoSolidale.activePolicy")}</FormLabel>
-                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="ricaricaAutomaticaAbilitata" render={({ field }) => (
-                    <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                      <div>
-                        <FormLabel className="m-0">{t("creditoSolidale.automaticFuture")}</FormLabel>
-                        <FormDescription>{t("creditoSolidale.automaticFutureHint")}</FormDescription>
-                      </div>
-                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                    </FormItem>
-                  )} />
+                  <FormField
+                    control={form.control}
+                    name="attiva"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <FormLabel className="m-0">
+                          {t("creditoSolidale.activePolicy")}
+                        </FormLabel>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {t("creditoSolidale.ricaricaCalendario")}
+                  </p>{" "}
                 </div>
 
-                <FormField control={form.control} name="note" render={({ field }) => (
-                  <FormItem><FormLabel>{t("creditoSolidale.note")}</FormLabel><FormControl><Textarea rows={3} {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="note"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("creditoSolidale.note")}</FormLabel>
+                      <FormControl>
+                        <Textarea rows={3} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <div className="pt-4 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
-                  <Button type="submit" disabled={createPolitica.isPending || updatePolitica.isPending}>{t("common.save")}</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsFormOpen(false)}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={
+                      createPolitica.isPending || updatePolitica.isPending
+                    }
+                  >
+                    {t("common.save")}
+                  </Button>
                 </div>
               </form>
             </Form>
@@ -433,15 +713,25 @@ export default function PoliticheCreditoSolidale() {
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={!!deactivatingId} onOpenChange={(open) => !open && setDeactivatingId(null)}>
+      <AlertDialog
+        open={!!deactivatingId}
+        onOpenChange={(open) => !open && setDeactivatingId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("creditoSolidale.deactivateTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("creditoSolidale.deactivateDescription")}</AlertDialogDescription>
+            <AlertDialogTitle>
+              {t("creditoSolidale.deactivateTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("creditoSolidale.deactivateDescription")}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeactivate} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction
+              onClick={handleDeactivate}
+              className="bg-destructive text-destructive-foreground"
+            >
               {t("creditoSolidale.deactivate")}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -76,7 +76,7 @@ function makeSchema(t: (k: string) => string) {
       .number()
       .int()
       .positive(t("zoneUds.selectAreaOperativa")),
-    nome: z.string().min(1, t("common.requiredField")),
+    nome: z.string().trim().min(1, t("common.requiredField")),
     attivo: z.boolean().default(true),
     note: z.string().optional(),
   });

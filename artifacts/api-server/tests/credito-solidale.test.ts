@@ -1,3 +1,9 @@
+import { randomUUID } from "node:crypto";
+import { eseguiRicaricaMensile } from "../src/lib/creditoMensile";
+import {
+  creditoRicaricheDestinatariTable,
+  creditoRicaricheMensiliTable,
+} from "@workspace/db";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
@@ -222,6 +228,14 @@ afterEach(async () => {
   }
   if (beneficiarioIds.length > 0) {
     await db
+      .delete(creditoRicaricheDestinatariTable)
+      .where(
+        inArray(
+          creditoRicaricheDestinatariTable.beneficiarioId,
+          beneficiarioIds,
+        ),
+      );
+    await db
       .delete(creditoSolidaleMovimentiTable)
       .where(
         inArray(creditoSolidaleMovimentiTable.beneficiarioId, beneficiarioIds),
@@ -259,7 +273,7 @@ describe("Politiche Credito Solidale", () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe(
-      "Il giorno di ricarica mensile deve essere compreso tra 1 e 28.",
+      "La ricarica mensile automatica avviene esclusivamente il primo del mese.",
     );
   });
 
@@ -435,17 +449,23 @@ describe("Movimenti Credito Solidale", () => {
       expect(
         (
           await request(denied)
-            .post(
-              `/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`,
-            )
-            .send({ variazioneCredito: 10, motivo: "No" })
+            .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
+            .send({
+              idempotencyKey: randomUUID(),
+              variazioneCredito: 10,
+              motivo: "No",
+            })
         ).status,
       ).toBe(403);
       expect(
         (
           await request(denied)
             .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
-            .send({ variazioneCredito: 10, motivo: "No" })
+            .send({
+              idempotencyKey: randomUUID(),
+              variazioneCredito: 10,
+              motivo: "No",
+            })
         ).status,
       ).toBe(403);
       expect(
@@ -487,15 +507,17 @@ describe("Movimenti Credito Solidale", () => {
     expect(
       (
         await request(monthlyOnly)
-          .post(
-            `/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`,
-          )
-          .send({ variazioneCredito: 10, motivo: "No" })
+          .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
+          .send({
+            idempotencyKey: randomUUID(),
+            variazioneCredito: 10,
+            motivo: "No",
+          })
       ).status,
     ).toBe(403);
   });
 
-  it("crea una ricarica manuale e aggiorna il saldo solo tramite movimento", async () => {
+  it("crea una rettifica positiva e aggiorna il saldo solo tramite movimento", async () => {
     const beneficiarioId = await createBeneficiario({
       creditoSolidaleAbilitato: true,
       creditoSolidaleStato: "attivo",
@@ -504,11 +526,15 @@ describe("Movimenti Credito Solidale", () => {
     const res = await request(
       await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     )
-      .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
-      .send({ variazioneCredito: 25, motivo: "Avvio saldo" });
+      .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
+      .send({
+        idempotencyKey: randomUUID(),
+        variazioneCredito: 25,
+        motivo: "Avvio saldo",
+      });
 
     expect(res.status).toBe(201);
-    expect(res.body.tipoMovimento).toBe("ricarica_manuale");
+    expect(res.body.tipoMovimento).toBe("rettifica_positiva");
     expect(res.body.saldoPrima).toBe(0);
     expect(res.body.variazioneCredito).toBe(25);
     expect(res.body.saldoDopo).toBe(25);
@@ -528,14 +554,22 @@ describe("Movimenti Credito Solidale", () => {
     await request(
       await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     )
-      .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
-      .send({ variazioneCredito: 10 });
+      .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
+      .send({
+        idempotencyKey: randomUUID(),
+        variazioneCredito: 10,
+        motivo: "Saldo iniziale sintetico",
+      });
 
     const res = await request(
       await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     )
       .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
-      .send({ variazioneCredito: -15, motivo: "Controllo saldo" });
+      .send({
+        idempotencyKey: randomUUID(),
+        variazioneCredito: -15,
+        motivo: "Controllo saldo",
+      });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe(
@@ -579,19 +613,21 @@ describe("Movimenti Credito Solidale", () => {
       ).saldoPrevistoDopoRicarica,
     ).toBe(15);
 
-    const first = await request(app)
-      .post("/credito-solidale/ricariche-mensili/esegui")
-      .send({ periodoRiferimento: "2026-07", centroAscoltoId: centroId });
-    expect(first.status).toBe(200);
-    expect(first.body.creati).toBe(1);
-    expect(first.body.totaleCreditoRicaricato).toBe(15);
-
-    const second = await request(app)
-      .post("/credito-solidale/ricariche-mensili/esegui")
-      .send({ periodoRiferimento: "2026-07", centroAscoltoId: centroId });
-    expect(second.status).toBe(200);
-    expect(second.body.creati).toBe(0);
-    expect(second.body.saltatiGiaRicaricati).toBe(1);
+    const clock = new Date("2098-07-01T08:00:00Z");
+    await db
+      .delete(creditoRicaricheDestinatariTable)
+      .where(eq(creditoRicaricheDestinatariTable.periodo, "2098-07"));
+    await db
+      .delete(creditoRicaricheMensiliTable)
+      .where(eq(creditoRicaricheMensiliTable.periodo, "2098-07"));
+    await eseguiRicaricaMensile(clock);
+    await eseguiRicaricaMensile(clock);
+    const monthly = await db
+      .select()
+      .from(creditoSolidaleMovimentiTable)
+      .where(eq(creditoSolidaleMovimentiTable.beneficiarioId, ricaricabileId));
+    expect(monthly).toHaveLength(1);
+    expect(monthly[0].tipoMovimento).toBe("ricarica_mensile");
 
     const saldo = await request(app).get(
       `/credito-solidale/beneficiari/${ricaricabileId}/saldo`,
@@ -614,11 +650,15 @@ describe("Movimenti Credito Solidale", () => {
     const write = await request(
       await makeApp({ centroAscoltoId: null, areaOperativaId: null }),
     )
-      .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
-      .send({ variazioneCredito: 5 });
+      .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
+      .send({
+        idempotencyKey: randomUUID(),
+        variazioneCredito: 5,
+        motivo: "Modulo disabilitato",
+      });
     expect(write.status).toBe(403);
     expect(write.body.error).toBe(
-      "Il modulo Emporio Solidale è disabilitato. Abilitalo da Impostazioni Moduli per utilizzare questa funzione.",
+      "Modulo Credito Solidale/Emporio non abilitato.",
     );
   });
 
@@ -629,8 +669,12 @@ describe("Movimenti Credito Solidale", () => {
     });
     const app = await makeApp({ centroAscoltoId: null, areaOperativaId: null });
     const movimento = await request(app)
-      .post(`/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`)
-      .send({ variazioneCredito: 20 });
+      .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
+      .send({
+        idempotencyKey: randomUUID(),
+        variazioneCredito: 20,
+        motivo: "Saldo iniziale sintetico",
+      });
 
     const storno = await request(app)
       .post(`/credito-solidale/movimenti/${movimento.body.id}/storno`)
@@ -667,10 +711,18 @@ describe("Movimenti Credito Solidale", () => {
     const [plus, minus] = await Promise.all([
       request(app)
         .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
-        .send({ variazioneCredito: 10, motivo: "Concorrenza +10" }),
+        .send({
+          idempotencyKey: randomUUID(),
+          variazioneCredito: 10,
+          motivo: "Concorrenza +10",
+        }),
       request(app)
         .post(`/credito-solidale/beneficiari/${beneficiarioId}/rettifica`)
-        .send({ variazioneCredito: -5, motivo: "Concorrenza -5" }),
+        .send({
+          idempotencyKey: randomUUID(),
+          variazioneCredito: -5,
+          motivo: "Concorrenza -5",
+        }),
     ]);
     expect(plus.status).toBe(201);
     expect(minus.status).toBe(201);
@@ -692,7 +744,7 @@ describe("Movimenti Credito Solidale", () => {
     );
   });
 
-  it("esegue una sola ricarica mensile con due refresh concorrenti", async () => {
+  it("nega due refresh concorrenti senza alcuna ricarica", async () => {
     const beneficiarioId = await createBeneficiario({
       creditoSolidaleAbilitato: true,
       creditoSolidaleStato: "attivo",
@@ -708,7 +760,7 @@ describe("Movimenti Credito Solidale", () => {
         .post(`/credito-solidale/beneficiari/${beneficiarioId}/refresh-credito`)
         .send({ periodoRiferimento: "2026-08" }),
     ]);
-    expect([first.status, second.status].sort()).toEqual([201, 409]);
+    expect([first.status, second.status].sort()).toEqual([410, 410]);
     const monthly = await db
       .select()
       .from(creditoSolidaleMovimentiTable)
@@ -721,8 +773,8 @@ describe("Movimenti Credito Solidale", () => {
       monthly.filter(
         (movimento) => movimento.tipoMovimento === "ricarica_mensile",
       ),
-    ).toHaveLength(1);
-    expect(beneficiario.creditoSolidaleSaldo).toBe("10.00");
+    ).toHaveLength(0);
+    expect(beneficiario.creditoSolidaleSaldo).toBe("0.00");
   });
 
   it("rispetta lo scoping Area nella lista movimenti", async () => {
@@ -750,19 +802,31 @@ describe("Movimenti Credito Solidale", () => {
         permessi: ["credito.adjust", "credito.view"],
       }),
     )
-      .post(`/credito-solidale/beneficiari/${beneficiarioB}/ricarica-manuale`)
-      .send({ variazioneCredito: 9 });
+      .post(`/credito-solidale/beneficiari/${beneficiarioB}/rettifica`)
+      .send({
+        idempotencyKey: randomUUID(),
+        variazioneCredito: 9,
+        motivo: "Scoping Area",
+      });
     expect(forbidden.status).toBe(403);
     const globalApp = await makeApp({
       centroAscoltoId: null,
       areaOperativaId: null,
     });
     await request(globalApp)
-      .post(`/credito-solidale/beneficiari/${beneficiarioA}/ricarica-manuale`)
-      .send({ variazioneCredito: 7 });
+      .post(`/credito-solidale/beneficiari/${beneficiarioA}/rettifica`)
+      .send({
+        idempotencyKey: randomUUID(),
+        variazioneCredito: 7,
+        motivo: "Scoping Area",
+      });
     await request(globalApp)
-      .post(`/credito-solidale/beneficiari/${beneficiarioB}/ricarica-manuale`)
-      .send({ variazioneCredito: 9 });
+      .post(`/credito-solidale/beneficiari/${beneficiarioB}/rettifica`)
+      .send({
+        idempotencyKey: randomUUID(),
+        variazioneCredito: 9,
+        motivo: "Scoping Area",
+      });
 
     const scoped = await request(
       await makeApp({

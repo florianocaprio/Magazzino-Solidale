@@ -100,7 +100,7 @@ export const MSG_SESSIONE_NON_PRONTA =
 export const MSG_SESSIONE_GIA_CHIUSA =
   "La sessione Cassa Emporio risulta già chiusa. Non è possibile chiudere due volte la stessa spesa.";
 export const MSG_SALDO_INSUFFICIENTE =
-  "Saldo Credito Solidale insufficiente. Riduci il carrello o effettua una ricarica prima della chiusura.";
+  "Saldo Credito Solidale insufficiente. Riduci il carrello prima della chiusura. Per una variazione straordinaria rivolgiti a un operatore autorizzato alla rettifica credito.";
 export const MSG_GIACENZA_INSUFFICIENTE =
   "Giacenza insufficiente per chiudere la spesa Emporio. Verifica le disponibilità di magazzino prima di riprovare.";
 export const MSG_CARRELLO_VUOTO = "Il Carrello Emporio è vuoto.";

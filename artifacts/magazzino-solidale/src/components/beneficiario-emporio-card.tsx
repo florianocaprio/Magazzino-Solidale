@@ -1,3 +1,4 @@
+import { RequiredField } from "./ui/required-field";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -64,6 +65,7 @@ export function BeneficiarioEmporioSection({
   const queryClient = useQueryClient();
   const [motivo, setMotivo] = useState("");
   const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
   if (!emporioAbilitato) return null;
   const canManage =
     hasPermission("emporio.eligibility.manage") &&
@@ -73,12 +75,15 @@ export function BeneficiarioEmporioSection({
           user.centroAscoltoId === beneficiario.centroAscoltoId)));
   const change = async (stato: EmporioAbilitazioneInputStato) => {
     setError("");
+    setSubmitted(true);
+    if (!motivo.trim()) return;
     try {
       await update.mutateAsync({
         beneficiarioId: beneficiario.id,
         data: { stato, motivo: motivo.trim() },
       });
       setMotivo("");
+      setSubmitted(false);
       await queryClient.invalidateQueries({
         predicate: (q) =>
           /\/api\/(emporio|accessi-emporio|cassa-emporio|credito-solidale|beneficiari)(?:\/|$)/.test(
@@ -110,18 +115,23 @@ export function BeneficiarioEmporioSection({
           beneficiario.attivo &&
           beneficiario.areaOperativaId != null && (
             <>
-              <Input
-                aria-label={t("emporioServizio.motivo")}
-                placeholder={t("emporioServizio.motivo")}
-                value={motivo}
-                maxLength={1000}
-                onChange={(e) => setMotivo(e.target.value)}
-              />
+              <RequiredField
+                label={t("emporioServizio.motivo")}
+                missing={submitted && !motivo.trim()}
+              >
+                <Input
+                  aria-label={t("emporioServizio.motivo")}
+                  placeholder={t("emporioServizio.motivo")}
+                  value={motivo}
+                  maxLength={1000}
+                  onChange={(e) => setMotivo(e.target.value)}
+                />
+              </RequiredField>
               <div className="flex flex-wrap gap-2">
                 {record.stato !== "attivo" && (
                   <Button
                     type="button"
-                    disabled={!motivo.trim() || update.isPending}
+                    disabled={update.isPending}
                     onClick={() => void change("attivo")}
                   >
                     {t(
@@ -135,7 +145,7 @@ export function BeneficiarioEmporioSection({
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!motivo.trim() || update.isPending}
+                    disabled={update.isPending}
                     onClick={() => void change("sospeso")}
                   >
                     {t("emporioServizio.sospendi")}
@@ -145,7 +155,7 @@ export function BeneficiarioEmporioSection({
                   <Button
                     type="button"
                     variant="destructive"
-                    disabled={!motivo.trim() || update.isPending}
+                    disabled={update.isPending}
                     onClick={() => void change("revocato")}
                   >
                     {t("emporioServizio.revoca")}

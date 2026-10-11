@@ -42,14 +42,14 @@ import { FseBeneficiariActions } from "@/components/fse-beneficiari-actions";
 import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 
 const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.object({
-  cognome: z.string().min(2),
-  nome: z.string().min(2),
+  cognome: z.string().trim().min(2),
+  nome: z.string().trim().min(2),
   soprannome: z.string().optional(),
   codiceFiscale: z.string().optional(),
   dataNascita: z.string().optional().refine(isNotFutureDateOnly, "La data di nascita non può essere successiva alla data odierna."),
-  sesso: z.string().min(1, t("beneficiari.sessoRequired")),
+  sesso: z.string().trim().min(1, t("beneficiari.sessoRequired")),
   cittadinanza: z.string().optional(),
-  areaProvenienza: z.string().min(1, t("common.requiredField")),
+  areaProvenienza: z.string().trim().min(1, t("common.requiredField")),
   residenza: z.string().optional(),
   domicilio: z.string().optional(),
   comune: z.string().optional(),
@@ -71,7 +71,7 @@ const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.ob
   motivoConsegnaDomicilio: z.string().optional(),
   restrizioniAlimentari: z.string().optional(),
   uds: z.boolean().default(false),
-  areaOperativaId: areaRequired ? z.string().min(1, t("common.requiredField")) : z.string().optional(),
+  areaOperativaId: areaRequired ? z.string().trim().min(1, t("common.requiredField")) : z.string().optional(),
   zonaUdsId: z.string().optional(),
 });
 type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;

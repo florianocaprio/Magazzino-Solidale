@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { schedulePriorityDowngrade } from "./lib/priorityDowngrade";
+import { scheduleMonthlyCredit } from "./lib/creditoMensile";
 import { initializeBaseData } from "./lib/baseData";
 import { mapsGeocodingStartupDiagnostics } from "./lib/maps-geocoding-config";
 
@@ -34,6 +35,7 @@ async function start(): Promise<void> {
     logger.info(mapsGeocodingStartupDiagnostics(), "maps geocoding");
 
     schedulePriorityDowngrade();
+    scheduleMonthlyCredit();
   });
 }
 

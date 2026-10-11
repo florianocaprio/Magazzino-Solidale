@@ -36,7 +36,6 @@ import {
   useListSessioniCassaEmporio,
   usePreparaChiusuraSessioneCassaEmporio,
   useRegistraInvioManualeBollaSpesaEmporio,
-  useRefreshCreditoSolidaleBeneficiario,
   useRiprendiSessioneCassaEmporio,
   useSearchBeneficiariCassaEmporio,
   useSearchProdottiCassaEmporio,
@@ -83,6 +82,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { RequiredField } from "@/components/ui/required-field";
 import {
   Select,
   SelectContent,
@@ -370,6 +370,7 @@ function EmporioCassa() {
   const [annullaOpen, setAnnullaOpen] = useState(false);
   const [motivoAnnullamento, setMotivoAnnullamento] = useState("");
   const [forzaOpen, setForzaOpen] = useState(false);
+  const [forzaSubmitted, setForzaSubmitted] = useState(false);
   const [motivoForzatura, setMotivoForzatura] = useState("");
   const [forzaEmporioId, setForzaEmporioId] = useState("");
   const [chiudiOpen, setChiudiOpen] = useState(false);
@@ -763,7 +764,6 @@ function EmporioCassa() {
       void verifyCheckout(sessione.id);
   }, [sessione?.id, sessione?.statoSessione, security.context]);
   const registraInvioManualeBolla = useRegistraInvioManualeBollaSpesaEmporio();
-  const refreshCredito = useRefreshCreditoSolidaleBeneficiario();
 
   useEffect(() => {
     setEmailDraftBolla(null);
@@ -1042,10 +1042,12 @@ function EmporioCassa() {
     }
     setForzaEmporioId(String(currentEmporioId));
     setMotivoForzatura("");
+    setForzaSubmitted(false);
     setForzaOpen(true);
   };
 
   const submitForzaAccesso = () => {
+    setForzaSubmitted(true);
     if (!selectedBeneficiario || !forzaEmporioId || !motivoForzatura.trim())
       return;
     forzaAccesso.mutate({
@@ -1057,44 +1059,6 @@ function EmporioCassa() {
         noteAccessoEmporio: t("cassaEmporio.accessoForzatoDaCassa"),
       },
     });
-  };
-
-  const refreshCreditoBeneficiario = async (beneficiarioId: number) => {
-    if (!canAdjustCredito) return;
-    try {
-      const result = await refreshCredito.mutateAsync({
-        beneficiarioId,
-        data: { note: t("cassaEmporio.refreshCreditoNote") },
-      });
-      if (
-        result.saldo &&
-        selectedBeneficiario?.beneficiarioId === beneficiarioId
-      ) {
-        setSelectedBeneficiario({
-          ...selectedBeneficiario,
-          saldoCreditoSolidale: result.saldo.saldoAttuale,
-        });
-      }
-      void queryClient.invalidateQueries({
-        queryKey: getSearchBeneficiariCassaEmporioQueryKey(
-          beneficiariSearchParams,
-        ),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: getListSessioniCassaEmporioQueryKey(sessioniSearchParams),
-      });
-      void queryClient.invalidateQueries({
-        predicate: (query) =>
-          String(query.queryKey[0] ?? "").includes("/api/credito-solidale"),
-      });
-      refreshSessione();
-      toast({ title: result.messaggio ?? t("cassaEmporio.creditoAggiornato") });
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: extractError(err, t("cassaEmporio.creditoRefreshErrore")),
-      });
-    }
   };
 
   const downloadBolla = async (spesa: SpesaEmporio) => {
@@ -1426,23 +1390,6 @@ function EmporioCassa() {
                         {t("cassaEmporio.saldoZero")}
                       </div>
                     )}
-                    {canAdjustCredito && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-3 w-full"
-                        onClick={() => {
-                          void refreshCreditoBeneficiario(
-                            selectedBeneficiario.beneficiarioId,
-                          );
-                        }}
-                        disabled={!emporioAbilitato || refreshCredito.isPending}
-                      >
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        {t("cassaEmporio.refreshCredito")}
-                      </Button>
-                    )}
                   </div>
                   <div className="space-y-2">
                     {activeAccessi.map((accesso) => (
@@ -1686,39 +1633,9 @@ function EmporioCassa() {
                       {t(`cassaEmporio.${activeSessione.statoSessione}`)}
                     </Badge>
                   </div>
-                  {canAdjustCredito && (
-                    <div className="md:col-span-2 xl:col-span-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          void refreshCreditoBeneficiario(
-                            activeSessione.beneficiarioId,
-                          );
-                        }}
-                        disabled={
-                          !emporioAbilitato ||
-                          refreshCredito.isPending ||
-                          activeSessione.statoSessione === "chiusa"
-                        }
-                      >
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        {t("cassaEmporio.refreshCredito")}
-                      </Button>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
 
-              {saldoInsufficiente && (
-                <Alert variant="destructive">
-                  <ShieldAlert className="h-4 w-4" />
-                  <AlertDescription>
-                    {t("cassaEmporio.saldoInsufficiente")}
-                  </AlertDescription>
-                </Alert>
-              )}
               {!canEdit &&
                 activeSessione.statoSessione !== "aperta" &&
                 activeSessione.statoSessione !== "sospesa" && (
@@ -1983,6 +1900,19 @@ function EmporioCassa() {
                     </Table>
                   </div>
 
+                  {saldoInsufficiente && (
+                    <Alert
+                      variant="destructive"
+                      role="alert"
+                      data-testid="credito-insufficiente-carrello"
+                    >
+                      <ShieldAlert className="h-4 w-4" />
+                      <AlertDescription>
+                        {t("cassaEmporio.saldoInsufficiente")}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   <div className="flex flex-col gap-2 md:flex-row md:justify-end">
                     <Button
                       variant="outline"
@@ -2240,9 +2170,16 @@ function EmporioCassa() {
           </DialogHeader>
           <div className="space-y-4">
             <Select value={forzaEmporioId} onValueChange={setForzaEmporioId}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("cassaEmporio.selezionaEmporio")} />
-              </SelectTrigger>
+              <RequiredField
+                label={t("cassaEmporio.selezionaEmporio")}
+                missing={forzaSubmitted && !forzaEmporioId}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={t("cassaEmporio.selezionaEmporio")}
+                  />
+                </SelectTrigger>
+              </RequiredField>
               <SelectContent>
                 {emporiFiltrati.map((emporio) => (
                   <SelectItem key={emporio.id} value={String(emporio.id)}>
@@ -2251,11 +2188,16 @@ function EmporioCassa() {
                 ))}
               </SelectContent>
             </Select>
-            <Textarea
-              value={motivoForzatura}
-              onChange={(e) => setMotivoForzatura(e.target.value)}
-              placeholder={t("cassaEmporio.motivoAccessoForzato")}
-            />
+            <RequiredField
+              label={t("cassaEmporio.motivoAccessoForzato")}
+              missing={forzaSubmitted && !motivoForzatura.trim()}
+            >
+              <Textarea
+                value={motivoForzatura}
+                onChange={(e) => setMotivoForzatura(e.target.value)}
+                placeholder={t("cassaEmporio.motivoAccessoForzato")}
+              />
+            </RequiredField>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setForzaOpen(false)}>
@@ -2263,11 +2205,7 @@ function EmporioCassa() {
             </Button>
             <Button
               onClick={submitForzaAccesso}
-              disabled={
-                !forzaEmporioId ||
-                !motivoForzatura.trim() ||
-                forzaAccesso.isPending
-              }
+              disabled={forzaAccesso.isPending}
             >
               {t("cassaEmporio.forzaAccesso")}
             </Button>

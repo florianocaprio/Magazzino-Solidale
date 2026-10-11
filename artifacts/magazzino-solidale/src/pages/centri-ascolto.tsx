@@ -26,7 +26,7 @@ import { errorMessage } from "@/lib/api-error";
 const NO_AREA_OPERATIVA = "__none__";
 
 const formSchema = z.object({
-  nome: z.string().min(2, "Nome obbligatorio"),
+  nome: z.string().trim().min(2, "Nome obbligatorio"),
   areaOperativaId: z.string().optional(),
   logoUrl: z.string().optional(),
   indirizzo: z.string().optional(),

@@ -143,8 +143,8 @@ import { invalidateBollaViews } from "@/lib/bolla-query-invalidation";
 const formSchema = z
   .object({
     beneficiarioId: z.coerce.number().min(1),
-    tipoConsegna: z.string().min(1),
-    dataPrevista: z.string().min(1),
+    tipoConsegna: z.string().trim().min(1),
+    dataPrevista: z.string().trim().min(1),
     fasciaOraria: z.string().optional(),
     indirizzoConsegna: z.string().optional(),
     zona: z.string().optional(),

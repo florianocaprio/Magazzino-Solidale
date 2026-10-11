@@ -592,10 +592,12 @@ describe("M6.2-A-F1 UAT", () => {
       sql`select count(*)::int n from credito_solidale_movimenti`,
     );
     const r = await f.agent
-      .post(
-        `/api/credito-solidale/beneficiari/${f.beneficiary.id}/ricarica-manuale`,
-      )
-      .send({ variazioneCredito: 10, motivo: "Prova negativa" });
+      .post(`/api/credito-solidale/beneficiari/${f.beneficiary.id}/rettifica`)
+      .send({
+        idempotencyKey: crypto.randomUUID(),
+        variazioneCredito: 10,
+        motivo: "Prova negativa",
+      });
     expect(r.status, r.text).toBe(400);
     const after = await db.execute(
       sql`select count(*)::int n from credito_solidale_movimenti`,
@@ -757,9 +759,13 @@ describe("M6.2-A-F1 UAT", () => {
         (
           await f.agent
             .post(
-              `/api/credito-solidale/beneficiari/${f.beneficiary.id}/ricarica-manuale`,
+              `/api/credito-solidale/beneficiari/${f.beneficiary.id}/rettifica`,
             )
-            .send({ variazioneCredito: 10, motivo: "Negativa revoca" })
+            .send({
+              idempotencyKey: crypto.randomUUID(),
+              variazioneCredito: 10,
+              motivo: "Negativa revoca",
+            })
         ).status,
       ).toBe(400);
       expect(
@@ -776,10 +782,12 @@ describe("M6.2-A-F1 UAT", () => {
     const f = await fixture();
     await enable(f);
     const r = await f.agent
-      .post(
-        `/api/credito-solidale/beneficiari/${f.beneficiary.id}/ricarica-manuale`,
-      )
-      .send({ variazioneCredito: 10, motivo: "Autorizzata" });
+      .post(`/api/credito-solidale/beneficiari/${f.beneficiary.id}/rettifica`)
+      .send({
+        idempotencyKey: crypto.randomUUID(),
+        variazioneCredito: 10,
+        motivo: "Autorizzata",
+      });
     expect(r.status, r.text).toBe(201);
     await db
       .update(beneficiariTable)

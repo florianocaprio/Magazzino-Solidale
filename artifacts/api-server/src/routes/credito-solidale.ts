@@ -1,4 +1,16 @@
 import { Router, type IRouter, type Request } from "express";
+import {
+  rettificaCredito,
+  esitoRettificaCredito,
+  CreditoSaldoError,
+} from "../lib/creditoSaldo";
+import { DocumentCommandError } from "../lib/documentCommand";
+import { auditContextFromRequest } from "../lib/auditEvent";
+import { calendarioCredito } from "../lib/creditoMensile";
+import {
+  creditoRicaricheMensiliTable,
+  creditoRicaricheDestinatariTable,
+} from "@workspace/db";
 import { creditoIntero, CreditoInteroError } from "../lib/creditoIntero";
 import {
   and,
@@ -385,7 +397,6 @@ async function monthlyRechargeExists(
           creditoSolidaleMovimentiTable.periodoRiferimento,
           periodoRiferimento,
         ),
-        eq(creditoSolidaleMovimentiTable.annullato, false),
       ),
     )
     .limit(1);
@@ -605,7 +616,6 @@ async function buildMonthlyPreview(
                 creditoSolidaleMovimentiTable.periodoRiferimento,
                 periodoRiferimento,
               ),
-              eq(creditoSolidaleMovimentiTable.annullato, false),
             ),
           );
   const giaRicaricati = new Set(
@@ -1091,93 +1101,11 @@ router.patch(
 router.post(
   "/credito-solidale/beneficiari/:beneficiarioId/refresh-credito",
   requirePermission("credito.adjust"),
-  async (req, res) => {
-    if (!(await isEmporioEnabled())) {
-      res.status(403).json({ error: EMPORIO_DISABLED_MSG });
-      return;
-    }
-    const beneficiarioId = Number(req.params.beneficiarioId);
-    const access = await requireAccessibleBeneficiario(beneficiarioId, req);
-    if ("error" in access) {
-      res.status(access.status ?? 400).json({ error: access.error });
-      return;
-    }
-    const b = access.beneficiario;
-    if (!b.attivo) {
-      res.status(400).json({ error: NOT_ACTIVE_MSG });
-      return;
-    }
-    if (!b.creditoSolidaleAbilitato) {
-      res.status(400).json({ error: NOT_ENABLED_MSG });
-      return;
-    }
-    if (b.creditoSolidaleStato !== "attivo") {
-      res.status(400).json({ error: NOT_ACTIVE_MSG });
-      return;
-    }
-
-    const periodoRiferimento =
-      parsePeriodo(req.body?.periodoRiferimento) ?? currentPeriodo();
-    const quota =
-      b.creditoSolidaleMensileAssegnato == null
-        ? null
-        : Number(b.creditoSolidaleMensileAssegnato);
-    if (quota == null || quota <= 0) {
-      res.status(400).json({ error: NO_QUOTA_MSG });
-      return;
-    }
-
-    const alreadyRecharged = await db.transaction(async (tx) => {
-      await requireEmporioCommandTx(
-        tx,
-        req.user!.id,
-        "credito.adjust",
-        { beneficiarioId: b.id },
-        true,
-      );
-      return monthlyRechargeExists(b.id, periodoRiferimento, tx);
-    });
-    if (alreadyRecharged) {
-      const saldo = await getSaldoBeneficiarioResponse(b.id);
-      res.json({
-        periodoRiferimento,
-        ricaricaEseguita: false,
-        movimento: null,
-        saldo,
-        messaggio: MONTHLY_ALREADY_DONE_MSG,
-      });
-      return;
-    }
-
-    const created = await creaMovimentoCreditoSolidale({
-      beneficiarioId: b.id,
-      tipoMovimento: "ricarica_mensile",
-      variazioneCredito: quota,
-      periodoRiferimento,
-      quotaMensileAssegnata: quota,
-      origine: "refresh_cassa",
-      motivo: "Refresh Credito Solidale da Cassa Emporio",
-      note: nullableText(req.body?.note),
-      operatoreId: req.user?.id ?? null,
-    });
-    if ("error" in created) {
-      res.status(created.status ?? 400).json({ error: created.error });
-      return;
-    }
-
-    const rows = await selectMovimenti(
-      [eq(creditoSolidaleMovimentiTable.id, created.movimento.id)],
-      1,
-    );
-    const saldo = await getSaldoBeneficiarioResponse(b.id);
-    res.status(201).json({
-      periodoRiferimento,
-      ricaricaEseguita: true,
-      movimento: fmtMovimento(rows[0]),
-      saldo,
-      messaggio: "Credito Solidale aggiornato.",
-    });
-  },
+  (_req, res) =>
+    res.status(410).json({
+      error:
+        "Ricarica dismessa: il saldo si aggiorna automaticamente il primo del mese. Per variazioni straordinarie usa Rettifica credito.",
+    }),
 );
 
 router.get(
@@ -1211,84 +1139,37 @@ router.get(
 router.post(
   "/credito-solidale/beneficiari/:beneficiarioId/ricarica-manuale",
   requirePermission("credito.adjust"),
-  async (req, res) => {
-    const beneficiarioId = Number(req.params.beneficiarioId);
-    const access = await requireAccessibleBeneficiario(beneficiarioId, req);
-    if ("error" in access) {
-      res.status(access.status ?? 400).json({ error: access.error });
-      return;
-    }
-    const variazioneCredito = parseDecimal(req.body?.variazioneCredito);
-    if (variazioneCredito == null || variazioneCredito <= 0) {
-      res.status(400).json({
-        error: "Il valore della ricarica deve essere maggiore di zero.",
-      });
-      return;
-    }
-    const result = await creaMovimentoCreditoSolidale({
-      beneficiarioId,
-      tipoMovimento: "ricarica_manuale",
-      variazioneCredito,
-      motivo: nullableText(req.body?.motivo),
-      note: nullableText(req.body?.note),
-      origine: "manuale",
-      operatoreId: req.user?.id ?? null,
-    });
-    if ("error" in result) {
-      res.status(result.status ?? 400).json({ error: result.error });
-      return;
-    }
-    const rows = await selectMovimenti(
-      [eq(creditoSolidaleMovimentiTable.id, result.movimento.id)],
-      1,
-    );
-    res.status(201).json(fmtMovimento(rows[0]));
-  },
+  (_req, res) =>
+    res
+      .status(410)
+      .json({ error: "Ricarica manuale dismessa. Usa Rettifica credito." }),
 );
 
 router.post(
   "/credito-solidale/beneficiari/:beneficiarioId/rettifica",
   requirePermission("credito.adjust"),
   async (req, res) => {
-    const beneficiarioId = Number(req.params.beneficiarioId);
-    const access = await requireAccessibleBeneficiario(beneficiarioId, req);
-    if ("error" in access) {
-      res.status(access.status ?? 400).json({ error: access.error });
-      return;
-    }
-    const variazioneCredito = parseDecimal(req.body?.variazioneCredito);
-    if (variazioneCredito == null || variazioneCredito === 0) {
-      res
-        .status(400)
-        .json({ error: "La variazione Credito Solidale non può essere zero." });
-      return;
-    }
-    const motivo = nullableText(req.body?.motivo);
-    if (!motivo) {
-      res
-        .status(400)
-        .json({ error: "Il motivo della rettifica è obbligatorio." });
-      return;
-    }
-    const result = await creaMovimentoCreditoSolidale({
-      beneficiarioId,
-      tipoMovimento:
-        variazioneCredito > 0 ? "rettifica_positiva" : "rettifica_negativa",
-      variazioneCredito,
-      motivo,
-      note: nullableText(req.body?.note),
-      origine: "manuale",
-      operatoreId: req.user?.id ?? null,
-    });
-    if ("error" in result) {
-      res.status(result.status ?? 400).json({ error: result.error });
-      return;
-    }
-    const rows = await selectMovimenti(
-      [eq(creditoSolidaleMovimentiTable.id, result.movimento.id)],
-      1,
+    res.status(201).json(
+      await rettificaCredito({
+        beneficiarioId: Number(req.params.beneficiarioId),
+        userId: req.user!.id,
+        body: req.body ?? {},
+        command: auditContextFromRequest(req),
+      }),
     );
-    res.status(201).json(fmtMovimento(rows[0]));
+  },
+);
+router.get(
+  "/credito-solidale/beneficiari/:beneficiarioId/rettifiche/:idempotencyKey/esito",
+  requirePermission("credito.adjust"),
+  async (req, res) => {
+    res.json(
+      await esitoRettificaCredito(
+        Number(req.params.beneficiarioId),
+        req.user!.id,
+        req.params.idempotencyKey,
+      ),
+    );
   },
 );
 
@@ -1419,78 +1300,66 @@ router.post(
 router.post(
   "/credito-solidale/ricariche-mensili/esegui",
   requirePermission("credito.monthly.execute"),
+  (_req, res) =>
+    res.status(410).json({
+      error:
+        "Comando dismesso. La ricarica mensile è esclusivamente automatica.",
+    }),
+);
+
+router.get(
+  "/credito-solidale/ricariche-mensili/stato",
+  requirePermission("credito.view"),
   async (req, res) => {
-    if (!(await isEmporioEnabled())) {
-      res.status(403).json({ error: EMPORIO_DISABLED_MSG });
-      return;
-    }
-    const preview = await buildMonthlyPreview(req, req.body ?? {});
-    if ("error" in preview) {
-      res.status(preview.status ?? 400).json({ error: preview.error });
-      return;
-    }
-
-    const movimentiCreatiIds: number[] = [];
-    let saltatiGiaRicaricati = preview.totaleGiaRicaricati;
-    const note = nullableText(req.body?.note);
-    await db.transaction(async (tx) => {
-      await currentEmporioActor(tx, req.user!.id, "credito.monthly.execute");
-      for (const riga of preview.righe
-        .filter((r) => r.ricaricabile)
-        .sort((a, b) => a.beneficiarioId - b.beneficiarioId)) {
-        await requireEmporioCommandTx(
-          tx,
-          req.user!.id,
-          "credito.monthly.execute",
-          { beneficiarioId: riga.beneficiarioId },
-          true,
-        );
-        const exists = await monthlyRechargeExists(
-          riga.beneficiarioId,
-          preview.periodoRiferimento,
-          tx,
-        );
-        if (exists) {
-          saltatiGiaRicaricati += 1;
-          continue;
-        }
-        const created = await creaMovimentoCreditoSolidaleTx(tx, {
-          beneficiarioId: riga.beneficiarioId,
-          tipoMovimento: "ricarica_mensile",
-          variazioneCredito: riga.creditoSolidaleMensileAssegnato ?? 0,
-          periodoRiferimento: preview.periodoRiferimento,
-          quotaMensileAssegnata: riga.creditoSolidaleMensileAssegnato ?? null,
-          origine: "ricarica_mensile",
-          permission: "credito.monthly.execute",
-          note,
-          operatoreId: req.user?.id ?? null,
-        });
-        if ("error" in created) throw new Error(created.error);
-        movimentiCreatiIds.push(created.movimento.id);
-      }
-    });
-
-    const movimenti =
-      movimentiCreatiIds.length === 0
-        ? []
-        : await selectMovimenti([
-            inArray(creditoSolidaleMovimentiTable.id, movimentiCreatiIds),
-          ]);
-    const movimentiCreati = movimenti.map(fmtMovimento);
-    res.json({
-      periodoRiferimento: preview.periodoRiferimento,
-      creati: movimentiCreati.length,
-      saltatiGiaRicaricati,
-      saltatiNonRicaricabili: preview.righe.filter(
-        (r) => !r.ricaricabile && !r.giaRicaricato,
-      ).length,
-      totaleCreditoRicaricato: round2(
-        movimentiCreati.reduce(
-          (sum, m) => sum + Math.max(0, m.variazioneCredito),
-          0,
+    const { periodo, primoDelMese } = calendarioCredito(new Date());
+    const [job] = await db
+      .select()
+      .from(creditoRicaricheMensiliTable)
+      .where(eq(creditoRicaricheMensiliTable.periodo, periodo));
+    const righe = await db
+      .select({
+        stato: creditoRicaricheDestinatariTable.stato,
+        causa: creditoRicaricheDestinatariTable.causa,
+        numero: sql<number>`count(*)::int`,
+      })
+      .from(creditoRicaricheDestinatariTable)
+      .innerJoin(
+        beneficiariTable,
+        eq(
+          beneficiariTable.id,
+          creditoRicaricheDestinatariTable.beneficiarioId,
         ),
-      ),
-      movimentiCreati,
+      )
+      .where(
+        and(
+          eq(creditoRicaricheDestinatariTable.periodo, periodo),
+          centroScopeFilter(
+            beneficiariTable.centroAscoltoId,
+            callerCentroId(req),
+          ),
+          zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req)),
+          areaOperativaScopeFilter(
+            beneficiariTable.areaOperativaId,
+            callerAreaOperativaId(req),
+          ),
+        ),
+      )
+      .groupBy(
+        creditoRicaricheDestinatariTable.stato,
+        creditoRicaricheDestinatariTable.causa,
+      );
+    res.json({
+      periodo,
+      calendario: "Primo del mese — Europe/Rome",
+      stato: job
+        ? job.completataAt
+          ? "completata"
+          : "in_corso"
+        : "non_avviata",
+      avviataAt: job?.avviataAt?.toISOString() ?? null,
+      completataAt: job?.completataAt?.toISOString() ?? null,
+      recuperoDaDecidere: !job && !primoDelMese,
+      esiti: righe,
     });
   },
 );
@@ -1502,6 +1371,17 @@ router.use(
     res: import("express").Response,
     next: import("express").NextFunction,
   ) => {
+    if (
+      error instanceof CreditoSaldoError ||
+      error instanceof DocumentCommandError
+    ) {
+      res.status(error.status).json({
+        error: error.message,
+        fieldErrors:
+          error instanceof CreditoSaldoError ? error.fieldErrors : undefined,
+      });
+      return;
+    }
     if (error instanceof CreditoInteroError) {
       res.status(400).json({ error: error.message });
       return;

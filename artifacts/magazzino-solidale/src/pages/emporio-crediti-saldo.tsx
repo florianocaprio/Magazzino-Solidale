@@ -1,3 +1,6 @@
+import { RequiredField } from "@/components/ui/required-field";
+import { CreditoRettificaDialog } from "@/components/credito-rettifica-dialog";
+import { CreditoMensileStato } from "@/components/credito-mensile-stato";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
@@ -5,9 +8,6 @@ import {
   getListCreditoSolidaleBeneficiariQueryKey,
   getListCreditoSolidaleMovimentiQueryKey,
   getListCreditoSolidaleBeneficiarioMovimentiQueryKey,
-  useCreateCreditoSolidaleRettifica,
-  useCreateCreditoSolidaleRicaricaManuale,
-  useExecuteCreditoSolidaleRicaricaMensile,
   useListCreditoSolidaleBeneficiari,
   useListCentriAscolto,
   useListAreeOperative,
@@ -89,7 +89,6 @@ const STATI_CREDITO_SOLIDALE = [
 type StatoCreditoSolidale = (typeof STATI_CREDITO_SOLIDALE)[number];
 
 type ActionState = {
-  tipo: "ricarica" | "rettifica";
   beneficiario: CreditoSolidaleBeneficiario;
 } | null;
 
@@ -163,7 +162,6 @@ function EmporioCreditiSaldo() {
   const { hasPermission } = useAuth();
   const canViewBeneficiario = hasPermission("beneficiari.view");
   const canAdjust = hasPermission("credito.adjust");
-  const canExecuteMonthly = hasPermission("credito.monthly.execute");
   const initialBeneficiarioId = useMemo(() => {
     const raw = new URLSearchParams(window.location.search).get(
       "beneficiarioId",
@@ -183,13 +181,10 @@ function EmporioCreditiSaldo() {
     initialBeneficiarioId,
   );
   const [action, setAction] = useState<ActionState>(null);
-  const [variazione, setVariazione] = useState("");
-  const [motivo, setMotivo] = useState("");
-  const [note, setNote] = useState("");
   const [stornoMovimento, setStornoMovimento] =
     useState<CreditoSolidaleMovimento | null>(null);
   const [stornoMotivo, setStornoMotivo] = useState("");
-  const [monthlyConfirmOpen, setMonthlyConfirmOpen] = useState(false);
+  const [stornoSubmitted, setStornoSubmitted] = useState(false);
   const normalizedSearch = search.trim();
 
   const beneficiariParams = {
@@ -264,12 +259,8 @@ function EmporioCreditiSaldo() {
       return;
     setAction(null);
     setStornoMovimento(null);
-    setMonthlyConfirmOpen(false);
   }, [beneficiariQuery.error, selectedMovimentiQuery.error]);
 
-  const createRicarica = useCreateCreditoSolidaleRicaricaManuale();
-  const createRettifica = useCreateCreditoSolidaleRettifica();
-  const executeRicarica = useExecuteCreditoSolidaleRicaricaMensile();
   const stornaMovimento = useStornaCreditoSolidaleMovimento();
 
   const filteredBeneficiari = useMemo(() => {
@@ -344,118 +335,9 @@ function EmporioCreditiSaldo() {
     });
   };
 
-  const executeMonthly = () => {
-    if (!canExecuteMonthly || !emporioAbilitato) return;
-    setMonthlyConfirmOpen(false);
-    executeRicarica.mutate(
-      {
-        data: {
-          periodoRiferimento: currentPeriodo(),
-          centroAscoltoId: null,
-          areaOperativaId: null,
-          note: null,
-        },
-      },
-      {
-        onSuccess: (data) => {
-          if (data.creati > 0) {
-            invalidateCredito();
-            toast({ title: t("creditoSolidale.ricaricaMensileCompletata") });
-          }
-        },
-        onError: (err) =>
-          toast({
-            title: t("creditoSolidale.ricaricaMensile"),
-            description: extractError(
-              err,
-              t("creditoSolidale.operazioneNonRiuscita"),
-            ),
-            variant: "destructive",
-          }),
-      },
-    );
-  };
-
-  const openAction = (
-    tipo: "ricarica" | "rettifica",
-    beneficiario: CreditoSolidaleBeneficiario,
-  ) => {
-    setAction({ tipo, beneficiario });
-    setVariazione("");
-    setMotivo("");
-    setNote("");
-  };
-
-  const submitAction = () => {
-    if (!action) return;
-    const parsed = Number(variazione.replace(",", "."));
-    if (
-      !Number.isFinite(parsed) ||
-      (action.tipo === "ricarica" ? parsed <= 0 : parsed === 0)
-    ) {
-      toast({
-        title: t("creditoSolidale.rettificaCreditoSolidale"),
-        description: t("creditoSolidale.valoreRichiesto"),
-        variant: "destructive",
-      });
-      return;
-    }
-    const cleanMotivo = motivo.trim();
-    const cleanNote = note.trim();
-    if (action.tipo === "rettifica" && !cleanMotivo) {
-      toast({
-        title: t("creditoSolidale.rettificaCreditoSolidale"),
-        description: t("creditoSolidale.motivoRichiesto"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const onSuccess = () => {
-      invalidateCredito(action.beneficiario.id);
-      toast({ title: t("creditoSolidale.movimentoCreato") });
-      setAction(null);
-    };
-    const onError = (err: unknown) =>
-      toast({
-        title: t("creditoSolidale.operazioneNonRiuscita"),
-        description: extractError(
-          err,
-          t("creditoSolidale.operazioneNonRiuscita"),
-        ),
-        variant: "destructive",
-      });
-
-    if (action.tipo === "ricarica") {
-      createRicarica.mutate(
-        {
-          beneficiarioId: action.beneficiario.id,
-          data: {
-            variazioneCredito: parsed,
-            motivo: cleanMotivo || null,
-            note: cleanNote || null,
-          },
-        },
-        { onSuccess, onError },
-      );
-      return;
-    }
-
-    createRettifica.mutate(
-      {
-        beneficiarioId: action.beneficiario.id,
-        data: {
-          variazioneCredito: parsed,
-          motivo: cleanMotivo,
-          note: cleanNote || null,
-        },
-      },
-      { onSuccess, onError },
-    );
-  };
-
   const handleStorno = () => {
     if (!stornoMovimento) return;
+    setStornoSubmitted(true);
     const cleanMotivo = stornoMotivo.trim();
     if (!cleanMotivo) {
       toast({
@@ -490,12 +372,6 @@ function EmporioCreditiSaldo() {
     );
   };
 
-  const actionDisabled =
-    !canAdjust ||
-    !emporioAbilitato ||
-    createRicarica.isPending ||
-    createRettifica.isPending;
-
   if (
     emporioReadDenied(beneficiariQuery.error) ||
     emporioReadDenied(selectedMovimentiQuery.error) ||
@@ -520,16 +396,6 @@ function EmporioCreditiSaldo() {
             </p>
           )}
         </div>
-        {canExecuteMonthly && (
-          <Button
-            type="button"
-            onClick={() => setMonthlyConfirmOpen(true)}
-            disabled={!emporioAbilitato || executeRicarica.isPending}
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />{" "}
-            {t("creditoSolidale.eseguiRicaricaMensile")}
-          </Button>
-        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -774,19 +640,7 @@ function EmporioCreditiSaldo() {
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => openAction("ricarica", b)}
-                              disabled={!canOperate}
-                            >
-                              <RefreshCw className="h-4 w-4 mr-1" />{" "}
-                              {t("creditoSolidale.ricaricaCreditoSolidale")}
-                            </Button>
-                          )}
-                          {canAdjust && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openAction("rettifica", b)}
+                              onClick={() => setAction({ beneficiario: b })}
                               disabled={!canOperate}
                             >
                               {t("creditoSolidale.rettificaCreditoSolidale")}
@@ -880,7 +734,11 @@ function EmporioCreditiSaldo() {
                                 m.annullato ||
                                 m.tipoMovimento === "storno"
                               }
-                              onClick={() => setStornoMovimento(m)}
+                              onClick={() => {
+                                setStornoSubmitted(false);
+                                setStornoMotivo("");
+                                setStornoMovimento(m);
+                              }}
                             >
                               <RotateCcw className="h-4 w-4" />
                             </Button>
@@ -895,79 +753,13 @@ function EmporioCreditiSaldo() {
         </CardContent>
       </Card>
 
-      <Dialog
-        open={action != null}
-        onOpenChange={(open) => !open && setAction(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {action?.tipo === "ricarica"
-                ? t("creditoSolidale.ricaricaCreditoSolidale")
-                : t("creditoSolidale.rettificaCreditoSolidale")}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {action && (
-              <p className="text-sm text-muted-foreground">
-                {action.beneficiario.cognome} {action.beneficiario.nome}
-              </p>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {t("creditoSolidale.variazioneCredito")}
-              </label>
-              <Input
-                type="number"
-                step="1"
-                value={variazione}
-                onChange={(event) => setVariazione(event.target.value)}
-                disabled={actionDisabled}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {t("creditoSolidale.motivo")}
-              </label>
-              <Textarea
-                rows={2}
-                value={motivo}
-                onChange={(event) => setMotivo(event.target.value)}
-                disabled={actionDisabled}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {t("creditoSolidale.noteOperative")}
-              </label>
-              <Textarea
-                rows={2}
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                disabled={actionDisabled}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setAction(null)}
-            >
-              {t("creditoSolidale.annulla")}
-            </Button>
-            <Button
-              type="button"
-              onClick={submitAction}
-              disabled={actionDisabled}
-            >
-              {action?.tipo === "ricarica"
-                ? t("creditoSolidale.salvaRicarica")
-                : t("creditoSolidale.salvaRettifica")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {action && (
+        <CreditoRettificaDialog
+          beneficiarioId={action.beneficiario.id}
+          saldo={action.beneficiario.creditoSolidaleSaldo}
+          onClose={() => setAction(null)}
+        />
+      )}
 
       <AlertDialog
         open={stornoMovimento != null}
@@ -986,49 +778,35 @@ function EmporioCreditiSaldo() {
             <label className="text-sm font-medium">
               {t("creditoSolidale.motivoStorno")}
             </label>
-            <Textarea
-              rows={2}
-              value={stornoMotivo}
-              onChange={(event) => setStornoMotivo(event.target.value)}
-            />
+            <RequiredField
+              label={t("creditoSolidale.motivoStorno")}
+              missing={stornoSubmitted && !stornoMotivo.trim()}
+            >
+              <Textarea
+                rows={2}
+                value={stornoMotivo}
+                onChange={(event) => setStornoMotivo(event.target.value)}
+              />
+            </RequiredField>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>
               {t("creditoSolidale.annulla")}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleStorno}>
-              {t("creditoSolidale.conferma")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={monthlyConfirmOpen}
-        onOpenChange={setMonthlyConfirmOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("creditoSolidale.confermaEsecuzioneTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("creditoSolidale.confermaEsecuzioneDescription")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("creditoSolidale.annulla")}
-            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={executeMonthly}
-              disabled={executeRicarica.isPending}
+              disabled={stornaMovimento.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                handleStorno();
+              }}
             >
               {t("creditoSolidale.conferma")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CreditoMensileStato />
     </div>
   );
 }

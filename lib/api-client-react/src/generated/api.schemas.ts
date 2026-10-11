@@ -4662,11 +4662,17 @@ export interface PoliticaCreditoSolidaleInput {
      */
   creditoMassimoMensile?: number | null;
   /**
+     * Calendario automatico fisso al primo del mese; omettere nei nuovi client.
+     * @deprecated
      * @minimum 1
-     * @maximum 28
+     * @maximum 1
      */
   giornoRicaricaMensile?: number;
-  ricaricaAutomaticaAbilitata?: boolean;
+  /**
+     * Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.
+     * @deprecated
+     */
+  ricaricaAutomaticaAbilitata?: true;
   arrotondamento?: PoliticaCreditoSolidaleInputArrotondamento;
   /** @nullable */
   note?: string | null;
@@ -4713,11 +4719,17 @@ export interface PoliticaCreditoSolidaleUpdate {
      */
   creditoMassimoMensile?: number | null;
   /**
+     * Calendario automatico fisso al primo del mese; omettere nei nuovi client.
+     * @deprecated
      * @minimum 1
-     * @maximum 28
+     * @maximum 1
      */
   giornoRicaricaMensile?: number;
-  ricaricaAutomaticaAbilitata?: boolean;
+  /**
+     * Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.
+     * @deprecated
+     */
+  ricaricaAutomaticaAbilitata?: true;
   arrotondamento?: PoliticaCreditoSolidaleUpdateArrotondamento;
   /** @nullable */
   note?: string | null;
@@ -4972,6 +4984,11 @@ export interface CreditoSolidaleRicaricaManualeInput {
 }
 
 export interface CreditoSolidaleRettificaInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  idempotencyKey: string;
   /**
      * @minimum -99999999
      * @maximum 99999999
@@ -11487,6 +11504,46 @@ page?: number;
  * @maximum 100
  */
 limit?: number;
+};
+
+export type RefreshCreditoSolidaleBeneficiario410 = {
+  error: string;
+};
+
+export type CreateCreditoSolidaleRicaricaManuale410 = {
+  error: string;
+};
+
+export type GetCreditoSolidaleRicaricaMensileStato200Stato = typeof GetCreditoSolidaleRicaricaMensileStato200Stato[keyof typeof GetCreditoSolidaleRicaricaMensileStato200Stato];
+
+
+export const GetCreditoSolidaleRicaricaMensileStato200Stato = {
+  non_avviata: 'non_avviata',
+  in_corso: 'in_corso',
+  completata: 'completata',
+} as const;
+
+export type GetCreditoSolidaleRicaricaMensileStato200EsitiItem = {
+  stato: string;
+  /** @nullable */
+  causa: string | null;
+  numero: number;
+};
+
+export type GetCreditoSolidaleRicaricaMensileStato200 = {
+  periodo: string;
+  calendario: string;
+  stato: GetCreditoSolidaleRicaricaMensileStato200Stato;
+  /** @nullable */
+  avviataAt?: string | null;
+  /** @nullable */
+  completataAt?: string | null;
+  recuperoDaDecidere: boolean;
+  esiti: GetCreditoSolidaleRicaricaMensileStato200EsitiItem[];
+};
+
+export type ExecuteCreditoSolidaleRicaricaMensile410 = {
+  error: string;
 };
 
 export type ListVolontariParams = {

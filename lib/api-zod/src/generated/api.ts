@@ -13117,7 +13117,7 @@ export const createPoliticaCreditoSolidaleBodyCreditoMinimoMensileMin = 0;
 
 export const createPoliticaCreditoSolidaleBodyCreditoMassimoMensileMin = 0;
 
-export const createPoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax = 28;
+export const createPoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax = 1;
 
 
 
@@ -13134,8 +13134,8 @@ export const CreatePoliticaCreditoSolidaleBody = zod.object({
   "bonusDisabile": zod.number().min(createPoliticaCreditoSolidaleBodyBonusDisabileMin).optional(),
   "creditoMinimoMensile": zod.number().min(createPoliticaCreditoSolidaleBodyCreditoMinimoMensileMin).optional(),
   "creditoMassimoMensile": zod.number().min(createPoliticaCreditoSolidaleBodyCreditoMassimoMensileMin).nullish(),
-  "giornoRicaricaMensile": zod.number().min(1).max(createPoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax).optional(),
-  "ricaricaAutomaticaAbilitata": zod.boolean().optional(),
+  "giornoRicaricaMensile": zod.number().min(1).max(createPoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax).optional().describe('Calendario automatico fisso al primo del mese; omettere nei nuovi client.'),
+  "ricaricaAutomaticaAbilitata": zod.literal(true).optional().describe('Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.'),
   "arrotondamento": zod.enum(['nessuno', 'intero_superiore', 'intero_inferiore', 'intero_piu_vicino']).optional(),
   "note": zod.string().nullish()
 })
@@ -13190,7 +13190,7 @@ export const updatePoliticaCreditoSolidaleBodyCreditoMinimoMensileMin = 0;
 
 export const updatePoliticaCreditoSolidaleBodyCreditoMassimoMensileMin = 0;
 
-export const updatePoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax = 28;
+export const updatePoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax = 1;
 
 
 
@@ -13207,8 +13207,8 @@ export const UpdatePoliticaCreditoSolidaleBody = zod.object({
   "bonusDisabile": zod.number().min(updatePoliticaCreditoSolidaleBodyBonusDisabileMin).optional(),
   "creditoMinimoMensile": zod.number().min(updatePoliticaCreditoSolidaleBodyCreditoMinimoMensileMin).optional(),
   "creditoMassimoMensile": zod.number().min(updatePoliticaCreditoSolidaleBodyCreditoMassimoMensileMin).nullish(),
-  "giornoRicaricaMensile": zod.number().min(1).max(updatePoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax).optional(),
-  "ricaricaAutomaticaAbilitata": zod.boolean().optional(),
+  "giornoRicaricaMensile": zod.number().min(1).max(updatePoliticaCreditoSolidaleBodyGiornoRicaricaMensileMax).optional().describe('Calendario automatico fisso al primo del mese; omettere nei nuovi client.'),
+  "ricaricaAutomaticaAbilitata": zod.literal(true).optional().describe('Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.'),
   "arrotondamento": zod.enum(['nessuno', 'intero_superiore', 'intero_inferiore', 'intero_piu_vicino']).optional(),
   "note": zod.string().nullish()
 })
@@ -13401,6 +13401,10 @@ export const UpdateCreditoSolidaleBeneficiarioConfigurazioneResponse = zod.objec
 })
 
 
+/**
+ * Comando dismesso. Ricarica solo automatica; usare Rettifica credito per variazioni straordinarie.
+ * @deprecated
+ */
 export const RefreshCreditoSolidaleBeneficiarioParams = zod.object({
   "beneficiarioId": zod.coerce.number()
 })
@@ -13411,46 +13415,6 @@ export const refreshCreditoSolidaleBeneficiarioBodyPeriodoRiferimentoRegExp = ne
 export const RefreshCreditoSolidaleBeneficiarioBody = zod.object({
   "periodoRiferimento": zod.string().regex(refreshCreditoSolidaleBeneficiarioBodyPeriodoRiferimentoRegExp).nullish(),
   "note": zod.string().nullish()
-})
-
-export const RefreshCreditoSolidaleBeneficiarioResponse = zod.object({
-  "periodoRiferimento": zod.string(),
-  "ricaricaEseguita": zod.boolean(),
-  "movimento": zod.union([zod.object({
-  "id": zod.number(),
-  "beneficiarioId": zod.number(),
-  "beneficiarioNome": zod.string(),
-  "centroAscoltoId": zod.number().nullable(),
-  "centroAscoltoNome": zod.string().nullable(),
-  "areaOperativaId": zod.number().nullable(),
-  "areaOperativaNome": zod.string().nullable(),
-  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']),
-  "variazioneCredito": zod.number(),
-  "saldoPrima": zod.number(),
-  "saldoDopo": zod.number(),
-  "periodoRiferimento": zod.string().nullable(),
-  "politicaCreditoSolidaleId": zod.number().nullable(),
-  "quotaMensileAssegnata": zod.number().nullable(),
-  "origine": zod.string().nullable(),
-  "riferimentoId": zod.number().nullable(),
-  "riferimentoTipo": zod.string().nullable(),
-  "note": zod.string().nullable(),
-  "motivo": zod.string().nullable(),
-  "dataMovimento": zod.coerce.date(),
-  "dataCreazione": zod.coerce.date(),
-  "annullato": zod.boolean(),
-  "annullatoDaMovimentoId": zod.number().nullable()
-}),zod.null()]),
-  "saldo": zod.union([zod.object({
-  "beneficiarioId": zod.number(),
-  "beneficiarioNome": zod.string(),
-  "creditoSolidaleAbilitato": zod.boolean(),
-  "creditoSolidaleStato": zod.enum(['non_abilitato', 'attivo', 'sospeso', 'revocato']),
-  "saldoAttuale": zod.number(),
-  "creditoSolidaleMensileAssegnato": zod.number().nullable(),
-  "dataUltimoMovimento": zod.coerce.date().nullable()
-}),zod.null()]),
-  "messaggio": zod.string()
 })
 
 
@@ -13486,6 +13450,10 @@ export const ListCreditoSolidaleBeneficiarioMovimentiResponseItem = zod.object({
 export const ListCreditoSolidaleBeneficiarioMovimentiResponse = zod.array(ListCreditoSolidaleBeneficiarioMovimentiResponseItem)
 
 
+/**
+ * Comando dismesso. Ricarica solo automatica; usare Rettifica credito per variazioni straordinarie.
+ * @deprecated
+ */
 export const CreateCreditoSolidaleRicaricaManualeParams = zod.object({
   "beneficiarioId": zod.coerce.number()
 })
@@ -13505,15 +13473,65 @@ export const CreateCreditoSolidaleRettificaParams = zod.object({
   "beneficiarioId": zod.coerce.number()
 })
 
+export const createCreditoSolidaleRettificaBodyIdempotencyKeyMax = 120;
+
 export const createCreditoSolidaleRettificaBodyVariazioneCreditoMin = -99999999;
 export const createCreditoSolidaleRettificaBodyVariazioneCreditoMax = 99999999;
 
 
 
 export const CreateCreditoSolidaleRettificaBody = zod.object({
+  "idempotencyKey": zod.string().min(1).max(createCreditoSolidaleRettificaBodyIdempotencyKeyMax),
   "variazioneCredito": zod.number().min(createCreditoSolidaleRettificaBodyVariazioneCreditoMin).max(createCreditoSolidaleRettificaBodyVariazioneCreditoMax),
   "motivo": zod.string(),
   "note": zod.string().nullish()
+})
+
+
+export const GetCreditoSolidaleRettificaEsitoParams = zod.object({
+  "beneficiarioId": zod.coerce.number(),
+  "idempotencyKey": zod.coerce.string()
+})
+
+export const GetCreditoSolidaleRettificaEsitoResponse = zod.object({
+  "id": zod.number(),
+  "beneficiarioId": zod.number(),
+  "beneficiarioNome": zod.string(),
+  "centroAscoltoId": zod.number().nullable(),
+  "centroAscoltoNome": zod.string().nullable(),
+  "areaOperativaId": zod.number().nullable(),
+  "areaOperativaNome": zod.string().nullable(),
+  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']),
+  "variazioneCredito": zod.number(),
+  "saldoPrima": zod.number(),
+  "saldoDopo": zod.number(),
+  "periodoRiferimento": zod.string().nullable(),
+  "politicaCreditoSolidaleId": zod.number().nullable(),
+  "quotaMensileAssegnata": zod.number().nullable(),
+  "origine": zod.string().nullable(),
+  "riferimentoId": zod.number().nullable(),
+  "riferimentoTipo": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "motivo": zod.string().nullable(),
+  "dataMovimento": zod.coerce.date(),
+  "dataCreazione": zod.coerce.date(),
+  "annullato": zod.boolean(),
+  "annullatoDaMovimentoId": zod.number().nullable()
+})
+
+
+export const GetCreditoSolidaleRicaricaMensileStatoResponse = zod.object({
+  "periodo": zod.string(),
+  "calendario": zod.string(),
+  "stato": zod.enum(['non_avviata', 'in_corso', 'completata']),
+  "avviataAt": zod.string().nullish(),
+  "completataAt": zod.string().nullish(),
+  "recuperoDaDecidere": zod.boolean(),
+  "esiti": zod.array(zod.object({
+  "stato": zod.string(),
+  "causa": zod.string().nullable(),
+  "numero": zod.number()
+}))
 })
 
 
@@ -13560,6 +13578,10 @@ export const PreviewCreditoSolidaleRicaricaMensileResponse = zod.object({
 })
 
 
+/**
+ * Comando dismesso. Ricarica solo automatica; usare Rettifica credito per variazioni straordinarie.
+ * @deprecated
+ */
 export const executeCreditoSolidaleRicaricaMensileBodyPeriodoRiferimentoRegExp = new RegExp('^\\d{4}-(0[1-9]|1[0-2])$');
 
 
@@ -13568,39 +13590,6 @@ export const ExecuteCreditoSolidaleRicaricaMensileBody = zod.object({
   "centroAscoltoId": zod.number().nullish(),
   "areaOperativaId": zod.number().nullish(),
   "note": zod.string().nullish()
-})
-
-export const ExecuteCreditoSolidaleRicaricaMensileResponse = zod.object({
-  "periodoRiferimento": zod.string(),
-  "creati": zod.number(),
-  "saltatiGiaRicaricati": zod.number(),
-  "saltatiNonRicaricabili": zod.number(),
-  "totaleCreditoRicaricato": zod.number(),
-  "movimentiCreati": zod.array(zod.object({
-  "id": zod.number(),
-  "beneficiarioId": zod.number(),
-  "beneficiarioNome": zod.string(),
-  "centroAscoltoId": zod.number().nullable(),
-  "centroAscoltoNome": zod.string().nullable(),
-  "areaOperativaId": zod.number().nullable(),
-  "areaOperativaNome": zod.string().nullable(),
-  "tipoMovimento": zod.enum(['ricarica_mensile', 'ricarica_manuale', 'rettifica_positiva', 'rettifica_negativa', 'storno', 'consumo_spesa']),
-  "variazioneCredito": zod.number(),
-  "saldoPrima": zod.number(),
-  "saldoDopo": zod.number(),
-  "periodoRiferimento": zod.string().nullable(),
-  "politicaCreditoSolidaleId": zod.number().nullable(),
-  "quotaMensileAssegnata": zod.number().nullable(),
-  "origine": zod.string().nullable(),
-  "riferimentoId": zod.number().nullable(),
-  "riferimentoTipo": zod.string().nullable(),
-  "note": zod.string().nullable(),
-  "motivo": zod.string().nullable(),
-  "dataMovimento": zod.coerce.date(),
-  "dataCreazione": zod.coerce.date(),
-  "annullato": zod.boolean(),
-  "annullatoDaMovimentoId": zod.number().nullable()
-}))
 })
 
 

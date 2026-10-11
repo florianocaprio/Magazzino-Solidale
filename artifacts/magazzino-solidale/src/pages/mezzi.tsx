@@ -39,7 +39,7 @@ export default function Mezzi() {
   const canExport = hasPermission("logistica.mezzi.export");
   const formSchema = z.object({
     codice: z.string().optional(),
-    tipo: z.string().min(1, t("mezzi.valTipo")),
+    tipo: z.string().trim().min(1, t("mezzi.valTipo")),
     targa: z.string().optional(),
     proprieta: z.string().default("associazione"),
     proprietarioNome: z.string().optional(),

@@ -38,11 +38,17 @@ export interface PoliticaCreditoSolidaleInput {
      */
   creditoMassimoMensile?: number | null;
   /**
+     * Calendario automatico fisso al primo del mese; omettere nei nuovi client.
+     * @deprecated
      * @minimum 1
-     * @maximum 28
+     * @maximum 1
      */
   giornoRicaricaMensile?: number;
-  ricaricaAutomaticaAbilitata?: boolean;
+  /**
+     * Non è un interruttore operativo. Il job non dipende dai vecchi valori memorizzati.
+     * @deprecated
+     */
+  ricaricaAutomaticaAbilitata?: true;
   arrotondamento?: PoliticaCreditoSolidaleInputArrotondamento;
   /** @nullable */
   note?: string | null;

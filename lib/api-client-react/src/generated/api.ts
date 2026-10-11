@@ -152,6 +152,7 @@ import type {
   ConsegnePerCentroReport,
   ConversioneConsegnaInput,
   ConversioneConsegnaResult,
+  CreateCreditoSolidaleRicaricaManuale410,
   CreateTrasferimentoMensa200,
   CreateTrasferimentoMensa201,
   CreditoSolidaleBeneficiario,
@@ -160,10 +161,8 @@ import type {
   CreditoSolidaleConfigurazioneInput,
   CreditoSolidaleMovimento,
   CreditoSolidaleRefreshInput,
-  CreditoSolidaleRefreshResult,
   CreditoSolidaleRettificaInput,
   CreditoSolidaleRicaricaManualeInput,
-  CreditoSolidaleRicaricaMensileEsecuzione,
   CreditoSolidaleRicaricaMensileEsecuzioneInput,
   CreditoSolidaleRicaricaMensilePreview,
   CreditoSolidaleRicaricaMensilePreviewInput,
@@ -183,6 +182,7 @@ import type {
   EnteDestinatario,
   EnteDestinatarioInput,
   EnteDestinatarioUpdate,
+  ExecuteCreditoSolidaleRicaricaMensile410,
   ExportConsegneParams,
   ExportDocumentiOperativiParams,
   ForgotPasswordInput,
@@ -218,6 +218,7 @@ import type {
   FseReportingPreview,
   FseResolutionInput,
   FseVersionInput,
+  GetCreditoSolidaleRicaricaMensileStato200,
   GetDocumentoOperativoRichiesta200,
   GetEmporioAbilitazioniRiepilogoBeneficiariParams,
   GetFseReportingPreviewParams,
@@ -394,6 +395,7 @@ import type {
   ProdottoInput,
   ProdottoUpdate,
   ReadinessStatus,
+  RefreshCreditoSolidaleBeneficiario410,
   ReportAllocazioneMezziParams,
   ReportConsegnePerCentroParams,
   ReportConsegnePerMeseParams,
@@ -22956,10 +22958,14 @@ export const getRefreshCreditoSolidaleBeneficiarioUrl = (beneficiarioId: number,
   return `/api/credito-solidale/beneficiari/${beneficiarioId}/refresh-credito`
 }
 
+/**
+ * Comando dismesso. Ricarica solo automatica; usare Rettifica credito per variazioni straordinarie.
+ * @deprecated
+ */
 export const refreshCreditoSolidaleBeneficiario = async (beneficiarioId: number,
-    creditoSolidaleRefreshInput?: CreditoSolidaleRefreshInput, options?: RequestInit): Promise<CreditoSolidaleRefreshResult> => {
+    creditoSolidaleRefreshInput?: CreditoSolidaleRefreshInput, options?: RequestInit): Promise<unknown> => {
 
-  return customFetch<CreditoSolidaleRefreshResult>(getRefreshCreditoSolidaleBeneficiarioUrl(beneficiarioId),
+  return customFetch<unknown>(getRefreshCreditoSolidaleBeneficiarioUrl(beneficiarioId),
   {
     ...options,
     method: 'POST',
@@ -22972,7 +22978,7 @@ export const refreshCreditoSolidaleBeneficiario = async (beneficiarioId: number,
 
 
 
-export const getRefreshCreditoSolidaleBeneficiarioMutationOptions = <TError = ErrorType<unknown>,
+export const getRefreshCreditoSolidaleBeneficiarioMutationOptions = <TError = ErrorType<RefreshCreditoSolidaleBeneficiario410>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshCreditoSolidaleBeneficiario>>, TError,{beneficiarioId: number;data?: BodyType<CreditoSolidaleRefreshInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof refreshCreditoSolidaleBeneficiario>>, TError,{beneficiarioId: number;data?: BodyType<CreditoSolidaleRefreshInput>}, TContext> => {
 
@@ -23001,9 +23007,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type RefreshCreditoSolidaleBeneficiarioMutationResult = NonNullable<Awaited<ReturnType<typeof refreshCreditoSolidaleBeneficiario>>>
     export type RefreshCreditoSolidaleBeneficiarioMutationBody = BodyType<CreditoSolidaleRefreshInput> | undefined
-    export type RefreshCreditoSolidaleBeneficiarioMutationError = ErrorType<unknown>
+    export type RefreshCreditoSolidaleBeneficiarioMutationError = ErrorType<RefreshCreditoSolidaleBeneficiario410>
 
-    export const useRefreshCreditoSolidaleBeneficiario = <TError = ErrorType<unknown>,
+    /**
+ * @deprecated
+ */
+export const useRefreshCreditoSolidaleBeneficiario = <TError = ErrorType<RefreshCreditoSolidaleBeneficiario410>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshCreditoSolidaleBeneficiario>>, TError,{beneficiarioId: number;data?: BodyType<CreditoSolidaleRefreshInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof refreshCreditoSolidaleBeneficiario>>,
@@ -23093,10 +23102,14 @@ export const getCreateCreditoSolidaleRicaricaManualeUrl = (beneficiarioId: numbe
   return `/api/credito-solidale/beneficiari/${beneficiarioId}/ricarica-manuale`
 }
 
+/**
+ * Comando dismesso. Ricarica solo automatica; usare Rettifica credito per variazioni straordinarie.
+ * @deprecated
+ */
 export const createCreditoSolidaleRicaricaManuale = async (beneficiarioId: number,
-    creditoSolidaleRicaricaManualeInput: CreditoSolidaleRicaricaManualeInput, options?: RequestInit): Promise<CreditoSolidaleMovimento> => {
+    creditoSolidaleRicaricaManualeInput: CreditoSolidaleRicaricaManualeInput, options?: RequestInit): Promise<unknown> => {
 
-  return customFetch<CreditoSolidaleMovimento>(getCreateCreditoSolidaleRicaricaManualeUrl(beneficiarioId),
+  return customFetch<unknown>(getCreateCreditoSolidaleRicaricaManualeUrl(beneficiarioId),
   {
     ...options,
     method: 'POST',
@@ -23109,7 +23122,7 @@ export const createCreditoSolidaleRicaricaManuale = async (beneficiarioId: numbe
 
 
 
-export const getCreateCreditoSolidaleRicaricaManualeMutationOptions = <TError = ErrorType<unknown>,
+export const getCreateCreditoSolidaleRicaricaManualeMutationOptions = <TError = ErrorType<CreateCreditoSolidaleRicaricaManuale410>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCreditoSolidaleRicaricaManuale>>, TError,{beneficiarioId: number;data: BodyType<CreditoSolidaleRicaricaManualeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createCreditoSolidaleRicaricaManuale>>, TError,{beneficiarioId: number;data: BodyType<CreditoSolidaleRicaricaManualeInput>}, TContext> => {
 
@@ -23138,9 +23151,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateCreditoSolidaleRicaricaManualeMutationResult = NonNullable<Awaited<ReturnType<typeof createCreditoSolidaleRicaricaManuale>>>
     export type CreateCreditoSolidaleRicaricaManualeMutationBody = BodyType<CreditoSolidaleRicaricaManualeInput>
-    export type CreateCreditoSolidaleRicaricaManualeMutationError = ErrorType<unknown>
+    export type CreateCreditoSolidaleRicaricaManualeMutationError = ErrorType<CreateCreditoSolidaleRicaricaManuale410>
 
-    export const useCreateCreditoSolidaleRicaricaManuale = <TError = ErrorType<unknown>,
+    /**
+ * @deprecated
+ */
+export const useCreateCreditoSolidaleRicaricaManuale = <TError = ErrorType<CreateCreditoSolidaleRicaricaManuale410>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCreditoSolidaleRicaricaManuale>>, TError,{beneficiarioId: number;data: BodyType<CreditoSolidaleRicaricaManualeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createCreditoSolidaleRicaricaManuale>>,
@@ -23216,6 +23232,153 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCreateCreditoSolidaleRettificaMutationOptions(options));
     }
+
+export const getGetCreditoSolidaleRettificaEsitoUrl = (beneficiarioId: number,
+    idempotencyKey: string,) => {
+
+
+
+
+  return `/api/credito-solidale/beneficiari/${beneficiarioId}/rettifiche/${idempotencyKey}/esito`
+}
+
+export const getCreditoSolidaleRettificaEsito = async (beneficiarioId: number,
+    idempotencyKey: string, options?: RequestInit): Promise<CreditoSolidaleMovimento> => {
+
+  return customFetch<CreditoSolidaleMovimento>(getGetCreditoSolidaleRettificaEsitoUrl(beneficiarioId,idempotencyKey),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCreditoSolidaleRettificaEsitoQueryKey = (beneficiarioId: number,
+    idempotencyKey: string,) => {
+    return [
+    `/api/credito-solidale/beneficiari/${beneficiarioId}/rettifiche/${idempotencyKey}/esito`
+    ] as const;
+    }
+
+
+export const getGetCreditoSolidaleRettificaEsitoQueryOptions = <TData = Awaited<ReturnType<typeof getCreditoSolidaleRettificaEsito>>, TError = ErrorType<void>>(beneficiarioId: number,
+    idempotencyKey: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCreditoSolidaleRettificaEsito>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCreditoSolidaleRettificaEsitoQueryKey(beneficiarioId,idempotencyKey);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCreditoSolidaleRettificaEsito>>> = ({ signal }) => getCreditoSolidaleRettificaEsito(beneficiarioId,idempotencyKey, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(beneficiarioId && idempotencyKey), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCreditoSolidaleRettificaEsito>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCreditoSolidaleRettificaEsitoQueryResult = NonNullable<Awaited<ReturnType<typeof getCreditoSolidaleRettificaEsito>>>
+export type GetCreditoSolidaleRettificaEsitoQueryError = ErrorType<void>
+
+
+
+export function useGetCreditoSolidaleRettificaEsito<TData = Awaited<ReturnType<typeof getCreditoSolidaleRettificaEsito>>, TError = ErrorType<void>>(
+ beneficiarioId: number,
+    idempotencyKey: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCreditoSolidaleRettificaEsito>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCreditoSolidaleRettificaEsitoQueryOptions(beneficiarioId,idempotencyKey,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetCreditoSolidaleRicaricaMensileStatoUrl = () => {
+
+
+
+
+  return `/api/credito-solidale/ricariche-mensili/stato`
+}
+
+export const getCreditoSolidaleRicaricaMensileStato = async ( options?: RequestInit): Promise<GetCreditoSolidaleRicaricaMensileStato200> => {
+
+  return customFetch<GetCreditoSolidaleRicaricaMensileStato200>(getGetCreditoSolidaleRicaricaMensileStatoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCreditoSolidaleRicaricaMensileStatoQueryKey = () => {
+    return [
+    `/api/credito-solidale/ricariche-mensili/stato`
+    ] as const;
+    }
+
+
+export const getGetCreditoSolidaleRicaricaMensileStatoQueryOptions = <TData = Awaited<ReturnType<typeof getCreditoSolidaleRicaricaMensileStato>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCreditoSolidaleRicaricaMensileStato>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCreditoSolidaleRicaricaMensileStatoQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCreditoSolidaleRicaricaMensileStato>>> = ({ signal }) => getCreditoSolidaleRicaricaMensileStato({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCreditoSolidaleRicaricaMensileStato>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCreditoSolidaleRicaricaMensileStatoQueryResult = NonNullable<Awaited<ReturnType<typeof getCreditoSolidaleRicaricaMensileStato>>>
+export type GetCreditoSolidaleRicaricaMensileStatoQueryError = ErrorType<unknown>
+
+
+
+export function useGetCreditoSolidaleRicaricaMensileStato<TData = Awaited<ReturnType<typeof getCreditoSolidaleRicaricaMensileStato>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCreditoSolidaleRicaricaMensileStato>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCreditoSolidaleRicaricaMensileStatoQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getStornaCreditoSolidaleMovimentoUrl = (id: number,) => {
 
@@ -23356,9 +23519,13 @@ export const getExecuteCreditoSolidaleRicaricaMensileUrl = () => {
   return `/api/credito-solidale/ricariche-mensili/esegui`
 }
 
-export const executeCreditoSolidaleRicaricaMensile = async (creditoSolidaleRicaricaMensileEsecuzioneInput: CreditoSolidaleRicaricaMensileEsecuzioneInput, options?: RequestInit): Promise<CreditoSolidaleRicaricaMensileEsecuzione> => {
+/**
+ * Comando dismesso. Ricarica solo automatica; usare Rettifica credito per variazioni straordinarie.
+ * @deprecated
+ */
+export const executeCreditoSolidaleRicaricaMensile = async (creditoSolidaleRicaricaMensileEsecuzioneInput: CreditoSolidaleRicaricaMensileEsecuzioneInput, options?: RequestInit): Promise<unknown> => {
 
-  return customFetch<CreditoSolidaleRicaricaMensileEsecuzione>(getExecuteCreditoSolidaleRicaricaMensileUrl(),
+  return customFetch<unknown>(getExecuteCreditoSolidaleRicaricaMensileUrl(),
   {
     ...options,
     method: 'POST',
@@ -23371,7 +23538,7 @@ export const executeCreditoSolidaleRicaricaMensile = async (creditoSolidaleRicar
 
 
 
-export const getExecuteCreditoSolidaleRicaricaMensileMutationOptions = <TError = ErrorType<unknown>,
+export const getExecuteCreditoSolidaleRicaricaMensileMutationOptions = <TError = ErrorType<ExecuteCreditoSolidaleRicaricaMensile410>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeCreditoSolidaleRicaricaMensile>>, TError,{data: BodyType<CreditoSolidaleRicaricaMensileEsecuzioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof executeCreditoSolidaleRicaricaMensile>>, TError,{data: BodyType<CreditoSolidaleRicaricaMensileEsecuzioneInput>}, TContext> => {
 
@@ -23400,9 +23567,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ExecuteCreditoSolidaleRicaricaMensileMutationResult = NonNullable<Awaited<ReturnType<typeof executeCreditoSolidaleRicaricaMensile>>>
     export type ExecuteCreditoSolidaleRicaricaMensileMutationBody = BodyType<CreditoSolidaleRicaricaMensileEsecuzioneInput>
-    export type ExecuteCreditoSolidaleRicaricaMensileMutationError = ErrorType<unknown>
+    export type ExecuteCreditoSolidaleRicaricaMensileMutationError = ErrorType<ExecuteCreditoSolidaleRicaricaMensile410>
 
-    export const useExecuteCreditoSolidaleRicaricaMensile = <TError = ErrorType<unknown>,
+    /**
+ * @deprecated
+ */
+export const useExecuteCreditoSolidaleRicaricaMensile = <TError = ErrorType<ExecuteCreditoSolidaleRicaricaMensile410>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeCreditoSolidaleRicaricaMensile>>, TError,{data: BodyType<CreditoSolidaleRicaricaMensileEsecuzioneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof executeCreditoSolidaleRicaricaMensile>>,
