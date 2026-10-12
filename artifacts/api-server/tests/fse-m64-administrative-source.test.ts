@@ -35,6 +35,10 @@ import caricoRouter from "../src/routes/carico-pratiche";
 import { creaScaricoInventariale } from "../src/lib/scaricoInventory";
 import { InventoryDecimal } from "../src/lib/inventoryDecimal";
 import {
+  freezeAdministrativeSource,
+  lockAdministrativeSource,
+} from "../src/lib/fseAdministrativeSource";
+import {
   createAreaOperativa,
   createMagazzino,
   createProdotto,
@@ -207,6 +211,249 @@ afterAll(async () => {
 });
 
 describe("D64-01 — actual M3B ingestion and immutable administrative source", () => {
+  it("R64-01/02: changed administrative quality is visible without new physical movements", async () => {
+    const doc = randomUUID();
+    const first = await acquire(1, fixture(doc));
+    await db
+      .update(fseImportRowsTable)
+      .set({ warningCodesJson: ["ANOMALIA_A", "ANOMALIA_B"] })
+      .where(eq(fseImportRowsTable.sessioneId, first.id));
+    const a = await calculateFseReconciliation(command(first));
+    expect(
+      a.rows.find((r) => r.observationId != null)?.qualityCodesJson,
+    ).toEqual(expect.arrayContaining(["ANOMALIA_A", "ANOMALIA_B"]));
+    const [baseline] = await db
+      .select()
+      .from(fseReconciliationRunsTable)
+      .where(
+        eq(fseReconciliationRunsTable.reconciliationId, a.reconciliation.id),
+      );
+    const second = await acquire(1, fixture(doc, 1, "18/09/2026"));
+    const before = (
+      await pool.query(
+        "SELECT * FROM movimenti WHERE magazzino_id=$1 ORDER BY id",
+        [warehouse],
+      )
+    ).rows;
+    const b = await calculateFseReconciliation({
+      ...command(second),
+      dataRiferimento: "2026-09-18",
+      baselineRunId: baseline.id,
+    });
+    const changed = b.rows.filter(
+      (r) => r.status === "QUALITA_AMMINISTRATIVA_VARIATA",
+    );
+    expect(changed).toHaveLength(1);
+    expect(changed[0]).toMatchObject({
+      movimentoId: null,
+      differencePieces: null,
+      differenceKgLt: null,
+      blocking: true,
+    });
+    expect(b.rows.some((r) => r.status === "MOVIMENTO_AGEA_SCOMPARSO")).toBe(
+      false,
+    );
+    expect(
+      (
+        await pool.query(
+          "SELECT * FROM movimenti WHERE magazzino_id=$1 ORDER BY id",
+          [warehouse],
+        )
+      ).rows,
+    ).toEqual(before);
+  });
+  it.each(["maxMovimentoId", "maxOperazioneDistribuzioneId"] as const)(
+    "R64-03: rejects regressive %s and rolls back the source/run",
+    async (dimension) => {
+      const doc = randomUUID();
+      const first = await acquire(1, fixture(doc));
+      const a = await calculateFseReconciliation({
+        ...command(first),
+        cutoff: { maxMovimentoId: 10, maxOperazioneDistribuzioneId: 10 },
+      });
+      const [baseline] = await db
+        .select()
+        .from(fseReconciliationRunsTable)
+        .where(
+          eq(fseReconciliationRunsTable.reconciliationId, a.reconciliation.id),
+        );
+      const second = await acquire(1, fixture(doc, 1, "18/09/2026"));
+      const snapshot = async () =>
+        (
+          await pool.query(
+            "SELECT (SELECT count(*) FROM fse_administrative_versions)::int versions,(SELECT count(*) FROM fse_reconciliation_runs)::int runs",
+          )
+        ).rows;
+      const before = await snapshot();
+      await expect(
+        calculateFseReconciliation({
+          ...command(second),
+          dataRiferimento: "2026-09-18",
+          baselineRunId: baseline.id,
+          cutoff: {
+            maxMovimentoId: 10,
+            maxOperazioneDistribuzioneId: 10,
+            [dimension]: 9,
+          },
+        }),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(await snapshot()).toEqual(before);
+      const valid = {
+        ...command(second),
+        dataRiferimento: "2026-09-18",
+        baselineRunId: baseline.id,
+        cutoff: { maxMovimentoId: 10, maxOperazioneDistribuzioneId: 10 },
+      };
+      const b = await calculateFseReconciliation(valid);
+      expect((await calculateFseReconciliation(valid)).reconciliation.id).toBe(
+        b.reconciliation.id,
+      );
+      await expect(
+        pool.query(
+          `UPDATE riconciliazioni_fse SET ${dimension === "maxMovimentoId" ? "max_movimento_id" : "max_operazione_distribuzione_id"}=9 WHERE id=$1`,
+          [b.reconciliation.id],
+        ),
+      ).rejects.toMatchObject({ code: "23514" });
+    },
+  );
+  it("R64-04: duplicate identity attaches a claim only to its accepted occurrence; SQL rejects duplication", async () => {
+    const session = await acquire();
+    const [unmapped] = await db
+      .select()
+      .from(fseImportRowsTable)
+      .where(eq(fseImportRowsTable.sessioneId, session.id));
+    await db.transaction((tx) =>
+      mapFseProduct(tx, {
+        sessionId: session.id,
+        version: session.versione,
+        externalDescription: unmapped.prodottoNormalizzato!,
+        productId: product,
+        actorId: actor,
+        reason: "R64 lineage fixture",
+        acceptDateFallback: false,
+        audit: audit(),
+      }),
+    );
+    const [mapped] = await db
+      .select()
+      .from(fseImportSessionsTable)
+      .where(eq(fseImportSessionsTable.id, session.id));
+    const [row] = await db
+      .select()
+      .from(fseImportRowsTable)
+      .where(eq(fseImportRowsTable.id, unmapped.id));
+    await db.transaction((tx) =>
+      addFseRowsToPractice(tx, {
+        sessionId: session.id,
+        version: mapped.versione,
+        rowIds: [row.id],
+        idempotencyKey: randomUUID(),
+        historicalCoverageConfirmed: false,
+        actorId: actor,
+        audit: audit(),
+      }),
+    );
+    const [duplicate] = await db
+      .insert(fseImportRowsTable)
+      .values({ ...row, id: undefined, numeroRiga: row.numeroRiga + 100 })
+      .returning();
+    const [current] = await db
+      .select()
+      .from(fseImportSessionsTable)
+      .where(eq(fseImportSessionsTable.id, session.id));
+    const result = await calculateFseReconciliation(command(current));
+    const lineage = (
+      await pool.query(
+        "SELECT l.* FROM fse_administrative_lineage l JOIN fse_administrative_observations o ON o.id=l.observation_id WHERE o.version_id=$1",
+        [result.reconciliation.administrativeVersionId],
+      )
+    ).rows;
+    expect(lineage).toHaveLength(1);
+    const [other] = await db
+      .select()
+      .from(fseAdministrativeObservationsTable)
+      .where(eq(fseAdministrativeObservationsTable.rowId, duplicate.id));
+    expect(other.qualityJson).toContain("LINEAGE_AMBIGUO");
+    await expect(
+      pool.query(
+        "INSERT INTO fse_administrative_lineage(observation_id,claim_id,load_row_id,claim_state,pieces,kg_lt) SELECT $1,claim_id,load_row_id,claim_state,pieces,kg_lt FROM fse_administrative_lineage WHERE id=$2",
+        [other.id, lineage[0].id],
+      ),
+    ).rejects.toMatchObject({ code: "23505" });
+    await db
+      .update(fseImportRowsTable)
+      .set({ warningCodesJson: ["NUOVA_OSSERVAZIONE"] })
+      .where(eq(fseImportRowsTable.id, row.id));
+    const again = await calculateFseReconciliation(command(current));
+    expect(again.reconciliation.administrativeVersionId).not.toBe(
+      result.reconciliation.administrativeVersionId,
+    );
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int n FROM fse_administrative_lineage WHERE claim_id=$1",
+          [lineage[0].claim_id],
+        )
+      ).rows[0].n,
+    ).toBe(2);
+  });
+  it.each([1000, 5000])(
+    "R64-06: measures actual freeze of %i synthetic observations",
+    async (size) => {
+      const session = await acquire(size);
+      const start = performance.now();
+      const version = await db.transaction(async (tx) => {
+        const current = await lockAdministrativeSource(tx, {
+          sessionId: session.id,
+          warehouseId: warehouse,
+          actorId: actor,
+        });
+        return freezeAdministrativeSource(tx, {
+          session: current,
+          expectedVersion: current.versione,
+          referenceDate: "2026-09-17",
+          actorId: actor,
+        });
+      });
+      const elapsedMs = Math.round(performance.now() - start);
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int n FROM fse_administrative_observations WHERE version_id=$1",
+            [version.id],
+          )
+        ).rows[0].n,
+      ).toBe(size);
+      console.info(JSON.stringify({ case: "R64-06", size, elapsedMs }));
+    },
+  );
+  it("R64-06: a failure after the first import batch rolls back the entire file", async () => {
+    const counts = async () =>
+      (
+        await pool.query(
+          "SELECT (SELECT count(*) FROM fse_import_sessions WHERE source_registry_id=$1)::int sessions,(SELECT count(*) FROM fse_import_rows r JOIN fse_import_sessions s ON s.id=r.sessione_id WHERE s.source_registry_id=$1)::int rows",
+          [source],
+        )
+      ).rows;
+    const before = await counts();
+    await pool.query(
+      "CREATE FUNCTION m64_review_batch_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.numero_riga=602 AND NEW.raw_json->>'Numero documento' LIKE 'R64-BATCH-%' THEN RAISE EXCEPTION 'R64_BATCH_INJECTED'; END IF; RETURN NEW; END $$",
+    );
+    await pool.query(
+      "CREATE TRIGGER m64_review_batch_failure BEFORE INSERT ON fse_import_rows FOR EACH ROW EXECUTE FUNCTION m64_review_batch_failure()",
+    );
+    try {
+      await expect(
+        acquire(1000, fixture("R64-BATCH-" + randomUUID(), 1000)),
+      ).rejects.toMatchObject({ cause: { message: "R64_BATCH_INJECTED" } });
+      expect(await counts()).toEqual(before);
+    } finally {
+      await pool.query(
+        "DROP TRIGGER m64_review_batch_failure ON fse_import_rows",
+      );
+      await pool.query("DROP FUNCTION m64_review_batch_failure()");
+    }
+  });
   it.each(["AGEA_LEGACY", "FSE_M3B"] as const)(
     "D18: %s cancellation preserves frozen evidence and inventory; stale replay conflicts",
     async (sourceType) => {

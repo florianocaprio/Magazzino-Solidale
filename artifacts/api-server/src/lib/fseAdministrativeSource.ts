@@ -200,8 +200,19 @@ export async function freezeAdministrativeSource(
     )
     .orderBy(fseMovementIdentityAliasesTable.id);
   const claims = await tx
-    .select({ claim: fseMovementClaimsTable, load: carichiMagazzinoRigheTable })
+    .select({
+      claim: fseMovementClaimsTable,
+      load: carichiMagazzinoRigheTable,
+      acceptedRowId: fseImportRowRevisionsTable.rigaId,
+    })
     .from(fseMovementClaimsTable)
+    .innerJoin(
+      fseImportRowRevisionsTable,
+      eq(
+        fseMovementClaimsTable.acceptedRevisionId,
+        fseImportRowRevisionsTable.id,
+      ),
+    )
     .leftJoin(
       carichiMagazzinoRigheTable,
       eq(
@@ -230,12 +241,10 @@ export async function freezeAdministrativeSource(
       ),
     );
   const occurrences = new Map<string, number>();
-  const observations = rows.map((row) => {
-    const quality = [...row.errorCodesJson, ...row.warningCodesJson];
+  const identities = new Map<number, string>();
+  const identityRows = new Map<string, number[]>();
+  for (const row of rows) {
     const raw = row.rawJson;
-    const rawDate =
-      parseFseDate(text(raw["Data carico magazzino"])) ??
-      parseFseDate(text(raw["Data documento"]));
     const originalIdentity = fseSemanticIdentityHash({
       fondo: row.fondoOrigine,
       prodotto: row.prodottoNormalizzato,
@@ -254,6 +263,19 @@ export async function freezeAdministrativeSource(
             a.semanticIdentityHash === row.semanticIdentityHash) &&
           a.disambiguatore === row.disambiguatore,
       )?.canonicalIdentityHash ?? originalIdentity;
+    identities.set(row.id, identity);
+    const key = `${identity}:${row.disambiguatore}`;
+    const group = identityRows.get(key) ?? [];
+    group.push(row.id);
+    identityRows.set(key, group);
+  }
+  const observations = rows.map((row) => {
+    const quality = [...row.errorCodesJson, ...row.warningCodesJson];
+    const raw = row.rawJson;
+    const rawDate =
+      parseFseDate(text(raw["Data carico magazzino"])) ??
+      parseFseDate(text(raw["Data documento"]));
+    const identity = identities.get(row.id)!;
     const revision = revisions.filter((r) => r.rigaId === row.id).at(-1);
     const mapping = mappings.find(
       (m) =>
@@ -290,20 +312,28 @@ export async function freezeAdministrativeSource(
     const key = `${identity}:${row.disambiguatore}`;
     const occurrence = (occurrences.get(key) ?? 0) + 1;
     occurrences.set(key, occurrence);
-    const lineage = claims
-      .filter(
-        ({ claim }) =>
-          claim.semanticIdentityHash === identity &&
-          claim.disambiguatore === row.disambiguatore &&
-          claim.stato !== "RILASCIATA",
-      )
-      .map(({ claim, load }) => ({
-        claimId: claim.id,
-        loadRowId: load?.id ?? null,
-        claimState: claim.stato,
-        pieces: load?.quantitaPezzi ?? null,
-        kgLt: load?.quantitaKgLt ?? null,
-      }));
+    const candidates = claims.filter(
+      ({ claim }) =>
+        claim.semanticIdentityHash === identity &&
+        claim.disambiguatore === row.disambiguatore &&
+        claim.stato !== "RILASCIATA",
+    );
+    const group = identityRows.get(key)!;
+    // The accepted revision proves the exact occurrence when present. Across
+    // cumulative files identity is sufficient only for a unique occurrence.
+    const proven = candidates.filter(
+      ({ acceptedRowId }) =>
+        acceptedRowId === row.id ||
+        (group.length === 1 && !identities.has(acceptedRowId)),
+    );
+    if (proven.length !== candidates.length) quality.push("LINEAGE_AMBIGUO");
+    const lineage = proven.map(({ claim, load }) => ({
+      claimId: claim.id,
+      loadRowId: load?.id ?? null,
+      claimState: claim.stato,
+      pieces: load?.quantitaPezzi ?? null,
+      kgLt: load?.quantitaKgLt ?? null,
+    }));
     // Coverage is an explicit claim, not an inference from date or session mode.
     const absorbed =
       lineage.some((l) => l.claimState === "COPERTA_SALDO") &&
@@ -463,9 +493,13 @@ export async function freezeAdministrativeSource(
       })
       .returning();
     if (lineage.length)
-      await tx
-        .insert(fseAdministrativeLineageTable)
-        .values(lineage.map((l) => ({ ...l, observationId: saved.id })));
+      await tx.insert(fseAdministrativeLineageTable).values(
+        lineage.map((l) => ({
+          ...l,
+          observationId: saved.id,
+          versionId: version.id,
+        })),
+      );
   }
   return version;
 }

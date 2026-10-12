@@ -910,44 +910,48 @@ async function persistRegistryRows(
   classified: Awaited<ReturnType<typeof classifyRegistryRows>>,
 ) {
   if (classified.length === 0) return;
-  await tx.insert(fseImportRowsTable).values(
-    classified.map(
-      ({ row, productId, state, errors, warnings, operational }) => ({
-        sessioneId: sessionId,
-        fileId,
-        numeroRiga: row.numeroRiga,
-        rawJson: row.rawJson,
-        semanticIdentityHash: row.identityKey,
-        movementContentHash: row.contentHash,
-        summaryHash: hash({
+  // Bound query parameters and Drizzle's AST size. Every batch remains inside
+  // the caller's original transaction: an error rolls back the whole file.
+  for (let offset = 0; offset < classified.length; offset += 500) {
+    await tx.insert(fseImportRowsTable).values(
+      classified
+        .slice(offset, offset + 500)
+        .map(({ row, productId, state, errors, warnings, operational }) => ({
+          sessioneId: sessionId,
+          fileId,
+          numeroRiga: row.numeroRiga,
+          rawJson: row.rawJson,
+          semanticIdentityHash: row.identityKey,
+          movementContentHash: row.contentHash,
+          summaryHash: hash({
+            saldoFinalePezzi: row.saldoFinalePezzi,
+            saldoFinaleKgLt: row.saldoFinaleKgLt,
+            saldoMovimentoPezzi: row.saldoMovimentoPezzi,
+            saldoMovimentoKgLt: row.saldoMovimentoKgLt,
+          }),
+          tipoMovimento: row.tipoMovimentoEsterno,
+          fondoOrigine: row.fondoNormalizzato,
+          prodottoEsterno: row.prodottoRaw,
+          prodottoNormalizzato: row.prodottoNormalizzato,
+          lottoFisico: row.lottoRaw,
+          numeroDocumento: row.numeroDocumentoRaw,
+          dataDocumento: row.dataDocumento,
+          dataOperativaProposta: row.dataCaricoRisolta,
+          dataOperativaFonte: row.dataCaricoFonte,
+          quantitaPezzi: row.movimentoPezzi,
+          quantitaKgLt: row.movimentoKgLt,
           saldoFinalePezzi: row.saldoFinalePezzi,
           saldoFinaleKgLt: row.saldoFinaleKgLt,
-          saldoMovimentoPezzi: row.saldoMovimentoPezzi,
-          saldoMovimentoKgLt: row.saldoMovimentoKgLt,
-        }),
-        tipoMovimento: row.tipoMovimentoEsterno,
-        fondoOrigine: row.fondoNormalizzato,
-        prodottoEsterno: row.prodottoRaw,
-        prodottoNormalizzato: row.prodottoNormalizzato,
-        lottoFisico: row.lottoRaw,
-        numeroDocumento: row.numeroDocumentoRaw,
-        dataDocumento: row.dataDocumento,
-        dataOperativaProposta: row.dataCaricoRisolta,
-        dataOperativaFonte: row.dataCaricoFonte,
-        quantitaPezzi: row.movimentoPezzi,
-        quantitaKgLt: row.movimentoKgLt,
-        saldoFinalePezzi: row.saldoFinalePezzi,
-        saldoFinaleKgLt: row.saldoFinaleKgLt,
-        prodottoId: productId,
-        quantitaOperativa: operational?.quantitaOperativa ?? null,
-        fattoreKgLtPezzo: operational?.fattoreKgLtPezzo ?? null,
-        stato: state,
-        errorCodesJson: [...new Set(errors)],
-        warningCodesJson: [...new Set(warnings)],
-        aggiornatoDa: actorId,
-      }),
-    ),
-  );
+          prodottoId: productId,
+          quantitaOperativa: operational?.quantitaOperativa ?? null,
+          fattoreKgLtPezzo: operational?.fattoreKgLtPezzo ?? null,
+          stato: state,
+          errorCodesJson: [...new Set(errors)],
+          warningCodesJson: [...new Set(warnings)],
+          aggiornatoDa: actorId,
+        })),
+    );
+  }
 }
 
 async function persistStockRows(

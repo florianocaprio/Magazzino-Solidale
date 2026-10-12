@@ -145,6 +145,9 @@ export const fseAdministrativeLineageTable = pgTable(
   "fse_administrative_lineage",
   {
     id: serial("id").primaryKey(),
+    versionId: integer("version_id")
+      .notNull()
+      .references(() => fseAdministrativeVersionsTable.id),
     observationId: integer("observation_id")
       .notNull()
       .references(() => fseAdministrativeObservationsTable.id),
@@ -161,6 +164,10 @@ export const fseAdministrativeLineageTable = pgTable(
   (t) => [
     uniqueIndex("fse_administrative_lineage_unique").on(
       t.observationId,
+      t.claimId,
+    ),
+    uniqueIndex("fse_administrative_lineage_version_claim_unique").on(
+      t.versionId,
       t.claimId,
     ),
   ],

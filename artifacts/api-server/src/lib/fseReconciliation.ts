@@ -231,7 +231,12 @@ function paired(
     channelExternal: normalizedChannel(external.channel),
     status,
     blocking: status !== "RICONCILIATA_ESATTA",
-    qualityCodesJson: status === "RICONCILIATA_ESATTA" ? [] : [status],
+    qualityCodesJson: [
+      ...new Set([
+        ...(status === "RICONCILIATA_ESATTA" ? [] : [status]),
+        ...(external.qualityCodes ?? []),
+      ]),
+    ],
   };
   return { ...base, contentHash: canonicalSha256(base) };
 }
@@ -338,7 +343,12 @@ function externalOnly(external: ReconciliationExternalLine): ReconciliationRow {
     channelExternal: normalizedChannel(external.channel),
     status,
     blocking: status !== "BASELINE_ASSORBITA",
-    qualityCodesJson: status === "BASELINE_ASSORBITA" ? [] : [status],
+    qualityCodesJson: [
+      ...new Set([
+        ...(status === "BASELINE_ASSORBITA" ? [] : [status]),
+        ...(external.qualityCodes ?? []),
+      ]),
+    ],
   };
   return { ...base, contentHash: canonicalSha256(base) };
 }
@@ -757,14 +767,61 @@ export function currentExternalDelta(
     const key = externalFingerprint(row);
     prior.set(key, [...(prior.get(key) ?? []), row]);
   }
-  const added = current.filter((row) => {
+  // First consume unchanged occurrences, then pair quality-only changes.
+  // Physical identity stays separate: a warning is not a new stock movement.
+  const quality = (row: ReconciliationExternalLine) =>
+    row.observationId == null
+      ? "legacy"
+      : canonicalSha256({
+          codes: [...new Set(row.qualityCodes ?? [])].sort(),
+          modified: row.modified,
+          baselineAbsorbed: row.baselineAbsorbed ?? false,
+        });
+  const pending = current.filter((row) => {
     const key = externalFingerprint(row);
     const remaining = prior.get(key) ?? [];
-    if (remaining.length === 0) return true;
-    remaining.shift();
+    const same = remaining.findIndex(
+      (previous) => quality(previous) === quality(row),
+    );
+    if (same < 0) return true;
+    remaining.splice(same, 1);
     return false;
   });
-  return { added, missing: [...prior.values()].flat() };
+  const changed: ReconciliationExternalLine[] = [];
+  const added = pending.filter((row) => {
+    const remaining = prior.get(externalFingerprint(row)) ?? [];
+    if (!remaining.length) return true;
+    remaining.shift();
+    changed.push(row);
+    return false;
+  });
+  return { added, missing: [...prior.values()].flat(), changed };
+}
+
+function administrativeQualityChange(
+  external: ReconciliationExternalLine,
+): ReconciliationRow {
+  const base = externalOnly(external);
+  const row = {
+    ...base,
+    businessKey: `${base.businessKey}:QUALITA`,
+    matchMethod: "VARIAZIONE_AMMINISTRATIVA",
+    status: "QUALITA_AMMINISTRATIVA_VARIATA",
+    blocking: true,
+    // Keep the current source values for inspection, not a fictional stock delta.
+    differencePieces: null,
+    differenceKgLt: null,
+    qualityCodesJson: [
+      ...new Set([
+        "QUALITA_AMMINISTRATIVA_VARIATA",
+        ...(external.qualityCodes ?? []),
+      ]),
+    ],
+  };
+  return {
+    ...row,
+    contentHash: canonicalSha256({ ...row, contentHash: undefined }),
+  };
 }
 
 export function selectLocalReconciliationDelta(
@@ -979,6 +1036,15 @@ async function buildAdministrativeReconciliation(
       409,
       "Baseline di altra fonte, ambito o stesso periodo: selezionare un run precedente compatibile",
     );
+  if (
+    baseline &&
+    (cutoff.maxMovimentoId < baseline.maxMovementId ||
+      cutoff.maxOperazioneDistribuzioneId < baseline.maxOperationId)
+  )
+    throw new FseReportingError(
+      409,
+      "Cutoff precedente alla baseline: selezionare un'istantanea non regressiva",
+    );
   const current = await loadAdministrativeLines(tx, version.id);
   const previous = prior ? await loadAdministrativeLines(tx, prior.id) : [];
   const delta = currentExternalDelta(current, previous);
@@ -999,7 +1065,9 @@ async function buildAdministrativeReconciliation(
       ...externalOnly(e),
       status: "MOVIMENTO_AGEA_SCOMPARSO",
       blocking: true,
-      qualityCodesJson: ["MOVIMENTO_AGEA_SCOMPARSO"],
+      qualityCodesJson: [
+        ...new Set(["MOVIMENTO_AGEA_SCOMPARSO", ...(e.qualityCodes ?? [])]),
+      ],
     };
     return {
       ...row,
@@ -1009,6 +1077,7 @@ async function buildAdministrativeReconciliation(
   });
   const rows = [
     ...reconcileFseLines(local, delta.added),
+    ...delta.changed.map(administrativeQualityChange),
     ...missing,
     ...(await administrativeBalanceRows(tx, version, cutoff)),
   ].sort((a, b) => a.businessKey.localeCompare(b.businessKey));

@@ -83,6 +83,59 @@ function external(
 }
 
 describe("Magazzino 2.0C — matching riconciliazione", () => {
+  it("R64-01: quality-only changes are administrative, not added/missing stock facts", () => {
+    const before = external({
+      observationId: 20,
+      qualityCodes: ["RIGA_ESCLUSA"],
+    });
+    const after = external({
+      observationId: 21,
+      importRowId: 21,
+      qualityCodes: [],
+    });
+    const delta = currentExternalDelta([after], [before]);
+    expect(delta.added).toEqual([]);
+    expect(delta.missing).toEqual([]);
+    expect(delta).toHaveProperty("changed", [after]);
+    expect(currentExternalDelta([before], [before])).toHaveProperty(
+      "changed",
+      [],
+    );
+  });
+  it("R64-02: all source quality reasons survive paired and unpaired projections", () => {
+    const row = external({
+      qualityCodes: ["RIGA_ESCLUSA", "DATO_RAW_NON_INTERPRETABILE"],
+    });
+    for (const locals of [[], [local()]]) {
+      expect(reconcileFseLines(locals, [row])[0]).toMatchObject({
+        blocking: true,
+        qualityCodesJson: expect.arrayContaining(row.qualityCodes!),
+      });
+    }
+  });
+  it.each([{ modified: true }, { baselineAbsorbed: true }])(
+    "R64-01: administrative flags %s do not disappear from the delta",
+    (change) => {
+      const row = external({ observationId: 20 });
+      expect(
+        currentExternalDelta([{ ...row, ...change }], [row]),
+      ).toMatchObject({
+        added: [],
+        missing: [],
+        changed: [{ ...row, ...change }],
+      });
+    },
+  );
+  it("R64-01: multiset ordering and quality code ordering do not fabricate variations", () => {
+    const a = external({ observationId: 20, qualityCodes: ["A", "B"] });
+    const b = external({ observationId: 21, qualityCodes: ["C"] });
+    expect(
+      currentExternalDelta(
+        [b, { ...a, qualityCodes: ["B", "A", "A"] }],
+        [a, b],
+      ),
+    ).toEqual({ added: [], missing: [], changed: [] });
+  });
   it("applica link diretto, exact e multinsieme in ordine deterministico", () => {
     expect(
       reconcileFseLines(
