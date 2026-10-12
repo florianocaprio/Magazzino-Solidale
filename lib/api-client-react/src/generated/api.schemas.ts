@@ -169,6 +169,11 @@ export const RichiestaMagazzinoCreateModalitaPreferita = {
 
 export interface RichiestaMagazzinoCreate {
   /**
+   * Mensa assegnata; destinazione derivata dal server.
+   * @minimum 1
+   */
+  mensaId?: number;
+  /**
    * @minLength 1
    * @maxLength 120
    */
@@ -333,6 +338,11 @@ export const RichiestaMagazzinoStato = {
  * Snapshot operativo; nessun dato del dossier sociale live.
  */
 export interface RichiestaMagazzino {
+  /**
+   * Provenienza Mensa strutturale e immutabile; null per richieste precedenti o altri percorsi.
+   * @nullable
+   */
+  mensaId?: number | null;
   id: number;
   codice: string;
   tipoDestinatario: RichiestaMagazzinoTipoDestinatario;
@@ -9843,10 +9853,20 @@ export interface MensaConsumiPage {
   total: number;
 }
 
-export type MensaTrasferimentiPageItemsItem = { [key: string]: unknown };
+export interface MensaTrasferimentoSummary {
+  id: number;
+  versione: number;
+  codice: string;
+  stato: string;
+  mensaId: number;
+  mensaNome: string;
+  magazzinoOrigineNome: string;
+  dataRichiesta: string;
+  dataCreazione: string;
+}
 
 export interface MensaTrasferimentiPage {
-  items: MensaTrasferimentiPageItemsItem[];
+  items: MensaTrasferimentoSummary[];
   page: number;
   pageSize: number;
   total: number;
@@ -10443,6 +10463,10 @@ export type MapsDaParameter = string;
 export type MapsAParameter = string;
 
 export type ListRichiesteMagazzinoParams = {
+  /**
+   * @minimum 1
+   */
+  mensaId?: number;
   /**
    * @minimum 1
    */
@@ -12236,12 +12260,24 @@ export type ListMenseParams = {
 
 export type SearchMensaBeneficiariParams = {
   /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  mensaId?: number;
+  /**
    * @minLength 2
    */
   search: string;
 };
 
 export type ListMensaAbilitazioniParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   beneficiarioId?: number;
   mensaId?: number;
 };
@@ -12329,6 +12365,14 @@ export type ListTrasferimentiMensaParams = {
   /**
    * @minimum 1
    */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  mensaId?: number;
+  /**
+   * @minimum 1
+   */
   page?: number;
   /**
    * @minimum 1
@@ -12337,13 +12381,10 @@ export type ListTrasferimentiMensaParams = {
   pageSize?: number;
 };
 
-export type ListTrasferimentiMensa200 =
-  | { [key: string]: unknown }[]
-  | MensaTrasferimentiPage;
-
-export type CreateTrasferimentoMensa200 = { [key: string]: unknown };
-
-export type CreateTrasferimentoMensa201 = { [key: string]: unknown };
+export type CreateTrasferimentoMensa410 = {
+  error: string;
+  code: string;
+};
 
 export type ListConsumiMensaParams = {
   mensaId?: number;

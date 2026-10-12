@@ -10,6 +10,14 @@ export type ListTrasferimentiMensaParams = {
   /**
    * @minimum 1
    */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  mensaId?: number;
+  /**
+   * @minimum 1
+   */
   page?: number;
   /**
    * @minimum 1

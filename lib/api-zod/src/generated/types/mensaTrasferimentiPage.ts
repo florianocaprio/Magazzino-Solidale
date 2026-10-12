@@ -5,10 +5,10 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
-import type { MensaTrasferimentiPageItemsItem } from "./mensaTrasferimentiPageItemsItem";
+import type { MensaTrasferimentoSummary } from "./mensaTrasferimentoSummary";
 
 export interface MensaTrasferimentiPage {
-  items: MensaTrasferimentiPageItemsItem[];
+  items: MensaTrasferimentoSummary[];
   page: number;
   pageSize: number;
   total: number;

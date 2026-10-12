@@ -1,6 +1,7 @@
 /* @vitest-environment node */
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { AREA_BY_SEGMENT } from "../src/lib/areas";
 
 const read = (path: string) => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -59,12 +60,15 @@ describe("M5A — contratto, codegen e migration append-only", () => {
   });
 
   it("mappa il segmento all'Area applicativa e lascia intatte le route legacy", async () => {
-    const [areas, routes, handler] = await Promise.all([
-      read("../src/lib/areas.ts"),
+    const [routes, handler] = await Promise.all([
       read("../src/routes/index.ts"),
       read("../src/routes/richieste-magazzino.ts"),
     ]);
-    expect(areas).toContain('"richieste-magazzino": ["sociale", "magazzino"]');
+    expect(AREA_BY_SEGMENT["richieste-magazzino"]).toEqual([
+      "sociale",
+      "magazzino",
+      "mensa",
+    ]);
     expect(routes).toContain("router.use(richiesteMagazzinoRouter)");
     expect(handler).toContain('requireModulo("MAGAZZINO_SOLIDALE")');
     expect(handler).toContain('isModuloAttivo("CENTRO_ASCOLTO")');

@@ -1,4 +1,4 @@
-import { and, eq, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, isNull, or, inArray, sql, type SQL } from "drizzle-orm";
 import {
   areeOperativeTable,
   centriAscoltoTable,
@@ -7,8 +7,12 @@ import {
 } from "@workspace/db";
 import { requireCurrentCommandActor } from "./currentCommandActor";
 import type { InventoryTransaction } from "./scaricoInventory";
+import { currentMensaIds } from "./mensaScope";
+import type { PermissionKey } from "./permissions";
 
 export type M5bRequestActor = {
+  id?: number;
+  mensaIds?: number[] | null;
   isAdmin: boolean;
   permessi: string[] | null;
   aree: string[] | null;
@@ -46,8 +50,15 @@ export async function requireCurrentM5bActor(
           .from(centriAscoltoTable)
           .where(eq(centriAscoltoTable.id, actor.centroAscoltoId))
           .for("share");
+  const mensaIds =
+    !actor.isAdmin && actor.aree.includes("mensa")
+      ? actor.areaOperativaId == null
+        ? []
+        : (await currentMensaIds(tx, userId)).ids
+      : undefined;
   return {
     ...actor,
+    mensaIds,
     areaOperativaAttiva:
       actor.areaOperativaId == null ? null : (area?.attivo ?? false),
     centroAscoltoAttivo:
@@ -97,6 +108,13 @@ export function canReadM5bRequest(
   actor: M5bRequestActor,
   row: RichiestaMagazzino,
 ) {
+  if (
+    row.mensaId != null &&
+    canReadMensaRequests(actor) &&
+    actor.mensaIds?.includes(row.mensaId) &&
+    actor.areaOperativaId === row.areaOperativaId
+  )
+    return true;
   if (!hasM5bGrant(actor, "richieste_magazzino.view")) return false;
   const territory = m5bTerritory(actor);
   if (territory === "none") return false;
@@ -126,11 +144,21 @@ export function canReadM5bRequest(
 
 /** Mirrors canReadM5bRequest in SQL, before count and pagination. */
 export function m5bRequestScopePredicate(actor: M5bRequestActor): SQL {
+  const mensa =
+    canReadMensaRequests(actor) && actor.mensaIds?.length
+      ? and(
+          inArray(richiesteMagazzinoTable.mensaId, actor.mensaIds),
+          eq(
+            richiesteMagazzinoTable.areaOperativaId,
+            actor.areaOperativaId ?? -1,
+          ),
+        )!
+      : sql`false`;
   if (
     !hasM5bGrant(actor, "richieste_magazzino.view") ||
     m5bTerritory(actor) === "none"
   )
-    return sql`false`;
+    return mensa;
   const parts: SQL[] = [];
   if (actor.areaOperativaId != null)
     parts.push(
@@ -149,12 +177,47 @@ export function m5bRequestScopePredicate(actor: M5bRequestActor): SQL {
         : eq(richiesteMagazzinoTable.centroAscoltoId, actor.centroAscoltoId),
     );
   if (!hasM5bArea(actor, "magazzino")) {
-    if (!hasM5bArea(actor, "sociale")) return sql`false`;
+    if (!hasM5bArea(actor, "sociale")) return mensa;
     parts.push(eq(richiesteMagazzinoTable.tipoDestinatario, "beneficiario"));
     if (actor.zonaUdsId != null)
       parts.push(
         eq(richiesteMagazzinoTable.zonaUdsIdSnapshot, actor.zonaUdsId),
       );
   }
-  return and(...parts) ?? sql`true`;
+  return or(mensa, and(...parts) ?? sql`true`)!;
+}
+
+/** Existing Mensa capabilities permit needs/receiving, never origin stock work. */
+export function canReadMensaRequests(actor: M5bRequestActor) {
+  return (
+    hasM5bArea(actor, "mensa") &&
+    [
+      "mensa.transfers.request",
+      "mensa.transfers.receive",
+      "mensa.transfers.manage",
+    ].some((permission) => hasM5bGrant(actor, permission))
+  );
+}
+
+export function mensaRequestPermission(
+  actor: M5bRequestActor,
+  permission: PermissionKey,
+): PermissionKey {
+  if (hasM5bGrant(actor, permission)) return permission;
+  if (!hasM5bArea(actor, "mensa")) return permission;
+  const allowed: PermissionKey[] =
+    permission === "richieste_magazzino.view"
+      ? [
+          "mensa.transfers.request",
+          "mensa.transfers.receive",
+          "mensa.transfers.manage",
+        ]
+      : [
+            "richieste_magazzino.create",
+            "richieste_magazzino.update",
+            "richieste_magazzino.cancel",
+          ].includes(permission)
+        ? ["mensa.transfers.request", "mensa.transfers.manage"]
+        : [];
+  return allowed.find((p) => hasM5bGrant(actor, p)) ?? permission;
 }

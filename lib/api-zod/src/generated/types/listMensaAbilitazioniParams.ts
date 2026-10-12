@@ -7,6 +7,10 @@
  */
 
 export type ListMensaAbilitazioniParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   beneficiarioId?: number;
   mensaId?: number;
 };

@@ -1,36 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  getDocumentoTrasferimento,
   getSearchMensaBeneficiariQueryKey,
   getListMensaAbilitazioniQueryKey,
   getListGiacenzeMensaQueryKey,
   getListLottiMensaQueryKey,
   getListConsumiMensaQueryKey,
   useAutorizzaEccezioneMensa,
-  useAvviaTrasferimento,
-  usePreparaTrasferimento,
-  useAnnullaTrasferimento,
-  useConfermaTrasferimento,
-  useSegnalaMancatoArrivoTrasferimento,
   useOpenGiornataMensa,
   useCreateAccessoTemporaneoMensa,
   useCreateMensaAbilitazione,
   useCreatePastoMensa,
   useCreateConsumoMensa,
   useCreateTesseraBeneficiario,
-  useCreateTrasferimentoMensa,
   useGetMensaReport,
   useListEccezioniMensa,
   useListConsumiMensa,
   useListGiornateMensa,
   useListGiacenzeMensa,
   useListLottiMensa,
-  useListMagazziniMensa,
   useListMensaAbilitazioni,
   useListMense,
   useListPastiMensa,
-  useListTrasferimentiMensa,
   useSearchMensaBeneficiari,
   useStornaConsumoMensa,
   useChiudiGiornataMensa,
@@ -76,9 +67,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { todayEuropeRome } from "@/lib/europe-rome";
-import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
 import { useCommandIntentRegistry } from "@/lib/command-intent";
 import { mensaErrorMessage } from "@/lib/mensa-ui";
+import { BarcodeScannerButton } from "@/components/barcode-scanner-button";
+import { MensaRifornimenti } from "@/components/mensa-rifornimenti";
+import {
+  MensaSelect,
+  MensaOperationalContext,
+  useMensaContext,
+} from "@/components/mensa-operational-context";
 
 export type MensaView =
   | "postazione"
@@ -117,7 +114,9 @@ function PageTitle({ view }: { view: MensaView }) {
     <div>
       <h1 className="text-2xl font-semibold">{t(`mensa.title.${view}`)}</h1>
       <p className="text-sm text-muted-foreground">
-        {t("mensa.noSensitiveData")}
+        {view === "postazione"
+          ? t("mensa.noSensitiveData")
+          : t(`mensa.description.${view}`)}
       </p>
     </div>
   );
@@ -143,55 +142,6 @@ function MensaQueryFeedback({
   if (empty)
     return <p className="text-sm text-muted-foreground">{t("mensa.empty")}</p>;
   return null;
-}
-
-function MensaSelect({
-  value,
-  onChange,
-  historical = false,
-}: {
-  value: number | null;
-  onChange: (value: number | null) => void;
-  historical?: boolean;
-}) {
-  const { t } = useTranslation();
-  const {
-    data: mense = [],
-    isError,
-    isLoading,
-  } = useListMense(historical ? {} : { attiva: true });
-  useEffect(() => {
-    if ((value == null || !mense.some((item) => item.id === value)) && mense[0])
-      onChange(mense[0].id);
-    else if (!isLoading && !isError && !mense.length && value != null)
-      onChange(null);
-  }, [mense, onChange, value, isLoading, isError]);
-  return (
-    <Select
-      value={value?.toString() ?? ""}
-      onValueChange={(next) => onChange(Number(next))}
-    >
-      <SelectTrigger aria-label="Mensa">
-        <SelectValue
-          placeholder={
-            isError
-              ? t("mensa.loadError")
-              : isLoading
-                ? t("common.loading")
-                : "Seleziona Mensa"
-          }
-        />
-      </SelectTrigger>
-      <SelectContent>
-        {mense.map((mensa) => (
-          <SelectItem key={mensa.id} value={String(mensa.id)}>
-            {mensa.nome}
-            {!mensa.attiva ? ` — ${t("mensa.inactive")}` : ""}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
 }
 
 function AccessFeedback({ access }: { access: MensaAccesso }) {
@@ -252,6 +202,9 @@ function AccessFeedback({ access }: { access: MensaAccesso }) {
 }
 
 export function MensaPostazione() {
+  const operationalContext = useMensaContext();
+  const areaId = operationalContext?.areaId;
+  const accessIntents = useCommandIntentRegistry();
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const { toast } = useToast();
@@ -262,14 +215,24 @@ export function MensaPostazione() {
   const [code, setCode] = useState("");
   const [access, setAccess] = useState<MensaAccesso | null>(null);
   const contextRef = useRef("");
-  const context = `${mensaId}:${tipoServizio}`;
+  const generation = useRef({ identity: "", value: 0 });
+  const identity = `${areaId}:${mensaId}:${tipoServizio}`;
+  if (generation.current.identity !== identity)
+    generation.current = { identity, value: generation.current.value + 1 };
+  const context = `${identity}:${generation.current.value}`;
   contextRef.current = context;
+  useEffect(
+    () => () => {
+      contextRef.current = "unmounted";
+    },
+    [],
+  );
   useEffect(() => {
     setAccess(null);
     setCode("");
     setReason("");
     setManualSearch("");
-    setTemporaryOpen(false);
+    resetTemporaryForm();
   }, [mensaId, tipoServizio]);
   const [reason, setReason] = useState("");
   const [manualSearch, setManualSearch] = useState("");
@@ -295,11 +258,33 @@ export function MensaPostazione() {
   const exception = useAutorizzaEccezioneMensa();
   const meal = useCreatePastoMensa();
   const temporaryAccess = useCreateAccessoTemporaneoMensa();
+  const setContextDirty = operationalContext?.setDirty;
+  const hasDraft = Boolean(
+    code ||
+    reason ||
+    manualSearch ||
+    temporaryOpen ||
+    verify.isPending ||
+    meal.isPending ||
+    temporaryAccess.isPending,
+  );
+  useEffect(() => {
+    setContextDirty?.(hasDraft);
+    return () => setContextDirty?.(false);
+  }, [setContextDirty, hasDraft]);
   const search = useSearchMensaBeneficiari(
-    { search: manualSearch },
+    {
+      search: manualSearch,
+      areaOperativaId: areaId,
+      mensaId: mensaId ?? undefined,
+    },
     {
       query: {
-        queryKey: getSearchMensaBeneficiariQueryKey({ search: manualSearch }),
+        queryKey: getSearchMensaBeneficiariQueryKey({
+          search: manualSearch,
+          areaOperativaId: areaId,
+          mensaId: mensaId ?? undefined,
+        }),
         enabled:
           hasPermission("mensa.access.manual") &&
           manualSearch.trim().length >= 2,
@@ -308,7 +293,11 @@ export function MensaPostazione() {
   );
 
   useEffect(() => {
-    inputRef.current?.focus();
+    if (
+      document.activeElement === document.body ||
+      document.activeElement === inputRef.current
+    )
+      inputRef.current?.focus();
   }, [verify.isPending, access]);
 
   const focusScanner = () => {
@@ -341,62 +330,90 @@ export function MensaPostazione() {
     focusScanner();
   };
 
-  const scan = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!mensaId || !code.trim() || verify.isPending || scanLockedRef.current)
+  const verifyCode = (scannedCode: string) => {
+    if (
+      !mensaId ||
+      !scannedCode.trim() ||
+      verify.isPending ||
+      scanLockedRef.current
+    )
       return;
     scanLockedRef.current = true;
+    setAccess(null);
+    const slot = `access:${context}`;
+    const payload = {
+      mensaId,
+      modalitaAccesso: "tessera" as const,
+      codiceTessera: scannedCode.trim(),
+      tipoServizio,
+    };
     verify.mutate(
       {
-        data: {
-          mensaId,
-          modalitaAccesso: "tessera",
-          codiceTessera: code.trim(),
-          tipoServizio,
-          idempotencyKey: requestKey("scan"),
-        },
+        data: accessIntents.prepare(slot, payload, payload),
       },
       {
         onSuccess: (result) => {
-          if (contextRef.current === context) setAccess(result);
-          setCode("");
+          accessIntents.complete(slot);
+          if (contextRef.current === context) {
+            setAccess(result);
+            setCode("");
+          }
         },
-        onError: (error) =>
+        onError: (error) => {
+          accessIntents.fail(slot, error);
+          if (contextRef.current !== context) return;
           toast({
             title: "Verifica non riuscita",
             description: errorMessage(error),
             variant: "destructive",
-          }),
+          });
+        },
         onSettled: () => {
           scanLockedRef.current = false;
         },
       },
     );
   };
+  const scan = (event: React.FormEvent) => {
+    event.preventDefault();
+    verifyCode(code);
+  };
 
   const verifyManual = (beneficiary: MensaBeneficiarioSummary) => {
-    if (!mensaId || verify.isPending) return;
+    if (!mensaId || verify.isPending || scanLockedRef.current) return;
+    scanLockedRef.current = true;
+    setAccess(null);
+    const slot = `access:${context}`;
+    const payload = {
+      mensaId,
+      modalitaAccesso: "manuale" as const,
+      beneficiarioId: beneficiary.id,
+      tipoServizio,
+    };
     verify.mutate(
       {
-        data: {
-          mensaId,
-          modalitaAccesso: "manuale",
-          beneficiarioId: beneficiary.id,
-          tipoServizio,
-          idempotencyKey: requestKey("manual"),
-        },
+        data: accessIntents.prepare(slot, payload, payload),
       },
       {
         onSuccess: (result) => {
-          if (contextRef.current === context) setAccess(result);
-          setManualSearch("");
+          accessIntents.complete(slot);
+          if (contextRef.current === context) {
+            setAccess(result);
+            setManualSearch("");
+          }
         },
-        onError: (error) =>
+        onError: (error) => {
+          accessIntents.fail(slot, error);
+          if (contextRef.current !== context) return;
           toast({
             title: t("mensa.loadError"),
             description: errorMessage(error),
             variant: "destructive",
-          }),
+          });
+        },
+        onSettled: () => {
+          scanLockedRef.current = false;
+        },
       },
     );
   };
@@ -412,12 +429,14 @@ export function MensaPostazione() {
             setReason("");
           }
         },
-        onError: (error) =>
+        onError: (error) => {
+          if (contextRef.current !== context) return;
           toast({
             title: t("mensa.actionFailed"),
             description: errorMessage(error),
             variant: "destructive",
-          }),
+          });
+        },
       },
     );
   };
@@ -443,6 +462,7 @@ export function MensaPostazione() {
             if (contextRef.current === context) readyForNextPerson();
           },
           onError: (error) => {
+            if (contextRef.current !== context) return;
             const message = errorMessage(error);
             if (
               !override &&
@@ -492,12 +512,14 @@ export function MensaPostazione() {
       },
       {
         onSuccess: onTemporarySuccess,
-        onError: (error) =>
+        onError: (error) => {
+          if (contextRef.current !== context) return;
           toast({
             title: "Accesso temporaneo non autorizzato",
             description: errorMessage(error),
             variant: "destructive",
-          }),
+          });
+        },
       },
     );
   };
@@ -534,6 +556,7 @@ export function MensaPostazione() {
       {
         onSuccess: onTemporarySuccess,
         onError: (error) => {
+          if (contextRef.current !== context) return;
           const data = (
             error as {
               data?: { possibiliDuplicati?: BeneficiarioSimile[] };
@@ -555,15 +578,16 @@ export function MensaPostazione() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
-      <PageTitle view="postazione" />
       <Card>
         <CardContent className="space-y-5 p-6">
           <MensaSelect value={mensaId} onChange={setMensaId} />
           <Select
             value={tipoServizio}
-            onValueChange={(value) =>
-              setTipoServizio(value as "pranzo" | "cena")
-            }
+            onValueChange={(value) => {
+              const change = () => setTipoServizio(value as "pranzo" | "cena");
+              if (operationalContext) operationalContext.change(change);
+              else change();
+            }}
           >
             <SelectTrigger aria-label="Tipo servizio">
               <SelectValue />
@@ -577,6 +601,13 @@ export function MensaPostazione() {
             <Label htmlFor="mensa-scan" className="text-xl">
               {t("mensa.scanPrompt")}
             </Label>
+            <BarcodeScannerButton
+              key={context}
+              withLabel
+              label={t("mensa.scanCard")}
+              disabled={!mensaId || verify.isPending}
+              onScan={verifyCode}
+            />
             <Input
               ref={inputRef}
               id="mensa-scan"
@@ -1090,6 +1121,8 @@ function PastiView() {
 }
 
 function AbilitazioniView() {
+  const operationalContext = useMensaContext();
+  const areaId = operationalContext?.areaId;
   const { t } = useTranslation();
   const { toast } = useToast();
   const onError = (error: unknown) =>
@@ -1107,16 +1140,29 @@ function AbilitazioniView() {
   const [mensaId, setMensaId] = useState<number | null>(null);
   const [start, setStart] = useState(todayEuropeRome());
   const [end, setEnd] = useState("");
+  const setContextDirty = operationalContext?.setDirty;
+  const hasDraft =
+    selected != null && (start !== todayEuropeRome() || end !== "");
+  useEffect(() => {
+    setContextDirty?.(hasDraft);
+    return () => setContextDirty?.(false);
+  }, [setContextDirty, hasDraft]);
   const search = useSearchMensaBeneficiari(
-    { search: searchText },
+    { search: searchText, areaOperativaId: areaId },
     {
       query: {
-        queryKey: getSearchMensaBeneficiariQueryKey({ search: searchText }),
+        queryKey: getSearchMensaBeneficiariQueryKey({
+          search: searchText,
+          areaOperativaId: areaId,
+        }),
         enabled: searchText.trim().length >= 2,
       },
     },
   );
-  const historyParams = { beneficiarioId: selected?.id };
+  const historyParams = {
+    beneficiarioId: selected?.id,
+    areaOperativaId: areaId,
+  };
   const history = useListMensaAbilitazioni(historyParams, {
     query: {
       queryKey: getListMensaAbilitazioniQueryKey(historyParams),
@@ -1127,10 +1173,15 @@ function AbilitazioniView() {
   const status = useUpdateMensaAbilitazioneStato();
   const card = useCreateTesseraBeneficiario();
   const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: ["/api/mensa/abilitazioni"] });
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["/api/mensa/abilitazioni"] }),
+      queryClient.invalidateQueries({
+        queryKey: ["/api/mensa/beneficiari/ricerca"],
+      }),
+      queryClient.invalidateQueries({ queryKey: ["/api/mensa/tessere"] }),
+    ]);
   return (
     <div className="space-y-6 p-6">
-      <PageTitle view="abilitazioni" />
       <MensaQueryFeedback
         isLoading={search.isLoading}
         isError={search.isError || history.isError}
@@ -1142,16 +1193,29 @@ function AbilitazioniView() {
             onChange={(e) => setSearchText(e.target.value)}
             placeholder="Cerca beneficiario"
           />
-          {search.data?.map((person) => (
-            <Button
-              key={person.id}
-              variant={selected?.id === person.id ? "default" : "outline"}
-              className="mr-2"
-              onClick={() => setSelected(person)}
-            >
-              {person.nome} {person.cognome} · {person.codice}
-            </Button>
-          ))}
+          {searchText.trim().length < 2 && <p>{t("mensa.searchHint")}</p>}
+          {search.isSuccess &&
+            searchText.trim().length >= 2 &&
+            !search.data?.length && <p>{t("mensa.noBeneficiariesInArea")}</p>}
+          {!search.isError &&
+            search.data?.map((person) => (
+              <Button
+                key={person.id}
+                variant={selected?.id === person.id ? "default" : "outline"}
+                className="mr-2"
+                onClick={() => {
+                  const change = () => {
+                    setSelected(person);
+                    setStart(todayEuropeRome());
+                    setEnd("");
+                  };
+                  if (operationalContext) operationalContext.change(change);
+                  else change();
+                }}
+              >
+                {person.nome} {person.cognome} · {person.codice}
+              </Button>
+            ))}
         </CardContent>
       </Card>
       {selected && (
@@ -1226,703 +1290,114 @@ function AbilitazioniView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {history.data?.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.mensaNome}</TableCell>
-                      <TableCell>
-                        {item.dataInizio} — {item.dataFine ?? "senza scadenza"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge>
-                            {item.stato === "attiva" &&
-                            item.dataInizio > todayEuropeRome()
-                              ? "programmata"
-                              : item.stato}
-                          </Badge>
-                          {item.mensaPrincipale && (
-                            <Badge variant="secondary">Mensa principale</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {item.stato === "attiva" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={status.isPending}
-                              onClick={() => {
-                                const motivo = window.prompt(
-                                  "Motivo obbligatorio della sospensione",
-                                );
-                                if (motivo?.trim())
+                  {!history.isError &&
+                    history.data?.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.mensaNome}</TableCell>
+                        <TableCell>
+                          {item.dataInizio} —{" "}
+                          {item.dataFine ?? "senza scadenza"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge>
+                              {item.stato === "attiva" &&
+                              item.dataInizio > todayEuropeRome()
+                                ? "programmata"
+                                : item.stato}
+                            </Badge>
+                            {item.mensaPrincipale && (
+                              <Badge variant="secondary">
+                                Mensa principale
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2">
+                            {item.stato === "attiva" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={status.isPending}
+                                onClick={() => {
+                                  const motivo = window.prompt(
+                                    "Motivo obbligatorio della sospensione",
+                                  );
+                                  if (motivo?.trim())
+                                    status.mutate(
+                                      {
+                                        id: item.id,
+                                        data: {
+                                          stato: "sospesa",
+                                          motivo: motivo.trim(),
+                                          versione: item.versione,
+                                        },
+                                      },
+                                      { onSuccess: refresh, onError },
+                                    );
+                                }}
+                              >
+                                Sospendi
+                              </Button>
+                            )}
+                            {item.stato === "sospesa" && (
+                              <Button
+                                size="sm"
+                                disabled={status.isPending}
+                                onClick={() =>
                                   status.mutate(
                                     {
                                       id: item.id,
                                       data: {
-                                        stato: "sospesa",
-                                        motivo: motivo.trim(),
+                                        stato: "attiva",
                                         versione: item.versione,
                                       },
                                     },
                                     { onSuccess: refresh, onError },
+                                  )
+                                }
+                              >
+                                Riattiva
+                              </Button>
+                            )}
+                            {(item.stato === "attiva" ||
+                              item.stato === "sospesa") && (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={status.isPending}
+                                onClick={() => {
+                                  const motivo = window.prompt(
+                                    "Motivo obbligatorio della revoca",
                                   );
-                              }}
-                            >
-                              Sospendi
-                            </Button>
-                          )}
-                          {item.stato === "sospesa" && (
-                            <Button
-                              size="sm"
-                              disabled={status.isPending}
-                              onClick={() =>
-                                status.mutate(
-                                  {
-                                    id: item.id,
-                                    data: {
-                                      stato: "attiva",
-                                      versione: item.versione,
-                                    },
-                                  },
-                                  { onSuccess: refresh, onError },
-                                )
-                              }
-                            >
-                              Riattiva
-                            </Button>
-                          )}
-                          {(item.stato === "attiva" ||
-                            item.stato === "sospesa") && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              disabled={status.isPending}
-                              onClick={() => {
-                                const motivo = window.prompt(
-                                  "Motivo obbligatorio della revoca",
-                                );
-                                if (motivo?.trim())
-                                  status.mutate(
-                                    {
-                                      id: item.id,
-                                      data: {
-                                        stato: "revocata",
-                                        motivo: motivo.trim(),
-                                        versione: item.versione,
+                                  if (motivo?.trim())
+                                    status.mutate(
+                                      {
+                                        id: item.id,
+                                        data: {
+                                          stato: "revocata",
+                                          motivo: motivo.trim(),
+                                          versione: item.versione,
+                                        },
                                       },
-                                    },
-                                    { onSuccess: refresh, onError },
-                                  );
-                              }}
-                            >
-                              Revoca
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                                      { onSuccess: refresh, onError },
+                                    );
+                                }}
+                              >
+                                Revoca
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
         </>
       )}
-    </div>
-  );
-}
-
-type TransferRow = {
-  id: number;
-  versione: number;
-  codice: string;
-  stato: string;
-  mensaNome?: string;
-  magazzinoOrigineNome?: string;
-  dataRichiesta?: string;
-};
-
-function TrasferimentiView() {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const { hasPermission } = useAuth();
-  const [page, setPage] = useState(1);
-  const { data: mense = [] } = useListMense({ attiva: true });
-  const { data: warehouses = [] } = useListMagazziniMensa();
-  const list = useListTrasferimentiMensa({ page, pageSize: 50 });
-  const [mensaId, setMensaId] = useState("");
-  const [originId, setOriginId] = useState("");
-  const [productId, setProductId] = useState("");
-  const [lottoId, setLottoId] = useState("");
-  const [lotPage, setLotPage] = useState(1);
-  const [lotSearch, setLotSearch] = useState("");
-  useEffect(() => {
-    setLotPage(1);
-    setLottoId("");
-  }, [mensaId, originId, productId, lotSearch]);
-  const [quantity, setQuantity] = useState("1");
-  const stockParams = { magazzinoId: Number(originId) };
-  const stock = useListGiacenzeMensa(stockParams, {
-    query: {
-      queryKey: getListGiacenzeMensaQueryKey(stockParams),
-      enabled: Number(originId) > 0,
-    },
-  });
-  const selectedProduct = stock.data?.find(
-    (item) => item.prodottoId === Number(productId),
-  );
-  const lotParams = {
-    mensaId: Number(mensaId),
-    magazzinoId: Number(originId),
-    prodottoId: Number(productId),
-    dataRichiesta: todayEuropeRome(),
-    page: lotPage,
-    pageSize: 50,
-    search: lotSearch || undefined,
-  };
-  const lots = useListLottiMensa(lotParams, {
-    query: {
-      queryKey: getListLottiMensaQueryKey(lotParams),
-      enabled:
-        Number(mensaId) > 0 &&
-        Number(originId) > 0 &&
-        Number(productId) > 0 &&
-        !!selectedProduct,
-    },
-  });
-  const availableLots = pageItems(lots.data);
-  const selectedLot = availableLots.find((item) => item.id === Number(lottoId));
-  const maxQuantity = selectedLot
-    ? Math.min(
-        selectedProduct?.disponibileReale ?? 0,
-        selectedLot.disponibileReale,
-      )
-    : (selectedProduct?.disponibileReale ?? 0);
-  const create = useCreateTrasferimentoMensa();
-  const start = useAvviaTrasferimento();
-  const prepare = usePreparaTrasferimento();
-  const cancel = useAnnullaTrasferimento();
-  const confirm = useConfermaTrasferimento();
-  const missing = useSegnalaMancatoArrivoTrasferimento();
-  const commandIntents = useCommandIntentRegistry();
-  const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: ["/api/mensa/trasferimenti"] });
-  const submit = () => {
-    const product = selectedProduct;
-    if (!product) return;
-    if (product.lottoFisicoObbligatorio && !selectedLot) {
-      toast({
-        title: "Seleziona il lotto fisico da trasferire",
-        variant: "destructive",
-      });
-      return;
-    }
-    const requestedQuantity = Number(quantity);
-    if (
-      !Number.isFinite(requestedQuantity) ||
-      requestedQuantity <= 0 ||
-      requestedQuantity > maxQuantity
-    ) {
-      toast({
-        title: "Quantità non disponibile",
-        description: `Il disponibile reale è ${maxQuantity} ${product.unitaMisura}`,
-        variant: "destructive",
-      });
-      return;
-    }
-    const slot = "trasferimento-mensa:create";
-    const semanticInput = {
-      mensaId: Number(mensaId),
-      magazzinoOrigineId: Number(originId),
-      trasportatoreNome: "Operatore Mensa",
-      righe: [
-        {
-          prodottoId: product.prodottoId,
-          quantita: String(requestedQuantity),
-          unitaMisura: product.unitaMisura,
-          ...(selectedLot ? { lottoId: selectedLot.id } : {}),
-        },
-      ],
-    };
-    create.mutate(
-      {
-        data: commandIntents.prepare(slot, semanticInput, {
-          ...semanticInput,
-          dataRichiesta: todayEuropeRome(),
-        }),
-      },
-      {
-        onSuccess: () => {
-          commandIntents.complete(slot);
-          refresh();
-          queryClient.invalidateQueries({
-            queryKey: getListLottiMensaQueryKey(),
-          });
-        },
-        onError: (error) => {
-          commandIntents.fail(slot, error);
-          toast({
-            title: "Trasferimento non creato",
-            description: errorMessage(error),
-            variant: "destructive",
-          });
-        },
-      },
-    );
-  };
-  const rows = pageItems(
-    list.data as TransferRow[] | { items: TransferRow[] } | undefined,
-  );
-  const total = pageTotal(
-    list.data as
-      | TransferRow[]
-      | { items: TransferRow[]; total: number }
-      | undefined,
-  );
-  const startTransfer = (row: TransferRow) => {
-    const slot = `trasferimento:${row.id}:start`;
-    start.mutate(
-      {
-        id: row.id,
-        data: commandIntents.prepare(slot, {}, { versione: row.versione }),
-      },
-      {
-        onSuccess: () => {
-          commandIntents.complete(slot);
-          refresh();
-          queryClient.invalidateQueries({
-            queryKey: getListGiacenzeMensaQueryKey(stockParams),
-          });
-          queryClient.invalidateQueries({
-            queryKey: getListLottiMensaQueryKey(),
-          });
-        },
-        onError: (error) => {
-          commandIntents.fail(slot, error);
-          toast({
-            title: "Trasferimento non avviato",
-            description: errorMessage(error),
-            variant: "destructive",
-          });
-        },
-      },
-    );
-  };
-  const prepareTransfer = (row: TransferRow) => {
-    const slot = `trasferimento:${row.id}:prepare`;
-    prepare.mutate(
-      {
-        id: row.id,
-        data: commandIntents.prepare(slot, {}, { versione: row.versione }),
-      },
-      {
-        onSuccess: () => {
-          commandIntents.complete(slot);
-          refresh();
-          queryClient.invalidateQueries({
-            queryKey: getListGiacenzeMensaQueryKey(stockParams),
-          });
-          queryClient.invalidateQueries({
-            queryKey: getListLottiMensaQueryKey(),
-          });
-          toast({ title: t("trasferimenti.toastPronto") });
-        },
-        onError: (error) => {
-          commandIntents.fail(slot, error);
-          toast({
-            title: t("trasferimenti.errorTitle"),
-            description: errorMessage(error),
-            variant: "destructive",
-          });
-        },
-      },
-    );
-  };
-  const cancelTransfer = (row: TransferRow) => {
-    const motivo = window.prompt(t("trasferimenti.motivoAnnullamento"))?.trim();
-    if (!motivo) return;
-    const slot = `trasferimento:${row.id}:cancel`;
-    cancel.mutate(
-      {
-        id: row.id,
-        data: commandIntents.prepare(
-          slot,
-          { motivo },
-          { versione: row.versione, motivo },
-        ),
-      },
-      {
-        onSuccess: () => {
-          commandIntents.complete(slot);
-          refresh();
-          queryClient.invalidateQueries({
-            queryKey: getListGiacenzeMensaQueryKey(stockParams),
-          });
-          queryClient.invalidateQueries({
-            queryKey: getListLottiMensaQueryKey(),
-          });
-          toast({ title: t("trasferimenti.toastAnnullato") });
-        },
-        onError: (error) => {
-          commandIntents.fail(slot, error);
-          toast({
-            title: t("trasferimenti.errorTitle"),
-            description: errorMessage(error),
-            variant: "destructive",
-          });
-        },
-      },
-    );
-  };
-  const confirmTransfer = (row: TransferRow) => {
-    const slot = `trasferimento:${row.id}:receive`;
-    confirm.mutate(
-      {
-        id: row.id,
-        data: commandIntents.prepare(slot, {}, { versione: row.versione }),
-      },
-      {
-        onSuccess: () => {
-          commandIntents.complete(slot);
-          refresh();
-        },
-        onError: (error) => {
-          commandIntents.fail(slot, error);
-          toast({
-            title: "Ricezione non confermata",
-            description: errorMessage(error),
-            variant: "destructive",
-          });
-        },
-      },
-    );
-  };
-  return (
-    <div className="space-y-6 p-6">
-      <PageTitle view="trasferimenti" />
-      <MensaQueryFeedback
-        isLoading={list.isLoading}
-        isError={list.isError || stock.isError}
-        empty={list.data != null && !pageItems(list.data).length}
-      />
-      <Card>
-        <CardHeader>
-          <CardTitle>Nuovo rifornimento</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          <Select
-            value={mensaId}
-            onValueChange={(value) => {
-              setMensaId(value);
-              setOriginId("");
-              setProductId("");
-              setLottoId("");
-            }}
-          >
-            <SelectTrigger aria-label="Mensa destinazione">
-              <SelectValue placeholder="Mensa destinazione" />
-            </SelectTrigger>
-            <SelectContent>
-              {mense.map((mensa) => (
-                <SelectItem key={mensa.id} value={String(mensa.id)}>
-                  {mensa.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={originId}
-            onValueChange={(value) => {
-              setOriginId(value);
-              setProductId("");
-              setLottoId("");
-            }}
-          >
-            <SelectTrigger aria-label="Magazzino origine">
-              <SelectValue placeholder="Magazzino origine" />
-            </SelectTrigger>
-            <SelectContent>
-              {warehouses
-                .filter(
-                  (warehouse) =>
-                    warehouse.id !==
-                    mense.find((m) => m.id === Number(mensaId))?.magazzinoId,
-                )
-                .map((warehouse) => (
-                  <SelectItem key={warehouse.id} value={String(warehouse.id)}>
-                    {warehouse.nome}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={productId}
-            onValueChange={(value) => {
-              setProductId(value);
-              setLottoId("");
-            }}
-          >
-            <SelectTrigger aria-label="Prodotto disponibile">
-              <SelectValue placeholder="Prodotto disponibile" />
-            </SelectTrigger>
-            <SelectContent>
-              {stock.data?.map((item) => (
-                <SelectItem
-                  key={item.prodottoId}
-                  value={String(item.prodottoId)}
-                >
-                  {item.nome} · fisica {item.giacenzaFisica} · impegnata{" "}
-                  {item.impegnato} · disponibile {item.disponibileReale}{" "}
-                  {item.unitaMisura}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {selectedProduct && (
-            <div className="space-y-2" data-testid="mensa-lotto-field">
-              <Label htmlFor="mensa-lotto">Lotto</Label>
-              <Input
-                aria-label={t("mensa.searchLot")}
-                value={lotSearch}
-                onChange={(event) => setLotSearch(event.target.value)}
-              />
-              <Select
-                value={lottoId || "fefo"}
-                onValueChange={(value) =>
-                  setLottoId(value === "fefo" ? "" : value)
-                }
-              >
-                <SelectTrigger id="mensa-lotto" aria-label="Lotto">
-                  <SelectValue placeholder="Seleziona lotto fisico" />
-                </SelectTrigger>
-                <SelectContent>
-                  {!selectedProduct.lottoFisicoObbligatorio && (
-                    <SelectItem value="fefo">
-                      {t("mensa.automaticFefo")}
-                    </SelectItem>
-                  )}
-                  {availableLots.map((lot) => (
-                    <SelectItem key={lot.id} value={String(lot.id)}>
-                      {lot.codiceLotto ?? `#${lot.id}`} ·{" "}
-                      {lot.dataScadenza
-                        ? `scad. ${new Date(`${lot.dataScadenza}T12:00:00Z`).toLocaleDateString("it-IT")}`
-                        : "senza scadenza"}{" "}
-                      · disponibile {lot.disponibileReale}{" "}
-                      {selectedProduct.unitaMisura}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  disabled={lotPage === 1}
-                  onClick={() => setLotPage((page) => page - 1)}
-                >
-                  {t("common.previous")}
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={lotPage * 50 >= pageTotal(lots.data)}
-                  onClick={() => setLotPage((page) => page + 1)}
-                >
-                  {t("common.next")}
-                </Button>
-              </div>
-              {selectedProduct.lottoFisicoObbligatorio && !selectedLot && (
-                <p className="text-sm text-muted-foreground">
-                  Seleziona il lotto fisico da trasferire
-                </p>
-              )}
-              {lots.isError && (
-                <p role="alert" className="text-sm text-destructive">
-                  Impossibile caricare i lotti disponibili
-                </p>
-              )}
-            </div>
-          )}
-          <Input
-            type="number"
-            aria-label="Quantità"
-            min={selectedProduct?.quantitaFrazionabile ? "0.000001" : "1"}
-            step={selectedProduct?.quantitaFrazionabile ? "0.000001" : "1"}
-            max={maxQuantity}
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-          />
-          <Button
-            disabled={
-              !mensaId ||
-              !originId ||
-              !productId ||
-              !selectedProduct ||
-              (selectedProduct.lottoFisicoObbligatorio && !selectedLot) ||
-              Number(quantity) <= 0 ||
-              Number(quantity) > maxQuantity ||
-              create.isPending
-            }
-            onClick={submit}
-          >
-            Crea trasferimento
-          </Button>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Documento</TableHead>
-                <TableHead>Origine</TableHead>
-                <TableHead>Mensa</TableHead>
-                <TableHead>Stato</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>{row.codice}</TableCell>
-                  <TableCell>{row.magazzinoOrigineNome}</TableCell>
-                  <TableCell>{row.mensaNome}</TableCell>
-                  <TableCell>
-                    <Badge>
-                      {row.stato === "richiesto"
-                        ? t("trasferimenti.statusRichiesto")
-                        : row.stato === "preparato"
-                          ? t("trasferimenti.statusPreparato")
-                          : row.stato === "in_transito"
-                            ? t("trasferimenti.statusInTransito")
-                            : row.stato === "annullato"
-                              ? t("trasferimenti.statusAnnullato")
-                              : row.stato}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="space-x-2">
-                    {row.stato === "richiesto" &&
-                      (hasPermission("mensa.transfers.prepare") ||
-                        hasPermission("magazzino.transfers.prepare")) && (
-                        <Button
-                          size="sm"
-                          onClick={() => prepareTransfer(row)}
-                          disabled={prepare.isPending}
-                        >
-                          {t("trasferimenti.segnaPronto")}
-                        </Button>
-                      )}
-                    {row.stato === "preparato" &&
-                      hasPermission("magazzino.transfers.dispatch") && (
-                        <Button
-                          size="sm"
-                          onClick={() => startTransfer(row)}
-                          disabled={start.isPending}
-                        >
-                          {t("trasferimenti.avvia")}
-                        </Button>
-                      )}
-                    {(row.stato === "richiesto" || row.stato === "preparato") &&
-                      (hasPermission("mensa.transfers.cancel") ||
-                        hasPermission("magazzino.transfers.cancel")) && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => cancelTransfer(row)}
-                          disabled={cancel.isPending}
-                        >
-                          {t("trasferimenti.annulla")}
-                        </Button>
-                      )}
-                    {row.stato === "in_transito" &&
-                      (hasPermission("mensa.transfers.receive") ||
-                        hasPermission("mensa.transfers.manage")) && (
-                        <Button
-                          size="sm"
-                          disabled={confirm.isPending}
-                          onClick={() => confirmTransfer(row)}
-                        >
-                          Conferma
-                        </Button>
-                      )}
-                    {row.stato === "in_transito" &&
-                      hasPermission("mensa.transfers.receive") && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={missing.isPending}
-                          onClick={() => {
-                            const motivo = window
-                              .prompt(t("mensa.missingReason"))
-                              ?.trim();
-                            if (!motivo) return;
-                            const slot = `trasferimento:${row.id}:missing`;
-                            missing.mutate(
-                              {
-                                id: row.id,
-                                data: commandIntents.prepare(
-                                  slot,
-                                  { motivo },
-                                  { versione: row.versione, motivo },
-                                ),
-                              },
-                              {
-                                onSuccess: () => {
-                                  commandIntents.complete(slot);
-                                  refresh();
-                                },
-                                onError: (error) => {
-                                  commandIntents.fail(slot, error);
-                                  toast({
-                                    title: t("mensa.actionFailed"),
-                                    description: errorMessage(error),
-                                    variant: "destructive",
-                                  });
-                                },
-                              },
-                            );
-                          }}
-                        >
-                          {t("mensa.reportMissing")}
-                        </Button>
-                      )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={async () =>
-                        generateTrasferimentoPdf({
-                          trasferimento: await getDocumentoTrasferimento(
-                            row.id,
-                          ),
-                        })
-                      }
-                    >
-                      Bolla PDF
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <div className="mt-4 flex justify-end gap-2">
-            <Button
-              variant="outline"
-              disabled={page === 1}
-              onClick={() => setPage((value) => value - 1)}
-            >
-              Precedente
-            </Button>
-            <Button
-              variant="outline"
-              disabled={page * 50 >= total}
-              onClick={() => setPage((value) => value + 1)}
-            >
-              Successiva
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
@@ -2608,7 +2083,7 @@ export default function MensaPage({ view }: { view: MensaView }) {
       case "abilitazioni":
         return <AbilitazioniView />;
       case "trasferimenti":
-        return <TrasferimentiView />;
+        return <MensaRifornimenti />;
       case "consumi":
         return <ConsumiView />;
       case "eccezioni":
@@ -2617,5 +2092,11 @@ export default function MensaPage({ view }: { view: MensaView }) {
         return <ReportView />;
     }
   }, [view]);
-  return content;
+  return ["postazione", "abilitazioni", "trasferimenti"].includes(view) ? (
+    <MensaOperationalContext key={view} heading={<PageTitle view={view} />}>
+      {content}
+    </MensaOperationalContext>
+  ) : (
+    content
+  );
 }

@@ -10,6 +10,7 @@ import * as zod from "zod";
 /**
  * @summary Coda territoriale M5A, richiede richieste_magazzino.view e MAGAZZINO_SOLIDALE
  */
+
 export const listRichiesteMagazzinoQueryPageDefault = 1;
 
 export const listRichiesteMagazzinoQueryLimitDefault = 30;
@@ -25,6 +26,7 @@ export const listRichiesteMagazzinoQueryRicercaMin = 2;
 export const listRichiesteMagazzinoQueryRicercaMax = 80;
 
 export const ListRichiesteMagazzinoQueryParams = zod.object({
+  mensaId: zod.coerce.number().min(1).optional(),
   page: zod.coerce
     .number()
     .min(1)
@@ -71,6 +73,12 @@ export const ListRichiesteMagazzinoResponse = zod.object({
   items: zod.array(
     zod
       .object({
+        mensaId: zod
+          .number()
+          .nullish()
+          .describe(
+            "Provenienza Mensa strutturale e immutabile; null per richieste precedenti o altri percorsi.",
+          ),
         id: zod.number(),
         codice: zod.string(),
         tipoDestinatario: zod.enum(["beneficiario", "ente", "magazzino"]),
@@ -178,6 +186,7 @@ export const ListRichiesteMagazzinoResponse = zod.object({
 /**
  * @summary Invia bisogno senza prenotazione, richiede create e scope del destinatario
  */
+
 export const createRichiestaMagazzinoBodyIdempotencyKeyMax = 120;
 
 export const createRichiestaMagazzinoBodyBisognoMax = 2000;
@@ -191,6 +200,11 @@ export const createRichiestaMagazzinoBodyDataDesiderataRegExp = new RegExp(
 export const createRichiestaMagazzinoBodyModalitaPreferitaDefault = `da_definire`;
 
 export const CreateRichiestaMagazzinoBody = zod.object({
+  mensaId: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe("Mensa assegnata; destinazione derivata dal server."),
   idempotencyKey: zod
     .string()
     .min(1)
@@ -234,6 +248,12 @@ export const getRichiestaMagazzinoResponseDataDesiderataRegExp = new RegExp(
 
 export const GetRichiestaMagazzinoResponse = zod
   .object({
+    mensaId: zod
+      .number()
+      .nullish()
+      .describe(
+        "Provenienza Mensa strutturale e immutabile; null per richieste precedenti o altri percorsi.",
+      ),
     id: zod.number(),
     codice: zod.string(),
     tipoDestinatario: zod.enum(["beneficiario", "ente", "magazzino"]),
@@ -20929,6 +20949,8 @@ export const UpdateMensaResponse = zod.object({
 export const searchMensaBeneficiariQuerySearchMin = 2;
 
 export const SearchMensaBeneficiariQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  mensaId: zod.coerce.number().min(1).optional(),
   search: zod.coerce.string().min(searchMensaBeneficiariQuerySearchMin),
 });
 
@@ -20945,6 +20967,7 @@ export const SearchMensaBeneficiariResponse = zod.array(
 );
 
 export const ListMensaAbilitazioniQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1).optional(),
   beneficiarioId: zod.coerce.number().optional(),
   mensaId: zod.coerce.number().optional(),
 });
@@ -21751,12 +21774,14 @@ export const ListLottiMensaResponse = zod.union([
 ]);
 
 /**
- * Richiede mensa.transfers.request (oppure il permesso legacy mensa.transfers.manage). La spedizione resta riservata a magazzino.transfers.dispatch; la ricezione richiede mensa.transfers.receive.
+ * Richiede mensa.transfers.request, receive oppure manage legacy. Elenco filtrato per assegnazioni correnti e Area; preparazione e spedizione riservate al Magazzino.
  */
 
 export const listTrasferimentiMensaQueryPageSizeMax = 200;
 
 export const ListTrasferimentiMensaQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  mensaId: zod.coerce.number().min(1).optional(),
   page: zod.coerce.number().min(1).optional(),
   pageSize: zod.coerce
     .number()
@@ -21766,15 +21791,43 @@ export const ListTrasferimentiMensaQueryParams = zod.object({
 });
 
 export const ListTrasferimentiMensaResponse = zod.union([
-  zod.array(zod.record(zod.string(), zod.unknown())),
+  zod.array(
+    zod.object({
+      id: zod.number(),
+      versione: zod.number(),
+      codice: zod.string(),
+      stato: zod.string(),
+      mensaId: zod.number(),
+      mensaNome: zod.string(),
+      magazzinoOrigineNome: zod.string(),
+      dataRichiesta: zod.coerce.date(),
+      dataCreazione: zod.coerce.date(),
+    }),
+  ),
   zod.object({
-    items: zod.array(zod.record(zod.string(), zod.unknown())),
+    items: zod.array(
+      zod.object({
+        id: zod.number(),
+        versione: zod.number(),
+        codice: zod.string(),
+        stato: zod.string(),
+        mensaId: zod.number(),
+        mensaNome: zod.string(),
+        magazzinoOrigineNome: zod.string(),
+        dataRichiesta: zod.coerce.date(),
+        dataCreazione: zod.coerce.date(),
+      }),
+    ),
     page: zod.number(),
     pageSize: zod.number(),
     total: zod.number(),
   }),
 ]);
 
+/**
+ * Ritirato. Inviare una Richiesta Magazzino canonica con mensaId; nessun effetto inventariale.
+ * @deprecated
+ */
 export const createTrasferimentoMensaBodyIdempotencyKeyMax = 80;
 
 export const createTrasferimentoMensaBodyRigheItemQuantitaRegExp = new RegExp(
@@ -21818,11 +21871,6 @@ export const CreateTrasferimentoMensaBody = zod.object({
     )
     .min(1),
 });
-
-export const CreateTrasferimentoMensaResponse = zod.record(
-  zod.string(),
-  zod.unknown(),
-);
 
 export const listConsumiMensaQueryPageSizeMax = 200;
 

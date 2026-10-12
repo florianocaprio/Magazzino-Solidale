@@ -29,7 +29,12 @@ function hasPermission(req: Request, permission: string) {
 
 async function documentBranchAccess(req: Request) {
   const canRequestBolle = hasPermission(req, "bolle.view");
-  const canRequestTransfers = hasPermission(req, "magazzino.view");
+  const mensaOnly =
+    !req.user?.isAdmin &&
+    req.user?.aree.includes("mensa") &&
+    !req.user.aree.includes("magazzino");
+  const canRequestTransfers =
+    !mensaOnly && hasPermission(req, "magazzino.view");
   const [magazzinoSolidaleAttivo, bolleAttivo, trasferimentiAttivo] =
     await Promise.all([
       canRequestBolle ? isModuloAttivo("MAGAZZINO_SOLIDALE") : false,
@@ -260,7 +265,7 @@ async function queryDocumentRows(
       FROM trasferimenti t
       LEFT JOIN magazzini mo ON mo.id = t.magazzino_origine_id
       LEFT JOIN magazzini md ON md.id = t.magazzino_destino_id
-      WHERE ${access.canReadTransfers} AND t.mensa_id IS NULL
+      WHERE ${access.canReadTransfers}
         AND ${m5bLinkedM4ListScope(req.user!, "trasferimento", sql`t.id`)}
     ), filtrati AS (
       SELECT * FROM documenti
@@ -441,7 +446,7 @@ router.get("/documenti-operativi/:tipo/:id", async (req, res) => {
       return;
     }
     const detail = await getTrasferimentoWithRighe(id);
-    if (!detail || detail.mensaId != null) {
+    if (!detail) {
       res.status(404).json({ error: "Documento non trovato" });
       return;
     }

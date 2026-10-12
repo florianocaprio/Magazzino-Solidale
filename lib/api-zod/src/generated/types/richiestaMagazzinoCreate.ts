@@ -12,6 +12,11 @@ import type { RichiestaMagazzinoCreateTipoDestinatario } from "./richiestaMagazz
 
 export interface RichiestaMagazzinoCreate {
   /**
+   * Mensa assegnata; destinazione derivata dal server.
+   * @minimum 1
+   */
+  mensaId?: number;
+  /**
    * @minLength 1
    * @maxLength 120
    */

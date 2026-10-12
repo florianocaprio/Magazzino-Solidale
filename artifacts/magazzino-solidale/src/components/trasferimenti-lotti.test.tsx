@@ -4,8 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const fixtures = vi.hoisted(() => ({
   products: [
-    { id: 11, lottoFisicoObbligatorio: false },
-    { id: 12, lottoFisicoObbligatorio: true },
+    { id: 11, lottoFisicoObbligatorio: false, unitaMisura: "cf" },
+    { id: 12, lottoFisicoObbligatorio: true, unitaMisura: "pz" },
   ],
   inventory: [
     {
@@ -134,6 +134,7 @@ afterEach(() => {
 });
 
 function EditorHarness() {
+  const [invalid, setInvalid] = useState(false);
   const [righe, setRighe] = useState([
     { key: "r1", prodottoId: "", lottoId: "", quantita: "", unitaMisura: "pz" },
   ]);
@@ -144,8 +145,10 @@ function EditorHarness() {
         areaOperativaId={1}
         righe={righe}
         setRighe={setRighe}
+        onLotInvalidChange={setInvalid}
       />
       <output data-testid="draft">{JSON.stringify(righe)}</output>
+      <output data-testid="invalid">{String(invalid)}</output>
     </>
   );
 }
@@ -159,6 +162,13 @@ describe("selettore lotto Trasferimento", () => {
     const option = (value: string) =>
       host?.querySelector<HTMLButtonElement>(`[data-option="${value}"]`);
     act(() => option("11")?.click());
+    expect(host.querySelector<HTMLInputElement>("input[readonly]")?.value).toBe(
+      "cf",
+    );
+    expect(host.querySelector('[data-testid="draft"]')?.textContent).toContain(
+      '"unitaMisura":"cf"',
+    );
+    expect(option("conf")).toBeNull();
     expect(option("fefo")).not.toBeNull();
     expect(option("101")?.textContent).toContain("A");
     expect(option("102")).toBeNull();
@@ -167,6 +177,29 @@ describe("selettore lotto Trasferimento", () => {
     act(() => option("101")?.click());
     expect(host.querySelector('[data-testid="draft"]')?.textContent).toContain(
       '"lottoId":"101"',
+    );
+    const quantity = host.querySelector<HTMLInputElement>(
+      'input[type="number"]',
+    )!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!.call(quantity, "9");
+      quantity.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(host.querySelector('[data-testid="invalid"]')?.textContent).toBe(
+      "true",
+    );
+    act(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!.call(quantity, "8");
+      quantity.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(host.querySelector('[data-testid="invalid"]')?.textContent).toBe(
+      "false",
     );
     act(() => option("12")?.click());
     expect(host.querySelector('[data-testid="draft"]')?.textContent).toContain(

@@ -77,6 +77,8 @@ import {
   TesseraBeneficiarioError,
 } from "../lib/tesseraBeneficiarioService";
 import { nextMagazzinoCodice } from "../lib/magazzinoCodice";
+import { transferMensaId } from "../lib/mensaTransferDestination";
+import { m5bLinkedM4ListScope } from "../lib/m5bDocumentLink";
 import {
   aggregatiConsumiMensa,
   getOrCreateGiornataMensa,
@@ -94,10 +96,6 @@ import {
   parseDbNumber,
 } from "../lib/disponibilitaMagazzino";
 import { ensureDistributionOperation } from "../lib/distributionLedger";
-import {
-  createTransferRequest,
-  TransferRequestError,
-} from "../lib/transferWorkflow";
 import {
   committedQuantityForLot,
   PRENOTAZIONE_ATTIVA,
@@ -663,6 +661,21 @@ async function requireMensa(id: number, req: Request, active = false) {
   return row;
 }
 
+/** A query filter only narrows the authenticated scope; it never grants it. */
+function selectedArea(req: Request, required = false) {
+  const own = callerAreaOperativaId(req);
+  const requested = optionalPositiveInt(
+    req.query.areaOperativaId,
+    "areaOperativaId",
+  );
+  if (own != null && requested != null && own !== requested)
+    throw new MensaError(403, "Area Operativa non accessibile");
+  const area = own ?? requested;
+  if (required && area == null)
+    throw new MensaError(400, "Seleziona l'Area Operativa");
+  return area;
+}
+
 async function requireMensaLogisticsWarehouse(
   id: number,
   req: Request,
@@ -1057,73 +1070,6 @@ async function requireReplayMensaScope(
   await requireMensa(resourceMensaId, req);
 }
 
-async function assertMensaTransferScopeTx(
-  tx: MensaTransaction,
-  req: Request,
-  transfer: Pick<
-    typeof trasferimentiTable.$inferSelect,
-    "mensaId" | "magazzinoOrigineId" | "magazzinoDestinoId"
-  >,
-  requestedMensaId: number,
-  requireActive: boolean,
-): Promise<void> {
-  assertAssignedMensa(req, requestedMensaId);
-  if (transfer.mensaId == null || transfer.mensaId !== requestedMensaId) {
-    throw new MensaError(403, "Replay idempotente non accessibile");
-  }
-  const [mensa] = await tx
-    .select()
-    .from(menseTable)
-    .where(eq(menseTable.id, transfer.mensaId))
-    .for("share");
-  if (
-    !mensa ||
-    !canAccessAreaOperativa(mensa.areaOperativaId, callerAreaOperativaId(req))
-  ) {
-    throw new MensaError(403, "Mensa non accessibile per la tua area");
-  }
-  if (transfer.magazzinoDestinoId !== mensa.magazzinoId) {
-    throw new MensaError(
-      409,
-      "Il Trasferimento non è più coerente con il magazzino della Mensa",
-    );
-  }
-  const warehouses = await tx
-    .select()
-    .from(magazziniTable)
-    .where(
-      inArray(magazziniTable.id, [
-        transfer.magazzinoOrigineId,
-        transfer.magazzinoDestinoId,
-      ]),
-    )
-    .orderBy(asc(magazziniTable.id))
-    .for("share");
-  const origin = warehouses.find(
-    (warehouse) => warehouse.id === transfer.magazzinoOrigineId,
-  );
-  const destination = warehouses.find(
-    (warehouse) => warehouse.id === transfer.magazzinoDestinoId,
-  );
-  if (
-    !origin ||
-    !destination ||
-    !canAccessCentro(origin.centroAscoltoId, callerCentroId(req)) ||
-    !canAccessAreaOperativa(origin.areaOperativaId, callerAreaOperativaId(req))
-  ) {
-    throw new MensaError(403, "Magazzino non accessibile per la tua area");
-  }
-  if (
-    requireActive &&
-    (!mensa.attiva ||
-      origin.stato !== "attivo" ||
-      destination.stato !== "attivo" ||
-      destination.tipoMagazzino !== "mensa")
-  ) {
-    throw new MensaError(409, "La Mensa o il magazzino non è attivo");
-  }
-}
-
 async function sendReplayMensaScope(
   req: Request,
   res: Response,
@@ -1145,15 +1091,9 @@ router.get(
   async (req, res) => {
     try {
       const conditions: SQL[] = [mensaScopeCondition(req, menseTable.id)];
-      const ownAreaOperativa = callerAreaOperativaId(req);
-      const requestedAreaOperativa = optionalPositiveInt(
-        req.query.areaOperativaId,
-        "areaOperativaId",
-      );
+      const ownAreaOperativa = selectedArea(req);
       if (ownAreaOperativa != null) {
         conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
-      } else if (requestedAreaOperativa != null) {
-        conditions.push(eq(menseTable.areaOperativaId, requestedAreaOperativa));
       }
       if (req.query.attiva === "true")
         conditions.push(eq(menseTable.attiva, true));
@@ -2871,282 +2811,87 @@ router.get(
   },
 );
 
-router.post(
-  "/mensa/trasferimenti",
-  requireMensaPermissionOrLegacy("mensa.transfers.request"),
-  async (req, res) => {
-    try {
-      const mensaId = positiveInt(req.body?.mensaId, "mensaId");
-      const origineId = positiveInt(
-        req.body?.magazzinoOrigineId,
-        "magazzinoOrigineId",
-      );
-      const idempotencyKey = text(
-        req.body?.idempotencyKey,
-        "La chiave di idempotenza",
-        80,
-      );
-      const mensa = await requireMensa(mensaId, req, true);
-      if (origineId === mensa.mensa.magazzinoId)
-        throw new MensaError(
-          400,
-          "Origine e destinazione devono essere diverse",
-        );
-      await requireMensaLogisticsWarehouse(origineId, req, false);
-      const dataRichiesta = dateOnly(
-        req.body?.dataRichiesta,
-        "La data richiesta",
-        true,
-      )!;
-      const righe: Array<Record<string, unknown>> = Array.isArray(
-        req.body?.righe,
-      )
-        ? req.body.righe
-        : [];
-      if (!righe.length)
-        throw new MensaError(400, "Indicare almeno un prodotto");
-      const normalized = righe.map((row: Record<string, unknown>) => {
-        let quantity: InventoryDecimal;
-        try {
-          if (
-            typeof row.quantita !== "string" &&
-            typeof row.quantita !== "number"
-          ) {
-            throw new InventoryDecimalError("Formato quantità non valido");
-          }
-          quantity = positiveInventoryDecimal(row.quantita);
-        } catch (error) {
-          if (!(error instanceof InventoryDecimalError)) throw error;
-          throw new MensaError(400, error.message);
-        }
-        return {
-          prodottoId: positiveInt(row.prodottoId, "prodottoId"),
-          quantita: quantity.toDb(),
-          unitaMisura:
-            row.unitaMisura == null
-              ? null
-              : text(row.unitaMisura, "L'unità di misura", 20),
-          note: optionalText(row.note, "Le note", 1000),
-          lottoId: optionalPositiveInt(row.lottoId, "lottoId"),
-        };
-      });
-      const trasportatoreNome = optionalText(
-        req.body?.trasportatoreNome,
-        "Il trasportatore",
-        120,
-      );
-      const note = optionalText(req.body?.note, "Le note", 2000);
-      const requestHash = commandRequestHash({
-        mensaId,
-        magazzinoOrigineId: origineId,
-        magazzinoDestinoId: mensa.mensa.magazzinoId,
-        dataRichiesta,
-        trasportatoreNome,
-        note,
-        righe: normalized,
-      });
-      const created = await createTransferRequest({
-        magazzinoOrigineId: origineId,
-        magazzinoDestinoId: mensa.mensa.magazzinoId,
-        mensaId,
-        idempotencyKey,
-        dataRichiesta,
-        trasportatoreNome,
-        note,
-        operatoreId: req.user!.id,
-        audit: auditContextFromRequest(req, { operationKey: idempotencyKey }),
-        command: {
-          idempotencyKey,
-          requestHash,
-          actorUserId: req.user!.id,
-        },
-        authorizeCurrent: (tx, transfer) =>
-          assertMensaTransferScopeTx(tx, req, transfer, mensaId, false),
-        beforeCreate: async (tx) => {
-          await assertMensaTransferScopeTx(
-            tx,
-            req,
-            {
-              mensaId,
-              magazzinoOrigineId: origineId,
-              magazzinoDestinoId: mensa.mensa.magazzinoId,
-            },
-            mensaId,
-            true,
-          );
-          // La richiesta non prenota merce: questa è una verifica iniziale.
-          // M4 rivalida e prenota il lotto in modo transazionale in Prepara.
-          const requestedByLot = new Map<number, InventoryDecimal>();
-          for (const row of normalized) {
-            if (row.lottoId == null) continue;
-            const previous =
-              requestedByLot.get(row.lottoId) ?? InventoryDecimal.zero();
-            requestedByLot.set(
-              row.lottoId,
-              previous.add(InventoryDecimal.parse(row.quantita)),
-            );
-          }
-          const riferimento =
-            dataRichiesta > dataServizioMensa()
-              ? dataRichiesta
-              : dataServizioMensa();
-          for (const [lottoId, requested] of requestedByLot) {
-            const [lotto] = await tx
-              .select()
-              .from(lottiTable)
-              .where(eq(lottiTable.id, lottoId))
-              .for("share");
-            if (
-              !lotto ||
-              lotto.magazzinoId !== origineId ||
-              normalized.some(
-                (row) =>
-                  row.lottoId === lottoId &&
-                  row.prodottoId !== lotto.prodottoId,
-              )
-            ) {
-              throw new MensaError(
-                400,
-                "Il lotto selezionato non appartiene al prodotto o al magazzino origine",
-              );
-            }
-            if (!isLottoDistribuibile(lotto.dataScadenza, riferimento))
-              throw new MensaError(409, "Il lotto selezionato è scaduto");
-            const available = InventoryDecimal.parse(
-              lotto.quantitaResidua,
-            ).subtract(await committedQuantityForLot(tx, lottoId));
-            if (available.compare(requested) < 0)
-              throw new MensaError(
-                409,
-                `Disponibilità reale insufficiente nel lotto ${lotto.codiceLotto ?? `#${lottoId}`}: disponibili ${available.isNegative() ? "0" : available.toCanonical()}, richiesti ${requested.toCanonical()}`,
-              );
-          }
-        },
-        righe: normalized,
-        afterCreate: async (tx, transfer) => {
-          await tx.insert(auditConfigurazioniTable).values(
-            auditValues(
-              req,
-              `mensa-trasferimento:${transfer.id}`,
-              "richiesta",
-              null,
-              {
-                mensaId,
-                origineId,
-                destinazioneId: mensa.mensa.magazzinoId,
-                righe: normalized.length,
-              },
-            ),
-          );
-        },
-      });
-      res.status(created.idempotentReplay ? 200 : 201).json({
-        id: created.id,
-        codice: created.codice,
-        stato: created.stato,
-        idempotentReplay: created.idempotentReplay,
-      });
-    } catch (error) {
-      if (error instanceof TransferRequestError) {
-        res.status(error.status).json({ error: error.message });
-        return;
-      }
-      if (isDocumentCommandError(error)) {
-        res.status(error.status).json({ error: error.message });
-        return;
-      }
-      if (isUniqueViolation(error)) {
-        const key =
-          typeof req.body?.idempotencyKey === "string"
-            ? req.body.idempotencyKey
-            : "";
-        const [existing] = await db
-          .select({
-            id: trasferimentiTable.id,
-            mensaId: trasferimentiTable.mensaId,
-          })
-          .from(trasferimentiTable)
-          .where(eq(trasferimentiTable.idempotencyKey, key));
-        if (existing) {
-          if (existing.mensaId == null) {
-            res
-              .status(403)
-              .json({ error: "Replay idempotente non accessibile" });
-            return;
-          }
-          if (
-            !(await sendReplayMensaScope(
-              req,
-              res,
-              existing.mensaId,
-              positiveInt(req.body?.mensaId, "mensaId"),
-            ))
-          )
-            return;
-          res.status(409).json({
-            error:
-              "La chiave appartiene a un Trasferimento legacy senza ricevuta verificabile; usare una nuova chiave",
-          });
-          return;
-        }
-        res.status(409).json({ error: "Trasferimento duplicato" });
-        return;
-      }
-      if (sendMensaError(error, res)) return;
-      throw error;
-    }
-  },
-);
+router.post("/mensa/trasferimenti", (_req, res) => {
+  res.status(410).json({
+    code: "MENSA_TRANSFER_CREATION_RETIRED",
+    error:
+      "Invia una Richiesta al Magazzino: il trasferimento viene preparato dal Magazzino.",
+  });
+});
 
 router.get(
   "/mensa/trasferimenti",
-  requireMensaPermissionOrLegacy("mensa.transfers.request"),
+  (req, res, next) =>
+    hasPermission(req, "mensa.transfers.receive")
+      ? next()
+      : requireMensaPermissionOrLegacy("mensa.transfers.request")(
+          req,
+          res,
+          next,
+        ),
   async (req, res) => {
-    const conditions: SQL[] = [mensaScopeCondition(req, menseTable.id)];
-    const ownAreaOperativa = callerAreaOperativaId(req);
-    if (ownAreaOperativa != null)
-      conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
-    const paging = pagination(req.query);
-    const where = conditions.length ? and(...conditions) : undefined;
-    const [totalRow] = paging.requested
-      ? await db
-          .select({ total: count() })
-          .from(trasferimentiTable)
-          .innerJoin(menseTable, eq(trasferimentiTable.mensaId, menseTable.id))
-          .where(where)
-      : [{ total: 0 }];
-    const rows = await db
-      .select({
-        trasferimento: trasferimentiTable,
-        mensaNome: menseTable.nome,
-        origineNome: magazziniTable.nome,
-      })
-      .from(trasferimentiTable)
-      .innerJoin(menseTable, eq(trasferimentiTable.mensaId, menseTable.id))
-      .innerJoin(
-        magazziniTable,
-        eq(trasferimentiTable.magazzinoOrigineId, magazziniTable.id),
-      )
-      .where(where)
-      .orderBy(desc(trasferimentiTable.dataCreazione))
-      .limit(paging.requested ? paging.pageSize : 200)
-      .offset(paging.requested ? paging.offset : 0);
-    const items = rows.map(({ trasferimento, mensaNome, origineNome }) => ({
-      ...trasferimento,
-      mensaNome,
-      magazzinoOrigineNome: origineNome,
-      dataCreazione: trasferimento.dataCreazione.toISOString(),
-    }));
-    res.json(
-      paging.requested
-        ? {
-            items,
-            page: paging.page,
-            pageSize: paging.pageSize,
-            total: totalRow?.total ?? 0,
-          }
-        : items,
-    );
+    try {
+      const conditions: SQL[] = [mensaScopeCondition(req, menseTable.id)];
+      const ownAreaOperativa = selectedArea(req);
+      if (ownAreaOperativa != null)
+        conditions.push(eq(menseTable.areaOperativaId, ownAreaOperativa));
+      const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
+      if (mensaId != null) {
+        await requireMensa(mensaId, req);
+        conditions.push(eq(menseTable.id, mensaId));
+      }
+      conditions.push(
+        m5bLinkedM4ListScope(req.user!, "trasferimento", trasferimentiTable.id),
+      );
+      const paging = pagination(req.query);
+      const where = conditions.length ? and(...conditions) : undefined;
+      const [totalRow] = paging.requested
+        ? await db
+            .select({ total: count() })
+            .from(trasferimentiTable)
+            .innerJoin(menseTable, eq(transferMensaId(), menseTable.id))
+            .where(where)
+        : [{ total: 0 }];
+      const rows = await db
+        .select({
+          trasferimento: trasferimentiTable,
+          mensaNome: menseTable.nome,
+          mensaId: menseTable.id,
+          origineNome: magazziniTable.nome,
+        })
+        .from(trasferimentiTable)
+        .innerJoin(menseTable, eq(transferMensaId(), menseTable.id))
+        .innerJoin(
+          magazziniTable,
+          eq(trasferimentiTable.magazzinoOrigineId, magazziniTable.id),
+        )
+        .where(where)
+        .orderBy(desc(trasferimentiTable.dataCreazione))
+        .limit(paging.requested ? paging.pageSize : 200)
+        .offset(paging.requested ? paging.offset : 0);
+      const items = rows.map(
+        ({ trasferimento, mensaNome, mensaId, origineNome }) => ({
+          ...trasferimento,
+          mensaNome,
+          mensaId,
+          magazzinoOrigineNome: origineNome,
+          dataCreazione: trasferimento.dataCreazione.toISOString(),
+        }),
+      );
+      res.json(
+        paging.requested
+          ? {
+              items,
+              page: paging.page,
+              pageSize: paging.pageSize,
+              total: totalRow?.total ?? 0,
+            }
+          : items,
+      );
+    } catch (error) {
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
   },
 );
 
@@ -4279,7 +4024,17 @@ router.get(
         callerCentroId(req),
       );
       if (centerScope) conditions.push(centerScope);
-      const ownAreaOperativa = callerAreaOperativaId(req);
+      const ownAreaOperativa = selectedArea(req, true);
+      const mensaId = optionalPositiveInt(req.query.mensaId, "mensaId");
+      if (
+        mensaId != null &&
+        (await requireMensa(mensaId, req)).mensa.areaOperativaId !==
+          ownAreaOperativa
+      )
+        throw new MensaError(
+          403,
+          "Mensa non appartenente all'Area selezionata",
+        );
       if (ownAreaOperativa != null)
         conditions.push(eq(beneficiariTable.areaOperativaId, ownAreaOperativa));
       const s = `%${search}%`;
@@ -4354,7 +4109,7 @@ router.get(
         conditions.push(eq(mensaAbilitazioniTable.mensaId, mensaId));
       const areaOperativaScope = areaOperativaScopeFilter(
         menseTable.areaOperativaId,
-        callerAreaOperativaId(req),
+        selectedArea(req),
       );
       if (areaOperativaScope) conditions.push(areaOperativaScope);
       const rows = await db

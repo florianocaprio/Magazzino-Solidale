@@ -150,8 +150,7 @@ import type {
   ConversioneConsegnaInput,
   ConversioneConsegnaResult,
   CreateCreditoSolidaleRicaricaManuale410,
-  CreateTrasferimentoMensa200,
-  CreateTrasferimentoMensa201,
+  CreateTrasferimentoMensa410,
   CreditoSolidaleBeneficiario,
   CreditoSolidaleCalcolo,
   CreditoSolidaleConfigurazione,
@@ -317,7 +316,6 @@ import type {
   ListSuperAdminAuditConfigurazioniParams,
   ListSuperAdminLogSistemaParams,
   ListTessereBeneficiarioParams,
-  ListTrasferimentiMensa200,
   ListTrasferimentiMensaParams,
   ListTrasferimentiParams,
   ListTurniParams,
@@ -373,7 +371,9 @@ import type {
   MensaRiaperturaInput,
   MensaStatoInput,
   MensaStornoInput,
+  MensaTrasferimentiPage,
   MensaTrasferimentoInput,
+  MensaTrasferimentoSummary,
   MensaUpdate,
   MezziBulkInput,
   Mezzo,
@@ -38156,13 +38156,13 @@ export const getListTrasferimentiMensaUrl = (
 };
 
 /**
- * Richiede mensa.transfers.request (oppure il permesso legacy mensa.transfers.manage). La spedizione resta riservata a magazzino.transfers.dispatch; la ricezione richiede mensa.transfers.receive.
+ * Richiede mensa.transfers.request, receive oppure manage legacy. Elenco filtrato per assegnazioni correnti e Area; preparazione e spedizione riservate al Magazzino.
  */
 export const listTrasferimentiMensa = async (
   params?: ListTrasferimentiMensaParams,
   options?: RequestInit,
-): Promise<ListTrasferimentiMensa200> => {
-  return customFetch<ListTrasferimentiMensa200>(
+): Promise<MensaTrasferimentoSummary[] | MensaTrasferimentiPage> => {
+  return customFetch<MensaTrasferimentoSummary[] | MensaTrasferimentiPage>(
     getListTrasferimentiMensaUrl(params),
     {
       ...options,
@@ -38240,23 +38240,24 @@ export const getCreateTrasferimentoMensaUrl = () => {
   return `/api/mensa/trasferimenti`;
 };
 
+/**
+ * Ritirato. Inviare una Richiesta Magazzino canonica con mensaId; nessun effetto inventariale.
+ * @deprecated
+ */
 export const createTrasferimentoMensa = async (
   mensaTrasferimentoInput: MensaTrasferimentoInput,
   options?: RequestInit,
-): Promise<CreateTrasferimentoMensa200 | CreateTrasferimentoMensa201> => {
-  return customFetch<CreateTrasferimentoMensa200 | CreateTrasferimentoMensa201>(
-    getCreateTrasferimentoMensaUrl(),
-    {
-      ...options,
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(mensaTrasferimentoInput),
-    },
-  );
+): Promise<unknown> => {
+  return customFetch<unknown>(getCreateTrasferimentoMensaUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(mensaTrasferimentoInput),
+  });
 };
 
 export const getCreateTrasferimentoMensaMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<CreateTrasferimentoMensa410>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -38298,10 +38299,14 @@ export type CreateTrasferimentoMensaMutationResult = NonNullable<
 >;
 export type CreateTrasferimentoMensaMutationBody =
   BodyType<MensaTrasferimentoInput>;
-export type CreateTrasferimentoMensaMutationError = ErrorType<unknown>;
+export type CreateTrasferimentoMensaMutationError =
+  ErrorType<CreateTrasferimentoMensa410>;
 
+/**
+ * @deprecated
+ */
 export const useCreateTrasferimentoMensa = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<CreateTrasferimentoMensa410>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<

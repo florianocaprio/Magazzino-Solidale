@@ -1,4 +1,10 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import {
+  Router,
+  type IRouter,
+  type Request,
+  type Response,
+  type RequestHandler,
+} from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "@workspace/api-zod";
 import {
@@ -25,6 +31,7 @@ import {
   entiDestinatariTable,
   interventiTable,
   magazziniTable,
+  menseTable,
   richiesteMagazzinoTable,
   type RichiestaMagazzino,
 } from "@workspace/db";
@@ -66,14 +73,38 @@ import {
   m5bRequestScopePredicate,
   m5bTerritory,
   requireCurrentM5bActor,
+  mensaRequestPermission,
+  canReadMensaRequests,
 } from "../lib/m5bRequestAccess";
+import { currentMensaScope, MensaScopeError } from "../lib/mensaScope";
+import type { PermissionKey } from "../lib/permissions";
 
 const router: IRouter = Router();
 router.use("/richieste-magazzino", requireModulo("MAGAZZINO_SOLIDALE"));
 router.use("/richieste-magazzino", async (req, res, next) => {
+  if (!req.user?.isAdmin && req.user?.aree.includes("mensa")) {
+    if (!req.user.aree.includes("magazzino"))
+      return requireModulo("MENSA")(req, res, () =>
+        currentMensaScope(req, res, next),
+      );
+    // A mixed role keeps its Warehouse capabilities when Mensa is disabled.
+    if (await isModuloAttivo("MENSA")) return currentMensaScope(req, res, next);
+  }
+  return next();
+});
+const requestPermission =
+  (permission: PermissionKey): RequestHandler =>
+  (req, res, next) =>
+    requirePermission(mensaRequestPermission(req.user!, permission))(
+      req,
+      res,
+      next,
+    );
+router.use("/richieste-magazzino", async (req, res, next) => {
   if (
     req.user &&
     !hasArea(req.user, "magazzino") &&
+    !hasArea(req.user, "mensa") &&
     hasArea(req.user, "sociale") &&
     !(await isModuloAttivo("CENTRO_ASCOLTO"))
   ) {
@@ -107,6 +138,7 @@ const createSchema = z.strictObject({
   beneficiarioId: positive.optional(),
   enteDestinatarioId: positive.optional(),
   magazzinoDestinatarioId: positive.optional(),
+  mensaId: positive.optional(),
   interventoId: positive.optional(),
   areaOperativaId: positive.optional(),
   centroAscoltoId: positive.optional(),
@@ -155,7 +187,9 @@ const conflict = (message: string) =>
   new RequestError(409, "RICHIESTA_CONFLITTO", message);
 
 function sendError(res: Response, error: unknown, correlationId: string) {
-  if (error instanceof M5bLinkError) {
+  if (error instanceof MensaScopeError) {
+    res.status(403).json({ error: error.message, correlationId });
+  } else if (error instanceof M5bLinkError) {
     res.status(error.status).json({
       code: "RICHIESTA_CONFLITTO",
       error: error.message,
@@ -208,6 +242,16 @@ function canSocialWrite(actor: Actor, row: RichiestaMagazzino) {
     (actor.zonaUdsId == null || actor.zonaUdsId === row.zonaUdsIdSnapshot)
   );
 }
+function canMensaWrite(actor: Actor, row: RichiestaMagazzino) {
+  return (
+    row.mensaId != null &&
+    canRead(actor, row) &&
+    hasArea(actor, "mensa") &&
+    (actor.isAdmin || actor.mensaIds?.includes(row.mensaId)) &&
+    (hasGrant(actor, "mensa.transfers.request") ||
+      hasGrant(actor, "mensa.transfers.manage"))
+  );
+}
 function actorFromRequest(req: Request) {
   if (!req.user) throw denied();
   return req.user;
@@ -250,6 +294,21 @@ export async function requireLiveSubject(
   tx: InventoryTransaction,
   row: RichiestaMagazzino,
 ) {
+  if (row.mensaId != null) {
+    const [mensa] = await tx
+      .select()
+      .from(menseTable)
+      .where(eq(menseTable.id, row.mensaId))
+      .for("share");
+    if (
+      !mensa?.attiva ||
+      mensa.magazzinoId !== row.magazzinoDestinatarioId ||
+      mensa.areaOperativaId !== row.areaOperativaId
+    )
+      throw conflict(
+        "Mensa destinataria non più operativa nel contesto della richiesta",
+      );
+  }
   if (row.tipoDestinatario === "beneficiario") {
     const [beneficiary] = await tx
       .select({
@@ -339,6 +398,70 @@ async function buildCreate(
   actor: Actor,
   input: Create,
 ) {
+  if (input.mensaId != null) {
+    if (
+      !hasArea(actor, "mensa") ||
+      !(await isModuloAttivo("MENSA")) ||
+      (!actor.isAdmin && !actor.mensaIds?.includes(input.mensaId))
+    )
+      throw denied();
+    if (
+      input.tipoDestinatario !== "magazzino" ||
+      input.sorgente !== "operativa" ||
+      input.beneficiarioId != null ||
+      input.enteDestinatarioId != null ||
+      input.interventoId != null ||
+      input.centroAscoltoId != null
+    )
+      throw invalid("Destinatario Mensa incoerente");
+    const [mensa] = await tx
+      .select()
+      .from(menseTable)
+      .where(eq(menseTable.id, input.mensaId))
+      .for("share");
+    if (
+      !mensa?.attiva ||
+      (actor.areaOperativaId != null &&
+        actor.areaOperativaId !== mensa.areaOperativaId)
+    )
+      throw denied();
+    if (
+      input.areaOperativaId !== mensa.areaOperativaId ||
+      (input.magazzinoDestinatarioId != null &&
+        input.magazzinoDestinatarioId !== mensa.magazzinoId)
+    )
+      throw invalid("Area/Mensa/magazzino destinatario incoerenti");
+    const [warehouse] = await tx
+      .select()
+      .from(magazziniTable)
+      .where(eq(magazziniTable.id, mensa.magazzinoId))
+      .for("share");
+    const [area] = await tx
+      .select()
+      .from(areeOperativeTable)
+      .where(eq(areeOperativeTable.id, mensa.areaOperativaId))
+      .for("share");
+    if (
+      warehouse?.stato !== "attivo" ||
+      warehouse.areaOperativaId !== mensa.areaOperativaId ||
+      !area?.attivo
+    )
+      throw invalid("Destinazione Mensa non operativa");
+    return {
+      mensaId: mensa.id,
+      beneficiarioId: null,
+      enteDestinatarioId: null,
+      magazzinoDestinatarioId: mensa.magazzinoId,
+      areaOperativaId: mensa.areaOperativaId,
+      centroAscoltoId: null,
+      zonaUdsIdSnapshot: null,
+      destinatarioCodiceSnapshot: mensa.codice,
+      destinatarioNomeSnapshot: mensa.nome,
+      numComponentiSnapshot: null,
+      areaNomeSnapshot: area.nome,
+      centroNomeSnapshot: null,
+    };
+  }
   if (m5bTerritory(actor) === "none") throw denied();
   const social = input.tipoDestinatario === "beneficiario";
   if (social) {
@@ -580,7 +703,7 @@ async function buildCreate(
 
 router.get(
   "/richieste-magazzino",
-  requirePermission("richieste_magazzino.view"),
+  requestPermission("richieste_magazzino.view"),
   async (req, res) => {
     const correlationId = randomUUID();
     try {
@@ -595,6 +718,7 @@ router.get(
         "beneficiarioId",
         "enteDestinatarioId",
         "magazzinoDestinatarioId",
+        "mensaId",
         "interventoId",
         "sorgente",
         "dataDa",
@@ -673,6 +797,7 @@ router.get(
           richiesteMagazzinoTable.magazzinoDestinatarioId,
         ],
         ["interventoId", richiesteMagazzinoTable.interventoId],
+        ["mensaId", richiesteMagazzinoTable.mensaId],
       ] as const) {
         const value = integer(key);
         if (value != null) filters.push(eq(column, value));
@@ -735,7 +860,9 @@ router.get(
         {
           bolla: actor.isAdmin || (actor.permessi ?? []).includes("bolle.view"),
           trasferimento:
-            actor.isAdmin || (actor.permessi ?? []).includes("magazzino.view"),
+            actor.isAdmin ||
+            (actor.permessi ?? []).includes("magazzino.view") ||
+            canReadMensaRequests(actor),
           areaOperativaId: actor.areaOperativaId,
           centroAscoltoId: actor.centroAscoltoId,
         },
@@ -758,7 +885,7 @@ router.get(
 
 router.get(
   "/richieste-magazzino/:id/storico",
-  requirePermission("richieste_magazzino.view"),
+  requestPermission("richieste_magazzino.view"),
   async (req, res) => {
     const correlationId = randomUUID();
     try {
@@ -795,7 +922,7 @@ router.get(
 
 router.get(
   "/richieste-magazzino/:id",
-  requirePermission("richieste_magazzino.view"),
+  requestPermission("richieste_magazzino.view"),
   async (req, res) => {
     const correlationId = randomUUID();
     try {
@@ -809,7 +936,9 @@ router.get(
       const documents = await requestDocumentSummaries([id], {
         bolla: actor.isAdmin || (actor.permessi ?? []).includes("bolle.view"),
         trasferimento:
-          actor.isAdmin || (actor.permessi ?? []).includes("magazzino.view"),
+          actor.isAdmin ||
+          (actor.permessi ?? []).includes("magazzino.view") ||
+          canReadMensaRequests(actor),
         areaOperativaId: actor.areaOperativaId,
         centroAscoltoId: actor.centroAscoltoId,
       });
@@ -827,7 +956,7 @@ router.get(
 
 router.post(
   "/richieste-magazzino",
-  requirePermission("richieste_magazzino.create"),
+  requestPermission("richieste_magazzino.create"),
   async (req, res) => {
     const correlationId = randomUUID();
     try {
@@ -849,7 +978,7 @@ router.post(
         const actor = await requireCurrentM5bActor(
           tx,
           req.user!.id,
-          "richieste_magazzino.create",
+          mensaRequestPermission(req.user!, "richieste_magazzino.create"),
         );
         if (
           !(await isModuloAttivo("MAGAZZINO_SOLIDALE")) ||
@@ -992,7 +1121,11 @@ async function mutate(
     });
     const result = await db.transaction(async (tx) => {
       await lockDocumentCommand(tx, tipoComando, idempotencyKey);
-      const actor = await requireCurrentM5bActor(tx, req.user!.id, permission);
+      const actor = await requireCurrentM5bActor(
+        tx,
+        req.user!.id,
+        mensaRequestPermission(req.user!, permission),
+      );
       if (!(await isModuloAttivo("MAGAZZINO_SOLIDALE"))) throw denied();
       const receipt = await loadDocumentCommand(tx, {
         tipoComando,
@@ -1003,6 +1136,13 @@ async function mutate(
         .from(richiesteMagazzinoTable)
         .where(eq(richiesteMagazzinoTable.id, id));
       if (!before || !canRead(actor, before)) throw missing();
+      if (before.mensaId != null && !(await isModuloAttivo("MENSA")))
+        throw denied();
+      if (
+        mensaRequestPermission(actor, permission).startsWith("mensa.") &&
+        !canMensaWrite(actor, before)
+      )
+        throw denied();
       if (receipt) {
         validateDocumentCommand(receipt, {
           tipoComando,
@@ -1026,21 +1166,27 @@ async function mutate(
           throw conflict("Presa in carico non disponibile");
       } else if (kind === "update") {
         if (
-          !hasArea(actor, "sociale") ||
-          !canSocialWrite(actor, row) ||
           row.stato !== "inviata" ||
-          !(await isModuloAttivo("CENTRO_ASCOLTO"))
+          !(
+            canMensaWrite(actor, row) ||
+            (canSocialWrite(actor, row) &&
+              (await isModuloAttivo("CENTRO_ASCOLTO")))
+          )
         )
           throw denied();
       } else if (row.stato === "inviata") {
         if (
-          !canSocialWrite(actor, row) ||
-          !(await isModuloAttivo("CENTRO_ASCOLTO"))
+          !(
+            canMensaWrite(actor, row) ||
+            (canSocialWrite(actor, row) &&
+              (await isModuloAttivo("CENTRO_ASCOLTO")))
+          )
         )
           throw denied();
       } else if (row.stato === "presa_in_carico") {
         if (
           !hasArea(actor, "magazzino") &&
+          !canMensaWrite(actor, row) &&
           !(
             canSocialWrite(actor, row) &&
             (await isModuloAttivo("CENTRO_ASCOLTO"))
@@ -1176,7 +1322,7 @@ async function mutate(
 
 router.patch(
   "/richieste-magazzino/:id",
-  requirePermission("richieste_magazzino.update"),
+  requestPermission("richieste_magazzino.update"),
   (req, res) => mutate(req, res, "update"),
 );
 router.post(
@@ -1186,7 +1332,7 @@ router.post(
 );
 router.post(
   "/richieste-magazzino/:id/annulla",
-  requirePermission("richieste_magazzino.cancel"),
+  requestPermission("richieste_magazzino.cancel"),
   (req, res) => mutate(req, res, "cancel"),
 );
 

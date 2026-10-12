@@ -115,6 +115,65 @@ async function realAdminSession(fixture: Fixture) {
   return realMensaSession({ ...fixture, userId: admin.id });
 }
 
+// The Mensa now requests needs; only the Warehouse creates the M4 supply.
+// Keep a real, non-admin actor per territory for command/replay assertions.
+const warehouseSessions = new WeakMap<
+  object,
+  Map<number, ReturnType<typeof request.agent>>
+>();
+async function warehouseSession(fixture: Fixture, areaId = fixture.romeId) {
+  const cached = warehouseSessions.get(fixture) ?? new Map();
+  warehouseSessions.set(fixture, cached);
+  if (cached.has(areaId)) return cached.get(areaId)!;
+  const [role] = await db
+    .insert(ruoliTable)
+    .values({
+      nome: `Mensa-supply-warehouse-${rnd()}`,
+      aree: ["magazzino"],
+      permessi: [
+        "magazzino.view",
+        "magazzino.transfers.create",
+        "magazzino.transfers.prepare",
+        "magazzino.transfers.dispatch",
+        "magazzino.transfers.cancel",
+      ],
+    })
+    .returning();
+  ids.roles.push(role.id);
+  const [user] = await db
+    .insert(utentiTable)
+    .values({
+      username: `mensa_supply_${rnd()}`,
+      passwordHash: "x",
+      nome: "Magazzino sintetico",
+      ruoloId: role.id,
+      areaOperativaId: areaId,
+    })
+    .returning();
+  ids.users.push(user.id);
+  const session = await realMensaSession({ ...fixture, userId: user.id });
+  cached.set(areaId, session);
+  return session;
+}
+async function createWarehouseSupply(
+  fixture: Fixture,
+  body: Record<string, unknown>,
+  areaId = fixture.romeId,
+) {
+  const [mensa] = await db
+    .select()
+    .from(menseTable)
+    .where(eq(menseTable.id, Number(body.mensaId)));
+  const { mensaId: _mensaId, ...payload } = body;
+  return (await warehouseSession(fixture, areaId))
+    .post("/api/trasferimenti")
+    .send({
+      ...payload,
+      magazzinoDestinoId: mensa.magazzinoId,
+      trasportatoreNome: "Trasporto sintetico",
+    });
+}
+
 async function m61Stock(
   fixture: Fixture,
   quantity = "10",
@@ -1274,8 +1333,8 @@ describe("Modulo Mensa", () => {
           lottoLogicoId: ids.logicalLots[0],
         })
         .where(eq(lottiTable.id, lot.id));
-      const requested = await operator.post("/api/mensa/trasferimenti").send({
-        mensaId: fixture.mensaA,
+      const requested = await warehouse.post("/api/trasferimenti").send({
+        magazzinoDestinoId: fixture.warehouseIds[0],
         magazzinoOrigineId: fixture.warehouseIds[1],
         dataRichiesta: dataServizioMensa(),
         trasportatoreNome: "Trasporto sintetico",
@@ -1432,8 +1491,9 @@ describe("Modulo Mensa", () => {
           .post(`/api/bolle/${bolla.id}/conferma`)
           .send({ versione: 1, idempotencyKey: `competing-${rnd()}` });
       } else {
-        const transfer = await operator.post("/api/mensa/trasferimenti").send({
-          mensaId: fixture.mensaB,
+        const transfer = await admin.post("/api/trasferimenti").send({
+          magazzinoDestinoId: fixture.warehouseIds[1],
+          trasportatoreNome: "Trasporto sintetico",
           magazzinoOrigineId: fixture.warehouseIds[0],
           dataRichiesta: dataServizioMensa(),
           idempotencyKey: `request-${rnd()}`,
@@ -2588,15 +2648,13 @@ describe("Modulo Mensa", () => {
     expect(crossConsumption.body).not.toHaveProperty("prodottoId");
 
     const transferKey = `scope-transfer-${rnd()}`;
-    const transfer = await request(appRome)
-      .post("/mensa/trasferimenti")
-      .send({
-        mensaId: fixture.mensaA,
-        magazzinoOrigineId: fixture.warehouseIds[1],
-        dataRichiesta: dataServizioMensa(),
-        idempotencyKey: transferKey,
-        righe: [{ prodottoId: product.id, quantita: 1 }],
-      });
+    const transfer = await createWarehouseSupply(fixture, {
+      mensaId: fixture.mensaA,
+      magazzinoOrigineId: fixture.warehouseIds[1],
+      dataRichiesta: dataServizioMensa(),
+      idempotencyKey: transferKey,
+      righe: [{ prodottoId: product.id, quantita: 1 }],
+    });
     expect(transfer.status).toBe(201);
     ids.transfers.push(transfer.body.id);
     const [milanOrigin] = await db
@@ -2609,15 +2667,17 @@ describe("Modulo Mensa", () => {
       })
       .returning({ id: magazziniTable.id });
     ids.warehouses.push(milanOrigin.id);
-    const crossTransfer = await request(appMilan)
-      .post("/mensa/trasferimenti")
-      .send({
+    const crossTransfer = await createWarehouseSupply(
+      fixture,
+      {
         mensaId: fixture.mensaMilan,
         magazzinoOrigineId: milanOrigin.id,
         dataRichiesta: dataServizioMensa(),
         idempotencyKey: transferKey,
         righe: [{ prodottoId: product.id, quantita: 1 }],
-      });
+      },
+      fixture.milanId,
+    );
     expect(crossTransfer.status).toBe(403);
     expect(crossTransfer.body).not.toHaveProperty("id");
   });
@@ -2640,27 +2700,23 @@ describe("Modulo Mensa", () => {
       "mensa.transfers.receive",
     ];
     const mismatchedKey = `transfer-mismatch-${rnd()}`;
-    const mismatched = await request(makeApp(fixture, permissions))
-      .post("/mensa/trasferimenti")
-      .send({
-        mensaId: fixture.mensaA,
-        magazzinoOrigineId: fixture.warehouseIds[1],
-        dataRichiesta: dataServizioMensa(),
-        idempotencyKey: mismatchedKey,
-        righe: [{ prodottoId: product.id, quantita: 1, unitaMisura: "kg" }],
-      });
+    const mismatched = await createWarehouseSupply(fixture, {
+      mensaId: fixture.mensaA,
+      magazzinoOrigineId: fixture.warehouseIds[1],
+      dataRichiesta: dataServizioMensa(),
+      idempotencyKey: mismatchedKey,
+      righe: [{ prodottoId: product.id, quantita: 1, unitaMisura: "kg" }],
+    });
     expect(mismatched.status).toBe(400);
     expect(mismatched.body.error).toMatch(/deve essere pz/i);
     const malformedKey = `transfer-malformed-${rnd()}`;
-    const malformed = await request(makeApp(fixture, permissions))
-      .post("/mensa/trasferimenti")
-      .send({
-        mensaId: fixture.mensaA,
-        magazzinoOrigineId: fixture.warehouseIds[1],
-        dataRichiesta: dataServizioMensa(),
-        idempotencyKey: malformedKey,
-        righe: [{ prodottoId: product.id, quantita: 1, unitaMisura: 42 }],
-      });
+    const malformed = await createWarehouseSupply(fixture, {
+      mensaId: fixture.mensaA,
+      magazzinoOrigineId: fixture.warehouseIds[1],
+      dataRichiesta: dataServizioMensa(),
+      idempotencyKey: malformedKey,
+      righe: [{ prodottoId: product.id, quantita: 1, unitaMisura: 42 }],
+    });
     expect(malformed.status).toBe(400);
     expect(
       await db
@@ -2693,25 +2749,19 @@ describe("Modulo Mensa", () => {
       idempotencyKey: requestKey,
       righe: [{ prodottoId: product.id, quantita: 1 }],
     };
-    const requested = await request(makeApp(fixture, permissions))
-      .post("/mensa/trasferimenti")
-      .send(requestBody);
+    const requested = await createWarehouseSupply(fixture, requestBody);
     expect(requested.status).toBe(201);
     ids.transfers.push(requested.body.id);
-    const requestReplay = await request(makeApp(fixture, permissions))
-      .post("/mensa/trasferimenti")
-      .send(requestBody);
+    const requestReplay = await createWarehouseSupply(fixture, requestBody);
     expect(requestReplay.status, requestReplay.text).toBe(200);
     expect(requestReplay.body).toMatchObject({
       id: requested.body.id,
-      idempotentReplay: true,
+      versione: requested.body.versione,
     });
-    const requestMismatch = await request(makeApp(fixture, permissions))
-      .post("/mensa/trasferimenti")
-      .send({
-        ...requestBody,
-        righe: [{ prodottoId: product.id, quantita: 2 }],
-      });
+    const requestMismatch = await createWarehouseSupply(fixture, {
+      ...requestBody,
+      righe: [{ prodottoId: product.id, quantita: 2 }],
+    });
     expect(requestMismatch.status).toBe(409);
     expect(requestMismatch.body.error).toMatch(/chiave di idempotenza/i);
     const [savedRow] = await db
@@ -2719,15 +2769,13 @@ describe("Modulo Mensa", () => {
       .from(trasferimentoRigheTable)
       .where(eq(trasferimentoRigheTable.trasferimentoId, requested.body.id));
     expect(savedRow.unitaMisura).toBe("pz");
-    const requestedWithNull = await request(makeApp(fixture, permissions))
-      .post("/mensa/trasferimenti")
-      .send({
-        mensaId: fixture.mensaA,
-        magazzinoOrigineId: fixture.warehouseIds[1],
-        dataRichiesta: dataServizioMensa(),
-        idempotencyKey: `transfer-null-unit-${rnd()}`,
-        righe: [{ prodottoId: product.id, quantita: 1, unitaMisura: null }],
-      });
+    const requestedWithNull = await createWarehouseSupply(fixture, {
+      mensaId: fixture.mensaA,
+      magazzinoOrigineId: fixture.warehouseIds[1],
+      dataRichiesta: dataServizioMensa(),
+      idempotencyKey: `transfer-null-unit-${rnd()}`,
+      righe: [{ prodottoId: product.id, quantita: 1, unitaMisura: null }],
+    });
     expect(requestedWithNull.status).toBe(201);
     ids.transfers.push(requestedWithNull.body.id);
     const [savedNullUnitRow] = await db
@@ -2898,9 +2946,7 @@ describe("Modulo Mensa", () => {
         { prodottoId: required.id, lottoId, quantita, unitaMisura: "cf" },
       ],
     });
-    const missing = await request(app)
-      .post("/mensa/trasferimenti")
-      .send(body(null, 1));
+    const missing = await createWarehouseSupply(fixture, body(null, 1));
     expect(missing.status).toBe(400);
     expect(missing.body.error).toMatch(/lotto fisico.*obbligatorio/i);
     for (const [lottoId, status] of [
@@ -2908,36 +2954,56 @@ describe("Modulo Mensa", () => {
       [wrongProduct.id, 400],
       [wrongWarehouse.id, 400],
     ] as const) {
-      const rejected = await request(app)
-        .post("/mensa/trasferimenti")
-        .send(body(lottoId, 1));
+      // M4 permits a draft; the reservation step must reject unavailable or
+      // incoherent lots atomically, without stock/reservation effects.
+      const draft = await createWarehouseSupply(fixture, body(lottoId, 1));
+      expect(draft.status, draft.text).toBe(201);
+      ids.transfers.push(draft.body.id);
+      const rejected = await (await warehouseSession(fixture))
+        .post(`/api/trasferimenti/${draft.body.id}/prepara`)
+        .send({
+          versione: draft.body.versione,
+          idempotencyKey: `invalid-lot-${rnd()}`,
+        });
       expect(rejected.status, rejected.text).toBe(status);
+      expect(
+        await db
+          .select()
+          .from(prenotazioniMagazzinoTable)
+          .where(eq(prenotazioniMagazzinoTable.trasferimentoId, draft.body.id)),
+      ).toEqual([]);
     }
-    const excessive = await request(app)
-      .post("/mensa/trasferimenti")
-      .send(body(lotA.id, 23));
+    const excessiveDraft = await createWarehouseSupply(
+      fixture,
+      body(lotA.id, 23),
+    );
+    expect(excessiveDraft.status, excessiveDraft.text).toBe(201);
+    ids.transfers.push(excessiveDraft.body.id);
+    const excessive = await (await warehouseSession(fixture))
+      .post(`/api/trasferimenti/${excessiveDraft.body.id}/prepara`)
+      .send({
+        versione: excessiveDraft.body.versione,
+        idempotencyKey: `excessive-${rnd()}`,
+      });
     expect(excessive.status).toBe(409);
     expect(excessive.body.error).toMatch(
       /disponibilit[aà] reale insufficiente/i,
     );
     const key = `mensa-lot-replay-${rnd()}`;
     const validBody = body(lotA.id, 10, key);
-    const created = await request(app)
-      .post("/mensa/trasferimenti")
-      .send(validBody);
+    const created = await createWarehouseSupply(fixture, validBody);
     expect(created.status, created.text).toBe(201);
     ids.transfers.push(created.body.id);
-    const replay = await request(app)
-      .post("/mensa/trasferimenti")
-      .send(validBody);
+    const replay = await createWarehouseSupply(fixture, validBody);
     expect(replay.status, replay.text).toBe(200);
     expect(replay.body).toMatchObject({
       id: created.body.id,
-      idempotentReplay: true,
+      versione: created.body.versione,
     });
-    const mismatch = await request(app)
-      .post("/mensa/trasferimenti")
-      .send(body(lotB.id, 10, key));
+    const mismatch = await createWarehouseSupply(
+      fixture,
+      body(lotB.id, 10, key),
+    );
     expect(mismatch.status).toBe(409);
     const [savedRow] = await db
       .select({ lottoId: trasferimentoRigheTable.lottoId })
@@ -2948,8 +3014,8 @@ describe("Modulo Mensa", () => {
       .select({ versione: trasferimentiTable.versione })
       .from(trasferimentiTable)
       .where(eq(trasferimentiTable.id, created.body.id));
-    const prepared = await request(app)
-      .post(`/trasferimenti/${created.body.id}/prepara`)
+    const prepared = await (await warehouseSession(fixture))
+      .post(`/api/trasferimenti/${created.body.id}/prepara`)
       .send({
         versione: transfer.versione,
         idempotencyKey: `mensa-prepare-${rnd()}`,
@@ -2970,13 +3036,11 @@ describe("Modulo Mensa", () => {
     expect(afterPrepare.body.map((lot: { id: number }) => lot.id)).toEqual([
       lotB.id,
     ]);
-    const optionalResponse = await request(app)
-      .post("/mensa/trasferimenti")
-      .send({
-        ...body(null, 1),
-        idempotencyKey: `mensa-optional-${rnd()}`,
-        righe: [{ prodottoId: optional.id, quantita: 1, unitaMisura: "cf" }],
-      });
+    const optionalResponse = await createWarehouseSupply(fixture, {
+      ...body(null, 1),
+      idempotencyKey: `mensa-optional-${rnd()}`,
+      righe: [{ prodottoId: optional.id, quantita: 1, unitaMisura: "cf" }],
+    });
     expect(optionalResponse.status, optionalResponse.text).toBe(201);
     ids.transfers.push(optionalResponse.body.id);
   });

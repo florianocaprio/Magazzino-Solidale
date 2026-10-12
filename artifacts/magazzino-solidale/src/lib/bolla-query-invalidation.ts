@@ -22,6 +22,7 @@ export async function invalidateRequestWorkflowViews(
     "/api/trasferimenti",
     "/api/consegne",
     "/api/interventi",
+    "/api/mensa/trasferimenti",
   ];
   if (stock) prefixes.push("/api/giacenze");
   await queryClient.invalidateQueries({

@@ -216,6 +216,11 @@ test("Mensa autorizza una persona temporanea, registra il pasto e rende il repla
   await page.goto("/mensa/postazione");
   await selectOption(
     page,
+    page.getByRole("combobox", { name: "Area Operativa" }),
+    area.nome,
+  );
+  await selectOption(
+    page,
     page.getByRole("combobox", { name: /^mensa$/i }),
     "Mensa E2E Operativa",
   );
@@ -319,7 +324,7 @@ test("Mensa autorizza una persona temporanea, registra il pasto e rende il repla
   ).toEqual([expect.objectContaining({ id: meal.id })]);
 });
 
-test("R2-04: rifornimento Mensa sceglie un lotto reale; prodotto non tracciato resta utilizzabile", async ({
+test("R2-04: Magazzino fornisce alla Mensa un lotto reale; prodotto non tracciato resta utilizzabile", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -419,37 +424,58 @@ test("R2-04: rifornimento Mensa sceglie un lotto reale; prodotto non tracciato r
     )
   ).rows;
   const lotA = lots.find((item) => item.codice_lotto === `R2-A-${suffix}`)!;
-  await page.goto("/mensa/trasferimenti");
+  const openSupply = async () => {
+    await page.goto("/bolle");
+    await page.getByRole("button", { name: "Nuovo", exact: true }).click();
+    await page
+      .getByRole("dialog", { name: "Nuovo documento operativo" })
+      .getByRole("button", { name: /Trasferimenti/ })
+      .click();
+    await selectOption(
+      page,
+      page.getByRole("combobox", { name: "Magazzino di partenza" }),
+      origin!.nome,
+    );
+    await selectOption(
+      page,
+      page.getByRole("combobox", { name: "Magazzino di destinazione" }),
+      `Mensa R2 ${suffix}`,
+    );
+    await selectOption(
+      page,
+      page.getByRole("combobox", { name: "Trasportatore", exact: true }),
+      "Altro…",
+    );
+    await page
+      .getByPlaceholder("Nome del trasportatore")
+      .fill("Trasporto sintetico");
+  };
+  await openSupply();
   await selectOption(
     page,
-    page.getByRole("combobox", { name: "Mensa destinazione" }),
-    `Mensa R2 ${suffix}`,
-  );
-  await selectOption(
-    page,
-    page.getByRole("combobox", { name: "Magazzino origine" }),
-    origin!.nome,
-  );
-  await selectOption(
-    page,
-    page.getByRole("combobox", { name: "Prodotto disponibile" }),
+    page.getByRole("combobox", { name: "Prodotto 1", exact: true }),
     new RegExp(`Biscotti R2 ${suffix}`),
   );
-  await expect(page.getByTestId("mensa-lotto-field")).toBeVisible();
-  const create = page.getByRole("button", { name: "Crea trasferimento" });
+  await expect(
+    page.getByRole("combobox", { name: "Lotto fisico 1" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Unità di misura 1" }),
+  ).toHaveValue("cf");
+  const create = page.getByRole("button", { name: "Crea e genera bolla" });
   await expect(create).toBeDisabled();
   await selectOption(
     page,
-    page.getByRole("combobox", { name: "Lotto" }),
+    page.getByRole("combobox", { name: "Lotto fisico 1" }),
     new RegExp(`R2-A-${suffix}`),
   );
-  await page.getByRole("spinbutton", { name: "Quantità" }).fill("23");
+  await page.getByRole("spinbutton", { name: "Quantità 1" }).fill("23");
   await expect(create).toBeDisabled();
-  await page.getByRole("spinbutton", { name: "Quantità" }).fill("10");
+  await page.getByRole("spinbutton", { name: "Quantità 1" }).fill("10");
   await expect(create).toBeEnabled();
   const createdResponsePromise = page.waitForResponse(
     (response) =>
-      response.url().endsWith("/api/mensa/trasferimenti") &&
+      response.url().endsWith("/api/trasferimenti") &&
       response.request().method() === "POST",
   );
   await create.click();
@@ -482,20 +508,23 @@ test("R2-04: rifornimento Mensa sceglie un lotto reale; prodotto non tracciato r
   ).rows;
   expect(reservation.lotto_id).toBe(lotA.id);
   expect(Number(reservation.quantita)).toBe(10);
+  await openSupply();
   await selectOption(
     page,
-    page.getByRole("combobox", { name: "Prodotto disponibile" }),
+    page.getByRole("combobox", { name: "Prodotto 1", exact: true }),
     new RegExp(`Pasta R2 ${suffix}`),
   );
   // M6.1: anche il lotto facoltativo è selezionabile, con FEFO di default.
-  await expect(page.getByTestId("mensa-lotto-field")).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Lotto" })).toContainText(
-    "Automatico FEFO",
-  );
-  await page.getByRole("spinbutton", { name: "Quantità" }).fill("1");
+  await expect(
+    page.getByRole("combobox", { name: "Lotto fisico 1" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Lotto fisico 1" }),
+  ).toContainText("Nessun lotto selezionato — prelievo FEFO");
+  await page.getByRole("spinbutton", { name: "Quantità 1" }).fill("1");
   const optionalPromise = page.waitForResponse(
     (response) =>
-      response.url().endsWith("/api/mensa/trasferimenti") &&
+      response.url().endsWith("/api/trasferimenti") &&
       response.request().method() === "POST",
   );
   await create.click();

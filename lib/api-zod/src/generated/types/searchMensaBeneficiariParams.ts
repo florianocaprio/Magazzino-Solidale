@@ -8,6 +8,14 @@
 
 export type SearchMensaBeneficiariParams = {
   /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  mensaId?: number;
+  /**
    * @minLength 2
    */
   search: string;

@@ -14,6 +14,7 @@ import {
 import { beneficiariTable } from "./beneficiari";
 import { entiDestinatariTable } from "./entiDestinatari";
 import { magazziniTable } from "./magazzini";
+import { menseTable } from "./mensa";
 import { interventiTable } from "./interventi";
 import { areeOperativeTable } from "./areeOperative";
 import { centriAscoltoTable } from "./centri";
@@ -38,6 +39,9 @@ export const richiesteMagazzinoTable = pgTable(
       () => magazziniTable.id,
       { onDelete: "restrict" },
     ),
+    mensaId: integer("mensa_id").references(() => menseTable.id, {
+      onDelete: "restrict",
+    }),
     areaOperativaId: integer("area_operativa_id")
       .notNull()
       .references(() => areeOperativeTable.id, { onDelete: "restrict" }),
@@ -112,6 +116,11 @@ export const richiesteMagazzinoTable = pgTable(
       table.magazzinoDestinatarioId,
     ),
     index("richieste_magazzino_intervento_idx").on(table.interventoId),
+    index("richieste_magazzino_mensa_idx").on(table.mensaId),
+    check(
+      "richieste_magazzino_mensa_check",
+      sql`${table.mensaId} is null or (${table.tipoDestinatario} = 'magazzino' and ${table.sorgente} = 'operativa' and ${table.interventoId} is null)`,
+    ),
     check(
       "richieste_magazzino_destinatario_check",
       sql`(${table.tipoDestinatario} = 'beneficiario' and ${table.beneficiarioId} is not null and ${table.enteDestinatarioId} is null and ${table.magazzinoDestinatarioId} is null and ${table.centroAscoltoId} is not null) or (${table.tipoDestinatario} = 'ente' and ${table.beneficiarioId} is null and ${table.enteDestinatarioId} is not null and ${table.magazzinoDestinatarioId} is null) or (${table.tipoDestinatario} = 'magazzino' and ${table.beneficiarioId} is null and ${table.enteDestinatarioId} is null and ${table.magazzinoDestinatarioId} is not null)`,

@@ -103,12 +103,19 @@ import {
   type ReturnLineInput,
 } from "../lib/transportReturn";
 
+import {
+  transferMensaId,
+  resolveTransferMensaId,
+} from "../lib/mensaTransferDestination";
+
 const router: IRouter = Router();
 router.use("/trasferimenti", requireModulo("TRASFERIMENTI"));
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 router.use("/trasferimenti", (req, res, next) =>
-  isMensaOnly(req) ? currentMensaScope(req, res, next) : next(),
+  isMensaOnly(req)
+    ? requireModulo("MENSA")(req, res, () => currentMensaScope(req, res, next))
+    : next(),
 );
 
 function isMensaOnly(req: Request): boolean {
@@ -284,15 +291,9 @@ function requireGenericTransferPermission(
 ): boolean {
   if (isMensaOnly(req)) {
     const mensaPermission =
-      permission === "magazzino.transfers.create"
-        ? "mensa.transfers.request"
-        : permission === "magazzino.transfers.prepare"
-          ? "mensa.transfers.prepare"
-          : permission === "magazzino.transfers.cancel"
-            ? "mensa.transfers.cancel"
-            : permission === "magazzino.transfers.receive"
-              ? "mensa.transfers.receive"
-              : null;
+      permission === "magazzino.transfers.receive"
+        ? "mensa.transfers.receive"
+        : null;
     if (
       mensaPermission != null &&
       (hasPermission(req, mensaPermission) ||
@@ -303,7 +304,6 @@ function requireGenericTransferPermission(
     if (permission === "magazzino.view" && canManageMensaTransfers(req)) {
       return true;
     }
-    if (hasPermission(req, permission)) return true;
     // La spedizione è sempre un'operazione del magazzino origine: il solo
     // ruolo Mensa non la eredita più implicitamente.
     res.status(403).json({
@@ -323,10 +323,11 @@ function requireGenericTransferPermission(
 
 async function enforceMensaTransfer(
   req: Request,
-  mensaId: number | null,
+  transferId: number,
 ): Promise<string | null> {
   if (!isMensaOnly(req)) return null;
   if (!canManageMensaTransfers(req)) return "Permesso Mensa non consentito";
+  const mensaId = await resolveTransferMensaId(transferId);
   if (mensaId == null) return "Trasferimento non associato a una Mensa";
   try {
     assertAssignedMensa(req, mensaId);
@@ -674,7 +675,7 @@ export async function getTrasferimentoWithRighe(id: number) {
     motivoMancatoArrivo: t.t.motivoMancatoArrivo ?? null,
     operatoreId: t.t.operatoreId ?? null,
     operatoreCodice: t.operatoreMatricola ?? t.operatoreUsername ?? null,
-    mensaId: t.t.mensaId ?? null,
+    mensaId: await resolveTransferMensaId(t.t.id),
     idempotencyKey: t.t.idempotencyKey ?? null,
     righe: righe.map((r) => {
       const split = provenance.get(`${id}:${r.r.prodottoId}`) ?? {
@@ -745,8 +746,8 @@ router.get("/trasferimenti", async (req, res) => {
       res.status(403).json({ error: "Permesso Mensa non consentito" });
       return;
     }
-    conditions.push(sql`${trasferimentiTable.mensaId} is not null`);
-    conditions.push(mensaScopeCondition(req, trasferimentiTable.mensaId));
+    conditions.push(sql`${transferMensaId()} is not null`);
+    conditions.push(mensaScopeCondition(req, transferMensaId()));
     const ownAreaOperativa = callerAreaOperativaId(req);
     if (ownAreaOperativa != null) {
       const visibleMense = await db
@@ -755,7 +756,7 @@ router.get("/trasferimenti", async (req, res) => {
         .where(eq(menseTable.areaOperativaId, ownAreaOperativa));
       const ids = visibleMense.map((row) => row.id);
       conditions.push(
-        ids.length ? inArray(trasferimentiTable.mensaId, ids) : sql`false`,
+        ids.length ? inArray(transferMensaId(), ids) : sql`false`,
       );
     }
   }
@@ -1075,7 +1076,7 @@ router.get("/trasferimenti/:id", async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  const mensaError = await enforceMensaTransfer(req, result.mensaId);
+  const mensaError = await enforceMensaTransfer(req, result.id);
   if (mensaError) {
     res.status(403).json({ error: mensaError });
     return;
@@ -1109,7 +1110,7 @@ router.get("/trasferimenti/:id/documento", async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  const mensaError = await enforceMensaTransfer(req, result.mensaId);
+  const mensaError = await enforceMensaTransfer(req, result.id);
   if (mensaError) {
     res.status(403).json({ error: mensaError });
     return;
@@ -1166,7 +1167,7 @@ router.patch("/trasferimenti/:id", async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  const mensaError = await enforceMensaTransfer(req, current.mensaId);
+  const mensaError = await enforceMensaTransfer(req, current.id);
   if (mensaError) {
     res.status(403).json({ error: mensaError });
     return;
@@ -1415,7 +1416,7 @@ router.post("/trasferimenti/:id/prepara", async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  const mensaError = await enforceMensaTransfer(req, current.mensaId);
+  const mensaError = await enforceMensaTransfer(req, current.id);
   if (mensaError) {
     res.status(403).json({ error: mensaError });
     return;
@@ -1555,7 +1556,7 @@ router.post("/trasferimenti/:id/annulla", async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  const mensaError = await enforceMensaTransfer(req, current.mensaId);
+  const mensaError = await enforceMensaTransfer(req, current.id);
   if (mensaError) {
     res.status(403).json({ error: mensaError });
     return;
@@ -1634,7 +1635,7 @@ router.post("/trasferimenti/:id/avvia", async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  const mensaError = await enforceMensaTransfer(req, current.mensaId);
+  const mensaError = await enforceMensaTransfer(req, current.id);
   if (mensaError) {
     res.status(403).json({ error: mensaError });
     return;
@@ -1880,7 +1881,7 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  const mensaError = await enforceMensaTransfer(req, current.mensaId);
+  const mensaError = await enforceMensaTransfer(req, current.id);
   if (mensaError) {
     res.status(403).json({ error: mensaError });
     return;
@@ -1921,9 +1922,22 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
         req.user!.id,
         "trasferimento",
         id,
-        "magazzino.transfers.receive",
+        isMensaOnly(req)
+          ? hasPermission(req, "mensa.transfers.receive")
+            ? "mensa.transfers.receive"
+            : "mensa.transfers.manage"
+          : "magazzino.transfers.receive",
       );
       const locked = await lockTransfer(tx, id);
+      if (isMensaOnly(req)) {
+        const destinationMensaId = await resolveTransferMensaId(locked.id, tx);
+        if (destinationMensaId == null)
+          throw new TransferRequestError(
+            403,
+            "Rifornimento Mensa non disponibile",
+          );
+        await assertCurrentMensaAssignment(tx, req, destinationMensaId);
+      }
       await assertCurrentTransferScope(tx, req, locked, "destination");
       const receipt = await findDocumentCommand(tx, {
         tipoComando: "trasferimento.receive",
@@ -2264,12 +2278,13 @@ router.post("/trasferimenti/:id/mancato-arrivo", async (req, res) => {
         commandPermission,
       );
       if (mensaDestination) {
-        if (locked.mensaId == null)
+        const destinationMensaId = await resolveTransferMensaId(locked.id, tx);
+        if (destinationMensaId == null)
           throw new TransferRequestError(
             403,
             "Rifornimento Mensa non disponibile",
           );
-        await assertCurrentMensaAssignment(tx, req, locked.mensaId);
+        await assertCurrentMensaAssignment(tx, req, destinationMensaId);
       }
       await assertCurrentTransferScope(
         tx,
@@ -2359,7 +2374,7 @@ router.get("/trasferimenti/:id/rientro", async (req, res) => {
     res.status(404).json({ error: "Trasferimento non trovato" });
     return;
   }
-  const mensaError = await enforceMensaTransfer(req, transfer.mensaId);
+  const mensaError = await enforceMensaTransfer(req, transfer.id);
   if (mensaError) {
     res.status(403).json({ error: mensaError });
     return;

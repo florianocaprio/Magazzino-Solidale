@@ -16,6 +16,11 @@ import type { RichiestaMagazzinoTipoDestinatario } from "./richiestaMagazzinoTip
  * Snapshot operativo; nessun dato del dossier sociale live.
  */
 export interface RichiestaMagazzino {
+  /**
+   * Provenienza Mensa strutturale e immutabile; null per richieste precedenti o altri percorsi.
+   * @nullable
+   */
+  mensaId?: number | null;
   id: number;
   codice: string;
   tipoDestinatario: RichiestaMagazzinoTipoDestinatario;

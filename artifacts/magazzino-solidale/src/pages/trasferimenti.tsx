@@ -55,6 +55,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { mensaErrorMessage } from "@/lib/mensa-ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
 import {
@@ -113,11 +114,13 @@ export function RigheEditor({
   areaOperativaId,
   righe,
   setRighe,
+  onLotInvalidChange,
 }: {
   magazzinoId: number;
   areaOperativaId: number;
   righe: RigaDraft[];
   setRighe: (r: RigaDraft[]) => void;
+  onLotInvalidChange?: (invalid: boolean) => void;
 }) {
   const { t } = useTranslation();
   const { data: giacenze } = useListGiacenze(
@@ -130,6 +133,16 @@ export function RigheEditor({
     },
   );
   const { data: prodotti } = useListProdotti();
+  useEffect(() => {
+    if (!prodotti) return;
+    const normalized = righe.map((row) => {
+      const product = prodotti.find((p) => p.id === Number(row.prodottoId));
+      return product && product.unitaMisura !== row.unitaMisura
+        ? { ...row, unitaMisura: product.unitaMisura }
+        : row;
+    });
+    if (normalized.some((row, i) => row !== righe[i])) setRighe(normalized);
+  }, [prodotti, righe, setRighe]);
   const { data: lotti } = useListLotti(
     { magazzinoId },
     {
@@ -176,6 +189,26 @@ export function RigheEditor({
       );
     }
   }, [lotti, magazzinoId, righe, setRighe]);
+  useEffect(() => {
+    onLotInvalidChange?.(
+      righe.some((row) => {
+        if (!row.lottoId) return false;
+        const lot = lotti?.find(
+          (item) =>
+            item.id === Number(row.lottoId) &&
+            transferLotIsAvailable(
+              item,
+              Number(row.prodottoId),
+              magazzinoId,
+              todayEuropeRome(),
+            ),
+        );
+        return (
+          !lot || Number(row.quantita) > Math.max(0, lot.disponibileReale ?? 0)
+        );
+      }),
+    );
+  }, [righe, lotti, magazzinoId, onLotInvalidChange]);
 
   const update = (key: string, patch: Partial<RigaDraft>) =>
     setRighe(righe.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -224,12 +257,10 @@ export function RigheEditor({
                 <Select
                   value={r.prodottoId}
                   onValueChange={(v) => {
-                    const g = giacenze?.find(
-                      (x) => x.prodottoId === parseInt(v),
-                    );
+                    const product = prodotti?.find((x) => x.id === Number(v));
                     update(r.key, {
                       prodottoId: v,
-                      unitaMisura: g?.unitaMisura ?? "pz",
+                      unitaMisura: product?.unitaMisura ?? "",
                       quantita: "",
                       lottoId: "",
                     });
@@ -348,32 +379,11 @@ export function RigheEditor({
                 <Label className="text-xs">
                   {t("trasferimenti.unitaMisura")}
                 </Label>
-                <Select
+                <Input
+                  aria-label={`${t("trasferimenti.unitaMisura")} ${index + 1}`}
                   value={r.unitaMisura}
-                  onValueChange={(v) => update(r.key, { unitaMisura: v })}
-                >
-                  <SelectTrigger
-                    aria-label={`${t("trasferimenti.unitaMisura")} ${index + 1}`}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[
-                      "pz",
-                      "kg",
-                      "g",
-                      "lt",
-                      "ml",
-                      "conf",
-                      "scatola",
-                      "busta",
-                    ].map((u) => (
-                      <SelectItem key={u} value={u}>
-                        {u}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  readOnly
+                />
               </div>
             </div>
           </div>
@@ -410,6 +420,7 @@ export function NuovoTrasferimentoForm({
   const [trasportatoreAltro, setTrasportatoreAltro] = useState("");
   const [note, setNote] = useState("");
   const [righe, setRighe] = useState<RigaDraft[]>([newRiga()]);
+  const [invalidLot, setInvalidLot] = useState(false);
 
   const { t } = useTranslation();
   const { data: magazzini } = useListMagazzini();
@@ -482,6 +493,7 @@ export function NuovoTrasferimentoForm({
     !!prodotti &&
     transferRowsHaveRequiredLots(righeValide, prodotti) &&
     !hasEccesso &&
+    !invalidLot &&
     trasportatoreValido &&
     !createTrasferimento.isPending;
 
@@ -520,7 +532,10 @@ export function NuovoTrasferimentoForm({
           commandIntents.fail(slot, error);
           toast({
             title: t("trasferimenti.errorTitle"),
-            description: t("trasferimenti.errorCreate"),
+            description: mensaErrorMessage(
+              error,
+              t("trasferimenti.errorCreate"),
+            ),
             variant: "destructive",
           });
         },
@@ -649,6 +664,7 @@ export function NuovoTrasferimentoForm({
                 areaOperativaId={origineAreaId}
                 righe={righe}
                 setRighe={setRighe}
+                onLotInvalidChange={setInvalidLot}
               />
             ) : (
               <p className="text-sm text-muted-foreground rounded-md border border-dashed p-3 text-center">
@@ -707,6 +723,7 @@ export function ModificaTrasferimentoForm({
   );
 
   const updateTrasferimento = useUpdateTrasferimento();
+  const [invalidLot, setInvalidLot] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const commandIntents = useCommandIntentRegistry();
@@ -771,6 +788,7 @@ export function ModificaTrasferimentoForm({
     !!prodotti &&
     transferRowsHaveRequiredLots(righeValide, prodotti) &&
     !hasEccesso &&
+    !invalidLot &&
     !updateTrasferimento.isPending;
 
   const onSubmit = () => {
@@ -801,7 +819,10 @@ export function ModificaTrasferimentoForm({
           commandIntents.fail(updateSlot, error);
           toast({
             title: t("trasferimenti.errorTitle"),
-            description: t("trasferimenti.errorUpdate"),
+            description: mensaErrorMessage(
+              error,
+              t("trasferimenti.errorUpdate"),
+            ),
             variant: "destructive",
           });
         },
@@ -846,6 +867,7 @@ export function ModificaTrasferimentoForm({
               areaOperativaId={origineAreaId}
               righe={righe}
               setRighe={setRighe}
+              onLotInvalidChange={setInvalidLot}
             />
           </div>
 
@@ -885,12 +907,14 @@ function trasportatoreLabel(
   return null;
 }
 
-function TrasportatoreCell({
+export function TrasportatoreCell({
   t: tras,
   canEdit,
+  onUpdated,
 }: {
   t: Trasferimento;
   canEdit: boolean;
+  onUpdated?: () => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -950,12 +974,16 @@ function TrasportatoreCell({
           });
           toast({ title: t("trasferimenti.toastTrasportatoreAggiornato") });
           setOpen(false);
+          onUpdated?.();
         },
         onError: (error) => {
           commandIntents.fail(updateTransporterSlot, error);
           toast({
             title: t("trasferimenti.errorTitle"),
-            description: t("trasferimenti.errorTrasportatore"),
+            description: mensaErrorMessage(
+              error,
+              t("trasferimenti.errorTrasportatore"),
+            ),
             variant: "destructive",
           });
         },
@@ -975,6 +1003,7 @@ function TrasportatoreCell({
     <>
       <button
         type="button"
+        aria-label={t("trasferimenti.riassegnaTitle")}
         onClick={openDialog}
         className="group flex min-h-11 items-center gap-1.5 text-left text-sm hover:text-foreground"
       >
@@ -1014,7 +1043,7 @@ function TrasportatoreCell({
                   if (v !== "altro") setTrasportatoreAltro("");
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label={t("trasferimenti.trasportatore")}>
                   <SelectValue
                     placeholder={t("trasferimenti.selectTrasportatore")}
                   />

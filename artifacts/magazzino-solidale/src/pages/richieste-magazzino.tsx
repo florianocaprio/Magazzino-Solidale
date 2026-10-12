@@ -863,7 +863,9 @@ export default function RichiesteMagazzino() {
                   }}
                 >
                   <span className="font-medium">
-                    {request.codice} — {request.destinatarioNomeSnapshot}
+                    {request.codice} —{" "}
+                    {request.mensaId != null ? "Mensa · " : ""}
+                    {request.destinatarioNomeSnapshot}
                   </span>
                   <span className="ml-2 text-xs">
                     {t(`richiesteMagazzino.${request.stato}`)}

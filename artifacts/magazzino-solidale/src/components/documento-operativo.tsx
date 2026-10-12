@@ -182,6 +182,7 @@ import { shouldFetchBollaBeneficiari } from "@/lib/bolle-beneficiari-query";
 import {
   ModificaTrasferimentoForm,
   NuovoTrasferimentoForm,
+  TrasportatoreCell,
 } from "@/pages/trasferimenti";
 
 export function statoBadge(stato: string) {
@@ -3241,7 +3242,10 @@ function TrasferimentoDettaglioComune({
           commandIntents.fail(slot, error);
           toast({
             title: t("trasferimenti.errorTitle"),
-            description: t("trasferimenti.errorUpdate"),
+            description: bollaErrorMessage(
+              error,
+              t("trasferimenti.errorUpdate"),
+            ),
             variant: "destructive",
           });
         },
@@ -3271,7 +3275,10 @@ function TrasferimentoDettaglioComune({
           commandIntents.fail(slot, error);
           toast({
             title: t("trasferimenti.errorTitle"),
-            description: t("trasferimenti.errorUpdate"),
+            description: bollaErrorMessage(
+              error,
+              t("trasferimenti.errorUpdate"),
+            ),
             variant: "destructive",
           });
         },
@@ -3301,7 +3308,10 @@ function TrasferimentoDettaglioComune({
           commandIntents.fail(slot, error);
           toast({
             title: t("trasferimenti.errorTitle"),
-            description: t("trasferimenti.errorUpdate"),
+            description: bollaErrorMessage(
+              error,
+              t("trasferimenti.errorUpdate"),
+            ),
             variant: "destructive",
           });
         },
@@ -3332,7 +3342,10 @@ function TrasferimentoDettaglioComune({
           commandIntents.fail(slot, error);
           toast({
             title: t("trasferimenti.errorTitle"),
-            description: t("trasferimenti.errorUpdate"),
+            description: bollaErrorMessage(
+              error,
+              t("trasferimenti.errorUpdate"),
+            ),
             variant: "destructive",
           });
         },
@@ -3390,6 +3403,13 @@ function TrasferimentoDettaglioComune({
         <ArrowRight className="h-4 w-4 text-muted-foreground" />
         <span>{trasferimento.magazzinoDestinoNome}</span>
       </div>
+      <TrasportatoreCell
+        t={trasferimento}
+        canEdit={
+          canEdit && ["richiesto", "preparato"].includes(trasferimento.stato)
+        }
+        onUpdated={invalidate}
+      />
       <div className="space-y-2">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
           {t("common.details")}

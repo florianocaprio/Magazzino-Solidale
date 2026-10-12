@@ -1,15 +1,18 @@
-import { act } from "react";
+import { act, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
-// Unit harness mounts video synchronously; browser/portal and real camera
-// behaviour remain manual UAT, not simulated by this test.
+// Model the asynchronous portal mount; real camera hardware is still UAT.
 vi.mock("@/components/ui/dialog", () => ({
   Dialog: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
     open ? <div role="dialog">{children}</div> : null,
-  DialogContent: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DialogContent: ({ children }: { children: React.ReactNode }) => {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+      setMounted(true);
+    }, []);
+    return mounted ? <div>{children}</div> : null;
+  },
   DialogHeader: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -112,4 +115,37 @@ it("existing ZXing supports QR/barcodes and forwards only a nonempty opaque toke
   );
   expect(scanned).toHaveBeenCalledExactlyOnceWith("MS-SYNTHETIC-F1");
   expect(mocks.stop).toHaveBeenCalled();
+  await act(() =>
+    callback({ getText: () => "MS-SYNTHETIC-F1" }, undefined, {
+      stop: mocks.stop,
+    }),
+  );
+  expect(scanned).toHaveBeenCalledTimes(1);
+});
+
+it("starts with the mounted video and releases a pending decoder on unmount", async () => {
+  let resolve!: (controls: { stop: typeof mocks.stop }) => void;
+  mocks.decode.mockReturnValue(
+    new Promise((done) => {
+      resolve = done;
+    }),
+  );
+  await open();
+  const video = mocks.decode.mock.calls[0][1] as HTMLVideoElement;
+  expect(video.isConnected).toBe(true);
+  const trackStop = vi.fn();
+  Object.defineProperty(video, "srcObject", {
+    configurable: true,
+    writable: true,
+    value: { getTracks: () => [{ stop: trackStop }] },
+  });
+  await act(() => root.render(null));
+  expect(trackStop).toHaveBeenCalledOnce();
+  await act(() => resolve({ stop: mocks.stop }));
+  expect(mocks.stop).toHaveBeenCalled();
+  const callback = mocks.decode.mock.calls[0][2];
+  await act(() =>
+    callback({ getText: () => "LATE" }, undefined, { stop: mocks.stop }),
+  );
+  expect(scanned).not.toHaveBeenCalled();
 });

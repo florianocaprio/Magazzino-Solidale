@@ -1,6 +1,7 @@
 import {
   db,
   prodottiTable,
+  menseTable,
   trasferimentiTable,
   trasferimentoRigheTable,
 } from "@workspace/db";
@@ -203,6 +204,23 @@ export async function createTransferRequestTx(
     await requireOperationalMagazzino(tx, input.magazzinoDestinoId);
   }
   await input.beforeCreate?.(tx);
+  // Resolve at the common persistence boundary: both direct and request-linked
+  // documents refer to the same actual destination, never to a UI-provided name.
+  const [destinationMensa] = await tx
+    .select()
+    .from(menseTable)
+    .where(eq(menseTable.magazzinoId, input.magazzinoDestinoId))
+    .for("share");
+  if (input.mensaId != null && destinationMensa?.id !== input.mensaId)
+    throw new TransferRequestError(
+      400,
+      "Mensa e magazzino destinatario non corrispondono",
+    );
+  if (destinationMensa && !destinationMensa.attiva)
+    throw new TransferRequestError(
+      409,
+      "La Mensa destinataria non è operativa",
+    );
   const normalizedRows = await normalizeTransferRows(tx, input.righe);
   const [created] = await tx
     .insert(trasferimentiTable)
@@ -215,7 +233,7 @@ export async function createTransferRequestTx(
       trasportatoreNome: input.trasportatoreNome ?? null,
       note: input.note ?? null,
       operatoreId: input.audit ? auditUserId(input.audit) : input.operatoreId,
-      mensaId: input.mensaId ?? null,
+      mensaId: destinationMensa?.id ?? null,
       idempotencyKey: input.idempotencyKey ?? null,
     })
     .returning();

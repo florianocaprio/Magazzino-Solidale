@@ -54,6 +54,7 @@ paths:
       tags: [richieste-magazzino]
       summary: Coda territoriale M5A, richiede richieste_magazzino.view e MAGAZZINO_SOLIDALE
       parameters:
+        - { name: mensaId, in: query, schema: { type: integer, minimum: 1 } }
         - {
             name: page,
             in: query,
@@ -9721,6 +9722,12 @@ paths:
       tags: [mensa]
       parameters:
         - {
+            name: areaOperativaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - { name: mensaId, in: query, schema: { type: integer, minimum: 1 } }
+        - {
             name: search,
             in: query,
             required: true,
@@ -9743,6 +9750,11 @@ paths:
       operationId: listMensaAbilitazioni
       tags: [mensa]
       parameters:
+        - {
+            name: areaOperativaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
         - { name: beneficiarioId, in: query, schema: { type: integer } }
         - { name: mensaId, in: query, schema: { type: integer } }
       responses:
@@ -10170,8 +10182,14 @@ paths:
     get:
       operationId: listTrasferimentiMensa
       tags: [mensa]
-      description: Richiede mensa.transfers.request (oppure il permesso legacy mensa.transfers.manage). La spedizione resta riservata a magazzino.transfers.dispatch; la ricezione richiede mensa.transfers.receive.
+      description: Richiede mensa.transfers.request, receive oppure manage legacy. Elenco filtrato per assegnazioni correnti e Area; preparazione e spedizione riservate al Magazzino.
       parameters:
+        - {
+            name: areaOperativaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - { name: mensaId, in: query, schema: { type: integer, minimum: 1 } }
         - { name: page, in: query, schema: { type: integer, minimum: 1 } }
         - {
             name: pageSize,
@@ -10186,10 +10204,13 @@ paths:
               schema:
                 oneOf:
                   - type: array
-                    items: { type: object, additionalProperties: true }
+                    items:
+                      { $ref: "#/components/schemas/MensaTrasferimentoSummary" }
                   - $ref: "#/components/schemas/MensaTrasferimentiPage"
     post:
       operationId: createTrasferimentoMensa
+      deprecated: true
+      description: Ritirato. Inviare una Richiesta Magazzino canonica con mensaId; nessun effetto inventariale.
       tags: [mensa]
       requestBody:
         required: true
@@ -10197,16 +10218,17 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/MensaTrasferimentoInput" }
       responses:
-        "200":
-          description: Replay idempotente
+        "410":
+          description: Creazione trasferimento Mensa ritirata
           content:
             application/json:
-              schema: { type: object, additionalProperties: true }
-        "201":
-          description: Trasferimento richiesto; avvio, conferma e PDF usano il motore logistico esistente
-          content:
-            application/json:
-              schema: { type: object, additionalProperties: true }
+              schema:
+                {
+                  type: object,
+                  required: [error, code],
+                  properties:
+                    { error: { type: string }, code: { type: string } },
+                }
 
   /mensa/consumi:
     get:
@@ -11033,6 +11055,12 @@ components:
       additionalProperties: false
       required: [idempotencyKey, tipoDestinatario, sorgente, bisogno]
       properties:
+        mensaId:
+          {
+            type: integer,
+            minimum: 1,
+            description: Mensa assegnata; destinazione derivata dal server.,
+          }
         idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
         tipoDestinatario:
           { type: string, enum: [beneficiario, ente, magazzino] }
@@ -11112,6 +11140,11 @@ components:
           dataAggiornamento,
         ]
       properties:
+        mensaId:
+          {
+            type: [integer, "null"],
+            description: Provenienza Mensa strutturale e immutabile; null per richieste precedenti o altri percorsi.,
+          }
         id: { type: integer }
         codice: { type: string }
         tipoDestinatario:
@@ -21963,12 +21996,40 @@ components:
         pageSize: { type: integer }
         total: { type: integer }
 
+    MensaTrasferimentoSummary:
+      type: object
+      required:
+        [
+          id,
+          versione,
+          codice,
+          stato,
+          mensaId,
+          mensaNome,
+          magazzinoOrigineNome,
+          dataRichiesta,
+          dataCreazione,
+        ]
+      properties:
+        id: { type: integer }
+        versione: { type: integer }
+        codice: { type: string }
+        stato: { type: string }
+        mensaId: { type: integer }
+        mensaNome: { type: string }
+        magazzinoOrigineNome: { type: string }
+        dataRichiesta: { type: string, format: date }
+        dataCreazione: { type: string, format: date-time }
+
     MensaTrasferimentiPage:
       type: object
       required: [items, page, pageSize, total]
       properties:
         items:
-          { type: array, items: { type: object, additionalProperties: true } }
+          {
+            type: array,
+            items: { $ref: "#/components/schemas/MensaTrasferimentoSummary" },
+          }
         page: { type: integer }
         pageSize: { type: integer }
         total: { type: integer }

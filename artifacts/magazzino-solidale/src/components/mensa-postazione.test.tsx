@@ -7,12 +7,14 @@ const mealMutate = vi.fn();
 const temporaryMutate = vi.fn();
 
 vi.mock("@workspace/api-client-react", () => ({
+  getListMenseQueryKey: (params: unknown) => ["/api/mensa/mense", params],
   getSearchMensaBeneficiariQueryKey: () => ["mensa-beneficiari"],
   getListMensaAbilitazioniQueryKey: () => ["mensa-abilitazioni"],
   getListGiacenzeMensaQueryKey: () => ["mensa-giacenze"],
   getListConsumiMensaQueryKey: () => ["mensa-consumi"],
   useListMense: () => ({
     data: [{ id: 10, nome: "Mensa Roma", attiva: true }],
+    isSuccess: true,
   }),
   useVerificaAccessoMensa: () => ({ mutate: verifyMutate, isPending: false }),
   useAutorizzaEccezioneMensa: () => ({ mutate: vi.fn(), isPending: false }),

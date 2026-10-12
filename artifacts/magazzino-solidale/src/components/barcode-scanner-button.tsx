@@ -70,7 +70,9 @@ export function BarcodeScannerButton({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  // The dialog portal may mount after the opening render. Start only when
+  // its video is actually available, rather than relying on effect timing.
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const onScanRef = useRef(onScan);
 
@@ -79,8 +81,9 @@ export function BarcodeScannerButton({
   }, [onScan]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !video) return;
     let cancelled = false;
+    let accepted = false;
     setError(null);
 
     if (
@@ -98,16 +101,15 @@ export function BarcodeScannerButton({
     const reader = new BrowserMultiFormatReader(hints);
 
     const start = async () => {
-      const video = videoRef.current;
-      if (!video) return;
       try {
         const controls = await reader.decodeFromConstraints(
           { video: { facingMode: { ideal: "environment" } } },
           video,
           (result, _err, ctrl) => {
-            if (!result) return;
+            if (!result || cancelled || accepted) return;
             const text = result.getText().trim();
             if (!text) return;
+            accepted = true;
             ctrl.stop();
             controlsRef.current = null;
             if (!cancelled) {
@@ -116,7 +118,7 @@ export function BarcodeScannerButton({
             }
           },
         );
-        if (cancelled) {
+        if (cancelled || accepted) {
           controls.stop();
           return;
         }
@@ -133,8 +135,12 @@ export function BarcodeScannerButton({
       cancelled = true;
       controlsRef.current?.stop();
       controlsRef.current = null;
+      const stream = video.srcObject;
+      if (stream && "getTracks" in stream)
+        stream.getTracks().forEach((track) => track.stop());
+      video.srcObject = null;
     };
-  }, [open, t]);
+  }, [open, video, t]);
 
   return (
     <>
@@ -143,7 +149,10 @@ export function BarcodeScannerButton({
         variant={variant}
         size={withLabel ? "default" : "icon"}
         disabled={disabled}
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setError(null);
+          setOpen(true);
+        }}
         className={cn(withLabel && "gap-2", "shrink-0", className)}
         aria-label={label ?? t("barcodeScanner.button")}
         title={label ?? t("barcodeScanner.button")}
@@ -167,7 +176,7 @@ export function BarcodeScannerButton({
             <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border bg-black">
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
               <video
-                ref={videoRef}
+                ref={setVideo}
                 className="h-full w-full object-cover"
                 muted
                 playsInline

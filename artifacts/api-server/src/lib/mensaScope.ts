@@ -119,6 +119,7 @@ export const currentMensaScope: RequestHandler = async (req, res, next) => {
       const current = await currentMensaIds(tx, req.user!.id);
       if (res.destroyed || res.writableEnded) return;
       scopes.set(req, current.ids);
+      Object.assign(req.user!, { mensaIds: current.ids });
       // Intersezione preserva controlli preliminari più restrittivi; mai elevazione.
       if (!current.role.isAdmin)
         req.user!.permessi = req.user!.permessi.filter((grant) =>
@@ -129,6 +130,7 @@ export const currentMensaScope: RequestHandler = async (req, res, next) => {
       req.user!.centroAscoltoId = current.user.centroAscoltoId;
       if (
         current.ids?.length === 0 &&
+        req.baseUrl.endsWith("/mensa") &&
         !(req.method === "GET" && req.path === "/mense")
       )
         throw new MensaScopeError("Nessuna assegnazione Mensa attiva");
