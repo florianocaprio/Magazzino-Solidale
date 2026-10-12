@@ -25,6 +25,7 @@ import {
 } from "@workspace/db";
 import { and, eq, inArray, like } from "drizzle-orm";
 import interventiRouter from "../src/routes/interventi";
+import { buildFseCanonicalReport } from "../src/lib/fseCanonicalReporting";
 
 const rnd = () => Math.random().toString(36).slice(2, 10);
 const ids = {
@@ -713,6 +714,16 @@ describe("gestione operativa degli interventi Sociali", () => {
   });
 
   it("preserva Area e Zona storiche UDS prima della scrittura nel ledger", async () => {
+    await db
+      .update(lottiTable)
+      .set({ fondoOrigine: "FSE_PLUS", fsePlus: true })
+      .where(eq(lottiTable.prodottoId, prodottoId));
+    const stockBefore = (
+      await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.prodottoId, prodottoId))
+    ).reduce((sum, lot) => sum + Number(lot.quantitaResidua), 0);
     const id = await createIntervento({
       stato: "in_corso",
       ambito: "uds",
@@ -760,6 +771,35 @@ describe("gestione operativa degli interventi Sociali", () => {
       centroAscoltoIdSnapshot: centroRoma,
       zonaUdsIdSnapshot: zonaRoma,
     });
+    const canonical = await buildFseCanonicalReport({
+      magazzinoId,
+      dataDa: "2026-08-01",
+      dataA: "2026-08-31",
+    });
+    const event = canonical.events.find(
+      (event) => event.operationDistributionId === operation.id,
+    );
+    expect(event).toBeDefined();
+    expect(event?.internalChannel).toBe("UDS_STRADA");
+    const lines = canonical.lines.filter(
+      (line) => line.eventKey === event!.eventKey,
+    );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      fund: "FSE_PLUS",
+      unitOfMeasureSnapshot: "kit",
+      quantityPiecesSigned: null,
+      quantityKgLtSigned: null,
+    });
+    expect(event?.blocking).toBe(true);
+    expect(
+      (
+        await db
+          .select()
+          .from(lottiTable)
+          .where(eq(lottiTable.prodottoId, prodottoId))
+      ).reduce((sum, lot) => sum + Number(lot.quantitaResidua), 0),
+    ).toBe(stockBefore - 1);
   });
 
   it("conclude una sola volta e crea il successivo nella stessa transazione", async () => {

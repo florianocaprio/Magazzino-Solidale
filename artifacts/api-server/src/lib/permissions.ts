@@ -293,6 +293,10 @@ export const APPROVVIGIONAMENTI_PERMISSIONS = [
 
 export const ALL_PERMISSIONS = [
   {
+    key: "magazzino.fse.export.original.view",
+    label: "FSE+: accesso motivato agli originali storici riservati",
+  },
+  {
     key: "emporio.eligibility.manage",
     label: "Emporio: gestione abilitazioni del servizio",
   },
@@ -317,6 +321,23 @@ export const ALL_PERMISSION_KEYS: PermissionKey[] = ALL_PERMISSIONS.map(
   (item) => item.key,
 );
 
+// Sensitive capabilities are catalogued, never granted by administrative defaults.
+export const FSE_ORIGINAL_PERMISSION = "magazzino.fse.export.original.view";
+export const DEFAULT_ADMIN_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
+  (key) => key !== FSE_ORIGINAL_PERMISSION,
+);
+
+export function adminPermissionsWithExplicitOriginal(
+  permissions: string[] = [],
+) {
+  return [
+    ...DEFAULT_ADMIN_PERMISSION_KEYS,
+    ...(permissions.includes(FSE_ORIGINAL_PERMISSION)
+      ? [FSE_ORIGINAL_PERMISSION]
+      : []),
+  ];
+}
+
 const permissionKeys = <T extends readonly { readonly key: PermissionKey }[]>(
   catalog: T,
 ): PermissionKey[] => catalog.map((item) => item.key);
@@ -335,6 +356,7 @@ const permissionKeys = <T extends readonly { readonly key: PermissionKey }[]>(
 export const AREA_PERMISSION_MAP = {
   generale: [],
   magazzino: [
+    FSE_ORIGINAL_PERMISSION,
     ...permissionKeys(MAGAZZINO_PERMISSIONS),
     "richieste_magazzino.view",
     "richieste_magazzino.create",
@@ -402,6 +424,7 @@ export const AREA_PERMISSION_MAP = {
     "uds.reports.view",
     "magazzino.fse.view",
     "magazzino.fse.export",
+    FSE_ORIGINAL_PERMISSION,
     "magazzino.fse.reconcile",
     "magazzino.fse.reconcile.manage",
     "magazzino.fse.monitoring.manage",

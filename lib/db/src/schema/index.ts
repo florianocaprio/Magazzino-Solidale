@@ -12,6 +12,7 @@ export * from "./inventoryAccounting";
 export * from "./ageaImports";
 export * from "./fseImportPratiche";
 export * from "./fseReporting";
+export * from "./fseAdministrativeSources";
 export * from "./fseFascicoliSociali";
 export * from "./carichiMagazzino";
 export * from "./caricoPratiche";

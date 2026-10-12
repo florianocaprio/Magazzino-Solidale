@@ -38,6 +38,30 @@ import { resolveInventoryQuantityDimensions } from "./inventoryQuantityDimension
 import { InventoryDecimal } from "./inventoryDecimal";
 import { validateProductOperationalQuantity } from "./productQuantity";
 import type { InventoryTransaction } from "./scaricoInventory";
+import { requireCurrentFseWarehouse } from "./fseAccess";
+import { CurrentCommandActorError } from "./currentCommandActor";
+
+async function authorizeImport(
+  tx: InventoryTransaction,
+  actorId: number,
+  permission: string,
+  context: { magazzinoId: number; modalita: string },
+) {
+  const actor = await requireCurrentFseWarehouse(
+    tx,
+    actorId,
+    permission,
+    context.magazzinoId,
+  );
+  if (
+    context.modalita === "SALDO_INIZIALE" &&
+    !actor.isAdmin &&
+    !(actor.permessi ?? []).includes("magazzino.agea.bootstrap")
+  )
+    throw new CurrentCommandActorError(
+      "Permesso saldo iniziale non più disponibile",
+    );
+}
 
 export class FsePracticeImportError extends Error {
   constructor(
@@ -1096,6 +1120,7 @@ export async function acquireFseFile(
     referenceDate: input.referenceDate,
   });
   await lockFseSource(tx, input.sourceRegistryId);
+  await authorizeImport(tx, input.actorId, "magazzino.agea.import", input);
   if (input.modalita === "NUOVI_CARICHI") {
     const [proposedCoverage] = await tx
       .select({ id: fseInitialBalanceCoverageTable.id })
@@ -1280,6 +1305,12 @@ export async function mapFseProduct(
       "SESSIONE_NON_TROVATA",
       "Procedura non trovata",
     );
+  await authorizeImport(
+    tx,
+    input.actorId,
+    "magazzino.agea.mapping.manage",
+    session,
+  );
   if (session.versione !== input.version)
     throw new FsePracticeImportError(
       409,
@@ -1543,6 +1574,7 @@ export async function reviseFseImportRow(
       "SESSIONE_NON_TROVATA",
       "Procedura non trovata",
     );
+  await authorizeImport(tx, input.actorId, "magazzino.agea.import", session);
   if (session.versione !== input.version)
     throw new FsePracticeImportError(
       409,
@@ -2008,6 +2040,7 @@ export async function addFseRowsToPractice(
       "SESSIONE_NON_TROVATA",
       "Procedura non trovata",
     );
+  await authorizeImport(tx, input.actorId, "magazzino.agea.import", session);
   const requestHash = hash({
     sessionId: input.sessionId,
     version: input.version,

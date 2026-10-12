@@ -856,6 +856,11 @@ export interface FseVersionInput {
   /** @minimum 1 */
   versione: number;
   /**
+   * Versione M3B esplicitamente confermata per il ricalcolo
+   * @minimum 1
+   */
+  sessionVersion?: number;
+  /**
    * @minLength 3
    * @maxLength 500
    */
@@ -890,7 +895,15 @@ export interface FseCancelInput {
   motivazione: string;
 }
 
-export interface FseReconciliationInput {
+export type FseLegacyReconciliationInputSourceType =
+  (typeof FseLegacyReconciliationInputSourceType)[keyof typeof FseLegacyReconciliationInputSourceType];
+
+export const FseLegacyReconciliationInputSourceType = {
+  AGEA_LEGACY: "AGEA_LEGACY",
+} as const;
+
+export interface FseLegacyReconciliationInput {
+  sourceType?: FseLegacyReconciliationInputSourceType;
   /** @minimum 1 */
   magazzinoId: number;
   /** @minimum 1 */
@@ -905,7 +918,48 @@ export interface FseReconciliationInput {
   maxMovimentoId?: number;
   /** @minimum 1 */
   maxOperazioneDistribuzioneId?: number;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  baselineRunId?: number | null;
 }
+
+export type FseM3bReconciliationInputSourceType =
+  (typeof FseM3bReconciliationInputSourceType)[keyof typeof FseM3bReconciliationInputSourceType];
+
+export const FseM3bReconciliationInputSourceType = {
+  FSE_M3B: "FSE_M3B",
+} as const;
+
+export interface FseM3bReconciliationInput {
+  sourceType: FseM3bReconciliationInputSourceType;
+  /** @minimum 1 */
+  magazzinoId: number;
+  /** @minimum 1 */
+  sessionId: number;
+  /** @minimum 1 */
+  sessionVersion: number;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  commandKey: string;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  baselineRunId?: number | null;
+  dataRiferimento: string;
+  /** @minimum 1 */
+  maxMovimentoId?: number;
+  /** @minimum 1 */
+  maxOperazioneDistribuzioneId?: number;
+}
+
+export type FseReconciliationInput =
+  | FseLegacyReconciliationInput
+  | FseM3bReconciliationInput;
 
 export type FseResolutionInputAzione =
   (typeof FseResolutionInputAzione)[keyof typeof FseResolutionInputAzione];
@@ -931,6 +985,11 @@ export interface FseResolutionInput {
   movimentoId?: number;
   /** @minimum 1 */
   importazioneAgeaRigaId?: number;
+  /**
+   * Osservazione M3B alternativa esclusiva alla riga AGEA legacy
+   * @minimum 1
+   */
+  observationId?: number;
 }
 
 export type FseMonitoringInputCanaleUfficiale =
@@ -10309,6 +10368,7 @@ export const FseQueueStatoParameter = {
   DA_RENDICONTARE: "DA_RENDICONTARE",
   ARRETRATO_NON_RENDICONTATO: "ARRETRATO_NON_RENDICONTATO",
   BLOCCATO: "BLOCCATO",
+  CORREZIONE_DA_GESTIRE_MANUALMENTE: "CORREZIONE_DA_GESTIRE_MANUALMENTE",
 } as const;
 
 export type FseQueueCanaleParameter = string;
@@ -10726,6 +10786,52 @@ export type DownloadFseExportParams = {
    * Rappresentazione derivata dallo stesso snapshot immutabile
    */
   representation?: FseDownloadRepresentationParameter;
+};
+
+export type DownloadFseOriginalBodyRepresentation =
+  (typeof DownloadFseOriginalBodyRepresentation)[keyof typeof DownloadFseOriginalBodyRepresentation];
+
+export const DownloadFseOriginalBodyRepresentation = {
+  FSE_CANONICAL_AUDIT_XLSX_V1: "FSE_CANONICAL_AUDIT_XLSX_V1",
+  SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1:
+    "SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1",
+} as const;
+
+export type DownloadFseOriginalBody = {
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  motivo: string;
+  representation?: DownloadFseOriginalBodyRepresentation;
+};
+
+export type ListFseAdministrativeSourcesParams = {
+  /**
+   * @minimum 1
+   */
+  magazzinoId: number;
+  /**
+   * @minimum 1
+   */
+  page?: FsePageParameter;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: FsePageSizeParameter;
+};
+
+export type ListFseAdministrativeObservationsParams = {
+  /**
+   * @minimum 1
+   */
+  page?: FsePageParameter;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  pageSize?: FsePageSizeParameter;
 };
 
 export type ListFseReconciliationsParams = {

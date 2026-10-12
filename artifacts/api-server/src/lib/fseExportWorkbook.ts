@@ -14,6 +14,15 @@ import {
   isFseFormat,
 } from "./fseCanonicalReporting";
 import { InventoryDecimal } from "./inventoryDecimal";
+import { canonicalSha256 } from "./fseCanonicalReporting";
+import {
+  FSE_MINIMIZATION_VERSION,
+  minimizedExportHeader,
+  minimizedExportEvent,
+  minimizedExportLine,
+  minimizedIndicatorValues,
+} from "./fseExportMinimization";
+import type { InventoryTransaction } from "./scaricoInventory";
 
 export const FSE_XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -50,58 +59,94 @@ function addSheet(
 export async function generateFseExportWorkbook(
   exportId: number,
   requestedFormat?: string,
-): Promise<{ buffer: Buffer; filename: string }> {
-  const [header] = await db
+  options: {
+    executor?: typeof db | InventoryTransaction;
+    original?: boolean;
+  } = {},
+): Promise<{ buffer: Buffer; filename: string; semanticHash: string }> {
+  const executor = options.executor ?? db;
+  const [storedHeader] = await executor
     .select()
     .from(esportazioniFseTable)
     .where(eq(esportazioniFseTable.id, exportId));
-  if (!header) throw new Error("Esportazione non trovata");
+  if (!storedHeader) throw new Error("Esportazione non trovata");
+  const header = options.original
+    ? storedHeader
+    : minimizedExportHeader(storedHeader);
   const formatCode = requestedFormat ?? header.formatCode;
   if (!isFseFormat(formatCode))
     throw new Error("Formato esportazione non supportato");
 
-  const [events, joinedLines, indicators, balances] = await Promise.all([
-    db
-      .select()
-      .from(esportazioniFseEventiTable)
-      .where(eq(esportazioniFseEventiTable.esportazioneId, exportId))
-      .orderBy(esportazioniFseEventiTable.id),
-    db
-      .select({
-        line: esportazioniFseRigheTable,
-        event: esportazioniFseEventiTable,
-      })
-      .from(esportazioniFseRigheTable)
-      .innerJoin(
-        esportazioniFseEventiTable,
-        eq(
-          esportazioniFseRigheTable.esportazioneEventoId,
-          esportazioniFseEventiTable.id,
+  const [storedEvents, storedLines, storedIndicators, balances] =
+    await Promise.all([
+      executor
+        .select()
+        .from(esportazioniFseEventiTable)
+        .where(eq(esportazioniFseEventiTable.esportazioneId, exportId))
+        .orderBy(esportazioniFseEventiTable.id),
+      executor
+        .select({
+          line: esportazioniFseRigheTable,
+          event: esportazioniFseEventiTable,
+        })
+        .from(esportazioniFseRigheTable)
+        .innerJoin(
+          esportazioniFseEventiTable,
+          eq(
+            esportazioniFseRigheTable.esportazioneEventoId,
+            esportazioniFseEventiTable.id,
+          ),
+        )
+        .where(eq(esportazioniFseEventiTable.esportazioneId, exportId))
+        .orderBy(esportazioniFseRigheTable.id),
+      executor
+        .select()
+        .from(esportazioniFseIndicatoriTable)
+        .where(eq(esportazioniFseIndicatoriTable.esportazioneId, exportId))
+        .orderBy(
+          esportazioniFseIndicatoriTable.annoMese,
+          esportazioniFseIndicatoriTable.canaleUfficiale,
         ),
-      )
-      .where(eq(esportazioniFseEventiTable.esportazioneId, exportId))
-      .orderBy(esportazioniFseRigheTable.id),
-    db
-      .select()
-      .from(esportazioniFseIndicatoriTable)
-      .where(eq(esportazioniFseIndicatoriTable.esportazioneId, exportId))
-      .orderBy(
-        esportazioniFseIndicatoriTable.annoMese,
-        esportazioniFseIndicatoriTable.canaleUfficiale,
-      ),
-    db
-      .select()
-      .from(esportazioniFseSaldiTable)
-      .where(eq(esportazioniFseSaldiTable.esportazioneId, exportId))
-      .orderBy(
-        esportazioniFseSaldiTable.prodottoId,
-        esportazioniFseSaldiTable.lottoId,
-      ),
-  ]);
+      executor
+        .select()
+        .from(esportazioniFseSaldiTable)
+        .where(eq(esportazioniFseSaldiTable.esportazioneId, exportId))
+        .orderBy(
+          esportazioniFseSaldiTable.prodottoId,
+          esportazioniFseSaldiTable.lottoId,
+        ),
+    ]);
+
+  const events = options.original
+    ? storedEvents
+    : storedEvents.map(minimizedExportEvent);
+  const joinedLines = options.original
+    ? storedLines
+    : storedLines.map(({ line, event }) => ({
+        line: minimizedExportLine(line),
+        event: minimizedExportEvent(event),
+      }));
+  const indicators = options.original
+    ? storedIndicators
+    : storedIndicators.map((row) => ({
+        ...row,
+        valuesJson: minimizedIndicatorValues(row.valuesJson),
+      }));
 
   const metadata = header.snapshotMetadataJson ?? {};
   const workbook = XLSX.utils.book_new();
   addSheet(workbook, "Metadati", [
+    {
+      chiave: "Variante",
+      valore: options.original
+        ? "STORICO_RIGENERATO_NON_MINIMIZZATO"
+        : FSE_MINIMIZATION_VERSION,
+    },
+    {
+      chiave: "Identità storico",
+      valore:
+        "Snapshot conservato; byte XLSX del download originario non conservati",
+    },
     {
       chiave: "Magazzino",
       valore: metadata.magazzinoNome ?? header.magazzinoId,
@@ -271,7 +316,20 @@ export async function generateFseExportWorkbook(
   }) as Buffer;
   return {
     buffer: output,
-    filename: `rendicontazione-fse-${header.magazzinoId}-${header.dataDa}-${header.dataA}-${formatCode}.xlsx`,
+    semanticHash: canonicalSha256({
+      formatCode,
+      variant: options.original
+        ? "STORICO_RIGENERATO_NON_MINIMIZZATO"
+        : FSE_MINIMIZATION_VERSION,
+      sheets: workbook.SheetNames.map((name) => ({
+        name,
+        rows: XLSX.utils.sheet_to_json(workbook.Sheets[name], {
+          header: 1,
+          defval: null,
+        }),
+      })),
+    }),
+    filename: `rendicontazione-fse-${header.magazzinoId}-${header.dataDa}-${header.dataA}-${formatCode}-${options.original ? "storico-rigenerato" : FSE_MINIMIZATION_VERSION}.xlsx`,
   };
 }
 

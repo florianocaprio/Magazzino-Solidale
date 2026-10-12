@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => ({
   invalidate: vi.fn().mockResolvedValue(undefined),
   toast: vi.fn(),
   eventsParams: vi.fn(),
+  exportsParams: vi.fn(),
+  linesParams: vi.fn(),
+  paginated: false,
+  denied: false,
 }));
 
 function spy(name: string): Mock<(payload: unknown) => void> {
@@ -80,27 +84,45 @@ vi.mock("@workspace/api-client-react", () => {
       };
     },
     useListFseReportingQuality: () => ({ data: { rows: [] } }),
-    useListFseExports: () => ({
-      data: {
-        rows: [
-          {
-            id: 201,
-            formatCode: "FSE_CANONICAL_AUDIT_XLSX_V1",
-            stato: "PRONTA_PER_INSERIMENTO_MANUALE",
-            dataDa: "2026-09-01",
-            dataA: "2026-09-30",
+    useListFseExports: (params: { page: number; pageSize: number }) => {
+      mocks.exportsParams(params);
+      if (mocks.paginated)
+        return {
+          data: {
+            total: 51,
+            rows: Array.from({ length: 51 }, (_, i) => ({
+              id: 201 + i,
+              formatCode: "FSE_CANONICAL_AUDIT_XLSX_V1",
+              stato: "PRONTA_PER_INSERIMENTO_MANUALE",
+            })).slice(
+              (params.page - 1) * params.pageSize,
+              params.page * params.pageSize,
+            ),
           },
-          {
-            id: 202,
-            formatCode: "FSE_CANONICAL_AUDIT_XLSX_V1",
-            stato: "INSERITA_MANUALMENTE",
-            dataDa: "2026-08-01",
-            dataA: "2026-08-31",
-          },
-        ],
-      },
-    }),
+        };
+      return {
+        data: {
+          rows: [
+            {
+              id: 201,
+              formatCode: "FSE_CANONICAL_AUDIT_XLSX_V1",
+              stato: "PRONTA_PER_INSERIMENTO_MANUALE",
+              dataDa: "2026-09-01",
+              dataA: "2026-09-30",
+            },
+            {
+              id: 202,
+              formatCode: "FSE_CANONICAL_AUDIT_XLSX_V1",
+              stato: "INSERITA_MANUALMENTE",
+              dataDa: "2026-08-01",
+              dataA: "2026-08-31",
+            },
+          ],
+        },
+      };
+    },
     useGetFseExport: (id: number) => ({
+      isError: mocks.denied,
       data:
         id > 0
           ? {
@@ -120,14 +142,37 @@ vi.mock("@workspace/api-client-react", () => {
     useGetFseReconciliation: (id: number) => ({
       data: id > 0 ? { id, stato: "APERTA", versione: 4 } : undefined,
     }),
-    useListFseReconciliationLines: (id: number) => ({
-      data: {
-        rows:
-          id > 0
-            ? [{ id: 302, status: "SOLO_LOCALE", businessKey: "R2-LINE" }]
-            : [],
-      },
-    }),
+    useListFseReconciliationLines: (
+      id: number,
+      params: { page: number; pageSize: number },
+    ) => {
+      mocks.linesParams(id, params);
+      if (mocks.paginated)
+        return {
+          data: {
+            total: 201,
+            rows:
+              id > 0
+                ? Array.from({ length: 201 }, (_, i) => ({
+                    id: 302 + i,
+                    status: "SOLO_LOCALE",
+                    businessKey: `R2-LINE-${i}`,
+                  })).slice(
+                    (params.page - 1) * params.pageSize,
+                    params.page * params.pageSize,
+                  )
+                : [],
+          },
+        };
+      return {
+        data: {
+          rows:
+            id > 0
+              ? [{ id: 302, status: "SOLO_LOCALE", businessKey: "R2-LINE" }]
+              : [],
+        },
+      };
+    },
     useListFseMonitoring: () => ({
       data: {
         rows: [
@@ -215,6 +260,10 @@ describe("FSE operations — interazioni R2", () => {
     mocks.calls.clear();
     mocks.invalidate.mockClear();
     mocks.eventsParams.mockClear();
+    mocks.exportsParams.mockClear();
+    mocks.linesParams.mockClear();
+    mocks.paginated = false;
+    mocks.denied = false;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -303,6 +352,8 @@ describe("FSE operations — interazioni R2", () => {
       data: { versione: 3, motivazione: "SIFEAD R2" },
     });
     expect(mocks.invalidate).toHaveBeenCalledWith({ queryKey: ["exports"] });
+    for (const key of ["preview", "events", "quality"])
+      expect(mocks.invalidate).toHaveBeenCalledWith({ queryKey: [key] });
     expect(mocks.invalidate).toHaveBeenCalledWith({
       queryKey: ["export", 201],
     });
@@ -310,6 +361,81 @@ describe("FSE operations — interazioni R2", () => {
     await selectRecord(202);
     expect(button("fseOperations.markEntered").disabled).toBe(true);
     expect(button("fseOperations.cancelExport").disabled).toBe(true);
+  });
+
+  it("M64: legge dal server la 51esima testata e la 201esima riga", async () => {
+    mocks.paginated = true;
+    await act(async () => root.render(<FseOperations filters={filters} />));
+    for (let page = 2; page <= 3; page++) {
+      const section = [
+        ...container.querySelectorAll('a[href*="representation="]'),
+      ][0].closest(".space-y-2")!;
+      const next = section.querySelector<HTMLButtonElement>(
+        'button[aria-label="fseOperations.nextPage"]',
+      )!;
+      expect(next.disabled).toBe(false);
+      await act(async () => next.click());
+      expect(mocks.exportsParams).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page, pageSize: 20 }),
+      );
+    }
+    await selectRecord(251);
+    await selectRecord(301);
+    for (let page = 2; page <= 11; page++) {
+      const line = [...container.querySelectorAll("p")].find((item) =>
+        item.textContent?.includes("R2-LINE-"),
+      )!;
+      const section = line.closest(".space-y-2")!;
+      await act(async () =>
+        section
+          .querySelector<HTMLButtonElement>(
+            'button[aria-label="fseOperations.nextPage"]',
+          )!
+          .click(),
+      );
+      expect(mocks.linesParams).toHaveBeenLastCalledWith(301, {
+        page,
+        pageSize: 20,
+      });
+    }
+    await selectRecord(502);
+    expect(container.textContent).toContain("201–201 / 201");
+  });
+
+  it("M64: cambio contesto elimina selezioni/baseline e un diniego nasconde il dettaglio cached", async () => {
+    await selectRecord(201);
+    expect(button("fseOperations.markEntered")).toBeTruthy();
+    mocks.denied = true;
+    await act(async () => root.render(<FseOperations filters={filters} />));
+    expect(button("fseOperations.markEntered")).toBeUndefined();
+    expect(
+      container.querySelector('a[href*="/exportazioni/201/download"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('a[href*="/exportazioni/202/download"]'),
+    ).not.toBeNull();
+    mocks.denied = false;
+    await selectRecord(301);
+    await change(
+      container.querySelector<HTMLInputElement>("#agea-previous-id")!,
+      "123",
+    );
+    await act(async () =>
+      root.render(<FseOperations filters={{ ...filters, magazzinoId: 10 }} />),
+    );
+    expect(button("fseOperations.markEntered")).toBeUndefined();
+    expect(button("fseOperations.resolve")).toBeUndefined();
+    expect(container.querySelector<HTMLInputElement>("#agea-id")?.value).toBe(
+      "",
+    );
+    expect(
+      container.querySelector<HTMLInputElement>("#agea-previous-id")?.value,
+    ).toBe("");
+    expect(
+      container
+        .querySelector<HTMLInputElement>("#agea-id")
+        ?.getAttribute("aria-invalid"),
+    ).toBe("true");
   });
 
   it("distingue null/zero e invia la versione nel monitoraggio", async () => {
@@ -408,7 +534,7 @@ describe("FSE operations — interazioni R2", () => {
       data: { versione: 4 },
     });
     expect(mocks.invalidate).toHaveBeenCalledWith({
-      queryKey: ["reconciliation-lines", 301, { pageSize: 200 }],
+      queryKey: ["reconciliation-lines", 301],
     });
   });
 });

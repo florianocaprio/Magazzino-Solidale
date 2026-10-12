@@ -5,20 +5,9 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { FseLegacyReconciliationInput } from "./fseLegacyReconciliationInput";
+import type { FseM3bReconciliationInput } from "./fseM3bReconciliationInput";
 
-export interface FseReconciliationInput {
-  /** @minimum 1 */
-  magazzinoId: number;
-  /** @minimum 1 */
-  importazioneAgeaId: number;
-  /**
-   * @minimum 1
-   * @nullable
-   */
-  importazioneAgeaPrecedenteId?: number | null;
-  dataRiferimento: Date;
-  /** @minimum 1 */
-  maxMovimentoId?: number;
-  /** @minimum 1 */
-  maxOperazioneDistribuzioneId?: number;
-}
+export type FseReconciliationInput =
+  | FseLegacyReconciliationInput
+  | FseM3bReconciliationInput;

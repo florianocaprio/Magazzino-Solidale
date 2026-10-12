@@ -1888,12 +1888,49 @@ paths:
         - { $ref: "#/components/parameters/FseDownloadRepresentation" }
       responses:
         "200":
-          description: XLSX generato dallo snapshot
+          description: Derivato minimizzato versionato dello snapshot; hash semantico e hash dei byte distinti. Non è il file storico originario.
           headers:
             Content-Disposition: { schema: { type: string } }
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema: { type: string, format: binary }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/exportazioni/{id}/originale:
+    post:
+      operationId: downloadFseOriginal
+      tags: [fse]
+      description: Rappresentazione storica rigenerata non minimizzata. Richiede capacità esplicita magazzino.fse.export.original.view anche per amministratori, motivo, scope corrente e audit. Non recupera byte XLSX mai conservati.
+      parameters:
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: integer, minimum: 1 },
+          }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo]
+              properties:
+                motivo: { type: string, minLength: 1, maxLength: 1000 }
+                representation:
+                  type: string
+                  enum:
+                    [
+                      FSE_CANONICAL_AUDIT_XLSX_V1,
+                      SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1,
+                    ]
+      responses:
+        "200":
+          description: Storico rigenerato, no-store; accesso auditato prima della consegna
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
         "403": { $ref: "#/components/responses/FseForbidden" }
         "404": { $ref: "#/components/responses/FseNotFound" }
   /fse/exportazioni/{id}/marca-inserita:
@@ -1957,6 +1994,67 @@ paths:
         "404": { $ref: "#/components/responses/FseNotFound" }
         "409": { $ref: "#/components/responses/FseConflict" }
 
+  /fse/fonti-m3b:
+    get:
+      operationId: listFseAdministrativeSources
+      tags: [fse]
+      parameters:
+        - {
+            name: magazzinoId,
+            in: query,
+            required: true,
+            schema: { type: integer, minimum: 1 },
+          }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          description: Sessioni e manifest dei file confermabili, non dichiarazione di contabilizzazione completa
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FseRecordPage" }
+        "400": { $ref: "#/components/responses/FseBadRequest" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+  /fse/riconciliazioni/{id}/fonte:
+    get:
+      operationId: getFseReconciliationSource
+      tags: [fse]
+      parameters:
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: integer, minimum: 1 },
+          }
+      responses:
+        "200":
+          description: Fonte congelata e run immutabili con cutoff esatto; nessun raw riservato
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FseRecord" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
+  /fse/riconciliazioni/{id}/osservazioni:
+    get:
+      operationId: listFseAdministrativeObservations
+      tags: [fse]
+      parameters:
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: integer, minimum: 1 },
+          }
+        - { $ref: "#/components/parameters/FsePage" }
+        - { $ref: "#/components/parameters/FsePageSize" }
+      responses:
+        "200":
+          description: Osservazioni amministrative minimizzate e lineage reale delle porzioni caricate
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FseRecordPage" }
+        "403": { $ref: "#/components/responses/FseForbidden" }
+        "404": { $ref: "#/components/responses/FseNotFound" }
   /fse/riconciliazioni:
     get:
       operationId: listFseReconciliations
@@ -10558,7 +10656,13 @@ components:
       in: query
       schema:
         type: string
-        enum: [DA_RENDICONTARE, ARRETRATO_NON_RENDICONTATO, BLOCCATO]
+        enum:
+          [
+            DA_RENDICONTARE,
+            ARRETRATO_NON_RENDICONTATO,
+            BLOCCATO,
+            CORREZIONE_DA_GESTIRE_MANUALMENTE,
+          ]
     FseQueueCanale:
       name: canale
       in: query
@@ -11561,6 +11665,12 @@ components:
       required: [versione]
       properties:
         versione: { type: integer, minimum: 1 }
+        sessionVersion:
+          {
+            type: integer,
+            minimum: 1,
+            description: Versione M3B esplicitamente confermata per il ricalcolo,
+          }
         motivazione: { type: string, minLength: 3, maxLength: 500 }
         data: { type: string, format: date }
         riferimentoEsterno: { type: string, minLength: 3, maxLength: 500 }
@@ -11579,12 +11689,41 @@ components:
         versione: { type: integer, minimum: 1 }
         motivazione: { type: string, minLength: 3, maxLength: 500 }
     FseReconciliationInput:
+      oneOf:
+        - { $ref: "#/components/schemas/FseLegacyReconciliationInput" }
+        - { $ref: "#/components/schemas/FseM3bReconciliationInput" }
+    FseLegacyReconciliationInput:
       type: object
+      additionalProperties: false
       required: [magazzinoId, importazioneAgeaId, dataRiferimento]
       properties:
+        sourceType: { type: string, enum: [AGEA_LEGACY] }
         magazzinoId: { type: integer, minimum: 1 }
         importazioneAgeaId: { type: integer, minimum: 1 }
         importazioneAgeaPrecedenteId: { type: [integer, "null"], minimum: 1 }
+        dataRiferimento: { type: string, format: date }
+        maxMovimentoId: { type: integer, minimum: 1 }
+        maxOperazioneDistribuzioneId: { type: integer, minimum: 1 }
+        baselineRunId: { type: [integer, "null"], minimum: 1 }
+    FseM3bReconciliationInput:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          sourceType,
+          magazzinoId,
+          sessionId,
+          sessionVersion,
+          commandKey,
+          dataRiferimento,
+        ]
+      properties:
+        sourceType: { type: string, enum: [FSE_M3B] }
+        magazzinoId: { type: integer, minimum: 1 }
+        sessionId: { type: integer, minimum: 1 }
+        sessionVersion: { type: integer, minimum: 1 }
+        commandKey: { type: string, minLength: 1, maxLength: 100 }
+        baselineRunId: { type: [integer, "null"], minimum: 1 }
         dataRiferimento: { type: string, format: date }
         maxMovimentoId: { type: integer, minimum: 1 }
         maxOperazioneDistribuzioneId: { type: integer, minimum: 1 }
@@ -11606,6 +11745,12 @@ components:
         motivazione: { type: string, minLength: 3, maxLength: 500 }
         movimentoId: { type: integer, minimum: 1 }
         importazioneAgeaRigaId: { type: integer, minimum: 1 }
+        observationId:
+          {
+            type: integer,
+            minimum: 1,
+            description: Osservazione M3B alternativa esclusiva alla riga AGEA legacy,
+          }
     FseMonitoringInput:
       type: object
       required:

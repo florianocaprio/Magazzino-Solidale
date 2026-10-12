@@ -15,6 +15,12 @@ import {
   signedInventoryValue,
 } from "./fseAccounting";
 import { InventoryDecimal } from "./inventoryDecimal";
+import {
+  auditUserId,
+  recordAuditEvent,
+  type AuditCommandContext,
+} from "./auditEvent";
+import { requireCurrentFseWarehouse } from "./fseAccess";
 import { signedPhysicalMovementSql } from "./movementPhysicalEffect";
 
 export const FSE_CANONICAL_FORMAT = "FSE_CANONICAL_AUDIT_XLSX_V1";
@@ -119,6 +125,7 @@ export type FseIndicatorSnapshot = {
 };
 
 export type FseBalanceSnapshot = {
+  unit?: string | null;
   magazzinoId: number;
   fund: string;
   productId: number;
@@ -602,6 +609,7 @@ function canonicalCandidateRowsSql(input: {
   magazzinoId: number;
   dataDa: string;
   dataA: string;
+  dataAsOf: string;
   includeArretrati: boolean;
   maxMovimentoId: number;
   maxOperazioneDistribuzioneId: number;
@@ -657,14 +665,49 @@ function canonicalCandidateRowsSql(input: {
         mv.operazione_distribuzione_id,
         original.operazione_distribuzione_id
       ) AND mixed.fondo_origine <> mv.fondo_origine
+        AND mixed.magazzino_id = ${input.magazzinoId}
+        AND mixed.id <= ${input.maxMovimentoId}
+        AND mixed.data_movimento <= ${input.dataA}
+        AND (${input.includeArretrati} OR mixed.data_movimento >= ${input.dataDa})
     )`;
+  // Compare reversals against each original, never compensate quantities across products/UOMs.
+  const partialReversal = sql`EXISTS (
+    SELECT 1 FROM movimenti rev JOIN movimenti orig ON orig.id = rev.movimento_origine_id
+    WHERE orig.natura_contabile = 'DISTRIBUZIONE_FINALE'
+      AND orig.operazione_distribuzione_id = COALESCE(mv.operazione_distribuzione_id, original.operazione_distribuzione_id)
+      AND rev.natura_contabile = 'STORNO' AND rev.magazzino_id = ${input.magazzinoId}
+      AND rev.id <= ${input.maxMovimentoId} AND rev.data_movimento <= ${input.dataA}
+      AND (${input.includeArretrati} OR rev.data_movimento >= ${input.dataDa})
+  ) AND (
+    (mv.natura_contabile = 'STORNO' AND ${originalCovered}) OR EXISTS (
+      SELECT 1 FROM movimenti orig
+      WHERE orig.natura_contabile = 'DISTRIBUZIONE_FINALE'
+        AND orig.operazione_distribuzione_id = COALESCE(mv.operazione_distribuzione_id, original.operazione_distribuzione_id)
+        AND orig.magazzino_id = ${input.magazzinoId} AND orig.id <= ${input.maxMovimentoId}
+        AND orig.data_movimento <= ${input.dataA}
+        AND (${input.includeArretrati} OR orig.data_movimento >= ${input.dataDa})
+        AND (abs(orig.quantita) <> COALESCE((SELECT sum(abs(rev.quantita)) FROM movimenti rev
+          WHERE rev.movimento_origine_id = orig.id AND rev.natura_contabile = 'STORNO'
+            AND rev.magazzino_id = orig.magazzino_id AND rev.prodotto_id = orig.prodotto_id
+            AND rev.unita_misura = orig.unita_misura AND rev.fondo_origine = orig.fondo_origine
+            AND rev.id <= ${input.maxMovimentoId} AND rev.data_movimento <= ${input.dataA}
+            AND (${input.includeArretrati} OR rev.data_movimento >= ${input.dataDa})), 0)
+          OR EXISTS (SELECT 1 FROM movimenti rev WHERE rev.movimento_origine_id = orig.id
+            AND rev.natura_contabile = 'STORNO' AND rev.id <= ${input.maxMovimentoId}
+            AND rev.data_movimento <= ${input.dataA} AND (${input.includeArretrati} OR rev.data_movimento >= ${input.dataDa})
+            AND (rev.prodotto_id <> orig.prodotto_id OR rev.unita_misura <> orig.unita_misura OR rev.fondo_origine <> orig.fondo_origine)))
+    )
+  )`;
+  const legacyFund = sql`mv.fondo_origine = 'NESSUN_FONDO' AND l.fse_plus = true`;
   const monitoringMissing = sql`${officialChannel} IN ('PACCHI', 'MENSA', 'STRADA')
     AND NOT EXISTS (
       SELECT 1 FROM rilevazioni_monitoraggio_fse monitoring
       WHERE monitoring.magazzino_id = mv.magazzino_id
         AND monitoring.anno_mese = to_char(${eventDate}::date, 'YYYY-MM')
         AND monitoring.canale_ufficiale = ${officialChannel}
-        AND monitoring.data_riferimento <= ${input.dataA}
+        AND monitoring.data_riferimento <= ${input.dataAsOf}
+        AND (${input.includeArretrati} OR monitoring.data_riferimento >= ${input.dataDa})
+        AND (monitoring.operazione_distribuzione_id IS NULL OR monitoring.operazione_distribuzione_id <= ${input.maxOperazioneDistribuzioneId})
     )`;
   const coverageEligible = sql`(
     mv.natura_contabile IN (
@@ -680,6 +723,7 @@ function canonicalCandidateRowsSql(input: {
     CASE WHEN ${channelMissing} THEN 'CANALE_FSE_NON_CLASSIFICATO' END,
     CASE WHEN ${statisticsMissing} THEN 'STATISTICHE_DDC_MANCANTI' END,
     CASE WHEN ${mixedFund} THEN 'EVENTO_FONDI_MISTI' END,
+    CASE WHEN ${partialReversal} THEN 'STATISTICHE_STORNO_PARZIALE_NON_RIPARTIBILI' END,
     CASE WHEN ${lotMissing} THEN 'LOTTO_MANCANTE' END,
     CASE WHEN ${adjustmentReasonMissing} THEN 'MOTIVAZIONE_MODIFICA_GIACENZA_MANCANTE' END,
     CASE WHEN ${monitoringMissing} THEN 'SNAPSHOT_INDICATORI_STORICI_MANCANTE' END,
@@ -693,7 +737,7 @@ function canonicalCandidateRowsSql(input: {
            ${coverageEligible} AS coverage_eligible,
            (${operationMissing} OR ${channelMissing} OR ${statisticsMissing}
              OR ${mixedFund} OR ${lotMissing} OR ${adjustmentReasonMissing}
-             OR ${monitoringMissing}) AS blocking,
+             OR ${monitoringMissing} OR ${partialReversal} OR ${legacyFund}) AS blocking,
            ${qualityCodes} AS quality_codes
     FROM movimenti mv
     JOIN prodotti p ON p.id = mv.prodotto_id
@@ -725,11 +769,16 @@ function canonicalCandidateRowsSql(input: {
   `;
 }
 
-function queueFilterSql(filters: FseCanonicalPageFilters): SQL {
+function queueFilterSql(
+  filters: FseCanonicalPageFilters,
+  quality = false,
+): SQL {
   const conditions: SQL[] = [
-    sql`candidate.fondo_origine = 'FSE_PLUS'`,
+    quality
+      ? sql`(candidate.fondo_origine = 'FSE_PLUS' OR 'FONDO_LEGACY_NON_DETERMINATO' = ANY(candidate.quality_codes))`
+      : sql`candidate.fondo_origine = 'FSE_PLUS'`,
     sql`candidate.active_coverage = false`,
-    sql`candidate.coverage_eligible = true`,
+    quality ? sql`true` : sql`candidate.coverage_eligible = true`,
   ];
   if (filters.fondo)
     conditions.push(sql`candidate.fondo_origine = ${filters.fondo}`);
@@ -764,12 +813,22 @@ export async function listFseCanonicalPage(input: {
   const dataAsOf = input.dataAsOf ?? input.dataA;
   const cutoff =
     input.cutoff ?? (await currentFseCutoff(db, input.magazzinoId, dataAsOf));
-  const candidate = canonicalCandidateRowsSql({
+  const rawCandidate = canonicalCandidateRowsSql({
     ...input,
+    dataAsOf,
     ...cutoff,
   });
+  const candidate = sql`WITH raw_candidate AS (${rawCandidate}), context AS (
+    SELECT event_key, bool_or(blocking) AS blocking,
+      array_remove(array_agg(DISTINCT code), NULL) AS quality_codes
+    FROM raw_candidate LEFT JOIN LATERAL unnest(quality_codes) code ON true
+    GROUP BY event_key
+  ) SELECT r.id, r.event_key, r.event_date, r.fondo_origine, r.prodotto_id,
+    r.internal_channel, r.official_channel, r.active_coverage, r.coverage_eligible,
+    context.blocking, context.quality_codes
+    FROM raw_candidate r JOIN context USING (event_key)`;
   const filters = input.filters ?? {};
-  const filtered = queueFilterSql(filters);
+  const filtered = queueFilterSql(filters, input.projection === "quality");
   const offset = (input.page - 1) * input.pageSize;
   const stateFilter =
     filters.statoRendicontazione == null
@@ -777,17 +836,24 @@ export async function listFseCanonicalPage(input: {
       : filters.statoRendicontazione === "BLOCCATO"
         ? sql`event_summary.blocking = true`
         : filters.statoRendicontazione === "ARRETRATO_NON_RENDICONTATO"
-          ? sql`event_summary.blocking = false AND event_summary.event_date < ${input.dataDa}::date`
+          ? sql`event_summary.blocking = false AND event_summary.event_key NOT LIKE 'CORREZIONE:%' AND event_summary.event_date < ${input.dataDa}::date`
           : filters.statoRendicontazione === "DA_RENDICONTARE"
-            ? sql`event_summary.blocking = false AND event_summary.event_date >= ${input.dataDa}::date`
-            : sql`false`;
+            ? sql`event_summary.blocking = false AND event_summary.event_key NOT LIKE 'CORREZIONE:%' AND event_summary.event_date >= ${input.dataDa}::date`
+            : filters.statoRendicontazione ===
+                "CORREZIONE_DA_GESTIRE_MANUALMENTE"
+              ? sql`event_summary.blocking = false AND event_summary.event_key LIKE 'CORREZIONE:%'`
+              : sql`false`;
 
   if (input.projection === "quality") {
     const result = await db.execute(sql`
       WITH candidate AS (${candidate}), filtered AS (
         SELECT * FROM candidate WHERE ${filtered}
+      ), event_summary AS (
+        SELECT event_key, min(event_date) AS event_date, bool_or(blocking) AS blocking
+        FROM filtered GROUP BY event_key
       ), expanded AS (
         SELECT DISTINCT event_key, unnest(quality_codes) AS code FROM filtered
+        JOIN event_summary USING (event_key) WHERE ${stateFilter}
       ), totals AS (
         SELECT code, count(*)::int AS count
         FROM expanded GROUP BY code
@@ -807,9 +873,13 @@ export async function listFseCanonicalPage(input: {
             await db.execute(sql`
               WITH candidate AS (${candidate}), filtered AS (
                 SELECT * FROM candidate WHERE ${filtered}
+              ), event_summary AS (
+                SELECT event_key, min(event_date) AS event_date, bool_or(blocking) AS blocking
+                FROM filtered GROUP BY event_key
               )
               SELECT count(DISTINCT code)::int AS total
-              FROM filtered CROSS JOIN LATERAL unnest(quality_codes) code
+              FROM filtered JOIN event_summary USING (event_key)
+              CROSS JOIN LATERAL unnest(quality_codes) code WHERE ${stateFilter}
             `)
           ).rows[0]?.total ?? 0,
         );
@@ -818,7 +888,7 @@ export async function listFseCanonicalPage(input: {
       pageSize: input.pageSize,
       total,
       rows: rows.map(({ total: _total, ...row }) => row),
-      summary: { cutoff },
+      summary: { cutoff, countUnit: "event-code" },
     };
   }
 
@@ -917,9 +987,8 @@ export async function listFseCanonicalPage(input: {
     ...input,
     dataAsOf,
     cutoff,
-    ...(input.projection === "events"
-      ? { eventKeys }
-      : { movementIds: selectedMovementIds! }),
+    // Classify the entire event before projecting the selected page of lines.
+    eventKeys,
     excludeCovered: true,
   });
   const rows =
@@ -979,7 +1048,7 @@ async function loadIndicators(
            minori_18, giovani_18_29, donne, over_65, persone_disabilita,
            cittadini_paesi_terzi, origine_straniera_minoranze,
            senzatetto_esclusione_abitativa, totale_saltuari,
-           fonte, completezza, versione, note_audit
+           fonte, completezza, versione
     FROM rilevazioni_monitoraggio_fse
     WHERE magazzino_id = ${input.magazzinoId}
       AND data_riferimento BETWEEN ${input.dataDa} AND ${input.dataAsOf}
@@ -1001,7 +1070,6 @@ async function loadIndicators(
       fonte: row.fonte,
       completezza: row.completezza,
       versione: row.versione,
-      noteAudit: row.note_audit,
     };
     const base = {
       id: Number(row.id),
@@ -1021,6 +1089,8 @@ export async function loadFseBalances(
     dataAsOf: string;
     maxMovimentoId: number;
     maxOperazioneDistribuzioneId: number;
+    groupByUnit?: boolean;
+    includeAllFunds?: boolean;
   },
 ): Promise<FseBalanceSnapshot[]> {
   const pieces = signedPhysicalMovementSql(
@@ -1037,18 +1107,25 @@ export async function loadFseBalances(
     sql`original.tipo_movimento`,
     sql`original.tipo_dettaglio`,
   );
+  const unit = input.groupByUnit ? sql`mv.unita_misura` : sql`NULL::varchar`;
+  const piecesSum = input.groupByUnit
+    ? sql`CASE WHEN count(mv.quantita_pezzi) = count(*) THEN SUM(${pieces}) END`
+    : sql`SUM(${pieces})`;
+  const kgLtSum = input.groupByUnit
+    ? sql`CASE WHEN count(mv.quantita_kg_lt) = count(*) THEN SUM(${kgLt}) END`
+    : sql`SUM(${kgLt})`;
   const result = await executor.execute(sql`
     SELECT mv.magazzino_id, mv.fondo_origine, mv.prodotto_id,
            p.codice AS prodotto_codice, p.nome AS prodotto_nome,
-           mv.lotto_id, l.codice_lotto,
-           SUM(${pieces})::text AS pieces,
-           SUM(${kgLt})::text AS kg_lt
+           mv.lotto_id, l.codice_lotto, ${unit} AS unit,
+           ${piecesSum}::text AS pieces,
+           ${kgLtSum}::text AS kg_lt
     FROM movimenti mv
     JOIN prodotti p ON p.id = mv.prodotto_id
     LEFT JOIN lotti l ON l.id = mv.lotto_id
     LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
     WHERE mv.magazzino_id = ${input.magazzinoId}
-      AND mv.fondo_origine = 'FSE_PLUS'
+      AND ${input.includeAllFunds ? sql`true` : sql`mv.fondo_origine = 'FSE_PLUS'`}
       AND mv.data_movimento <= ${input.dataAsOf}
       AND mv.id <= ${input.maxMovimentoId}
       AND (
@@ -1056,7 +1133,7 @@ export async function loadFseBalances(
         OR COALESCE(mv.operazione_distribuzione_id, original.operazione_distribuzione_id) <= ${input.maxOperazioneDistribuzioneId}
       )
     GROUP BY mv.magazzino_id, mv.fondo_origine, mv.prodotto_id,
-             p.codice, p.nome, mv.lotto_id, l.codice_lotto
+             p.codice, p.nome, mv.lotto_id, l.codice_lotto, ${unit}
     ORDER BY mv.prodotto_id, mv.lotto_id NULLS LAST
   `);
   return (result.rows as Array<Record<string, unknown>>).map((row) => {
@@ -1069,6 +1146,9 @@ export async function loadFseBalances(
       lotId: row.lotto_id == null ? null : Number(row.lotto_id),
       lotCodeSnapshot:
         row.codice_lotto == null ? null : String(row.codice_lotto),
+      ...(input.groupByUnit
+        ? { unit: row.unit == null ? null : String(row.unit) }
+        : {}),
       pieces: row.pieces == null ? null : String(row.pieces),
       kgLt: row.kg_lt == null ? null : String(row.kg_lt),
     };
@@ -1082,6 +1162,7 @@ async function loadProgressiveBalances(
     magazzinoId: number;
     dataAsOf: string;
     maxMovimentoId: number;
+    maxOperazioneDistribuzioneId: number;
     movementIds: number[];
   },
 ): Promise<
@@ -1121,6 +1202,10 @@ async function loadProgressiveBalances(
       WHERE mv.magazzino_id = ${input.magazzinoId}
         AND mv.id <= ${input.maxMovimentoId}
         AND mv.data_movimento <= ${input.dataAsOf}
+        AND (
+          COALESCE(mv.operazione_distribuzione_id, original.operazione_distribuzione_id) IS NULL
+          OR COALESCE(mv.operazione_distribuzione_id, original.operazione_distribuzione_id) <= ${input.maxOperazioneDistribuzioneId}
+        )
     ), progressive AS (
       SELECT *,
         CASE WHEN count(pieces) OVER balance_window = 0 THEN NULL
@@ -1165,19 +1250,41 @@ function addDecimal(total: InventoryDecimal, value: string): InventoryDecimal {
 }
 
 function reversalState(rows: LedgerRow[]): "NONE" | "PARTIAL" | "FULL" {
-  let originals = InventoryDecimal.zero();
-  let reversals = InventoryDecimal.zero();
-  for (const row of rows) {
-    if (row.natura_contabile === "DISTRIBUZIONE_FINALE")
-      originals = addDecimal(originals, row.quantita);
-    if (
+  const originals = rows.filter(
+    (row) => row.natura_contabile === "DISTRIBUZIONE_FINALE",
+  );
+  const reversals = rows.filter(
+    (row) =>
       row.natura_contabile === "STORNO" &&
-      row.natura_originale === "DISTRIBUZIONE_FINALE"
+      row.natura_originale === "DISTRIBUZIONE_FINALE",
+  );
+  if (reversals.length === 0) return "NONE";
+  if (
+    originals.length === 0 ||
+    reversals.some(
+      (rev) =>
+        !originals.some(
+          (orig) =>
+            orig.id === rev.movimento_origine_id &&
+            orig.prodotto_id === rev.prodotto_id &&
+            orig.unita_misura === rev.unita_misura &&
+            orig.fondo_origine === rev.fondo_origine,
+        ),
     )
-      reversals = addDecimal(reversals, row.quantita);
-  }
-  if (reversals.isZero()) return "NONE";
-  return originals.isPositive() && originals.compare(reversals) === 0
+  )
+    return "PARTIAL";
+  return originals.every(
+    (orig) =>
+      reversals
+        .filter((rev) => rev.movimento_origine_id === orig.id)
+        .reduce(
+          (sum, rev) => addDecimal(sum, rev.quantita),
+          InventoryDecimal.zero(),
+        )
+        .compare(
+          InventoryDecimal.parse(orig.quantita, { allowNegative: true }).abs(),
+        ) === 0,
+  )
     ? "FULL"
     : "PARTIAL";
 }
@@ -1265,7 +1372,26 @@ export async function buildFseCanonicalReport(input: {
     const reversal = reversalState(eventRows);
     const mixed =
       operationId != null && (operationFunds.get(operationId)?.size ?? 0) > 1;
-    const qualityCodes = qualityForEvent(row, mixed, reversal === "PARTIAL");
+    const qualityCodes = [
+      ...new Set(
+        eventRows.flatMap((item) => [
+          ...qualityForEvent(item, mixed, reversal === "PARTIAL"),
+          ...qualityForLine(item),
+        ]),
+      ),
+    ].sort();
+    const officialActivity = activity(row.canale_operativo);
+    const eventDate = row.op_data ?? row.data_movimento;
+    if (
+      officialActivity &&
+      ["PACCHI", "MENSA", "STRADA"].includes(officialActivity) &&
+      !indicators.some(
+        (indicator) =>
+          indicator.annoMese === eventDate.slice(0, 7) &&
+          indicator.canaleUfficiale === officialActivity,
+      )
+    )
+      qualityCodes.push("SNAPSHOT_INDICATORI_STORICI_MANCANTE");
     const grossStatistics: StatisticsSnapshot = {
       packs: row.op_pacchi,
       meals: row.op_pasti,
@@ -1343,7 +1469,9 @@ export async function buildFseCanonicalReport(input: {
         naturaOriginale: item.natura_originale,
         origineCarico: item.origine_carico,
       });
-      const lineQuality = qualityForLine(item);
+      const lineQuality = [
+        ...new Set([...qualityCodes, ...qualityForLine(item)]),
+      ].sort();
       const coverageEligible = isAdministrativeDisposition(disposition);
       const lineBase = {
         lineKey: `MOVIMENTO:${item.id}`,
@@ -1461,6 +1589,7 @@ export async function buildFseCanonicalReport(input: {
     magazzinoId: input.magazzinoId,
     dataAsOf,
     maxMovimentoId: cutoff.maxMovimentoId,
+    maxOperazioneDistribuzioneId: cutoff.maxOperazioneDistribuzioneId,
     movementIds: lines.map((line) => line.movementId),
   });
   for (const line of lines) {
@@ -1491,36 +1620,19 @@ export async function buildFseCanonicalReport(input: {
     current.count += count;
     qualityCounts.set(code, current);
   };
-  for (const code of [
-    ...events.flatMap((item) => item.qualityCodes),
-    ...lines.flatMap((item) => item.qualityCodes),
-  ])
-    addQuality(code);
+  // One diagnostic per event/code, independent of number of physical lines or page size.
+  for (const event of events)
+    for (const code of new Set(event.qualityCodes)) addQuality(code);
   addQuality(
     "FONDO_LEGACY_NON_DETERMINATO",
-    source.filter(
-      (row) =>
-        row.fondo_origine === "NESSUN_FONDO" && row.lotto_fse_plus === true,
-    ).length,
-  );
-  const availableMonitoring = new Set(
-    indicators.map((item) => `${item.annoMese}|${item.canaleUfficiale}`),
-  );
-  const requiredMonitoring = new Set(
-    events
-      .filter(
-        (event) =>
-          event.officialActivity &&
-          ["PACCHI", "MENSA", "STRADA"].includes(event.officialActivity),
-      )
-      .map(
-        (event) => `${event.eventDate.slice(0, 7)}|${event.officialActivity}`,
-      ),
-  );
-  addQuality(
-    "SNAPSHOT_INDICATORI_STORICI_MANCANTE",
-    [...requiredMonitoring].filter((key) => !availableMonitoring.has(key))
-      .length,
+    new Set(
+      source
+        .filter(
+          (row) =>
+            row.fondo_origine === "NESSUN_FONDO" && row.lotto_fse_plus === true,
+        )
+        .map((row) => eventKey(row, covered.eventKeys)),
+    ).size,
   );
 
   const reportBase = {
@@ -1552,6 +1664,7 @@ function chunks<T>(values: T[], size: number): T[][] {
 }
 
 export async function createFseExport(input: {
+  audit?: AuditCommandContext;
   magazzinoId: number;
   dataDa: string;
   dataA: string;
@@ -1565,6 +1678,13 @@ export async function createFseExport(input: {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-export:${input.magazzinoId}`}, 0))`,
     );
+    if (input.audit)
+      await requireCurrentFseWarehouse(
+        tx,
+        auditUserId(input.audit),
+        "magazzino.fse.export",
+        input.magazzinoId,
+      );
     const cutoff =
       input.cutoff ??
       (await currentFseCutoff(tx, input.magazzinoId, input.dataAsOf));
@@ -1783,6 +1903,14 @@ export async function createFseExport(input: {
           contentHash: balance.contentHash,
         })),
       );
+    if (input.audit)
+      await recordAuditEvent(tx, {
+        command: input.audit,
+        azione: "FSE_ESPORTAZIONE_CREATA",
+        entitaTipo: "esportazione_fse",
+        entitaId: created.id,
+        magazzinoIdSnapshot: created.magazzinoId,
+      });
     return { export: created, report, replayed: false };
   });
 }
@@ -1808,6 +1936,7 @@ export async function deactivateExportCoverage(
   actorId: number,
   motivation: string,
   version: number,
+  audit?: AuditCommandContext,
 ) {
   return db.transaction(async (tx) => {
     const [current] = await tx
@@ -1822,6 +1951,13 @@ export async function deactivateExportCoverage(
       .for("update");
     if (!current)
       throw new FseReportingError(409, "Versione esportazione non corrente");
+    if (audit)
+      await requireCurrentFseWarehouse(
+        tx,
+        auditUserId(audit),
+        "magazzino.fse.export",
+        current.magazzinoId,
+      );
     if (current.stato === "ANNULLATA") return current;
     if (current.stato === "INSERITA_MANUALMENTE")
       throw new FseReportingError(
@@ -1848,11 +1984,21 @@ export async function deactivateExportCoverage(
       })
       .where(eq(esportazioniFseTable.id, exportId))
       .returning();
+    if (audit)
+      await recordAuditEvent(tx, {
+        command: audit,
+        azione: "FSE_ESPORTAZIONE_ANNULLATA",
+        entitaTipo: "esportazione_fse",
+        entitaId: updated.id,
+        magazzinoIdSnapshot: updated.magazzinoId,
+        motivo: motivation,
+      });
     return updated;
   });
 }
 
 export async function markFseExportEntered(input: {
+  audit?: AuditCommandContext;
   exportId: number;
   actorId: number;
   version: number;
@@ -1872,6 +2018,13 @@ export async function markFseExportEntered(input: {
       .for("update");
     if (!current)
       throw new FseReportingError(409, "Versione esportazione non corrente");
+    if (input.audit)
+      await requireCurrentFseWarehouse(
+        tx,
+        auditUserId(input.audit),
+        "magazzino.fse.export",
+        current.magazzinoId,
+      );
     if (current.stato !== "PRONTA_PER_INSERIMENTO_MANUALE")
       throw new FseReportingError(
         409,
@@ -1900,6 +2053,14 @@ export async function markFseExportEntered(input: {
       .update(esportazioniFseEventiTable)
       .set({ administrativeStatus: "INSERITO_MANUALMENTE" })
       .where(eq(esportazioniFseEventiTable.esportazioneId, input.exportId));
+    if (input.audit)
+      await recordAuditEvent(tx, {
+        command: input.audit,
+        azione: "FSE_ESPORTAZIONE_INSERITA",
+        entitaTipo: "esportazione_fse",
+        entitaId: updated.id,
+        magazzinoIdSnapshot: updated.magazzinoId,
+      });
     return updated;
   });
 }

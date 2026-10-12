@@ -11,6 +11,12 @@ import {
   riconciliazioniFseRigheTable,
   riconciliazioniFseRisoluzioniTable,
   riconciliazioniFseTable,
+  fseImportSessionsTable,
+  fseImportFilesTable,
+  fseAdministrativeVersionsTable,
+  fseAdministrativeObservationsTable,
+  fseAdministrativeLineageTable,
+  fseReconciliationRunsTable,
   scarichiTable,
 } from "@workspace/db";
 import {
@@ -22,6 +28,7 @@ import {
   inArray,
   lte,
   ne,
+  sql,
   type SQL,
 } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
@@ -35,16 +42,20 @@ import {
   listFseCanonicalPage,
   markFseExportEntered,
 } from "../lib/fseCanonicalReporting";
+import { FSE_XLSX_MIME } from "../lib/fseExportWorkbook";
+import { downloadFseRepresentation } from "../lib/fseExportRepresentation";
 import {
-  FSE_XLSX_MIME,
-  generateFseExportWorkbook,
-} from "../lib/fseExportWorkbook";
+  minimizedExportHeader,
+  minimizedExportEvent,
+  minimizedExportLine,
+} from "../lib/fseExportMinimization";
 import {
-  callerAreaOperativaId,
-  callerCentroId,
-  canAccessMagazzino,
-  visibleMagazzinoIds,
-} from "../lib/centroScope";
+  canAccessFseWarehouse,
+  visibleFseWarehouseIds,
+  requireCurrentFseWarehouse,
+} from "../lib/fseAccess";
+import { CurrentCommandActorError } from "../lib/currentCommandActor";
+import { auditContextFromRequest, recordAuditEvent } from "../lib/auditEvent";
 import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 import {
@@ -52,11 +63,13 @@ import {
   recalculateFseReconciliation,
   refreshReconciliationCounts,
   requireOpenReconciliation,
+  compareReconciliationTargets,
 } from "../lib/fseReconciliation";
 import {
   creaScaricoInventariale,
   InventoryError,
   stornaScaricoInventariale,
+  type InventoryTransaction,
 } from "../lib/scaricoInventory";
 import {
   InventoryDecimal,
@@ -150,13 +163,7 @@ function period(req: Request) {
 }
 
 async function requireWarehouse(req: Request, magazzinoId: number) {
-  if (
-    !(await canAccessMagazzino(
-      magazzinoId,
-      callerCentroId(req),
-      callerAreaOperativaId(req),
-    ))
-  )
+  if (!(await canAccessFseWarehouse(req.user!, magazzinoId)))
     throw new FseReportingError(
       403,
       "Magazzino non accessibile per il profilo",
@@ -184,17 +191,13 @@ async function accessibleReconciliation(req: Request, id: number) {
 }
 
 function sendFseError(res: Response, error: unknown): boolean {
-  if (!(error instanceof FseReportingError)) return false;
+  if (
+    !(error instanceof FseReportingError) &&
+    !(error instanceof CurrentCommandActorError)
+  )
+    return false;
   res.status(error.status).json({ error: error.message });
   return true;
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  const candidate = error as {
-    code?: unknown;
-    cause?: { code?: unknown };
-  } | null;
-  return candidate?.code === "23505" || candidate?.cause?.code === "23505";
 }
 
 function returnCode(idempotencyKey: string): string {
@@ -309,6 +312,7 @@ for (const [path, projection] of [
               "DA_RENDICONTARE",
               "ARRETRATO_NON_RENDICONTATO",
               "BLOCCATO",
+              "CORREZIONE_DA_GESTIRE_MANUALMENTE",
             ].includes(statoRendicontazione)
           )
             throw new FseReportingError(400, "statoRendicontazione non valido");
@@ -354,10 +358,7 @@ router.get(
   async (req, res) => {
     try {
       const { page, pageSize, offset } = pagination(req);
-      const visible = await visibleMagazzinoIds(
-        callerCentroId(req),
-        callerAreaOperativaId(req),
-      );
+      const visible = await visibleFseWarehouseIds(req.user!);
       const requestedWarehouse =
         req.query.magazzinoId == null
           ? null
@@ -393,7 +394,10 @@ router.get(
         .select()
         .from(esportazioniFseTable)
         .where(where)
-        .orderBy(desc(esportazioniFseTable.dataCreazione))
+        .orderBy(
+          desc(esportazioniFseTable.dataCreazione),
+          desc(esportazioniFseTable.id),
+        )
         .limit(pageSize)
         .offset(offset);
       const total = Number(
@@ -404,7 +408,12 @@ router.get(
             .where(where)
         )[0]?.value ?? 0,
       );
-      res.json({ rows, page, pageSize, total });
+      res.json({
+        rows: rows.map(minimizedExportHeader),
+        page,
+        pageSize,
+        total,
+      });
     } catch (error) {
       if (!sendFseError(res, error)) throw error;
     }
@@ -425,10 +434,12 @@ router.post(
         ...input,
         formatCode: req.body.formatCode,
         creatoDa: req.user!.id,
+        audit: auditContextFromRequest(req),
       });
-      res
-        .status(result.replayed ? 200 : 201)
-        .json({ ...result.export, replayed: result.replayed });
+      res.status(result.replayed ? 200 : 201).json({
+        ...minimizedExportHeader(result.export),
+        replayed: result.replayed,
+      });
     } catch (error) {
       if (sendFseError(res, error)) return;
       if (
@@ -454,7 +465,8 @@ router.get(
     try {
       const id = positiveId(req.params.id);
       if (!id) throw new FseReportingError(400, "ID non valido");
-      res.json(await accessibleExport(req, id));
+      res.setHeader("Cache-Control", "no-store");
+      res.json(minimizedExportHeader(await accessibleExport(req, id)));
     } catch (error) {
       if (!sendFseError(res, error)) throw error;
     }
@@ -486,7 +498,7 @@ for (const suffix of ["eventi", "righe"] as const) {
               .where(eq(esportazioniFseEventiTable.esportazioneId, id)),
           ]);
           res.json({
-            rows: items,
+            rows: items.map(minimizedExportEvent),
             page,
             pageSize,
             total: Number(totalRows[0]?.value ?? 0),
@@ -523,7 +535,10 @@ for (const suffix of ["eventi", "righe"] as const) {
               .where(eq(esportazioniFseEventiTable.esportazioneId, id)),
           ]);
           res.json({
-            rows: items,
+            rows: items.map(({ line, eventKey }) => ({
+              line: minimizedExportLine(line),
+              eventKey,
+            })),
             page,
             pageSize,
             total: Number(totalRows[0]?.value ?? 0),
@@ -550,7 +565,54 @@ router.get(
           : String(req.query.representation);
       if (requestedFormat != null && !isFseFormat(requestedFormat))
         throw new FseReportingError(400, "representation non valida");
-      const file = await generateFseExportWorkbook(id, requestedFormat);
+      const file = await downloadFseRepresentation({
+        id,
+        format: requestedFormat,
+        audit: auditContextFromRequest(req),
+      });
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("X-FSE-Variant", file.variant);
+      res.setHeader("X-FSE-Artifact-SHA256", file.artifactHash);
+      res.setHeader("X-FSE-Semantic-SHA256", file.semanticHash);
+      res.setHeader("Content-Type", FSE_XLSX_MIME);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${file.filename}"`,
+      );
+      res.send(file.buffer);
+    } catch (error) {
+      if (!sendFseError(res, error)) throw error;
+    }
+  },
+);
+
+router.post(
+  "/fse/exportazioni/:id/originale",
+  requirePermission("magazzino.fse.export.original.view"),
+  async (req, res) => {
+    try {
+      const id = positiveId(req.params.id);
+      if (
+        !id ||
+        typeof req.body?.motivo !== "string" ||
+        !req.body.motivo.trim() ||
+        req.body.motivo.length > 1000
+      )
+        throw new FseReportingError(400, "ID e motivo accesso obbligatori");
+      if (
+        req.body.representation != null &&
+        !isFseFormat(req.body.representation)
+      )
+        throw new FseReportingError(400, "representation non valida");
+      const file = await downloadFseRepresentation({
+        id,
+        format: req.body.representation,
+        originalReason: req.body.motivo,
+        audit: auditContextFromRequest(req),
+      });
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("X-FSE-Variant", file.variant);
+      res.setHeader("X-FSE-Artifact-SHA256", file.artifactHash);
       res.setHeader("Content-Type", FSE_XLSX_MIME);
       res.setHeader(
         "Content-Disposition",
@@ -586,11 +648,14 @@ router.post(
         );
       await accessibleExport(req, id);
       res.json(
-        await deactivateExportCoverage(
-          id,
-          req.user!.id,
-          motivation,
-          currentVersion,
+        minimizedExportHeader(
+          await deactivateExportCoverage(
+            id,
+            req.user!.id,
+            motivation,
+            currentVersion,
+            auditContextFromRequest(req),
+          ),
         ),
       );
     } catch (error) {
@@ -624,13 +689,16 @@ router.post(
         );
       await accessibleExport(req, id);
       res.json(
-        await markFseExportEntered({
-          exportId: id,
-          actorId: req.user!.id,
-          version: currentVersion,
-          insertedAt: new Date(`${insertedDate}T12:00:00.000Z`),
-          externalReference: reference,
-        }),
+        minimizedExportHeader(
+          await markFseExportEntered({
+            exportId: id,
+            actorId: req.user!.id,
+            version: currentVersion,
+            insertedAt: new Date(`${insertedDate}T12:00:00.000Z`),
+            externalReference: reference,
+            audit: auditContextFromRequest(req),
+          }),
+        ),
       );
     } catch (error) {
       if (!sendFseError(res, error)) throw error;
@@ -644,10 +712,7 @@ router.get(
   async (req, res) => {
     try {
       const { page, pageSize, offset } = pagination(req);
-      const visible = await visibleMagazzinoIds(
-        callerCentroId(req),
-        callerAreaOperativaId(req),
-      );
+      const visible = await visibleFseWarehouseIds(req.user!);
       const requestedWarehouse =
         req.query.magazzinoId == null
           ? null
@@ -687,7 +752,10 @@ router.get(
         .select()
         .from(rilevazioniMonitoraggioFseTable)
         .where(where)
-        .orderBy(desc(rilevazioniMonitoraggioFseTable.dataRiferimento))
+        .orderBy(
+          desc(rilevazioniMonitoraggioFseTable.dataRiferimento),
+          desc(rilevazioniMonitoraggioFseTable.id),
+        )
         .limit(pageSize)
         .offset(offset);
       const total = Number(
@@ -739,14 +807,17 @@ const MONITORING_SOURCES = [
 ] as const;
 const MONITORING_COMPLETENESS = ["PARZIALE", "COMPLETA"] as const;
 
-async function validateMonitoringOperation(input: {
-  id: number | null;
-  magazzinoId: number;
-  annoMese: string;
-  canale: string;
-}) {
+async function validateMonitoringOperation(
+  input: {
+    id: number | null;
+    magazzinoId: number;
+    annoMese: string;
+    canale: string;
+  },
+  executor: typeof db | InventoryTransaction = db,
+) {
   if (input.id == null) return;
-  const [operation] = await db
+  const [operation] = await executor
     .select()
     .from(operazioniDistribuzioneMagazzinoTable)
     .where(eq(operazioniDistribuzioneMagazzinoTable.id, input.id));
@@ -797,31 +868,50 @@ router.post(
       )
         throw new FseReportingError(400, "Rilevazione mensile non valida");
       await requireWarehouse(req, magazzinoId);
-      await validateMonitoringOperation({
-        id: operazioneDistribuzioneId,
-        magazzinoId,
-        annoMese,
-        canale,
-      });
-      const [created] = await db
-        .insert(rilevazioniMonitoraggioFseTable)
-        .values({
+      const created = await db.transaction(async (tx) => {
+        await requireCurrentFseWarehouse(
+          tx,
+          req.user!.id,
+          "magazzino.fse.monitoring.manage",
           magazzinoId,
-          annoMese,
-          canaleUfficiale: canale,
-          operazioneDistribuzioneId,
-          dataRiferimento,
-          fonte,
-          completezza,
-          ...monitoringValues(req.body),
-          creatoDa: req.user!.id,
-          aggiornatoDa: req.user!.id,
-          noteAudit:
-            typeof req.body?.noteAudit === "string"
-              ? req.body.noteAudit.trim() || null
-              : null,
-        })
-        .returning();
+        );
+        await validateMonitoringOperation(
+          {
+            id: operazioneDistribuzioneId,
+            magazzinoId,
+            annoMese,
+            canale,
+          },
+          tx,
+        );
+        const [created] = await tx
+          .insert(rilevazioniMonitoraggioFseTable)
+          .values({
+            magazzinoId,
+            annoMese,
+            canaleUfficiale: canale,
+            operazioneDistribuzioneId,
+            dataRiferimento,
+            fonte,
+            completezza,
+            ...monitoringValues(req.body),
+            creatoDa: req.user!.id,
+            aggiornatoDa: req.user!.id,
+            noteAudit:
+              typeof req.body?.noteAudit === "string"
+                ? req.body.noteAudit.trim() || null
+                : null,
+          })
+          .returning();
+        await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req),
+          azione: "FSE_MONITORAGGIO_CREATO",
+          entitaTipo: "rilevazione_monitoraggio_fse",
+          entitaId: created.id,
+          magazzinoIdSnapshot: magazzinoId,
+        });
+        return created;
+      });
       res.status(201).json(created);
     } catch (error) {
       if (sendFseError(res, error)) return;
@@ -848,38 +938,55 @@ router.patch(
       const currentVersion = version(req.body?.versione);
       if (!id || !currentVersion)
         throw new FseReportingError(400, "ID o versione non validi");
-      const [current] = await db
-        .select()
-        .from(rilevazioniMonitoraggioFseTable)
-        .where(eq(rilevazioniMonitoraggioFseTable.id, id));
-      if (!current) throw new FseReportingError(404, "Rilevazione non trovata");
-      await requireWarehouse(req, current.magazzinoId);
-      const [updated] = await db
-        .update(rilevazioniMonitoraggioFseTable)
-        .set({
-          ...monitoringValues({
-            ...Object.fromEntries(
-              indicatorFields.map((field) => [field, current[field]]),
+      const updated = await db.transaction(async (tx) => {
+        const [current] = await tx
+          .select()
+          .from(rilevazioniMonitoraggioFseTable)
+          .where(eq(rilevazioniMonitoraggioFseTable.id, id))
+          .for("update");
+        if (!current)
+          throw new FseReportingError(404, "Rilevazione non trovata");
+        await requireCurrentFseWarehouse(
+          tx,
+          req.user!.id,
+          "magazzino.fse.monitoring.manage",
+          current.magazzinoId,
+        );
+        const [updated] = await tx
+          .update(rilevazioniMonitoraggioFseTable)
+          .set({
+            ...monitoringValues({
+              ...Object.fromEntries(
+                indicatorFields.map((field) => [field, current[field]]),
+              ),
+              ...req.body,
+            }),
+            versione: currentVersion + 1,
+            aggiornatoDa: req.user!.id,
+            dataAggiornamento: new Date(),
+            noteAudit:
+              typeof req.body?.noteAudit === "string"
+                ? req.body.noteAudit.trim() || null
+                : current.noteAudit,
+          })
+          .where(
+            and(
+              eq(rilevazioniMonitoraggioFseTable.id, id),
+              eq(rilevazioniMonitoraggioFseTable.versione, currentVersion),
             ),
-            ...req.body,
-          }),
-          versione: currentVersion + 1,
-          aggiornatoDa: req.user!.id,
-          dataAggiornamento: new Date(),
-          noteAudit:
-            typeof req.body?.noteAudit === "string"
-              ? req.body.noteAudit.trim() || null
-              : current.noteAudit,
-        })
-        .where(
-          and(
-            eq(rilevazioniMonitoraggioFseTable.id, id),
-            eq(rilevazioniMonitoraggioFseTable.versione, currentVersion),
-          ),
-        )
-        .returning();
-      if (!updated)
-        throw new FseReportingError(409, "Versione rilevazione non corrente");
+          )
+          .returning();
+        if (!updated)
+          throw new FseReportingError(409, "Versione rilevazione non corrente");
+        await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req),
+          azione: "FSE_MONITORAGGIO_AGGIORNATO",
+          entitaTipo: "rilevazione_monitoraggio_fse",
+          entitaId: id,
+          magazzinoIdSnapshot: current.magazzinoId,
+        });
+        return updated;
+      });
       res.json(updated);
     } catch (error) {
       if (!sendFseError(res, error)) throw error;
@@ -980,88 +1087,75 @@ router.post(
         throw new FseReportingError(400, "Prodotto del reso non trovato");
 
       const codice = returnCode(idempotencyKey);
-      const [existing] = await db
-        .select()
-        .from(scarichiTable)
-        .where(eq(scarichiTable.codice, codice));
-      if (existing) {
-        const replay = await accessibleReturn(req, existing.id);
-        if (
-          existing.magazzinoId !== magazzinoId ||
-          existing.dataScarico !== dataReso ||
-          existing.causaleAltro !== destinazioneOpc ||
-          existing.note !== motivazione ||
-          existing.fseRequestHash !== requestHash
-        ) {
-          throw new FseReportingError(
-            409,
-            "Idempotency key gia usata con dati diversi",
-          );
-        }
-        res.status(200).json({ ...replay, idempotentReplay: true });
-        return;
-      }
-
-      let newId: number;
-      try {
-        newId = await db.transaction(async (tx) => {
-          await requireOperationalMagazzino(tx, magazzinoId);
-          const createdId = await creaScaricoInventariale(tx, {
-            codice,
-            magazzinoId,
-            centroAscoltoId: callerCentroId(req),
-            dataScarico: dataReso,
-            causale: "reso_opc",
-            causaleAltro: destinazioneOpc,
-            note: motivazione,
-            operatoreId: req.user!.id,
-            documentoRiferimento: codice,
-            lottoPolicy: "qualsiasi",
-            allowedFondiOrigine: ["FSE_PLUS"],
-            source: {
-              naturaContabile: "RESO",
-              dominioOrigine: "FSE",
-              entitaOrigineTipo: "reso_opc",
-              entitaOrigineId: 0,
-            },
-            righe: normalizedRows.map((row) => ({
-              prodottoId: row.prodottoId!,
-              lottoId: modalita === "PARTITA_ESATTA" ? row.lottoId : null,
-              quantita: row.quantita,
-              unitaMisura: productMap.get(row.prodottoId!)!.unitaMisura,
-            })),
-          });
-          await tx
-            .update(scarichiTable)
-            .set({
-              fseIdempotencyKey: idempotencyKey,
-              fseRequestHash: requestHash,
-            })
-            .where(eq(scarichiTable.id, createdId));
-          return createdId;
-        });
-      } catch (error) {
-        if (!isUniqueViolation(error)) throw error;
-        const [concurrent] = await db
+      const command = auditContextFromRequest(req, {
+        operationKey: `fse-return:${codice}`,
+      });
+      const result = await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-return:${codice}`}, 0))`,
+        );
+        const [existing] = await tx
           .select()
           .from(scarichiTable)
-          .where(eq(scarichiTable.codice, codice));
-        if (!concurrent) throw error;
-        const replay = await accessibleReturn(req, concurrent.id);
-        if (concurrent.fseRequestHash !== requestHash)
-          throw new FseReportingError(
-            409,
-            "Idempotency key gia usata con dati diversi",
-          );
-        res.status(200).json({
-          ...replay,
-          idempotentReplay: true,
+          .where(eq(scarichiTable.codice, codice))
+          .for("update");
+        const actor = await requireCurrentFseWarehouse(
+          tx,
+          req.user!.id,
+          "magazzino.fse.return",
+          magazzinoId,
+        );
+        if (existing) {
+          if (
+            existing.magazzinoId !== magazzinoId ||
+            existing.causale !== "reso_opc" ||
+            existing.fseRequestHash !== requestHash
+          )
+            throw new FseReportingError(
+              409,
+              "Idempotency key gia usata con dati diversi",
+            );
+          return { id: existing.id, replayed: true };
+        }
+        await requireOperationalMagazzino(tx, magazzinoId);
+        const createdId = await creaScaricoInventariale(tx, {
+          codice,
+          magazzinoId,
+          centroAscoltoId: actor.centroAscoltoId,
+          dataScarico: dataReso,
+          causale: "reso_opc",
+          causaleAltro: destinazioneOpc,
+          note: motivazione,
+          operatoreId: req.user!.id,
+          audit: command,
+          documentoRiferimento: codice,
+          lottoPolicy: "qualsiasi",
+          allowedFondiOrigine: ["FSE_PLUS"],
+          source: {
+            naturaContabile: "RESO",
+            dominioOrigine: "FSE",
+            entitaOrigineTipo: "reso_opc",
+            entitaOrigineId: 0,
+          },
+          righe: normalizedRows.map((row) => ({
+            prodottoId: row.prodottoId!,
+            lottoId: modalita === "PARTITA_ESATTA" ? row.lottoId : null,
+            quantita: row.quantita,
+            unitaMisura: productMap.get(row.prodottoId!)!.unitaMisura,
+          })),
         });
-        return;
-      }
-      res.status(201).json({
-        ...(await accessibleReturn(req, newId)),
-        idempotentReplay: false,
+        await tx
+          .update(scarichiTable)
+          .set({
+            fseIdempotencyKey: idempotencyKey,
+            fseRequestHash: requestHash,
+          })
+          .where(eq(scarichiTable.id, createdId));
+        return { id: createdId, replayed: false };
+      });
+      res.status(result.replayed ? 200 : 201).json({
+        ...(await accessibleReturn(req, result.id)),
+        idempotentReplay: result.replayed,
       });
     } catch (error) {
       if (error instanceof InventoryDecimalError) {
@@ -1104,16 +1198,34 @@ router.post(
       }
       if (current.versione !== currentVersion)
         throw new FseReportingError(409, "Versione reso non corrente");
-      await db.transaction((tx) =>
-        stornaScaricoInventariale(tx, {
+      await db.transaction(async (tx) => {
+        const [locked] = await tx
+          .select()
+          .from(scarichiTable)
+          .where(eq(scarichiTable.id, id))
+          .for("update");
+        if (!locked || locked.causale !== "reso_opc")
+          throw new FseReportingError(404, "Reso non trovato");
+        await requireCurrentFseWarehouse(
+          tx,
+          req.user!.id,
+          "magazzino.fse.return",
+          locked.magazzinoId,
+        );
+        if (currentVersion !== 1)
+          throw new FseReportingError(409, "Versione reso non corrente");
+        await stornaScaricoInventariale(tx, {
           documentoRiferimento: current.codice,
           dataMovimento: data,
           operatoreId: req.user!.id,
+          audit: auditContextFromRequest(req, {
+            operationKey: `fse-return-storno:${id}`,
+          }),
           tipoDettaglio: "storno_reso_opc",
           note: `Storno reso verso OpC: ${motivazione}`,
           rejectAlreadyReversed: true,
-        }),
-      );
+        });
+      });
       res.json(await accessibleReturn(req, id));
     } catch (error) {
       if (error instanceof InventoryError) {
@@ -1131,10 +1243,7 @@ router.get(
   async (req, res) => {
     try {
       const { page, pageSize, offset } = pagination(req);
-      const visible = await visibleMagazzinoIds(
-        callerCentroId(req),
-        callerAreaOperativaId(req),
-      );
+      const visible = await visibleFseWarehouseIds(req.user!);
       const requestedWarehouse =
         req.query.magazzinoId == null
           ? null
@@ -1172,7 +1281,10 @@ router.get(
         .select()
         .from(riconciliazioniFseTable)
         .where(where)
-        .orderBy(desc(riconciliazioniFseTable.dataCreazione))
+        .orderBy(
+          desc(riconciliazioniFseTable.dataCreazione),
+          desc(riconciliazioniFseTable.id),
+        )
         .limit(pageSize)
         .offset(offset);
       const total = Number(
@@ -1197,6 +1309,14 @@ router.post(
     try {
       const magazzinoId = positiveId(req.body?.magazzinoId);
       const importazioneAgeaId = positiveId(req.body?.importazioneAgeaId);
+      const sourceType = req.body?.sourceType ?? "AGEA_LEGACY";
+      const sessionId = positiveId(req.body?.sessionId);
+      const sessionVersion = version(req.body?.sessionVersion);
+      const baselineRunId = positiveId(req.body?.baselineRunId);
+      const commandKey =
+        typeof req.body?.commandKey === "string"
+          ? req.body.commandKey.trim()
+          : undefined;
       const previousId =
         req.body?.importazioneAgeaPrecedenteId == null
           ? null
@@ -1212,7 +1332,15 @@ router.post(
           : positiveId(req.body.maxOperazioneDistribuzioneId);
       if (
         !magazzinoId ||
-        !importazioneAgeaId ||
+        !["AGEA_LEGACY", "FSE_M3B"].includes(sourceType) ||
+        (sourceType === "AGEA_LEGACY"
+          ? !importazioneAgeaId || req.body?.sessionId != null
+          : !sessionId ||
+            !sessionVersion ||
+            !commandKey ||
+            req.body?.importazioneAgeaId != null ||
+            req.body?.importazioneAgeaPrecedenteId != null) ||
+        (req.body?.baselineRunId != null && !baselineRunId) ||
         !isCivilDate(dataRiferimento) ||
         (req.body?.importazioneAgeaPrecedenteId != null && !previousId) ||
         (req.body?.maxMovimentoId != null && !maxMovimentoId) ||
@@ -1222,8 +1350,14 @@ router.post(
         throw new FseReportingError(400, "Input riconciliazione non valido");
       await requireWarehouse(req, magazzinoId);
       const result = await calculateFseReconciliation({
+        audit: auditContextFromRequest(req),
         magazzinoId,
-        importazioneAgeaId,
+        sourceType,
+        sessionId: sessionId ?? undefined,
+        sessionVersion: sessionVersion ?? undefined,
+        baselineRunId,
+        commandKey,
+        importazioneAgeaId: importazioneAgeaId ?? undefined,
         importazioneAgeaPrecedenteId: previousId,
         dataRiferimento,
         creatoDa: req.user!.id,
@@ -1235,6 +1369,198 @@ router.post(
       res.status(result.replayed ? 200 : 201).json({
         ...result.reconciliation,
         replayed: result.replayed,
+      });
+    } catch (error) {
+      if (!sendFseError(res, error)) throw error;
+    }
+  },
+);
+
+// Source discovery is scoped to one authorized warehouse; import privileges are
+// not a prerequisite for reading the administrative source used in reconciliation.
+router.get(
+  "/fse/fonti-m3b",
+  requirePermission("magazzino.fse.reconcile"),
+  async (req, res) => {
+    try {
+      const magazzinoId = positiveId(req.query.magazzinoId);
+      if (!magazzinoId)
+        throw new FseReportingError(400, "Magazzino obbligatorio");
+      await requireWarehouse(req, magazzinoId);
+      const { page, pageSize, offset } = pagination(req);
+      const where = and(
+        eq(fseImportSessionsTable.magazzinoId, magazzinoId),
+        ne(fseImportSessionsTable.stato, "ANNULLATA"),
+      );
+      const rows = await db
+        .select({
+          id: fseImportSessionsTable.id,
+          sourceRegistryId: fseImportSessionsTable.sourceRegistryId,
+          versione: fseImportSessionsTable.versione,
+          modalita: fseImportSessionsTable.modalita,
+          stato: fseImportSessionsTable.stato,
+        })
+        .from(fseImportSessionsTable)
+        .where(where)
+        .orderBy(desc(fseImportSessionsTable.id))
+        .limit(pageSize)
+        .offset(offset);
+      const files = rows.length
+        ? await db
+            .select({
+              sessionId: fseImportFilesTable.sessioneId,
+              id: fseImportFilesTable.id,
+              role: fseImportFilesTable.profilo,
+              sha256: fseImportFilesTable.sha256File,
+              referenceDate: fseImportFilesTable.dataRiferimento,
+            })
+            .from(fseImportFilesTable)
+            .where(
+              inArray(
+                fseImportFilesTable.sessioneId,
+                rows.map((r) => r.id),
+              ),
+            )
+            .orderBy(fseImportFilesTable.id)
+        : [];
+      const summaries = rows.length
+        ? (
+            await db.execute(sql`SELECT r.sessione_id, count(*)::int AS observations,
+      count(*) FILTER (WHERE r.stato='ESCLUSA')::int AS excluded,
+      count(*) FILTER (WHERE jsonb_array_length(r.error_codes_json)>0)::int AS anomalous,
+      count(*) FILTER (WHERE r.stato='REGISTRATA')::int AS registered
+      FROM fse_import_rows r WHERE r.sessione_id IN (${sql.join(
+        rows.map((r) => sql`${r.id}`),
+        sql`,`,
+      )}) GROUP BY r.sessione_id`)
+          ).rows
+        : [];
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(fseImportSessionsTable)
+        .where(where);
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        rows: rows.map((r) => ({
+          ...r,
+          summary: summaries.find((s) => Number(s.sessione_id) === r.id) ?? {
+            observations: 0,
+            registered: 0,
+            excluded: 0,
+            anomalous: 0,
+          },
+          files: files.filter((f) => f.sessionId === r.id),
+        })),
+        page,
+        pageSize,
+        total: Number(total),
+      });
+    } catch (error) {
+      if (!sendFseError(res, error)) throw error;
+    }
+  },
+);
+
+router.get(
+  "/fse/riconciliazioni/:id/fonte",
+  requirePermission("magazzino.fse.view"),
+  async (req, res) => {
+    try {
+      const id = positiveId(req.params.id);
+      if (!id) throw new FseReportingError(400, "ID non valido");
+      const header = await accessibleReconciliation(req, id);
+      const [source] =
+        header.administrativeVersionId == null
+          ? []
+          : await db
+              .select({
+                id: fseAdministrativeVersionsTable.id,
+                sourceRegistryId:
+                  fseAdministrativeVersionsTable.sourceRegistryId,
+                sessionId: fseAdministrativeVersionsTable.sessionId,
+                sessionVersion: fseAdministrativeVersionsTable.sessionVersion,
+                referenceDate: fseAdministrativeVersionsTable.referenceDate,
+                mode: fseAdministrativeVersionsTable.mode,
+                manifestHash: fseAdministrativeVersionsTable.manifestHash,
+              })
+              .from(fseAdministrativeVersionsTable)
+              .where(
+                eq(
+                  fseAdministrativeVersionsTable.id,
+                  header.administrativeVersionId,
+                ),
+              );
+      const runs = await db
+        .select({
+          id: fseReconciliationRunsTable.id,
+          headerVersion: fseReconciliationRunsTable.headerVersion,
+          administrativeVersionId:
+            fseReconciliationRunsTable.administrativeVersionId,
+          baselineRunId: fseReconciliationRunsTable.baselineRunId,
+          maxMovementId: fseReconciliationRunsTable.maxMovementId,
+          maxOperationId: fseReconciliationRunsTable.maxOperationId,
+          referenceDate: fseReconciliationRunsTable.referenceDate,
+          canonicalHash: fseReconciliationRunsTable.canonicalHash,
+        })
+        .from(fseReconciliationRunsTable)
+        .where(eq(fseReconciliationRunsTable.reconciliationId, id))
+        .orderBy(fseReconciliationRunsTable.id);
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ sourceType: header.sourceType, source: source ?? null, runs });
+    } catch (error) {
+      if (!sendFseError(res, error)) throw error;
+    }
+  },
+);
+
+router.get(
+  "/fse/riconciliazioni/:id/osservazioni",
+  requirePermission("magazzino.fse.view"),
+  async (req, res) => {
+    try {
+      const id = positiveId(req.params.id);
+      if (!id) throw new FseReportingError(400, "ID non valido");
+      const header = await accessibleReconciliation(req, id);
+      const { page, pageSize, offset } = pagination(req);
+      if (header.administrativeVersionId == null) {
+        res.json({ rows: [], total: 0, page, pageSize });
+        return;
+      }
+      const where = eq(
+        fseAdministrativeObservationsTable.versionId,
+        header.administrativeVersionId,
+      );
+      const rows = await db
+        .select()
+        .from(fseAdministrativeObservationsTable)
+        .where(where)
+        .orderBy(fseAdministrativeObservationsTable.id)
+        .limit(pageSize)
+        .offset(offset);
+      const lineage = rows.length
+        ? await db
+            .select()
+            .from(fseAdministrativeLineageTable)
+            .where(
+              inArray(
+                fseAdministrativeLineageTable.observationId,
+                rows.map((r) => r.id),
+              ),
+            )
+        : [];
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(fseAdministrativeObservationsTable)
+        .where(where);
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        rows: rows.map((r) => ({
+          ...r,
+          lineage: lineage.filter((l) => l.observationId === r.id),
+        })),
+        total: Number(total),
+        page,
+        pageSize,
       });
     } catch (error) {
       if (!sendFseError(res, error)) throw error;
@@ -1315,9 +1641,11 @@ router.post(
       res.json(
         (
           await recalculateFseReconciliation({
+            audit: auditContextFromRequest(req),
             id,
             versione: currentVersion,
             actorId: req.user!.id,
+            sessionVersion: version(req.body?.sessionVersion) ?? undefined,
           })
         ).reconciliation,
       );
@@ -1358,6 +1686,12 @@ router.patch(
       await accessibleReconciliation(req, id);
       const result = await db.transaction(async (tx) => {
         const header = await requireOpenReconciliation(tx, id, currentVersion);
+        await requireCurrentFseWarehouse(
+          tx,
+          req.user!.id,
+          "magazzino.fse.reconcile.manage",
+          header.magazzinoId,
+        );
         const [current] = await tx
           .select()
           .from(riconciliazioniFseRigheTable)
@@ -1373,12 +1707,18 @@ router.patch(
           throw new FseReportingError(404, "Riga riconciliazione non trovata");
         const targetMovementId = positiveId(req.body?.movimentoId);
         const targetAgeaRowId = positiveId(req.body?.importazioneAgeaRigaId);
+        const targetObservationId = positiveId(req.body?.observationId);
         let structuredMatch: Record<string, unknown> | null = null;
         if (action === "ABBINA") {
-          if (!targetMovementId || !targetAgeaRowId)
+          if (
+            !targetMovementId ||
+            (header.sourceType === "FSE_M3B"
+              ? !targetObservationId || targetAgeaRowId != null
+              : !targetAgeaRowId || targetObservationId != null)
+          )
             throw new FseReportingError(
               400,
-              "ABBINA richiede movimentoId e importazioneAgeaRigaId",
+              "ABBINA richiede movimentoId e un riferimento esterno coerente con la fonte",
             );
           const [localTarget] = await tx
             .select()
@@ -1396,14 +1736,26 @@ router.patch(
             .where(
               and(
                 eq(riconciliazioniFseRigheTable.riconciliazioneId, id),
-                eq(
-                  riconciliazioniFseRigheTable.importazioneAgeaRigaId,
-                  targetAgeaRowId,
-                ),
+                header.sourceType === "FSE_M3B"
+                  ? eq(
+                      riconciliazioniFseRigheTable.observationId,
+                      targetObservationId!,
+                    )
+                  : eq(
+                      riconciliazioniFseRigheTable.importazioneAgeaRigaId,
+                      targetAgeaRowId!,
+                    ),
                 eq(riconciliazioniFseRigheTable.active, true),
               ),
             );
-          if (!localTarget || !externalTarget)
+          if (
+            !localTarget ||
+            !externalTarget ||
+            ![localTarget.id, externalTarget.id].includes(current.id) ||
+            localTarget.importazioneAgeaRigaId != null ||
+            localTarget.observationId != null ||
+            externalTarget.movimentoId != null
+          )
             throw new FseReportingError(
               409,
               "Target ABBINA non appartenenti alla riconciliazione",
@@ -1424,15 +1776,13 @@ router.patch(
             localTarget.kgLtLocal,
             externalTarget.kgLtExternal,
           );
-          const exact =
-            differencePieces != null &&
-            differenceKgLt != null &&
-            InventoryDecimal.parse(differencePieces, {
-              allowNegative: true,
-            }).isZero() &&
-            InventoryDecimal.parse(differenceKgLt, {
-              allowNegative: true,
-            }).isZero();
+          const comparisonStatus = await compareReconciliationTargets(
+            tx,
+            header,
+            targetMovementId,
+            (targetObservationId ?? targetAgeaRowId)!,
+          );
+          const exact = comparisonStatus === "RICONCILIATA_ESATTA";
           structuredMatch = {
             localEventKey: localTarget.localEventKey,
             localLineKey: localTarget.localLineKey,
@@ -1440,6 +1790,7 @@ router.patch(
             operazioneDistribuzioneId: localTarget.operazioneDistribuzioneId,
             externalMovementId: externalTarget.externalMovementId,
             importazioneAgeaRigaId: targetAgeaRowId,
+            observationId: targetObservationId,
             fundLocal: localTarget.fundLocal,
             fundExternal: externalTarget.fundExternal,
             productIdLocal: localTarget.productIdLocal,
@@ -1461,12 +1812,14 @@ router.patch(
             blocking: !exact,
             exact,
             workflowStatus: "ABBINATO_MANUALMENTE",
-            qualityCodesJson: exact ? [] : ["ABBINATA_CON_SCOSTAMENTO"],
+            qualityCodesJson: exact
+              ? []
+              : ["ABBINATA_CON_SCOSTAMENTO", comparisonStatus],
             active: true,
           };
           const resolutionGroupId = createHash("sha256")
             .update(
-              `${id}:${header.versione}:${targetMovementId}:${targetAgeaRowId}`,
+              `${id}:${header.versione}:${targetMovementId}:${header.sourceType}:${targetObservationId ?? targetAgeaRowId}`,
             )
             .digest("hex");
           await tx
@@ -1481,7 +1834,10 @@ router.patch(
           structuredMatch.resolutionGroupId = resolutionGroupId;
         }
         if (action === "DISABBINA") {
-          if (!current.movimentoId || !current.importazioneAgeaRigaId)
+          if (
+            !current.movimentoId ||
+            !(current.importazioneAgeaRigaId || current.observationId)
+          )
             throw new FseReportingError(
               409,
               "DISABBINA richiede una riga realmente abbinata",
@@ -1496,7 +1852,7 @@ router.patch(
           const externalState = {
             ...current,
             id: undefined,
-            businessKey: `AGEA:${current.importazioneAgeaRigaId}:DISABBINATO:${header.versione}`,
+            businessKey: `${current.observationId == null ? "AGEA" : "M3B"}:${current.observationId ?? current.importazioneAgeaRigaId}:DISABBINATO:${header.versione}`,
             localEventKey: null,
             localLineKey: null,
             movimentoId: null,
@@ -1531,6 +1887,7 @@ router.patch(
           structuredMatch = {
             externalMovementId: null,
             importazioneAgeaRigaId: null,
+            observationId: null,
             fundExternal: null,
             productIdExternal: null,
             lotExternal: null,
@@ -1585,7 +1942,12 @@ router.patch(
                   blocking: Boolean(
                     current.calculatedStateJson.blocking ?? true,
                   ),
-                  exact: Boolean(current.calculatedStateJson.exact ?? false),
+                  exact:
+                    current.calculatedStateJson.exact == null
+                      ? ["RICONCILIATA_ESATTA", "SALDO_RICONCILIATO"].includes(
+                          String(current.calculatedStateJson.status),
+                        )
+                      : current.calculatedStateJson.exact === true,
                   workflowStatus: "CALCOLATO",
                   active: true,
                   companionRowId: null,
@@ -1617,6 +1979,7 @@ router.patch(
           riconciliazioneId: id,
           targetMovimentoId: current.movimentoId,
           targetImportazioneRigaId: current.importazioneAgeaRigaId,
+          targetObservationId: current.observationId,
           headerVersionBefore: header.versione,
           headerVersionAfter: header.versione + 1,
           creatoDa: req.user!.id,
@@ -1631,6 +1994,14 @@ router.patch(
           .update(riconciliazioniFseTable)
           .set({ versione: header.versione + 1, stato: "DA_RIVEDERE" })
           .where(eq(riconciliazioniFseTable.id, id));
+        await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req),
+          azione: "FSE_RICONCILIAZIONE_RISOLTA",
+          entitaTipo: "riconciliazione_fse",
+          entitaId: id,
+          magazzinoIdSnapshot: header.magazzinoId,
+          motivo: motivation,
+        });
         return updatedRow;
       });
       res.json(result);
@@ -1661,6 +2032,12 @@ router.post(
       await accessibleReconciliation(req, id);
       const updated = await db.transaction(async (tx) => {
         const header = await requireOpenReconciliation(tx, id, currentVersion);
+        await requireCurrentFseWarehouse(
+          tx,
+          req.user!.id,
+          "magazzino.fse.reconcile.manage",
+          header.magazzinoId,
+        );
         if (
           !withDifferences &&
           (header.bloccanti > 0 || header.scostamenti > 0)
@@ -1680,6 +2057,14 @@ router.post(
           })
           .where(eq(riconciliazioniFseTable.id, id))
           .returning();
+        await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req),
+          azione: "FSE_RICONCILIAZIONE_CHIUSA",
+          entitaTipo: "riconciliazione_fse",
+          entitaId: id,
+          magazzinoIdSnapshot: header.magazzinoId,
+          motivo: motivation,
+        });
         return row;
       });
       res.json(updated);
@@ -1699,26 +2084,49 @@ router.post(
       if (!id || !currentVersion)
         throw new FseReportingError(400, "ID o versione non validi");
       await accessibleReconciliation(req, id);
-      const [updated] = await db
-        .update(riconciliazioniFseTable)
-        .set({
-          stato: "ANNULLATA",
-          annullatoDa: req.user!.id,
-          dataAnnullamento: new Date(),
-          versione: currentVersion + 1,
-        })
-        .where(
-          and(
-            eq(riconciliazioniFseTable.id, id),
-            eq(riconciliazioniFseTable.versione, currentVersion),
-          ),
-        )
-        .returning();
-      if (!updated)
-        throw new FseReportingError(
-          409,
-          "Versione riconciliazione non corrente",
+      const updated = await db.transaction(async (tx) => {
+        const [header] = await tx
+          .select()
+          .from(riconciliazioniFseTable)
+          .where(eq(riconciliazioniFseTable.id, id))
+          .for("update");
+        if (!header)
+          throw new FseReportingError(404, "Riconciliazione non trovata");
+        await requireCurrentFseWarehouse(
+          tx,
+          req.user!.id,
+          "magazzino.fse.reconcile.manage",
+          header.magazzinoId,
         );
+        const [updated] = await tx
+          .update(riconciliazioniFseTable)
+          .set({
+            stato: "ANNULLATA",
+            annullatoDa: req.user!.id,
+            dataAnnullamento: new Date(),
+            versione: currentVersion + 1,
+          })
+          .where(
+            and(
+              eq(riconciliazioniFseTable.id, id),
+              eq(riconciliazioniFseTable.versione, currentVersion),
+            ),
+          )
+          .returning();
+        if (!updated)
+          throw new FseReportingError(
+            409,
+            "Versione riconciliazione non corrente",
+          );
+        await recordAuditEvent(tx, {
+          command: auditContextFromRequest(req),
+          azione: "FSE_RICONCILIAZIONE_ANNULLATA",
+          entitaTipo: "riconciliazione_fse",
+          entitaId: id,
+          magazzinoIdSnapshot: header.magazzinoId,
+        });
+        return updated;
+      });
       res.json(updated);
     } catch (error) {
       if (!sendFseError(res, error)) throw error;

@@ -65,6 +65,7 @@ import {
 } from "../src/lib/configurazioneAmbiente";
 import { dataCivileEuropeRome } from "../src/lib/interventiWorkflow";
 import { quantitaNettaMensileProdotto } from "../src/lib/speseEmporio";
+import { buildFseCanonicalReport } from "../src/lib/fseCanonicalReporting";
 import {
   emporioActorFixture,
   cleanupEmporioActorFixtures,
@@ -1937,6 +1938,24 @@ describe("Cassa Emporio", () => {
     ).toEqual([
       [firstLot, 3, "NESSUN_FONDO", 0.5],
       [second.id, 5, "FSE_PLUS", 0.75],
+    ]);
+    const canonical = await buildFseCanonicalReport({
+      magazzinoId: fixture.magazzinoId,
+      dataDa: todayInput(),
+      dataA: todayInput(),
+    });
+    expect(canonical.events).toEqual([
+      expect.objectContaining({
+        blocking: true,
+        qualityCodes: expect.arrayContaining(["EVENTO_FONDI_MISTI"]),
+      }),
+    ]);
+    expect(canonical.lines).toEqual([
+      expect.objectContaining({
+        fund: "FSE_PLUS",
+        quantityPiecesSigned: "-5.000000",
+        accountingNature: "DISTRIBUZIONE_FINALE",
+      }),
     ]);
     expect(
       moves.every(

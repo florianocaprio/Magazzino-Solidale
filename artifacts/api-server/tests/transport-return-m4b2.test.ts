@@ -347,7 +347,13 @@ describe("CR-M4-01 — incaricato esclusivo in Affida", () => {
       await db
         .select()
         .from(operazioniDistribuzioneMagazzinoTable)
-        .where(eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, id)),
+        .where(
+          and(
+            eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, id),
+            eq(operazioniDistribuzioneMagazzinoTable.dominioOrigine, "BOLLA"),
+            eq(operazioniDistribuzioneMagazzinoTable.magazzinoId, warehouseId),
+          ),
+        ),
     ).toHaveLength(0);
   });
 
@@ -745,7 +751,13 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
       await db
         .select()
         .from(operazioniDistribuzioneMagazzinoTable)
-        .where(eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, id)),
+        .where(
+          and(
+            eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, id),
+            eq(operazioniDistribuzioneMagazzinoTable.dominioOrigine, "BOLLA"),
+            eq(operazioniDistribuzioneMagazzinoTable.magazzinoId, warehouseId),
+          ),
+        ),
     ).toHaveLength(0);
     const payload = command(await bollaVersion(id), {
       confermaRicezione: true,
@@ -889,7 +901,14 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
         .select()
         .from(operazioniDistribuzioneMagazzinoTable)
         .where(
-          eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, created.id),
+          and(
+            eq(
+              operazioniDistribuzioneMagazzinoTable.entitaOrigineId,
+              created.id,
+            ),
+            eq(operazioniDistribuzioneMagazzinoTable.dominioOrigine, "BOLLA"),
+            eq(operazioniDistribuzioneMagazzinoTable.magazzinoId, warehouseId),
+          ),
         ),
     ).toHaveLength(0);
   });
@@ -1288,7 +1307,13 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
       await db
         .select()
         .from(operazioniDistribuzioneMagazzinoTable)
-        .where(eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, id)),
+        .where(
+          and(
+            eq(operazioniDistribuzioneMagazzinoTable.entitaOrigineId, id),
+            eq(operazioniDistribuzioneMagazzinoTable.dominioOrigine, "BOLLA"),
+            eq(operazioniDistribuzioneMagazzinoTable.magazzinoId, warehouseId),
+          ),
+        ),
     ).toHaveLength(1);
   });
 

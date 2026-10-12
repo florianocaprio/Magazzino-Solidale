@@ -5,16 +5,31 @@ import {
   riconciliazioniFseRigheTable,
   riconciliazioniFseRisoluzioniTable,
   riconciliazioniFseTable,
+  fseAdministrativeVersionsTable,
+  fseAdministrativeObservationsTable,
+  fseReconciliationRunsTable,
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
 import {
   canonicalSha256,
   currentFseCutoff,
   FseReportingError,
+  loadFseBalances,
 } from "./fseCanonicalReporting";
 import { signedInventoryValue } from "./fseAccounting";
 import { signedPhysicalMovementSql } from "./movementPhysicalEffect";
 import { InventoryDecimal } from "./inventoryDecimal";
+import {
+  auditUserId,
+  recordAuditEvent,
+  type AuditCommandContext,
+} from "./auditEvent";
+import { requireCurrentFseWarehouse } from "./fseAccess";
+import {
+  lockAdministrativeSource,
+  freezeAdministrativeSource,
+  loadAdministrativeLines,
+} from "./fseAdministrativeSource";
 
 type DbExecutor =
   | typeof db
@@ -42,6 +57,10 @@ export type ReconciliationLocalLine = {
 
 export type ReconciliationExternalLine = {
   importRowId: number;
+  observationId?: number;
+  identityHash?: string;
+  originalComparisonHash?: string;
+  qualityCodes?: string[];
   externalMovementId: number | null;
   caricoMagazzinoRigaId: number | null;
   type: string;
@@ -70,6 +89,14 @@ export type ReconciliationRow = {
   operazioneDistribuzioneId: number | null;
   externalMovementId: number | null;
   importazioneAgeaRigaId: number | null;
+  observationId?: number | null;
+  aggregateVersionId?: number | null;
+  aggregationKey?: {
+    fund: string | null;
+    productId: number | null;
+    lot: string | null;
+    unit: string | null;
+  };
   fundLocal: string | null;
   fundExternal: string | null;
   productIdLocal: number | null;
@@ -151,6 +178,7 @@ function mismatch(
   right: ReconciliationExternalLine,
 ): string {
   if (right.modified) return "MOVIMENTO_AGEA_MODIFICATO";
+  if (right.qualityCodes?.length) return right.qualityCodes[0];
   if (left.fund !== right.fund) return "FONDO_DIFFERENTE";
   if (left.productId !== right.productId) return "PRODOTTO_DIFFERENTE";
   if ((left.lot ?? null) !== (right.lot ?? null)) return "LOTTO_DIFFERENTE";
@@ -173,14 +201,18 @@ function paired(
   const status = forcedStatus ?? mismatch(local, external);
   const base = {
     tipoRiga: local.type,
-    businessKey: `PAIR:${local.movementId}:${external.importRowId}`,
+    businessKey: `PAIR:${local.movementId}:${external.observationId == null ? "" : "M3B:"}${external.importRowId}`,
     matchMethod,
     localEventKey: local.eventKey,
     localLineKey: local.lineKey,
     movimentoId: local.movementId,
     operazioneDistribuzioneId: local.operationDistributionId,
     externalMovementId: external.externalMovementId,
-    importazioneAgeaRigaId: external.importRowId,
+    importazioneAgeaRigaId:
+      external.observationId == null ? external.importRowId : null,
+    ...(external.observationId == null
+      ? {}
+      : { observationId: external.observationId }),
     fundLocal: local.fund,
     fundExternal: external.fund,
     productIdLocal: local.productId,
@@ -249,23 +281,31 @@ function localOnly(local: ReconciliationLocalLine): ReconciliationRow {
 }
 
 function externalOnly(external: ReconciliationExternalLine): ReconciliationRow {
-  const status = external.baselineAbsorbed
-    ? "BASELINE_ASSORBITA"
-    : external.productId == null
-      ? "PRODOTTO_NON_MAPPATO"
-      : external.modified
-        ? "MOVIMENTO_AGEA_MODIFICATO"
-        : "SOLO_AGEA";
+  const status = external.modified
+    ? "MOVIMENTO_AGEA_MODIFICATO"
+    : external.qualityCodes?.length
+      ? external.qualityCodes[0]
+      : external.baselineAbsorbed
+        ? "BASELINE_ASSORBITA"
+        : external.productId == null
+          ? "PRODOTTO_NON_MAPPATO"
+          : external.modified
+            ? "MOVIMENTO_AGEA_MODIFICATO"
+            : "SOLO_AGEA";
   const base = {
     tipoRiga: external.type,
-    businessKey: `AGEA:${external.importRowId}`,
+    businessKey: `${external.observationId == null ? "AGEA" : "M3B"}:${external.importRowId}`,
     matchMethod: "NESSUNO",
     localEventKey: null,
     localLineKey: null,
     movimentoId: null,
     operazioneDistribuzioneId: null,
     externalMovementId: external.externalMovementId,
-    importazioneAgeaRigaId: external.importRowId,
+    importazioneAgeaRigaId:
+      external.observationId == null ? external.importRowId : null,
+    ...(external.observationId == null
+      ? {}
+      : { observationId: external.observationId }),
     fundLocal: null,
     fundExternal: external.fund,
     productIdLocal: null,
@@ -655,10 +695,13 @@ async function loadBalanceRows(
 }
 
 function persistedRow(row: ReconciliationRow) {
+  const exact = ["RICONCILIATA_ESATTA", "SALDO_RICONCILIATO"].includes(
+    row.status,
+  );
   return {
     ...row,
-    exact: ["RICONCILIATA_ESATTA", "SALDO_RICONCILIATO"].includes(row.status),
-    calculatedStateJson: row,
+    exact,
+    calculatedStateJson: { ...row, exact },
     workflowStatus: "CALCOLATO",
   };
 }
@@ -666,8 +709,9 @@ function persistedRow(row: ReconciliationRow) {
 function totals(rows: ReconciliationRow[]) {
   return {
     totaleRighe: rows.length,
-    riconciliate: rows.filter((row) => row.status === "RICONCILIATA_ESATTA")
-      .length,
+    riconciliate: rows.filter((row) =>
+      ["RICONCILIATA_ESATTA", "SALDO_RICONCILIATO"].includes(row.status),
+    ).length,
     soloLocali: rows.filter(
       (row) => row.status === "SOLO_LOCALE_DA_RENDICONTARE",
     ).length,
@@ -676,6 +720,7 @@ function totals(rows: ReconciliationRow[]) {
       (row) =>
         ![
           "RICONCILIATA_ESATTA",
+          "SALDO_RICONCILIATO",
           "SOLO_LOCALE_DA_RENDICONTARE",
           "SOLO_AGEA",
         ].includes(row.status),
@@ -691,6 +736,10 @@ function totals(rows: ReconciliationRow[]) {
 function externalFingerprint(row: ReconciliationExternalLine): string {
   return canonicalSha256({
     externalMovementId: row.externalMovementId,
+    ...(row.identityHash ? { administrativeIdentity: row.identityHash } : {}),
+    ...(row.originalComparisonHash
+      ? { originalComparisonHash: row.originalComparisonHash }
+      : {}),
     identity: exactKey(row),
     packs: row.packs,
     meals: row.meals,
@@ -729,22 +778,405 @@ export function selectLocalReconciliationDelta(
     : local.filter((row) => row.movementId > previousMaxMovementId);
 }
 
-export async function calculateFseReconciliation(input: {
+type ReconciliationInput = {
+  audit?: AuditCommandContext;
   magazzinoId: number;
-  importazioneAgeaId: number;
+  importazioneAgeaId?: number;
   importazioneAgeaPrecedenteId?: number | null;
+  sourceType?: "AGEA_LEGACY" | "FSE_M3B";
+  sessionId?: number;
+  sessionVersion?: number;
+  baselineRunId?: number | null;
+  commandKey?: string;
   dataRiferimento: string;
   creatoDa: number;
   cutoff?: { maxMovimentoId: number; maxOperazioneDistribuzioneId: number };
-}) {
+};
+
+async function administrativeBalanceRows(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  version: typeof fseAdministrativeVersionsTable.$inferSelect,
+  cutoff: { maxMovimentoId: number; maxOperazioneDistribuzioneId: number },
+): Promise<ReconciliationRow[]> {
+  const local = await loadFseBalances(tx, {
+    magazzinoId: version.magazzinoId,
+    dataAsOf: version.referenceDate,
+    groupByUnit: true,
+    includeAllFunds: true,
+    ...cutoff,
+  });
+  const observations = await tx
+    .select()
+    .from(fseAdministrativeObservationsTable)
+    .where(eq(fseAdministrativeObservationsTable.versionId, version.id));
+  const hasStock = observations.some((o) => o.stockRowId != null);
+  type Balance = {
+    unit: string | null;
+    fund: string | null;
+    productId: number | null;
+    lot: string | null;
+    pieces: string | null;
+    kgLt: string | null;
+    ambiguous?: boolean;
+  };
+  const key = (b: Balance) =>
+    JSON.stringify([b.fund, b.productId, b.lot ?? "", b.unit]);
+  const ext = new Map<string, Balance>();
+  for (const o of observations.filter((o) =>
+    hasStock ? o.stockRowId != null : o.rowId != null,
+  )) {
+    const v = o.interpretedJson;
+    const b: Balance = {
+      unit:
+        (hasStock ? v.kgLt : v.balanceKgLt) == null
+          ? "pz"
+          : ((v.unit as string | null) ?? null),
+      fund: v.fund as string | null,
+      productId: v.productId as number | null,
+      lot: v.lot as string | null,
+      pieces: (hasStock ? v.pieces : v.balancePieces) as string | null,
+      kgLt: (hasStock ? v.kgLt : v.balanceKgLt) as string | null,
+      ambiguous:
+        o.qualityJson.length > 0 ||
+        ((hasStock ? v.kgLt : v.balanceKgLt) != null && v.unit == null),
+    };
+    const old = ext.get(key(b));
+    if (old) {
+      old.ambiguous ||= b.ambiguous;
+      // Registry final balances repeat on every movement: never sum them.
+      if (hasStock) {
+        old.pieces = addDimension(old.pieces, b.pieces);
+        old.kgLt = addDimension(old.kgLt, b.kgLt);
+      } else if (
+        exact(old.pieces) !== exact(b.pieces) ||
+        exact(old.kgLt) !== exact(b.kgLt)
+      )
+        old.ambiguous = true;
+    } else ext.set(key(b), b);
+  }
+  const loc = new Map<string, Balance>();
+  for (const l of local) {
+    const b = {
+      unit: l.kgLt == null ? "pz" : (l.unit ?? null),
+      fund: l.fund,
+      productId: l.productId,
+      lot: l.lotCodeSnapshot,
+      pieces: l.pieces,
+      kgLt: l.kgLt,
+    };
+    const old = loc.get(key(b));
+    if (old) {
+      old.pieces = addDimension(old.pieces, b.pieces);
+      old.kgLt = addDimension(old.kgLt, b.kgLt);
+    } else loc.set(key(b), b);
+  }
+  return [...new Set([...loc.keys(), ...ext.keys()])].sort().map((k) => {
+    const l = loc.get(k),
+      e = ext.get(k);
+    const equal =
+      l &&
+      e &&
+      !e.ambiguous &&
+      e.productId != null &&
+      exact(l.pieces) === exact(e.pieces) &&
+      exact(l.kgLt) === exact(e.kgLt);
+    const status = equal
+      ? "SALDO_RICONCILIATO"
+      : e?.ambiguous
+        ? "SALDO_ESTERNO_AMBIGUO"
+        : !e
+          ? "PARTITA_SOLO_LOCALE"
+          : !l
+            ? "PARTITA_SOLO_AGEA"
+            : "SCOSTAMENTO_SALDO_ENTRAMBI";
+    const base: ReconciliationRow = {
+      tipoRiga: "SALDO_PARTITA",
+      businessKey: `SALDO:M3B:${canonicalSha256(k)}`,
+      matchMethod: "PARTITA_AS_OF",
+      localEventKey: null,
+      localLineKey: null,
+      movimentoId: null,
+      operazioneDistribuzioneId: null,
+      externalMovementId: null,
+      importazioneAgeaRigaId: null,
+      aggregateVersionId: version.id,
+      aggregationKey: {
+        fund: (e ?? l)!.fund,
+        productId: (e ?? l)!.productId,
+        lot: (e ?? l)!.lot,
+        unit: (e ?? l)!.unit,
+      },
+      fundLocal: l?.fund ?? null,
+      fundExternal: e?.fund ?? null,
+      productIdLocal: l?.productId ?? null,
+      productIdExternal: e?.productId ?? null,
+      lotLocal: l?.lot ?? null,
+      lotExternal: e?.lot ?? null,
+      dateLocal: version.referenceDate,
+      dateExternal: version.referenceDate,
+      piecesLocal: exact(l?.pieces ?? null),
+      piecesExternal: exact(e?.pieces ?? null),
+      kgLtLocal: exact(l?.kgLt ?? null),
+      kgLtExternal: exact(e?.kgLt ?? null),
+      differencePieces: difference(l?.pieces ?? null, e?.pieces ?? null),
+      differenceKgLt: difference(l?.kgLt ?? null, e?.kgLt ?? null),
+      channelLocal: null,
+      channelExternal: null,
+      status,
+      blocking: !equal,
+      qualityCodesJson: equal ? [] : [status],
+      contentHash: "",
+    };
+    return {
+      ...base,
+      contentHash: canonicalSha256({ ...base, contentHash: undefined }),
+    };
+  });
+}
+function addDimension(a: string | null, b: string | null) {
+  return a == null || b == null
+    ? null
+    : InventoryDecimal.parse(a, { allowNegative: true })
+        .add(InventoryDecimal.parse(b, { allowNegative: true }))
+        .toDb();
+}
+
+async function buildAdministrativeReconciliation(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  version: typeof fseAdministrativeVersionsTable.$inferSelect,
+  baselineRunId: number | null,
+  cutoff: { maxMovimentoId: number; maxOperazioneDistribuzioneId: number },
+) {
+  const [baseline] =
+    baselineRunId == null
+      ? []
+      : await tx
+          .select()
+          .from(fseReconciliationRunsTable)
+          .where(eq(fseReconciliationRunsTable.id, baselineRunId));
+  if (baselineRunId != null && !baseline?.administrativeVersionId)
+    throw new FseReportingError(409, "Baseline M3B non compatibile");
+  const [prior] =
+    baseline?.administrativeVersionId == null
+      ? []
+      : await tx
+          .select()
+          .from(fseAdministrativeVersionsTable)
+          .where(
+            eq(
+              fseAdministrativeVersionsTable.id,
+              baseline.administrativeVersionId,
+            ),
+          );
+  if (
+    prior &&
+    (prior.sourceRegistryId !== version.sourceRegistryId ||
+      prior.magazzinoId !== version.magazzinoId ||
+      prior.mode !== version.mode ||
+      prior.referenceDate >= version.referenceDate)
+  )
+    throw new FseReportingError(
+      409,
+      "Baseline di altra fonte, ambito o stesso periodo: selezionare un run precedente compatibile",
+    );
+  const current = await loadAdministrativeLines(tx, version.id);
+  const previous = prior ? await loadAdministrativeLines(tx, prior.id) : [];
+  const delta = currentExternalDelta(current, previous);
+  const allLocal = await loadLocal(
+    tx,
+    version.magazzinoId,
+    version.referenceDate,
+    cutoff.maxMovimentoId,
+    cutoff.maxOperazioneDistribuzioneId,
+  );
+  const local = selectLocalReconciliationDelta(
+    allLocal,
+    prior?.referenceDate ?? null,
+    baseline?.maxMovementId ?? null,
+  );
+  const missing = delta.missing.map((e) => {
+    const row = {
+      ...externalOnly(e),
+      status: "MOVIMENTO_AGEA_SCOMPARSO",
+      blocking: true,
+      qualityCodesJson: ["MOVIMENTO_AGEA_SCOMPARSO"],
+    };
+    return {
+      ...row,
+      businessKey: row.businessKey + ":SCOMPARSO",
+      contentHash: canonicalSha256(row),
+    };
+  });
+  const rows = [
+    ...reconcileFseLines(local, delta.added),
+    ...missing,
+    ...(await administrativeBalanceRows(tx, version, cutoff)),
+  ].sort((a, b) => a.businessKey.localeCompare(b.businessKey));
+  return {
+    rows,
+    summary: totals(rows),
+    canonicalHash: canonicalSha256({
+      source: "FSE_M3B",
+      manifest: version.manifestHash,
+      baselineRunId,
+      cutoff,
+      rows,
+    }),
+  };
+}
+
+async function calculateAdministrativeReconciliation(
+  input: ReconciliationInput,
+) {
+  if (
+    !input.sessionId ||
+    !input.sessionVersion ||
+    !input.commandKey?.trim() ||
+    input.commandKey.length > 100 ||
+    input.importazioneAgeaId != null ||
+    input.importazioneAgeaPrecedenteId != null
+  )
+    throw new FseReportingError(
+      400,
+      "Fonte M3B: sessione, versione e chiave comando obbligatorie; riferimenti legacy non ammessi",
+    );
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-reconciliation-command:${input.commandKey}`},0))`,
+    );
+    const session = await lockAdministrativeSource(tx, {
+      sessionId: input.sessionId!,
+      warehouseId: input.magazzinoId,
+      actorId: input.creatoDa,
+    });
+    const commandHash = canonicalSha256({
+      sourceType: "FSE_M3B",
+      sessionId: input.sessionId,
+      sessionVersion: input.sessionVersion,
+      warehouse: input.magazzinoId,
+      reference: input.dataRiferimento,
+      baselineRunId: input.baselineRunId ?? null,
+      requestedCutoff: input.cutoff ?? null,
+    });
+    const [replay] = await tx
+      .select()
+      .from(riconciliazioniFseTable)
+      .where(eq(riconciliazioniFseTable.commandKey, input.commandKey!));
+    if (replay) {
+      if (replay.commandHash !== commandHash)
+        throw new FseReportingError(
+          409,
+          "Chiave comando riutilizzata con parametri diversi",
+        );
+      const [receipt] = await tx
+        .select()
+        .from(fseReconciliationRunsTable)
+        .where(
+          and(
+            eq(fseReconciliationRunsTable.reconciliationId, replay.id),
+            eq(fseReconciliationRunsTable.headerVersion, 1),
+          ),
+        );
+      if (!receipt?.snapshotJson.header)
+        throw new FseReportingError(
+          409,
+          "Ricevuta del comando non disponibile",
+        );
+      return {
+        reconciliation: receipt.snapshotJson.header as typeof replay,
+        rows: receipt.snapshotJson.rows as ReconciliationRow[],
+        replayed: true,
+      };
+    }
+    const version = await freezeAdministrativeSource(tx, {
+      session,
+      expectedVersion: input.sessionVersion!,
+      referenceDate: input.dataRiferimento,
+      actorId: input.creatoDa,
+    });
+    const cutoff =
+      input.cutoff ??
+      (await currentFseCutoff(tx, input.magazzinoId, input.dataRiferimento));
+    const calculated = await buildAdministrativeReconciliation(
+      tx,
+      version,
+      input.baselineRunId ?? null,
+      cutoff,
+    );
+    const [header] = await tx
+      .insert(riconciliazioniFseTable)
+      .values({
+        magazzinoId: input.magazzinoId,
+        sourceType: "FSE_M3B",
+        administrativeVersionId: version.id,
+        baselineRunId: input.baselineRunId ?? null,
+        commandKey: input.commandKey,
+        commandHash,
+        dataRiferimento: input.dataRiferimento,
+        ...cutoff,
+        modelVersion: "M64_ADMIN_V1",
+        canonicalHash: calculated.canonicalHash,
+        stato: calculated.summary.bloccanti ? "DA_RIVEDERE" : "CALCOLATA",
+        ...calculated.summary,
+        creatoDa: input.creatoDa,
+      })
+      .returning();
+    if (calculated.rows.length)
+      await tx.insert(riconciliazioniFseRigheTable).values(
+        calculated.rows.map((row) => ({
+          ...persistedRow(row),
+          riconciliazioneId: header.id,
+        })),
+      );
+    await tx.insert(fseReconciliationRunsTable).values({
+      reconciliationId: header.id,
+      headerVersion: header.versione,
+      administrativeVersionId: version.id,
+      baselineRunId: input.baselineRunId ?? null,
+      maxMovementId: cutoff.maxMovimentoId,
+      maxOperationId: cutoff.maxOperazioneDistribuzioneId,
+      referenceDate: input.dataRiferimento,
+      canonicalHash: calculated.canonicalHash,
+      snapshotJson: {
+        header,
+        rows: calculated.rows,
+        manifestHash: version.manifestHash,
+      },
+      creatoDa: input.creatoDa,
+    });
+    if (input.audit)
+      await recordAuditEvent(tx, {
+        command: input.audit,
+        azione: "FSE_RICONCILIAZIONE_CREATA",
+        entitaTipo: "riconciliazione_fse",
+        entitaId: header.id,
+        magazzinoIdSnapshot: header.magazzinoId,
+      });
+    return { reconciliation: header, rows: calculated.rows, replayed: false };
+  });
+}
+
+export async function calculateFseReconciliation(input: ReconciliationInput) {
+  if (input.sourceType === "FSE_M3B")
+    return calculateAdministrativeReconciliation(input);
+  if (input.importazioneAgeaId == null || input.sessionId != null)
+    throw new FseReportingError(400, "Importazione legacy richiesta");
+  const importId = input.importazioneAgeaId;
   return db.transaction(async (tx) => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-reconciliation:${input.magazzinoId}`}, 0))`,
     );
+    if (input.audit)
+      await requireCurrentFseWarehouse(
+        tx,
+        auditUserId(input.audit),
+        "magazzino.fse.reconcile",
+        input.magazzinoId,
+      );
     const [agea] = await tx
       .select()
       .from(importazioniAgeaTable)
-      .where(eq(importazioniAgeaTable.id, input.importazioneAgeaId))
+      .where(eq(importazioniAgeaTable.id, importId))
       .for("share");
     if (!agea)
       throw new FseReportingError(404, "Importazione AGEA non trovata");
@@ -776,10 +1208,16 @@ export async function calculateFseReconciliation(input: {
         throw new FseReportingError(409, "Baseline AGEA precedente non valida");
       previousReference = previous.dataRiferimento;
     }
+    const baseline = await selectLegacyBaselineRun(
+      tx,
+      input.magazzinoId,
+      input.importazioneAgeaPrecedenteId ?? null,
+      input.baselineRunId ?? null,
+    );
     const cutoff =
       input.cutoff ??
       (await currentFseCutoff(tx, input.magazzinoId, input.dataRiferimento));
-    const [local, externalCurrent, externalPrevious, balanceRows, previousRun] =
+    const [local, externalCurrent, externalPrevious, balanceRows] =
       await Promise.all([
         loadLocal(
           tx,
@@ -788,35 +1226,17 @@ export async function calculateFseReconciliation(input: {
           cutoff.maxMovimentoId,
           cutoff.maxOperazioneDistribuzioneId,
         ),
-        loadExternal(tx, input.importazioneAgeaId),
+        loadExternal(tx, importId),
         input.importazioneAgeaPrecedenteId == null
           ? Promise.resolve([])
           : loadExternal(tx, input.importazioneAgeaPrecedenteId),
         loadBalanceRows(tx, {
           magazzinoId: input.magazzinoId,
-          importId: input.importazioneAgeaId,
+          importId,
           dataRiferimento: input.dataRiferimento,
           maxMovimentoId: cutoff.maxMovimentoId,
           maxOperazioneDistribuzioneId: cutoff.maxOperazioneDistribuzioneId,
         }),
-        input.importazioneAgeaPrecedenteId == null
-          ? Promise.resolve([])
-          : tx
-              .select({
-                maxMovimentoId: riconciliazioniFseTable.maxMovimentoId,
-              })
-              .from(riconciliazioniFseTable)
-              .where(
-                and(
-                  eq(
-                    riconciliazioniFseTable.importazioneAgeaId,
-                    input.importazioneAgeaPrecedenteId,
-                  ),
-                  eq(riconciliazioniFseTable.magazzinoId, input.magazzinoId),
-                ),
-              )
-              .orderBy(sql`${riconciliazioniFseTable.id} DESC`)
-              .limit(1),
       ]);
     const externalDelta = currentExternalDelta(
       externalCurrent,
@@ -825,7 +1245,7 @@ export async function calculateFseReconciliation(input: {
     const localDelta = selectLocalReconciliationDelta(
       local,
       previousReference,
-      previousRun[0]?.maxMovimentoId ?? null,
+      baseline?.maxMovementId ?? null,
     );
     const missingRows = externalDelta.missing.map((row) => {
       const base = externalOnly(row);
@@ -860,6 +1280,7 @@ export async function calculateFseReconciliation(input: {
       importazioneAgeaPrecedenteId: input.importazioneAgeaPrecedenteId ?? null,
       dataRiferimento: input.dataRiferimento,
       cutoff,
+      baselineRunId: baseline?.id ?? null,
     });
     const [existing] = await tx
       .select()
@@ -882,6 +1303,7 @@ export async function calculateFseReconciliation(input: {
       .insert(riconciliazioniFseTable)
       .values({
         magazzinoId: input.magazzinoId,
+        baselineRunId: baseline?.id ?? null,
         importazioneAgeaId: input.importazioneAgeaId,
         importazioneAgeaPrecedenteId:
           input.importazioneAgeaPrecedenteId ?? null,
@@ -904,8 +1326,119 @@ export async function calculateFseReconciliation(input: {
           riconciliazioneId: header.id,
         })),
       );
+    await preserveLegacyRun(tx, header);
+    if (input.audit)
+      await recordAuditEvent(tx, {
+        command: input.audit,
+        azione: "FSE_RICONCILIAZIONE_CREATA",
+        entitaTipo: "riconciliazione_fse",
+        entitaId: header.id,
+        magazzinoIdSnapshot: header.magazzinoId,
+      });
     return { reconciliation: header, rows, replayed: false };
   });
+}
+
+async function preserveLegacyRun(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  header: typeof riconciliazioniFseTable.$inferSelect,
+) {
+  const [existing] = await tx
+    .select()
+    .from(fseReconciliationRunsTable)
+    .where(
+      and(
+        eq(fseReconciliationRunsTable.reconciliationId, header.id),
+        eq(fseReconciliationRunsTable.headerVersion, header.versione),
+      ),
+    );
+  if (existing) return existing;
+  const rows = await tx
+    .select()
+    .from(riconciliazioniFseRigheTable)
+    .where(eq(riconciliazioniFseRigheTable.riconciliazioneId, header.id));
+  const [saved] = await tx
+    .insert(fseReconciliationRunsTable)
+    .values({
+      reconciliationId: header.id,
+      headerVersion: header.versione,
+      legacyImportId: header.importazioneAgeaId,
+      baselineRunId: header.baselineRunId,
+      maxMovementId: header.maxMovimentoId,
+      maxOperationId: header.maxOperazioneDistribuzioneId,
+      referenceDate: header.dataRiferimento,
+      canonicalHash: header.canonicalHash,
+      snapshotJson: { header, rows, capturedLegacyState: true },
+      creatoDa: header.creatoDa,
+    })
+    .returning();
+  return saved;
+}
+
+async function selectLegacyBaselineRun(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  warehouseId: number,
+  previousImportId: number | null,
+  runId: number | null,
+) {
+  if (previousImportId == null) {
+    if (runId != null)
+      throw new FseReportingError(
+        409,
+        "Run baseline senza importazione precedente",
+      );
+    return null;
+  }
+  if (runId != null) {
+    const [run] = await tx
+      .select({ run: fseReconciliationRunsTable })
+      .from(fseReconciliationRunsTable)
+      .innerJoin(
+        riconciliazioniFseTable,
+        eq(
+          fseReconciliationRunsTable.reconciliationId,
+          riconciliazioniFseTable.id,
+        ),
+      )
+      .where(
+        and(
+          eq(fseReconciliationRunsTable.id, runId),
+          eq(fseReconciliationRunsTable.legacyImportId, previousImportId),
+          eq(riconciliazioniFseTable.magazzinoId, warehouseId),
+        ),
+      );
+    if (!run)
+      throw new FseReportingError(409, "Run baseline legacy non compatibile");
+    return run.run;
+  }
+  const headers = await tx
+    .select()
+    .from(riconciliazioniFseTable)
+    .where(
+      and(
+        eq(riconciliazioniFseTable.importazioneAgeaId, previousImportId),
+        eq(riconciliazioniFseTable.magazzinoId, warehouseId),
+      ),
+    )
+    .for("share");
+  // Preserve the historical date-only baseline when there is no local run. Never
+  // replace a known but ambiguous cutoff with an arbitrary latest identifier.
+  if (headers.length === 0) return null;
+  if (headers.length !== 1)
+    throw new FseReportingError(
+      409,
+      "Più calcoli della baseline: selezionare il run esatto",
+    );
+  const runs = await tx
+    .select()
+    .from(fseReconciliationRunsTable)
+    .where(eq(fseReconciliationRunsTable.reconciliationId, headers[0].id));
+  if (runs.length > 1)
+    throw new FseReportingError(
+      409,
+      "Più run della baseline: selezionare il cutoff esatto",
+    );
+  return runs[0] ?? preserveLegacyRun(tx, headers[0]);
 }
 
 export async function refreshReconciliationCounts(
@@ -914,10 +1447,10 @@ export async function refreshReconciliationCounts(
 ) {
   const result = await executor.execute(sql`
     SELECT count(*)::int AS totale,
-      count(*) FILTER (WHERE status = 'RICONCILIATA_ESATTA')::int AS riconciliate,
+      count(*) FILTER (WHERE status IN ('RICONCILIATA_ESATTA','SALDO_RICONCILIATO'))::int AS riconciliate,
       count(*) FILTER (WHERE status = 'SOLO_LOCALE_DA_RENDICONTARE')::int AS solo_locali,
       count(*) FILTER (WHERE status = 'SOLO_AGEA')::int AS solo_agea,
-      count(*) FILTER (WHERE status NOT IN ('RICONCILIATA_ESATTA','SOLO_LOCALE_DA_RENDICONTARE','SOLO_AGEA'))::int AS scostamenti,
+      count(*) FILTER (WHERE status NOT IN ('RICONCILIATA_ESATTA','SALDO_RICONCILIATO','SOLO_LOCALE_DA_RENDICONTARE','SOLO_AGEA'))::int AS scostamenti,
       count(*) FILTER (WHERE status = 'IDENTITA_AMBIGUA')::int AS ambigue,
       count(*) FILTER (WHERE status = 'SCOSTAMENTO_ACCETTATO')::int AS scostamenti_accettati,
       count(*) FILTER (WHERE blocking)::int AS bloccanti
@@ -928,6 +1461,50 @@ export async function refreshReconciliationCounts(
   await executor.execute(
     sql`UPDATE riconciliazioni_fse SET totale_righe=${row.totale}, riconciliate=${row.riconciliate}, solo_locali=${row.solo_locali}, solo_agea=${row.solo_agea}, scostamenti=${row.scostamenti}, scostamenti_accettati=${row.scostamenti_accettati}, ambigue=${row.ambigue}, bloccanti=${row.bloccanti} WHERE id=${id}`,
   );
+}
+
+export async function compareReconciliationTargets(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  header: typeof riconciliazioniFseTable.$inferSelect,
+  movementId: number,
+  externalId: number,
+) {
+  const local = (
+    await loadLocal(
+      tx,
+      header.magazzinoId,
+      header.dataRiferimento,
+      header.maxMovimentoId,
+      header.maxOperazioneDistribuzioneId,
+    )
+  ).find((r) => r.movementId === movementId);
+  const externalRows =
+    header.sourceType === "FSE_M3B"
+      ? await loadAdministrativeLines(tx, header.administrativeVersionId!)
+      : await loadExternal(tx, header.importazioneAgeaId!);
+  let external = externalRows.find((r) => r.importRowId === externalId);
+  if (!external && header.baselineRunId != null) {
+    const [baseline] = await tx
+      .select()
+      .from(fseReconciliationRunsTable)
+      .where(eq(fseReconciliationRunsTable.id, header.baselineRunId));
+    const previous =
+      baseline?.administrativeVersionId != null
+        ? await loadAdministrativeLines(tx, baseline.administrativeVersionId)
+        : baseline?.legacyImportId != null
+          ? await loadExternal(tx, baseline.legacyImportId)
+          : [];
+    external = previous.find((r) => r.importRowId === externalId);
+    // A disappearance remains a documented difference even after manual pairing.
+    if (local && external) return "MOVIMENTO_AGEA_SCOMPARSO";
+  }
+  if (!local || !external)
+    throw new FseReportingError(
+      409,
+      "Abbinamento non appartenente alla fonte corrente e al cutoff congelato",
+    );
+  // Use the same matcher, including raw corrections and indivisible statistics.
+  return mismatch(local, external);
 }
 
 export async function requireOpenReconciliation(
@@ -955,17 +1532,136 @@ export async function requireOpenReconciliation(
 }
 
 export async function recalculateFseReconciliation(input: {
+  audit?: AuditCommandContext;
   id: number;
   versione: number;
   actorId: number;
+  sessionVersion?: number;
   cutoff?: { maxMovimentoId: number; maxOperazioneDistribuzioneId: number };
 }) {
   return db.transaction(async (tx) => {
+    const [identity] = await tx
+      .select()
+      .from(riconciliazioniFseTable)
+      .where(eq(riconciliazioniFseTable.id, input.id));
+    if (identity?.sourceType === "FSE_M3B") {
+      const [oldSource] = await tx
+        .select()
+        .from(fseAdministrativeVersionsTable)
+        .where(
+          eq(
+            fseAdministrativeVersionsTable.id,
+            identity.administrativeVersionId!,
+          ),
+        );
+      const session = await lockAdministrativeSource(tx, {
+        sessionId: oldSource.sessionId,
+        warehouseId: identity.magazzinoId,
+        actorId: input.actorId,
+      });
+      const header = await requireOpenReconciliation(
+        tx,
+        input.id,
+        input.versione,
+      );
+      const [resolution] = await tx
+        .select()
+        .from(riconciliazioniFseRisoluzioniTable)
+        .where(
+          eq(riconciliazioniFseRisoluzioniTable.riconciliazioneId, header.id),
+        )
+        .limit(1);
+      if (resolution)
+        throw new FseReportingError(
+          409,
+          "Il ricalcolo non può eliminare risoluzioni manuali auditabili",
+        );
+      if (!input.sessionVersion)
+        throw new FseReportingError(
+          400,
+          "Confermare la versione amministrativa della procedura per ricalcolare",
+        );
+      const source = await freezeAdministrativeSource(tx, {
+        session,
+        expectedVersion: input.sessionVersion,
+        referenceDate: header.dataRiferimento,
+        actorId: input.actorId,
+      });
+      const cutoff =
+        input.cutoff ??
+        (await currentFseCutoff(
+          tx,
+          header.magazzinoId,
+          header.dataRiferimento,
+        ));
+      const calculated = await buildAdministrativeReconciliation(
+        tx,
+        source,
+        header.baselineRunId,
+        cutoff,
+      );
+      // Previous source, cutoff and calculated rows remain in the immutable run ledger.
+      await tx
+        .delete(riconciliazioniFseRigheTable)
+        .where(eq(riconciliazioniFseRigheTable.riconciliazioneId, header.id));
+      const [updated] = await tx
+        .update(riconciliazioniFseTable)
+        .set({
+          ...cutoff,
+          administrativeVersionId: source.id,
+          canonicalHash: calculated.canonicalHash,
+          ...calculated.summary,
+          stato: calculated.summary.bloccanti ? "DA_RIVEDERE" : "CALCOLATA",
+          versione: header.versione + 1,
+          ricalcolatoDa: input.actorId,
+          dataRicalcolo: new Date(),
+        })
+        .where(eq(riconciliazioniFseTable.id, header.id))
+        .returning();
+      if (calculated.rows.length)
+        await tx.insert(riconciliazioniFseRigheTable).values(
+          calculated.rows.map((row) => ({
+            ...persistedRow(row),
+            riconciliazioneId: header.id,
+          })),
+        );
+      await tx.insert(fseReconciliationRunsTable).values({
+        reconciliationId: header.id,
+        headerVersion: updated.versione,
+        administrativeVersionId: source.id,
+        baselineRunId: header.baselineRunId,
+        maxMovementId: cutoff.maxMovimentoId,
+        maxOperationId: cutoff.maxOperazioneDistribuzioneId,
+        referenceDate: header.dataRiferimento,
+        canonicalHash: calculated.canonicalHash,
+        snapshotJson: {
+          rows: calculated.rows,
+          manifestHash: source.manifestHash,
+        },
+        creatoDa: input.actorId,
+      });
+      if (input.audit)
+        await recordAuditEvent(tx, {
+          command: input.audit,
+          azione: "FSE_RICONCILIAZIONE_RICALCOLATA",
+          entitaTipo: "riconciliazione_fse",
+          entitaId: header.id,
+          magazzinoIdSnapshot: header.magazzinoId,
+        });
+      return { reconciliation: updated, rows: calculated.rows };
+    }
     const header = await requireOpenReconciliation(
       tx,
       input.id,
       input.versione,
     );
+    if (input.audit)
+      await requireCurrentFseWarehouse(
+        tx,
+        auditUserId(input.audit),
+        "magazzino.fse.reconcile",
+        header.magazzinoId,
+      );
     const [resolution] = await tx
       .select({ id: riconciliazioniFseRisoluzioniTable.id })
       .from(riconciliazioniFseRisoluzioniTable)
@@ -986,7 +1682,14 @@ export async function recalculateFseReconciliation(input: {
     const cutoff =
       input.cutoff ??
       (await currentFseCutoff(tx, header.magazzinoId, header.dataRiferimento));
-    const [local, external, balanceRows] = await Promise.all([
+    await preserveLegacyRun(tx, header);
+    const baseline = await selectLegacyBaselineRun(
+      tx,
+      header.magazzinoId,
+      header.importazioneAgeaPrecedenteId,
+      header.baselineRunId,
+    );
+    const [local, external, balanceRows, previousExternal] = await Promise.all([
       loadLocal(
         tx,
         header.magazzinoId,
@@ -994,18 +1697,49 @@ export async function recalculateFseReconciliation(input: {
         cutoff.maxMovimentoId,
         cutoff.maxOperazioneDistribuzioneId,
       ),
-      loadExternal(tx, header.importazioneAgeaId),
+      loadExternal(tx, header.importazioneAgeaId!),
       loadBalanceRows(tx, {
         magazzinoId: header.magazzinoId,
-        importId: header.importazioneAgeaId,
+        importId: header.importazioneAgeaId!,
         dataRiferimento: header.dataRiferimento,
         maxMovimentoId: cutoff.maxMovimentoId,
         maxOperazioneDistribuzioneId: cutoff.maxOperazioneDistribuzioneId,
       }),
+      header.importazioneAgeaPrecedenteId == null
+        ? Promise.resolve([])
+        : loadExternal(tx, header.importazioneAgeaPrecedenteId),
     ]);
-    const rows = [...reconcileFseLines(local, external), ...balanceRows].sort(
-      (a, b) => a.businessKey.localeCompare(b.businessKey),
-    );
+    const [previousImport] =
+      header.importazioneAgeaPrecedenteId == null
+        ? []
+        : await tx
+            .select()
+            .from(importazioniAgeaTable)
+            .where(
+              eq(importazioniAgeaTable.id, header.importazioneAgeaPrecedenteId),
+            );
+    const delta = currentExternalDelta(external, previousExternal);
+    const missing = delta.missing.map((row) => {
+      const value = {
+        ...externalOnly(row),
+        status: "MOVIMENTO_AGEA_SCOMPARSO",
+        blocking: true,
+        qualityCodesJson: ["MOVIMENTO_AGEA_SCOMPARSO"],
+      };
+      return { ...value, contentHash: canonicalSha256(value) };
+    });
+    const rows = [
+      ...reconcileFseLines(
+        selectLocalReconciliationDelta(
+          local,
+          previousImport?.dataRiferimento ?? null,
+          baseline?.maxMovementId ?? null,
+        ),
+        delta.added,
+      ),
+      ...missing,
+      ...balanceRows,
+    ].sort((a, b) => a.businessKey.localeCompare(b.businessKey));
     const summary = totals(rows);
     const canonicalHash = canonicalSha256({
       modelVersion: FSE_REPORTING_MODEL_VERSION,
@@ -1030,6 +1764,7 @@ export async function recalculateFseReconciliation(input: {
       .update(riconciliazioniFseTable)
       .set({
         maxMovimentoId: cutoff.maxMovimentoId,
+        baselineRunId: baseline?.id ?? null,
         maxOperazioneDistribuzioneId: cutoff.maxOperazioneDistribuzioneId,
         canonicalHash,
         stato: summary.bloccanti > 0 ? "DA_RIVEDERE" : "CALCOLATA",
@@ -1040,6 +1775,15 @@ export async function recalculateFseReconciliation(input: {
       })
       .where(eq(riconciliazioniFseTable.id, input.id))
       .returning();
+    await preserveLegacyRun(tx, updated);
+    if (input.audit)
+      await recordAuditEvent(tx, {
+        command: input.audit,
+        azione: "FSE_RICONCILIAZIONE_RICALCOLATA",
+        entitaTipo: "riconciliazione_fse",
+        entitaId: updated.id,
+        magazzinoIdSnapshot: updated.magazzinoId,
+      });
     return { reconciliation: updated, rows };
   });
 }

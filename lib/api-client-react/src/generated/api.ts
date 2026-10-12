@@ -171,6 +171,7 @@ import type {
   DocumentoOperativoDettaglio,
   DocumentoOperativoPage,
   DownloadFseExportParams,
+  DownloadFseOriginalBody,
   EmailSendResult,
   EmporioAbilitazione,
   EmporioAbilitazioneInput,
@@ -283,6 +284,8 @@ import type {
   ListEccezioniMensaParams,
   ListEntiDestinatariParams,
   ListFornitoriParams,
+  ListFseAdministrativeObservationsParams,
+  ListFseAdministrativeSourcesParams,
   ListFseExportEventsParams,
   ListFseExportLinesParams,
   ListFseExportsParams,
@@ -7374,6 +7377,96 @@ export function useDownloadFseExport<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
+export const getDownloadFseOriginalUrl = (id: number) => {
+  return `/api/fse/exportazioni/${id}/originale`;
+};
+
+/**
+ * Rappresentazione storica rigenerata non minimizzata. Richiede capacità esplicita magazzino.fse.export.original.view anche per amministratori, motivo, scope corrente e audit. Non recupera byte XLSX mai conservati.
+ */
+export const downloadFseOriginal = async (
+  id: number,
+  downloadFseOriginalBody: DownloadFseOriginalBody,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getDownloadFseOriginalUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(downloadFseOriginalBody),
+  });
+};
+
+export const getDownloadFseOriginalMutationOptions = <
+  TError = ErrorType<
+    FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof downloadFseOriginal>>,
+    TError,
+    { id: number; data: BodyType<DownloadFseOriginalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof downloadFseOriginal>>,
+  TError,
+  { id: number; data: BodyType<DownloadFseOriginalBody> },
+  TContext
+> => {
+  const mutationKey = ["downloadFseOriginal"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof downloadFseOriginal>>,
+    { id: number; data: BodyType<DownloadFseOriginalBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return downloadFseOriginal(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DownloadFseOriginalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof downloadFseOriginal>>
+>;
+export type DownloadFseOriginalMutationBody = BodyType<DownloadFseOriginalBody>;
+export type DownloadFseOriginalMutationError = ErrorType<
+  FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse
+>;
+
+export const useDownloadFseOriginal = <
+  TError = ErrorType<
+    FseBadRequestResponse | FseForbiddenResponse | FseNotFoundResponse
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof downloadFseOriginal>>,
+    TError,
+    { id: number; data: BodyType<DownloadFseOriginalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof downloadFseOriginal>>,
+  TError,
+  { id: number; data: BodyType<DownloadFseOriginalBody> },
+  TContext
+> => {
+  return useMutation(getDownloadFseOriginalMutationOptions(options));
+};
+
 export const getMarkFseExportManuallyEnteredUrl = (id: number) => {
   return `/api/fse/exportazioni/${id}/marca-inserita`;
 };
@@ -7566,6 +7659,310 @@ export const useCancelFseExport = <
 > => {
   return useMutation(getCancelFseExportMutationOptions(options));
 };
+
+export const getListFseAdministrativeSourcesUrl = (
+  params: ListFseAdministrativeSourcesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/fse/fonti-m3b?${stringifiedParams}`
+    : `/api/fse/fonti-m3b`;
+};
+
+export const listFseAdministrativeSources = async (
+  params: ListFseAdministrativeSourcesParams,
+  options?: RequestInit,
+): Promise<FseRecordPage> => {
+  return customFetch<FseRecordPage>(
+    getListFseAdministrativeSourcesUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListFseAdministrativeSourcesQueryKey = (
+  params?: ListFseAdministrativeSourcesParams,
+) => {
+  return [`/api/fse/fonti-m3b`, ...(params ? [params] : [])] as const;
+};
+
+export const getListFseAdministrativeSourcesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFseAdministrativeSources>>,
+  TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>,
+>(
+  params: ListFseAdministrativeSourcesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listFseAdministrativeSources>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListFseAdministrativeSourcesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listFseAdministrativeSources>>
+  > = ({ signal }) =>
+    listFseAdministrativeSources(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFseAdministrativeSources>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListFseAdministrativeSourcesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFseAdministrativeSources>>
+>;
+export type ListFseAdministrativeSourcesQueryError = ErrorType<
+  FseBadRequestResponse | FseForbiddenResponse
+>;
+
+export function useListFseAdministrativeSources<
+  TData = Awaited<ReturnType<typeof listFseAdministrativeSources>>,
+  TError = ErrorType<FseBadRequestResponse | FseForbiddenResponse>,
+>(
+  params: ListFseAdministrativeSourcesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listFseAdministrativeSources>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListFseAdministrativeSourcesQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetFseReconciliationSourceUrl = (id: number) => {
+  return `/api/fse/riconciliazioni/${id}/fonte`;
+};
+
+export const getFseReconciliationSource = async (
+  id: number,
+  options?: RequestInit,
+): Promise<FseRecord> => {
+  return customFetch<FseRecord>(getGetFseReconciliationSourceUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetFseReconciliationSourceQueryKey = (id: number) => {
+  return [`/api/fse/riconciliazioni/${id}/fonte`] as const;
+};
+
+export const getGetFseReconciliationSourceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFseReconciliationSource>>,
+  TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFseReconciliationSource>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetFseReconciliationSourceQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getFseReconciliationSource>>
+  > = ({ signal }) =>
+    getFseReconciliationSource(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFseReconciliationSource>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetFseReconciliationSourceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFseReconciliationSource>>
+>;
+export type GetFseReconciliationSourceQueryError = ErrorType<
+  FseForbiddenResponse | FseNotFoundResponse
+>;
+
+export function useGetFseReconciliationSource<
+  TData = Awaited<ReturnType<typeof getFseReconciliationSource>>,
+  TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFseReconciliationSource>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetFseReconciliationSourceQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getListFseAdministrativeObservationsUrl = (
+  id: number,
+  params?: ListFseAdministrativeObservationsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/fse/riconciliazioni/${id}/osservazioni?${stringifiedParams}`
+    : `/api/fse/riconciliazioni/${id}/osservazioni`;
+};
+
+export const listFseAdministrativeObservations = async (
+  id: number,
+  params?: ListFseAdministrativeObservationsParams,
+  options?: RequestInit,
+): Promise<FseRecordPage> => {
+  return customFetch<FseRecordPage>(
+    getListFseAdministrativeObservationsUrl(id, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListFseAdministrativeObservationsQueryKey = (
+  id: number,
+  params?: ListFseAdministrativeObservationsParams,
+) => {
+  return [
+    `/api/fse/riconciliazioni/${id}/osservazioni`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListFseAdministrativeObservationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFseAdministrativeObservations>>,
+  TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>,
+>(
+  id: number,
+  params?: ListFseAdministrativeObservationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listFseAdministrativeObservations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListFseAdministrativeObservationsQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listFseAdministrativeObservations>>
+  > = ({ signal }) =>
+    listFseAdministrativeObservations(id, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFseAdministrativeObservations>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListFseAdministrativeObservationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFseAdministrativeObservations>>
+>;
+export type ListFseAdministrativeObservationsQueryError = ErrorType<
+  FseForbiddenResponse | FseNotFoundResponse
+>;
+
+export function useListFseAdministrativeObservations<
+  TData = Awaited<ReturnType<typeof listFseAdministrativeObservations>>,
+  TError = ErrorType<FseForbiddenResponse | FseNotFoundResponse>,
+>(
+  id: number,
+  params?: ListFseAdministrativeObservationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listFseAdministrativeObservations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListFseAdministrativeObservationsQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 export const getListFseReconciliationsUrl = (
   params?: ListFseReconciliationsParams,

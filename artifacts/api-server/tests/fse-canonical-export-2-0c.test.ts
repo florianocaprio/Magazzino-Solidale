@@ -115,6 +115,8 @@ beforeAll(async () => {
   [{ id: monitoringId }] = await db
     .insert(rilevazioniMonitoraggioFseTable)
     .values({
+      noteAudit:
+        "M64_PRIVATE_SENTINEL =persona.sintetica@example.invalid +390000000 -test @internal",
       magazzinoId,
       annoMese: "2026-08",
       canaleUfficiale: "PACCHI",
@@ -488,6 +490,14 @@ describe("Magazzino 2.0C — canonical reporting ed export", () => {
     const workbook = await generateFseExportWorkbook(first.export.id);
     expect(workbook.buffer.subarray(0, 2).toString()).toBe("PK");
     const parsedWorkbook = XLSX.read(workbook.buffer);
+    const indicatorRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      parsedWorkbook.Sheets["Indicatori"],
+    );
+    expect(indicatorRows).toHaveLength(1);
+    expect(indicatorRows[0]).not.toHaveProperty("noteAudit");
+    expect(JSON.stringify(parsedWorkbook.Sheets)).not.toContain(
+      "M64_PRIVATE_SENTINEL",
+    );
     expect(parsedWorkbook.SheetNames).toEqual(
       expect.arrayContaining([
         "Metadati",
@@ -579,6 +589,8 @@ describe("Magazzino 2.0C — canonical reporting ed export", () => {
     expect(normalizeWorkbook(stableDownload.buffer)).toEqual(normalizedBefore);
     expect(first.export.canonicalHash).toBe(replay.export.canonicalHash);
     expect(safeExcelText("=2+2")).toBe("'=2+2");
+    for (const value of ["+2+2", "-2+2", "@SUM(A1)"])
+      expect(safeExcelText(value)).toBe(`'${value}`);
     const cancelled = await deactivateExportCoverage(
       first.export.id,
       userId,

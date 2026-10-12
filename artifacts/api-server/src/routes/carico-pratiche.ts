@@ -69,6 +69,12 @@ import { requirePermission } from "../middlewares/auth";
 import type { InventoryTransaction } from "../lib/scaricoInventory";
 import { dataCivileEuropeRome } from "../lib/interventiWorkflow";
 import { releaseFseClaimForPracticeRow } from "../lib/fsePracticeImportService";
+import {
+  canAccessFseWarehouse,
+  requireCurrentFseWarehouse,
+  visibleFseWarehouseIds,
+} from "../lib/fseAccess";
+import { CurrentCommandActorError } from "../lib/currentCommandActor";
 
 const router: IRouter = Router();
 router.use("/carico-pratiche", requireModulo("LOTTI"));
@@ -157,6 +163,7 @@ function practiceCode(): string {
 function errorResponse(error: unknown, res: Response) {
   if (
     error instanceof CaricoPraticaError ||
+    error instanceof CurrentCommandActorError ||
     error instanceof InventoryLedgerError ||
     error instanceof LogicalLotError
   ) {
@@ -372,7 +379,12 @@ async function normalizeDraftLine(
   };
 }
 
-async function lockedPractice(tx: InventoryTransaction, id: number) {
+async function lockedPractice(
+  tx: InventoryTransaction,
+  id: number,
+  actorId: number,
+  permission = "magazzino.stock.receive",
+) {
   await tx.execute(
     sql`SELECT id FROM ${caricoPraticheTable} WHERE ${caricoPraticheTable.id} = ${id} FOR UPDATE`,
   );
@@ -382,6 +394,22 @@ async function lockedPractice(tx: InventoryTransaction, id: number) {
     .where(eq(caricoPraticheTable.id, id));
   if (!practice)
     throw new CaricoPraticaError(404, "Pratica di carico non trovata");
+  if (["AGEA_SIFEAD", "SALDO_INIZIALE"].includes(practice.origineCarico)) {
+    const actor = await requireCurrentFseWarehouse(
+      tx,
+      actorId,
+      permission,
+      practice.magazzinoId,
+    );
+    if (
+      practice.tipoPratica === "SALDO_INIZIALE" &&
+      !actor.isAdmin &&
+      !(actor.permessi ?? []).includes("magazzino.agea.bootstrap")
+    )
+      throw new CurrentCommandActorError(
+        "Permesso saldo iniziale non più disponibile",
+      );
+  }
   return practice;
 }
 
@@ -520,8 +548,16 @@ async function detail(id: number) {
 
 async function assertAccess(
   req: Parameters<typeof callerCentroId>[0],
-  practice: Pick<CaricoPratica, "magazzinoId">,
+  practice: Pick<CaricoPratica, "magazzinoId" | "origineCarico">,
 ) {
+  if (
+    ["AGEA_SIFEAD", "SALDO_INIZIALE"].includes(practice.origineCarico) &&
+    !(await canAccessFseWarehouse(req.user!, practice.magazzinoId))
+  )
+    throw new CaricoPraticaError(
+      403,
+      "Pratica FSE non accessibile per il profilo corrente",
+    );
   if (
     !(await canAccessMagazzino(
       practice.magazzinoId,
@@ -612,6 +648,14 @@ router.get(
         await visibleMagazzinoIds(callerCentroId(req), callerArea),
       );
       if (scope) conditions.push(scope);
+      const fseWarehouses = await visibleFseWarehouseIds(req.user!);
+      conditions.push(
+        sql`(${caricoPraticheTable.origineCarico} NOT IN ('AGEA_SIFEAD', 'SALDO_INIZIALE') OR ${
+          fseWarehouses.length
+            ? inArray(caricoPraticheTable.magazzinoId, fseWarehouses)
+            : sql`false`
+        })`,
+      );
       const rows = await db
         .select({
           pratica: caricoPraticheTable,
@@ -748,7 +792,7 @@ router.patch(
       await assertAccess(req, current);
       const command = auditContextFromRequest(req);
       await db.transaction(async (tx) => {
-        const practice = await lockedPractice(tx, id);
+        const practice = await lockedPractice(tx, id, req.user!.id);
         requireVersion(practice, version(body.versione));
         requireWorkingState(practice);
         requireManualPracticeEdit(practice);
@@ -826,7 +870,7 @@ router.post(
       const command = auditContextFromRequest(req);
       let rowId = 0;
       await db.transaction(async (tx) => {
-        const practice = await lockedPractice(tx, id);
+        const practice = await lockedPractice(tx, id, req.user!.id);
         requireVersion(practice, version(req.body?.versione));
         requireWorkingState(practice);
         requireManualPracticeEdit(practice);
@@ -887,7 +931,7 @@ router.patch(
       await assertAccess(req, current);
       const command = auditContextFromRequest(req);
       await db.transaction(async (tx) => {
-        const practice = await lockedPractice(tx, id);
+        const practice = await lockedPractice(tx, id, req.user!.id);
         requireVersion(practice, version(req.body?.versione));
         requireWorkingState(practice);
         requireManualPracticeEdit(practice);
@@ -960,7 +1004,7 @@ router.delete(
       await assertAccess(req, current);
       const command = auditContextFromRequest(req);
       await db.transaction(async (tx) => {
-        const practice = await lockedPractice(tx, id);
+        const practice = await lockedPractice(tx, id, req.user!.id);
         requireVersion(practice, version(req.body?.versione));
         requireWorkingState(practice);
         if (practice.tipoPratica === "SALDO_INIZIALE")
@@ -1061,6 +1105,17 @@ router.post(
         await tx.execute(
           sql`SELECT pg_advisory_xact_lock(hashtextextended(${`carico-pratica:${key}`}, 0))`,
         );
+        const [coverageForLock] = await tx
+          .select({
+            sourceRegistryId: fseInitialBalanceCoverageTable.sourceRegistryId,
+          })
+          .from(fseInitialBalanceCoverageTable)
+          .where(eq(fseInitialBalanceCoverageTable.caricoPraticaId, id));
+        if (coverageForLock)
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-source:${coverageForLock.sourceRegistryId}`}, 0))`,
+          );
+        const practice = await lockedPractice(tx, id, req.user!.id);
         const [replay] = await tx
           .select()
           .from(caricoIntegrazioniTable)
@@ -1073,17 +1128,6 @@ router.post(
             );
           return { ...replay.resultSnapshot, replay: true };
         }
-        const [coverageForLock] = await tx
-          .select({
-            sourceRegistryId: fseInitialBalanceCoverageTable.sourceRegistryId,
-          })
-          .from(fseInitialBalanceCoverageTable)
-          .where(eq(fseInitialBalanceCoverageTable.caricoPraticaId, id));
-        if (coverageForLock)
-          await tx.execute(
-            sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fse-source:${coverageForLock.sourceRegistryId}`}, 0))`,
-          );
-        const practice = await lockedPractice(tx, id);
         requireVersion(practice, requestedVersion);
         requireWorkingState(practice);
         const selected = await tx
@@ -1402,6 +1446,12 @@ router.post(
         await tx.execute(
           sql`SELECT pg_advisory_xact_lock(hashtextextended(${`carico-pratica-rettifica:${key}`}, 0))`,
         );
+        const practice = await lockedPractice(
+          tx,
+          id,
+          req.user!.id,
+          "magazzino.stock.adjust",
+        );
         const [replay] = await tx
           .select()
           .from(caricoPraticaRettificheTable)
@@ -1425,7 +1475,6 @@ router.post(
           return { ...replay.resultSnapshot, replay: true };
         }
 
-        const practice = await lockedPractice(tx, id);
         requireVersion(practice, requestedVersion);
         const [source] = await tx
           .select({
@@ -1620,7 +1669,7 @@ for (const action of ["chiudi", "riapri", "annulla"] as const) {
           throw new CaricoPraticaError(400, "Il motivo è obbligatorio");
         const command = auditContextFromRequest(req);
         await db.transaction(async (tx) => {
-          const practice = await lockedPractice(tx, id);
+          const practice = await lockedPractice(tx, id, req.user!.id);
           requireVersion(practice, version(req.body?.versione));
           const target =
             action === "chiudi"

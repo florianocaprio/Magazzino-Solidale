@@ -20,4 +20,9 @@ export interface FseResolutionInput {
   movimentoId?: number;
   /** @minimum 1 */
   importazioneAgeaRigaId?: number;
+  /**
+   * Osservazione M3B alternativa esclusiva alla riga AGEA legacy
+   * @minimum 1
+   */
+  observationId?: number;
 }

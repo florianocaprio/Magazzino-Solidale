@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import { db, ruoliTable } from "@workspace/db";
 import { ALL_AREA_KEYS, EMPORIO_AREA_KEY, MENSA_AREA_KEY } from "./areas";
 import {
-  ALL_PERMISSION_KEYS,
+  DEFAULT_ADMIN_PERMISSION_KEYS,
+  adminPermissionsWithExplicitOriginal,
   LOGISTICA_PERMISSIONS,
   MENSA_PERMISSIONS,
   UDS_PERMISSIONS,
@@ -185,7 +186,7 @@ export function defaultMensaRolePermissions(
 
 export async function ensureSuperAdminRole(): Promise<number> {
   const [existing] = await db
-    .select({ id: ruoliTable.id })
+    .select({ id: ruoliTable.id, permessi: ruoliTable.permessi })
     .from(ruoliTable)
     .where(eq(ruoliTable.nome, SUPER_ADMIN_ROLE_NAME));
 
@@ -196,7 +197,7 @@ export async function ensureSuperAdminRole(): Promise<number> {
         descrizione:
           "Accesso completo a tutte le aree e alla configurazione ambiente",
         aree: ALL_AREA_KEYS,
-        permessi: ALL_PERMISSION_KEYS,
+        permessi: adminPermissionsWithExplicitOriginal(existing.permessi ?? []),
         isAdmin: true,
       })
       .where(eq(ruoliTable.id, existing.id));
@@ -210,7 +211,7 @@ export async function ensureSuperAdminRole(): Promise<number> {
       descrizione:
         "Accesso completo a tutte le aree e alla configurazione ambiente",
       aree: ALL_AREA_KEYS,
-      permessi: ALL_PERMISSION_KEYS,
+      permessi: DEFAULT_ADMIN_PERMISSION_KEYS,
       isAdmin: true,
     })
     .returning({ id: ruoliTable.id });
@@ -235,7 +236,7 @@ export async function seedRoles(): Promise<void> {
       nome: ADMIN_ROLE_NAME,
       descrizione: "Accesso completo a tutte le aree e alla gestione utenti",
       aree: ALL_AREA_KEYS,
-      permessi: ALL_PERMISSION_KEYS,
+      permessi: DEFAULT_ADMIN_PERMISSION_KEYS,
       isAdmin: true,
     });
     logger.info("Seeded admin role");

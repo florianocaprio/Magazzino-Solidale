@@ -4216,7 +4216,12 @@ export const ListFseReportingEventsQueryParams = zod.object({
     .max(listFseReportingEventsQueryPageSizeMax)
     .default(listFseReportingEventsQueryPageSizeDefault),
   statoRendicontazione: zod
-    .enum(["DA_RENDICONTARE", "ARRETRATO_NON_RENDICONTATO", "BLOCCATO"])
+    .enum([
+      "DA_RENDICONTARE",
+      "ARRETRATO_NON_RENDICONTATO",
+      "BLOCCATO",
+      "CORREZIONE_DA_GESTIRE_MANUALMENTE",
+    ])
     .optional(),
   canale: zod.coerce.string().optional(),
   fondo: zod.coerce.string().optional(),
@@ -4259,7 +4264,12 @@ export const ListFseReportingLinesQueryParams = zod.object({
     .max(listFseReportingLinesQueryPageSizeMax)
     .default(listFseReportingLinesQueryPageSizeDefault),
   statoRendicontazione: zod
-    .enum(["DA_RENDICONTARE", "ARRETRATO_NON_RENDICONTATO", "BLOCCATO"])
+    .enum([
+      "DA_RENDICONTARE",
+      "ARRETRATO_NON_RENDICONTATO",
+      "BLOCCATO",
+      "CORREZIONE_DA_GESTIRE_MANUALMENTE",
+    ])
     .optional(),
   canale: zod.coerce.string().optional(),
   fondo: zod.coerce.string().optional(),
@@ -4302,7 +4312,12 @@ export const ListFseReportingQualityQueryParams = zod.object({
     .max(listFseReportingQualityQueryPageSizeMax)
     .default(listFseReportingQualityQueryPageSizeDefault),
   statoRendicontazione: zod
-    .enum(["DA_RENDICONTARE", "ARRETRATO_NON_RENDICONTATO", "BLOCCATO"])
+    .enum([
+      "DA_RENDICONTARE",
+      "ARRETRATO_NON_RENDICONTATO",
+      "BLOCCATO",
+      "CORREZIONE_DA_GESTIRE_MANUALMENTE",
+    ])
     .optional(),
   canale: zod.coerce.string().optional(),
   fondo: zod.coerce.string().optional(),
@@ -4452,6 +4467,26 @@ export const DownloadFseExportQueryParams = zod.object({
     .describe("Rappresentazione derivata dallo stesso snapshot immutabile"),
 });
 
+/**
+ * Rappresentazione storica rigenerata non minimizzata. Richiede capacità esplicita magazzino.fse.export.original.view anche per amministratori, motivo, scope corrente e audit. Non recupera byte XLSX mai conservati.
+ */
+
+export const DownloadFseOriginalParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const downloadFseOriginalBodyMotivoMax = 1000;
+
+export const DownloadFseOriginalBody = zod.object({
+  motivo: zod.string().min(1).max(downloadFseOriginalBodyMotivoMax),
+  representation: zod
+    .enum([
+      "FSE_CANONICAL_AUDIT_XLSX_V1",
+      "SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1",
+    ])
+    .optional(),
+});
+
 export const MarkFseExportManuallyEnteredParams = zod.object({
   id: zod.coerce.number(),
 });
@@ -4489,6 +4524,84 @@ export const CancelFseExportBody = zod.object({
 });
 
 export const CancelFseExportResponse = zod.record(zod.string(), zod.unknown());
+
+export const listFseAdministrativeSourcesQueryPageDefault = 1;
+
+export const listFseAdministrativeSourcesQueryPageSizeDefault = 50;
+export const listFseAdministrativeSourcesQueryPageSizeMax = 200;
+
+export const ListFseAdministrativeSourcesQueryParams = zod.object({
+  magazzinoId: zod.coerce.number().min(1),
+  page: zod.coerce
+    .number()
+    .min(1)
+    .default(listFseAdministrativeSourcesQueryPageDefault),
+  pageSize: zod.coerce
+    .number()
+    .min(1)
+    .max(listFseAdministrativeSourcesQueryPageSizeMax)
+    .default(listFseAdministrativeSourcesQueryPageSizeDefault),
+});
+
+export const listFseAdministrativeSourcesResponsePageSizeMax = 200;
+
+export const listFseAdministrativeSourcesResponseTotalMin = 0;
+
+export const ListFseAdministrativeSourcesResponse = zod.object({
+  page: zod.number().min(1),
+  pageSize: zod
+    .number()
+    .min(1)
+    .max(listFseAdministrativeSourcesResponsePageSizeMax),
+  total: zod.number().min(listFseAdministrativeSourcesResponseTotalMin),
+  rows: zod.array(zod.record(zod.string(), zod.unknown())),
+  summary: zod.record(zod.string(), zod.unknown()).optional(),
+});
+
+export const GetFseReconciliationSourceParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const GetFseReconciliationSourceResponse = zod.record(
+  zod.string(),
+  zod.unknown(),
+);
+
+export const ListFseAdministrativeObservationsParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const listFseAdministrativeObservationsQueryPageDefault = 1;
+
+export const listFseAdministrativeObservationsQueryPageSizeDefault = 50;
+export const listFseAdministrativeObservationsQueryPageSizeMax = 200;
+
+export const ListFseAdministrativeObservationsQueryParams = zod.object({
+  page: zod.coerce
+    .number()
+    .min(1)
+    .default(listFseAdministrativeObservationsQueryPageDefault),
+  pageSize: zod.coerce
+    .number()
+    .min(1)
+    .max(listFseAdministrativeObservationsQueryPageSizeMax)
+    .default(listFseAdministrativeObservationsQueryPageSizeDefault),
+});
+
+export const listFseAdministrativeObservationsResponsePageSizeMax = 200;
+
+export const listFseAdministrativeObservationsResponseTotalMin = 0;
+
+export const ListFseAdministrativeObservationsResponse = zod.object({
+  page: zod.number().min(1),
+  pageSize: zod
+    .number()
+    .min(1)
+    .max(listFseAdministrativeObservationsResponsePageSizeMax),
+  total: zod.number().min(listFseAdministrativeObservationsResponseTotalMin),
+  rows: zod.array(zod.record(zod.string(), zod.unknown())),
+  summary: zod.record(zod.string(), zod.unknown()).optional(),
+});
 
 export const listFseReconciliationsQueryPageDefault = 1;
 
@@ -4528,14 +4641,34 @@ export const ListFseReconciliationsResponse = zod.object({
   summary: zod.record(zod.string(), zod.unknown()).optional(),
 });
 
-export const CreateFseReconciliationBody = zod.object({
-  magazzinoId: zod.number().min(1),
-  importazioneAgeaId: zod.number().min(1),
-  importazioneAgeaPrecedenteId: zod.number().min(1).nullish(),
-  dataRiferimento: zod.coerce.date(),
-  maxMovimentoId: zod.number().min(1).optional(),
-  maxOperazioneDistribuzioneId: zod.number().min(1).optional(),
-});
+export const createFseReconciliationBodyTwoCommandKeyMax = 100;
+
+export const CreateFseReconciliationBody = zod.union([
+  zod.object({
+    sourceType: zod.enum(["AGEA_LEGACY"]).optional(),
+    magazzinoId: zod.number().min(1),
+    importazioneAgeaId: zod.number().min(1),
+    importazioneAgeaPrecedenteId: zod.number().min(1).nullish(),
+    dataRiferimento: zod.coerce.date(),
+    maxMovimentoId: zod.number().min(1).optional(),
+    maxOperazioneDistribuzioneId: zod.number().min(1).optional(),
+    baselineRunId: zod.number().min(1).nullish(),
+  }),
+  zod.object({
+    sourceType: zod.enum(["FSE_M3B"]),
+    magazzinoId: zod.number().min(1),
+    sessionId: zod.number().min(1),
+    sessionVersion: zod.number().min(1),
+    commandKey: zod
+      .string()
+      .min(1)
+      .max(createFseReconciliationBodyTwoCommandKeyMax),
+    baselineRunId: zod.number().min(1).nullish(),
+    dataRiferimento: zod.coerce.date(),
+    maxMovimentoId: zod.number().min(1).optional(),
+    maxOperazioneDistribuzioneId: zod.number().min(1).optional(),
+  }),
+]);
 
 export const GetFseReconciliationParams = zod.object({
   id: zod.coerce.number(),
@@ -4609,6 +4742,11 @@ export const recalculateFseReconciliationBodyRiferimentoEsternoMax = 500;
 
 export const RecalculateFseReconciliationBody = zod.object({
   versione: zod.number().min(1),
+  sessionVersion: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe("Versione M3B esplicitamente confermata per il ricalcolo"),
   motivazione: zod
     .string()
     .min(recalculateFseReconciliationBodyMotivazioneMin)
@@ -4651,6 +4789,11 @@ export const ResolveFseReconciliationLineBody = zod.object({
     .max(resolveFseReconciliationLineBodyMotivazioneMax),
   movimentoId: zod.number().min(1).optional(),
   importazioneAgeaRigaId: zod.number().min(1).optional(),
+  observationId: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe("Osservazione M3B alternativa esclusiva alla riga AGEA legacy"),
 });
 
 export const ResolveFseReconciliationLineResponse = zod.record(
@@ -4670,6 +4813,11 @@ export const closeFseReconciliationBodyRiferimentoEsternoMax = 500;
 
 export const CloseFseReconciliationBody = zod.object({
   versione: zod.number().min(1),
+  sessionVersion: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe("Versione M3B esplicitamente confermata per il ricalcolo"),
   motivazione: zod
     .string()
     .min(closeFseReconciliationBodyMotivazioneMin)
@@ -4701,6 +4849,11 @@ export const cancelFseReconciliationBodyRiferimentoEsternoMax = 500;
 
 export const CancelFseReconciliationBody = zod.object({
   versione: zod.number().min(1),
+  sessionVersion: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe("Versione M3B esplicitamente confermata per il ricalcolo"),
   motivazione: zod
     .string()
     .min(cancelFseReconciliationBodyMotivazioneMin)

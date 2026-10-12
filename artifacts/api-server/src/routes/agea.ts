@@ -10,7 +10,7 @@ import {
   systemLogsTable,
   type AgeaImportMode,
 } from "@workspace/db";
-import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
 import {
   analyzeAgeaImport,
   AgeaImportError,
@@ -27,17 +27,70 @@ import {
   normalizeAgeaKey,
   normalizeAgeaText,
 } from "../lib/ageaSifeadParser";
+import { magazzinoScopeFilter } from "../lib/centroScope";
 import {
-  callerAreaOperativaId,
-  callerCentroId,
-  canAccessMagazzino,
-  magazzinoScopeFilter,
-  visibleMagazzinoIds,
-} from "../lib/centroScope";
+  canAccessFseWarehouse,
+  visibleFseWarehouseIds,
+  fseTerritory,
+  requireCurrentFseWarehouse,
+} from "../lib/fseAccess";
+import { CurrentCommandActorError } from "../lib/currentCommandActor";
+import { requireCurrentM5bActor } from "../lib/m5bRequestAccess";
+import type { InventoryTransaction } from "../lib/scaricoInventory";
 import { requireModulo } from "../lib/featureFlags";
 import { requirePermission } from "../middlewares/auth";
 
 const router: IRouter = Router();
+
+async function legacyImportTransaction<T>(
+  req: Parameters<RequestHandler>[0],
+  warehouseId: number,
+  action: (tx: InventoryTransaction) => Promise<T>,
+  importId?: number,
+) {
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended('fse-agea-writer-transition', 0))`,
+    );
+    const [header] =
+      importId == null
+        ? []
+        : await tx
+            .select()
+            .from(importazioniAgeaTable)
+            .where(eq(importazioniAgeaTable.id, importId))
+            .for("update");
+    const actor = await requireCurrentFseWarehouse(
+      tx,
+      req.user!.id,
+      "magazzino.agea.import",
+      header?.magazzinoId ?? warehouseId,
+    );
+    if (
+      (header?.modalita === "PRIMA_ACQUISIZIONE" ||
+        req.query.modalita === "PRIMA_ACQUISIZIONE") &&
+      !actor.isAdmin &&
+      !(actor.permessi ?? []).includes("magazzino.agea.bootstrap")
+    )
+      throw new CurrentCommandActorError(
+        "Permesso bootstrap AGEA non più disponibile",
+      );
+    return action(tx);
+  });
+}
+
+async function requireLegacyMappingActor(
+  tx: InventoryTransaction,
+  req: Parameters<RequestHandler>[0],
+) {
+  const actor = await requireCurrentM5bActor(
+    tx,
+    req.user!.id,
+    "magazzino.agea.mapping.manage",
+  );
+  if (fseTerritory(actor) === "none")
+    throw new CurrentCommandActorError("Perimetro FSE non disponibile");
+}
 
 const xlsxBody: RequestHandler = express.raw({
   type: AGEA_XLSX_MIME,
@@ -100,11 +153,7 @@ async function accessibleImport(
     .from(importazioniAgeaTable)
     .where(eq(importazioniAgeaTable.id, id));
   if (!row) return { row: null, allowed: false };
-  const allowed = await canAccessMagazzino(
-    row.magazzinoId,
-    callerCentroId(req),
-    callerAreaOperativaId(req),
-  );
+  const allowed = await canAccessFseWarehouse(req.user!, row.magazzinoId);
   return { row, allowed };
 }
 
@@ -112,6 +161,10 @@ function sendKnownError(
   res: Parameters<RequestHandler>[1],
   error: unknown,
 ): boolean {
+  if (error instanceof CurrentCommandActorError) {
+    res.status(403).json({ error: error.message, code: "FSE_SCOPE_REVOKED" });
+    return true;
+  }
   const known = asAgeaImportError(error);
   if (!known) return false;
   res.status(known.status).json({
@@ -144,10 +197,7 @@ router.get(
   "/agea/importazioni",
   requirePermission("magazzino.agea.view"),
   async (req, res) => {
-    const visible = await visibleMagazzinoIds(
-      callerCentroId(req),
-      callerAreaOperativaId(req),
-    );
+    const visible = await visibleFseWarehouseIds(req.user!);
     const scope = magazzinoScopeFilter(
       importazioniAgeaTable.magazzinoId,
       visible,
@@ -195,13 +245,7 @@ router.post(
       res.status(403).json({ error: "Permesso bootstrap AGEA richiesto" });
       return;
     }
-    if (
-      !(await canAccessMagazzino(
-        magazzinoId,
-        callerCentroId(req),
-        callerAreaOperativaId(req),
-      ))
-    ) {
+    if (!(await canAccessFseWarehouse(req.user!, magazzinoId))) {
       res
         .status(403)
         .json({ error: "Magazzino non accessibile per il tuo profilo" });
@@ -220,7 +264,7 @@ router.post(
       return;
     }
     try {
-      const result = await db.transaction((tx) =>
+      const result = await legacyImportTransaction(req, magazzinoId, (tx) =>
         analyzeAgeaImport(tx, {
           buffer: req.body as Buffer,
           magazzinoId,
@@ -429,15 +473,19 @@ router.patch(
         .status(403)
         .json({ error: "Importazione non accessibile" });
     try {
-      const updated = await db.transaction((tx) =>
-        correctAgeaImportExpiry(tx, {
-          importId: id,
-          partyId: partitaId,
-          expectedVersion: versione,
-          userId: req.user!.id,
-          motivation: motivazione,
-          value: req.body.dataScadenza,
-        }),
+      const updated = await legacyImportTransaction(
+        req,
+        access.row.magazzinoId,
+        (tx) =>
+          correctAgeaImportExpiry(tx, {
+            importId: id,
+            partyId: partitaId,
+            expectedVersion: versione,
+            userId: req.user!.id,
+            motivation: motivazione,
+            value: req.body.dataScadenza,
+          }),
+        id,
       );
       res.json(updated);
     } catch (error) {
@@ -498,16 +546,20 @@ for (const correction of [
           .status(403)
           .json({ error: "Importazione non accessibile" });
       try {
-        const updated = await db.transaction((tx) =>
-          correctAgeaImportRow(tx, {
-            importId: id,
-            rowId,
-            expectedVersion: versione,
-            userId: req.user!.id,
-            motivation: motivazione,
-            field: correction.field,
-            value: value === null ? null : value,
-          }),
+        const updated = await legacyImportTransaction(
+          req,
+          access.row.magazzinoId,
+          (tx) =>
+            correctAgeaImportRow(tx, {
+              importId: id,
+              rowId,
+              expectedVersion: versione,
+              userId: req.user!.id,
+              motivation: motivazione,
+              field: correction.field,
+              value: value === null ? null : value,
+            }),
+          id,
         );
         res.json(updated);
       } catch (error) {
@@ -542,23 +594,28 @@ router.post(
         .json({ error: "Importazione non accessibile" });
     try {
       res.json(
-        await db.transaction(async (tx) => {
-          const result = await recalculateAgeaImport(tx, id, versione);
-          await tx.insert(systemLogsTable).values({
-            evento: "MAGAZZINO_AGEA_PREVIEW_RICALCOLATA",
-            esito: result.stato === "BLOCCATA" ? "FAILURE" : "SUCCESS",
-            actorUserId: req.user!.id,
-            details: {
-              importazioneId: result.id,
-              magazzinoId: result.magazzinoId,
-              stato: result.stato,
-              righeBloccanti: result.righeBloccanti,
-              versionePrecedente: versione,
-              versioneNuova: result.versione,
-            },
-          });
-          return result;
-        }),
+        await legacyImportTransaction(
+          req,
+          access.row.magazzinoId,
+          async (tx) => {
+            const result = await recalculateAgeaImport(tx, id, versione);
+            await tx.insert(systemLogsTable).values({
+              evento: "MAGAZZINO_AGEA_PREVIEW_RICALCOLATA",
+              esito: result.stato === "BLOCCATA" ? "FAILURE" : "SUCCESS",
+              actorUserId: req.user!.id,
+              details: {
+                importazioneId: result.id,
+                magazzinoId: result.magazzinoId,
+                stato: result.stato,
+                righeBloccanti: result.righeBloccanti,
+                versionePrecedente: versione,
+                versioneNuova: result.versione,
+              },
+            });
+            return result;
+          },
+          id,
+        ),
       );
     } catch (error) {
       await auditAgeaConflict(
@@ -600,8 +657,11 @@ router.post(
         .json({ error: "Permesso bootstrap AGEA richiesto" });
     try {
       res.json(
-        await db.transaction((tx) =>
-          confirmAgeaImport(tx, id, req.user!.id, versione),
+        await legacyImportTransaction(
+          req,
+          access.row.magazzinoId,
+          (tx) => confirmAgeaImport(tx, id, req.user!.id, versione),
+          id,
         ),
       );
     } catch (error) {
@@ -634,50 +694,55 @@ router.post(
         .status(403)
         .json({ error: "Importazione non accessibile" });
     try {
-      const updated = await db.transaction(async (tx) => {
-        const [locked] = await tx
-          .select()
-          .from(importazioniAgeaTable)
-          .where(eq(importazioniAgeaTable.id, id))
-          .for("update");
-        if (!locked)
-          throw new Error("Importazione non trovata durante l'annullamento");
-        if (locked.stato === "CONFERMATA")
-          throw new AgeaImportError(
-            409,
-            "IMPORTAZIONE_IMMUTABILE",
-            "Un'importazione confermata non può essere annullata",
-          );
-        if (locked.versione !== versione)
-          throw new AgeaImportError(
-            409,
-            "VERSIONE_NON_CORRENTE",
-            "La preview è stata aggiornata: ricaricare i dati",
-          );
-        if (locked.stato === "ANNULLATA") return locked;
-        const [result] = await tx
-          .update(importazioniAgeaTable)
-          .set({
-            stato: "ANNULLATA",
-            versione: locked.versione + 1,
-            annullatoDa: req.user!.id,
-            dataAnnullamento: new Date(),
-          })
-          .where(eq(importazioniAgeaTable.id, id))
-          .returning();
-        await tx.insert(systemLogsTable).values({
-          evento: "MAGAZZINO_AGEA_IMPORT_ANNULLATA",
-          esito: "SUCCESS",
-          actorUserId: req.user!.id,
-          details: {
-            importazioneId: result.id,
-            magazzinoId: result.magazzinoId,
-            versionePrecedente: versione,
-            versioneNuova: result.versione,
-          },
-        });
-        return result;
-      });
+      const updated = await legacyImportTransaction(
+        req,
+        access.row.magazzinoId,
+        async (tx) => {
+          const [locked] = await tx
+            .select()
+            .from(importazioniAgeaTable)
+            .where(eq(importazioniAgeaTable.id, id))
+            .for("update");
+          if (!locked)
+            throw new Error("Importazione non trovata durante l'annullamento");
+          if (locked.stato === "CONFERMATA")
+            throw new AgeaImportError(
+              409,
+              "IMPORTAZIONE_IMMUTABILE",
+              "Un'importazione confermata non può essere annullata",
+            );
+          if (locked.versione !== versione)
+            throw new AgeaImportError(
+              409,
+              "VERSIONE_NON_CORRENTE",
+              "La preview è stata aggiornata: ricaricare i dati",
+            );
+          if (locked.stato === "ANNULLATA") return locked;
+          const [result] = await tx
+            .update(importazioniAgeaTable)
+            .set({
+              stato: "ANNULLATA",
+              versione: locked.versione + 1,
+              annullatoDa: req.user!.id,
+              dataAnnullamento: new Date(),
+            })
+            .where(eq(importazioniAgeaTable.id, id))
+            .returning();
+          await tx.insert(systemLogsTable).values({
+            evento: "MAGAZZINO_AGEA_IMPORT_ANNULLATA",
+            esito: "SUCCESS",
+            actorUserId: req.user!.id,
+            details: {
+              importazioneId: result.id,
+              magazzinoId: result.magazzinoId,
+              versionePrecedente: versione,
+              versioneNuova: result.versione,
+            },
+          });
+          return result;
+        },
+        id,
+      );
       res.json(updated);
     } catch (error) {
       await auditAgeaConflict(
@@ -693,7 +758,11 @@ router.post(
 router.get(
   "/agea/mappature-prodotti",
   requirePermission("magazzino.agea.view"),
-  async (_req, res) => {
+  async (req, res) => {
+    if (fseTerritory(req.user!) === "none") {
+      res.json([]);
+      return;
+    }
     const rows = await db
       .select({
         mapping: mappatureProdottiEsterniTable,
@@ -704,7 +773,12 @@ router.get(
         prodottiTable,
         eq(mappatureProdottiEsterniTable.prodottoId, prodottiTable.id),
       )
-      .where(eq(mappatureProdottiEsterniTable.fonte, "AGEA_SIFEAD"))
+      .where(
+        and(
+          eq(mappatureProdottiEsterniTable.fonte, "AGEA_SIFEAD"),
+          isNull(mappatureProdottiEsterniTable.sourceRegistryId),
+        ),
+      )
       .orderBy(asc(mappatureProdottiEsterniTable.descrizioneEsterna));
     res.json(rows.map(({ mapping, prodotto }) => ({ ...mapping, prodotto })));
   },
@@ -734,12 +808,14 @@ router.post(
         .json({ error: "Prodotto non trovato o non attivo" });
     try {
       const created = await db.transaction(async (tx) => {
+        await requireLegacyMappingActor(tx, req);
         const [previous] = await tx
           .select()
           .from(mappatureProdottiEsterniTable)
           .where(
             and(
               eq(mappatureProdottiEsterniTable.fonte, "AGEA_SIFEAD"),
+              isNull(mappatureProdottiEsterniTable.sourceRegistryId),
               eq(
                 mappatureProdottiEsterniTable.chiaveDescrizioneNormalizzata,
                 key,
@@ -822,6 +898,11 @@ router.patch(
           .where(eq(mappatureProdottiEsterniTable.id, id))
           .for("update");
         if (!previous) return null;
+        await requireLegacyMappingActor(tx, req);
+        if (previous.sourceRegistryId != null)
+          throw new CurrentCommandActorError(
+            "Usa la procedura della sorgente FSE per modificare questa associazione",
+          );
         if (previous.versione !== versione)
           throw new AgeaImportError(
             409,

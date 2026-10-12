@@ -31,6 +31,7 @@ import {
   pool,
   prodottiTable,
   utentiTable,
+  ruoliTable,
 } from "@workspace/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
@@ -45,6 +46,7 @@ import { AGEA_XLSX_MIME } from "../src/lib/ageaSifeadParser";
 
 const suffix = `${process.pid}${Date.now().toString(36)}`;
 let actorId: number;
+let adminActorId: number;
 let areaId: number;
 let logicalLotId: number;
 let ordinaryWarehouseId: number;
@@ -175,13 +177,16 @@ function appFor(
     isSuperAdmin?: boolean;
     areaOperativaId?: number | null;
     permissions?: string[];
+    actorId?: number;
   } = {},
 ): Express {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.user = {
-      id: actorId,
+      id:
+        options.actorId ??
+        (options.isAdmin || options.isSuperAdmin ? adminActorId : actorId),
       username: `m3b_${suffix}`,
       matricola: `M3B-${suffix}`,
       isAdmin: options.isAdmin ?? false,
@@ -492,6 +497,43 @@ beforeAll(async () => {
     .insert(areeOperativeTable)
     .values({ nome: `M3B Area ${suffix}` })
     .returning({ id: areeOperativeTable.id });
+  const [role] = await db
+    .insert(ruoliTable)
+    .values({
+      nome: `M3B operator ${suffix}`,
+      isAdmin: false,
+      aree: ["magazzino"],
+      permessi: [
+        "magazzino.view",
+        "magazzino.stock.receive",
+        "magazzino.stock.adjust",
+        "magazzino.agea.view",
+        "magazzino.agea.import",
+        "magazzino.agea.mapping.manage",
+        "magazzino.agea.bootstrap",
+        "magazzino.products.manage",
+      ],
+    })
+    .returning();
+  await db
+    .update(utentiTable)
+    .set({ ruoloId: role.id, areaOperativaId: areaId })
+    .where(eq(utentiTable.id, actorId));
+  const [adminRole] = await db
+    .insert(ruoliTable)
+    .values({ nome: `M3B admin ${suffix}`, isAdmin: true, aree: ["magazzino"] })
+    .returning();
+  [{ id: adminActorId }] = await db
+    .insert(utentiTable)
+    .values({
+      username: `m3b_admin_${suffix}`,
+      passwordHash: "fixture-only",
+      nome: "Amministratore",
+      cognome: "M3B",
+      ruoloId: adminRole.id,
+      areaOperativaId: areaId,
+    })
+    .returning();
   [{ id: logicalLotId }] = await db
     .insert(lottiLogiciTable)
     .values({
@@ -780,6 +822,22 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
       "REGISTRATA",
       "REGISTRATA",
     ]);
+    // F12: the real M3B -> M3A chain does not fabricate a legacy AGEA source.
+    // The administrative reconciliation selector still consumes this legacy list.
+    const legacySources = await request(app).get("/agea/importazioni");
+    expect(legacySources.status).toBe(200);
+    expect(
+      legacySources.body.filter(
+        (row: { magazzinoId: number }) =>
+          row.magazzinoId === ordinaryWarehouseId,
+      ),
+    ).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(importazioniAgeaTable)
+        .where(eq(importazioniAgeaTable.magazzinoId, ordinaryWarehouseId)),
+    ).toEqual([]);
   });
 
   it("conserva l'identità esterna originale e riconcilia gli alias verificati di lotto, documento e data", async () => {
@@ -1721,7 +1779,40 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
         },
       ])
       .returning({ id: magazziniTable.id });
-    const scopedApp = appFor({ areaOperativaId: legacyAreaId });
+    // Separate real actors for the other Area: do not simulate a scope absent in DB.
+    const [ordinaryActor] = await db
+      .select()
+      .from(utentiTable)
+      .where(eq(utentiTable.id, actorId));
+    const [administrativeActor] = await db
+      .select()
+      .from(utentiTable)
+      .where(eq(utentiTable.id, adminActorId));
+    const [legacyActor, legacyAdmin] = await db
+      .insert(utentiTable)
+      .values([
+        {
+          username: `m3b_legacy_${suffix}`,
+          passwordHash: "fixture-only",
+          nome: "Operatore",
+          cognome: "Legacy",
+          ruoloId: ordinaryActor.ruoloId,
+          areaOperativaId: legacyAreaId,
+        },
+        {
+          username: `m3b_legacy_admin_${suffix}`,
+          passwordHash: "fixture-only",
+          nome: "Admin",
+          cognome: "Legacy",
+          ruoloId: administrativeActor.ruoloId,
+          areaOperativaId: legacyAreaId,
+        },
+      ])
+      .returning();
+    const scopedApp = appFor({
+      areaOperativaId: legacyAreaId,
+      actorId: legacyActor.id,
+    });
     const bytes = workbook(registryHeaders, [
       legacyRegistryRow(`DOC-LEGACY-FIRST-${suffix}`),
     ]);
@@ -1738,7 +1829,11 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
     expect(confirmed.status).toBe(200);
 
     const sourceCreated = await request(
-      appFor({ isAdmin: true, areaOperativaId: legacyAreaId }),
+      appFor({
+        isAdmin: true,
+        areaOperativaId: legacyAreaId,
+        actorId: legacyAdmin.id,
+      }),
     )
       .post("/fse-importazioni/sorgenti")
       .send({

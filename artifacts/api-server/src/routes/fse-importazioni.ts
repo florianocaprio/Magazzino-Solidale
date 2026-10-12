@@ -14,11 +14,10 @@ import {
   auditFields,
   recordAuditEvent,
 } from "../lib/auditEvent";
-import {
-  callerAreaOperativaId,
-  callerCentroId,
-  canAccessMagazzino,
-} from "../lib/centroScope";
+import { callerAreaOperativaId, callerCentroId } from "../lib/centroScope";
+import { canAccessFseWarehouse, fseTerritory } from "../lib/fseAccess";
+import { CurrentCommandActorError } from "../lib/currentCommandActor";
+import { requireCurrentM5bActor } from "../lib/m5bRequestAccess";
 import { AGEA_MAX_BYTES, AgeaParserError } from "../lib/ageaSifeadParser";
 import {
   FsePracticeImportError,
@@ -65,6 +64,10 @@ function text(value: unknown, field: string, max: number): string {
 }
 
 function sendKnownError(res: Response, error: unknown) {
+  if (error instanceof CurrentCommandActorError) {
+    res.status(403).json({ error: error.message, code: "FSE_SCOPE_REVOKED" });
+    return true;
+  }
   if (error instanceof FsePracticeImportError) {
     res.status(error.status).json({ error: error.message, code: error.code });
     return true;
@@ -107,13 +110,7 @@ async function assertWarehouseAccess(
   req: Parameters<typeof callerCentroId>[0],
   warehouseId: number,
 ) {
-  if (
-    !(await canAccessMagazzino(
-      warehouseId,
-      callerCentroId(req),
-      callerAreaOperativaId(req),
-    ))
-  )
+  if (!(await canAccessFseWarehouse(req.user!, warehouseId)))
     throw new FsePracticeImportError(
       403,
       "MAGAZZINO_NON_ACCESSIBILE",
@@ -161,6 +158,10 @@ router.get(
   requirePermission("magazzino.agea.view"),
   async (req, res) => {
     const area = callerAreaOperativaId(req);
+    if (fseTerritory(req.user!) === "none") {
+      res.json([]);
+      return;
+    }
     const rows = await db
       .select()
       .from(fseSourceRegistriesTable)
@@ -206,6 +207,20 @@ router.post(
         await tx.execute(
           sql`SELECT pg_advisory_xact_lock(hashtextextended('fse-agea-writer-transition', 0))`,
         );
+        const actor = await requireCurrentM5bActor(
+          tx,
+          req.user!.id,
+          "magazzino.agea.mapping.manage",
+        );
+        if (
+          !actor.isAdmin ||
+          fseTerritory(actor) === "none" ||
+          (actor.areaOperativaId != null &&
+            actor.areaOperativaId !== areaOperativaId)
+        )
+          throw new CurrentCommandActorError(
+            "Configurazione sorgente non autorizzata nel perimetro corrente",
+          );
         const [created] = await tx
           .insert(fseSourceRegistriesTable)
           .values({

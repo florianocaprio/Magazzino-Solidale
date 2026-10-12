@@ -5,7 +5,10 @@ import { CreateRuoloBody, UpdateRuoloBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { ALL_AREA_KEYS, sanitizeRoleAreas } from "../lib/areas";
 import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
-import { ALL_PERMISSION_KEYS } from "../lib/permissions";
+import {
+  ALL_PERMISSION_KEYS,
+  adminPermissionsWithExplicitOriginal,
+} from "../lib/permissions";
 
 const router: IRouter = Router();
 const permissionKeys = new Set<string>(ALL_PERMISSION_KEYS);
@@ -14,12 +17,10 @@ router.use("/ruoli", requireAuth, requireAdmin);
 
 function rejectLimitedAdminRoleMutation(req: Request, res: Response): boolean {
   if (req.user?.isSuperAdmin || req.user?.areaOperativaId == null) return false;
-  res
-    .status(403)
-    .json({
-      error:
-        "Un amministratore limitato non può modificare ruoli e permessi condivisi",
-    });
+  res.status(403).json({
+    error:
+      "Un amministratore limitato non può modificare ruoli e permessi condivisi",
+  });
   return true;
 }
 
@@ -104,7 +105,7 @@ router.post("/ruoli", async (req, res): Promise<void> => {
         ? ALL_AREA_KEYS
         : sanitizeRoleAreas(aree, isAdmin ?? false),
       permessi: creatingSuperAdminRole
-        ? ALL_PERMISSION_KEYS
+        ? adminPermissionsWithExplicitOriginal(sanitizePermessi(permessi))
         : sanitizePermessi(permessi),
       isAdmin: creatingSuperAdminRole ? true : (isAdmin ?? false),
     })
@@ -177,7 +178,11 @@ router.patch("/ruoli/:id", async (req, res): Promise<void> => {
   if (isProtectedSuperAdminRole) {
     updates.nome = SUPER_ADMIN_ROLE_NAME;
     updates.aree = ALL_AREA_KEYS;
-    updates.permessi = ALL_PERMISSION_KEYS;
+    updates.permessi = adminPermissionsWithExplicitOriginal(
+      body.permessi !== undefined
+        ? sanitizePermessi(body.permessi)
+        : (current.permessi ?? []),
+    );
     updates.isAdmin = true;
   } else if (body.nome !== undefined) {
     updates.nome = body.nome;

@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import express, { type Express } from "express";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { removeFseRunFixtures } from "./helpers/fse-snapshot-cleanup";
 import * as XLSX from "xlsx";
 import {
   areeOperativeTable,
@@ -25,6 +26,8 @@ import {
   riconciliazioniFseTable,
   systemLogsTable,
   utentiTable,
+  ruoliTable,
+  fseSourceRegistriesTable,
 } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import ageaRouter from "../src/routes/agea";
@@ -43,6 +46,8 @@ let app: Express;
 let deniedApp: Express;
 let scopedApp: Express;
 let userId: number;
+let roleId: number;
+let isolatedSourceId: number | undefined;
 let warehouseId: number;
 let foreignWarehouseId: number;
 let scopeAreaId: number;
@@ -207,7 +212,7 @@ function workbookFromRows(rows: Array<Array<string | number>>) {
 
 function makeApp(
   permissions: string[],
-  areaOperativaId: number | null = null,
+  areaOperativaId: number | null = scopeAreaId,
 ): Express {
   const instance = express();
   instance.use(express.json());
@@ -355,6 +360,19 @@ beforeAll(async () => {
     "magazzino.agea.mapping.manage",
     "magazzino.agea.bootstrap",
   ];
+  [{ id: roleId }] = await db
+    .insert(ruoliTable)
+    .values({
+      nome: `AGEA role ${suffix}`,
+      isAdmin: false,
+      aree: ["magazzino"],
+      permessi: permissions,
+    })
+    .returning();
+  await db
+    .update(utentiTable)
+    .set({ ruoloId: roleId, areaOperativaId: scopeAreaId })
+    .where(eq(utentiTable.id, userId));
   app = makeApp(permissions);
   deniedApp = makeApp(["magazzino.agea.view"]);
   scopedApp = makeApp(permissions, scopeAreaId);
@@ -453,6 +471,7 @@ afterAll(async () => {
   }
   if (acceptanceWarehouseId != null) {
     if (acceptanceReconciliationId != null) {
+      await removeFseRunFixtures([acceptanceReconciliationId]);
       await db
         .delete(riconciliazioniFseRigheTable)
         .where(
@@ -556,6 +575,10 @@ afterAll(async () => {
       .where(inArray(prodottiTable.id, extraProductIds));
   }
   await db.delete(prodottiTable).where(eq(prodottiTable.id, productId));
+  if (isolatedSourceId)
+    await db
+      .delete(fseSourceRegistriesTable)
+      .where(eq(fseSourceRegistriesTable.id, isolatedSourceId));
   await db.delete(magazziniTable).where(eq(magazziniTable.id, warehouseId));
   await db
     .delete(magazziniTable)
@@ -564,6 +587,7 @@ afterAll(async () => {
     .delete(systemLogsTable)
     .where(eq(systemLogsTable.actorUserId, userId));
   await db.delete(utentiTable).where(eq(utentiTable.id, userId));
+  await db.delete(ruoliTable).where(eq(ruoliTable.id, roleId));
   await db
     .delete(lottiLogiciTable)
     .where(inArray(lottiLogiciTable.id, [scopeGeneralId, foreignGeneralId]));
@@ -1807,6 +1831,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
           nome: `Prodotto acceptance AGEA ${index + 1}`,
           tipoProdotto: "alimentare",
           unitaMisura: useKg ? "kg" : "pz",
+          quantitaFrazionabile: useKg,
           lottoFisicoObbligatorio: true,
           gestioneScadenza: false,
         };
@@ -1852,7 +1877,7 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       const confirmed = await request(app)
         .post(`/agea/importazioni/${analyzed.body.id}/conferma`)
         .send({ versione: analyzed.body.versione });
-      expect(confirmed.status).toBe(200);
+      expect(confirmed.status, JSON.stringify(confirmed.body)).toBe(200);
       expect(confirmed.body.carichi).toHaveLength(1);
       const loadLines = await db
         .select()
@@ -1923,6 +1948,48 @@ describe("Import AGEA/SIFEAD 2.0B", () => {
       ).toHaveLength(0);
     },
   );
+
+  it("M64: un mapping della sorgente M3B non sovrascrive il mapping legacy omonimo", async () => {
+    const [source] = await db
+      .insert(fseSourceRegistriesTable)
+      .values({
+        codice: `M64-${suffix}`,
+        descrizione: "Sorgente isolata",
+        areaOperativaId: foreignAreaId,
+        creatoDa: userId,
+      })
+      .returning();
+    isolatedSourceId = source.id;
+    const [product] = await db
+      .insert(prodottiTable)
+      .values({
+        codice: `M64MP-${suffix}`.slice(0, 30),
+        nome: "Prodotto altra sorgente",
+        tipoProdotto: "alimentare",
+        unitaMisura: "pz",
+      })
+      .returning();
+    extraProductIds.push(product.id);
+    await db.insert(mappatureProdottiEsterniTable).values({
+      fonte: "AGEA_SIFEAD",
+      sourceRegistryId: source.id,
+      descrizioneEsterna: "Pasta test AGEA",
+      chiaveDescrizioneNormalizzata: "PASTA TEST AGEA",
+      prodottoId: product.id,
+      creatoDa: userId,
+      aggiornatoDa: userId,
+    });
+    const response = await analyze("SOLO_ANALISI", registry());
+    expect(response.status).toBe(201);
+    const rows = await db
+      .select()
+      .from(importazioniAgeaRigheTable)
+      .where(eq(importazioniAgeaRigheTable.importazioneId, response.body.id));
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.map((row) => row.prodottoIdSnapshot)).toEqual(
+      rows.map(() => productId),
+    );
+  });
 
   it("nega l'analisi senza magazzino.agea.import", async () => {
     const response = await request(deniedApp)

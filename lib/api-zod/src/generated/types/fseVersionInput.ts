@@ -10,6 +10,11 @@ export interface FseVersionInput {
   /** @minimum 1 */
   versione: number;
   /**
+   * Versione M3B esplicitamente confermata per il ricalcolo
+   * @minimum 1
+   */
+  sessionVersion?: number;
+  /**
    * @minLength 3
    * @maxLength 500
    */

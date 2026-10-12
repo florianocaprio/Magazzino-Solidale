@@ -14,7 +14,12 @@ import {
   timestamp,
   uniqueIndex,
   varchar,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import {
+  fseAdministrativeVersionsTable,
+  fseAdministrativeObservationsTable,
+} from "./fseAdministrativeSources";
 import {
   importazioniAgeaRigheTable,
   importazioniAgeaTable,
@@ -388,9 +393,20 @@ export const riconciliazioniFseTable = pgTable(
     magazzinoId: integer("magazzino_id")
       .notNull()
       .references(() => magazziniTable.id),
-    importazioneAgeaId: integer("importazione_agea_id")
+    importazioneAgeaId: integer("importazione_agea_id").references(
+      () => importazioniAgeaTable.id,
+    ),
+    sourceType: varchar("source_type", { length: 20 })
       .notNull()
-      .references(() => importazioniAgeaTable.id),
+      .default("AGEA_LEGACY"),
+    administrativeVersionId: integer("administrative_version_id").references(
+      () => fseAdministrativeVersionsTable.id,
+    ),
+    baselineRunId: integer("baseline_run_id").references(
+      (): AnyPgColumn => fseReconciliationRunsTable.id,
+    ),
+    commandKey: varchar("command_key", { length: 100 }),
+    commandHash: varchar("command_hash", { length: 64 }),
     importazioneAgeaPrecedenteId: integer(
       "importazione_agea_precedente_id",
     ).references(() => importazioniAgeaTable.id),
@@ -437,6 +453,11 @@ export const riconciliazioniFseTable = pgTable(
       sql`${table.canonicalHash} ~ '^[0-9a-f]{64}$'`,
     ),
     check("riconciliazioni_fse_version_check", sql`${table.versione} >= 1`),
+    check(
+      "riconciliazioni_fse_source_check",
+      sql`(${table.sourceType} = 'AGEA_LEGACY' AND ${table.importazioneAgeaId} IS NOT NULL AND ${table.administrativeVersionId} IS NULL) OR (${table.sourceType} = 'FSE_M3B' AND ${table.importazioneAgeaId} IS NULL AND ${table.importazioneAgeaPrecedenteId} IS NULL AND ${table.administrativeVersionId} IS NOT NULL)`,
+    ),
+    uniqueIndex("riconciliazioni_fse_command_unique").on(table.commandKey),
   ],
 );
 
@@ -459,6 +480,12 @@ export const riconciliazioniFseRigheTable = pgTable(
     externalMovementId: integer("external_movement_id"),
     importazioneAgeaRigaId: integer("importazione_agea_riga_id").references(
       () => importazioniAgeaRigheTable.id,
+    ),
+    observationId: integer("observation_id").references(
+      () => fseAdministrativeObservationsTable.id,
+    ),
+    aggregateVersionId: integer("aggregate_version_id").references(
+      () => fseAdministrativeVersionsTable.id,
     ),
     fundLocal: varchar("fund_local", { length: 50 }),
     fundExternal: varchar("fund_external", { length: 50 }),
@@ -517,6 +544,15 @@ export const riconciliazioniFseRigheTable = pgTable(
       .where(
         sql`${table.active} = true AND ${table.importazioneAgeaRigaId} IS NOT NULL`,
       ),
+    uniqueIndex("riconciliazioni_fse_righe_active_observation_unique")
+      .on(table.riconciliazioneId, table.observationId)
+      .where(
+        sql`${table.active} = true AND ${table.observationId} IS NOT NULL`,
+      ),
+    check(
+      "riconciliazioni_fse_righe_external_exclusivity",
+      sql`num_nonnulls(${table.importazioneAgeaRigaId},${table.observationId}) <= 1 AND (${table.tipoRiga} <> 'SALDO_PARTITA' OR num_nonnulls(${table.importazioneAgeaRigaId},${table.observationId}) = 0)`,
+    ),
     index("riconciliazioni_fse_righe_resolution_group_idx").on(
       table.riconciliazioneId,
       table.resolutionGroupId,
@@ -553,6 +589,9 @@ export const riconciliazioniFseRisoluzioniTable = pgTable(
     targetImportazioneRigaId: integer("target_importazione_riga_id").references(
       () => importazioniAgeaRigheTable.id,
     ),
+    targetObservationId: integer("target_observation_id").references(
+      () => fseAdministrativeObservationsTable.id,
+    ),
     headerVersionBefore: integer("header_version_before"),
     headerVersionAfter: integer("header_version_after"),
     creatoDa: integer("creato_da")
@@ -570,6 +609,95 @@ export const riconciliazioniFseRisoluzioniTable = pgTable(
 );
 
 export type EsportazioneFse = typeof esportazioniFseTable.$inferSelect;
+
+export const fseReconciliationRunsTable = pgTable(
+  "fse_reconciliation_runs",
+  {
+    id: serial("id").primaryKey(),
+    reconciliationId: integer("reconciliation_id")
+      .notNull()
+      .references(() => riconciliazioniFseTable.id),
+    headerVersion: integer("header_version").notNull(),
+    administrativeVersionId: integer("administrative_version_id").references(
+      () => fseAdministrativeVersionsTable.id,
+    ),
+    legacyImportId: integer("legacy_import_id").references(
+      () => importazioniAgeaTable.id,
+    ),
+    baselineRunId: integer("baseline_run_id").references(
+      (): AnyPgColumn => fseReconciliationRunsTable.id,
+    ),
+    maxMovementId: integer("max_movement_id").notNull(),
+    maxOperationId: integer("max_operation_id").notNull(),
+    referenceDate: date("reference_date").notNull(),
+    canonicalHash: varchar("canonical_hash", { length: 64 }).notNull(),
+    snapshotJson: jsonb("snapshot_json")
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    creatoDa: integer("creato_da")
+      .notNull()
+      .references(() => utentiTable.id),
+    dataCreazione: timestamp("data_creazione", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("fse_reconciliation_runs_version_unique").on(
+      t.reconciliationId,
+      t.headerVersion,
+    ),
+    check(
+      "fse_reconciliation_runs_source_check",
+      sql`num_nonnulls(${t.administrativeVersionId},${t.legacyImportId}) = 1`,
+    ),
+    check(
+      "fse_reconciliation_runs_hash_check",
+      sql`${t.canonicalHash} ~ '^[0-9a-f]{64}$' AND ${t.headerVersion} > 0`,
+    ),
+  ],
+);
+
+/** Immutable representations, not new exports or administrative coverage. */
+export const esportazioniFseRappresentazioniTable = pgTable(
+  "esportazioni_fse_rappresentazioni",
+  {
+    id: serial("id").primaryKey(),
+    esportazioneId: integer("esportazione_id")
+      .notNull()
+      .references(() => esportazioniFseTable.id),
+    originalSnapshotHash: varchar("original_snapshot_hash", {
+      length: 64,
+    }).notNull(),
+    formatCode: varchar("format_code", { length: 60 }).notNull(),
+    transformationVersion: varchar("transformation_version", {
+      length: 40,
+    }).notNull(),
+    semanticHash: varchar("semantic_hash", { length: 64 }).notNull(),
+    artifactHash: varchar("artifact_hash", { length: 64 }).notNull(),
+    artifactBase64: text("artifact_base64").notNull(),
+    creatoDa: integer("creato_da")
+      .notNull()
+      .references(() => utentiTable.id),
+    dataCreazione: timestamp("data_creazione", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("esportazioni_fse_rappresentazioni_identity_unique").on(
+      t.esportazioneId,
+      t.formatCode,
+      t.transformationVersion,
+    ),
+    check(
+      "esportazioni_fse_rappresentazioni_hash_check",
+      sql`${t.originalSnapshotHash} ~ '^[0-9a-f]{64}$' AND ${t.semanticHash} ~ '^[0-9a-f]{64}$' AND ${t.artifactHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "esportazioni_fse_rappresentazioni_format_check",
+      sql`${t.formatCode} IN ('FSE_CANONICAL_AUDIT_XLSX_V1','SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1')`,
+    ),
+  ],
+);
 export type EsportazioneFseEvento =
   typeof esportazioniFseEventiTable.$inferSelect;
 export type EsportazioneFseRiga = typeof esportazioniFseRigheTable.$inferSelect;

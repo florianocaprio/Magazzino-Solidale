@@ -12,9 +12,15 @@ import {
   operazioniDistribuzioneMagazzinoTable,
   pool,
   rilevazioniMonitoraggioFseTable,
+  utentiTable,
+  ruoliTable,
+  auditEventiTable,
+  scarichiTable,
 } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import request from "supertest";
+import bcrypt from "bcryptjs";
+import { httpListeners } from "./helpers/http-listeners";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import fseRouter from "../src/routes/fse";
 import {
@@ -25,6 +31,7 @@ import {
   createLotto,
   createProdotto,
   createUtente,
+  createRuolo,
   insertMovimento,
   makeScopedApp,
   newScope,
@@ -41,6 +48,8 @@ let magazzinoA: number;
 let magazzinoSameArea: number;
 let magazzinoB: number;
 let userId: number;
+const actorByCentro = new Map<number, number>();
+const sessions = httpListeners({ diagnostics: "m64-real-session" });
 
 const app = (
   centroAscoltoId: number | null,
@@ -48,7 +57,7 @@ const app = (
   areaOperativaId = areaA,
 ) =>
   makeScopedApp(fseRouter, {
-    id: userId,
+    id: actorByCentro.get(centroAscoltoId!) ?? userId,
     centroAscoltoId,
     areaOperativaId,
     permessi,
@@ -70,10 +79,38 @@ beforeAll(async () => {
   magazzinoB = await createMagazzino(scope, centroB, {
     areaOperativaId: areaB,
   });
-  userId = await createUtente(scope, { centroId: centroA });
+  const role = await createRuolo(scope);
+  await db
+    .update(ruoliTable)
+    .set({
+      aree: ["magazzino"],
+      permessi: [
+        "magazzino.fse.view",
+        "magazzino.fse.export",
+        "magazzino.fse.return",
+        "magazzino.fse.reconcile",
+        "magazzino.fse.reconcile.manage",
+        "magazzino.fse.monitoring.manage",
+      ],
+    })
+    .where(eq(ruoliTable.id, role));
+  for (const [centroId, areaId] of [
+    [centroA, areaA],
+    [centroSameArea, areaA],
+    [centroB, areaB],
+  ]) {
+    const id = await createUtente(scope, { centroId, ruoloId: role });
+    await db
+      .update(utentiTable)
+      .set({ areaOperativaId: areaId })
+      .where(eq(utentiTable.id, id));
+    actorByCentro.set(centroId, id);
+  }
+  userId = actorByCentro.get(centroA)!;
 });
 
 afterAll(async () => {
+  await sessions.close();
   if (exportIds.length > 0) {
     await db
       .delete(esportazioniFseIndicatoriTable)
@@ -115,6 +152,185 @@ afterAll(async () => {
 });
 
 describe("Magazzino 2.0C — API FSE+", () => {
+  it("M64 F21: pagina 51 testate reali senza perdere elementi a parità di data", async () => {
+    const warehouse = await createMagazzino(scope, centroA, {
+      areaOperativaId: areaA,
+    });
+    const inserted = await db
+      .insert(esportazioniFseTable)
+      .values(
+        Array.from({ length: 51 }, (_, index) => ({
+          magazzinoId: warehouse,
+          dataDa: "2026-10-01",
+          dataA: "2026-10-31",
+          dataAsOf: "2026-10-31",
+          formatCode: "FSE_CANONICAL_AUDIT_XLSX_V1",
+          modelVersion: "MAGAZZINO_2_0C_R1_V2",
+          stato: "ANNULLATA",
+          maxMovimentoId: 0,
+          maxOperazioneDistribuzioneId: 0,
+          canonicalHash: "0".repeat(64),
+          idempotencyKey:
+            `${warehouse.toString(16)}${index.toString(16).padStart(4, "0")}`.padStart(
+              64,
+              "0",
+            ),
+          eventiTotali: 0,
+          righeTotali: 0,
+          righeBloccanti: 0,
+          righeWarning: 0,
+          creatoDa: userId,
+          dataCreazione: new Date("2026-10-01T00:00:00Z"),
+        })),
+      )
+      .returning({ id: esportazioniFseTable.id });
+    exportIds.push(...inserted.map((row) => row.id));
+    const actual: number[] = [];
+    for (let page = 1; page <= 3; page++) {
+      const response = await request(app(centroA, ["magazzino.fse.view"]))
+        .get("/fse/exportazioni")
+        .query({ magazzinoId: warehouse, page, pageSize: 20 });
+      expect(response.status, response.text).toBe(200);
+      expect(response.body.total).toBe(51);
+      expect(response.body.rows).toHaveLength(page === 3 ? 11 : 20);
+      actual.push(...response.body.rows.map((row: { id: number }) => row.id));
+    }
+    expect(actual).toEqual(inserted.map((row) => row.id).sort((a, b) => b - a));
+    expect(new Set(actual).size).toBe(51);
+  });
+  it("M64 F01/F03: la stessa sessione reale perde letture e replay dopo revoca territoriale", async () => {
+    const sessionWarehouse = await createMagazzino(scope, centroA, {
+      areaOperativaId: areaA,
+    });
+    const password = `M64-${userId}-session-only!`;
+    const [user] = await db
+      .update(utentiTable)
+      .set({
+        passwordHash: await bcrypt.hash(password, 4),
+        mustChangePassword: false,
+      })
+      .where(eq(utentiTable.id, userId))
+      .returning();
+    const { default: realApp } = await import("../src/app");
+    const session = request.agent(await sessions.open("fse", () => realApp));
+    expect(
+      (
+        await session
+          .post("/api/auth/login")
+          .send({ username: user.username, password })
+      ).status,
+    ).toBe(200);
+    const prodottoId = await createProdotto(scope);
+    const lottoId = await createLotto(scope, {
+      prodottoId,
+      magazzinoId: sessionWarehouse,
+      quantita: 10,
+      fsePlus: true,
+    });
+    const payload = {
+      versione: 1,
+      idempotencyKey: `real-session-${lottoId}`,
+      magazzinoId: sessionWarehouse,
+      dataReso: "2026-08-20",
+      destinazioneOpc: "OpC sintetica",
+      motivazione: "Prova sessione",
+      modalitaSelezione: "PARTITA_ESATTA",
+      righe: [{ prodottoId, lottoId, quantita: 1 }],
+    };
+    const created = await session.post("/api/fse/resi-opc").send(payload);
+    expect(created.status, created.text).toBe(201);
+    scope.scaricoIds.push(created.body.id);
+    const read = () =>
+      session.get("/api/fse/rendicontazione/preview").query({
+        magazzinoId: sessionWarehouse,
+        dataDa: "2026-08-01",
+        dataA: "2026-08-31",
+      });
+    expect((await read()).status).toBe(200);
+    try {
+      await db
+        .update(utentiTable)
+        .set({ areaOperativaId: null, centroAscoltoId: null })
+        .where(eq(utentiTable.id, userId));
+      expect((await read()).status).toBe(403);
+      expect(
+        (await session.post("/api/fse/resi-opc").send(payload)).status,
+      ).toBe(403);
+      expect((await session.get("/api/fse/exportazioni")).body.rows).toEqual(
+        [],
+      );
+      expect(
+        Number(
+          (
+            await db.select().from(lottiTable).where(eq(lottiTable.id, lottoId))
+          )[0].quantitaResidua,
+        ),
+      ).toBe(9);
+    } finally {
+      await db
+        .update(utentiTable)
+        .set({ areaOperativaId: areaA, centroAscoltoId: centroA })
+        .where(eq(utentiTable.id, userId));
+    }
+  });
+  it("M64 F05: una failure audit annulla documento, movimento e residuo del reso OpC", async () => {
+    const prodottoId = await createProdotto(scope);
+    const lottoId = await createLotto(scope, {
+      prodottoId,
+      magazzinoId: magazzinoA,
+      quantita: 10,
+      fsePlus: true,
+    });
+    const before = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.id, lottoId));
+    const beforeDocuments = await db
+      .select({ id: scarichiTable.id })
+      .from(scarichiTable)
+      .where(eq(scarichiTable.magazzinoId, magazzinoA));
+    await pool.query(`CREATE FUNCTION test_m64_opc_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF NEW.azione='SCARICO_MAGAZZINO_CREATO' AND NEW.magazzino_id_snapshot=${magazzinoA}
+        THEN RAISE EXCEPTION 'synthetic M64 audit failure'; END IF; RETURN NEW; END $$`);
+    await pool.query(
+      `CREATE TRIGGER test_m64_opc_audit_failure BEFORE INSERT ON audit_eventi FOR EACH ROW EXECUTE FUNCTION test_m64_opc_audit_failure()`,
+    );
+    try {
+      const response = await request(app(centroA, ["magazzino.fse.return"]))
+        .post("/fse/resi-opc")
+        .send({
+          versione: 1,
+          idempotencyKey: `m64-audit-fault-${lottoId}`,
+          magazzinoId: magazzinoA,
+          dataReso: "2026-08-20",
+          destinazioneOpc: "OpC sintetica",
+          motivazione: "Prova rollback",
+          modalitaSelezione: "PARTITA_ESATTA",
+          righe: [{ prodottoId, lottoId, quantita: 4 }],
+        });
+      expect(response.status, response.text).toBe(500);
+      expect(
+        await db.select().from(lottiTable).where(eq(lottiTable.id, lottoId)),
+      ).toEqual(before);
+      expect(
+        await db
+          .select()
+          .from(movimentiTable)
+          .where(eq(movimentiTable.lottoId, lottoId)),
+      ).toEqual([]);
+      expect(
+        await db
+          .select({ id: scarichiTable.id })
+          .from(scarichiTable)
+          .where(eq(scarichiTable.magazzinoId, magazzinoA)),
+      ).toEqual(beforeDocuments);
+    } finally {
+      await pool.query(
+        "DROP TRIGGER test_m64_opc_audit_failure ON audit_eventi",
+      );
+      await pool.query("DROP FUNCTION test_m64_opc_audit_failure()");
+    }
+  });
   it("separa view ed export nell'RBAC", async () => {
     const viewOnly = app(centroA, ["magazzino.fse.view"]);
     const preview = await request(viewOnly)
@@ -462,6 +678,65 @@ describe("Magazzino 2.0C — API FSE+", () => {
       versione: 1,
       idempotentReplay: true,
     });
+    const creationAudits = await db
+      .select()
+      .from(auditEventiTable)
+      .where(
+        and(
+          eq(auditEventiTable.entitaTipo, "scarico"),
+          eq(auditEventiTable.entitaId, created.body.id),
+          eq(auditEventiTable.azione, "SCARICO_MAGAZZINO_CREATO"),
+        ),
+      );
+    expect(creationAudits).toHaveLength(1);
+    expect(creationAudits[0]).toMatchObject({
+      actorUserId: userId,
+      magazzinoIdSnapshot: magazzinoA,
+    });
+    // Real PostgreSQL barrier: revoke while the stale HTTP session waits for the actor lock.
+    const revoke = await pool.connect();
+    let pending: Promise<request.Response> | undefined;
+    try {
+      await revoke.query("BEGIN");
+      await revoke.query(
+        "UPDATE utenti SET area_operativa_id=NULL, centro_ascolto_id=NULL WHERE id=$1",
+        [userId],
+      );
+      const {
+        rows: [{ pid }],
+      } = await revoke.query("SELECT pg_backend_pid() AS pid");
+      pending = request(client)
+        .post("/fse/resi-opc")
+        .send(payload)
+        .then((response) => response);
+      const deadline = Date.now() + 10000;
+      while (true) {
+        const waiting = await pool.query(
+          "SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND $1 = ANY(pg_blocking_pids(pid))",
+          [pid],
+        );
+        if (waiting.rowCount) break;
+        if (Date.now() > deadline)
+          throw new Error("Barriera revoca FSE non osservata");
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      await revoke.query("COMMIT");
+      expect((await pending).status).toBe(403);
+      expect(
+        await db
+          .select()
+          .from(auditEventiTable)
+          .where(eq(auditEventiTable.id, creationAudits[0].id)),
+      ).toEqual(creationAudits);
+    } finally {
+      await revoke.query("ROLLBACK");
+      revoke.release();
+      await pending;
+      await db
+        .update(utentiTable)
+        .set({ areaOperativaId: areaA, centroAscoltoId: centroA })
+        .where(eq(utentiTable.id, userId));
+    }
     const differentPayload = await request(client)
       .post("/fse/resi-opc")
       .send({
@@ -520,7 +795,7 @@ describe("Magazzino 2.0C — API FSE+", () => {
       fondoOrigine: "FSE_PLUS",
       naturaContabile: "RESO",
       operatoreId: userId,
-      auditEventoId: null,
+      auditEventoId: expect.any(Number),
     });
     expect(Number(movement.quantita)).toBe(4);
 
@@ -566,7 +841,7 @@ describe("Magazzino 2.0C — API FSE+", () => {
       naturaContabile: "STORNO",
       fondoOrigine: "FSE_PLUS",
       operatoreId: userId,
-      auditEventoId: null,
+      auditEventoId: expect.any(Number),
     });
     expect(Number(compensation.quantita)).toBe(4);
 

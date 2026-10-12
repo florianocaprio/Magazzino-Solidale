@@ -45,8 +45,21 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import type { ReportingFilterState } from "@/components/reporting/report-filters";
 import { ExternalLink, ShieldAlert } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from "react";
+import { errorMessage } from "@/lib/api-error";
 import { useTranslation } from "react-i18next";
+import {
+  FseAdministrativeSourceForm,
+  FseAdministrativeProvenance,
+  FseOriginalDownload,
+} from "./fse-administrative-source";
 
 export const FSE_OPERATION_TABS = [
   "overview",
@@ -56,6 +69,63 @@ export const FSE_OPERATION_TABS = [
   "indicators",
   "anomalies",
 ] as const;
+
+export function fseReadableData<T>(query: { data?: T; isError?: boolean }) {
+  return query.isError ? undefined : query.data;
+}
+
+function FseQueryFeedback({
+  query,
+}: {
+  query?: { isError?: boolean; isLoading?: boolean; error?: unknown };
+}) {
+  const { t } = useTranslation();
+  if (query?.isError)
+    return (
+      <Alert variant="destructive" role="alert">
+        <AlertDescription>
+          {errorMessage(query.error, t("fseOperations.failed"))}
+        </AlertDescription>
+      </Alert>
+    );
+  if (query?.isLoading)
+    return (
+      <p role="status" className="text-sm text-muted-foreground">
+        {t("common.loading")}
+      </p>
+    );
+  return null;
+}
+
+function FseRequiredInput({
+  valid,
+  ...props
+}: ComponentProps<typeof Input> & { valid: boolean }) {
+  const generatedId = useId();
+  const id = props.id ?? generatedId;
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-1">
+      <Input
+        {...props}
+        id={id}
+        required
+        aria-invalid={!valid}
+        aria-describedby={!valid ? `${id}-error` : undefined}
+        className={
+          !valid
+            ? "border-destructive focus-visible:ring-destructive"
+            : undefined
+        }
+      />
+      {!valid && (
+        <p id={`${id}-error`} className="text-sm text-destructive">
+          {t("fseOperations.requiredValue")}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function fseExportActionAvailability(
   record: FseRecord,
@@ -101,25 +171,43 @@ export function RecordList({
   downloadExports = false,
   onSelect,
   selectedId,
+  pagination,
+  query,
 }: {
   rows: FseRecord[] | undefined;
   downloadExports?: boolean;
   onSelect?: (id: number) => void;
   selectedId?: number | null;
+  pagination?: {
+    page: number;
+    pageSize: number;
+    total: number;
+    onChange: (page: number) => void;
+  };
+  query?: { isError?: boolean; isLoading?: boolean; error?: unknown };
 }) {
   const { t } = useTranslation();
   const [page, setPage] = useState(0);
-  if (!rows?.length)
-    return (
-      <p className="text-sm text-muted-foreground">
-        {t("fseOperations.empty")}
-      </p>
-    );
+  const currentPage = pagination ? pagination.page - 1 : page;
+  const pageSize = pagination?.pageSize ?? 20;
+  const total = pagination?.total ?? rows?.length ?? 0;
+  const changePage = (next: number) =>
+    pagination ? pagination.onChange(next + 1) : setPage(next);
+  const visibleRows = pagination
+    ? (rows ?? [])
+    : (rows?.slice(page * 20, page * 20 + 20) ?? []);
+  if (query?.isError || query?.isLoading)
+    return <FseQueryFeedback query={query} />;
   return (
     <div className="space-y-2">
-      {rows.slice(page * 20, page * 20 + 20).map((row, index) => (
+      {!visibleRows.length && (
+        <p className="text-sm text-muted-foreground">
+          {t("fseOperations.empty")}
+        </p>
+      )}
+      {visibleRows.map((row, index) => (
         <div
-          className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border p-3 text-sm"
+          className="grid min-w-0 gap-3 rounded-md border p-3 text-sm"
           key={text(row, "id") === "—" ? index : text(row, "id")}
         >
           <div className="min-w-0">
@@ -135,7 +223,7 @@ export function RecordList({
                 : text(row, "businessKey")}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">
               {text(row, "stato")}
             </span>
@@ -169,26 +257,29 @@ export function RecordList({
           </div>
         </div>
       ))}
-      {rows.length > 20 && (
+      {(total > pageSize || currentPage > 0) && (
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
-            {page * 20 + 1}–{Math.min((page + 1) * 20, rows.length)} /{" "}
-            {rows.length} {t("fseOperations.records")}
+            {Math.min(currentPage * pageSize + 1, total)}–
+            {Math.min((currentPage + 1) * pageSize, total)} / {total}{" "}
+            {t("fseOperations.records")}
           </p>
           <div className="flex gap-2">
             <Button
               size="sm"
               variant="outline"
-              disabled={page === 0}
-              onClick={() => setPage((current) => Math.max(0, current - 1))}
+              aria-label={t("fseOperations.previousPage")}
+              disabled={currentPage === 0}
+              onClick={() => changePage(Math.max(0, currentPage - 1))}
             >
               ‹
             </Button>
             <Button
               size="sm"
               variant="outline"
-              disabled={(page + 1) * 20 >= rows.length}
-              onClick={() => setPage((current) => current + 1)}
+              aria-label={t("fseOperations.nextPage")}
+              disabled={(currentPage + 1) * pageSize >= total}
+              onClick={() => changePage(currentPage + 1)}
             >
               ›
             </Button>
@@ -200,12 +291,66 @@ export function RecordList({
 }
 
 export function FseOperations({ filters }: { filters: ReportingFilterState }) {
+  const { user } = useAuth();
+  const scopeKey = JSON.stringify([
+    user?.id,
+    user?.areaOperativaId,
+    user?.centroAscoltoId,
+    user?.isAdmin,
+    user?.aree,
+    user?.permessi,
+    filters,
+  ]);
+  // A new territory/session owns new selections and drafts; late responses cannot populate it.
+  return (
+    <FseOperationsContext
+      key={scopeKey}
+      filters={filters}
+      scopeKey={scopeKey}
+    />
+  );
+}
+
+function FseOperationsContext({
+  filters,
+  scopeKey,
+}: {
+  filters: ReportingFilterState;
+  scopeKey: string;
+}) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const queryClient = useQueryClient();
   const warehouseId = filters.magazzinoId ?? 0;
-  const enabled = warehouseId > 0;
+  const enabled = warehouseId > 0 && hasPermission("magazzino.fse.view");
+  const active = useRef(true);
+  const section = useRef<HTMLElement>(null);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
+  const [pages, setPages] = useState({
+    events: 1,
+    quality: 1,
+    exports: 1,
+    reconciliations: 1,
+    monitoring: 1,
+    lines: 1,
+  });
+  const paging = (name: keyof typeof pages, total = 0) => ({
+    page: pages[name],
+    pageSize: 20,
+    total,
+    onChange: (page: number) =>
+      setPages((current) => ({ ...current, [name]: page })),
+  });
+  const scopedKey = (key: readonly unknown[]) => [
+    ...key,
+    { fseScope: scopeKey },
+  ];
   const [reportingStateFilter, setReportingStateFilter] = useState<
     "" | FseQueueStatoParameter
   >("");
@@ -226,36 +371,55 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
     magazzinoId: warehouseId,
     dataCompetenzaDa: filters.da,
     dataCompetenzaA: filters.a,
-    pageSize: 50,
+    pageSize: 20,
   };
   const preview = useGetFseReportingPreview(previewParams, {
     query: {
       enabled,
-      queryKey: getGetFseReportingPreviewQueryKey(previewParams),
+      queryKey: scopedKey(getGetFseReportingPreviewQueryKey(previewParams)),
     },
   });
-  const events = useListFseReportingEvents(params, {
-    query: { enabled, queryKey: getListFseReportingEventsQueryKey(params) },
-  });
-  const quality = useListFseReportingQuality(params, {
-    query: { enabled, queryKey: getListFseReportingQualityQueryKey(params) },
-  });
-  const exportsQuery = useListFseExports(listParams, {
-    query: { enabled, queryKey: getListFseExportsQueryKey(listParams) },
-  });
-  const reconciliations = useListFseReconciliations(listParams, {
+  const eventParams = { ...params, page: pages.events, pageSize: 20 };
+  const qualityParams = { ...params, page: pages.quality, pageSize: 20 };
+  const exportsParams = { ...listParams, page: pages.exports };
+  const reconciliationParams = { ...listParams, page: pages.reconciliations };
+  const monitoringParams = { ...listParams, page: pages.monitoring };
+  const events = useListFseReportingEvents(eventParams, {
     query: {
       enabled,
-      queryKey: getListFseReconciliationsQueryKey(listParams),
+      queryKey: scopedKey(getListFseReportingEventsQueryKey(eventParams)),
     },
   });
-  const monitoring = useListFseMonitoring(listParams, {
-    query: { enabled, queryKey: getListFseMonitoringQueryKey(listParams) },
+  const quality = useListFseReportingQuality(qualityParams, {
+    query: {
+      enabled,
+      queryKey: scopedKey(getListFseReportingQualityQueryKey(qualityParams)),
+    },
+  });
+  const exportsQuery = useListFseExports(exportsParams, {
+    query: {
+      enabled,
+      queryKey: scopedKey(getListFseExportsQueryKey(exportsParams)),
+    },
+  });
+  const reconciliations = useListFseReconciliations(reconciliationParams, {
+    query: {
+      enabled,
+      queryKey: scopedKey(
+        getListFseReconciliationsQueryKey(reconciliationParams),
+      ),
+    },
+  });
+  const monitoring = useListFseMonitoring(monitoringParams, {
+    query: {
+      enabled,
+      queryKey: scopedKey(getListFseMonitoringQueryKey(monitoringParams)),
+    },
   });
   const ageaImports = useListAgeaImportazioni({
     query: {
       enabled: hasPermission("magazzino.fse.reconcile"),
-      queryKey: getListAgeaImportazioniQueryKey(),
+      queryKey: scopedKey(getListAgeaImportazioniQueryKey()),
     },
   });
   const [format, setFormat] = useState<FseExportInputFormatCode>(
@@ -265,11 +429,16 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
   const [exportActionText, setExportActionText] = useState("");
   const selectedExport = useGetFseExport(selectedExportId ?? 0, {
     query: {
-      enabled: selectedExportId != null,
-      queryKey: getGetFseExportQueryKey(selectedExportId ?? 0),
+      enabled: enabled && selectedExportId != null,
+      queryKey: scopedKey(getGetFseExportQueryKey(selectedExportId ?? 0)),
     },
   });
   const [ageaId, setAgeaId] = useState("");
+  const [sourceType, setSourceType] = useState<"AGEA_LEGACY" | "FSE_M3B">(
+    "AGEA_LEGACY",
+  );
+  const [recalculationSourceVersion, setRecalculationSourceVersion] =
+    useState("");
   const [previousAgeaId, setPreviousAgeaId] = useState("");
   const [selectedReconciliationId, setSelectedReconciliationId] = useState<
     number | null
@@ -292,40 +461,63 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
     selectedReconciliationId ?? 0,
     {
       query: {
-        enabled: selectedReconciliationId != null,
-        queryKey: getGetFseReconciliationQueryKey(
-          selectedReconciliationId ?? 0,
+        enabled: enabled && selectedReconciliationId != null,
+        queryKey: scopedKey(
+          getGetFseReconciliationQueryKey(selectedReconciliationId ?? 0),
         ),
       },
     },
   );
   const reconciliationLines = useListFseReconciliationLines(
     selectedReconciliationId ?? 0,
-    { pageSize: 200 },
+    { page: pages.lines, pageSize: 20 },
     {
       query: {
-        enabled: selectedReconciliationId != null,
-        queryKey: getListFseReconciliationLinesQueryKey(
-          selectedReconciliationId ?? 0,
-          { pageSize: 200 },
+        enabled: enabled && selectedReconciliationId != null,
+        queryKey: scopedKey(
+          getListFseReconciliationLinesQueryKey(selectedReconciliationId ?? 0, {
+            page: pages.lines,
+            pageSize: 20,
+          }),
         ),
       },
     },
   );
 
   useEffect(() => {
-    const candidate = ageaImports.data?.find(
+    const candidate = fseReadableData(ageaImports)?.find(
       (item) => item.magazzinoId === warehouseId && item.stato === "CONFERMATA",
     );
     if (candidate && !ageaId) setAgeaId(String(candidate.id));
-  }, [ageaId, ageaImports.data, warehouseId]);
+  }, [ageaId, ageaImports.data, ageaImports.isError, warehouseId]);
 
-  const completed = () => toast({ title: t("fseOperations.done") });
-  const failed = () =>
-    toast({ title: t("fseOperations.failed"), variant: "destructive" });
+  const [actionError, setActionError] = useState<string | null>(null);
+  const completed = () => {
+    if (active.current) {
+      setActionError(null);
+      toast({ title: t("fseOperations.done") });
+    }
+  };
+  const failed = (error: unknown) => {
+    if (active.current) {
+      setActionError(errorMessage(error, t("fseOperations.failed")));
+      section.current
+        ?.querySelector<HTMLElement>('[aria-invalid="true"]')
+        ?.focus();
+    }
+  };
+  const refreshCanonical = () =>
+    Promise.all(
+      [
+        getGetFseReportingPreviewQueryKey(),
+        getListFseReportingEventsQueryKey(),
+        getListFseReportingQualityQueryKey(),
+      ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    );
   const createExport = useCreateFseExport({
     mutation: {
       onSuccess: async () => {
+        await refreshCanonical();
         await queryClient.invalidateQueries({
           queryKey: getListFseExportsQueryKey(),
         });
@@ -335,6 +527,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
     },
   });
   const refreshSelectedExport = async () => {
+    await refreshCanonical();
     await queryClient.invalidateQueries({
       queryKey: getListFseExportsQueryKey(),
     });
@@ -374,7 +567,6 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
       queryClient.invalidateQueries({
         queryKey: getListFseReconciliationLinesQueryKey(
           selectedReconciliationId,
-          { pageSize: 200 },
         ),
       }),
     ]);
@@ -403,6 +595,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
     mutation: { onSuccess: refreshSelectedReconciliation, onError: failed },
   });
   const refreshMonitoring = async () => {
+    await refreshCanonical();
     await queryClient.invalidateQueries({
       queryKey: getListFseMonitoringQueryKey(),
     });
@@ -414,12 +607,13 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
   const updateMonitoring = useUpdateFseMonitoring({
     mutation: { onSuccess: refreshMonitoring, onError: failed },
   });
-  const selectedMonitoring = monitoring.data?.rows.find(
+  const selectedMonitoring = fseReadableData(monitoring)?.rows.find(
     (row) => Number(row.id) === selectedMonitoringId,
   );
 
   return (
     <section
+      ref={section}
       className="space-y-4 rounded-lg border p-4"
       aria-label={t("fseOperations.title")}
     >
@@ -438,6 +632,18 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
         </Alert>
       )}
       <Tabs defaultValue="overview">
+        <FseQueryFeedback query={preview} />
+        {selectedExportId != null && (
+          <FseQueryFeedback query={selectedExport} />
+        )}
+        {selectedReconciliationId != null && (
+          <FseQueryFeedback query={selectedReconciliation} />
+        )}
+        {actionError && (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>{actionError}</AlertDescription>
+          </Alert>
+        )}
         <TabsList className="h-auto flex-wrap justify-start">
           {FSE_OPERATION_TABS.map((tab) => (
             <TabsTrigger key={tab} value={tab}>
@@ -455,7 +661,9 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-2xl font-bold">
-                  {preview.data ? text(preview.data, key) : "—"}
+                  {fseReadableData(preview)
+                    ? text(fseReadableData(preview)!, key)
+                    : "—"}
                 </CardContent>
               </Card>
             ),
@@ -481,11 +689,12 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
             aria-label={t("fseOperations.queueFilter")}
             className="h-10 rounded-md border bg-background px-3 text-sm"
             value={reportingStateFilter}
-            onChange={(event) =>
+            onChange={(event) => {
+              setPages((current) => ({ ...current, events: 1, quality: 1 }));
               setReportingStateFilter(
                 event.target.value as "" | FseQueueStatoParameter,
-              )
-            }
+              );
+            }}
           >
             <option value="">{t("fseOperations.allStatuses")}</option>
             <option value="DA_RENDICONTARE">DA_RENDICONTARE</option>
@@ -493,8 +702,15 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
               ARRETRATO_NON_RENDICONTATO
             </option>
             <option value="BLOCCATO">BLOCCATO</option>
+            <option value="CORREZIONE_DA_GESTIRE_MANUALMENTE">
+              CORREZIONE_DA_GESTIRE_MANUALMENTE
+            </option>
           </select>
-          <RecordList rows={events.data?.rows} />
+          <RecordList
+            query={events}
+            rows={fseReadableData(events)?.rows}
+            pagination={paging("events", fseReadableData(events)?.total)}
+          />
         </TabsContent>
         <TabsContent value="exports" className="grid gap-4 lg:grid-cols-2">
           <Card>
@@ -556,7 +772,7 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                   {t("fseOperations.generate")}
                 </Button>
               )}
-              {preview.data && (
+              {!preview.isError && preview.data && (
                 <p className="text-sm text-muted-foreground">
                   {t("fseOperations.preview")}:{" "}
                   {text(preview.data, "eventiTotali")} ·{" "}
@@ -572,12 +788,21 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
             </CardHeader>
             <CardContent>
               <RecordList
-                rows={exportsQuery.data?.rows}
+                query={exportsQuery}
+                rows={fseReadableData(exportsQuery)?.rows?.filter(
+                  (row) =>
+                    !selectedExport.isError ||
+                    Number(row.id) !== selectedExportId,
+                )}
+                pagination={paging(
+                  "exports",
+                  fseReadableData(exportsQuery)?.total,
+                )}
                 downloadExports
                 selectedId={selectedExportId}
                 onSelect={setSelectedExportId}
               />
-              {selectedExport.data && (
+              {!selectedExport.isError && selectedExport.data && (
                 <div className="mt-4 space-y-3 border-t pt-4">
                   <p className="text-sm text-muted-foreground">
                     {t("fseOperations.status")}:{" "}
@@ -586,7 +811,16 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
                       ? ` · ${t("fseOperations.legacyReviewRequired")}`
                       : ""}
                   </p>
-                  <Input
+                  {user?.permessi?.includes(
+                    "magazzino.fse.export.original.view",
+                  ) && (
+                    <FseOriginalDownload
+                      key={selectedExportId}
+                      id={selectedExportId!}
+                    />
+                  )}
+                  <FseRequiredInput
+                    valid={exportActionText.trim().length >= 3}
                     placeholder={t("fseOperations.motivation")}
                     value={exportActionText}
                     onChange={(event) =>
@@ -654,48 +888,86 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
               <p className="text-sm text-muted-foreground">
                 {t("fseOperations.reconciliationSteps")}
               </p>
-              <div className="space-y-2">
-                <Label htmlFor="agea-id">{t("fseOperations.importId")}</Label>
-                <Input
-                  id="agea-id"
-                  type="number"
-                  min={1}
-                  value={ageaId}
-                  onChange={(event) => setAgeaId(event.target.value)}
+              <Label htmlFor="fse-source-type">
+                {t("fseOperations.sourceType")}
+              </Label>
+              <select
+                id="fse-source-type"
+                className="h-10 rounded-md border bg-background px-3"
+                value={sourceType}
+                onChange={(e) => {
+                  setSourceType(e.target.value as typeof sourceType);
+                  setAgeaId("");
+                  setPreviousAgeaId("");
+                  setActionError(null);
+                }}
+              >
+                <option value="AGEA_LEGACY">AGEA legacy</option>
+                <option value="FSE_M3B">FSE+ M3B</option>
+              </select>
+              {sourceType === "FSE_M3B" ? (
+                <FseAdministrativeSourceForm
+                  key={scopeKey}
+                  warehouseId={warehouseId}
+                  referenceDate={filters.a}
+                  scopeKey={scopeKey}
+                  pending={createReconciliation.isPending}
+                  onCalculate={(data) => createReconciliation.mutate({ data })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="agea-previous-id">
-                  {t("fseOperations.previousImportId")}
-                </Label>
-                <Input
-                  id="agea-previous-id"
-                  type="number"
-                  min={1}
-                  value={previousAgeaId}
-                  onChange={(event) => setPreviousAgeaId(event.target.value)}
-                />
-              </div>
-              {hasPermission("magazzino.fse.reconcile") && (
-                <Button
-                  disabled={
-                    !enabled || !ageaId || createReconciliation.isPending
-                  }
-                  onClick={() =>
-                    createReconciliation.mutate({
-                      data: {
-                        magazzinoId: warehouseId,
-                        importazioneAgeaId: Number(ageaId),
-                        importazioneAgeaPrecedenteId: previousAgeaId
-                          ? Number(previousAgeaId)
-                          : null,
-                        dataRiferimento: filters.a,
-                      },
-                    })
-                  }
-                >
-                  {t("fseOperations.calculate")}
-                </Button>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="agea-id">
+                      {t("fseOperations.importId")}
+                    </Label>
+                    <FseRequiredInput
+                      valid={
+                        Number.isSafeInteger(Number(ageaId)) &&
+                        Number(ageaId) > 0
+                      }
+                      id="agea-id"
+                      type="number"
+                      min={1}
+                      value={ageaId}
+                      onChange={(event) => setAgeaId(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="agea-previous-id">
+                      {t("fseOperations.previousImportId")}
+                    </Label>
+                    <Input
+                      id="agea-previous-id"
+                      type="number"
+                      min={1}
+                      value={previousAgeaId}
+                      onChange={(event) =>
+                        setPreviousAgeaId(event.target.value)
+                      }
+                    />
+                  </div>
+                  {hasPermission("magazzino.fse.reconcile") && (
+                    <Button
+                      disabled={
+                        !enabled || !ageaId || createReconciliation.isPending
+                      }
+                      onClick={() =>
+                        createReconciliation.mutate({
+                          data: {
+                            magazzinoId: warehouseId,
+                            importazioneAgeaId: Number(ageaId),
+                            importazioneAgeaPrecedenteId: previousAgeaId
+                              ? Number(previousAgeaId)
+                              : null,
+                            dataRiferimento: filters.a,
+                          },
+                        })
+                      }
+                    >
+                      {t("fseOperations.calculate")}
+                    </Button>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -705,214 +977,282 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
             </CardHeader>
             <CardContent>
               <RecordList
-                rows={reconciliations.data?.rows}
+                query={reconciliations}
+                rows={fseReadableData(reconciliations)?.rows}
+                pagination={paging(
+                  "reconciliations",
+                  fseReadableData(reconciliations)?.total,
+                )}
                 selectedId={selectedReconciliationId}
                 onSelect={(id) => {
                   setSelectedReconciliationId(id);
                   setSelectedLineId(null);
+                  setRecalculationSourceVersion("");
+                  setPages((current) => ({ ...current, lines: 1 }));
                 }}
               />
             </CardContent>
           </Card>
-          {selectedReconciliationId != null && (
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>
-                  {t("fseOperations.manageReconciliation")} #
-                  {selectedReconciliationId}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  {t("fseOperations.version")}:{" "}
-                  {selectedReconciliation.data
-                    ? text(selectedReconciliation.data, "versione")
-                    : "—"}{" "}
-                  · {t("fseOperations.status")}:{" "}
-                  {selectedReconciliation.data
-                    ? text(selectedReconciliation.data, "stato")
-                    : "—"}
-                </p>
-                <RecordList
-                  rows={reconciliationLines.data?.rows}
-                  selectedId={selectedLineId}
-                  onSelect={setSelectedLineId}
-                />
-                {hasPermission("magazzino.fse.reconcile.manage") && (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <select
-                      aria-label={t("fseOperations.action")}
-                      className="h-10 rounded-md border bg-background px-3 text-sm"
-                      value={resolutionAction}
-                      onChange={(event) =>
-                        setResolutionAction(
-                          event.target.value as FseResolutionInputAzione,
-                        )
-                      }
-                    >
-                      {Object.values(FseResolutionInputAzione).map((action) => (
-                        <option key={action} value={action}>
-                          {action}
-                        </option>
-                      ))}
-                    </select>
-                    {resolutionAction === FseResolutionInputAzione.ABBINA && (
-                      <>
-                        <Input
-                          type="number"
-                          min={1}
-                          placeholder={t("fseOperations.targetMovement")}
-                          value={targetMovementId}
-                          onChange={(event) =>
-                            setTargetMovementId(event.target.value)
-                          }
-                        />
-                        <Input
-                          type="number"
-                          min={1}
-                          placeholder={t("fseOperations.targetAgeaRow")}
-                          value={targetAgeaRowId}
-                          onChange={(event) =>
-                            setTargetAgeaRowId(event.target.value)
-                          }
-                        />
-                      </>
-                    )}
-                    <Input
-                      aria-label={t("fseOperations.motivation")}
-                      placeholder={t("fseOperations.motivation")}
-                      value={resolutionMotivation}
-                      onChange={(event) =>
-                        setResolutionMotivation(event.target.value)
-                      }
+          {selectedReconciliationId != null &&
+            fseReadableData(selectedReconciliation) && (
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>
+                    {t("fseOperations.manageReconciliation")} #
+                    {selectedReconciliationId}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {selectedReconciliation.data?.sourceType === "FSE_M3B" && (
+                    <FseAdministrativeProvenance
+                      key={selectedReconciliationId}
+                      id={selectedReconciliationId}
+                      scopeKey={scopeKey}
                     />
-                    <Button
-                      disabled={
-                        !fseResolutionReady({
-                          lineId: selectedLineId,
-                          action: resolutionAction,
-                          motivation: resolutionMotivation,
-                          targetMovementId,
-                          targetAgeaRowId,
-                          hasHeader: selectedReconciliation.data != null,
-                        }) || resolveLine.isPending
-                      }
-                      onClick={() =>
-                        resolveLine.mutate({
-                          id: selectedReconciliationId,
-                          rigaId: selectedLineId!,
-                          data: {
-                            versione: Number(
-                              selectedReconciliation.data?.versione,
-                            ),
-                            azione: resolutionAction,
-                            motivazione: resolutionMotivation.trim(),
-                            movimentoId: targetMovementId
-                              ? Number(targetMovementId)
-                              : undefined,
-                            importazioneAgeaRigaId: targetAgeaRowId
-                              ? Number(targetAgeaRowId)
-                              : undefined,
-                          },
-                        })
-                      }
-                    >
-                      {t("fseOperations.resolve")}
-                    </Button>
-                  </div>
-                )}
-                {hasPermission("magazzino.fse.reconcile.manage") && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      disabled={
-                        !selectedReconciliation.data ||
-                        recalculateReconciliation.isPending
-                      }
-                      onClick={() =>
-                        recalculateReconciliation.mutate({
-                          id: selectedReconciliationId,
-                          data: {
-                            versione: Number(
-                              selectedReconciliation.data?.versione,
-                            ),
-                          },
-                        })
-                      }
-                    >
-                      {t("fseOperations.recalculate")}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      disabled={
-                        !selectedReconciliation.data ||
-                        [
-                          "RICONCILIATA",
-                          "CHIUSA_CON_SCOSTAMENTI",
-                          "ANNULLATA",
-                        ].includes(String(selectedReconciliation.data.stato)) ||
-                        cancelReconciliation.isPending
-                      }
-                      onClick={() =>
-                        cancelReconciliation.mutate({
-                          id: selectedReconciliationId,
-                          data: {
-                            versione: Number(
-                              selectedReconciliation.data?.versione,
-                            ),
-                          },
-                        })
-                      }
-                    >
-                      {t("fseOperations.cancelReconciliation")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={
-                        !selectedReconciliation.data ||
-                        closeReconciliation.isPending
-                      }
-                      onClick={() =>
-                        closeReconciliation.mutate({
-                          id: selectedReconciliationId,
-                          data: {
-                            versione: Number(
-                              selectedReconciliation.data?.versione,
-                            ),
-                            conScostamenti: false,
-                          },
-                        })
-                      }
-                    >
-                      {t("fseOperations.closeExact")}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      disabled={
-                        !selectedReconciliation.data ||
-                        resolutionMotivation.trim().length < 3 ||
-                        closeReconciliation.isPending
-                      }
-                      onClick={() =>
-                        closeReconciliation.mutate({
-                          id: selectedReconciliationId,
-                          data: {
-                            versione: Number(
-                              selectedReconciliation.data?.versione,
-                            ),
-                            conScostamenti: true,
-                            motivazione: resolutionMotivation.trim(),
-                          },
-                        })
-                      }
-                    >
-                      {t("fseOperations.closeWithDifferences")}
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    {t("fseOperations.version")}:{" "}
+                    {selectedReconciliation.data
+                      ? text(selectedReconciliation.data, "versione")
+                      : "—"}{" "}
+                    · {t("fseOperations.status")}:{" "}
+                    {selectedReconciliation.data
+                      ? text(selectedReconciliation.data, "stato")
+                      : "—"}
+                  </p>
+                  <RecordList
+                    query={reconciliationLines}
+                    rows={fseReadableData(reconciliationLines)?.rows}
+                    pagination={paging(
+                      "lines",
+                      fseReadableData(reconciliationLines)?.total,
+                    )}
+                    selectedId={selectedLineId}
+                    onSelect={setSelectedLineId}
+                  />
+                  {hasPermission("magazzino.fse.reconcile.manage") && (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <select
+                        aria-label={t("fseOperations.action")}
+                        className="h-10 rounded-md border bg-background px-3 text-sm"
+                        value={resolutionAction}
+                        onChange={(event) =>
+                          setResolutionAction(
+                            event.target.value as FseResolutionInputAzione,
+                          )
+                        }
+                      >
+                        {Object.values(FseResolutionInputAzione).map(
+                          (action) => (
+                            <option key={action} value={action}>
+                              {action}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                      {resolutionAction === FseResolutionInputAzione.ABBINA && (
+                        <>
+                          <FseRequiredInput
+                            valid={
+                              Number.isSafeInteger(Number(targetMovementId)) &&
+                              Number(targetMovementId) > 0
+                            }
+                            type="number"
+                            min={1}
+                            placeholder={t("fseOperations.targetMovement")}
+                            value={targetMovementId}
+                            onChange={(event) =>
+                              setTargetMovementId(event.target.value)
+                            }
+                          />
+                          <FseRequiredInput
+                            valid={
+                              Number.isSafeInteger(Number(targetAgeaRowId)) &&
+                              Number(targetAgeaRowId) > 0
+                            }
+                            type="number"
+                            min={1}
+                            placeholder={t("fseOperations.targetAgeaRow")}
+                            value={targetAgeaRowId}
+                            onChange={(event) =>
+                              setTargetAgeaRowId(event.target.value)
+                            }
+                          />
+                        </>
+                      )}
+                      <FseRequiredInput
+                        valid={resolutionMotivation.trim().length >= 3}
+                        aria-label={t("fseOperations.motivation")}
+                        placeholder={t("fseOperations.motivation")}
+                        value={resolutionMotivation}
+                        onChange={(event) =>
+                          setResolutionMotivation(event.target.value)
+                        }
+                      />
+                      <Button
+                        disabled={
+                          !fseResolutionReady({
+                            lineId: selectedLineId,
+                            action: resolutionAction,
+                            motivation: resolutionMotivation,
+                            targetMovementId,
+                            targetAgeaRowId,
+                            hasHeader: selectedReconciliation.data != null,
+                          }) || resolveLine.isPending
+                        }
+                        onClick={() =>
+                          resolveLine.mutate({
+                            id: selectedReconciliationId,
+                            rigaId: selectedLineId!,
+                            data: {
+                              versione: Number(
+                                selectedReconciliation.data?.versione,
+                              ),
+                              azione: resolutionAction,
+                              motivazione: resolutionMotivation.trim(),
+                              movimentoId: targetMovementId
+                                ? Number(targetMovementId)
+                                : undefined,
+                              ...(selectedReconciliation.data?.sourceType ===
+                              "FSE_M3B"
+                                ? {
+                                    observationId: targetAgeaRowId
+                                      ? Number(targetAgeaRowId)
+                                      : undefined,
+                                  }
+                                : {
+                                    importazioneAgeaRigaId: targetAgeaRowId
+                                      ? Number(targetAgeaRowId)
+                                      : undefined,
+                                  }),
+                            },
+                          })
+                        }
+                      >
+                        {t("fseOperations.resolve")}
+                      </Button>
+                    </div>
+                  )}
+                  {hasPermission("magazzino.fse.reconcile.manage") && (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedReconciliation.data?.sourceType ===
+                        "FSE_M3B" && (
+                        <div>
+                          <Label htmlFor="fse-recalculate-version">
+                            {t("fseOperations.sourceVersionRequired")}
+                          </Label>
+                          <FseRequiredInput
+                            id="fse-recalculate-version"
+                            type="number"
+                            min={1}
+                            valid={Number(recalculationSourceVersion) > 0}
+                            value={recalculationSourceVersion}
+                            onChange={(e) =>
+                              setRecalculationSourceVersion(e.target.value)
+                            }
+                          />
+                        </div>
+                      )}
+                      <Button
+                        variant="outline"
+                        disabled={
+                          !selectedReconciliation.data ||
+                          (selectedReconciliation.data?.sourceType ===
+                            "FSE_M3B" &&
+                            !(Number(recalculationSourceVersion) > 0)) ||
+                          recalculateReconciliation.isPending
+                        }
+                        onClick={() =>
+                          recalculateReconciliation.mutate({
+                            id: selectedReconciliationId,
+                            data: {
+                              versione: Number(
+                                selectedReconciliation.data?.versione,
+                              ),
+                              sessionVersion:
+                                selectedReconciliation.data?.sourceType ===
+                                "FSE_M3B"
+                                  ? Number(recalculationSourceVersion)
+                                  : undefined,
+                            },
+                          })
+                        }
+                      >
+                        {t("fseOperations.recalculate")}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        disabled={
+                          !selectedReconciliation.data ||
+                          [
+                            "RICONCILIATA",
+                            "CHIUSA_CON_SCOSTAMENTI",
+                            "ANNULLATA",
+                          ].includes(
+                            String(selectedReconciliation.data.stato),
+                          ) ||
+                          cancelReconciliation.isPending
+                        }
+                        onClick={() =>
+                          cancelReconciliation.mutate({
+                            id: selectedReconciliationId,
+                            data: {
+                              versione: Number(
+                                selectedReconciliation.data?.versione,
+                              ),
+                            },
+                          })
+                        }
+                      >
+                        {t("fseOperations.cancelReconciliation")}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={
+                          !selectedReconciliation.data ||
+                          closeReconciliation.isPending
+                        }
+                        onClick={() =>
+                          closeReconciliation.mutate({
+                            id: selectedReconciliationId,
+                            data: {
+                              versione: Number(
+                                selectedReconciliation.data?.versione,
+                              ),
+                              conScostamenti: false,
+                            },
+                          })
+                        }
+                      >
+                        {t("fseOperations.closeExact")}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        disabled={
+                          !selectedReconciliation.data ||
+                          resolutionMotivation.trim().length < 3 ||
+                          closeReconciliation.isPending
+                        }
+                        onClick={() =>
+                          closeReconciliation.mutate({
+                            id: selectedReconciliationId,
+                            data: {
+                              versione: Number(
+                                selectedReconciliation.data?.versione,
+                              ),
+                              conScostamenti: true,
+                              motivazione: resolutionMotivation.trim(),
+                            },
+                          })
+                        }
+                      >
+                        {t("fseOperations.closeWithDifferences")}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
         </TabsContent>
         <TabsContent value="indicators" className="grid gap-4 lg:grid-cols-2">
           <Card>
@@ -920,7 +1260,8 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
               <CardTitle>{t("fseOperations.monitoringTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Input
+              <FseRequiredInput
+                valid={/^\d{4}-(0[1-9]|1[0-2])$/.test(monitoringMonth)}
                 type="month"
                 value={monitoringMonth}
                 onChange={(event) => setMonitoringMonth(event.target.value)}
@@ -990,7 +1331,12 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
             </CardHeader>
             <CardContent>
               <RecordList
-                rows={monitoring.data?.rows}
+                query={monitoring}
+                rows={fseReadableData(monitoring)?.rows}
+                pagination={paging(
+                  "monitoring",
+                  fseReadableData(monitoring)?.total,
+                )}
                 selectedId={selectedMonitoringId}
                 onSelect={setSelectedMonitoringId}
               />
@@ -998,7 +1344,11 @@ export function FseOperations({ filters }: { filters: ReportingFilterState }) {
           </Card>
         </TabsContent>
         <TabsContent value="anomalies">
-          <RecordList rows={quality.data?.rows} />
+          <RecordList
+            query={quality}
+            rows={fseReadableData(quality)?.rows}
+            pagination={paging("quality", fseReadableData(quality)?.total)}
+          />
         </TabsContent>
       </Tabs>
     </section>

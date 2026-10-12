@@ -12,7 +12,7 @@ import {
   type AgeaImportMode,
   type FondoOrigine,
 } from "@workspace/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { InventoryDecimal } from "./inventoryDecimal";
 import {
   createWarehouseLoad,
@@ -252,6 +252,7 @@ async function mappingsForRows(
     .where(
       and(
         eq(mappatureProdottiEsterniTable.fonte, "AGEA_SIFEAD"),
+        isNull(mappatureProdottiEsterniTable.sourceRegistryId),
         eq(mappatureProdottiEsterniTable.attiva, true),
         inArray(
           mappatureProdottiEsterniTable.chiaveDescrizioneNormalizzata,
@@ -417,6 +418,7 @@ async function rebuildImport(
         .where(
           and(
             eq(mappatureProdottiEsterniTable.fonte, "AGEA_SIFEAD"),
+            isNull(mappatureProdottiEsterniTable.sourceRegistryId),
             eq(mappatureProdottiEsterniTable.attiva, true),
             inArray(
               mappatureProdottiEsterniTable.chiaveDescrizioneNormalizzata,

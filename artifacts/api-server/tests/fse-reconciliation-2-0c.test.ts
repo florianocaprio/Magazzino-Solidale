@@ -14,9 +14,12 @@ import {
   riconciliazioniFseRisoluzioniTable,
   riconciliazioniFseTable,
   utentiTable,
+  areeOperativeTable,
+  ruoliTable,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { removeFseRunFixtures } from "./helpers/fse-snapshot-cleanup";
 import request from "supertest";
 import {
   calculateFseReconciliation,
@@ -173,7 +176,74 @@ describe("Magazzino 2.0C — matching riconciliazione", () => {
 });
 
 const suffix = `${process.pid}${Date.now().toString(36)}`;
+it("M64 F21: API reale raggiunge tutte le 201 righe di riconciliazione", async () => {
+  const [header] = await db
+    .insert(riconciliazioniFseTable)
+    .values({
+      magazzinoId,
+      importazioneAgeaId: importId,
+      dataRiferimento: "2026-08-31",
+      maxMovimentoId: 0,
+      maxOperazioneDistribuzioneId: 0,
+      modelVersion: "MAGAZZINO_2_0C_R1_V2",
+      canonicalHash: "0".repeat(64),
+      stato: "DA_RIVEDERE",
+      creatoDa: userId,
+      totaleRighe: 201,
+    })
+    .returning();
+  try {
+    const inserted = await db
+      .insert(riconciliazioniFseRigheTable)
+      .values(
+        Array.from({ length: 201 }, (_, i) => ({
+          riconciliazioneId: header.id,
+          tipoRiga: "MOVIMENTO",
+          businessKey: `m64-page-${i}`,
+          matchMethod: "NESSUNO",
+          status: "SOLO_AGEA",
+          blocking: true,
+          contentHash: "0".repeat(64),
+        })),
+      )
+      .returning({ id: riconciliazioniFseRigheTable.id });
+    const api = makeScopedApp(fseRouter, {
+      id: userId,
+      areaOperativaId: areaId,
+      centroAscoltoId: null,
+      permessi: permissions,
+    });
+    const actual: number[] = [];
+    for (let page = 1; page <= 11; page++) {
+      const response = await request(api)
+        .get(`/fse/riconciliazioni/${header.id}/righe`)
+        .query({ page, pageSize: 20 });
+      expect(response.status, response.text).toBe(200);
+      expect(response.body.total).toBe(201);
+      expect(response.body.rows).toHaveLength(page === 11 ? 1 : 20);
+      actual.push(...response.body.rows.map((row: { id: number }) => row.id));
+    }
+    expect(new Set(actual).size).toBe(201);
+    expect([...actual].sort((a, b) => a - b)).toEqual(
+      inserted.map((row) => row.id).sort((a, b) => a - b),
+    );
+  } finally {
+    await db
+      .delete(riconciliazioniFseRigheTable)
+      .where(eq(riconciliazioniFseRigheTable.riconciliazioneId, header.id));
+    await db
+      .delete(riconciliazioniFseTable)
+      .where(eq(riconciliazioniFseTable.id, header.id));
+  }
+});
 let userId: number;
+let areaId: number;
+let roleId: number;
+const permissions = [
+  "magazzino.fse.view",
+  "magazzino.fse.reconcile",
+  "magazzino.fse.reconcile.manage",
+];
 let magazzinoId: number;
 let prodottoId: number;
 let lottoId: number;
@@ -184,6 +254,19 @@ let importRowId: number;
 let reconciliationId: number;
 
 beforeAll(async () => {
+  [{ id: areaId }] = await db
+    .insert(areeOperativeTable)
+    .values({ nome: `FSE recon area ${suffix}` })
+    .returning();
+  [{ id: roleId }] = await db
+    .insert(ruoliTable)
+    .values({
+      nome: `FSE recon role ${suffix}`,
+      isAdmin: false,
+      aree: ["magazzino"],
+      permessi: permissions,
+    })
+    .returning();
   [{ id: userId }] = await db
     .insert(utentiTable)
     .values({
@@ -191,6 +274,8 @@ beforeAll(async () => {
       passwordHash: "x",
       nome: "Test",
       cognome: "Recon",
+      ruoloId: roleId,
+      areaOperativaId: areaId,
     })
     .returning({ id: utentiTable.id });
   [{ id: magazzinoId }] = await db
@@ -198,6 +283,7 @@ beforeAll(async () => {
     .values({
       codice: `FSER-${suffix}`.slice(0, 20),
       nome: `FSE recon ${suffix}`,
+      areaOperativaId: areaId,
     })
     .returning({ id: magazziniTable.id });
   [{ id: prodottoId }] = await db
@@ -312,6 +398,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (reconciliationId) {
+    await removeFseRunFixtures([reconciliationId]);
     await db
       .delete(riconciliazioniFseRisoluzioniTable)
       .where(
@@ -343,6 +430,8 @@ afterAll(async () => {
   await db.delete(prodottiTable).where(eq(prodottiTable.id, prodottoId));
   await db.delete(magazziniTable).where(eq(magazziniTable.id, magazzinoId));
   await db.delete(utentiTable).where(eq(utentiTable.id, userId));
+  await db.delete(ruoliTable).where(eq(ruoliTable.id, roleId));
+  await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, areaId));
   await pool.end();
 });
 
@@ -425,13 +514,14 @@ describe("Magazzino 2.0C — snapshot riconciliazione PostgreSQL", () => {
     const api = makeScopedApp(fseRouter, {
       id: userId,
       centroAscoltoId: null,
+      areaOperativaId: areaId,
       aree: ["magazzino"],
       permessi: [
         "magazzino.fse.view",
         "magazzino.fse.reconcile",
         "magazzino.fse.reconcile.manage",
       ],
-      isAdmin: true,
+      isAdmin: false,
     });
     let [header] = await db
       .select()

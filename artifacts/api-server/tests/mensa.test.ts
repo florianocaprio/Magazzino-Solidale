@@ -60,6 +60,7 @@ import { aggregatiConsumiMensa } from "../src/lib/mensaService";
 import { areaGuard } from "../src/middlewares/auth";
 import { initDbExtensions } from "../src/lib/dbInit";
 import { InventoryDecimal } from "../src/lib/inventoryDecimal";
+import { buildFseCanonicalReport } from "../src/lib/fseCanonicalReporting";
 import bcrypt from "bcryptjs";
 
 const sessionListeners = httpListeners({ diagnostics: "mensa-real-session" });
@@ -5185,6 +5186,8 @@ describe("Modulo Mensa", () => {
         products.map((product, index) => ({
           prodottoId: product.id,
           codiceLotto: `R2L${index}-${rnd()}`,
+          fsePlus: true,
+          fondoOrigine: "FSE_PLUS" as const,
           dataScadenza: `2027-0${index + 1}-15`,
           dataCarico: "2026-08-01",
           quantitaCaricata: "5.000000",
@@ -5313,6 +5316,27 @@ describe("Modulo Mensa", () => {
         : net.add(quantity);
     }, InventoryDecimal.zero());
     expect(netAfterB.toDb()).toBe("3.000000");
+    const fseAfterB = await buildFseCanonicalReport({
+      magazzinoId: fixture.warehouseIds[0],
+      dataDa: today,
+      dataA: today,
+    });
+    expect(
+      fseAfterB.events.find(
+        (event) => event.eventKey === `DISTRIBUZIONE:${operation.id}`,
+      ),
+    ).toMatchObject({
+      blocking: true,
+      qualityCodes: expect.arrayContaining([
+        "STATISTICHE_STORNO_PARZIALE_NON_RIPARTIBILI",
+        "STATISTICHE_DDC_MANCANTI",
+      ]),
+    });
+    expect(
+      fseAfterB.lines.filter(
+        (line) => line.accountingNature === "DISTRIBUZIONE_FINALE",
+      ),
+    ).toHaveLength(2);
 
     const reversalB = await request(app)
       .post(`/mensa/consumi/${second.body.id}/storno`)
