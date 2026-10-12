@@ -646,7 +646,7 @@ function FseOperationsContext({
         )}
         <TabsList className="h-auto flex-wrap justify-start">
           {FSE_OPERATION_TABS.map((tab) => (
-            <TabsTrigger key={tab} value={tab}>
+            <TabsTrigger key={tab} value={tab} className="min-h-11 min-w-11">
               {t(`fseOperations.${tab}`)}
             </TabsTrigger>
           ))}

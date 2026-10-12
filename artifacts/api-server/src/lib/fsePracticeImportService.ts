@@ -966,75 +966,78 @@ async function persistStockRows(
   ]);
   const productMap = await productsById(tx, [...mappings.values()]);
   if (parsed.stockRows.length === 0) return;
-  await tx.insert(fseImportStockRowsTable).values(
-    parsed.stockRows.map((row) => {
-      const productId = mappings.get(row.prodottoNormalizzato) ?? null;
-      const product = productId == null ? null : productMap.get(productId);
-      let operational: ReturnType<typeof quantityForProduct> | null = null;
-      const errors = [...row.errorCodes];
-      if (product) {
-        try {
-          const productUnit = product.unitaMisura.trim().toLowerCase();
-          if (
-            ["kg", "l", "lt"].includes(productUnit) &&
-            row.unitaMisuraPeso != null &&
-            !(
-              (productUnit === "kg" && row.unitaMisuraPeso === "kg") ||
-              (["l", "lt"].includes(productUnit) && row.unitaMisuraPeso === "l")
+  for (let offset = 0; offset < parsed.stockRows.length; offset += 500) {
+    await tx.insert(fseImportStockRowsTable).values(
+      parsed.stockRows.slice(offset, offset + 500).map((row) => {
+        const productId = mappings.get(row.prodottoNormalizzato) ?? null;
+        const product = productId == null ? null : productMap.get(productId);
+        let operational: ReturnType<typeof quantityForProduct> | null = null;
+        const errors = [...row.errorCodes];
+        if (product) {
+          try {
+            const productUnit = product.unitaMisura.trim().toLowerCase();
+            if (
+              ["kg", "l", "lt"].includes(productUnit) &&
+              row.unitaMisuraPeso != null &&
+              !(
+                (productUnit === "kg" && row.unitaMisuraPeso === "kg") ||
+                (["l", "lt"].includes(productUnit) &&
+                  row.unitaMisuraPeso === "l")
+              )
             )
-          )
-            throw new FsePracticeImportError(
-              400,
-              "UNITA_PESO_INCOMPATIBILE",
-              `L'unità esterna non coincide con ${product.unitaMisura}`,
+              throw new FsePracticeImportError(
+                400,
+                "UNITA_PESO_INCOMPATIBILE",
+                `L'unità esterna non coincide con ${product.unitaMisura}`,
+              );
+            if (product.lottoFisicoObbligatorio && !row.lottoRaw)
+              errors.push("LOTTO_FISICO_OBBLIGATORIO");
+            if (product.gestioneScadenza && !row.dataScadenza)
+              errors.push("SCADENZA_OBBLIGATORIA");
+            operational = quantityForProduct(product, {
+              pieces: row.giacenzaPezzi,
+              kgLt: row.giacenzaPesoVolume,
+              factor: row.pesoUnita,
+            });
+          } catch (error) {
+            errors.push(
+              error instanceof FsePracticeImportError
+                ? error.code
+                : "QUANTITA_NON_COMPATIBILE",
             );
-          if (product.lottoFisicoObbligatorio && !row.lottoRaw)
-            errors.push("LOTTO_FISICO_OBBLIGATORIO");
-          if (product.gestioneScadenza && !row.dataScadenza)
-            errors.push("SCADENZA_OBBLIGATORIA");
-          operational = quantityForProduct(product, {
-            pieces: row.giacenzaPezzi,
-            kgLt: row.giacenzaPesoVolume,
-            factor: row.pesoUnita,
-          });
-        } catch (error) {
-          errors.push(
-            error instanceof FsePracticeImportError
-              ? error.code
-              : "QUANTITA_NON_COMPATIBILE",
-          );
+          }
         }
-      }
-      return {
-        sessioneId: sessionId,
-        fileId,
-        numeroRiga: row.numeroRiga,
-        rawJson: row.rawJson,
-        balanceKey: row.balanceKey,
-        fondoOrigine: row.fondoNormalizzato,
-        prodottoEsterno: row.prodottoRaw,
-        prodottoNormalizzato: row.prodottoNormalizzato,
-        lottoFisico: row.lottoRaw,
-        pesoUnita: row.pesoUnita,
-        unitaMisuraPeso: row.unitaMisuraPeso,
-        giacenzaPesoVolume: row.giacenzaPesoVolume,
-        giacenzaPezzi: row.giacenzaPezzi,
-        pezziPerCollo: row.pezziPerCollo,
-        giacenzaColli: row.giacenzaColli,
-        dataScadenza: row.dataScadenza,
-        prodottoId: productId,
-        quantitaOperativa: operational?.quantitaOperativa ?? null,
-        stato:
-          errors.length > 0
-            ? "ERRORE"
-            : productId == null
-              ? "DA_ASSOCIARE"
-              : "PRONTO",
-        errorCodesJson: [...new Set(errors)],
-        warningCodesJson: row.warningCodes,
-      };
-    }),
-  );
+        return {
+          sessioneId: sessionId,
+          fileId,
+          numeroRiga: row.numeroRiga,
+          rawJson: row.rawJson,
+          balanceKey: row.balanceKey,
+          fondoOrigine: row.fondoNormalizzato,
+          prodottoEsterno: row.prodottoRaw,
+          prodottoNormalizzato: row.prodottoNormalizzato,
+          lottoFisico: row.lottoRaw,
+          pesoUnita: row.pesoUnita,
+          unitaMisuraPeso: row.unitaMisuraPeso,
+          giacenzaPesoVolume: row.giacenzaPesoVolume,
+          giacenzaPezzi: row.giacenzaPezzi,
+          pezziPerCollo: row.pezziPerCollo,
+          giacenzaColli: row.giacenzaColli,
+          dataScadenza: row.dataScadenza,
+          prodottoId: productId,
+          quantitaOperativa: operational?.quantitaOperativa ?? null,
+          stato:
+            errors.length > 0
+              ? "ERRORE"
+              : productId == null
+                ? "DA_ASSOCIARE"
+                : "PRONTO",
+          errorCodesJson: [...new Set(errors)],
+          warningCodesJson: row.warningCodes,
+        };
+      }),
+    );
+  }
 }
 
 async function refreshSessionState(

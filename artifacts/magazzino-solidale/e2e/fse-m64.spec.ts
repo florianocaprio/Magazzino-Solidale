@@ -25,6 +25,24 @@ test.describe("M6.4 — reporting verticale", () => {
       name: "Rendicontazione FSE+",
       exact: true,
     });
+    for (const name of [
+      "Panoramica",
+      "Da rendicontare",
+      "Esportazioni",
+      "Riconciliazioni",
+      "Indicatori",
+      "Anomalie",
+    ]) {
+      const tab = panel.getByRole("tab", { name, exact: true });
+      await tab.scrollIntoViewIfNeeded();
+      await expect(tab).toBeVisible();
+      const bounds = await tab.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.height).toBeGreaterThanOrEqual(44);
+      expect(bounds!.width).toBeGreaterThanOrEqual(44);
+      await tab.click();
+      await expect(tab).toHaveAttribute("data-state", "active");
+    }
     await expect(
       panel.getByRole("tab", { name: "Da rendicontare", exact: true }),
     ).toBeVisible();

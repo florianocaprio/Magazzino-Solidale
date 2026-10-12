@@ -1,6 +1,7 @@
 /* @vitest-environment node */
 
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import express, { type Express } from "express";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -16,6 +17,7 @@ import {
   fseImportRowRevisionsTable,
   fseImportRowsTable,
   fseImportSessionsTable,
+  fseImportStockRowsTable,
   fseInitialBalanceCoverageTable,
   fseMovementIdentityAliasesTable,
   fseMovementClaimsTable,
@@ -178,6 +180,7 @@ function appFor(
     areaOperativaId?: number | null;
     permissions?: string[];
     actorId?: number;
+    errors?: unknown[];
   } = {},
 ): Express {
   const app = express();
@@ -214,7 +217,34 @@ function appFor(
   app.use(ageaRouter);
   app.use(fseImportazioniRouter);
   app.use(caricoPraticheRouter);
+  if (options.errors) {
+    app.use(
+      (
+        error: unknown,
+        _req: express.Request,
+        _res: express.Response,
+        next: express.NextFunction,
+      ) => {
+        options.errors!.push(error);
+        next(error);
+      },
+    );
+  }
   return app;
+}
+
+function errorMessages(errors: unknown[]): string[] {
+  return errors.flatMap((error) => {
+    const messages: string[] = [];
+    for (
+      let current = error;
+      current instanceof Error;
+      current = current.cause
+    ) {
+      messages.push(current.message.slice(0, 300));
+    }
+    return messages;
+  });
 }
 
 async function createEmptyPractice(
@@ -626,6 +656,217 @@ afterAll(async () => {
 });
 
 describe("M3B — import FSE+ nella pratica Carico Merce", () => {
+  it.each([5000, 10000])(
+    "R64-07 acquisisce %i Giacenze senza stock, con mapping, ownership, hash e replay",
+    async (count) => {
+      const errors: unknown[] = [];
+      const app = appFor({ errors });
+      const context = await createIsolatedContext(`volume-${count}`);
+      const practice = await createEmptyPractice(app, context.warehouseId);
+      expect(practice.status).toBe(201);
+      const mappedProducts = await db
+        .insert(prodottiTable)
+        .values(
+          ["pz", "kg", "l"].map((unit) => ({
+            codice: `V${count}-${unit}-${suffix}`.slice(0, 30),
+            nome: `Volume ${unit}`,
+            tipoProdotto: "alimentare",
+            unitaMisura: unit,
+            quantitaFrazionabile: unit !== "pz",
+            lottoFisicoObbligatorio: false,
+            gestioneScadenza: false,
+          })),
+        )
+        .returning();
+      await db.insert(mappatureProdottiEsterniTable).values(
+        mappedProducts.map((product) => ({
+          fonte: "AGEA_SIFEAD",
+          sourceRegistryId: context.sourceId,
+          descrizioneEsterna: `Volume ${product.unitaMisura}`,
+          chiaveDescrizioneNormalizzata: `VOLUME ${product.unitaMisura.toUpperCase()}`,
+          prodottoId: product.id,
+          creatoDa: actorId,
+          aggiornatoDa: actorId,
+        })),
+      );
+      const rows = Array.from({ length: count }, (_, index) => {
+        const variant = index % 4;
+        const unit = ["pz", "kg", "l", "unmapped"][variant];
+        const row: unknown[] = stockRow(4, `V-${index}`);
+        row[4] = index % 2 ? "FSE+" : "Fondo Nazionale";
+        row[5] = `Volume ${unit}`;
+        if (variant === 1 || variant === 2) {
+          row[7] = 0.5;
+          row[8] = unit;
+          row[9] = 2;
+          row[11] = 2;
+          row[12] = 2;
+          row[14] = "17/09/2027";
+        }
+        return row;
+      });
+      const bytes = workbook(stockHeaders, rows);
+      const input = {
+        ...context,
+        bytes,
+        practiceId: practice.body.id,
+        mode: "SALDO_INIZIALE" as const,
+        profile: "GIACENZE" as const,
+      };
+      const started = Date.now();
+      const response = await upload(app, input);
+      expect(response.status, JSON.stringify(errorMessages(errors))).toBe(201);
+      const { sessionId, fileId } = response.body;
+      const [session] = await db
+        .select()
+        .from(fseImportSessionsTable)
+        .where(eq(fseImportSessionsTable.id, sessionId));
+      expect(session).toMatchObject({
+        sourceRegistryId: context.sourceId,
+        magazzinoId: context.warehouseId,
+        areaOperativaId: areaId,
+        caricoPraticaId: practice.body.id,
+        creatoDa: actorId,
+      });
+      const [file] = await db
+        .select()
+        .from(fseImportFilesTable)
+        .where(eq(fseImportFilesTable.id, fileId));
+      expect(file).toMatchObject({
+        sessioneId: sessionId,
+        profilo: "GIACENZE",
+        sha256File: createHash("sha256").update(bytes).digest("hex"),
+      });
+      const saved = await db
+        .select()
+        .from(fseImportStockRowsTable)
+        .where(eq(fseImportStockRowsTable.sessioneId, sessionId))
+        .orderBy(fseImportStockRowsTable.numeroRiga);
+      expect(saved).toHaveLength(count);
+      expect(
+        saved.every(
+          (row) => row.fileId === fileId && row.errorCodesJson.length === 0,
+        ),
+      ).toBe(true);
+      expect(saved.filter((row) => row.stato === "PRONTO")).toHaveLength(
+        (count * 3) / 4,
+      );
+      expect(saved.filter((row) => row.stato === "DA_ASSOCIARE")).toHaveLength(
+        count / 4,
+      );
+      expect(saved[0]).toMatchObject({
+        lottoFisico: "V-0",
+        quantitaOperativa: "4.00",
+        pesoUnita: null,
+      });
+      expect(saved[1]).toMatchObject({
+        lottoFisico: "V-1",
+        unitaMisuraPeso: "kg",
+        quantitaOperativa: "2.00",
+      });
+      expect(saved[2]).toMatchObject({
+        unitaMisuraPeso: "l",
+        quantitaOperativa: "2.00",
+      });
+      const replay = await upload(app, input);
+      expect(replay.status).toBe(200);
+      expect(replay.body).toMatchObject({ sessionId, fileId, replay: true });
+      expect(
+        await db
+          .select()
+          .from(fseImportStockRowsTable)
+          .where(eq(fseImportStockRowsTable.sessioneId, sessionId))
+          .orderBy(fseImportStockRowsTable.numeroRiga),
+      ).toEqual(saved);
+      expect(
+        await db
+          .select()
+          .from(fseImportFilesTable)
+          .where(eq(fseImportFilesTable.sessioneId, sessionId)),
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(movimentiTable)
+          .where(eq(movimentiTable.magazzinoId, context.warehouseId)),
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(lottiTable)
+          .where(eq(lottiTable.magazzinoId, context.warehouseId)),
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(fseMovementClaimsTable)
+          .where(eq(fseMovementClaimsTable.sourceRegistryId, context.sourceId)),
+      ).toEqual([]);
+      console.info(
+        `R64-07 GIACENZE ${count}: upload/ownership/hash/replay ${Date.now() - started}ms`,
+      );
+    },
+  );
+
+  it("R64-07 errore oltre il primo batch Giacenze annulla sessione, file, righe e audit", async () => {
+    const errors: unknown[] = [];
+    const app = appFor({ errors });
+    const context = await createIsolatedContext("batch-rollback");
+    const practice = await createEmptyPractice(app, context.warehouseId);
+    expect(practice.status).toBe(201);
+    const snapshot = async () => {
+      const result: Record<string, unknown> = {};
+      for (const table of [
+        "fse_import_sessions",
+        "fse_import_files",
+        "fse_import_stock_rows",
+        "audit_eventi",
+        "movimenti",
+        "lotti",
+        "fse_movement_claims",
+      ]) {
+        result[table] = (
+          await pool.query(
+            `SELECT count(*)::int AS n, max(id) AS last_id FROM ${table}`,
+          )
+        ).rows;
+      }
+      return result;
+    };
+    const before = await snapshot();
+    await pool.query(`CREATE FUNCTION r64_stock_batch_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.lotto_fisico='R64-FAIL-600' THEN
+          IF (SELECT count(*) FROM fse_import_stock_rows WHERE sessione_id=NEW.sessione_id) < 500 THEN
+            RAISE EXCEPTION 'R64_FIRST_BATCH_NOT_OBSERVED';
+          END IF;
+          RAISE EXCEPTION 'R64_STOCK_BATCH_INJECTED';
+        END IF;
+        RETURN NEW;
+      END $$;
+      CREATE TRIGGER r64_stock_batch_failure BEFORE INSERT ON fse_import_stock_rows
+        FOR EACH ROW EXECUTE FUNCTION r64_stock_batch_failure()`);
+    try {
+      const response = await upload(app, {
+        ...context,
+        practiceId: practice.body.id,
+        bytes: workbook(
+          stockHeaders,
+          Array.from({ length: 1000 }, (_, i) => stockRow(4, `R64-FAIL-${i}`)),
+        ),
+        mode: "SALDO_INIZIALE",
+        profile: "GIACENZE",
+      });
+      expect(response.status).toBe(500);
+      expect(errorMessages(errors)).toContain("R64_STOCK_BATCH_INJECTED");
+      expect(await snapshot()).toEqual(before);
+    } finally {
+      await pool.query(
+        "DROP TRIGGER r64_stock_batch_failure ON fse_import_stock_rows; DROP FUNCTION r64_stock_batch_failure()",
+      );
+    }
+  });
+
   it("riserva la configurazione sorgente agli amministratori e serializza i codici duplicati", async () => {
     const code = `M3B-ADMIN-${suffix}`;
     const payload = {

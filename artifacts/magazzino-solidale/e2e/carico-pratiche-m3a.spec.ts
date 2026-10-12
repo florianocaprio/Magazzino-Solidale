@@ -373,10 +373,8 @@ test.describe("M3A — pratica di carico persistente", () => {
       ),
     ).toBeVisible();
 
-    await page
-      .getByRole("link", { name: /giacenze/i })
-      .first()
-      .click();
+    await page.getByRole("button", { name: "Magazzino", exact: true }).click();
+    await page.getByRole("link", { name: "Giacenze", exact: true }).click();
     const unsavedDialog = page.getByRole("alertdialog", {
       name: /modifiche non salvate/i,
     });
