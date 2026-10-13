@@ -500,6 +500,7 @@ export * from "./listInterventiParams";
 export * from "./listLottiLogiciParams";
 export * from "./listLottiMensaParams";
 export * from "./listLottiParams";
+export * from "./listMagazziniMensaParams";
 export * from "./listMensaAbilitazioniParams";
 export * from "./listMenseParams";
 export * from "./listMovimentiParams";

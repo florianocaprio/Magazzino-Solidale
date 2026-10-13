@@ -78,6 +78,7 @@ import {
 } from "../lib/m5bRequestAccess";
 import { currentMensaScope, MensaScopeError } from "../lib/mensaScope";
 import type { PermissionKey } from "../lib/permissions";
+import { canAccessCentro } from "../lib/centroScope";
 
 const router: IRouter = Router();
 router.use("/richieste-magazzino", requireModulo("MAGAZZINO_SOLIDALE"));
@@ -139,6 +140,7 @@ const createSchema = z.strictObject({
   enteDestinatarioId: positive.optional(),
   magazzinoDestinatarioId: positive.optional(),
   mensaId: positive.optional(),
+  magazzinoRichiestoId: positive.optional(),
   interventoId: positive.optional(),
   areaOperativaId: positive.optional(),
   centroAscoltoId: positive.optional(),
@@ -398,6 +400,8 @@ async function buildCreate(
   actor: Actor,
   input: Create,
 ) {
+  if (input.mensaId == null && input.magazzinoRichiestoId != null)
+    throw invalid("Il magazzino richiesto è previsto solo per richieste Mensa");
   if (input.mensaId != null) {
     if (
       !hasArea(actor, "mensa") ||
@@ -447,8 +451,27 @@ async function buildCreate(
       !area?.attivo
     )
       throw invalid("Destinazione Mensa non operativa");
+    if (input.magazzinoRichiestoId == null)
+      throw invalid("Seleziona il magazzino di approvvigionamento richiesto");
+    const [supplier] = await tx
+      .select()
+      .from(magazziniTable)
+      .where(eq(magazziniTable.id, input.magazzinoRichiestoId))
+      .for("share");
+    if (
+      !supplier ||
+      supplier.stato !== "attivo" ||
+      supplier.id === mensa.magazzinoId ||
+      supplier.areaOperativaId !== mensa.areaOperativaId ||
+      !canAccessCentro(supplier.centroAscoltoId, actor.centroAscoltoId)
+    )
+      throw invalid(
+        "Magazzino richiesto non disponibile nel contesto della Mensa",
+      );
     return {
       mensaId: mensa.id,
+      magazzinoRichiestoId: supplier.id,
+      magazzinoRichiestoNomeSnapshot: supplier.nome,
       beneficiarioId: null,
       enteDestinatarioId: null,
       magazzinoDestinatarioId: mensa.magazzinoId,
@@ -1048,8 +1071,9 @@ router.post(
               versione: 1,
               stato: "inviata",
               tipoDestinatario: created.tipoDestinatario,
+              magazzinoRichiestoId: created.magazzinoRichiestoId,
             },
-            ["versione", "stato", "tipoDestinatario"],
+            ["versione", "stato", "tipoDestinatario", "magazzinoRichiestoId"],
           ),
         });
         const snapshot = commandResult(created);

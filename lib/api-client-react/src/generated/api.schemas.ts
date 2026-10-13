@@ -169,6 +169,11 @@ export const RichiestaMagazzinoCreateModalitaPreferita = {
 
 export interface RichiestaMagazzinoCreate {
   /**
+   * Obbligatorio per nuove richieste Mensa. Preferenza della stessa Area autorizzata; il Magazzino può scegliere un'altra origine in preparazione.
+   * @minimum 1
+   */
+  magazzinoRichiestoId?: number;
+  /**
    * Mensa assegnata; destinazione derivata dal server.
    * @minimum 1
    */
@@ -338,6 +343,16 @@ export const RichiestaMagazzinoStato = {
  * Snapshot operativo; nessun dato del dossier sociale live.
  */
 export interface RichiestaMagazzino {
+  /**
+   * Preferenza originaria Mensa immutabile; null per richieste precedenti o altri percorsi. Non vincola l'origine effettiva del trasferimento.
+   * @nullable
+   */
+  magazzinoRichiestoId?: number | null;
+  /**
+   * Nome del magazzino richiesto al momento dell'invio.
+   * @nullable
+   */
+  magazzinoRichiestoNomeSnapshot?: string | null;
   /**
    * Provenienza Mensa strutturale e immutabile; null per richieste precedenti o altri percorsi.
    * @nullable
@@ -12331,6 +12346,18 @@ export type ListEccezioniMensaParams = {
    * @maximum 200
    */
   pageSize?: number;
+};
+
+export type ListMagazziniMensaParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * Mensa destinataria autorizzata; richiede Area coerente ed esclude il suo magazzino.
+   * @minimum 1
+   */
+  mensaId?: number;
 };
 
 export type ListGiacenzeMensaParams = {

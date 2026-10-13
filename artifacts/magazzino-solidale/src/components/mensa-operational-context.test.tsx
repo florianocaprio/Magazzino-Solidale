@@ -74,6 +74,7 @@ function Consumer() {
     <section data-testid="content">
       <span>{context.mense.map((m) => m.nome).join(",")}</span>
       <output>{String(draft)}</output>
+      <span data-area-interactions>{context.areaInteraction}</span>
       <button
         data-draft
         onClick={() => {
@@ -153,4 +154,30 @@ it("SEC-01: query revocata nasconde dati cached; nuovo attore non eredita draft"
   render();
   expect(host.querySelector("section")?.textContent).toContain("Mensa Milano");
   expect(host.querySelector("output")?.textContent).toBe("false");
+});
+it("Il primo clic o uso tastiera dell'Area segnala l'interazione senza azzerare il draft", () => {
+  click('[data-area="1"]');
+  click("[data-draft]");
+  const before = Number(
+    host.querySelector("[data-area-interactions]")!.textContent,
+  );
+  click('label[for="mensa-area"]');
+  expect(
+    Number(host.querySelector("[data-area-interactions]")!.textContent),
+  ).toBeGreaterThan(before);
+  expect(host.querySelector("output")?.textContent).toBe("true");
+  const after = Number(
+    host.querySelector("[data-area-interactions]")!.textContent,
+  );
+  act(() =>
+    host
+      .querySelector('label[for="mensa-area"]')!
+      .dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      ),
+  );
+  expect(
+    Number(host.querySelector("[data-area-interactions]")!.textContent),
+  ).toBeGreaterThan(after);
+  expect(host.querySelector("output")?.textContent).toBe("true");
 });

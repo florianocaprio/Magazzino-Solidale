@@ -12,6 +12,11 @@ import type { RichiestaMagazzinoCreateTipoDestinatario } from "./richiestaMagazz
 
 export interface RichiestaMagazzinoCreate {
   /**
+   * Obbligatorio per nuove richieste Mensa. Preferenza della stessa Area autorizzata; il Magazzino può scegliere un'altra origine in preparazione.
+   * @minimum 1
+   */
+  magazzinoRichiestoId?: number;
+  /**
    * Mensa assegnata; destinazione derivata dal server.
    * @minimum 1
    */

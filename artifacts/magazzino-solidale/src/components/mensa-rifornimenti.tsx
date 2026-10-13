@@ -6,6 +6,8 @@ import {
   useCancelRichiestaMagazzino,
   useListRichiesteMagazzino,
   useListTrasferimentiMensa,
+  useListMagazziniMensa,
+  getListMagazziniMensaQueryKey,
   useConfermaTrasferimento,
   useSegnalaMancatoArrivoTrasferimento,
   useGetTrasferimento,
@@ -15,9 +17,14 @@ import {
   getGetTrasferimentoQueryKey,
   type MensaTrasferimentoSummary,
   type RichiestaMagazzinoCreatePriorita,
+  type RichiestaMagazzinoCommandResult,
+  type RichiestaMagazzinoStato,
+  type RichiestaMagazzino,
 } from "@workspace/api-client-react";
 import { MensaSelect, useMensaContext } from "./mensa-operational-context";
 import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -43,6 +50,30 @@ import { mensaErrorMessage } from "@/lib/mensa-ui";
 import { generateTrasferimentoPdf } from "@/lib/trasferimento-pdf";
 import { linkedDocumentSelection } from "@/lib/richiesta-documento-navigation";
 
+const requestStatusClasses: Record<RichiestaMagazzinoStato, string> = {
+  inviata:
+    "border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-200",
+  presa_in_carico:
+    "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200",
+  chiusa:
+    "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-200",
+  annullata:
+    "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200",
+};
+
+// Presentation only: Mensa transfers are outside administrative request closure.
+// Never infer completion from dispatch, an old document or a local mutation.
+function requestDisplayStatus(
+  row: RichiestaMagazzino,
+): RichiestaMagazzinoStato {
+  return row.stato === "presa_in_carico" &&
+    row.documentoCorrente?.corrente === true &&
+    row.documentoCorrente.tipoDocumento === "trasferimento" &&
+    row.documentoCorrente.statoDocumento === "completato"
+    ? "chiusa"
+    : row.stato;
+}
+
 export function MensaRifornimenti() {
   const { t } = useTranslation();
   const [mensaId, setMensaId] = useState<number | null>(null);
@@ -56,9 +87,46 @@ export function MensaRifornimenti() {
 
 function Rifornimenti({ mensaId }: { mensaId: number }) {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const context = useMensaContext()!;
   const active = context.mense.some((m) => m.id === mensaId && m.attiva);
+  const canRequest =
+    hasPermission("mensa.transfers.request") ||
+    hasPermission("mensa.transfers.manage");
+  const [supplierId, setSupplierId] = useState("");
+  const supplierParams = { areaOperativaId: context.areaId, mensaId };
+  const suppliers = useListMagazziniMensa(supplierParams, {
+    query: {
+      queryKey: [
+        ...getListMagazziniMensaQueryKey(supplierParams),
+        "actor",
+        JSON.stringify([
+          user?.id,
+          user?.areaOperativaId,
+          user?.centroAscoltoId,
+          user?.permessi,
+          user?.aree,
+          user?.isAdmin,
+        ]),
+      ],
+      enabled: active && canRequest,
+      staleTime: 0,
+      retry: false,
+      refetchOnWindowFocus: "always",
+    },
+  });
+  const supplier =
+    !suppliers.isError && !suppliers.isLoading
+      ? suppliers.data?.find((item) => String(item.id) === supplierId)
+      : undefined;
+  useEffect(() => {
+    if (
+      suppliers.isError ||
+      (suppliers.data &&
+        !suppliers.data.some((item) => String(item.id) === supplierId))
+    )
+      setSupplierId("");
+  }, [suppliers.data, suppliers.isError, supplierId]);
   const [bisogno, setBisogno] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState("");
@@ -67,6 +135,16 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
   const [attempted, setAttempted] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [sentRequest, setSentRequest] =
+    useState<RichiestaMagazzinoCommandResult | null>(null);
+  const dismissSent = () => {
+    setSentRequest(null);
+    setSuccess("");
+  };
+  useEffect(() => {
+    setSentRequest(null);
+    setSuccess("");
+  }, [context.areaInteraction]);
   const [page, setPage] = useState(1);
   const [requestPage, setRequestPage] = useState(1);
   const [documentId, setDocumentId] = useState<number | null>(null);
@@ -80,7 +158,7 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
     };
   }, []);
   const dirty = Boolean(
-    bisogno || note || date || priority !== "normale" || pending,
+    supplierId || bisogno || note || date || priority !== "normale" || pending,
   );
   const { setDirty } = context;
   useEffect(() => {
@@ -138,15 +216,16 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
       ...[
         "/api/mensa/trasferimenti",
         "/api/mensa/mense",
+        "/api/mensa/logistica/magazzini",
         "/api/mensa/logistica/giacenze",
         "/api/trasferimenti",
       ].map((key) => client.invalidateQueries({ queryKey: [key] })),
     ]);
   };
-  const command = async (
+  const command = async <T,>(
     slot: string,
-    action: () => Promise<unknown>,
-    onSuccess?: () => void,
+    action: () => Promise<T>,
+    onSuccess?: (result: T) => void,
   ) => {
     if (lock.current) return;
     lock.current = true;
@@ -154,10 +233,10 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
     setError("");
     setSuccess("");
     try {
-      await action();
+      const result = await action();
       intents.complete(slot);
       if (alive.current) {
-        onSuccess?.();
+        onSuccess?.(result);
         setSuccess(t("mensa.operationSaved"));
       }
       // Refetch/PDF errors never repeat a successfully committed command.
@@ -174,10 +253,11 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
   };
   const submit = () => {
     setAttempted(true);
-    if (!bisogno.trim()) return;
+    if (!bisogno.trim() || !supplier) return;
     const slot = `mensa:${mensaId}:request`;
     const payload = {
       mensaId,
+      magazzinoRichiestoId: supplier.id,
       areaOperativaId: context.areaId,
       tipoDestinatario: "magazzino" as const,
       sorgente: "operativa" as const,
@@ -190,8 +270,11 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
       slot,
       () =>
         create.mutateAsync({ data: intents.prepare(slot, payload, payload) }),
-      () => {
+      (created) => {
+        setSentRequest(created);
+        setRequestPage(1);
         setBisogno("");
+        setSupplierId("");
         setNote("");
         setDate("");
         setPriority("normale");
@@ -223,9 +306,6 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
       }),
     );
   };
-  const canRequest =
-    hasPermission("mensa.transfers.request") ||
-    hasPermission("mensa.transfers.manage");
   const canReceive =
     hasPermission("mensa.transfers.receive") ||
     hasPermission("mensa.transfers.manage");
@@ -239,8 +319,31 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
           {error}
         </p>
       )}
-      {success && <p role="status">{success}</p>}
-      {canRequest && active && (
+      {success && !sentRequest && <p role="status">{success}</p>}
+      {sentRequest && canRequest && active && (
+        <Card
+          className="border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950"
+          onClick={dismissSent}
+        >
+          <CardContent className="space-y-3 p-6">
+            <div role="status" aria-live="polite" className="space-y-2">
+              <CheckCircle2
+                aria-hidden="true"
+                className="h-10 w-10 text-emerald-700 dark:text-emerald-300"
+              />
+              <h2 className="text-xl font-semibold">
+                {t("mensa.requestSent")}
+              </h2>
+              <p>{sentRequest.codice}</p>
+              <p>{t("mensa.requestSentHint")}</p>
+            </div>
+            <Button variant="outline" onClick={dismissSent}>
+              {t("mensa.newRequest")}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {canRequest && active && !sentRequest && (
         <Card>
           <CardHeader>
             <CardTitle>{t("mensa.newRequest")}</CardTitle>
@@ -253,6 +356,51 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
                 submit();
               }}
             >
+              <Label htmlFor="mensa-supplier">
+                {t("mensa.requestedWarehouse")} *
+              </Label>
+              <select
+                id="mensa-supplier"
+                value={supplier ? supplierId : ""}
+                onChange={(e) => setSupplierId(e.target.value)}
+                aria-invalid={attempted && !supplier}
+                aria-describedby="mensa-supplier-hint"
+                disabled={pending || suppliers.isLoading || suppliers.isError}
+                className={`w-full rounded-md border bg-background p-2 ${attempted && !supplier ? "border-destructive" : ""}`}
+              >
+                <option value="">{t("mensa.chooseRequestedWarehouse")}</option>
+                {!suppliers.isError &&
+                  suppliers.data?.map((item) => (
+                    <option key={item.id} value={String(item.id)}>
+                      {item.nome}
+                    </option>
+                  ))}
+              </select>
+              <p
+                id="mensa-supplier-hint"
+                className="text-sm text-muted-foreground"
+              >
+                {t("mensa.requestedWarehouseHint")}
+              </p>
+              {suppliers.isError ? (
+                <p role="alert" className="text-destructive">
+                  {mensaErrorMessage(
+                    suppliers.error,
+                    t("mensa.warehousesLoadError"),
+                  )}
+                </p>
+              ) : suppliers.isLoading ? (
+                <p role="status">{t("common.loading")}</p>
+              ) : !suppliers.data?.length ? (
+                <p role="status">{t("mensa.noSupplyWarehouses")}</p>
+              ) : (
+                attempted &&
+                !supplier && (
+                  <p role="alert" className="text-destructive">
+                    {t("mensa.chooseRequestedWarehouse")}
+                  </p>
+                )
+              )}
               <Label htmlFor="mensa-needs">{t("mensa.needs")} *</Label>
               <Textarea
                 id="mensa-needs"
@@ -328,11 +476,27 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
             <p>{t("mensa.empty")}</p>
           ) : (
             requests.data.items.map((row) => (
-              <article className="rounded border p-3 space-y-2" key={row.id}>
-                <h3 className="font-semibold">
-                  {row.codice} · {row.stato.replaceAll("_", " ")}
-                </h3>
+              <article
+                className="rounded border p-3 space-y-2"
+                key={row.id}
+                aria-label={row.codice}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold">{row.codice}</h3>
+                  <Badge
+                    variant="outline"
+                    className={requestStatusClasses[requestDisplayStatus(row)]}
+                  >
+                    {t(`mensa.requestStatus.${requestDisplayStatus(row)}`)}
+                  </Badge>
+                </div>
                 <p className="whitespace-pre-wrap">{row.bisogno}</p>
+                {row.magazzinoRichiestoNomeSnapshot && (
+                  <p>
+                    {t("mensa.requestedWarehouse")}:{" "}
+                    {row.magazzinoRichiestoNomeSnapshot}
+                  </p>
+                )}
                 <p>
                   {row.dataDesiderata} · {row.priorita}
                 </p>
@@ -353,6 +517,7 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
                   </Button>
                 )}
                 {canRequest &&
+                  requestDisplayStatus(row) !== "chiusa" &&
                   ["inviata", "presa_in_carico"].includes(row.stato) && (
                     <Button
                       variant="outline"

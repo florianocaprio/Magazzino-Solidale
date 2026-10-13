@@ -10035,6 +10035,18 @@ paths:
     get:
       operationId: listMagazziniMensa
       tags: [mensa]
+      parameters:
+        - {
+            name: areaOperativaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: mensaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+            description: Mensa destinataria autorizzata; richiede Area coerente ed esclude il suo magazzino.,
+          }
       responses:
         "200":
           description: Magazzini origine accessibili
@@ -11055,6 +11067,12 @@ components:
       additionalProperties: false
       required: [idempotencyKey, tipoDestinatario, sorgente, bisogno]
       properties:
+        magazzinoRichiestoId:
+          {
+            type: integer,
+            minimum: 1,
+            description: Obbligatorio per nuove richieste Mensa. Preferenza della stessa Area autorizzata; il Magazzino può scegliere un'altra origine in preparazione.,
+          }
         mensaId:
           {
             type: integer,
@@ -11140,6 +11158,16 @@ components:
           dataAggiornamento,
         ]
       properties:
+        magazzinoRichiestoId:
+          {
+            type: [integer, "null"],
+            description: Preferenza originaria Mensa immutabile; null per richieste precedenti o altri percorsi. Non vincola l'origine effettiva del trasferimento.,
+          }
+        magazzinoRichiestoNomeSnapshot:
+          {
+            type: [string, "null"],
+            description: Nome del magazzino richiesto al momento dell'invio.,
+          }
         mensaId:
           {
             type: [integer, "null"],

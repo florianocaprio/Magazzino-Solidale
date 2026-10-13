@@ -304,6 +304,7 @@ import type {
   ListLottiLogiciParams,
   ListLottiMensaParams,
   ListLottiParams,
+  ListMagazziniMensaParams,
   ListMensaAbilitazioniParams,
   ListMenseParams,
   ListMovimentiParams,
@@ -37702,41 +37703,66 @@ export function useListEccezioniMensa<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
-export const getListMagazziniMensaUrl = () => {
-  return `/api/mensa/logistica/magazzini`;
+export const getListMagazziniMensaUrl = (params?: ListMagazziniMensaParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/mensa/logistica/magazzini?${stringifiedParams}`
+    : `/api/mensa/logistica/magazzini`;
 };
 
 export const listMagazziniMensa = async (
+  params?: ListMagazziniMensaParams,
   options?: RequestInit,
 ): Promise<MensaMagazzinoSummary[]> => {
-  return customFetch<MensaMagazzinoSummary[]>(getListMagazziniMensaUrl(), {
-    ...options,
-    method: "GET",
-  });
+  return customFetch<MensaMagazzinoSummary[]>(
+    getListMagazziniMensaUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
-export const getListMagazziniMensaQueryKey = () => {
-  return [`/api/mensa/logistica/magazzini`] as const;
+export const getListMagazziniMensaQueryKey = (
+  params?: ListMagazziniMensaParams,
+) => {
+  return [
+    `/api/mensa/logistica/magazzini`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getListMagazziniMensaQueryOptions = <
   TData = Awaited<ReturnType<typeof listMagazziniMensa>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listMagazziniMensa>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListMagazziniMensaParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMagazziniMensa>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListMagazziniMensaQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getListMagazziniMensaQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listMagazziniMensa>>
-  > = ({ signal }) => listMagazziniMensa({ signal, ...requestOptions });
+  > = ({ signal }) => listMagazziniMensa(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listMagazziniMensa>>,
@@ -37753,15 +37779,18 @@ export type ListMagazziniMensaQueryError = ErrorType<unknown>;
 export function useListMagazziniMensa<
   TData = Awaited<ReturnType<typeof listMagazziniMensa>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listMagazziniMensa>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListMagazziniMensaQueryOptions(options);
+>(
+  params?: ListMagazziniMensaParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMagazziniMensa>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMagazziniMensaQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

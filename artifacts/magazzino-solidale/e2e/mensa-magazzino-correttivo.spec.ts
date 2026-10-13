@@ -57,6 +57,12 @@ test("Mensa → richiesta → Magazzino → fornitura 12/20 → ricezione; diret
         [`MMD-${suffix}`, `Mensa ${suffix}`, area],
       )
     ).rows[0].id;
+    const requestedWarehouse = (
+      await pool.query(
+        "insert into magazzini(codice,nome,area_operativa_id) values($1,$2,$3) returning id",
+        [`MMR-${suffix}`, `Preferito ${suffix}`, area],
+      )
+    ).rows[0].id;
     const mensa = (
       await pool.query(
         "insert into mense(codice,nome,area_operativa_id,magazzino_id) values($1,$2,$3,$4) returning id",
@@ -153,6 +159,9 @@ test("Mensa → richiesta → Magazzino → fornitura 12/20 → ricezione; diret
     await mensaPage
       .getByLabel("Descrizione delle esigenze", { exact: false })
       .fill("20 kg di riso e 10 litri di olio");
+    await mensaPage
+      .getByLabel("Magazzino di approvvigionamento richiesto", { exact: false })
+      .selectOption(String(requestedWarehouse));
     const response = mensaPage.waitForResponse(
       (r) =>
         r.url().endsWith("/api/richieste-magazzino") &&
@@ -166,9 +175,33 @@ test("Mensa → richiesta → Magazzino → fornitura 12/20 → ricezione; diret
     const request = await created.json();
     expect(await counts()).toEqual(before);
     await expect(
-      mensaPage.getByText(request.codice, { exact: false }),
+      mensaPage.getByRole("heading", {
+        name: "Richiesta inviata",
+        exact: true,
+      }),
     ).toBeVisible();
+    await expect(mensaPage.locator("#mensa-needs")).toHaveCount(0);
+    const requestArticle = mensaPage.getByRole("article", {
+      name: request.codice,
+      exact: true,
+    });
+    await expect(
+      requestArticle.getByText("INVIATA", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      requestArticle.getByText("INVIATA", { exact: true }),
+    ).toHaveClass(/bg-blue-50/);
     await assertViewportSafe(mensaPage);
+    await mensaPage
+      .getByRole("group", { name: "Area Operativa", exact: true })
+      .click();
+    await expect(
+      mensaPage.getByRole("heading", {
+        name: "Richiesta inviata",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(mensaPage.locator("#mensa-needs")).toBeVisible();
     await warehousePage.goto("/richieste-magazzino");
     await warehousePage
       .getByRole("button", { name: new RegExp(request.codice) })
@@ -178,6 +211,22 @@ test("Mensa → richiesta → Magazzino → fornitura 12/20 → ricezione; diret
       .getByRole("button", { name: "Prendi in carico", exact: true })
       .click();
     await expect(sheet.locator("#rm-warehouse")).toBeVisible();
+    await mensaPage.reload();
+    await expect(
+      requestArticle.getByText("PRESA IN CARICO", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      requestArticle.getByText("PRESA IN CARICO", { exact: true }),
+    ).toHaveClass(/bg-amber-50/);
+    await expect(sheet.locator("#rm-warehouse")).toHaveValue(
+      String(requestedWarehouse),
+    );
+    await expect(
+      sheet.getByText(
+        `Magazzino di approvvigionamento richiesto: Preferito ${suffix}`,
+        { exact: true },
+      ),
+    ).toBeVisible();
     expect(await counts()).toEqual(before);
     await sheet.locator("#rm-warehouse").selectOption(String(origin));
     await selectOption(
@@ -198,6 +247,16 @@ test("Mensa → richiesta → Magazzino → fornitura 12/20 → ricezione; diret
         [origin],
       )
     ).rows[0];
+    const preference = (
+      await pool.query(
+        "select magazzino_richiesto_id,magazzino_richiesto_nome_snapshot from richieste_magazzino where id=$1",
+        [request.id],
+      )
+    ).rows[0];
+    expect(preference.magazzino_richiesto_id).toBe(requestedWarehouse);
+    expect(preference.magazzino_richiesto_nome_snapshot).toBe(
+      `Preferito ${suffix}`,
+    );
     await sheet
       .getByRole("button", { name: "Riassegna trasportatore", exact: true })
       .click();
@@ -268,6 +327,12 @@ test("Mensa → richiesta → Magazzino → fornitura 12/20 → ricezione; diret
     const receipt = await receiptResponse;
     expect(receipt.status(), await receipt.text()).toBe(200);
     await expect(incoming).toContainText("completato");
+    await expect(
+      requestArticle.getByText("COMPLETATA", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      requestArticle.getByText("COMPLETATA", { exact: true }),
+    ).toHaveClass(/bg-emerald-50/);
     const final = await stock();
     expect(final.find((r) => r.magazzino_id === origin).qty).toBe("0.000000");
     expect(final.find((r) => r.magazzino_id === destination).qty).toBe(

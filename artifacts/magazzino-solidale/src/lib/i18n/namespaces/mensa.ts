@@ -1,10 +1,27 @@
 const it = {
+  requestSent: "Richiesta inviata",
+  requestSentHint:
+    "La richiesta è stata inviata al Magazzino. Puoi seguirne lo stato nel riepilogo qui sotto. Tocca questo riquadro o l’Area Operativa per tornare all’inserimento.",
+  requestStatus: {
+    inviata: "INVIATA",
+    presa_in_carico: "PRESA IN CARICO",
+    chiusa: "COMPLETATA",
+    annullata: "ANNULLATA",
+  },
   operationalArea: "Area Operativa",
   selectArea: "Seleziona l'Area Operativa",
   selectMensa: "Seleziona Mensa",
   noAssignment: "Nessuna assegnazione Mensa valida: contatta l'amministratore.",
   refreshContext: "Aggiorna",
   newRequest: "Nuova richiesta al Magazzino",
+  requestedWarehouse: "Magazzino di approvvigionamento richiesto",
+  chooseRequestedWarehouse: "Seleziona il magazzino richiesto",
+  requestedWarehouseHint:
+    "È una preferenza: il Magazzino può scegliere un'altra origine durante la preparazione.",
+  noSupplyWarehouses:
+    "Nessun magazzino di approvvigionamento disponibile nel contesto selezionato.",
+  warehousesLoadError:
+    "Impossibile caricare i magazzini di approvvigionamento.",
   needs: "Descrizione delle esigenze",
   needsRequired: "Descrivi le esigenze della Mensa.",
   desiredDate: "Data desiderata (facoltativa)",
@@ -95,6 +112,22 @@ const it = {
 
 const en = {
   ...it,
+  requestSent: "Request sent",
+  requestSentHint:
+    "Your request has been sent to the warehouse. Follow its status in the summary below. Tap this panel or the Operational Area to return to the form.",
+  requestStatus: {
+    inviata: "SENT",
+    presa_in_carico: "IN PROGRESS",
+    chiusa: "COMPLETED",
+    annullata: "CANCELLED",
+  },
+  requestedWarehouse: "Requested supplying warehouse",
+  chooseRequestedWarehouse: "Select the requested warehouse",
+  requestedWarehouseHint:
+    "This is a preference: warehouse staff may choose a different origin during preparation.",
+  noSupplyWarehouses:
+    "No supplying warehouse is available in the selected context.",
+  warehousesLoadError: "Unable to load supplying warehouses.",
   operationalArea: "Operational area",
   selectArea: "Select the operational area",
   selectMensa: "Select canteen",

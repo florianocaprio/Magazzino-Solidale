@@ -33,6 +33,7 @@ type Context = {
   mense: Mensa[];
   setDirty: (dirty: boolean) => void;
   change: (action: () => void) => void;
+  areaInteraction: number;
 };
 const MensaContext = createContext<Context | null>(null);
 export const useMensaContext = () => useContext(MensaContext);
@@ -54,6 +55,7 @@ export function MensaOperationalContext({
     user?.permessi,
   ]);
   const [selectedArea, setArea] = useState<number | null>(null);
+  const [areaInteraction, setAreaInteraction] = useState(0);
   const [dirty, setDirty] = useState(false);
   const guard = useUnsavedChangesGuard(dirty);
   const query = useListMense(
@@ -93,7 +95,17 @@ export function MensaOperationalContext({
     <div>
       {heading && <div className="px-6 pt-6">{heading}</div>}
       <div className="mx-6 mt-6 flex flex-wrap items-end gap-3">
-        <div className="min-w-64 space-y-2">
+        <div
+          role="group"
+          aria-label={t("mensa.operationalArea")}
+          className="min-w-64 space-y-2"
+          onPointerDownCapture={() => setAreaInteraction((n) => n + 1)}
+          onClickCapture={() => setAreaInteraction((n) => n + 1)}
+          onKeyDownCapture={(event) => {
+            if (["Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key))
+              setAreaInteraction((n) => n + 1);
+          }}
+        >
           <Label htmlFor="mensa-area">{t("mensa.operationalArea")}</Label>
           <Select
             value={areaId?.toString() ?? ""}
@@ -139,7 +151,13 @@ export function MensaOperationalContext({
       ) : (
         <MensaContext.Provider
           key={identity}
-          value={{ areaId, mense, setDirty, change: guard.requestClose }}
+          value={{
+            areaId,
+            mense,
+            setDirty,
+            change: guard.requestClose,
+            areaInteraction,
+          }}
         >
           {children}
         </MensaContext.Provider>

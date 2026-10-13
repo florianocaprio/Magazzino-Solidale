@@ -174,7 +174,8 @@ export default function RichiesteMagazzino() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState("");
-  const [warehouseId, setWarehouseId] = useState("");
+  // null = use the Mensa preference; empty string = explicitly clear selection.
+  const [warehouseId, setWarehouseId] = useState<string | null>(null);
   const [transferRows, setTransferRows] = useState<RigaDraft[]>([newRiga()]);
   const [documentDirty, setDocumentDirty] = useState(false);
   const documentSelection = parseDocumentoSelection(
@@ -214,7 +215,7 @@ export default function RichiesteMagazzino() {
     setCancelOpen(false);
     setCancelReason("");
     setCancelNote("");
-    setWarehouseId("");
+    setWarehouseId(null);
     setTransferRows([newRiga()]);
   }, [contextRequestId]);
   const selectRequest = (id: number | null) => {
@@ -372,8 +373,24 @@ export default function RichiesteMagazzino() {
   const products = useListProdotti(undefined, {
     query: { enabled: canPrepare, queryKey: getListProdottiQueryKey() },
   });
-  const chosenWarehouse = warehouses.data?.find(
-    (item) => item.id === Number(warehouseId),
+  const availableWarehouses = warehouses.isError
+    ? []
+    : (warehouses.data ?? []).filter(
+        (item) =>
+          item.stato === "attivo" &&
+          item.areaOperativaId === row?.areaOperativaId &&
+          item.id !== row?.magazzinoDestinatarioId &&
+          (row?.centroAscoltoId == null ||
+            item.centroAscoltoId == null ||
+            item.centroAscoltoId === row.centroAscoltoId),
+      );
+  const preferredWarehouse = availableWarehouses.find(
+    (item) => item.id === row?.magazzinoRichiestoId,
+  );
+  const selectedWarehouseId =
+    warehouseId ?? preferredWarehouse?.id.toString() ?? "";
+  const chosenWarehouse = availableWarehouses.find(
+    (item) => String(item.id) === selectedWarehouseId,
   );
   const transferInput = transferRows.filter(
     (item) => item.prodottoId && item.quantita,
@@ -428,7 +445,7 @@ export default function RichiesteMagazzino() {
         }
         selectRequest(null);
         setEdit(false);
-        setWarehouseId("");
+        setWarehouseId(null);
         setTransferRows([newRiga()]);
         await refresh();
       } else if (status === 409) await refresh(selectedId ?? undefined);
@@ -569,7 +586,7 @@ export default function RichiesteMagazzino() {
       (body) => createRichiestaMagazzinoDocumento(row.id, body),
     );
     if (ok) {
-      setWarehouseId("");
+      setWarehouseId(null);
       setTransferRows([newRiga()]);
       setConfirmation(t("richiesteMagazzino.documentCreated"));
       setDocumentDirty(false);
@@ -965,6 +982,17 @@ export default function RichiesteMagazzino() {
                     {row.centroNomeSnapshot ?? "—"}
                   </p>
                   <p className="whitespace-pre-wrap">{row.bisogno}</p>
+                  {row.magazzinoRichiestoNomeSnapshot && (
+                    <div className="rounded border p-3">
+                      <p>
+                        {t("mensa.requestedWarehouse")}:{" "}
+                        {row.magazzinoRichiestoNomeSnapshot}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {t("mensa.requestedWarehouseHint")}
+                      </p>
+                    </div>
+                  )}
                   {row.dataDesiderata && (
                     <p>
                       {t("richiesteMagazzino.desiredDate")}:{" "}
@@ -1044,7 +1072,7 @@ export default function RichiesteMagazzino() {
                         <select
                           id="rm-warehouse"
                           className="rounded border p-2"
-                          value={warehouseId}
+                          value={chosenWarehouse ? selectedWarehouseId : ""}
                           onChange={(event) =>
                             setWarehouseId(event.target.value)
                           }
@@ -1052,21 +1080,11 @@ export default function RichiesteMagazzino() {
                           <option value="">
                             {t("richiesteMagazzino.chooseWarehouse")}
                           </option>
-                          {warehouses.data
-                            ?.filter(
-                              (item) =>
-                                item.stato === "attivo" &&
-                                item.areaOperativaId === row.areaOperativaId &&
-                                item.id !== row.magazzinoDestinatarioId &&
-                                (row.centroAscoltoId == null ||
-                                  item.centroAscoltoId == null ||
-                                  item.centroAscoltoId === row.centroAscoltoId),
-                            )
-                            .map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.nome}
-                              </option>
-                            ))}
+                          {availableWarehouses.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.nome}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       {row.tipoDestinatario === "magazzino" &&

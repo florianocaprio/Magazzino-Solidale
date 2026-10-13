@@ -73,6 +73,16 @@ export const ListRichiesteMagazzinoResponse = zod.object({
   items: zod.array(
     zod
       .object({
+        magazzinoRichiestoId: zod
+          .number()
+          .nullish()
+          .describe(
+            "Preferenza originaria Mensa immutabile; null per richieste precedenti o altri percorsi. Non vincola l'origine effettiva del trasferimento.",
+          ),
+        magazzinoRichiestoNomeSnapshot: zod
+          .string()
+          .nullish()
+          .describe("Nome del magazzino richiesto al momento dell'invio."),
         mensaId: zod
           .number()
           .nullish()
@@ -200,6 +210,13 @@ export const createRichiestaMagazzinoBodyDataDesiderataRegExp = new RegExp(
 export const createRichiestaMagazzinoBodyModalitaPreferitaDefault = `da_definire`;
 
 export const CreateRichiestaMagazzinoBody = zod.object({
+  magazzinoRichiestoId: zod
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Obbligatorio per nuove richieste Mensa. Preferenza della stessa Area autorizzata; il Magazzino può scegliere un'altra origine in preparazione.",
+    ),
   mensaId: zod
     .number()
     .min(1)
@@ -248,6 +265,16 @@ export const getRichiestaMagazzinoResponseDataDesiderataRegExp = new RegExp(
 
 export const GetRichiestaMagazzinoResponse = zod
   .object({
+    magazzinoRichiestoId: zod
+      .number()
+      .nullish()
+      .describe(
+        "Preferenza originaria Mensa immutabile; null per richieste precedenti o altri percorsi. Non vincola l'origine effettiva del trasferimento.",
+      ),
+    magazzinoRichiestoNomeSnapshot: zod
+      .string()
+      .nullish()
+      .describe("Nome del magazzino richiesto al momento dell'invio."),
     mensaId: zod
       .number()
       .nullish()
@@ -21573,6 +21600,17 @@ export const ListEccezioniMensaResponse = zod.union([
     total: zod.number(),
   }),
 ]);
+
+export const ListMagazziniMensaQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  mensaId: zod.coerce
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Mensa destinataria autorizzata; richiede Area coerente ed esclude il suo magazzino.",
+    ),
+});
 
 export const ListMagazziniMensaResponseItem = zod.object({
   id: zod.number(),

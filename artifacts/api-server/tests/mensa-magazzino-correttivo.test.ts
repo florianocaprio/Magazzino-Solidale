@@ -22,6 +22,7 @@ import {
   createLotto,
   createUtente,
   createBeneficiario,
+  createCentroRec,
   newScope,
 } from "./scope-helpers";
 import { httpListeners } from "./helpers/http-listeners";
@@ -151,6 +152,7 @@ afterAll(async () => {
 const need = () => ({
   idempotencyKey: randomUUID(),
   mensaId,
+  magazzinoRichiestoId: origin,
   areaOperativaId: area,
   tipoDestinatario: "magazzino",
   sorgente: "operativa",
@@ -168,12 +170,152 @@ async function inventory() {
   return result.rows[0];
 }
 
+it("Magazzino richiesto: obbligatorio, lista per Mensa/Area e nessuna scelta inattiva, propria o fuori scope", async () => {
+  const foreign = await createMagazzino(scope, null, {
+    areaOperativaId: otherArea,
+  });
+  const inactive = await createMagazzino(scope, null, {
+    areaOperativaId: area,
+  });
+  await db
+    .update(magazziniTable)
+    .set({ stato: "inattivo" })
+    .where(eq(magazziniTable.id, inactive));
+  const list = await mensa.get(
+    `/api/mensa/logistica/magazzini?mensaId=${mensaId}&areaOperativaId=${area}`,
+  );
+  expect(list.status, list.text).toBe(200);
+  const ids = list.body.map((item: { id: number }) => item.id);
+  expect(ids).toContain(origin);
+  for (const id of [destination, foreign, inactive])
+    expect(ids).not.toContain(id);
+  expect(
+    (
+      await mensa.get(
+        `/api/mensa/logistica/magazzini?mensaId=${otherMensa}&areaOperativaId=${area}`,
+      )
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await mensa.get(
+        `/api/mensa/logistica/magazzini?mensaId=${mensaId}&areaOperativaId=${otherArea}`,
+      )
+    ).status,
+  ).toBe(400);
+  const before = await inventory();
+  for (const id of [undefined, destination, foreign, inactive, 2147483647]) {
+    const invalid = await mensa
+      .post("/api/richieste-magazzino")
+      .send({ ...need(), magazzinoRichiestoId: id });
+    expect(invalid.status, invalid.text).toBe(400);
+  }
+  expect(await inventory()).toEqual(before);
+});
+
+it("Preferenza persistita e immutabile: il Magazzino può fornire da un'origine diversa", async () => {
+  const alternative = await createMagazzino(scope, null, {
+    areaOperativaId: area,
+  });
+  await createLotto(scope, {
+    prodottoId: product,
+    magazzinoId: alternative,
+    quantita: 2,
+  });
+  const before = await inventory();
+  const payload = need();
+  const created = await mensa.post("/api/richieste-magazzino").send(payload);
+  expect(created.status, created.text).toBe(201);
+  expect(await inventory()).toEqual(before);
+  const id = created.body.id;
+  const original = (await mensa.get(`/api/richieste-magazzino/${id}`)).body;
+  expect(original.magazzinoRichiestoId).toBe(origin);
+  expect(
+    (
+      await mensa
+        .post("/api/richieste-magazzino")
+        .send({ ...payload, magazzinoRichiestoId: alternative })
+    ).status,
+  ).toBe(409);
+  await expect(
+    pool.query(
+      "update richieste_magazzino set magazzino_richiesto_id=$1 where id=$2",
+      [alternative, id],
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
+  await expect(
+    pool.query(
+      "update richieste_magazzino set magazzino_richiesto_nome_snapshot='Altro nome' where id=$1",
+      [id],
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
+  const taken = await warehouse
+    .post(`/api/richieste-magazzino/${id}/presa-in-carico`)
+    .send({ versione: 1, idempotencyKey: randomUUID() });
+  expect(taken.status, taken.text).toBe(200);
+  const document = await warehouse
+    .post(`/api/richieste-magazzino/${id}/documento`)
+    .send({
+      versione: taken.body.versione,
+      idempotencyKey: randomUUID(),
+      magazzinoId: alternative,
+      righe: [{ prodottoId: product, quantita: "2", unitaMisura: "kg" }],
+    });
+  expect(document.status, document.text).toBe(201);
+  const [actual] = await db
+    .select()
+    .from(trasferimentiTable)
+    .where(eq(trasferimentiTable.id, document.body.documentoId));
+  expect(actual.magazzinoOrigineId).toBe(alternative);
+  const after = (await mensa.get(`/api/richieste-magazzino/${id}`)).body;
+  expect(after.magazzinoRichiestoId).toBe(origin);
+  expect(after.magazzinoRichiestoNomeSnapshot).toBe(
+    original.magazzinoRichiestoNomeSnapshot,
+  );
+});
+
+it("La stessa sessione rivalida lo scope Centro per elenco e preferenza inviata", async () => {
+  const own = await createCentroRec(scope, { areaOperativaId: area });
+  const other = await createCentroRec(scope, { areaOperativaId: area });
+  const forbidden = await createMagazzino(scope, other.id, {
+    areaOperativaId: area,
+  });
+  await db
+    .update(utentiTable)
+    .set({ centroAscoltoId: own.id })
+    .where(eq(utentiTable.id, operatorId));
+  try {
+    const list = await mensa.get(
+      `/api/mensa/logistica/magazzini?mensaId=${mensaId}&areaOperativaId=${area}`,
+    );
+    expect(list.status, list.text).toBe(200);
+    expect(list.body.map((item: { id: number }) => item.id)).toContain(origin);
+    expect(list.body.map((item: { id: number }) => item.id)).not.toContain(
+      forbidden,
+    );
+    const before = await inventory();
+    const denied = await mensa
+      .post("/api/richieste-magazzino")
+      .send({ ...need(), magazzinoRichiestoId: forbidden });
+    expect(denied.status, denied.text).toBe(400);
+    expect(await inventory()).toEqual(before);
+  } finally {
+    await db
+      .update(utentiTable)
+      .set({ centroAscoltoId: null })
+      .where(eq(utentiTable.id, operatorId));
+  }
+});
+
 it("RIC-01/02/03 TRA-01/03/05 IDE-01: due operatori, fabbisogno 20 / fornitura 12, M4 una sola volta", async () => {
   const payload = need(),
     before = await inventory();
   const created = await mensa.post("/api/richieste-magazzino").send(payload);
   expect(created.status, created.text).toBe(201);
   const id = created.body.id;
+  const persisted = await mensa.get(`/api/richieste-magazzino/${id}`);
+  expect(persisted.body.magazzinoRichiestoId).toBe(origin);
+  expect(persisted.body.magazzinoRichiestoNomeSnapshot).toBeTruthy();
   expect(await inventory()).toEqual(before);
   const replay = await mensa.post("/api/richieste-magazzino").send(payload);
   // Canonical request create replays the original 201 response, not a new insert.

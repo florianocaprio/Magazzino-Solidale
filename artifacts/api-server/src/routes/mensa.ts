@@ -2586,30 +2586,61 @@ router.get(
   "/mensa/logistica/magazzini",
   requireMensaPermissionOrLegacy("mensa.transfers.request"),
   async (req, res) => {
-    const ids = await visibleMagazzinoIds(
-      callerCentroId(req),
-      callerAreaOperativaId(req),
-    );
-    const conditions: SQL[] = [eq(magazziniTable.stato, "attivo")];
-    const ownAreaOperativa = callerAreaOperativaId(req);
-    if (ownAreaOperativa != null)
-      conditions.push(eq(magazziniTable.areaOperativaId, ownAreaOperativa));
-    if (ids != null)
-      conditions.push(
-        ids.length ? inArray(magazziniTable.id, ids) : sql`false`,
+    try {
+      const requestedArea = optionalPositiveInt(
+        req.query.areaOperativaId,
+        "areaOperativaId",
       );
-    const rows = await db
-      .select({
-        id: magazziniTable.id,
-        codice: magazziniTable.codice,
-        nome: magazziniTable.nome,
-        areaOperativaId: magazziniTable.areaOperativaId,
-        tipoMagazzino: magazziniTable.tipoMagazzino,
-      })
-      .from(magazziniTable)
-      .where(and(...conditions))
-      .orderBy(asc(magazziniTable.nome));
-    res.json(rows);
+      const requestedMensa = optionalPositiveInt(req.query.mensaId, "mensaId");
+      const target =
+        requestedMensa == null
+          ? null
+          : await requireMensa(requestedMensa, req, true);
+      if (
+        requestedMensa != null &&
+        requestedArea !== target!.mensa.areaOperativaId
+      )
+        throw new MensaError(400, "Area/Mensa incoerenti");
+      if (
+        requestedArea != null &&
+        callerAreaOperativaId(req) != null &&
+        requestedArea !== callerAreaOperativaId(req)
+      )
+        throw new MensaError(403, "Area non autorizzata");
+      const ids = await visibleMagazzinoIds(
+        callerCentroId(req),
+        callerAreaOperativaId(req),
+      );
+      const conditions: SQL[] = [eq(magazziniTable.stato, "attivo")];
+      if (requestedArea != null)
+        conditions.push(eq(magazziniTable.areaOperativaId, requestedArea));
+      if (target)
+        conditions.push(
+          sql`${magazziniTable.id} <> ${target.mensa.magazzinoId}`,
+        );
+      const ownAreaOperativa = callerAreaOperativaId(req);
+      if (ownAreaOperativa != null)
+        conditions.push(eq(magazziniTable.areaOperativaId, ownAreaOperativa));
+      if (ids != null)
+        conditions.push(
+          ids.length ? inArray(magazziniTable.id, ids) : sql`false`,
+        );
+      const rows = await db
+        .select({
+          id: magazziniTable.id,
+          codice: magazziniTable.codice,
+          nome: magazziniTable.nome,
+          areaOperativaId: magazziniTable.areaOperativaId,
+          tipoMagazzino: magazziniTable.tipoMagazzino,
+        })
+        .from(magazziniTable)
+        .where(and(...conditions))
+        .orderBy(asc(magazziniTable.nome));
+      res.json(rows);
+    } catch (error) {
+      if (sendMensaError(error, res)) return;
+      throw error;
+    }
   },
 );
 

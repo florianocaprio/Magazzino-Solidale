@@ -42,6 +42,16 @@ export const richiesteMagazzinoTable = pgTable(
     mensaId: integer("mensa_id").references(() => menseTable.id, {
       onDelete: "restrict",
     }),
+    magazzinoRichiestoId: integer("magazzino_richiesto_id").references(
+      () => magazziniTable.id,
+      { onDelete: "restrict" },
+    ),
+    magazzinoRichiestoNomeSnapshot: varchar(
+      "magazzino_richiesto_nome_snapshot",
+      {
+        length: 120,
+      },
+    ),
     areaOperativaId: integer("area_operativa_id")
       .notNull()
       .references(() => areeOperativeTable.id, { onDelete: "restrict" }),
@@ -117,6 +127,10 @@ export const richiesteMagazzinoTable = pgTable(
     ),
     index("richieste_magazzino_intervento_idx").on(table.interventoId),
     index("richieste_magazzino_mensa_idx").on(table.mensaId),
+    check(
+      "richieste_magazzino_fornitore_check",
+      sql`(${table.magazzinoRichiestoId} is null and ${table.magazzinoRichiestoNomeSnapshot} is null) or (${table.magazzinoRichiestoId} is not null and ${table.magazzinoRichiestoNomeSnapshot} is not null and length(btrim(${table.magazzinoRichiestoNomeSnapshot})) > 0 and ${table.mensaId} is not null and ${table.magazzinoRichiestoId} <> ${table.magazzinoDestinatarioId})`,
+    ),
     check(
       "richieste_magazzino_mensa_check",
       sql`${table.mensaId} is null or (${table.tipoDestinatario} = 'magazzino' and ${table.sorgente} = 'operativa' and ${table.interventoId} is null)`,

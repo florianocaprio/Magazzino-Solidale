@@ -17,6 +17,16 @@ import type { RichiestaMagazzinoTipoDestinatario } from "./richiestaMagazzinoTip
  */
 export interface RichiestaMagazzino {
   /**
+   * Preferenza originaria Mensa immutabile; null per richieste precedenti o altri percorsi. Non vincola l'origine effettiva del trasferimento.
+   * @nullable
+   */
+  magazzinoRichiestoId?: number | null;
+  /**
+   * Nome del magazzino richiesto al momento dell'invio.
+   * @nullable
+   */
+  magazzinoRichiestoNomeSnapshot?: string | null;
+  /**
    * Provenienza Mensa strutturale e immutabile; null per richieste precedenti o altri percorsi.
    * @nullable
    */
