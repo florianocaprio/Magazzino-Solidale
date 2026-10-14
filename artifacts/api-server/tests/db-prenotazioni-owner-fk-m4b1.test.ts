@@ -45,15 +45,20 @@ async function insertedId(
 
 async function seedFixture(client: PoolClient): Promise<Fixture> {
   const suffix = randomUUID().slice(0, 8);
+  const areaId = await insertedId(
+    client,
+    "INSERT INTO aree_operative(nome) VALUES ($1) RETURNING id",
+    [`Owner FK ${suffix}`],
+  );
   const magazzinoId = await insertedId(
     client,
-    "INSERT INTO magazzini (codice, nome) VALUES ($1, $2) RETURNING id",
-    [`OFK-A-${suffix}`, "Owner FK origine"],
+    "INSERT INTO magazzini (codice, nome, area_operativa_id) VALUES ($1, $2, $3) RETURNING id",
+    [`OFK-A-${suffix}`, "Owner FK origine", areaId],
   );
   const destinazioneId = await insertedId(
     client,
-    "INSERT INTO magazzini (codice, nome) VALUES ($1, $2) RETURNING id",
-    [`OFK-B-${suffix}`, "Owner FK destinazione"],
+    "INSERT INTO magazzini (codice, nome, area_operativa_id) VALUES ($1, $2, $3) RETURNING id",
+    [`OFK-B-${suffix}`, "Owner FK destinazione", areaId],
   );
   const prodottoId = await insertedId(
     client,

@@ -126,12 +126,20 @@ export async function prepareReport(req: Request) {
   // Deliberately OUTSIDE the repeatable-read snapshot: a revoke/logout during
   // generation must not be hidden by the old snapshot or a populated browser cache.
   await new Promise<void>((resolve, reject) =>
-    req.session.reload((error) =>
-      error ? reject(new ReportingError(401, "Sessione terminata")) : resolve(),
-    ),
+    req.session.reload((error) => {
+      if (error) {
+        // Detach only this stale request. With rolling sessions, keeping the old
+        // object would reissue its cookie over a concurrent user's new login.
+        // Never destroy the current store session or clear the client's cookie.
+        Reflect.deleteProperty(req, "session");
+        reject(new ReportingError(401, "Sessione terminata"));
+      } else resolve();
+    }),
   );
-  if (req.session.userId !== userId)
+  if (req.session.userId !== userId) {
+    Reflect.deleteProperty(req, "session");
     throw new ReportingError(401, "Sessione cambiata");
+  }
   const currentUser = await loadSessionUser(userId);
   if (!currentUser || JSON.stringify(currentUser) !== JSON.stringify(user))
     throw new ReportingError(

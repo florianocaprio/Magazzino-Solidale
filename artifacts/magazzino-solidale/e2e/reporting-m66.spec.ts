@@ -11,12 +11,17 @@ import {
   magazziniTable,
   prodottiTable,
   lottiTable,
+  beneficiariTable,
+  bolleTable,
 } from "../../../lib/db/src/index";
 import { base } from "../src/lib/i18n/namespaces/base";
 
 const requireApi = createRequire(
   new URL("../../api-server/package.json", import.meta.url),
 );
+const { sql } = requireApi(
+  "drizzle-orm",
+) as typeof import("../../api-server/node_modules/drizzle-orm");
 const bcrypt = requireApi(
   "bcryptjs",
 ) as typeof import("../../api-server/node_modules/bcryptjs");
@@ -33,7 +38,16 @@ const sections = [
   "magazzino-logistica",
   "fse-plus",
 ];
-let username: string, password: string, areaId: number;
+const privateSentinels = [
+  "PDF_PRIVATE_NAME",
+  "PDF_PRIVATE_NOTE",
+  "pdf-private-contact@invalid.example",
+];
+let username: string,
+  password: string,
+  areaId: number,
+  userId: number,
+  exactStock: string;
 
 test.beforeAll(async () => {
   const url = new URL(process.env.DATABASE_URL!);
@@ -63,13 +77,17 @@ test.beforeAll(async () => {
     .returning();
   username = `report-${suffix}`;
   password = `Synthetic-${randomUUID()}!`;
-  await db.insert(utentiTable).values({
-    username,
-    nome: "Operatore sintetico reporting",
-    passwordHash: await bcrypt.hash(password, 4),
-    ruoloId: role.id,
-    mustChangePassword: false,
-  });
+  const [user] = await db
+    .insert(utentiTable)
+    .values({
+      username,
+      nome: "Operatore sintetico reporting",
+      passwordHash: await bcrypt.hash(password, 4),
+      ruoloId: role.id,
+      mustChangePassword: false,
+    })
+    .returning();
+  userId = user.id;
   const [area] = await db
     .insert(areeOperativeTable)
     .values({ nome: `Area sintetica PDF ${suffix}` })
@@ -83,6 +101,32 @@ test.beforeAll(async () => {
       areaOperativaId: area.id,
     })
     .returning();
+  // A real database record contributing to Pacchi counts, with private fields
+  // that must never be projected into the aggregate or its exported documents.
+  // This is a legacy read fixture, not evidence of a stock-writing workflow.
+  const [beneficiary] = await db
+    .insert(beneficiariTable)
+    .values({
+      codice: `PII-${suffix.slice(0, 8)}`,
+      nome: privateSentinels[0],
+      cognome: "Synthetic",
+      noteInterne: privateSentinels[1],
+      email: privateSentinels[2],
+      areaOperativaId: area.id,
+    })
+    .returning();
+  await db.insert(bolleTable).values({
+    numeroBolla: `PDF-PII-${suffix.slice(0, 8)}`,
+    dataBolla: "2026-01-15",
+    beneficiarioId: beneficiary.id,
+    magazzinoId: warehouse.id,
+    areaOperativaIdSnapshot: area.id,
+    numeroComponentiNucleoSnapshot: 1,
+    stato: "consegnato",
+    destinatarioNomeSnapshot: privateSentinels[0],
+    destinatarioEmailSnapshot: privateSentinels[2],
+    noteConsegna: privateSentinels[1],
+  });
   const products = await db
     .insert(prodottiTable)
     .values(
@@ -112,6 +156,17 @@ test.beforeAll(async () => {
       fsePlus: false,
     })),
   );
+  // Real PostgreSQL aggregate beyond IEEE-754 precision, never injected into the API response.
+  await db.execute(sql`INSERT INTO lotti(prodotto_id,magazzino_id,codice_lotto,quantita_caricata,quantita_residua,data_carico)
+    SELECT ${products[0].id},${warehouse.id},'REVIEW-'||i,99999999.123456,99999999.123456,'2026-01-15'
+    FROM generate_series(1,10001) i`);
+  exactStock = String(
+    (
+      await db.execute(
+        sql`SELECT sum(quantita_residua)::text AS total FROM lotti WHERE magazzino_id=${warehouse.id}`,
+      )
+    ).rows[0].total,
+  );
 });
 test.afterAll(async () => {
   await pool.end();
@@ -132,10 +187,39 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
   await page.getByLabel(/^password$/i).fill(password);
   await page.getByRole("button", { name: /accedi|sign in|login/i }).click();
   await expect(page).toHaveURL(/\/$/);
+  // Deep links and browser history must restore the actual controls, not only
+  // the URL. Options failures stay explicit and are not presented as zero data.
+  await page.goto("/report/mensa?da=2026-01-04&a=2026-01-20");
+  await expect(page.locator("#report-da")).toHaveValue("2026-01-04");
+  await page.goto("/report/uds?da=2026-02-02&a=2026-02-20");
+  await expect(page.locator("#report-da")).toHaveValue("2026-02-02");
+  await page.goBack();
+  await expect(page.locator("#report-da")).toHaveValue("2026-01-04");
+  await page.goForward();
+  await expect(page.locator("#report-da")).toHaveValue("2026-02-02");
+  await page.route("**/api/report/filter-options?**", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "Synthetic options unavailable" }),
+    }),
+  );
+  await page.reload();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: /Impossibile caricare le opzioni/ }),
+  ).toBeVisible({ timeout: 15000 });
+  await page.unroute("**/api/report/filter-options?**");
   for (const section of sections) {
     const query = new URLSearchParams({ da: "2026-01-01", a: "2026-12-31" });
     if (section === "magazzino-logistica")
       query.set("areaOperativaId", String(areaId));
+    if (section === "centro-ascolto") {
+      query.set("operatoreId", String(userId));
+      query.set("tipoIntervento", "Accompagnamento");
+    }
+    if (section === "mensa") query.set("tipoServizio", "pranzo");
     await page.goto(`/report/${section}?${query}`);
     const pdf = page.getByRole("button", {
       name: "Esporta in PDF",
@@ -145,6 +229,19 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
     const rect = await pdf.boundingBox();
     expect(rect!.height).toBeGreaterThanOrEqual(44);
     expect(rect!.width).toBeGreaterThanOrEqual(44);
+    const filterControls = page.locator(
+      'input[id^="report-"], button[id^="report-"], select[id^="report-"]',
+    );
+    expect(await filterControls.count()).toBeGreaterThanOrEqual(3);
+    for (const control of await filterControls.all()) {
+      if (!(await control.isVisible())) continue;
+      const bounds = await control.boundingBox();
+      expect(
+        bounds!.height,
+        await control.getAttribute("id"),
+      ).toBeGreaterThanOrEqual(44);
+      expect(bounds!.width).toBeGreaterThanOrEqual(44);
+    }
     const preparedResponse = page.waitForResponse(
       (r) =>
         r.url().includes("/api/report/prepare") &&
@@ -155,6 +252,33 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
     const prepared = await preparedResponse;
     expect(prepared.status()).toBe(200);
     const dataset = await prepared.json();
+    for (const sentinel of privateSentinels)
+      expect(JSON.stringify(dataset)).not.toContain(sentinel);
+    if (section === "pacchi")
+      expect(
+        Number(
+          dataset.report.kpi.find(
+            (item: { key: string }) => item.key === "pacchiDistribuiti",
+          ).exactValue,
+        ),
+      ).toBeGreaterThanOrEqual(1);
+    if (section === "dashboard")
+      expect(dataset.report.series[0].secondary).toEqual({
+        label: "personeMese",
+        unit: "count",
+      });
+    if (section === "centro-ascolto")
+      expect(dataset.report.filters).toMatchObject({
+        operatoreId: userId,
+        tipoIntervento: "Accompagnamento",
+      });
+    if (section === "mensa")
+      expect(dataset.report.filters.tipoServizio).toBe("pranzo");
+    if (section === "magazzino-logistica")
+      expect(
+        dataset.report.tables.find((t: { key: string }) => t.key === "giacenze")
+          .rows[0].quantita,
+      ).toBe(exactStock);
     await writeFile(
       `${output}/${section}.json`,
       JSON.stringify(dataset, null, 2),
@@ -169,7 +293,9 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
         textPath = "/src/lib/reporting-text.ts";
       const exports = await import(exportPath),
         { default: i18n } = await import(i18nPath),
-        { localizeReportingText } = await import(textPath);
+        { localizeReportingText, reportingColumnLabel } = await import(
+          textPath
+        );
       const t = i18n.t.bind(i18n);
       const metadata = Object.fromEntries(
         [
@@ -204,7 +330,7 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
         title: t(`reporting.sections.${prepared.report.section}.title`),
         kpi: (key: string) => t(`reporting.kpi.${key}`),
         table: (key: string) => t(`reporting.tables.${key}`),
-        column: (key: string) => t(`reporting.columns.${key}`),
+        column: (key: string) => reportingColumnLabel(t, key),
         quality: (key: string) => t(`reporting.quality.${key}`),
         unit: (key: string) => t(`reporting.units.${key}`),
         availability: (key: string) => t(`reporting.availability.${key}`),
@@ -236,6 +362,62 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
         prepared.datasetId,
       );
       return {
+        tables: prepared.report.tables.map(
+          (table: {
+            key: string;
+            columns: string[];
+            rows: Record<string, unknown>[];
+          }) => ({
+            key: table.key,
+            title: labels.table(table.key),
+            columns: table.columns.map(labels.column),
+            rows: table.rows.map((row) =>
+              table.columns.map((column) =>
+                typeof row[column] === "string"
+                  ? labels.text(row[column])
+                  : (row[column] ?? labels.unavailable),
+              ),
+            ),
+          }),
+        ),
+        series: prepared.report.series.map(
+          (series: {
+            key: string;
+            points: Array<{
+              label: string;
+              exactValue?: string;
+              value: number;
+              exactSecondaryValue?: string;
+              secondaryValue?: number;
+            }>;
+          }) => ({
+            title: labels.table(series.key),
+            rows: series.points.map((point) => [
+              point.label,
+              point.exactValue ?? String(point.value),
+              point.exactSecondaryValue ??
+                point.secondaryValue ??
+                labels.unavailable,
+            ]),
+          }),
+        ),
+        definitions: [
+          ...(prepared.report.excludedSources ?? []),
+          ...prepared.report.definitions,
+        ].map(labels.text),
+        quality: prepared.report.quality.map(
+          (item: {
+            key: string;
+            count: number | null;
+            availability: string;
+            note?: unknown;
+          }) => [
+            labels.quality(item.key),
+            item.count ?? labels.unavailable,
+            labels.availability(item.availability),
+            item.note ? labels.text(item.note) : "",
+          ],
+        ),
         kpi: prepared.report.kpi.map(
           (k: {
             key: string;
@@ -265,12 +447,63 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
       { header: 1 },
     );
     expect(summary).toContainEqual(["Dataset", dataset.datasetId]);
+    if (section === "centro-ascolto") {
+      expect(summary).toContainEqual(["Operatore", String(userId)]);
+      expect(summary).toContainEqual(["Tipo Intervento", "Accompagnamento"]);
+    }
+    if (section === "mensa")
+      expect(summary).toContainEqual(["Tipo servizio", "pranzo"]);
+    if (section === "magazzino-logistica")
+      expect(
+        XLSX.utils
+          .sheet_to_json<unknown[]>(sameWorkbook.Sheets.giacenze, { header: 1 })
+          .some((row) => row.includes(exactStock)),
+      ).toBe(true);
     for (const [label, exact, unit] of expected.kpi)
       expect(
         summary.some(
           (row) => row[0] === label && row[1] === exact && row[2] === unit,
         ),
       ).toBe(true);
+    for (const table of expected.tables) {
+      const key = table.key.replace(/[\\/?*\[\]:]/g, "_").slice(0, 31);
+      const values = XLSX.utils.sheet_to_json<unknown[]>(
+        sameWorkbook.Sheets[key],
+        { header: 1, defval: expected.unavailable },
+      );
+      expect(values, `${section}/${key}`).toEqual([
+        table.columns,
+        ...table.rows.map((row) =>
+          row.map((cell) =>
+            typeof cell === "string" &&
+            /^[=+\-@]/.test(cell) &&
+            !/^-?\d+(\.\d+)?$/.test(cell)
+              ? `'${cell}`
+              : cell,
+          ),
+        ),
+      ]);
+    }
+    for (const [index, series] of expected.series.entries()) {
+      const values = XLSX.utils.sheet_to_json<unknown[]>(
+        sameWorkbook.Sheets[`Serie_${index + 1}`],
+        { header: 1, defval: expected.unavailable },
+      );
+      expect(values.slice(2), `${section}/${series.title}`).toEqual(
+        series.rows,
+      );
+    }
+    const qualitySheet =
+      section === "fse-plus" ? "08_Qualita_Dati" : "Qualita_Dati";
+    expect(
+      XLSX.utils
+        .sheet_to_json<
+          unknown[]
+        >(sameWorkbook.Sheets[qualitySheet], { header: 1, defval: "" })
+        .slice(1),
+    ).toEqual(expected.quality);
+    for (const definition of expected.definitions)
+      expect(summary).toContainEqual([definition]);
     const excelDownload = page.waitForEvent("download");
     await page
       .getByRole("button", { name: "Esporta in Excel (XLSX)", exact: true })
@@ -307,7 +540,7 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
   await expect(
     page.getByRole("alert").filter({ hasText: "Anteprima bloccata" }),
   ).toBeVisible();
-  if (info.project.name === "desktop-1440x900") {
+  {
     for (const language of ["en", "es", "fr", "de", "ar"] as const) {
       await page.evaluate(
         (lng) => localStorage.setItem("ms-lang", lng),

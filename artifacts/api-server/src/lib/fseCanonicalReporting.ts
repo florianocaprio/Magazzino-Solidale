@@ -613,6 +613,7 @@ function canonicalCandidateRowsSql(input: {
   includeArretrati: boolean;
   maxMovimentoId: number;
   maxOperazioneDistribuzioneId: number;
+  pendingEventsOnly?: boolean;
 }): SQL {
   const lowerBound = input.includeArretrati
     ? sql`mv.data_movimento <= ${input.dataA}`
@@ -754,6 +755,7 @@ function canonicalCandidateRowsSql(input: {
       )
      AND op.id <= ${input.maxOperazioneDistribuzioneId}
     WHERE mv.magazzino_id = ${input.magazzinoId}
+      AND ${input.pendingEventsOnly ? sql`${eventKey} IN (SELECT event_key FROM pending_event_keys)` : sql`true`}
       AND ${lowerBound}
       AND mv.id <= ${input.maxMovimentoId}
       AND (
@@ -792,6 +794,88 @@ function queueFilterSql(
   return and(...conditions) ?? sql`true`;
 }
 
+/** Shared classification context: compute event quality before projecting funds or pages. */
+function canonicalQueueCandidates(
+  input: Parameters<typeof canonicalCandidateRowsSql>[0],
+  pendingOnly = false,
+): SQL {
+  const rawCandidate = canonicalCandidateRowsSql({
+    ...input,
+    pendingEventsOnly: pendingOnly,
+  });
+  // Exclude covered history before expensive quality classification, but keep
+  // every row of a pending event (including other funds and covered companions).
+  const pendingEvents = sql`pending_event_keys AS MATERIALIZED (
+    SELECT DISTINCT ${canonicalEventKeySql()} AS event_key
+    FROM movimenti mv LEFT JOIN movimenti original ON original.id=mv.movimento_origine_id
+    LEFT JOIN carichi_magazzino_righe ocr ON ocr.id=original.carico_magazzino_riga_id
+    LEFT JOIN carichi_magazzino_righe cr ON cr.id=mv.carico_magazzino_riga_id
+    LEFT JOIN lotti l ON l.id=mv.lotto_id
+    WHERE mv.magazzino_id=${input.magazzinoId} AND mv.id<=${input.maxMovimentoId}
+      AND mv.data_movimento<=${input.dataA}
+      AND (${input.includeArretrati} OR mv.data_movimento>=${input.dataDa})
+      AND (mv.fondo_origine='FSE_PLUS' OR (mv.fondo_origine='NESSUN_FONDO' AND l.fse_plus=true))
+      AND NOT ${isActiveLineCoverageSql(sql`mv.id`)}
+  ),`;
+  return sql`WITH ${pendingOnly ? pendingEvents : sql``}
+    raw_candidate AS ${pendingOnly ? sql`MATERIALIZED` : sql``} (${rawCandidate}), context AS (
+    SELECT event_key, bool_or(blocking) AS blocking,
+      array_remove(array_agg(DISTINCT code), NULL) AS quality_codes
+    FROM raw_candidate LEFT JOIN LATERAL unnest(quality_codes) code ON true
+    GROUP BY event_key
+  ) SELECT r.id, r.event_key, r.event_date, r.fondo_origine, r.prodotto_id,
+    r.internal_channel, r.official_channel, r.active_coverage, r.coverage_eligible,
+    context.blocking, context.quality_codes
+    FROM raw_candidate r JOIN context USING (event_key)`;
+}
+
+/** Read-only totals of the operational queue. Ledger size is not an export row limit. */
+export async function summarizeFseCanonicalQueue(input: {
+  magazzinoId: number;
+  dataDa: string;
+  dataA: string;
+  executor: DbExecutor;
+  authorizedMovement: SQL;
+}): Promise<{
+  assess: string;
+  generable: string;
+  blocked: string;
+  backlog: string;
+}> {
+  const cutoff = await currentFseCutoff(
+    input.executor,
+    input.magazzinoId,
+    input.dataA,
+  );
+  const candidate = canonicalQueueCandidates(
+    { ...input, dataAsOf: input.dataA, includeArretrati: true, ...cutoff },
+    true,
+  );
+  const result = await input.executor.execute(sql`
+    WITH candidate AS (${candidate}), authorized_ids AS (
+      SELECT mv.id FROM movimenti mv
+      LEFT JOIN movimenti original ON original.id=mv.movimento_origine_id
+      JOIN magazzini mg ON mg.id=mv.magazzino_id
+      WHERE mv.magazzino_id=${input.magazzinoId} AND ${input.authorizedMovement}
+    ), events AS (
+      SELECT candidate.event_key, min(candidate.event_date) AS event_date,
+        bool_or(candidate.blocking) AS blocking
+      FROM candidate JOIN authorized_ids ON authorized_ids.id=candidate.id
+      WHERE ${queueFilterSql({})}
+      GROUP BY candidate.event_key
+    ) SELECT count(*)::text AS assess,
+      count(*) FILTER (WHERE NOT blocking)::text AS generable,
+      count(*) FILTER (WHERE blocking)::text AS blocked,
+      count(*) FILTER (WHERE NOT blocking AND event_key NOT LIKE 'CORREZIONE:%'
+        AND event_date<${input.dataDa}::date)::text AS backlog FROM events`);
+  return result.rows[0] as {
+    assess: string;
+    generable: string;
+    blocked: string;
+    backlog: string;
+  };
+}
+
 export async function listFseCanonicalPage(input: {
   magazzinoId: number;
   dataDa: string;
@@ -813,20 +897,7 @@ export async function listFseCanonicalPage(input: {
   const dataAsOf = input.dataAsOf ?? input.dataA;
   const cutoff =
     input.cutoff ?? (await currentFseCutoff(db, input.magazzinoId, dataAsOf));
-  const rawCandidate = canonicalCandidateRowsSql({
-    ...input,
-    dataAsOf,
-    ...cutoff,
-  });
-  const candidate = sql`WITH raw_candidate AS (${rawCandidate}), context AS (
-    SELECT event_key, bool_or(blocking) AS blocking,
-      array_remove(array_agg(DISTINCT code), NULL) AS quality_codes
-    FROM raw_candidate LEFT JOIN LATERAL unnest(quality_codes) code ON true
-    GROUP BY event_key
-  ) SELECT r.id, r.event_key, r.event_date, r.fondo_origine, r.prodotto_id,
-    r.internal_channel, r.official_channel, r.active_coverage, r.coverage_eligible,
-    context.blocking, context.quality_codes
-    FROM raw_candidate r JOIN context USING (event_key)`;
+  const candidate = canonicalQueueCandidates({ ...input, dataAsOf, ...cutoff });
   const filters = input.filters ?? {};
   const filtered = queueFilterSql(filters, input.projection === "quality");
   const offset = (input.page - 1) * input.pageSize;

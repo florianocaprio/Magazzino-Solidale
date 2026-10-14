@@ -11,6 +11,30 @@ import type {
 import { publicFilters } from "./types";
 import { REPORTING_MODEL_VERSION } from "./version";
 
+// Definition-owned measures, shared by UI and document consumers through the DTO.
+const SERIES_MEASURES: Record<string, [string, string, string?, string?]> = {
+  attivitaPerMeseArea: ["eventi", "count", "personeMese", "count"],
+  pacchiPerMese: ["pacchi", "count", "nuclei", "count"],
+  interventiPerMese: ["interventi", "count", "persone", "count"],
+  spesePerMese: ["spese", "count", "credito", "credit"],
+  pastiPerGiorno: ["pasti", "count", "persone", "count"],
+  pastiPerMese: ["pasti", "count", "persone", "count"],
+  movimentiPerMese: ["carichi", "count", "scarichi", "count"],
+  canali: ["documenti", "count", "nuclei", "count"],
+};
+function seriesWithMeasures(series: ReportSeries): ReportSeries {
+  const definition = SERIES_MEASURES[series.key];
+  if (!definition) return series;
+  const [label, unit, secondaryLabel, secondaryUnit] = definition;
+  return {
+    ...series,
+    primary: { label, unit },
+    ...(secondaryLabel && secondaryUnit
+      ? { secondary: { label: secondaryLabel, unit: secondaryUnit } }
+      : {}),
+  };
+}
+
 /** Keep SQL integer/decimal text alongside the intentionally approximate graph value. */
 export function numericMetrics<T extends Record<string, unknown>>(input: T) {
   const exact = Object.fromEntries(
@@ -73,7 +97,7 @@ export function dashboard(input: {
         ? { ...item, exactValue: input.exactKpi[item.key] }
         : item,
     ),
-    series: input.series ?? [],
+    series: (input.series ?? []).map(seriesWithMeasures),
     tables: input.tables ?? [],
     quality: input.quality ?? [],
     definitions: input.definitions,

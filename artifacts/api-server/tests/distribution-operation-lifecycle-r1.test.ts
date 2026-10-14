@@ -3,6 +3,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   db,
+  areeOperativeTable,
   lottiTable,
   magazziniTable,
   movimentiTable,
@@ -27,11 +28,16 @@ import { InventoryDecimal } from "../src/lib/inventoryDecimal";
 const suffix = `${process.pid}${Date.now().toString(36)}`;
 let operatoreId: number;
 let magazzinoId: number;
+let areaId: number;
 let prodottoId: number;
 let lottoId: number;
 let r2ScaricoId: number | null = null;
 
 beforeAll(async () => {
+  [{ id: areaId }] = await db
+    .insert(areeOperativeTable)
+    .values({ nome: `DR1 ${suffix}` })
+    .returning();
   [{ id: operatoreId }] = await db
     .insert(utentiTable)
     .values({
@@ -46,6 +52,7 @@ beforeAll(async () => {
     .values({
       codice: `DR1-${suffix}`.slice(0, 20),
       nome: `Distribution ${suffix}`,
+      areaOperativaId: areaId,
     })
     .returning({ id: magazziniTable.id });
   [{ id: prodottoId }] = await db
@@ -86,6 +93,7 @@ afterAll(async () => {
   await db.delete(lottiTable).where(eq(lottiTable.id, lottoId));
   await db.delete(prodottiTable).where(eq(prodottiTable.id, prodottoId));
   await db.delete(magazziniTable).where(eq(magazziniTable.id, magazzinoId));
+  await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, areaId));
   await db.delete(utentiTable).where(eq(utentiTable.id, operatoreId));
   await pool.end();
 });

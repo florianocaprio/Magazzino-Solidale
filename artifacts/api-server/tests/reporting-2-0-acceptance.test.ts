@@ -129,13 +129,13 @@ beforeAll(async () => {
       {
         codice: `R20-S-${suffix}`,
         nome: `Reporting Magazzino condiviso ${suffix}`,
-        areaOperativaId: null,
+        areaOperativaId: areaA,
         centroAscoltoId: null,
       },
     ])
     .returning({ id: magazziniTable.id });
   [warehouseA, warehouseB, warehouseShared] = warehouses.map((item) => item.id);
-  ids.warehouses.push(warehouseA, warehouseB);
+  ids.warehouses.push(warehouseA, warehouseB, warehouseShared);
 
   const beneficiaries = await db
     .insert(beneficiariTable)
@@ -1084,7 +1084,7 @@ describe("Reporting 2.0: accettazione FSE canonica", () => {
     ).toBe(401);
   });
 
-  it("isola gli eventi di un Magazzino condiviso per snapshot Area", async () => {
+  it("isola gli eventi per Area del Magazzino e snapshot, mantenendo il Centro condiviso", async () => {
     const scoped = (
       areaOperativaId: number,
       centroAscoltoId: number,
@@ -1112,7 +1112,9 @@ describe("Reporting 2.0: accettazione FSE canonica", () => {
         .find((table) => table.key === "01_Prodotti_FSE")
         ?.rows.reduce((sum, row) => sum + Number(row.quantitaFse), 0) ?? 0;
     expect(quantity(reportA)).toBe(1);
-    expect(quantity(reportB)).toBe(1);
+    // The physical warehouse belongs to Area A. A B snapshot does not grant
+    // Area B access to an A warehouse. The global view retains all four facts.
+    expect(quantity(reportB)).toBe(0);
     expect(quantity(globalReport)).toBe(4);
     const qualityCount = (
       report: Awaited<ReturnType<typeof buildFsePlusReport>>,
@@ -1148,6 +1150,6 @@ describe("Reporting 2.0: accettazione FSE canonica", () => {
     ).toBe(1);
     expect(
       detailB.rows.reduce((sum, row) => sum + Number(row.quantita), 0),
-    ).toBe(1);
+    ).toBe(0);
   });
 });

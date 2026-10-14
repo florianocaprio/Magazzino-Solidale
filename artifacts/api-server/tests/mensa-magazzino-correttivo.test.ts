@@ -33,6 +33,8 @@ import {
 } from "../src/lib/configurazioneAmbiente";
 import { resolveTransferMensaId } from "../src/lib/mensaTransferDestination";
 import { dataServizioMensa } from "../src/lib/mensaWorkflow";
+import { buildMensaReport } from "../src/lib/reporting/mensa";
+import { reportingOracleFilters } from "./helpers/reporting-oracle";
 
 const listeners = httpListeners({ diagnostics: "mensa-magazzino-correttivo" });
 const scope = newScope();
@@ -272,6 +274,20 @@ it("Preferenza persistita e immutabile: il Magazzino può fornire da un'origine 
   expect(after.magazzinoRichiestoNomeSnapshot).toBe(
     original.magazzinoRichiestoNomeSnapshot,
   );
+  const report = await buildMensaReport(
+    reportingOracleFilters(dataServizioMensa(), {
+      areaOperativaId: area,
+      mensaId,
+    }),
+  );
+  expect(
+    report.tables
+      .find((t) => t.key === "richiesteTop200")
+      ?.rows.find((r) => r.id === id),
+  ).toMatchObject({
+    preferenza: original.magazzinoRichiestoNomeSnapshot,
+    origineId: alternative,
+  });
 });
 
 it("La stessa sessione rivalida lo scope Centro per elenco e preferenza inviata", async () => {
@@ -314,6 +330,45 @@ it("RIC-01/02/03 TRA-01/03/05 IDE-01: due operatori, fabbisogno 20 / fornitura 1
   expect(created.status, created.text).toBe(201);
   const id = created.body.id;
   const persisted = await mensa.get(`/api/richieste-magazzino/${id}`);
+  async function assertReporting(
+    state: string,
+    documentState: string | null,
+    received: boolean,
+  ) {
+    const beforeRead = await inventory();
+    const requestBefore = await db
+      .select()
+      .from(richiesteMagazzinoTable)
+      .where(eq(richiesteMagazzinoTable.id, id));
+    const report = await buildMensaReport(
+      reportingOracleFilters(dataServizioMensa(), {
+        areaOperativaId: area,
+        mensaId,
+      }),
+    );
+    const rows = report.tables.find((t) => t.key === "richiesteTop200")!.rows;
+    expect(rows.filter((r) => r.id === id)).toHaveLength(1);
+    expect(rows.find((r) => r.id === id)).toMatchObject({
+      stato: state,
+      statoDocumento: documentState,
+      dataRicezione: received ? dataServizioMensa() : null,
+    });
+    expect(
+      report.kpi.find((k) => k.key === "richiesteCoorteRicevute")?.exactValue,
+    ).toBe(received ? "1" : "0");
+    expect(JSON.stringify(report)).not.toContain(payload.bisogno);
+    expect(report.kpi.some((k) => /percentuale|soddisfa/i.test(k.key))).toBe(
+      false,
+    );
+    expect(await inventory()).toEqual(beforeRead);
+    expect(
+      await db
+        .select()
+        .from(richiesteMagazzinoTable)
+        .where(eq(richiesteMagazzinoTable.id, id)),
+    ).toEqual(requestBefore);
+  }
+  await assertReporting("inviata", null, false);
   expect(persisted.body.magazzinoRichiestoId).toBe(origin);
   expect(persisted.body.magazzinoRichiestoNomeSnapshot).toBeTruthy();
   expect(await inventory()).toEqual(before);
@@ -336,6 +391,7 @@ it("RIC-01/02/03 TRA-01/03/05 IDE-01: due operatori, fabbisogno 20 / fornitura 1
     .send({ versione: 1, idempotencyKey: randomUUID() });
   expect(taken.status, taken.text).toBe(200);
   expect(await inventory()).toEqual(before);
+  await assertReporting("presa_in_carico", null, false);
   const documentInput = {
     versione: taken.body.versione,
     idempotencyKey: randomUUID(),
@@ -405,6 +461,7 @@ it("RIC-01/02/03 TRA-01/03/05 IDE-01: due operatori, fabbisogno 20 / fornitura 1
   };
   const shipped = await warehouse.post(`${path}/avvia`).send(shipInput);
   expect(shipped.status, shipped.text).toBe(200);
+  await assertReporting("presa_in_carico", "in_transito", false);
   expect((await warehouse.post(`${path}/avvia`).send(shipInput)).status).toBe(
     200,
   );
@@ -422,6 +479,9 @@ it("RIC-01/02/03 TRA-01/03/05 IDE-01: due operatori, fabbisogno 20 / fornitura 1
   };
   const received = await mensa.post(`${path}/conferma`).send(receipt);
   expect(received.status, received.text).toBe(200);
+  // M4's current receipt command persists completato (confermato is legacy).
+  expect(received.body.stato).toBe("completato");
+  await assertReporting("presa_in_carico", "completato", true);
   const after = await inventory();
   expect((await mensa.post(`${path}/conferma`).send(receipt)).status).toBe(200);
   expect(await inventory()).toEqual(after);

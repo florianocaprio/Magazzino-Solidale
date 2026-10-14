@@ -3796,6 +3796,7 @@ describe("Report e preparazione — semantica merce impegnata/consegnata", () =>
       tipoMovimento: "scarico",
       naturaContabile: "DISTRIBUZIONE_FINALE",
       fondoOrigine: "FSE_PLUS",
+      canaleOperativo: "PACCHI",
     });
 
     const after = (

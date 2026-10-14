@@ -66,6 +66,8 @@ export type ReportSeriesPoint = {
 
 export type ReportSeries = {
   key: string;
+  primary?: { label: string; unit: string };
+  secondary?: { label: string; unit: string };
   points: ReportSeriesPoint[];
 };
 

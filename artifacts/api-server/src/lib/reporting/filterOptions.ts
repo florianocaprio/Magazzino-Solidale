@@ -22,6 +22,7 @@ import {
   reportExecutor,
 } from "./queryContext";
 import type { ReportSection, ReportFilters } from "./types";
+import { logisticsSources } from "./logisticsAccess";
 
 export type ReportFilterOption = {
   id: number;
@@ -92,15 +93,26 @@ export async function buildReportFilterOptions(
     isModuloAttivo("TRASFERIMENTI"),
   ]);
 
-  const pacchiSource = hasArea("sociale") && magazzino && bolle;
+  const pacchiSource =
+    hasArea("sociale") && hasPermission("bolle.view") && magazzino && bolle;
   const socialSource = hasArea("sociale") && centroAscolto;
   const emporioSource = hasArea("emporio") && emporio;
   const mensaSource =
     hasArea("mensa") && hasPermission("mensa.reports.view") && mensa;
   const udsSource = hasArea("uds") && hasPermission("uds.reports.view") && uds;
-  const logisticsSource =
+  const fseLogisticsSource =
     (hasArea("magazzino") || hasArea("logistica")) &&
     (magazzino || lotti || trasferimenti);
+  const logistics = await logisticsSources({
+    callerIsAdmin: isAdmin,
+    callerAreas: user?.aree ?? [],
+    callerPermissions: user?.permessi ?? [],
+    areaOperativaId: effectiveAreaOperativaId,
+    centroAscoltoId: ownCentreId,
+    zonaUdsId: ownZoneId,
+  });
+  const logisticsSource =
+    logistics.stock || logistics.transfers || logistics.supplies;
   const fseSource =
     hasPermission("magazzino.fse.view") &&
     ((hasArea("sociale") && magazzino && bolle) ||
@@ -129,7 +141,7 @@ export async function buildReportFilterOptions(
               : section === "uds"
                 ? udsSource
                 : section === "magazzino-logistica"
-                  ? logisticsSource
+                  ? Object.values(logistics).some(Boolean)
                   : fseSource;
 
   const includeWarehouses =
@@ -146,7 +158,7 @@ export async function buildReportFilterOptions(
   const assignedMensaWarehouses =
     section === "fse-plus" &&
     mensaSource &&
-    !logisticsSource &&
+    !fseLogisticsSource &&
     !pacchiSource &&
     !emporioSource &&
     !udsSource;

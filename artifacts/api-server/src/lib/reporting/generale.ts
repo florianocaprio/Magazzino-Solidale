@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import { isReportModuleActive as isModuloAttivo } from "./queryContext";
 import type { ReportFilters, ReportKpi } from "./types";
-import { andSql, number, rows } from "./sql";
+import { andSql, number, rows, utcTimestampRomeDate } from "./sql";
 import { dashboard, kpi, text } from "./shared";
 import { pacchiConditions, pacchiMetrics } from "./pacchi";
 import {
@@ -41,7 +41,12 @@ async function activeSources(filters: ReportFilters): Promise<ActiveSources> {
     (filters.callerAreas.includes("uds") &&
       filters.callerPermissions.includes("uds.reports.view"));
   return {
-    pacchi: magazzino && bolle && canRead("sociale"),
+    pacchi:
+      magazzino &&
+      bolle &&
+      canRead("sociale") &&
+      (filters.callerIsAdmin ||
+        filters.callerPermissions.includes("bolle.view")),
     sociale: sociale && canRead("sociale"),
     emporio: emporio && canRead("emporio"),
     mensa: mensa && canReadMensa && filters.callerMensaIds?.length !== 0,
@@ -66,7 +71,7 @@ function eventUnions(filters: ReportFilters, active: ActiveSources): SQL[] {
       WHERE ${andSql(socialCompletedConditions(filters))}`);
   }
   if (active.emporio) {
-    unions.push(sql`SELECT se.beneficiario_id, se.data_chiusura::date AS giorno, 'emporio'::text AS area,
+    unions.push(sql`SELECT se.beneficiario_id, ${utcTimestampRomeDate(sql`se.data_chiusura`)} AS giorno, 'emporio'::text AS area,
       se.area_operativa_id, se.centro_ascolto_id
       FROM spese_emporio se WHERE ${andSql(speseConditions(filters))}`);
   }

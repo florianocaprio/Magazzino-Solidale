@@ -723,7 +723,7 @@ export const ListMagazziniResponseItem = zod.object({
   email: zod.string().nullish(),
   centroAscoltoId: zod.number().nullish(),
   centroAscoltoNome: zod.string().nullish(),
-  areaOperativaId: zod.number().nullish(),
+  areaOperativaId: zod.number(),
   tipoMagazzino: zod.enum(["logistico", "emporio", "misto", "mensa"]),
   stato: zod.string(),
   note: zod.string().nullish(),
@@ -732,7 +732,7 @@ export const ListMagazziniResponseItem = zod.object({
 export const ListMagazziniResponse = zod.array(ListMagazziniResponseItem);
 
 /**
- * Creates a warehouse. When tipoMagazzino is mensa, areaOperativaId (the Area) is required and the operational Mensa detail is created atomically.
+ * Creates a warehouse in an existing active Area. areaOperativaId must be supplied unless the caller has a fixed Area, which is enforced by the server. A null Area is invalid for every type. When tipoMagazzino is mensa, the operational Mensa detail is created atomically.
  * @summary Create a warehouse
  */
 
@@ -748,8 +748,10 @@ export const CreateMagazzinoBody = zod.object({
   centroAscoltoId: zod.number().nullish(),
   areaOperativaId: zod
     .number()
-    .nullish()
-    .describe("Area identifier; required when tipoMagazzino is mensa"),
+    .optional()
+    .describe(
+      "Existing active Area; required unless supplied by the caller's fixed Area. Null is never valid.",
+    ),
   tipoMagazzino: zod
     .enum(["logistico", "emporio", "misto", "mensa"])
     .optional(),
@@ -773,7 +775,7 @@ export const GetMagazzinoResponse = zod.object({
   email: zod.string().nullish(),
   centroAscoltoId: zod.number().nullish(),
   centroAscoltoNome: zod.string().nullish(),
-  areaOperativaId: zod.number().nullish(),
+  areaOperativaId: zod.number(),
   tipoMagazzino: zod.enum(["logistico", "emporio", "misto", "mensa"]),
   stato: zod.string(),
   note: zod.string().nullish(),
@@ -799,8 +801,10 @@ export const UpdateMagazzinoBody = zod.object({
   centroAscoltoId: zod.number().nullish(),
   areaOperativaId: zod
     .number()
-    .nullish()
-    .describe("Area identifier; required when the resulting type is mensa"),
+    .optional()
+    .describe(
+      "Existing active Area. Omission preserves the current Area; null is never valid.",
+    ),
   tipoMagazzino: zod
     .enum(["logistico", "emporio", "misto", "mensa"])
     .optional(),
@@ -820,7 +824,7 @@ export const UpdateMagazzinoResponse = zod.object({
   email: zod.string().nullish(),
   centroAscoltoId: zod.number().nullish(),
   centroAscoltoNome: zod.string().nullish(),
-  areaOperativaId: zod.number().nullish(),
+  areaOperativaId: zod.number(),
   tipoMagazzino: zod.enum(["logistico", "emporio", "misto", "mensa"]),
   stato: zod.string(),
   note: zod.string().nullish(),
@@ -19528,6 +19532,18 @@ export const GetReportDashboardGeneraleResponse = zod.object({
   series: zod.array(
     zod.object({
       key: zod.string(),
+      primary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
+      secondary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
       points: zod.array(
         zod.object({
           label: zod.string(),
@@ -19668,6 +19684,18 @@ export const GetReportPacchiResponse = zod.object({
   series: zod.array(
     zod.object({
       key: zod.string(),
+      primary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
+      secondary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
       points: zod.array(
         zod.object({
           label: zod.string(),
@@ -19810,6 +19838,18 @@ export const GetReportCentroAscoltoResponse = zod.object({
   series: zod.array(
     zod.object({
       key: zod.string(),
+      primary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
+      secondary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
       points: zod.array(
         zod.object({
           label: zod.string(),
@@ -19950,6 +19990,18 @@ export const GetReportEmporioResponse = zod.object({
   series: zod.array(
     zod.object({
       key: zod.string(),
+      primary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
+      secondary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
       points: zod.array(
         zod.object({
           label: zod.string(),
@@ -20093,6 +20145,18 @@ export const GetReportMensaIntegratoResponse = zod.object({
   series: zod.array(
     zod.object({
       key: zod.string(),
+      primary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
+      secondary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
       points: zod.array(
         zod.object({
           label: zod.string(),
@@ -20235,6 +20299,18 @@ export const GetReportUdsIntegratoResponse = zod.object({
   series: zod.array(
     zod.object({
       key: zod.string(),
+      primary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
+      secondary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
       points: zod.array(
         zod.object({
           label: zod.string(),
@@ -20375,6 +20451,18 @@ export const GetReportMagazzinoLogisticaResponse = zod.object({
   series: zod.array(
     zod.object({
       key: zod.string(),
+      primary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
+      secondary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
       points: zod.array(
         zod.object({
           label: zod.string(),
@@ -20523,6 +20611,18 @@ export const GetReportFsePlusIntegratoResponse = zod.object({
   series: zod.array(
     zod.object({
       key: zod.string(),
+      primary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
+      secondary: zod
+        .object({
+          label: zod.string().describe("Reporting column translation key"),
+          unit: zod.string().describe("Reporting unit translation key"),
+        })
+        .optional(),
       points: zod.array(
         zod.object({
           label: zod.string(),
@@ -20772,6 +20872,18 @@ export const PrepareReportExportResponse = zod.object({
     series: zod.array(
       zod.object({
         key: zod.string(),
+        primary: zod
+          .object({
+            label: zod.string().describe("Reporting column translation key"),
+            unit: zod.string().describe("Reporting unit translation key"),
+          })
+          .optional(),
+        secondary: zod
+          .object({
+            label: zod.string().describe("Reporting column translation key"),
+            unit: zod.string().describe("Reporting unit translation key"),
+          })
+          .optional(),
         points: zod.array(
           zod.object({
             label: zod.string(),

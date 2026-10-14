@@ -52,7 +52,7 @@ import {
   rientriTrasportoTable,
   rientroTrasportoRigheTable,
 } from "@workspace/db";
-import { inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 /**
  * Shared fixtures + app builder for the per-Centro-di-Ascolto scoping tests.
@@ -274,6 +274,27 @@ export async function createCentroRec(
   return { id: c.id, nome };
 }
 
+const fixtureWarehouseAreas = new WeakMap<SeedScope, number>();
+
+// Centre-scoping tests still need valid warehouses. Reuse the Centre's Area
+// when specified, otherwise create a dedicated synthetic Area for this scope.
+// This is test provisioning only: no production/legacy assignment is inferred.
+async function fixtureWarehouseArea(scope: SeedScope, centroId: number | null) {
+  if (centroId != null) {
+    const [centre] = await db
+      .select({ area: centriAscoltoTable.areaOperativaId })
+      .from(centriAscoltoTable)
+      .where(eq(centriAscoltoTable.id, centroId));
+    if (centre?.area != null) return centre.area;
+  }
+  let area = fixtureWarehouseAreas.get(scope);
+  if (area == null) {
+    area = await createAreaOperativa(scope);
+    fixtureWarehouseAreas.set(scope, area);
+  }
+  return area;
+}
+
 export async function createMagazzino(
   scope: SeedScope,
   centroId: number | null,
@@ -285,7 +306,10 @@ export async function createMagazzino(
       codice: `MAG-${rnd()}`,
       nome: `Mag ${rnd()}`,
       centroAscoltoId: centroId,
-      areaOperativaId: opts.areaOperativaId ?? null,
+      areaOperativaId:
+        opts.areaOperativaId === undefined
+          ? await fixtureWarehouseArea(scope, centroId)
+          : opts.areaOperativaId,
     })
     .returning({ id: magazziniTable.id });
   scope.magazzinoIds.push(m.id);
@@ -305,7 +329,10 @@ export async function createMagazzinoRec(
       codice: `MAG-${rnd()}`,
       nome,
       centroAscoltoId: centroId,
-      areaOperativaId: opts.areaOperativaId ?? null,
+      areaOperativaId:
+        opts.areaOperativaId === undefined
+          ? await fixtureWarehouseArea(scope, centroId)
+          : opts.areaOperativaId,
     })
     .returning({ id: magazziniTable.id });
   scope.magazzinoIds.push(m.id);

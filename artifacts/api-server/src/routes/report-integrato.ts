@@ -82,6 +82,8 @@ function reportHandler(
 ): RequestHandler {
   return async (req, res) => {
     try {
+      if (req.path === "/report/magazzino-logistica")
+        await assertReportSectionAccess(req, "magazzino-logistica");
       const filters = parseReportFilters(req);
       await assertReportFilterScope(req, filters);
       if (req.path === "/report/mensa" && filters.callerMensaIds?.length === 0)
@@ -123,6 +125,7 @@ router.get("/report/dashboard", reportHandler(buildGeneralReport));
 router.get(
   "/report/pacchi",
   requireSourceArea("sociale"),
+  requirePermission("bolle.view"),
   requireAllModuli(["MAGAZZINO_SOLIDALE", "BOLLE"]),
   reportHandler(buildPacchiReport),
 );

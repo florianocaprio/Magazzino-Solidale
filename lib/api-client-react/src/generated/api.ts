@@ -2086,7 +2086,7 @@ export const getCreateMagazzinoUrl = () => {
 };
 
 /**
- * Creates a warehouse. When tipoMagazzino is mensa, areaOperativaId (the Area) is required and the operational Mensa detail is created atomically.
+ * Creates a warehouse in an existing active Area. areaOperativaId must be supplied unless the caller has a fixed Area, which is enforced by the server. A null Area is invalid for every type. When tipoMagazzino is mensa, the operational Mensa detail is created atomically.
  * @summary Create a warehouse
  */
 export const createMagazzino = async (

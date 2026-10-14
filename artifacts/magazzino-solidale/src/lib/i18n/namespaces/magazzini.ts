@@ -23,7 +23,8 @@ export const magazzini = {
     saveChanges: "Salva Modifiche",
     createWarehouse: "Crea Magazzino",
     deleteTitle: "Sei sicuro?",
-    deleteDescription: "Il magazzino verrà eliminato definitivamente solo se non possiede bolle o storico operativo. In caso contrario puoi disattivarlo.",
+    deleteDescription:
+      "Il magazzino verrà eliminato definitivamente solo se non possiede bolle o storico operativo. In caso contrario puoi disattivarlo.",
     toastUpdated: "Magazzino aggiornato",
     toastCreated: "Magazzino creato",
     toastDeleted: "Magazzino eliminato",
@@ -38,11 +39,12 @@ export const magazzini = {
     filterTipoMagazzino: "Tutti i tipi",
     areaOperativa: "Area Operativa",
     nessunaAreaOperativa: "Nessuna Area Operativa",
-    mensaAreaRequired: "Per una Mensa devi selezionare un'Area Operativa",
+    areaRequired: "Seleziona un'Area Operativa per il Magazzino",
   },
   es: {
     title: "Almacenes",
-    subtitle: "Gestiona las sedes y los puntos de almacenamiento de la asociación.",
+    subtitle:
+      "Gestiona las sedes y los puntos de almacenamiento de la asociación.",
     newWarehouse: "Nuevo Almacén",
     searchPlaceholder: "Buscar por nombre, código o municipio...",
     colPlace: "Lugar",
@@ -55,7 +57,8 @@ export const magazzini = {
     openMenu: "Abrir menú",
     editTitle: "Editar Almacén",
     newTitle: "Nuevo Almacén",
-    formDescription: "Completa los detalles de la sede o punto de almacenamiento.",
+    formDescription:
+      "Completa los detalles de la sede o punto de almacenamiento.",
     codicePlaceholder: "Dejar vacío para generarlo (ej. MAG-001)",
     selectStatus: "Selecciona estado",
     nomePlaceholder: "Sede Central...",
@@ -64,7 +67,8 @@ export const magazzini = {
     saveChanges: "Guardar Cambios",
     createWarehouse: "Crear Almacén",
     deleteTitle: "¿Estás seguro?",
-    deleteDescription: "Esta acción no se puede deshacer. El almacén se eliminará permanentemente.",
+    deleteDescription:
+      "Esta acción no se puede deshacer. El almacén se eliminará permanentemente.",
     toastUpdated: "Almacén actualizado",
     toastCreated: "Almacén creado",
     toastDeleted: "Almacén eliminado",
@@ -79,7 +83,7 @@ export const magazzini = {
     filterTipoMagazzino: "Todos los tipos",
     areaOperativa: "Área Operativa",
     nessunaAreaOperativa: "Sin área",
-    mensaAreaRequired: "Para un comedor debes seleccionar un área",
+    areaRequired: "Selecciona un área para el almacén",
   },
   en: {
     title: "Warehouses",
@@ -105,7 +109,8 @@ export const magazzini = {
     saveChanges: "Save Changes",
     createWarehouse: "Create Warehouse",
     deleteTitle: "Are you sure?",
-    deleteDescription: "This action cannot be undone. The warehouse will be permanently deleted.",
+    deleteDescription:
+      "This action cannot be undone. The warehouse will be permanently deleted.",
     toastUpdated: "Warehouse updated",
     toastCreated: "Warehouse created",
     toastDeleted: "Warehouse deleted",
@@ -120,7 +125,7 @@ export const magazzini = {
     filterTipoMagazzino: "All types",
     areaOperativa: "Operational Area",
     nessunaAreaOperativa: "No area",
-    mensaAreaRequired: "You must select an area for a canteen",
+    areaRequired: "Select an operational area for the warehouse",
   },
   fr: {
     title: "Entrepôts",
@@ -146,7 +151,8 @@ export const magazzini = {
     saveChanges: "Enregistrer les modifications",
     createWarehouse: "Créer l'Entrepôt",
     deleteTitle: "Êtes-vous sûr ?",
-    deleteDescription: "Cette action est irréversible. L'entrepôt sera définitivement supprimé.",
+    deleteDescription:
+      "Cette action est irréversible. L'entrepôt sera définitivement supprimé.",
     toastUpdated: "Entrepôt mis à jour",
     toastCreated: "Entrepôt créé",
     toastDeleted: "Entrepôt supprimé",
@@ -161,7 +167,7 @@ export const magazzini = {
     filterTipoMagazzino: "Tous les types",
     areaOperativa: "Zone opérationnelle",
     nessunaAreaOperativa: "Aucun zone opérationnelle",
-    mensaAreaRequired: "Vous devez sélectionner un zone opérationnelle pour une cantine",
+    areaRequired: "Sélectionnez une zone opérationnelle pour l’entrepôt",
   },
   de: {
     title: "Lager",
@@ -178,7 +184,8 @@ export const magazzini = {
     openMenu: "Menü öffnen",
     editTitle: "Lager bearbeiten",
     newTitle: "Neues Lager",
-    formDescription: "Geben Sie die Details des Standorts oder Lagerpunkts ein.",
+    formDescription:
+      "Geben Sie die Details des Standorts oder Lagerpunkts ein.",
     codicePlaceholder: "Leer lassen zum Generieren (z. B. MAG-001)",
     selectStatus: "Status auswählen",
     nomePlaceholder: "Hauptsitz...",
@@ -187,7 +194,8 @@ export const magazzini = {
     saveChanges: "Änderungen speichern",
     createWarehouse: "Lager erstellen",
     deleteTitle: "Sind Sie sicher?",
-    deleteDescription: "Diese Aktion kann nicht rückgängig gemacht werden. Das Lager wird dauerhaft gelöscht.",
+    deleteDescription:
+      "Diese Aktion kann nicht rückgängig gemacht werden. Das Lager wird dauerhaft gelöscht.",
     toastUpdated: "Lager aktualisiert",
     toastCreated: "Lager erstellt",
     toastDeleted: "Lager gelöscht",
@@ -202,7 +210,7 @@ export const magazzini = {
     filterTipoMagazzino: "Alle Typen",
     areaOperativa: "Betriebsbereich",
     nessunaAreaOperativa: "Kein Betriebsbereich",
-    mensaAreaRequired: "Für eine Mensa muss ein Betriebsbereich ausgewählt werden",
+    areaRequired: "Wählen Sie einen Betriebsbereich für das Lager",
   },
   ar: {
     title: "المستودعات",
@@ -228,7 +236,8 @@ export const magazzini = {
     saveChanges: "حفظ التغييرات",
     createWarehouse: "إنشاء مستودع",
     deleteTitle: "هل أنت متأكد؟",
-    deleteDescription: "لا يمكن التراجع عن هذا الإجراء. سيتم حذف المستودع نهائيًا.",
+    deleteDescription:
+      "لا يمكن التراجع عن هذا الإجراء. سيتم حذف المستودع نهائيًا.",
     toastUpdated: "تم تحديث المستودع",
     toastCreated: "تم إنشاء المستودع",
     toastDeleted: "تم حذف المستودع",
@@ -243,6 +252,6 @@ export const magazzini = {
     filterTipoMagazzino: "كل الأنواع",
     areaOperativa: "المنطقة التشغيلية",
     nessunaAreaOperativa: "بدون إقليم",
-    mensaAreaRequired: "يجب اختيار إقليم للمطعم",
+    areaRequired: "اختر منطقة تشغيلية للمستودع",
   },
 } as const;

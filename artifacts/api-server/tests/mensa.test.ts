@@ -62,6 +62,8 @@ import { initDbExtensions } from "../src/lib/dbInit";
 import { InventoryDecimal } from "../src/lib/inventoryDecimal";
 import { buildFseCanonicalReport } from "../src/lib/fseCanonicalReporting";
 import bcrypt from "bcryptjs";
+import { buildMensaReport } from "../src/lib/reporting/mensa";
+import { reportingOracleFilters } from "./helpers/reporting-oracle";
 
 const sessionListeners = httpListeners({ diagnostics: "mensa-real-session" });
 
@@ -1076,6 +1078,32 @@ describe("Modulo Mensa", () => {
         dataOperativa: day.dataServizio,
         changes: { mensaId: fixture.mensaA, snapshot: day.snapshot },
       });
+      // M6.6 AC-08: real consumption, waste, reversal and reopened day;
+      // the reporting builder must reconcile the vertical's current net.
+      const report = await buildMensaReport(
+        reportingOracleFilters(day.dataServizio, {
+          areaOperativaId: fixture.romeId,
+          mensaId: fixture.mensaA,
+        }),
+      );
+      expect(
+        report.tables.find((t) => t.key === "consumiScartiMensa")?.rows,
+      ).toEqual([
+        {
+          prodotto: stock.product.nome,
+          unita: "kg",
+          causale: "scarto",
+          quantita: "0.200000",
+        },
+      ]);
+      expect(
+        report.kpi.find((k) => k.key === "giornateMensaServizio")?.exactValue,
+      ).toBe("1");
+      const [remaining] = await db
+        .select()
+        .from(lottiTable)
+        .where(eq(lottiTable.id, stock.lot.id));
+      expect(remaining.quantitaResidua).toBe("9.80");
     });
 
     it("F4: associazioni assenti, orfane o duplicate sono respinte dai vincoli senza fallback", async () => {
@@ -3231,26 +3259,21 @@ describe("Modulo Mensa", () => {
     expect(access.body.motivoEsito).toBe("MENSA_NON_ATTIVA");
   });
 
-  it("esclude i magazzini senza area operativa dallo scope logistico territoriale", async () => {
+  it("vieta già a DB i magazzini senza Area prima della consultazione logistica", async () => {
     const fixture = await createFixture();
-    const [legacyWarehouse] = await db
-      .insert(magazziniTable)
-      .values({
-        codice: `LEG-${rnd()}`,
-        nome: "Magazzino legacy senza area operativa",
-        areaOperativaId: null,
-        tipoMagazzino: "logistico",
-      })
-      .returning({ id: magazziniTable.id });
-    ids.warehouses.push(legacyWarehouse.id);
+    const codice = `LEG-${rnd()}`;
+    await expect(
+      pool.query(
+        "INSERT INTO magazzini(codice,nome) VALUES ($1,'Invalid Mensa supplier')",
+        [codice],
+      ),
+    ).rejects.toMatchObject({ code: "23502", column: "area_operativa_id" });
     const response = await request(makeApp(fixture)).get(
       "/mensa/logistica/magazzini",
     );
     expect(response.status).toBe(200);
     expect(response.body).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: legacyWarehouse.id }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ codice })]),
     );
   });
 

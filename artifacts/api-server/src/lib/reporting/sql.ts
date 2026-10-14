@@ -3,6 +3,12 @@ import { ReportingError } from "./filters";
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 
+/** For Drizzle Date timestamps stored without time zone: the driver writes
+ * ISO UTC and reads them as UTC. Do not use for civil DATE or local-time fields. */
+export function utcTimestampRomeDate(column: SQL): SQL {
+  return sql`((${column} AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Rome')::date`;
+}
+
 export async function rows<T extends Record<string, unknown>>(
   query: SQL,
 ): Promise<T[]> {

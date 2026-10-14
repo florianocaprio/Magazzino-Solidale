@@ -184,11 +184,17 @@ beforeEach(async () => {
     { areaOperativaId: null, isAdmin: true, isSuperAdmin: true },
     adminRoleId,
   );
-  globalAdmin = await createUser({ areaOperativaId: null, isAdmin: true }, adminRoleId,
+  globalAdmin = await createUser(
+    { areaOperativaId: null, isAdmin: true },
+    adminRoleId,
   );
-  adminA = await createUser({ areaOperativaId: areaA, isAdmin: true }, adminRoleId,
+  adminA = await createUser(
+    { areaOperativaId: areaA, isAdmin: true },
+    adminRoleId,
   );
-  adminB = await createUser({ areaOperativaId: areaB, isAdmin: true }, adminRoleId,
+  adminB = await createUser(
+    { areaOperativaId: areaB, isAdmin: true },
+    adminRoleId,
   );
   operator = await createUser(
     { areaOperativaId: areaA, isAdmin: false },
@@ -279,8 +285,11 @@ describe("audit hardening Amministrazione/Core", () => {
     expect(list.status).toBe(200);
     expect(list.body.map((row: { id: number }) => row.id)).toEqual([areaA]);
     expect(
-      (await request(scopedApp).post("/aree-operative").send({ nome: "Non consentita" }))
-        .status,
+      (
+        await request(scopedApp)
+          .post("/aree-operative")
+          .send({ nome: "Non consentita" })
+      ).status,
     ).toBe(403);
     expect(
       (
@@ -289,9 +298,9 @@ describe("audit hardening Amministrazione/Core", () => {
           .send({ nome: "Violazione" })
       ).status,
     ).toBe(403);
-    expect((await request(scopedApp).delete(`/aree-operative/${areaB}`)).status,
-    ).toBe(
-      403);
+    expect(
+      (await request(scopedApp).delete(`/aree-operative/${areaB}`)).status,
+    ).toBe(403);
 
     const globalApp = appAs(globalAdmin, areaOperativaRouter);
     const created = await request(globalApp)
@@ -302,9 +311,9 @@ describe("audit hardening Amministrazione/Core", () => {
   });
 
   it("ADM-01 disattiva l'Area senza scollegare le dipendenze", async () => {
-    const response = await request(appAs(superAdmin, areaOperativaRouter),
-    ).delete(
-      `/aree-operative/${areaA}`);
+    const response = await request(
+      appAs(superAdmin, areaOperativaRouter),
+    ).delete(`/aree-operative/${areaA}`);
     expect(response.status).toBe(204);
     const [area] = await db
       .select()
@@ -344,7 +353,8 @@ describe("audit hardening Amministrazione/Core", () => {
         .status,
     ).toBe(403);
     expect(
-      (await request(app).post("/zone-uds").send({ areaOperativaId: areaA })).status,
+      (await request(app).post("/zone-uds").send({ areaOperativaId: areaA }))
+        .status,
     ).toBe(400);
 
     expect(
@@ -420,17 +430,16 @@ describe("audit hardening Amministrazione/Core", () => {
     expect(storedBeneficiario.centroAscoltoId).toBe(centroA);
   });
 
-  it("ADM-06 separa la visibilità shared dallo scope di mutazione dei Magazzini", async () => {
+  it("ADM-06 mantiene lo scope di mutazione e impedisce magazzini senza Area", async () => {
     const token = suffix();
-    const [own, other, shared] = await db
+    const [own, other] = await db
       .insert(magazziniTable)
       .values([
         { codice: `MA-${token}`, nome: "Mag A", areaOperativaId: areaA },
         { codice: `MB-${token}`, nome: "Mag B", areaOperativaId: areaB },
-        { codice: `MS-${token}`, nome: "Mag shared", areaOperativaId: null },
       ])
       .returning({ id: magazziniTable.id });
-    ids.magazzini.push(own.id, other.id, shared.id);
+    ids.magazzini.push(own.id, other.id);
     const app = appAs(adminA, magazziniRouter);
 
     expect(
@@ -450,13 +459,19 @@ describe("audit hardening Amministrazione/Core", () => {
     expect(
       (
         await request(app)
-          .patch(`/magazzini/${shared.id}`)
-          .send({ nome: "Violazione" })
+          .patch(`/magazzini/${own.id}`)
+          .send({ areaOperativaId: null })
       ).status,
-    ).toBe(403);
-    expect((await request(app).delete(`/magazzini/${shared.id}`)).status).toBe(
+    ).toBe(400);
+    expect((await request(app).delete(`/magazzini/${other.id}`)).status).toBe(
       403,
     );
+    await expect(
+      pool.query(
+        "INSERT INTO magazzini(codice,nome) VALUES ($1,'Invalid ADM')",
+        [`MS-${token}`],
+      ),
+    ).rejects.toMatchObject({ code: "23502", column: "area_operativa_id" });
   });
 
   it("ADM-06 valida Area e Centro per ogni tipo di Magazzino e preserva la sincronizzazione Mensa", async () => {
@@ -492,7 +507,9 @@ describe("audit hardening Amministrazione/Core", () => {
       ).status,
     ).toBe(400);
 
-    const centerBoundApp = appAs({ ...adminA, centroAscoltoId: centroA }, magazziniRouter,
+    const centerBoundApp = appAs(
+      { ...adminA, centroAscoltoId: centroA },
+      magazziniRouter,
     );
     const centerBound = await request(centerBoundApp).post("/magazzini").send({
       nome: "Centro vincolato",
@@ -503,7 +520,10 @@ describe("audit hardening Amministrazione/Core", () => {
     expect(centerBound.body.centroAscoltoId).toBe(centroA);
     ids.magazzini.push(centerBound.body.id);
 
-    await db.update(centriAscoltoTable).set({ attivo: false }).where(eq(centriAscoltoTable.id, centroA));
+    await db
+      .update(centriAscoltoTable)
+      .set({ attivo: false })
+      .where(eq(centriAscoltoTable.id, centroA));
     const inactiveCenterCode = `MI-${suffix()}`;
     rejectedCodes.push(inactiveCenterCode);
     expect(
@@ -516,9 +536,15 @@ describe("audit hardening Amministrazione/Core", () => {
         })
       ).status,
     ).toBe(400);
-    await db.update(centriAscoltoTable).set({ attivo: true }).where(eq(centriAscoltoTable.id, centroA));
+    await db
+      .update(centriAscoltoTable)
+      .set({ attivo: true })
+      .where(eq(centriAscoltoTable.id, centroA));
 
-    await db.update(areeOperativeTable).set({ attivo: false }).where(eq(areeOperativeTable.id, areaA));
+    await db
+      .update(areeOperativeTable)
+      .set({ attivo: false })
+      .where(eq(areeOperativeTable.id, areaA));
     const inactiveAreaCode = `MA-${suffix()}`;
     rejectedCodes.push(inactiveAreaCode);
     expect(
@@ -531,7 +557,10 @@ describe("audit hardening Amministrazione/Core", () => {
         })
       ).status,
     ).toBe(400);
-    await db.update(areeOperativeTable).set({ attivo: true }).where(eq(areeOperativeTable.id, areaA));
+    await db
+      .update(areeOperativeTable)
+      .set({ attivo: true })
+      .where(eq(areeOperativeTable.id, areaA));
 
     const active = await request(globalApp).post("/magazzini").send({
       nome: "Magazzino valido",
@@ -542,7 +571,10 @@ describe("audit hardening Amministrazione/Core", () => {
     expect(active.status).toBe(201);
     ids.magazzini.push(active.body.id);
 
-    await db.update(areeOperativeTable).set({ attivo: false }).where(eq(areeOperativeTable.id, areaB));
+    await db
+      .update(areeOperativeTable)
+      .set({ attivo: false })
+      .where(eq(areeOperativeTable.id, areaB));
     expect(
       (
         await request(globalApp)
@@ -550,8 +582,14 @@ describe("audit hardening Amministrazione/Core", () => {
           .send({ areaOperativaId: areaB, centroAscoltoId: null })
       ).status,
     ).toBe(400);
-    await db.update(areeOperativeTable).set({ attivo: true }).where(eq(areeOperativeTable.id, areaB));
-    await db.update(centriAscoltoTable).set({ attivo: false }).where(eq(centriAscoltoTable.id, centroB));
+    await db
+      .update(areeOperativeTable)
+      .set({ attivo: true })
+      .where(eq(areeOperativeTable.id, areaB));
+    await db
+      .update(centriAscoltoTable)
+      .set({ attivo: false })
+      .where(eq(centriAscoltoTable.id, centroB));
     expect(
       (
         await request(globalApp)
@@ -559,7 +597,10 @@ describe("audit hardening Amministrazione/Core", () => {
           .send({ areaOperativaId: areaB, centroAscoltoId: centroB })
       ).status,
     ).toBe(400);
-    await db.update(centriAscoltoTable).set({ attivo: true }).where(eq(centriAscoltoTable.id, centroB));
+    await db
+      .update(centriAscoltoTable)
+      .set({ attivo: true })
+      .where(eq(centriAscoltoTable.id, centroB));
 
     const mensa = await request(globalApp).post("/magazzini").send({
       nome: "Mensa valida",
@@ -569,51 +610,73 @@ describe("audit hardening Amministrazione/Core", () => {
     });
     expect(mensa.status).toBe(201);
     ids.magazzini.push(mensa.body.id);
-    const [linkedMensa] = await db.select({ id: menseTable.id }).from(menseTable).where(eq(menseTable.magazzinoId, mensa.body.id));
+    const [linkedMensa] = await db
+      .select({ id: menseTable.id })
+      .from(menseTable)
+      .where(eq(menseTable.magazzinoId, mensa.body.id));
     expect(linkedMensa).toBeDefined();
     ids.mense.push(linkedMensa.id);
 
-    const rejected = await db.select({ id: magazziniTable.id }).from(magazziniTable).where(inArray(magazziniTable.codice, rejectedCodes));
+    const rejected = await db
+      .select({ id: magazziniTable.id })
+      .from(magazziniTable)
+      .where(inArray(magazziniTable.codice, rejectedCodes));
     expect(rejected).toHaveLength(0);
   });
 
   it("impedisce nuove relazioni operative con Aree e Centri disattivati", async () => {
-    const globalApp = appAs(globalAdmin, utentiRouter, centriRouter, politicheRouter,
+    const globalApp = appAs(
+      globalAdmin,
+      utentiRouter,
+      centriRouter,
+      politicheRouter,
     );
-    await db.update(areeOperativeTable).set({ attivo: false }).where(eq(areeOperativeTable.id, areaA));
+    await db
+      .update(areeOperativeTable)
+      .set({ attivo: false })
+      .where(eq(areeOperativeTable.id, areaA));
 
     const userToken = suffix();
     expect(
       (
-        await request(globalApp).post("/utenti").send({
-          username: `inactive_${userToken}`,
-          email: `inactive_${userToken}@example.org`,
-          password: "Password1",
-          nome: "Area",
-          cognome: "Inattiva",
-          ruoloId: operatorRoleId,
-          areaOperativaId: areaA,
-        })
+        await request(globalApp)
+          .post("/utenti")
+          .send({
+            username: `inactive_${userToken}`,
+            email: `inactive_${userToken}@example.org`,
+            password: "Password1",
+            nome: "Area",
+            cognome: "Inattiva",
+            ruoloId: operatorRoleId,
+            areaOperativaId: areaA,
+          })
       ).status,
     ).toBe(400);
     expect(
       (
-        await request(globalApp).post("/centri-ascolto").send({
-          nome: `Centro area inattiva ${suffix()}`,
-          areaOperativaId: areaA,
-        })
+        await request(globalApp)
+          .post("/centri-ascolto")
+          .send({
+            nome: `Centro area inattiva ${suffix()}`,
+            areaOperativaId: areaA,
+          })
       ).status,
     ).toBe(400);
     expect(
       (
-        await request(globalApp).post("/politiche-credito-solidale").send({
-          nome: `Policy area inattiva ${suffix()}`,
-          areaOperativaId: areaA,
-        })
+        await request(globalApp)
+          .post("/politiche-credito-solidale")
+          .send({
+            nome: `Policy area inattiva ${suffix()}`,
+            areaOperativaId: areaA,
+          })
       ).status,
     ).toBe(400);
 
-    await db.update(areeOperativeTable).set({ attivo: false }).where(eq(areeOperativeTable.id, areaB));
+    await db
+      .update(areeOperativeTable)
+      .set({ attivo: false })
+      .where(eq(areeOperativeTable.id, areaB));
     expect(
       (
         await request(globalApp)
@@ -629,21 +692,32 @@ describe("audit hardening Amministrazione/Core", () => {
       ).status,
     ).toBe(400);
 
-    await db.update(areeOperativeTable).set({ attivo: true }).where(eq(areeOperativeTable.id, areaA));
-    await db.update(centriAscoltoTable).set({ attivo: false }).where(eq(centriAscoltoTable.id, centroA));
+    await db
+      .update(areeOperativeTable)
+      .set({ attivo: true })
+      .where(eq(areeOperativeTable.id, areaA));
+    await db
+      .update(centriAscoltoTable)
+      .set({ attivo: false })
+      .where(eq(centriAscoltoTable.id, centroA));
     expect(
       (
-        await request(globalApp).post("/politiche-credito-solidale").send({
-          nome: `Policy centro inattivo ${suffix()}`,
-          areaOperativaId: areaA,
-          centroAscoltoId: centroA,
-        })
+        await request(globalApp)
+          .post("/politiche-credito-solidale")
+          .send({
+            nome: `Policy centro inattivo ${suffix()}`,
+            areaOperativaId: areaA,
+            centroAscoltoId: centroA,
+          })
       ).status,
     ).toBe(400);
 
     const [existingPolicy] = await db
       .insert(politicheCreditoSolidaleTable)
-      .values({ nome: `Policy storica ${suffix()}`, areaOperativaId: areaA, centroAscoltoId: centroA,
+      .values({
+        nome: `Policy storica ${suffix()}`,
+        areaOperativaId: areaA,
+        centroAscoltoId: centroA,
       })
       .returning({ id: politicheCreditoSolidaleTable.id });
     ids.politiche.push(existingPolicy.id);
@@ -660,7 +734,10 @@ describe("audit hardening Amministrazione/Core", () => {
     const [globalPolicy, otherPolicy] = await db
       .insert(politicheCreditoSolidaleTable)
       .values([
-        { nome: `Globale ${suffix()}`, areaOperativaId: null, centroAscoltoId: null,
+        {
+          nome: `Globale ${suffix()}`,
+          areaOperativaId: null,
+          centroAscoltoId: null,
         },
         {
           nome: `Area B ${suffix()}`,

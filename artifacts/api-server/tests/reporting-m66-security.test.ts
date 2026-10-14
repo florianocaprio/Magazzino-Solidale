@@ -72,6 +72,7 @@ let area: number,
   m2: number,
   z1: number,
   z2: number,
+  streetUser: number,
   canteenUser: number;
 const sentinel = `PRIVATE-Z2-${randomUUID()}`;
 beforeAll(async () => {
@@ -199,7 +200,9 @@ beforeAll(async () => {
     .values({ utenteId: canteenUser, mensaId: m1, assegnataDa: canteenUser });
   z1 = (await createZona(scope, area)).id;
   z2 = (await createZona(scope, area)).id;
-  street = (await login(["analisi", "uds"], area, z1)).agent;
+  const streetLogin = await login(["analisi", "uds"], area, z1);
+  street = streetLogin.agent;
+  streetUser = streetLogin.id;
   const beneficiary = await createBeneficiario(scope, null, {
     areaOperativaId: area,
     zonaUdsId: z1,
@@ -363,6 +366,173 @@ it("SEC-02 revocation takes effect on the same real session", async () => {
     ).status,
   ).toBe(403);
 });
+
+it("SEC-03/04 UDS identifiers, options, detail and preparation enforce the current zone and PII allowlist", async () => {
+  for (const path of [
+    "/api/report/uds",
+    "/api/report/dashboard",
+    "/api/report/drilldown",
+    "/api/report/filter-options",
+    "/api/report/uds/interventi-giornalieri",
+  ]) {
+    const denied = await street.get(path).query({
+      ...period,
+      section: "uds",
+      metric: "interventi",
+      zonaUdsId: z2,
+    });
+    expect(denied.status, path).toBe(403);
+  }
+  expect(
+    (
+      await street
+        .post("/api/report/prepare")
+        .query({ ...period, section: "uds", zonaUdsId: z2 })
+    ).status,
+  ).toBe(403);
+  const options = await street
+    .get("/api/report/filter-options")
+    .query({ section: "uds" });
+  expect(options.status).toBe(200);
+  expect(options.body.zones.map((z: { id: number }) => z.id)).toEqual([z1]);
+  const prepared = await street
+    .post("/api/report/prepare")
+    .query({ ...period, section: "uds" });
+  expect(prepared.status).toBe(200);
+  expect(value(prepared.body.report, "interventi")).toBe(1);
+  expect(prepared.body.detail).toBeNull();
+  expect(JSON.stringify(prepared.body)).not.toContain(sentinel);
+  expect(JSON.stringify(prepared.body)).not.toContain("Nota lecita");
+  const daily = await street
+    .get("/api/report/uds/interventi-giornalieri")
+    .query(period);
+  expect(daily.status).toBe(200);
+  expect(daily.body).toHaveLength(1);
+  expect(Object.keys(daily.body[0]).sort()).toEqual(
+    [
+      "id",
+      "beneficiarioId",
+      "beneficiarioNome",
+      "soprannome",
+      "zonaUdsId",
+      "zonaNome",
+      "dataIntervento",
+      "tipoIntervento",
+      "descrizione",
+      "note",
+      "noteUds",
+      "operatoreCodice",
+      "numeroIntervento",
+      "primoIntervento",
+    ].sort(),
+  );
+  expect(daily.body[0]).toMatchObject({
+    zonaUdsId: z1,
+    noteUds: "Nota lecita",
+    primoIntervento: false,
+  });
+});
+
+it("SEC-07 UDS grant and territory revocations affect the already-open session", async () => {
+  const [user] = await db
+    .select()
+    .from(utentiTable)
+    .where(eq(utentiTable.id, streetUser));
+  const [role] = await db
+    .select()
+    .from(ruoliTable)
+    .where(eq(ruoliTable.id, user.ruoloId!));
+  const read = () =>
+    street.post("/api/report/prepare").query({ ...period, section: "uds" });
+  expect((await read()).status).toBe(200);
+  try {
+    await db
+      .update(ruoliTable)
+      .set({ permessi: role.permessi.filter((p) => p !== "uds.reports.view") })
+      .where(eq(ruoliTable.id, role.id));
+    expect((await read()).status).toBe(403);
+    expect(
+      (await street.get("/api/report/uds/interventi-giornalieri").query(period))
+        .status,
+    ).toBe(403);
+    await db
+      .update(ruoliTable)
+      .set({ permessi: role.permessi })
+      .where(eq(ruoliTable.id, role.id));
+    expect((await read()).status).toBe(200);
+    await db
+      .update(utentiTable)
+      .set({ areaOperativaId: null, zonaUdsId: null, centroAscoltoId: null })
+      .where(eq(utentiTable.id, user.id));
+    expect((await read()).status).toBe(403);
+    expect(
+      (await street.get("/api/report/dashboard").query(period)).status,
+    ).toBe(403);
+  } finally {
+    await db
+      .update(ruoliTable)
+      .set({ permessi: role.permessi })
+      .where(eq(ruoliTable.id, role.id));
+    await db
+      .update(utentiTable)
+      .set({
+        areaOperativaId: user.areaOperativaId,
+        zonaUdsId: user.zonaUdsId,
+        centroAscoltoId: user.centroAscoltoId,
+      })
+      .where(eq(utentiTable.id, user.id));
+  }
+});
+
+it.each([
+  ["MENSA", "mensa", "pastiErogati"],
+  ["UDS", "uds", "interventiUds"],
+  ["EMPORIO_SOLIDALE", "emporio", "speseEmporio"],
+  ["CENTRO_ASCOLTO", "centro-ascolto", "interventiCentroAscolto"],
+] as const)(
+  "SEC-06 disabled %s rejects all section surfaces and removes only its general source",
+  async (module, section, key) => {
+    await updateModuloAmbiente(module, true, null);
+    const before = await admin.get("/api/report/dashboard").query(period);
+    expect(before.status).toBe(200);
+    expect(before.body.kpi.some((k: { key: string }) => k.key === key)).toBe(
+      true,
+    );
+    try {
+      await updateModuloAmbiente(module, false, null);
+      for (const path of [
+        `/api/report/${section}`,
+        "/api/report/filter-options",
+        "/api/report/drilldown",
+      ]) {
+        expect(
+          (
+            await admin
+              .get(path)
+              .query({ ...period, section, metric: "interventi" })
+          ).status,
+          path,
+        ).toBe(403);
+      }
+      expect(
+        (await admin.post("/api/report/prepare").query({ ...period, section }))
+          .status,
+      ).toBe(403);
+      const general = await admin
+        .post("/api/report/prepare")
+        .query({ ...period, section: "generale" });
+      expect(general.status).toBe(200);
+      expect(
+        general.body.report.kpi.some((k: { key: string }) => k.key === key),
+      ).toBe(false);
+      expect(
+        value(general.body.report, "personeUnicheComplessive"),
+      ).toBeGreaterThanOrEqual(0);
+    } finally {
+      await updateModuloAmbiente(module, true, null);
+    }
+  },
+);
 it("D08 page beyond the last keeps the true authorized total", async () => {
   const result = await street.get("/api/report/drilldown").query({
     ...period,
@@ -668,6 +838,138 @@ it("PDF-13 prepared row bound rejects 10001 rows instead of silently truncating"
     ),
   ).toHaveLength(10000);
 });
+
+it("PDF-09 real HTTP prepare keeps stock table and KPI in the same snapshot across a committed change", async () => {
+  const localArea = await createAreaOperativa(scope);
+  const warehouse = await createMagazzino(scope, null, {
+    areaOperativaId: localArea,
+  });
+  const product = await createProdotto(scope, { unitaMisura: "pz" });
+  const lot = await createLotto(scope, {
+    prodottoId: product,
+    magazzinoId: warehouse,
+    quantita: 10,
+  });
+  // Include an actual multipage-sized dataset, not just a single KPI.
+  await pool.query(
+    `WITH inserted AS (
+      INSERT INTO prodotti(codice,nome,tipo_prodotto,unita_misura)
+      SELECT $1||g,'Snapshot product '||g,'alimentare','pz'
+      FROM generate_series(1,301) g RETURNING id
+    ) INSERT INTO lotti(prodotto_id,magazzino_id,data_carico,quantita_caricata,quantita_residua)
+      SELECT id,$2,'2026-01-01',1,1 FROM inserted`,
+    [`SNAP-${randomUUID().slice(0, 8)}-`, warehouse],
+  );
+  const lock = await pool.connect();
+  let pending: Promise<request.Response> | undefined;
+  try {
+    await lock.query("BEGIN");
+    await lock.query("LOCK TABLE lotti IN ACCESS EXCLUSIVE MODE");
+    pending = admin
+      .post("/api/report/prepare")
+      .query({
+        ...period,
+        section: "magazzino-logistica",
+        magazzinoId: warehouse,
+      })
+      .then((r) => r);
+    const deadline = Date.now() + 10000;
+    let observed = false;
+    while (Date.now() < deadline) {
+      const waiting = await pool.query(
+        "SELECT 1 FROM pg_locks l JOIN pg_stat_activity a ON a.pid=l.pid WHERE a.datname=current_database() AND NOT l.granted AND l.relation='lotti'::regclass AND a.pid<>pg_backend_pid()",
+      );
+      if (waiting.rowCount) {
+        observed = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(observed, "observable DB barrier before concurrent mutation").toBe(
+      true,
+    );
+    await lock.query("UPDATE lotti SET quantita_residua=9 WHERE id=$1", [lot]);
+    await lock.query("COMMIT");
+    const result = await pending;
+    expect(result.status, result.text).toBe(200);
+    const table = result.body.report.tables.find(
+      (t: { key: string }) => t.key === "giacenze",
+    );
+    expect(table.rows).toHaveLength(1);
+    expect(table.rows[0]).toMatchObject({
+      magazzinoId: warehouse,
+      unitaMisura: "pz",
+      quantita: "311.00",
+    });
+    expect(value(result.body.report, "giacenzaCorrentePezzi")).toBe(311);
+    const detail = result.body.report.tables.find(
+      (t: { key: string }) => t.key === "disponibilitaCorrente",
+    );
+    expect(detail.rows).toHaveLength(302);
+    expect(
+      detail.rows.filter(
+        (r: { disponibile: string }) => r.disponibile === "10.000000",
+      ),
+    ).toHaveLength(1);
+    expect(
+      detail.rows.filter(
+        (r: { disponibile: string }) => r.disponibile === "1.000000",
+      ),
+    ).toHaveLength(301);
+    expect(
+      (
+        await pool.query(
+          "SELECT quantita_residua::text AS quantity FROM lotti WHERE id=$1",
+          [lot],
+        )
+      ).rows,
+    ).toEqual([{ quantity: "9.000000" }]);
+  } finally {
+    await lock.query("ROLLBACK");
+    lock.release();
+    await pending;
+  }
+});
+
+it("PDF-13 real prepare rejects the UTF-8 8 MiB bound without returning a truncated report", async () => {
+  const localArea = await createAreaOperativa(scope);
+  // Exactly 10k rows: the row guard must NOT be the reason for this rejection.
+  // 120 four-byte characters respect the real varchar(120) column constraint.
+  await pool.query(
+    "INSERT INTO magazzini(codice,nome,area_operativa_id) SELECT $1||g,repeat('📦',120),$2 FROM generate_series(1,10000) g",
+    [`SZ${localArea}-`, localArea],
+  );
+  try {
+    const direct = await admin
+      .get("/api/report/magazzino-logistica")
+      .query({ ...period, areaOperativaId: localArea });
+    expect(direct.status).toBe(200);
+    expect(
+      direct.body.tables.find((t: { key: string }) => t.key === "giacenze")
+        .rows,
+    ).toHaveLength(10000);
+    const result = await admin.post("/api/report/prepare").query({
+      ...period,
+      section: "magazzino-logistica",
+      areaOperativaId: localArea,
+    });
+    expect(result.status, result.text.slice(0, 300)).toBe(413);
+    expect(result.text).toContain("8 MiB");
+    expect(result.body).not.toHaveProperty("report");
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS n FROM magazzini WHERE area_operativa_id=$1",
+          [localArea],
+        )
+      ).rows,
+    ).toEqual([{ n: 10000 }]);
+  } finally {
+    await pool.query("DELETE FROM magazzini WHERE area_operativa_id=$1", [
+      localArea,
+    ]);
+  }
+}, 120000);
 
 it("SEC-02 FSE movement controls cannot reveal distributions belonging to unassigned M2", async () => {
   const product = await createProdotto(scope);

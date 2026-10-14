@@ -1,8 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
-import { buildFseCanonicalReport } from "../fseCanonicalReporting";
+import { summarizeFseCanonicalQueue } from "../fseCanonicalReporting";
 import { reportExecutor } from "./queryContext";
 import { rows } from "./sql";
-import { ReportingError } from "./filters";
 import { kpi, text } from "./shared";
 import type { ReportFilters } from "./types";
 import { emptyReportPanel, type ReportPanel } from "./requests";
@@ -13,51 +12,54 @@ export async function fseQueuePanel(
   warehouseScope: SQL,
   authorized: SQL,
 ): Promise<ReportPanel> {
-  const source = await rows<{ id: number; magazzinoId: number }>(sql`
-    SELECT mv.id,mv.magazzino_id AS "magazzinoId" FROM movimenti mv
-    LEFT JOIN movimenti original ON original.id=mv.movimento_origine_id
-    JOIN magazzini mg ON mg.id=mv.magazzino_id
-    WHERE mv.fondo_origine='FSE_PLUS' AND mv.data_movimento<=${filters.a}
-      AND ${warehouseScope} AND ${authorized}
-    ORDER BY mv.magazzino_id,mv.id LIMIT 10001`);
-  if (source.length > 10000)
-    throw new ReportingError(
-      413,
-      "Coda FSE troppo ampia: selezionare un Magazzino o un periodo più stretto",
-    );
-  const byWarehouse = new Map<number, number[]>();
-  for (const row of source) {
-    const ids = byWarehouse.get(row.magazzinoId) ?? [];
-    ids.push(row.id);
-    byWarehouse.set(row.magazzinoId, ids);
-  }
-  const totals = { assess: 0, generable: 0, blocked: 0, backlog: 0 };
-  for (const [magazzinoId, movementIds] of byWarehouse) {
-    const current = await buildFseCanonicalReport({
+  const warehouses = await rows<{ magazzinoId: number }>(sql`
+    SELECT mg.id AS "magazzinoId" FROM magazzini mg WHERE ${warehouseScope}`);
+  const totals = { assess: 0n, generable: 0n, blocked: 0n, backlog: 0n };
+  for (const { magazzinoId } of warehouses) {
+    const current = await summarizeFseCanonicalQueue({
       magazzinoId,
-      movementIds,
       dataDa: filters.da,
       dataA: filters.a,
-      dataAsOf: filters.a,
-      includeArretrati: true,
-      excludeCovered: true,
       executor: reportExecutor(),
+      authorizedMovement: authorized,
     });
-    totals.assess += current.events.length;
-    totals.generable += current.events.filter(
-      (event) => event.coverageEligible && !event.blocking,
-    ).length;
-    totals.blocked += current.events.filter((event) => event.blocking).length;
-    totals.backlog += current.events.filter(
-      (event) => event.coverageEligible && !event.blocking && event.arretrato,
-    ).length;
+    for (const key of Object.keys(totals) as Array<keyof typeof totals>)
+      totals[key] += BigInt(current[key]);
   }
   const result = emptyReportPanel();
   result.kpi = [
-    kpi("fseEventiDaValutare", totals.assess),
-    kpi("fseEventiGenerabili", totals.generable),
-    kpi("fseEventiQualitaBloccante", totals.blocked),
-    kpi("fseGenerabiliArretrati", totals.backlog),
+    kpi(
+      "fseEventiDaValutare",
+      Number(totals.assess),
+      "count",
+      null,
+      "ok",
+      String(totals.assess),
+    ),
+    kpi(
+      "fseEventiGenerabili",
+      Number(totals.generable),
+      "count",
+      null,
+      "ok",
+      String(totals.generable),
+    ),
+    kpi(
+      "fseEventiQualitaBloccante",
+      Number(totals.blocked),
+      "count",
+      null,
+      "ok",
+      String(totals.blocked),
+    ),
+    kpi(
+      "fseGenerabiliArretrati",
+      Number(totals.backlog),
+      "count",
+      null,
+      "ok",
+      String(totals.backlog),
+    ),
   ];
   result.definitions = [text("fseCanonicalQueue")];
   return result;

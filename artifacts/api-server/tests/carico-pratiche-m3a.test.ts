@@ -39,7 +39,6 @@ let areaBId: number;
 let magazzinoAId: number;
 let magazzinoBId: number;
 let magazzinoInattivoId: number;
-let magazzinoLegacyId: number;
 let generaleAId: number;
 let generaleBId: number;
 let lottoOperativoAId: number;
@@ -231,14 +230,6 @@ beforeAll(async () => {
       stato: "inattivo",
     })
     .returning({ id: magazziniTable.id });
-  [{ id: magazzinoLegacyId }] = await db
-    .insert(magazziniTable)
-    .values({
-      codice: `M3AL-${suffix}`.slice(0, 20),
-      nome: "M3A Deposito legacy",
-      areaOperativaId: null,
-    })
-    .returning({ id: magazziniTable.id });
   [{ id: prodottoPzId }] = await db
     .insert(prodottiTable)
     .values({
@@ -330,7 +321,6 @@ afterAll(async () => {
         magazzinoAId,
         magazzinoBId,
         magazzinoInattivoId,
-        magazzinoLegacyId,
       ]),
     );
   await db
@@ -831,13 +821,13 @@ describe("M3A — pratica persistente e registrazioni incrementali", () => {
       .post("/carico-pratiche")
       .send({ ...header({ magazzinoId: magazzinoInattivoId }), righe: [] });
     expect(inactive.status).toBe(400);
-    const legacy = await request(appFor(operatorAId))
-      .post("/carico-pratiche")
-      .send({
-        ...header({ areaOperativaId: areaAId, magazzinoId: magazzinoLegacyId }),
-        righe: [],
-      });
-    expect(legacy.status).toBe(400);
+    // Migration 56 forbids the invalid warehouse itself, before the load API.
+    await expect(
+      pool.query(
+        "INSERT INTO magazzini(codice,nome) VALUES ($1,'Invalid M3A')",
+        [`M3AL-${suffix}`.slice(0, 20)],
+      ),
+    ).rejects.toMatchObject({ code: "23502", column: "area_operativa_id" });
     const wrongLot = await request(scoped)
       .post("/carico-pratiche")
       .send({ ...header({ lottoLogicoId: generaleBId }), righe: [] });

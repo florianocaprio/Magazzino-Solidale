@@ -2,12 +2,13 @@ import { sql, type SQL } from "drizzle-orm";
 import type { ReportDrilldown, ReportFilters, ReportSection } from "./types";
 import { REPORTING_MODEL_VERSION } from "./version";
 import { ReportingError } from "./filters";
-import { andSql, number, reportScope, rows } from "./sql";
+import { andSql, number, reportScope, rows, utcTimestampRomeDate } from "./sql";
 import { pacchiConditions } from "./pacchi";
 import { socialCompletedConditions, socialEventDate } from "./centroAscolto";
 import { accessConditions, speseConditions } from "./emporio";
 import { mealConditions, mensaAccessConditions } from "./mensa";
 import { udsBaseConditions, udsEventDate } from "./uds";
+import { logisticsSources } from "./logisticsAccess";
 import {
   movementConditions,
   transferCondition,
@@ -20,11 +21,11 @@ import {
 } from "./fsePlus";
 import {
   effectiveBollaRigaId,
+  fseBeneficiaryProfilesCte,
   fseDistributionNatureCondition,
   fseCanonicalPeriodCondition,
   fseNetDistributedQuantity,
 } from "./fseCanonicalFacts";
-import { authoritativeSnapshotOrderForAliasS } from "./fseSnapshotOrder";
 
 type DetailDefinition = { columns: string[]; query: SQL };
 
@@ -80,6 +81,13 @@ async function detailDefinition(
     );
   }
   const pagination = sql`LIMIT ${limit} OFFSET ${offset}`;
+  if (section === "magazzino-logistica") {
+    const sources = await logisticsSources(filters);
+    if (
+      !(metric.startsWith("trasferimenti") ? sources.transfers : sources.stock)
+    )
+      throw new ReportingError(403, "Sorgente del dettaglio non autorizzata");
+  }
   if (section === "pacchi") {
     if (metric === "nucleiServiti") {
       return {
@@ -235,7 +243,7 @@ async function detailDefinition(
       columns: ["id", "beneficiarioCodice", "data", "stato", "magazzino"],
       query: sql`
         SELECT c.id, be.codice AS beneficiario_codice,
-               COALESCE(c.data_ora_effettiva_accesso::date, c.data_prevista)::text AS data,
+               COALESCE(${utcTimestampRomeDate(sql`c.data_ora_effettiva_accesso`)}, c.data_prevista)::text AS data,
                c.stato_accesso_emporio AS stato, mg.nome AS magazzino,
                COUNT(*) OVER() AS full_count
         FROM consegne c JOIN beneficiari be ON be.id = c.beneficiario_id
@@ -527,41 +535,11 @@ async function detailDefinition(
     );
     const netDistributedQuantity = fseNetDistributedQuantity(sql`mv.quantita`);
     if (metric === "nucleiRaggiunti" || metric === "personeRaggiunte") {
-      const peopleCte = sql`
-        WITH famiglie AS (
-          SELECT DISTINCT be.id, be.codice
-          FROM movimenti mv
-          LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
-          JOIN magazzini mg ON mg.id = mv.magazzino_id
-          LEFT JOIN bolla_righe br_famiglia ON br_famiglia.id = COALESCE(
-            mv.bolla_riga_id,
-            original.bolla_riga_id
-          )
-          JOIN bolle b ON b.id = COALESCE(
-            mv.bolla_id,
-            original.bolla_id,
-            br_famiglia.bolla_id
-          )
-          JOIN beneficiari be ON be.id = b.beneficiario_id
-          WHERE ${fseCanonicalPeriodCondition(filters, warehouseScope, authorizedMovement)}
-            AND ${andSql(
-              reportScope(filters, {
-                areaOperativa: sql`COALESCE(b.area_operativa_id_snapshot, be.area_operativa_id)`,
-                centro: sql`COALESCE(b.centro_ascolto_id_snapshot, be.centro_ascolto_id)`,
-              }),
-            )}
-        ), profili AS (
-          SELECT f.*, fs.numero_componenti, fs.donne, fs.uomini,
-                 fs.eta_0_17, fs.eta_18_29, fs.eta_30_64, fs.eta_65_plus,
-                 fs.data_riferimento, fs.origine_snapshot
-          FROM famiglie f
-          LEFT JOIN LATERAL (
-            SELECT s.* FROM fse_fascicoli_sociali_snapshot s
-            WHERE s.beneficiario_id = f.id AND s.data_riferimento <= ${filters.a}
-            ORDER BY ${authoritativeSnapshotOrderForAliasS}
-            LIMIT 1
-          ) fs ON true
-        )`;
+      const peopleCte = fseBeneficiaryProfilesCte(
+        filters,
+        warehouseScope,
+        authorizedMovement,
+      );
       if (metric === "nucleiRaggiunti") {
         return {
           columns: [
@@ -572,9 +550,9 @@ async function detailDefinition(
             "numeroComponenti",
           ],
           query: sql`${peopleCte}
-            SELECT id, codice AS beneficiario_codice, data_riferimento,
+            SELECT household_id AS id, codice AS beneficiario_codice, data_riferimento,
                    origine_snapshot, numero_componenti, COUNT(*) OVER() AS full_count
-            FROM profili ORDER BY codice, id ${pagination}`,
+            FROM profili ORDER BY codice, household_id ${pagination}`,
         };
       }
       return {
@@ -591,10 +569,10 @@ async function detailDefinition(
           "dataRiferimento",
         ],
         query: sql`${peopleCte}
-          SELECT id, codice AS beneficiario_codice, numero_componenti AS persone,
-                 donne, uomini, eta_0_17, eta_18_29, eta_30_64, eta_65_plus,
+          SELECT household_id AS id, codice AS beneficiario_codice, numero_componenti AS persone,
+                 donne, uomini, eta_0_17 AS "eta017", eta_18_29 AS "eta1829", eta_30_64 AS "eta3064", eta_65_plus AS "eta65Plus",
                  data_riferimento, COUNT(*) OVER() AS full_count
-          FROM profili ORDER BY codice, id ${pagination}`,
+          FROM profili ORDER BY codice, household_id ${pagination}`,
       };
     }
     if (metric === "prodottiFseDistinti") {

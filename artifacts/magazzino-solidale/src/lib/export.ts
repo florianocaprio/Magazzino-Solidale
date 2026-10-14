@@ -8,6 +8,10 @@ import type {
 } from "@workspace/api-client-react";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import type { ReportingDocumentInput } from "./reporting-document";
+import {
+  reportingFilterRows,
+  reportingSeriesLabel,
+} from "./reporting-metadata";
 
 /** Load the complete reporting renderer only when a document is requested. */
 export async function buildReportingPdf(
@@ -287,56 +291,12 @@ export function buildReportingWorkbook(
   fseControl?: ReportDrilldown | null,
   datasetId?: string,
 ): XLSX.WorkBook {
-  const scopeValue = (
-    id: number | null | undefined,
-    name: string | null | undefined,
-    all: string,
-  ) => name ?? (id == null ? all : String(id));
   const workbook = XLSX.utils.book_new();
   const summary = [
     [labels.title],
     [labels.metadata.from, report.filters.da],
     [labels.metadata.to, report.filters.a],
-    [
-      labels.metadata.areaOperativa,
-      scopeValue(
-        report.filters.areaOperativaId,
-        scopeNames.areaOperativa,
-        labels.metadata.allAreeOperative,
-      ),
-    ],
-    [
-      labels.metadata.centre,
-      scopeValue(
-        report.filters.centroAscoltoId,
-        scopeNames.centre,
-        labels.metadata.allCentres,
-      ),
-    ],
-    [
-      labels.metadata.warehouse,
-      scopeValue(
-        report.filters.magazzinoId,
-        scopeNames.warehouse,
-        labels.metadata.allWarehouses,
-      ),
-    ],
-    [
-      labels.metadata.mensa,
-      scopeValue(
-        report.filters.mensaId,
-        scopeNames.mensa,
-        labels.metadata.allMense,
-      ),
-    ],
-    [
-      labels.metadata.zone,
-      scopeValue(
-        report.filters.zonaUdsId,
-        scopeNames.zone,
-        labels.metadata.allZones,
-      ),
-    ],
+    ...reportingFilterRows(report, labels, scopeNames),
     [labels.metadata.generatedAt, report.generatedAt],
     [labels.metadata.application, "Magazzino Solidale"],
     ["Europe/Rome"],
@@ -404,8 +364,8 @@ export function buildReportingWorkbook(
       [labels.table(series.key)],
       [
         labels.column("data"),
-        labels.metadata.value,
-        labels.column("valoreSecondario"),
+        reportingSeriesLabel(series, false, labels),
+        reportingSeriesLabel(series, true, labels),
       ],
       ...series.points.map((point) => [
         point.label,

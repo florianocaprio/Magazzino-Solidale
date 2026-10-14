@@ -19,11 +19,8 @@ export interface MagazzinoUpdate {
   email?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
-  /**
-   * Area identifier; required when the resulting type is mensa
-   * @nullable
-   */
-  areaOperativaId?: number | null;
+  /** Existing active Area. Omission preserves the current Area; null is never valid. */
+  areaOperativaId?: number;
   tipoMagazzino?: MagazzinoUpdateTipoMagazzino;
   stato?: string;
   note?: string;

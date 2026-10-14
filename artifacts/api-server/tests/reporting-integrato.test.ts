@@ -1166,15 +1166,19 @@ describe("regole di conteggio Pacchi e FSE+", () => {
           ?.rows ?? [];
       expect(stockRows).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ unitaMisura: "kg", quantita: 15 }),
-          expect.objectContaining({ unitaMisura: "pz", quantita: 16 }),
+          expect.objectContaining({ unitaMisura: "kg", quantita: "15.00" }),
+          expect.objectContaining({ unitaMisura: "pz", quantita: "16.00" }),
         ]),
       );
 
       const pacchiOptions = await buildReportFilterOptions(
         requestFor(
           {},
-          { areaOperativaId: areaOperativa.id, aree: ["analisi", "sociale"] },
+          {
+            areaOperativaId: areaOperativa.id,
+            aree: ["analisi", "sociale"],
+            permessi: ["bolle.view"],
+          },
         ),
         "pacchi",
         areaOperativa.id,

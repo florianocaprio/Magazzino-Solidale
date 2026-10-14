@@ -28,7 +28,10 @@ import { useAuth } from "@/lib/auth";
 import { isCivilDate, todayEuropeRome } from "@/lib/europe-rome";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { localizeReportingText } from "@/lib/reporting-text";
+import {
+  localizeReportingText,
+  reportingColumnLabel,
+} from "@/lib/reporting-text";
 import { FseOperations } from "@/components/reporting/fse-operations";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -44,6 +47,9 @@ type CommonParams = {
   magazzinoId?: number;
   mensaId?: number;
   zonaUdsId?: number;
+  operatoreId?: number;
+  tipoIntervento?: string;
+  tipoServizio?: string;
 };
 
 function positiveId(
@@ -93,6 +99,9 @@ export function reportingFiltersFromSearch(
     magazzinoId: positiveId(params, "magazzinoId", null),
     mensaId: positiveId(params, "mensaId", null),
     zonaUdsId: positiveId(params, "zonaUdsId", user?.zonaUdsId ?? null),
+    operatoreId: positiveId(params, "operatoreId", null),
+    tipoIntervento: params.get("tipoIntervento")?.trim() || null,
+    tipoServizio: params.get("tipoServizio")?.trim() || null,
   };
 }
 
@@ -112,6 +121,9 @@ function writeFiltersToUrl(filters: ReportingFilterState) {
     "magazzinoId",
     "mensaId",
     "zonaUdsId",
+    "operatoreId",
+    "tipoIntervento",
+    "tipoServizio",
   ] as const) {
     if (filters[key] != null) params.set(key, String(filters[key]));
   }
@@ -132,6 +144,9 @@ function apiParams(filters: ReportingFilterState): CommonParams {
     magazzinoId: filters.magazzinoId ?? undefined,
     mensaId: filters.mensaId ?? undefined,
     zonaUdsId: filters.zonaUdsId ?? undefined,
+    operatoreId: filters.operatoreId ?? undefined,
+    tipoIntervento: filters.tipoIntervento ?? undefined,
+    tipoServizio: filters.tipoServizio ?? undefined,
   };
 }
 
@@ -213,6 +228,19 @@ function QueryContent({
               }).format(new Date(report.generatedAt)),
             })}
           </p>
+          {(
+            [
+              ["operatore", report.filters.operatoreId],
+              ["tipoIntervento", report.filters.tipoIntervento],
+              ["tipoServizio", report.filters.tipoServizio],
+            ] as const
+          )
+            .filter(([, value]) => value != null)
+            .map(([key, value]) => (
+              <p key={key}>
+                {reportingColumnLabel(t, key)}: {value}
+              </p>
+            ))}
         </div>
         <ReportExportActions report={report} />
       </div>

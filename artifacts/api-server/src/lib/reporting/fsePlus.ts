@@ -6,12 +6,12 @@ import { dashboard, kpi, quality, text } from "./shared";
 import { signedMovementSql } from "../fseAccounting";
 import { signedPhysicalMovementSql } from "../movementPhysicalEffect";
 import {
+  fseBeneficiaryProfilesCte,
   fseCanonicalPeriodCondition,
   fseDistributionNatureCondition,
   fseNetDistributedQuantity,
   fseSignedQuantity,
 } from "./fseCanonicalFacts";
-import { authoritativeSnapshotOrderForAliasS } from "./fseSnapshotOrder";
 import { appendReportPanels } from "./requests";
 import { fseQueuePanel } from "./fseQueue";
 import { InventoryDecimal } from "../inventoryDecimal";
@@ -204,50 +204,11 @@ export async function buildFsePlusReport(filters: ReportFilters) {
   const distributedKgLt = sql`CASE WHEN mv.natura_contabile = 'LEGACY'
     AND lower(mv.unita_misura) IN ('kg', 'lt', 'l')
     THEN abs(mv.quantita::numeric) ELSE ${fseNetDistributedQuantity(sql`mv.quantita_kg_lt`)} END`;
-  const beneficiaryProfilesCte = sql`
-    WITH movimenti_famiglie AS (
-      SELECT b.beneficiario_id,
-             COALESCE(
-               mv.operazione_distribuzione_id,
-               original.operazione_distribuzione_id,
-               -mv.id
-             ) AS evento_id,
-             SUM(${distributedQuantity}) AS quantita_netta
-      FROM movimenti mv
-      LEFT JOIN movimenti original ON original.id = mv.movimento_origine_id
-      JOIN magazzini mg ON mg.id = mv.magazzino_id
-      LEFT JOIN bolla_righe br_famiglia ON br_famiglia.id = COALESCE(
-        mv.bolla_riga_id,
-        original.bolla_riga_id
-      )
-      JOIN bolle b ON b.id = COALESCE(
-        mv.bolla_id,
-        original.bolla_id,
-        br_famiglia.bolla_id
-      )
-      JOIN beneficiari be ON be.id = b.beneficiario_id
-      WHERE mv.fondo_origine = 'FSE_PLUS'
-        AND mv.data_movimento BETWEEN ${filters.da} AND ${filters.a}
-        AND ${fseDistributionNatureCondition}
-        AND ${warehouseScope}
-        AND ${authorizedFseMovement}
-        AND ${fseScope(filters)}
-      GROUP BY b.beneficiario_id, evento_id
-    ), famiglie AS (
-      SELECT DISTINCT beneficiario_id
-      FROM movimenti_famiglie
-      WHERE quantita_netta <> 0
-    ), profili AS (
-      SELECT f.beneficiario_id, fs.*
-      FROM famiglie f
-      LEFT JOIN LATERAL (
-        SELECT s.* FROM fse_fascicoli_sociali_snapshot s
-        WHERE s.beneficiario_id = f.beneficiario_id
-          AND s.data_riferimento <= ${filters.a}
-        ORDER BY ${authoritativeSnapshotOrderForAliasS}
-        LIMIT 1
-      ) fs ON true
-    )`;
+  const beneficiaryProfilesCte = fseBeneficiaryProfilesCte(
+    filters,
+    warehouseScope,
+    authorizedFseMovement,
+  );
   const [
     products,
     channels,
@@ -530,12 +491,13 @@ export async function buildFsePlusReport(filters: ReportFilters) {
          JOIN riconciliazioni_fse rf ON rf.id = rr.riconciliazione_id
          JOIN magazzini mg ON mg.id = rf.magazzino_id
          WHERE rf.data_riferimento <= ${filters.a}
+           AND rr.active = true AND rf.stato <> 'ANNULLATA'
            AND rr.status = 'RICONCILIATA_ESATTA' AND ${warehouseScope}) AS righe_riconciliate,
         (SELECT count(*) FROM riconciliazioni_fse_righe rr
          JOIN riconciliazioni_fse rf ON rf.id = rr.riconciliazione_id
          JOIN magazzini mg ON mg.id = rf.magazzino_id
          WHERE rf.data_riferimento <= ${filters.a}
-           AND rr.blocking = true
+           AND rr.active = true AND rr.blocking = true
            AND rf.stato IN ('CALCOLATA', 'DA_RIVEDERE')
            AND ${warehouseScope}) AS scostamenti_aperti
     `)
@@ -836,6 +798,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
             value: number(r.documenti),
             exactValue: String(r.documenti),
             secondaryValue: r.nuclei == null ? null : number(r.nuclei),
+            exactSecondaryValue: r.nuclei == null ? null : String(r.nuclei),
           })),
         },
       ],

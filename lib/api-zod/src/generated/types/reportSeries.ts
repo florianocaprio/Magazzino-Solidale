@@ -6,8 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ReportSeriesPointsItem } from "./reportSeriesPointsItem";
+import type { ReportSeriesPrimary } from "./reportSeriesPrimary";
+import type { ReportSeriesSecondary } from "./reportSeriesSecondary";
 
 export interface ReportSeries {
   key: string;
+  primary?: ReportSeriesPrimary;
+  secondary?: ReportSeriesSecondary;
   points: ReportSeriesPointsItem[];
 }

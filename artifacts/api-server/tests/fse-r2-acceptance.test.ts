@@ -2,6 +2,7 @@
 
 import {
   db,
+  areeOperativeTable,
   esportazioniFseEventiTable,
   esportazioniFseIndicatoriTable,
   esportazioniFseRigheTable,
@@ -30,6 +31,7 @@ import { generateFseExportWorkbook } from "../src/lib/fseExportWorkbook";
 const suffix = `${process.pid}${Date.now().toString(36)}`;
 let userId: number;
 let warehouseId: number;
+let areaId: number;
 let productId: number;
 let lotId: number;
 const operationIds: number[] = [];
@@ -118,6 +120,10 @@ async function monitoring(
 }
 
 beforeAll(async () => {
+  [{ id: areaId }] = await db
+    .insert(areeOperativeTable)
+    .values({ nome: `R2 ${suffix}` })
+    .returning();
   [{ id: userId }] = await db
     .insert(utentiTable)
     .values({
@@ -132,6 +138,7 @@ beforeAll(async () => {
     .values({
       codice: `R2-${suffix}`.slice(0, 20),
       nome: `Acceptance R2 ${suffix}`,
+      areaOperativaId: areaId,
     })
     .returning({ id: magazziniTable.id });
   [{ id: productId }] = await db
@@ -220,6 +227,7 @@ afterAll(async () => {
   await db.delete(lottiTable).where(eq(lottiTable.id, lotId));
   await db.delete(prodottiTable).where(eq(prodottiTable.id, productId));
   await db.delete(magazziniTable).where(eq(magazziniTable.id, warehouseId));
+  await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, areaId));
   await db.delete(utentiTable).where(eq(utentiTable.id, userId));
   await pool.end();
 });

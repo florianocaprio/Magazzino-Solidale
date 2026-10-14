@@ -6,6 +6,7 @@ import { requireAllModuli, requireAnyModulo } from "../lib/featureFlags";
 import { isUdsReportRequest, requirePermission } from "../middlewares/auth";
 import { effectiveMezzoCentroSql } from "../lib/logisticaPolicy";
 import { buildFsePlusReport } from "../lib/reporting/fsePlus";
+import { logisticsSources } from "../lib/reporting/logisticsAccess";
 import {
   assertReportFilterScope,
   parseReportFilters,
@@ -65,6 +66,26 @@ router.use("/report", (req, res, next) => {
   res.status(403).json({ error: "Area Analisi richiesta" });
 });
 router.use("/report/uds", requirePermission("uds.reports.view"));
+router.use(
+  "/report/giacenze-per-magazzino",
+  requirePermission("magazzino.view"),
+  async (req, res, next) => {
+    const user = req.user!;
+    const sources = await logisticsSources({
+      callerIsAdmin: user.isAdmin,
+      callerAreas: user.aree,
+      callerPermissions: user.permessi,
+      areaOperativaId: user.areaOperativaId ?? null,
+      centroAscoltoId: user.centroAscoltoId ?? null,
+      zonaUdsId: user.zonaUdsId ?? null,
+    });
+    if (!sources.stock) {
+      res.status(403).json({ error: "Sorgente Magazzino non autorizzata" });
+      return;
+    }
+    next();
+  },
+);
 router.use("/report", (req, res, next) => {
   try {
     assertReportTerritory(req);

@@ -723,6 +723,8 @@ export * from "./reportQualityItem";
 export * from "./reportQualityItemAvailability";
 export * from "./reportSeries";
 export * from "./reportSeriesPointsItem";
+export * from "./reportSeriesPrimary";
+export * from "./reportSeriesSecondary";
 export * from "./reportTable";
 export * from "./reportTableRowsItem";
 export * from "./reportText";

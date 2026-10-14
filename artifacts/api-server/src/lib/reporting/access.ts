@@ -2,13 +2,18 @@ import type { Request } from "express";
 import { isReportModuleActive as isModuloAttivo } from "./queryContext";
 import { assertReportTerritory, ReportingError } from "./filters";
 import type { ReportSection } from "./types";
+import { logisticsSources } from "./logisticsAccess";
 
 const policy: Record<
   ReportSection,
   { areas: string[]; all?: string[]; any?: string[]; grant?: string }
 > = {
   generale: { areas: [] },
-  pacchi: { areas: ["sociale"], all: ["MAGAZZINO_SOLIDALE", "BOLLE"] },
+  pacchi: {
+    areas: ["sociale"],
+    all: ["MAGAZZINO_SOLIDALE", "BOLLE"],
+    grant: "bolle.view",
+  },
   "centro-ascolto": { areas: ["sociale"], all: ["CENTRO_ASCOLTO"] },
   emporio: { areas: ["emporio"], all: ["EMPORIO_SOLIDALE"] },
   mensa: { areas: ["mensa"], all: ["MENSA"], grant: "mensa.reports.view" },
@@ -59,4 +64,19 @@ export async function assertReportSectionAccess(
     : [true];
   if (!all.every(Boolean) || !any.some(Boolean))
     throw new ReportingError(403, "Modulo sorgente del report non abilitato");
+  if (section === "magazzino-logistica") {
+    const sources = await logisticsSources({
+      callerIsAdmin: user.isAdmin,
+      callerAreas: user.aree,
+      callerPermissions: user.permessi,
+      areaOperativaId: user.areaOperativaId ?? null,
+      centroAscoltoId: user.centroAscoltoId ?? null,
+      zonaUdsId: user.zonaUdsId ?? null,
+    });
+    if (!Object.values(sources).some(Boolean))
+      throw new ReportingError(
+        403,
+        "Nessuna sorgente logistica autorizzata per il ruolo corrente",
+      );
+  }
 }

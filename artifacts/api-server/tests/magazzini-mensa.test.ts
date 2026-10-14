@@ -247,9 +247,10 @@ describe("Magazzino con tag Mensa", () => {
   });
 
   it("applica lo stesso blocco alle bolle di un normale magazzino logistico", async () => {
+    const areaOperativaId = await createArea(`Area Logistica ${Date.now()}`);
     const created = await request(app)
       .post("/magazzini")
-      .send({ nome: "Magazzino logistico con bolla" });
+      .send({ nome: "Magazzino logistico con bolla", areaOperativaId });
     expect(created.status).toBe(201);
     magazzinoIds.push(created.body.id);
     const [bolla] = await db

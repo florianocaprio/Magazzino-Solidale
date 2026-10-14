@@ -2,6 +2,7 @@
 
 import {
   db,
+  areeOperativeTable,
   esportazioniFseEventiTable,
   esportazioniFseIndicatoriTable,
   esportazioniFseRigheTable,
@@ -37,6 +38,7 @@ import {
 const suffix = `${process.pid}${Date.now().toString(36)}`;
 let userId: number;
 let magazzinoId: number;
+let areaId: number;
 let prodottoId: number;
 let lottoId: number;
 let operationId: number;
@@ -63,11 +65,16 @@ beforeAll(async () => {
       cognome: "FSE",
     })
     .returning({ id: utentiTable.id });
+  [{ id: areaId }] = await db
+    .insert(areeOperativeTable)
+    .values({ nome: `FSE ${suffix}` })
+    .returning();
   [{ id: magazzinoId }] = await db
     .insert(magazziniTable)
     .values({
       codice: `FSE-${suffix}`.slice(0, 20),
       nome: `Magazzino FSE ${suffix}`,
+      areaOperativaId: areaId,
     })
     .returning({ id: magazziniTable.id });
   [{ id: prodottoId }] = await db
@@ -349,6 +356,7 @@ afterAll(async () => {
   await db.delete(lottiTable).where(eq(lottiTable.id, lottoId));
   await db.delete(prodottiTable).where(eq(prodottiTable.id, prodottoId));
   await db.delete(magazziniTable).where(eq(magazziniTable.id, magazzinoId));
+  await db.delete(areeOperativeTable).where(eq(areeOperativeTable.id, areaId));
   await db.delete(utentiTable).where(eq(utentiTable.id, userId));
   await pool.end();
 });

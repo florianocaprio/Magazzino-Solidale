@@ -68,7 +68,10 @@ beforeEach(async () => {
   centro = await createCentro(scope);
   areaOperativaA = await createAreaOperativa(scope);
   areaOperativaB = await createAreaOperativa(scope);
-  magNull = await createMagazzino(scope, null);
+  // NULL refers to the shared Centre, never to the warehouse's Area.
+  magNull = await createMagazzino(scope, null, {
+    areaOperativaId: areaOperativaA,
+  });
   prod = await createProdotto(scope);
 });
 

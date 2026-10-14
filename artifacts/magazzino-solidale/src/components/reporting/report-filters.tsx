@@ -25,6 +25,9 @@ export type ReportingFilterState = {
   magazzinoId: number | null;
   mensaId: number | null;
   zonaUdsId: number | null;
+  operatoreId?: number | null;
+  tipoIntervento?: string | null;
+  tipoServizio?: string | null;
 };
 
 const ALL = "all";

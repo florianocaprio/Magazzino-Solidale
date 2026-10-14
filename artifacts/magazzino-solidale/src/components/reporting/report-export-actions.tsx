@@ -14,7 +14,10 @@ import {
   downloadReportingBlob,
   exportReportingWorkbook,
 } from "@/lib/export";
-import { localizeReportingText } from "@/lib/reporting-text";
+import {
+  localizeReportingText,
+  reportingColumnLabel,
+} from "@/lib/reporting-text";
 
 export function ReportExportActions({
   report,
@@ -67,7 +70,7 @@ export function ReportExportActions({
     kpi: kpiLabel,
     table: (key: string) => t(`reporting.tables.${key}`),
     quality: (key: string) => t(`reporting.quality.${key}`),
-    column: (key: string) => t(`reporting.columns.${key}`),
+    column: (key: string) => reportingColumnLabel(t, key),
     unit: (key: string) => t(`reporting.units.${key}`),
     availability: (key: string) => t(`reporting.availability.${key}`),
     text: localizeReportingText.bind(null, t),

@@ -1,6 +1,13 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
-import { andSql, monthSeries, number, reportScope, rows } from "./sql";
+import {
+  andSql,
+  monthSeries,
+  number,
+  reportScope,
+  rows,
+  utcTimestampRomeDate,
+} from "./sql";
 import { dashboard, kpi, quality, text, numericMetrics } from "./shared";
 import { appendReportPanels } from "./requests";
 import { distributionFlowPanel } from "./distributionFlow";
@@ -14,7 +21,7 @@ import {
 function speseConditions(filters: ReportFilters): SQL[] {
   return [
     sql`se.stato_spesa = 'chiusa'`,
-    sql`se.data_chiusura::date BETWEEN ${filters.da} AND ${filters.a}`,
+    sql`${utcTimestampRomeDate(sql`se.data_chiusura`)} BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
       areaOperativa: sql`se.area_operativa_id`,
       centro: sql`se.centro_ascolto_id`,
@@ -27,7 +34,7 @@ function accessConditions(filters: ReportFilters): SQL[] {
   return [
     sql`c.tipo_pianificazione = 'accesso_emporio'`,
     sql`c.stato_accesso_emporio = 'effettuato'`,
-    sql`COALESCE(c.data_ora_effettiva_accesso::date, c.data_prevista) BETWEEN ${filters.da} AND ${filters.a}`,
+    sql`COALESCE(${utcTimestampRomeDate(sql`c.data_ora_effettiva_accesso`)}, c.data_prevista) BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {
       areaOperativa: sql`COALESCE(c.area_operativa_id_snapshot, be.area_operativa_id)`,
       centro: sql`COALESCE(c.centro_ascolto_id_snapshot, be.centro_ascolto_id)`,
@@ -67,7 +74,7 @@ export async function emporioMetrics(filters: ReportFilters) {
                  JOIN spese_emporio_righe ser ON ser.spesa_emporio_id = se3.id
                  JOIN movimenti_distribuzione md ON md.bolla_riga_id = ser.bolla_riga_id
                  WHERE se3.stato_spesa = 'chiusa'
-                   AND se3.data_chiusura::date BETWEEN ${filters.da} AND ${filters.a}
+                   AND ${utcTimestampRomeDate(sql`se3.data_chiusura`)} BETWEEN ${filters.da} AND ${filters.a}
                    AND ${andSql(
                      reportScope(filters, {
                        areaOperativa: sql`se3.area_operativa_id`,
@@ -138,7 +145,7 @@ export async function buildEmporioReport(filters: ReportFilters) {
   const metrics = await emporioMetrics(filters);
   const [monthly, products, centres, frequency, dqRows] = await Promise.all([
     rows<Record<string, unknown>>(sql`
-      SELECT to_char(se.data_chiusura::date, 'YYYY-MM') AS mese,
+      SELECT to_char(${utcTimestampRomeDate(sql`se.data_chiusura`)}, 'YYYY-MM') AS mese,
              COUNT(*) AS totale,
              COALESCE(SUM(se.totale_credito_consumati::numeric), 0) AS credito
       FROM spese_emporio se WHERE ${where}
@@ -255,9 +262,9 @@ export async function buildEmporioReport(filters: ReportFilters) {
             prodottoId: number(r.prodotto_id),
             prodottoNome: String(r.prodotto_nome),
             unitaMisura: String(r.unita_misura),
-            quantita: number(r.quantita),
-            quantitaFse: number(r.quantita_fse),
-            quantitaNonFse: number(r.quantita_non_fse),
+            quantita: String(r.quantita),
+            quantitaFse: String(r.quantita_fse),
+            quantitaNonFse: String(r.quantita_non_fse),
           })),
         },
         {

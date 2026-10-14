@@ -1,19 +1,47 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
-import { db, pool, magazziniTable, centriAscoltoTable } from "@workspace/db";
+import {
+  db,
+  pool,
+  magazziniTable,
+  centriAscoltoTable,
+  areeOperativeTable,
+} from "@workspace/db";
 import { inArray, eq } from "drizzle-orm";
 import magazziniRouter from "../src/routes/magazzini";
+import {
+  getImpostazioniModuli,
+  updateImpostazioniModuli,
+} from "../src/lib/impostazioniModuli";
 
 let app: Express;
 const createdIds: number[] = [];
+let areaOperativaId: number;
+let emporioEnabled: boolean;
 
 /** Builds a minimal app mounting only the magazzini router. */
 function makeApp(isAdmin = true): Express {
   const a = express();
   a.use(express.json());
   a.use((req, _res, next) => {
-    (req as unknown as { user: { isAdmin: boolean; centroAscoltoId: null; areaOperativaId: null } }).user = {
+    (
+      req as unknown as {
+        user: {
+          isAdmin: boolean;
+          centroAscoltoId: null;
+          areaOperativaId: null;
+        };
+      }
+    ).user = {
       isAdmin,
       centroAscoltoId: null,
       areaOperativaId: null,
@@ -29,9 +57,18 @@ function makeAppAs(centroId: number | null, isAdmin = true): Express {
   const a = express();
   a.use(express.json());
   a.use((req, _res, next) => {
-    (req as unknown as { user: { isAdmin: boolean; centroAscoltoId: number | null } }).user = {
+    (
+      req as unknown as {
+        user: {
+          isAdmin: boolean;
+          centroAscoltoId: number | null;
+          areaOperativaId: number;
+        };
+      }
+    ).user = {
       isAdmin,
       centroAscoltoId: centroId,
+      areaOperativaId,
     };
     next();
   });
@@ -41,7 +78,9 @@ function makeAppAs(centroId: number | null, isAdmin = true): Express {
 
 /** Creates a warehouse via the API and tracks its id for cleanup. */
 async function createMagazzino(body: Record<string, unknown>) {
-  const res = await request(app).post("/magazzini").send(body);
+  const res = await request(app)
+    .post("/magazzini")
+    .send({ areaOperativaId, ...body });
   expect(res.status).toBe(201);
   createdIds.push(res.body.id);
   return res.body;
@@ -49,7 +88,9 @@ async function createMagazzino(body: Record<string, unknown>) {
 
 /** Highest existing MAG-<n> number across the whole table (0 if none). */
 async function currentMaxMag(): Promise<number> {
-  const rows = await db.select({ codice: magazziniTable.codice }).from(magazziniTable);
+  const rows = await db
+    .select({ codice: magazziniTable.codice })
+    .from(magazziniTable);
   let max = 0;
   for (const r of rows) {
     const m = /^MAG-(\d+)$/.exec(r.codice);
@@ -58,18 +99,34 @@ async function currentMaxMag(): Promise<number> {
   return max;
 }
 
+beforeAll(async () => {
+  const [area] = await db
+    .insert(areeOperativeTable)
+    .values({ nome: `Magazzini test ${Date.now()}` })
+    .returning();
+  areaOperativaId = area.id;
+  emporioEnabled = (await getImpostazioniModuli()).emporioAbilitato;
+  await updateImpostazioniModuli({ emporioAbilitato: true });
+});
+
 beforeEach(() => {
   app = makeApp();
 });
 
 afterEach(async () => {
   if (createdIds.length > 0) {
-    await db.delete(magazziniTable).where(inArray(magazziniTable.id, createdIds));
+    await db
+      .delete(magazziniTable)
+      .where(inArray(magazziniTable.id, createdIds));
     createdIds.length = 0;
   }
 });
 
 afterAll(async () => {
+  await db
+    .delete(areeOperativeTable)
+    .where(eq(areeOperativeTable.id, areaOperativaId));
+  await updateImpostazioniModuli({ emporioAbilitato: emporioEnabled });
   await pool.end();
 });
 
@@ -90,7 +147,10 @@ describe("POST /magazzini — auto-generazione codice", () => {
   });
 
   it("rispetta un codice fornito esplicitamente (trimmato)", async () => {
-    const m = await createMagazzino({ nome: "Magazzino Con Codice", codice: "  WH-CUSTOM-1  " });
+    const m = await createMagazzino({
+      nome: "Magazzino Con Codice",
+      codice: "  WH-CUSTOM-1  ",
+    });
     expect(m.codice).toBe("WH-CUSTOM-1");
 
     const [row] = await db
@@ -112,7 +172,10 @@ describe("POST /magazzini — auto-generazione codice", () => {
     // Punto di partenza deterministico al di sopra di qualsiasi codice esistente.
     const base = (await currentMaxMag()) + 500;
     const baseCodice = `MAG-${String(base).padStart(3, "0")}`;
-    const first = await createMagazzino({ nome: "Magazzino Base", codice: baseCodice });
+    const first = await createMagazzino({
+      nome: "Magazzino Base",
+      codice: baseCodice,
+    });
     expect(first.codice).toBe(baseCodice);
 
     // Il prossimo auto-generato deve essere base + 1.
@@ -126,7 +189,9 @@ describe("POST /magazzini — codice duplicato", () => {
     const codice = `DUP-${Date.now()}`;
     await createMagazzino({ nome: "Primo", codice });
 
-    const res = await request(app).post("/magazzini").send({ nome: "Secondo", codice });
+    const res = await request(app)
+      .post("/magazzini")
+      .send({ nome: "Secondo", codice, areaOperativaId });
     expect(res.status).toBe(409);
     expect(res.body.error).toBeTruthy();
 
@@ -149,6 +214,71 @@ describe("Mutazioni /magazzini — admin only", () => {
   });
 });
 
+describe("Area obbligatoria per ogni tipo di magazzino", () => {
+  it.each(["logistico", "emporio", "misto", "mensa"])(
+    "rifiuta Area omessa o NULL per %s senza inserire righe",
+    async (tipoMagazzino) => {
+      const before = await db
+        .select({ id: magazziniTable.id })
+        .from(magazziniTable);
+      for (const assignment of [{}, { areaOperativaId: null }]) {
+        const res = await request(app)
+          .post("/magazzini")
+          .send({ nome: "Senza Area", tipoMagazzino, ...assignment });
+        expect(res.status).toBe(400);
+      }
+      expect(
+        await db.select({ id: magazziniTable.id }).from(magazziniTable),
+      ).toEqual(before);
+    },
+  );
+
+  it("rifiuta Area inesistente/inattiva e non perde l'Area su PATCH parziale", async () => {
+    expect(
+      (
+        await request(app)
+          .post("/magazzini")
+          .send({ nome: "Invalid", areaOperativaId: 2147483647 })
+      ).status,
+    ).toBe(400);
+    await db
+      .update(areeOperativeTable)
+      .set({ attivo: false })
+      .where(eq(areeOperativeTable.id, areaOperativaId));
+    try {
+      expect(
+        (
+          await request(app)
+            .post("/magazzini")
+            .send({ nome: "Inactive", areaOperativaId })
+        ).status,
+      ).toBe(400);
+    } finally {
+      await db
+        .update(areeOperativeTable)
+        .set({ attivo: true })
+        .where(eq(areeOperativeTable.id, areaOperativaId));
+    }
+    const warehouse = await createMagazzino({
+      nome: "Valid warehouse",
+      centroAscoltoId: null,
+    });
+    expect(
+      (
+        await request(app)
+          .patch(`/magazzini/${warehouse.id}`)
+          .send({ areaOperativaId: null })
+      ).status,
+    ).toBe(400);
+    const result = await request(app)
+      .patch(`/magazzini/${warehouse.id}`)
+      .send({ nome: "Renamed" });
+    expect(result.status).toBe(200);
+    expect(result.body.areaOperativaId).toBe(areaOperativaId);
+    expect(result.body.centroAscoltoId).toBeNull();
+  });
+});
+
 describe("Scoping per Centro di Ascolto", () => {
   let centroA: number;
   let centroB: number;
@@ -159,7 +289,10 @@ describe("Scoping per Centro di Ascolto", () => {
   beforeEach(async () => {
     const [a, b] = await db
       .insert(centriAscoltoTable)
-      .values([{ nome: `Test Centro A ${Date.now()}` }, { nome: `Test Centro B ${Date.now()}` }])
+      .values([
+        { nome: `Test Centro A ${Date.now()}`, areaOperativaId },
+        { nome: `Test Centro B ${Date.now()}`, areaOperativaId },
+      ])
       .returning({ id: centriAscoltoTable.id });
     centroA = a.id;
     centroB = b.id;
@@ -168,9 +301,24 @@ describe("Scoping per Centro di Ascolto", () => {
     const rows = await db
       .insert(magazziniTable)
       .values([
-        { codice: `SA-${suffix}`, nome: "Mag A", centroAscoltoId: centroA },
-        { codice: `SB-${suffix}`, nome: "Mag B", centroAscoltoId: centroB },
-        { codice: `SC-${suffix}`, nome: "Mag Comune", centroAscoltoId: null },
+        {
+          codice: `SA-${suffix}`,
+          nome: "Mag A",
+          centroAscoltoId: centroA,
+          areaOperativaId,
+        },
+        {
+          codice: `SB-${suffix}`,
+          nome: "Mag B",
+          centroAscoltoId: centroB,
+          areaOperativaId,
+        },
+        {
+          codice: `SC-${suffix}`,
+          nome: "Mag Comune",
+          centroAscoltoId: null,
+          areaOperativaId,
+        },
       ])
       .returning({ id: magazziniTable.id });
     magA = rows[0].id;
@@ -182,10 +330,14 @@ describe("Scoping per Centro di Ascolto", () => {
   afterEach(async () => {
     // Delete dependent magazzini before the referenced centri (FK has no cascade).
     if (createdIds.length > 0) {
-      await db.delete(magazziniTable).where(inArray(magazziniTable.id, createdIds));
+      await db
+        .delete(magazziniTable)
+        .where(inArray(magazziniTable.id, createdIds));
       createdIds.length = 0;
     }
-    await db.delete(centriAscoltoTable).where(inArray(centriAscoltoTable.id, [centroA, centroB]));
+    await db
+      .delete(centriAscoltoTable)
+      .where(inArray(centriAscoltoTable.id, [centroA, centroB]));
   });
 
   it("un caller legato al centro A vede solo i magazzini del centro A e quelli comuni (NULL)", async () => {
@@ -224,7 +376,9 @@ describe("Scoping per Centro di Ascolto", () => {
 
   it("PATCH /magazzini/:id restituisce 403 per un magazzino fuori dal centro del caller", async () => {
     const scopedApp = makeAppAs(centroA);
-    const res = await request(scopedApp).patch(`/magazzini/${magB}`).send({ nome: "Hack" });
+    const res = await request(scopedApp)
+      .patch(`/magazzini/${magB}`)
+      .send({ nome: "Hack" });
     expect(res.status).toBe(403);
   });
 

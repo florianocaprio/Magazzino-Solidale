@@ -106,6 +106,9 @@ describe("reportistica integrata", () => {
       magazzinoId: null,
       mensaId: null,
       zonaUdsId: 5,
+      operatoreId: null,
+      tipoIntervento: null,
+      tipoServizio: null,
     });
     const cachedOptions = {
       areeOperative: [{ id: 1 }],
@@ -125,6 +128,25 @@ describe("reportistica integrata", () => {
         }),
       ),
     ).toEqual({ magazzinoId: null });
+  });
+
+  it("preserva i filtri non territoriali del deep-link per API e documento", () => {
+    expect(
+      reportingFiltersFromSearch(
+        "?operatoreId=42&tipoIntervento=Accompagnamento&tipoServizio=pranzo",
+        null,
+      ),
+    ).toMatchObject({
+      operatoreId: 42,
+      tipoIntervento: "Accompagnamento",
+      tipoServizio: "pranzo",
+    });
+    expect(
+      reportingFiltersFromSearch("?operatoreId=-42&tipoIntervento=%20", null),
+    ).toMatchObject({
+      operatoreId: null,
+      tipoIntervento: null,
+    });
   });
 
   it("chiude l'anno FSE corrente a oggi e un anno passato al 31 dicembre", () => {

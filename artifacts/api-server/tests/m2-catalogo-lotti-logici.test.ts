@@ -35,7 +35,6 @@ let userId: number;
 let areaAId: number;
 let areaBId: number;
 let warehouseAId: number;
-let warehouseLegacyId: number;
 let generalAId: number;
 let generalBId: number;
 let pieceProductId: number;
@@ -174,14 +173,6 @@ beforeAll(async () => {
       codice: `M2A-${suffix}`.slice(0, 20),
       nome: `Magazzino M2 ${suffix}`,
       areaOperativaId: areaAId,
-    })
-    .returning({ id: magazziniTable.id });
-  [{ id: warehouseLegacyId }] = await db
-    .insert(magazziniTable)
-    .values({
-      codice: `M2L-${suffix}`.slice(0, 20),
-      nome: `Magazzino legacy M2 ${suffix}`,
-      areaOperativaId: null,
     })
     .returning({ id: magazziniTable.id });
   app = makeApp();
@@ -516,19 +507,14 @@ describe("M2 — catalogo globale e quantità", () => {
     );
   });
 
-  it("rifiuta i nuovi carichi su un Magazzino legacy senza Area", async () => {
-    const response = await postLoad({
-      magazzinoId: warehouseLegacyId,
-      righe: [
-        {
-          prodottoId: pieceProductId,
-          fondoOrigine: "NESSUN_FONDO",
-          quantitaOperativa: "1",
-        },
-      ],
-    });
-    expect(response.status).toBe(409);
-    expect(response.body.error).toContain("Area Operativa");
+  it("rifiuta già a DB un Magazzino senza Area, prima di qualunque nuovo carico", async () => {
+    // From migration 56 the formerly readable legacy NULL fixture is invalid.
+    await expect(
+      pool.query(
+        "INSERT INTO magazzini(codice,nome) VALUES ($1,'Invalid M2')",
+        [`M2L-${suffix}`.slice(0, 20)],
+      ),
+    ).rejects.toMatchObject({ code: "23502", column: "area_operativa_id" });
   });
 
   it("legge il legacy frazionario e consente solo la rettifica amministrativa motivata", async () => {

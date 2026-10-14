@@ -1305,6 +1305,20 @@ export interface ReportKpi {
   presentationDecimals?: number;
 }
 
+export type ReportSeriesPrimary = {
+  /** Reporting column translation key */
+  label: string;
+  /** Reporting unit translation key */
+  unit: string;
+};
+
+export type ReportSeriesSecondary = {
+  /** Reporting column translation key */
+  label: string;
+  /** Reporting unit translation key */
+  unit: string;
+};
+
 export type ReportSeriesPointsItem = {
   label: string;
   value: number;
@@ -1317,6 +1331,8 @@ export type ReportSeriesPointsItem = {
 
 export interface ReportSeries {
   key: string;
+  primary?: ReportSeriesPrimary;
+  secondary?: ReportSeriesSecondary;
   points: ReportSeriesPointsItem[];
 }
 
@@ -1547,8 +1563,7 @@ export interface Magazzino {
   centroAscoltoId?: number | null;
   /** @nullable */
   centroAscoltoNome?: string | null;
-  /** @nullable */
-  areaOperativaId?: number | null;
+  areaOperativaId: number;
   tipoMagazzino: MagazzinoTipoMagazzino;
   stato: string;
   /** @nullable */
@@ -1814,11 +1829,8 @@ export interface MagazzinoInput {
   email?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
-  /**
-   * Area identifier; required when tipoMagazzino is mensa
-   * @nullable
-   */
-  areaOperativaId?: number | null;
+  /** Existing active Area; required unless supplied by the caller's fixed Area. Null is never valid. */
+  areaOperativaId?: number;
   tipoMagazzino?: MagazzinoInputTipoMagazzino;
   stato?: string;
   note?: string;
@@ -1846,11 +1858,8 @@ export interface MagazzinoUpdate {
   email?: string;
   /** @nullable */
   centroAscoltoId?: number | null;
-  /**
-   * Area identifier; required when the resulting type is mensa
-   * @nullable
-   */
-  areaOperativaId?: number | null;
+  /** Existing active Area. Omission preserves the current Area; null is never valid. */
+  areaOperativaId?: number;
   tipoMagazzino?: MagazzinoUpdateTipoMagazzino;
   stato?: string;
   note?: string;

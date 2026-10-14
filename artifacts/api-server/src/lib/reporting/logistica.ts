@@ -2,7 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
 import { dashboard, kpi, quality, text } from "./shared";
-import { isReportModuleActive as isModuloAttivo } from "./queryContext";
+import { logisticsSources } from "./logisticsAccess";
 import { signedPhysicalMovementSql } from "../movementPhysicalEffect";
 import { appendReportPanels, requestReportPanel } from "./requests";
 import { volunteerReportPanel } from "./volunteers";
@@ -61,19 +61,18 @@ function transferCondition(filters: ReportFilters): SQL {
 }
 
 export async function buildLogisticaReport(filters: ReportFilters) {
-  const [
-    magazzinoEnabled,
-    lottiEnabled,
-    trasferimentiEnabled,
-    approvvigionamentiEnabled,
-    mezziEnabled,
-  ] = await Promise.all([
-    isModuloAttivo("MAGAZZINO_SOLIDALE"),
-    isModuloAttivo("LOTTI"),
-    isModuloAttivo("TRASFERIMENTI"),
-    isModuloAttivo("APPROVVIGIONAMENTI"),
-    isModuloAttivo("MEZZI"),
-  ]);
+  const sources = await logisticsSources(filters);
+  const {
+    stock: stockEnabled,
+    lots: lottiEnabled,
+    transfers: trasferimentiEnabled,
+    supplies: approvvigionamentiEnabled,
+    means: mezziEnabled,
+  } = sources;
+  // Do not even execute an unauthorized source query; hiding its card alone
+  // would leave tables, series, quality and prepared exports exposed.
+  const readSource = (enabled: boolean, query: SQL) =>
+    enabled ? rows<Record<string, unknown>>(query) : Promise.resolve([]);
   const warehouseWhere = andSql(warehouseConditions(filters));
   const movementWhere = andSql(movementConditions(filters));
   const transferWhere = transferCondition(filters);
@@ -111,7 +110,9 @@ export async function buildLogisticaReport(filters: ReportFilters) {
     transferStates,
     dqRows,
   ] = await Promise.all([
-    rows<Record<string, unknown>>(sql`
+    readSource(
+      stockEnabled,
+      sql`
       WITH stock AS (
         SELECT l.magazzino_id, l.prodotto_id, SUM(l.quantita_residua::numeric) AS quantita
         FROM lotti l JOIN magazzini mg ON mg.id = l.magazzino_id
@@ -142,8 +143,11 @@ export async function buildLogisticaReport(filters: ReportFilters) {
       FROM magazzini mg LEFT JOIN stock ON stock.magazzino_id = mg.id
       LEFT JOIN prodotti p ON p.id = stock.prodotto_id
       WHERE ${warehouseWhere}
-    `),
-    rows<Record<string, unknown>>(sql`
+    `,
+    ),
+    readSource(
+      stockEnabled,
+      sql`
       SELECT
         COALESCE(SUM(CASE WHEN lower(p.unita_misura) = 'pz'
           THEN l.quantita_residua::numeric
@@ -175,14 +179,20 @@ export async function buildLogisticaReport(filters: ReportFilters) {
           WHERE mv.data_movimento BETWEEN ${filters.da} AND ${filters.a} AND mv.natura_contabile = 'TRASFERIMENTO_INTERNO_USCITA' AND ${warehouseWhere}) AS trasferimenti_uscita
       FROM lotti l JOIN magazzini mg ON mg.id = l.magazzino_id
       JOIN prodotti p ON p.id = l.prodotto_id WHERE ${warehouseWhere}
-    `),
-    rows<Record<string, unknown>>(sql`
+    `,
+    ),
+    readSource(
+      stockEnabled,
+      sql`
       SELECT COUNT(*) FILTER (WHERE mv.tipo_movimento = 'carico') AS carichi,
              COUNT(*) FILTER (WHERE mv.tipo_movimento = 'scarico') AS scarichi
       FROM movimenti mv JOIN magazzini mg ON mg.id = mv.magazzino_id
       WHERE ${movementWhere}
-    `),
-    rows<Record<string, unknown>>(sql`
+    `,
+    ),
+    readSource(
+      trasferimentiEnabled,
+      sql`
       SELECT COUNT(*) FILTER (WHERE ${transferStateCondition("trasferimentiRichiesti")}) AS richiesti,
              COUNT(*) FILTER (WHERE ${transferStateCondition("trasferimentiInTransito")}) AS in_transito,
              COUNT(*) FILTER (WHERE ${transferStateCondition("trasferimentiCompletati")}) AS completati
@@ -190,8 +200,11 @@ export async function buildLogisticaReport(filters: ReportFilters) {
       JOIN magazzini mo ON mo.id = tr.magazzino_origine_id
       JOIN magazzini md ON md.id = tr.magazzino_destino_id
       WHERE tr.data_richiesta BETWEEN ${filters.da} AND ${filters.a} AND ${transferWhere}
-    `),
-    rows<Record<string, unknown>>(sql`
+    `,
+    ),
+    readSource(
+      approvvigionamentiEnabled,
+      sql`
       SELECT COUNT(*) AS aperti FROM approvvigionamenti ap
       LEFT JOIN magazzini mg ON mg.id = ap.magazzino_id
       WHERE ap.stato IN ('bozza', 'sottomesso')
@@ -203,8 +216,11 @@ export async function buildLogisticaReport(filters: ReportFilters) {
             magazzino: sql`ap.magazzino_id`,
           }),
         )}
-    `),
-    rows<Record<string, unknown>>(sql`
+    `,
+    ),
+    readSource(
+      mezziEnabled,
+      sql`
       SELECT COUNT(DISTINCT uso.mezzo_id) AS mezzi
       FROM (
         SELECT c.mezzo_id, be.area_operativa_id, be.centro_ascolto_id
@@ -216,15 +232,21 @@ export async function buildLogisticaReport(filters: ReportFilters) {
         WHERE b.mezzo_id IS NOT NULL AND b.data_bolla BETWEEN ${filters.da} AND ${filters.a}
       ) uso
       WHERE ${andSql(reportScope(filters, { areaOperativa: sql`uso.area_operativa_id`, centro: sql`uso.centro_ascolto_id` }))}
-    `),
-    rows<Record<string, unknown>>(sql`
+    `,
+    ),
+    readSource(
+      stockEnabled,
+      sql`
       SELECT to_char(mv.data_movimento, 'YYYY-MM') AS mese,
              COUNT(*) FILTER (WHERE mv.tipo_movimento = 'carico') AS carichi,
              COUNT(*) FILTER (WHERE mv.tipo_movimento = 'scarico') AS scarichi
       FROM movimenti mv JOIN magazzini mg ON mg.id = mv.magazzino_id
       WHERE ${movementWhere} GROUP BY 1 ORDER BY 1
-    `),
-    rows<Record<string, unknown>>(sql`
+    `,
+    ),
+    readSource(
+      stockEnabled,
+      sql`
       WITH lot_asof AS (
         SELECT mv.lotto_id, mv.magazzino_id, mv.prodotto_id,
                SUM(${signedQuantity}) AS quantita
@@ -255,8 +277,11 @@ export async function buildLogisticaReport(filters: ReportFilters) {
       FROM magazzini mg LEFT JOIN lotti l ON l.magazzino_id = mg.id
       LEFT JOIN prodotti p ON p.id = l.prodotto_id
       WHERE ${warehouseWhere} GROUP BY mg.id, mg.nome, p.unita_misura ORDER BY mg.nome, p.unita_misura
-    `),
-    rows<Record<string, unknown>>(sql`
+    `,
+    ),
+    readSource(
+      stockEnabled,
+      sql`
       SELECT mv.tipo_movimento AS tipo, mv.tipo_dettaglio AS causale,
              mv.unita_misura, COUNT(*) AS movimenti,
              COALESCE(SUM(abs(mv.quantita::numeric)), 0) AS quantita
@@ -264,20 +289,27 @@ export async function buildLogisticaReport(filters: ReportFilters) {
       WHERE ${movementWhere}
       GROUP BY mv.tipo_movimento, mv.tipo_dettaglio, mv.unita_misura
       ORDER BY movimenti DESC, causale, mv.unita_misura
-    `),
-    rows<Record<string, unknown>>(sql`
+    `,
+    ),
+    readSource(
+      trasferimentiEnabled,
+      sql`
       SELECT tr.stato, COUNT(*) AS totale
       FROM trasferimenti tr JOIN magazzini mo ON mo.id = tr.magazzino_origine_id
       JOIN magazzini md ON md.id = tr.magazzino_destino_id
       WHERE tr.data_richiesta BETWEEN ${filters.da} AND ${filters.a} AND ${transferWhere}
       GROUP BY tr.stato ORDER BY totale DESC, tr.stato
-    `),
-    rows<Record<string, unknown>>(sql`
+    `,
+    ),
+    readSource(
+      lottiEnabled,
+      sql`
       SELECT COUNT(*) FILTER (WHERE l.data_scadenza IS NULL) AS scadenza_mancante,
              COUNT(*) FILTER (WHERE l.fondo_origine = 'NESSUN_FONDO' AND l.fornitore_id IS NULL) AS provenienza_mancante
       FROM lotti l JOIN magazzini mg ON mg.id = l.magazzino_id
       WHERE l.quantita_residua::numeric > 0 AND ${warehouseWhere}
-    `),
+    `,
+    ),
   ]);
   const st = stock[0] ?? {};
   const ac = accounting[0] ?? {};
@@ -286,7 +318,7 @@ export async function buildLogisticaReport(filters: ReportFilters) {
   const dq = dqRows[0] ?? {};
 
   const reportKpi = [];
-  if (magazzinoEnabled || lottiEnabled) {
+  if (stockEnabled) {
     reportKpi.push(
       kpi(
         "giacenzaCorrentePezzi",
@@ -371,28 +403,25 @@ export async function buildLogisticaReport(filters: ReportFilters) {
     reportKpi.push(kpi("mezziUtilizzati", number(means[0]?.mezzi)));
 
   const [requests, volunteers, available] = await Promise.all([
-    requestReportPanel(filters),
-    volunteerReportPanel(filters),
-    magazzinoEnabled || lottiEnabled
-      ? availableStockPanel(filters)
-      : emptyReportPanel(),
+    sources.requests ? requestReportPanel(filters) : emptyReportPanel(),
+    sources.volunteers ? volunteerReportPanel(filters) : emptyReportPanel(),
+    stockEnabled ? availableStockPanel(filters) : emptyReportPanel(),
   ]);
   return appendReportPanels(
     dashboard({
       section: "magazzino-logistica",
       filters,
       kpi: reportKpi,
-      series:
-        magazzinoEnabled || lottiEnabled
-          ? [
-              {
-                key: "movimentiPerMese",
-                points: monthSeries(monthly, "carichi", "scarichi"),
-              },
-            ]
-          : [],
+      series: stockEnabled
+        ? [
+            {
+              key: "movimentiPerMese",
+              points: monthSeries(monthly, "carichi", "scarichi"),
+            },
+          ]
+        : [],
       tables: [
-        ...(magazzinoEnabled || lottiEnabled
+        ...(stockEnabled
           ? [
               {
                 key: "giacenze",
@@ -409,9 +438,9 @@ export async function buildLogisticaReport(filters: ReportFilters) {
                   magazzinoNome: String(r.magazzino_nome),
                   unitaMisura:
                     r.unita_misura == null ? null : String(r.unita_misura),
-                  prodotti: number(r.prodotti),
-                  quantita: number(r.quantita),
-                  scaduti: number(r.scaduti),
+                  prodotti: r.prodotti == null ? null : String(r.prodotti),
+                  quantita: r.quantita == null ? null : String(r.quantita),
+                  scaduti: r.scaduti == null ? null : String(r.scaduti),
                 })),
               },
               {
@@ -427,8 +456,8 @@ export async function buildLogisticaReport(filters: ReportFilters) {
                   tipo: String(r.tipo),
                   causale: String(r.causale),
                   unitaMisura: String(r.unita_misura),
-                  movimenti: number(r.movimenti),
-                  quantita: number(r.quantita),
+                  movimenti: r.movimenti == null ? null : String(r.movimenti),
+                  quantita: r.quantita == null ? null : String(r.quantita),
                 })),
               },
             ]
@@ -440,7 +469,7 @@ export async function buildLogisticaReport(filters: ReportFilters) {
                 columns: ["stato", "totale"],
                 rows: transferStates.map((r) => ({
                   stato: String(r.stato),
-                  totale: number(r.totale),
+                  totale: r.totale == null ? null : String(r.totale),
                 })),
               },
             ]

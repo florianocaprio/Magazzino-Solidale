@@ -6,6 +6,7 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
@@ -66,6 +67,8 @@ import {
 import { dataCivileEuropeRome } from "../src/lib/interventiWorkflow";
 import { quantitaNettaMensileProdotto } from "../src/lib/speseEmporio";
 import { buildFseCanonicalReport } from "../src/lib/fseCanonicalReporting";
+import { buildEmporioReport } from "../src/lib/reporting/emporio";
+import { reportingOracleFilters } from "./helpers/reporting-oracle";
 import {
   emporioActorFixture,
   cleanupEmporioActorFixtures,
@@ -593,8 +596,9 @@ describe("Cassa Emporio", () => {
     quantity = 2,
     uom = "pz",
     multi = false,
+    fixtureOptions: Parameters<typeof createFixture>[0] = {},
   ) {
-    const fixture = await createFixture();
+    const fixture = await createFixture(fixtureOptions);
     const product = await createProdotto({
       magazzinoId: fixture.magazzinoId,
       creditoSolidaleValore: price,
@@ -645,6 +649,66 @@ describe("Cassa Emporio", () => {
         ...body,
       });
   }
+
+  it("M66 AC-10 real checkout and refund straddle Rome midnight without double counting credit", async () => {
+    // Only the clock is controlled. Stock/credit facts are created by the
+    // existing checkout and correction commands, never by report fixtures.
+    // 150 is an explicit opening balance, not a fabricated recharge event.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-01-31T22:59:00Z"));
+      const c = await cExpense("100", 1, "pz", false, { saldo: "150" });
+      vi.setSystemTime(new Date("2026-01-31T23:01:00Z"));
+      const refunded = await cPost(c, {
+        tipoRettifica: "solo_credito",
+        creditoRestituito: 20,
+      });
+      expect(refunded.status, refunded.text).toBe(201);
+      const snapshot = async () => ({
+        credit: await db
+          .select()
+          .from(creditoSolidaleMovimentiTable)
+          .where(
+            eq(
+              creditoSolidaleMovimentiTable.beneficiarioId,
+              c.fixture.beneficiarioId,
+            ),
+          ),
+        stock: await db
+          .select()
+          .from(lottiTable)
+          .where(eq(lottiTable.prodottoId, c.product)),
+        person: await db
+          .select()
+          .from(beneficiariTable)
+          .where(eq(beneficiariTable.id, c.fixture.beneficiarioId)),
+      });
+      const before = await snapshot();
+      expect(before.person[0].creditoSolidaleSaldo).toBe("70.00");
+      expect(before.stock[0].quantitaResidua).toBe("9.00");
+      for (const [date, type, delta] of [
+        ["2026-01-31", "consumo_spesa", "-100.00"],
+        ["2026-02-01", "storno", "20.00"],
+      ] as const) {
+        const report = await buildEmporioReport(
+          reportingOracleFilters(date, {
+            areaOperativaId: c.fixture.areaOperativaId,
+          }),
+        );
+        expect(
+          report.tables.find((t) => t.key === "creditoFlussiPeriodo")?.rows,
+        ).toEqual([
+          { tipo: type, eventi: "1", variazione: delta, frazionari: "0" },
+        ]);
+        expect(
+          report.kpi.find((k) => k.key === "creditoSaldoAsOf"),
+        ).toMatchObject({ value: null, availability: "missing" });
+      }
+      expect(await snapshot()).toEqual(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("C04/C05 credito intero con quantità frazionaria, rifiuto senza effetti", async () => {
     const f = await createFixture();

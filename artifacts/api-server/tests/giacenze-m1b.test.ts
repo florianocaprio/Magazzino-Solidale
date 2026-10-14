@@ -66,7 +66,7 @@ let centroB: number;
 let magA1: number;
 let magA2: number;
 let magB1: number;
-let magLegacy: number;
+let magAreaC: number;
 let prodottoP: number;
 let lottoA1: number;
 let lottoA2: number;
@@ -103,7 +103,9 @@ beforeEach(async () => {
   magB1 = await createMagazzino(scope, null, {
     areaOperativaId: areaB,
   });
-  magLegacy = await createMagazzino(scope, null);
+  magAreaC = await createMagazzino(scope, null, {
+    areaOperativaId: await createAreaOperativa(scope),
+  });
   prodottoP = await createProdotto(scope);
   await db
     .update(prodottiTable)
@@ -128,7 +130,7 @@ beforeEach(async () => {
   });
   await createLotto(scope, {
     prodottoId: prodottoP,
-    magazzinoId: magLegacy,
+    magazzinoId: magAreaC,
     quantita: 90,
   });
 });
@@ -171,7 +173,7 @@ describe("GET /giacenze — M1B Area Operativa → Magazzino", () => {
     ).toBe(404);
   });
 
-  it("aggrega una sola Area, espone il DTO esplicito ed esclude Area B e legacy null", async () => {
+  it("aggrega una sola Area, esclude le Aree B/C e vieta i magazzini senza Area", async () => {
     const app = appAs({});
     const areaAResponse = await request(app).get(
       `/giacenze?areaOperativaId=${areaA}`,
@@ -202,11 +204,11 @@ describe("GET /giacenze — M1B Area Operativa → Magazzino", () => {
     });
     expect(rows(areaAResponse.body)[0].giacenzaFisica).not.toBe(70);
     expect(rows(areaAResponse.body)[0].giacenzaFisica).not.toBe(160);
-    const [legacyAfter] = await db
-      .select({ areaOperativaId: magazziniTable.areaOperativaId })
-      .from(magazziniTable)
-      .where(eq(magazziniTable.id, magLegacy));
-    expect(legacyAfter.areaOperativaId).toBeNull();
+    await expect(
+      pool.query("UPDATE magazzini SET area_operativa_id=NULL WHERE id=$1", [
+        magAreaC,
+      ]),
+    ).rejects.toMatchObject({ code: "23502", column: "area_operativa_id" });
   });
 
   it("restituisce un array vuoto per un'Area valida senza Magazzini", async () => {

@@ -533,8 +533,10 @@ paths:
       tags: [magazzini]
       summary: Create a warehouse
       description: >-
-        Creates a warehouse. When tipoMagazzino is mensa, areaOperativaId (the Area)
-        is required and the operational Mensa detail is created atomically.
+        Creates a warehouse in an existing active Area. areaOperativaId must be
+        supplied unless the caller has a fixed Area, which is enforced by the server.
+        A null Area is invalid for every type. When tipoMagazzino is mensa,
+        the operational Mensa detail is created atomically.
       requestBody:
         required: true
         content:
@@ -12145,6 +12147,20 @@ components:
       required: [key, points]
       properties:
         key: { type: string }
+        primary:
+          type: object
+          required: [label, unit]
+          properties:
+            label:
+              { type: string, description: Reporting column translation key }
+            unit: { type: string, description: Reporting unit translation key }
+        secondary:
+          type: object
+          required: [label, unit]
+          properties:
+            label:
+              { type: string, description: Reporting column translation key }
+            unit: { type: string, description: Reporting unit translation key }
         points:
           type: array
           items:
@@ -12480,7 +12496,7 @@ components:
         centroAscoltoNome:
           type: ["string", "null"]
         areaOperativaId:
-          type: ["integer", "null"]
+          type: integer
         tipoMagazzino:
           type: string
           enum: [logistico, emporio, misto, mensa]
@@ -12490,7 +12506,8 @@ components:
           type: ["string", "null"]
         dataCreazione:
           type: string
-      required: [id, codice, nome, tipoMagazzino, stato, dataCreazione]
+      required:
+        [id, codice, nome, areaOperativaId, tipoMagazzino, stato, dataCreazione]
 
     VolontariBulkInput:
       type: object
@@ -12577,8 +12594,8 @@ components:
         centroAscoltoId:
           type: ["integer", "null"]
         areaOperativaId:
-          type: ["integer", "null"]
-          description: Area identifier; required when tipoMagazzino is mensa
+          type: integer
+          description: Existing active Area; required unless supplied by the caller's fixed Area. Null is never valid.
         tipoMagazzino:
           type: string
           enum: [logistico, emporio, misto, mensa]
@@ -12611,8 +12628,8 @@ components:
         centroAscoltoId:
           type: ["integer", "null"]
         areaOperativaId:
-          type: ["integer", "null"]
-          description: Area identifier; required when the resulting type is mensa
+          type: integer
+          description: Existing active Area. Omission preserves the current Area; null is never valid.
         tipoMagazzino:
           type: string
           enum: [logistico, emporio, misto, mensa]

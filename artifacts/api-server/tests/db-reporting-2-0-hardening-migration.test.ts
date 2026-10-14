@@ -110,7 +110,8 @@ describe("Reporting 2.0 hardening migration", () => {
         "INSERT INTO utenti (username, password_hash, nome) VALUES ('reporting-hardening-user', 'test', 'Test') RETURNING id",
       );
       const warehouse = await client.query<{ id: number }>(
-        "INSERT INTO magazzini (codice, nome) VALUES ('RPT-HARD', 'Reporting hardening shared') RETURNING id",
+        "INSERT INTO magazzini (codice, nome, area_operativa_id) VALUES ('RPT-HARD', 'Reporting hardening shared', $1) RETURNING id",
+        [areaAId],
       );
       const beneficiary = await client.query<{ id: number }>(
         "INSERT INTO beneficiari (codice, nome, cognome) VALUES ('RPT-HARD', 'Test', 'Reporting') RETURNING id",

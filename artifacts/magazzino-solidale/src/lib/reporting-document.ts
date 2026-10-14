@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import type {
   ReportDrilldown,
   ReportingDashboard,
+  ReportSeries,
 } from "@workspace/api-client-react";
 import type {
   PdfExportBranding,
@@ -10,6 +11,10 @@ import type {
   ReportingScopeNames,
 } from "./export";
 import amiriUrl from "@/assets/reporting/Amiri-Regular.ttf?url";
+import {
+  reportingFilterRows,
+  reportingSeriesLabel,
+} from "./reporting-metadata";
 
 export type ReportingDocumentInput = {
   title: string;
@@ -35,7 +40,14 @@ export async function buildReportingPdf(
   const doc = new jsPDF({
     unit: "pt",
     format: "a4",
-    orientation: "landscape",
+    orientation:
+      Math.max(
+        4,
+        ...report.tables.map((table) => table.columns.length),
+        input.detail?.columns.length ?? 0,
+      ) > 5
+        ? "landscape"
+        : "portrait",
     putOnlyUsedFonts: true,
   });
   doc.addFileToVFS("Amiri-Regular.ttf", btoa(binary));
@@ -138,6 +150,19 @@ export async function buildReportingPdf(
           .finalY + 24;
     }
   };
+  if (input.branding?.logoDataUrl) {
+    const logo = doc.getImageProperties(input.branding.logoDataUrl);
+    const scale = Math.min(120 / logo.width, 52 / logo.height);
+    doc.addImage(
+      input.branding.logoDataUrl,
+      logo.fileType,
+      rtl ? width - margin - logo.width * scale : margin,
+      y,
+      logo.width * scale,
+      logo.height * scale,
+    );
+    y += logo.height * scale + 24;
+  }
   write(input.branding?.nomeDocumento || "Magazzino Solidale", 18);
   if (input.branding?.sottotitoloDocumento)
     write(input.branding.sottotitoloDocumento);
@@ -160,40 +185,12 @@ export async function buildReportingPdf(
     );
   }
   write(`Dataset: ${datasetId}`);
-  const names = input.scopeNames ?? {};
-  for (const [label, name, id, all] of [
-    [
-      labels.metadata.areaOperativa,
-      names.areaOperativa,
-      report.filters.areaOperativaId,
-      labels.metadata.allAreeOperative,
-    ],
-    [
-      labels.metadata.centre,
-      names.centre,
-      report.filters.centroAscoltoId,
-      labels.metadata.allCentres,
-    ],
-    [
-      labels.metadata.warehouse,
-      names.warehouse,
-      report.filters.magazzinoId,
-      labels.metadata.allWarehouses,
-    ],
-    [
-      labels.metadata.mensa,
-      names.mensa,
-      report.filters.mensaId,
-      labels.metadata.allMense,
-    ],
-    [
-      labels.metadata.zone,
-      names.zone,
-      report.filters.zonaUdsId,
-      labels.metadata.allZones,
-    ],
-  ])
-    write(`${label}: ${name ?? (id == null ? all : id)}`);
+  for (const [label, value] of reportingFilterRows(
+    report,
+    labels,
+    input.scopeNames,
+  ))
+    write(`${label}: ${value}`);
   table(
     labels.metadata.indicator,
     [
@@ -209,43 +206,63 @@ export async function buildReportingPdf(
       `${labels.availability(item.availability)}${item.denominator == null ? "" : ` (${item.numerator}/${item.denominator}; ${item.presentationDecimals} dec.)`}`,
     ]),
   );
+  const drawSeries = (series: ReportSeries) => {
+    // Separate scales/panels: never put credit and counts on one implicit axis.
+    const measures =
+      series.secondary || series.points.some((p) => p.secondaryValue != null)
+        ? [false, true]
+        : [false];
+    for (const secondary of measures) {
+      const label = reportingSeriesLabel(series, secondary, labels);
+      write(label, 11);
+      const value = (p: ReportSeries["points"][number]) =>
+        secondary ? p.secondaryValue : p.value;
+      const max = Math.max(
+        1,
+        ...series.points.map((p) => Math.abs(value(p) ?? 0)),
+      );
+      const axis = margin + bodyWidth * 0.56;
+      for (const point of series.points) {
+        if (y > height - 100) {
+          doc.addPage();
+          y = 46;
+          write(`${labels.table(series.key)} · ${label}`, 11);
+        }
+        const amount = value(point);
+        doc.setFontSize(10);
+        doc.setR2L(false);
+        const name = doc.splitTextToSize(
+          point.label,
+          bodyWidth * 0.3,
+        ) as string[];
+        doc.text(name, margin, y);
+        const length = (Math.abs(amount ?? 0) / max) * bodyWidth * 0.2;
+        doc.setDrawColor(70);
+        doc.line(axis, y - 8, axis, y + 2);
+        const gray = secondary ? 175 : 85;
+        doc.setFillColor(gray, gray, gray);
+        if (amount != null)
+          doc.rect(amount < 0 ? axis - length : axis, y - 7, length, 7, "FD");
+        const exact = secondary ? point.exactSecondaryValue : point.exactValue;
+        const numberText =
+          exact ?? (amount == null ? labels.unavailable : String(amount));
+        // Values get their own line: large exact decimals must never overlap bars.
+        y += Math.max(14, name.length * 13);
+        doc.text(numberText, width - margin, y, { align: "right" });
+        y += 20;
+      }
+      y += 10;
+    }
+  };
   for (const series of report.series) {
     write(labels.table(series.key), 13);
-    const max = Math.max(
-      1,
-      ...series.points.map((point) => Math.abs(point.value)),
-    );
-    const axis = margin + bodyWidth * 0.6;
-    for (const point of series.points) {
-      if (y > height - 85) {
-        doc.addPage();
-        y = 46;
-        write(labels.table(series.key), 13);
-      }
-      doc.setFontSize(10);
-      doc.setR2L(false);
-      doc.text(
-        point.label.length > 38 ? `${point.label.slice(0, 35)}…` : point.label,
-        margin,
-        y,
-      );
-      const length = (Math.abs(point.value) / max) * bodyWidth * 0.23;
-      doc.setDrawColor(70);
-      doc.line(axis, y - 8, axis, y + 2);
-      doc.setFillColor(95, 95, 95);
-      doc.rect(point.value < 0 ? axis - length : axis, y - 7, length, 7, "F");
-      doc.text(point.exactValue ?? String(point.value), width - margin, y, {
-        align: "right",
-      });
-      y += 18;
-    }
-    y += 10;
+    drawSeries(series);
     table(
       labels.table(series.key),
       [
         labels.column("data"),
-        labels.metadata.value,
-        labels.column("valoreSecondario"),
+        reportingSeriesLabel(series, false, labels),
+        reportingSeriesLabel(series, true, labels),
       ],
       series.points.map((point) => [
         point.label,
