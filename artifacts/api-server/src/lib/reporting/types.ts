@@ -30,21 +30,38 @@ export type ReportFilters = {
   callerAreas: string[];
   callerPermissions: string[];
   callerIsAdmin: boolean;
+  /** Internal, resolved from current persisted assignments. Never serialized. */
+  callerMensaIds?: number[] | null;
+  callerUserId?: number;
 };
 
 export type ReportKpi = {
   key: string;
   value: number | null;
   exactValue: string | null;
-  unit: "count" | "pieces" | "kgLt" | "percentage" | "credit" | "days" | "average" | "quantity" | "kg";
+  unit:
+    | "count"
+    | "pieces"
+    | "kgLt"
+    | "percentage"
+    | "credit"
+    | "days"
+    | "average"
+    | "quantity"
+    | "kg";
   availability: ReportAvailability;
   drilldownMetric: string | null;
+  numerator?: string;
+  denominator?: string;
+  presentationDecimals?: number;
 };
 
 export type ReportSeriesPoint = {
   label: string;
   value: number;
   secondaryValue?: number | null;
+  exactValue?: string;
+  exactSecondaryValue?: string | null;
 };
 
 export type ReportSeries = {
@@ -83,6 +100,8 @@ export type ReportingDashboard = {
     | "callerAreas"
     | "callerPermissions"
     | "callerIsAdmin"
+    | "callerMensaIds"
+    | "callerUserId"
   >;
   kpi: ReportKpi[];
   series: ReportSeries[];
@@ -91,6 +110,8 @@ export type ReportingDashboard = {
   definitions: ReportText[];
   generatedAt: string;
   timezone: "Europe/Rome";
+  definitionRevision?: string;
+  excludedSources?: ReportText[];
 };
 
 export type ReportDrilldown = {
@@ -104,7 +125,19 @@ export type ReportDrilldown = {
   rows: Array<Record<string, ReportCell>>;
 };
 
-export function publicFilters(filters: ReportFilters): ReportingDashboard["filters"] {
-  const { areaOperativaMode: _areaOperativaMode, centroMode: _centroMode, zonaMode: _zonaMode, callerAreas: _callerAreas, callerPermissions: _callerPermissions, callerIsAdmin: _callerIsAdmin, ...result } = filters;
+export function publicFilters(
+  filters: ReportFilters,
+): ReportingDashboard["filters"] {
+  const {
+    areaOperativaMode: _areaOperativaMode,
+    centroMode: _centroMode,
+    zonaMode: _zonaMode,
+    callerAreas: _callerAreas,
+    callerPermissions: _callerPermissions,
+    callerIsAdmin: _callerIsAdmin,
+    callerMensaIds: _callerMensaIds,
+    callerUserId: _callerUserId,
+    ...result
+  } = filters;
   return result;
 }

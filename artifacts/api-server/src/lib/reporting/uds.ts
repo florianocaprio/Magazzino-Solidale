@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, rows } from "./sql";
-import { dashboard, kpi, quality, text } from "./shared";
+import { dashboard, kpi, quality, text, numericMetrics } from "./shared";
 
 function udsIdentityConditions(filters: ReportFilters): SQL[] {
   const conditions: SQL[] = [sql`i.ambito = 'uds'`];
@@ -10,7 +10,7 @@ function udsIdentityConditions(filters: ReportFilters): SQL[] {
       sql`i.area_operativa_id_snapshot = ${filters.areaOperativaId}`,
     );
   }
-  if (filters.zonaUdsId != null && filters.zonaMode === "query") {
+  if (filters.zonaUdsId != null && filters.zonaMode !== "all") {
     conditions.push(sql`i.zona_uds_id_snapshot = ${filters.zonaUdsId}`);
   }
   return conditions;
@@ -37,9 +37,11 @@ export async function udsMetrics(filters: ReportFilters) {
     sql`giorno BETWEEN ${filters.da} AND ${filters.a}`,
   ];
   if (filters.areaOperativaId != null && filters.areaOperativaMode !== "all") {
-    periodFilters.push(sql`area_operativa_id_snapshot = ${filters.areaOperativaId}`);
+    periodFilters.push(
+      sql`area_operativa_id_snapshot = ${filters.areaOperativaId}`,
+    );
   }
-  if (filters.zonaUdsId != null && filters.zonaMode === "query") {
+  if (filters.zonaUdsId != null && filters.zonaMode !== "all") {
     periodFilters.push(sql`zona_uds_id_snapshot = ${filters.zonaUdsId}`);
   }
   if (filters.operatoreId != null)
@@ -71,14 +73,14 @@ export async function udsMetrics(filters: ReportFilters) {
            COUNT(DISTINCT beneficiario_id) FILTER (WHERE numero > 1) AS persone_conosciute
     FROM periodo
   `);
-  return {
-    interventi: number(row?.interventi),
-    persone: number(row?.persone),
-    primi: number(row?.primi_contatti),
-    successivi: number(row?.successivi),
-    nuove: number(row?.persone_nuove),
-    conosciute: number(row?.persone_conosciute),
-  };
+  return numericMetrics({
+    interventi: row?.interventi,
+    persone: row?.persone,
+    primi: row?.primi_contatti,
+    successivi: row?.successivi,
+    nuove: row?.persone_nuove,
+    conosciute: row?.persone_conosciute,
+  });
 }
 
 export async function buildUdsReport(filters: ReportFilters) {
@@ -129,6 +131,14 @@ export async function buildUdsReport(filters: ReportFilters) {
   return dashboard({
     section: "uds",
     filters,
+    exactKpi: {
+      interventi: metrics.exact.interventi,
+      personeUniche: metrics.exact.persone,
+      primiContatti: metrics.exact.primi,
+      contattiSuccessivi: metrics.exact.successivi,
+      personeNuove: metrics.exact.nuove,
+      personeConosciute: metrics.exact.conosciute,
+    },
     kpi: [
       kpi("interventi", metrics.interventi, "count", "interventi"),
       kpi("personeUniche", metrics.persone, "count", "personeUniche"),

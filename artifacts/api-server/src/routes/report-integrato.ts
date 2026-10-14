@@ -19,12 +19,24 @@ import {
   parseReportFilters,
   assertReportFilterScope,
   ReportingError,
+  assertReportTerritory,
 } from "../lib/reporting/filters";
 import { buildDrilldown } from "../lib/reporting/drilldown";
 import type { ReportSection } from "../lib/reporting/types";
 import { buildReportFilterOptions } from "../lib/reporting/filterOptions";
+import { assertReportSectionAccess } from "../lib/reporting/access";
+import { prepareReport } from "../lib/reporting/prepare";
 
 const router: IRouter = Router();
+
+router.post("/report/prepare", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store, private");
+  try {
+    res.json(await prepareReport(req));
+  } catch (error) {
+    if (!sendError(error, res)) throw error;
+  }
+});
 
 const sections = new Set<ReportSection>([
   "generale",
@@ -72,6 +84,8 @@ function reportHandler(
     try {
       const filters = parseReportFilters(req);
       await assertReportFilterScope(req, filters);
+      if (req.path === "/report/mensa" && filters.callerMensaIds?.length === 0)
+        throw new ReportingError(403, "Nessuna assegnazione Mensa attiva");
       res.json(await builder(filters));
     } catch (error) {
       if (sendError(error, res)) return;
@@ -95,6 +109,14 @@ router.use(
   ],
   requireSourceArea("analisi"),
   requireModulo("REPORT"),
+  (req, res, next) => {
+    try {
+      assertReportTerritory(req);
+      next();
+    } catch (error) {
+      if (!sendError(error, res)) next(error);
+    }
+  },
 );
 
 router.get("/report/dashboard", reportHandler(buildGeneralReport));
@@ -169,6 +191,9 @@ router.get("/report/filter-options", async (req, res) => {
     const section = String(req.query.section ?? "") as ReportSection;
     if (!sections.has(section))
       throw new ReportingError(400, "section non valida");
+    await assertReportSectionAccess(req, section);
+    const filters = parseReportFilters(req);
+    await assertReportFilterScope(req, filters);
     if (
       section === "fse-plus" &&
       !req.user?.isAdmin &&
@@ -205,7 +230,12 @@ router.get("/report/filter-options", async (req, res) => {
       );
     }
     res.json(
-      await buildReportFilterOptions(req, section, requestedAreaOperativaId),
+      await buildReportFilterOptions(
+        req,
+        section,
+        requestedAreaOperativaId,
+        filters,
+      ),
     );
   } catch (error) {
     if (sendError(error, res)) return;
@@ -219,6 +249,7 @@ router.get("/report/drilldown", async (req, res) => {
     const metric = String(req.query.metric ?? "").trim();
     if (!sections.has(section))
       throw new ReportingError(400, "section non valida");
+    await assertReportSectionAccess(req, section);
     if (
       section === "fse-plus" &&
       !req.user?.isAdmin &&

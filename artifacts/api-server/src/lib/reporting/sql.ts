@@ -1,9 +1,20 @@
-import { db } from "@workspace/db";
+import { reportExecutor, hasReportSnapshot } from "./queryContext";
+import { ReportingError } from "./filters";
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 
-export async function rows<T extends Record<string, unknown>>(query: SQL): Promise<T[]> {
-  const result = await db.execute(query);
+export async function rows<T extends Record<string, unknown>>(
+  query: SQL,
+): Promise<T[]> {
+  const bounded = hasReportSnapshot();
+  const result = await reportExecutor().execute(
+    bounded ? sql`SELECT * FROM (${query}) report_bounded LIMIT 10001` : query,
+  );
+  if (bounded && result.rows.length > 10000)
+    throw new ReportingError(
+      413,
+      "Report troppo ampio: restringere i filtri (massimo 10000 righe per insieme)",
+    );
   return result.rows as T[];
 }
 
@@ -74,6 +85,20 @@ export function reportScope(
   if (columns.mensa && filters.mensaId != null) {
     conditions.push(sql`${columns.mensa} = ${filters.mensaId}`);
   }
+  if (
+    columns.mensa &&
+    filters.callerMensaIds !== undefined &&
+    filters.callerMensaIds !== null
+  ) {
+    conditions.push(
+      filters.callerMensaIds.length
+        ? sql`${columns.mensa} IN (${sql.join(
+            filters.callerMensaIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`
+        : sql`false`,
+    );
+  }
   if (columns.operatore && filters.operatoreId != null) {
     conditions.push(sql`${columns.operatore} = ${filters.operatoreId}`);
   }
@@ -84,10 +109,21 @@ export function andSql(conditions: SQL[]): SQL {
   return conditions.length === 0 ? sql`true` : sql.join(conditions, sql` AND `);
 }
 
-export function monthSeries(input: Array<Record<string, unknown>>, valueKey = "totale", secondaryKey?: string) {
+export function monthSeries(
+  input: Array<Record<string, unknown>>,
+  valueKey = "totale",
+  secondaryKey?: string,
+) {
   return input.map((row) => ({
     label: String(row.mese),
     value: number(row[valueKey]),
-    ...(secondaryKey ? { secondaryValue: number(row[secondaryKey]) } : {}),
+    exactValue: String(row[valueKey] ?? "0"),
+    ...(secondaryKey
+      ? {
+          secondaryValue: number(row[secondaryKey]),
+          exactSecondaryValue:
+            row[secondaryKey] == null ? null : String(row[secondaryKey]),
+        }
+      : {}),
   }));
 }

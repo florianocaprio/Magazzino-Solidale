@@ -19520,6 +19520,9 @@ export const GetReportDashboardGeneraleResponse = zod.object({
       ]),
       availability: zod.enum(["ok", "derivable", "missing"]),
       drilldownMetric: zod.string().nullable(),
+      numerator: zod.string().optional(),
+      denominator: zod.string().optional(),
+      presentationDecimals: zod.number().optional(),
     }),
   ),
   series: zod.array(
@@ -19530,6 +19533,8 @@ export const GetReportDashboardGeneraleResponse = zod.object({
           label: zod.string(),
           value: zod.number(),
           secondaryValue: zod.number().nullish(),
+          exactValue: zod.string().optional(),
+          exactSecondaryValue: zod.string().nullish(),
         }),
       ),
     }),
@@ -19567,6 +19572,17 @@ export const GetReportDashboardGeneraleResponse = zod.object({
   ),
   generatedAt: zod.coerce.date(),
   timezone: zod.enum(["Europe/Rome"]),
+  definitionRevision: zod.string().optional(),
+  excludedSources: zod
+    .array(
+      zod.object({
+        code: zod.string(),
+        params: zod
+          .record(zod.string(), zod.union([zod.string(), zod.number()]))
+          .optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -19644,6 +19660,9 @@ export const GetReportPacchiResponse = zod.object({
       ]),
       availability: zod.enum(["ok", "derivable", "missing"]),
       drilldownMetric: zod.string().nullable(),
+      numerator: zod.string().optional(),
+      denominator: zod.string().optional(),
+      presentationDecimals: zod.number().optional(),
     }),
   ),
   series: zod.array(
@@ -19654,6 +19673,8 @@ export const GetReportPacchiResponse = zod.object({
           label: zod.string(),
           value: zod.number(),
           secondaryValue: zod.number().nullish(),
+          exactValue: zod.string().optional(),
+          exactSecondaryValue: zod.string().nullish(),
         }),
       ),
     }),
@@ -19691,6 +19712,17 @@ export const GetReportPacchiResponse = zod.object({
   ),
   generatedAt: zod.coerce.date(),
   timezone: zod.enum(["Europe/Rome"]),
+  definitionRevision: zod.string().optional(),
+  excludedSources: zod
+    .array(
+      zod.object({
+        code: zod.string(),
+        params: zod
+          .record(zod.string(), zod.union([zod.string(), zod.number()]))
+          .optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -19770,6 +19802,9 @@ export const GetReportCentroAscoltoResponse = zod.object({
       ]),
       availability: zod.enum(["ok", "derivable", "missing"]),
       drilldownMetric: zod.string().nullable(),
+      numerator: zod.string().optional(),
+      denominator: zod.string().optional(),
+      presentationDecimals: zod.number().optional(),
     }),
   ),
   series: zod.array(
@@ -19780,6 +19815,8 @@ export const GetReportCentroAscoltoResponse = zod.object({
           label: zod.string(),
           value: zod.number(),
           secondaryValue: zod.number().nullish(),
+          exactValue: zod.string().optional(),
+          exactSecondaryValue: zod.string().nullish(),
         }),
       ),
     }),
@@ -19817,6 +19854,17 @@ export const GetReportCentroAscoltoResponse = zod.object({
   ),
   generatedAt: zod.coerce.date(),
   timezone: zod.enum(["Europe/Rome"]),
+  definitionRevision: zod.string().optional(),
+  excludedSources: zod
+    .array(
+      zod.object({
+        code: zod.string(),
+        params: zod
+          .record(zod.string(), zod.union([zod.string(), zod.number()]))
+          .optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -19894,6 +19942,9 @@ export const GetReportEmporioResponse = zod.object({
       ]),
       availability: zod.enum(["ok", "derivable", "missing"]),
       drilldownMetric: zod.string().nullable(),
+      numerator: zod.string().optional(),
+      denominator: zod.string().optional(),
+      presentationDecimals: zod.number().optional(),
     }),
   ),
   series: zod.array(
@@ -19904,6 +19955,8 @@ export const GetReportEmporioResponse = zod.object({
           label: zod.string(),
           value: zod.number(),
           secondaryValue: zod.number().nullish(),
+          exactValue: zod.string().optional(),
+          exactSecondaryValue: zod.string().nullish(),
         }),
       ),
     }),
@@ -19941,6 +19994,17 @@ export const GetReportEmporioResponse = zod.object({
   ),
   generatedAt: zod.coerce.date(),
   timezone: zod.enum(["Europe/Rome"]),
+  definitionRevision: zod.string().optional(),
+  excludedSources: zod
+    .array(
+      zod.object({
+        code: zod.string(),
+        params: zod
+          .record(zod.string(), zod.union([zod.string(), zod.number()]))
+          .optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -20021,6 +20085,9 @@ export const GetReportMensaIntegratoResponse = zod.object({
       ]),
       availability: zod.enum(["ok", "derivable", "missing"]),
       drilldownMetric: zod.string().nullable(),
+      numerator: zod.string().optional(),
+      denominator: zod.string().optional(),
+      presentationDecimals: zod.number().optional(),
     }),
   ),
   series: zod.array(
@@ -20031,6 +20098,8 @@ export const GetReportMensaIntegratoResponse = zod.object({
           label: zod.string(),
           value: zod.number(),
           secondaryValue: zod.number().nullish(),
+          exactValue: zod.string().optional(),
+          exactSecondaryValue: zod.string().nullish(),
         }),
       ),
     }),
@@ -20068,6 +20137,17 @@ export const GetReportMensaIntegratoResponse = zod.object({
   ),
   generatedAt: zod.coerce.date(),
   timezone: zod.enum(["Europe/Rome"]),
+  definitionRevision: zod.string().optional(),
+  excludedSources: zod
+    .array(
+      zod.object({
+        code: zod.string(),
+        params: zod
+          .record(zod.string(), zod.union([zod.string(), zod.number()]))
+          .optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -20147,6 +20227,9 @@ export const GetReportUdsIntegratoResponse = zod.object({
       ]),
       availability: zod.enum(["ok", "derivable", "missing"]),
       drilldownMetric: zod.string().nullable(),
+      numerator: zod.string().optional(),
+      denominator: zod.string().optional(),
+      presentationDecimals: zod.number().optional(),
     }),
   ),
   series: zod.array(
@@ -20157,6 +20240,8 @@ export const GetReportUdsIntegratoResponse = zod.object({
           label: zod.string(),
           value: zod.number(),
           secondaryValue: zod.number().nullish(),
+          exactValue: zod.string().optional(),
+          exactSecondaryValue: zod.string().nullish(),
         }),
       ),
     }),
@@ -20194,6 +20279,17 @@ export const GetReportUdsIntegratoResponse = zod.object({
   ),
   generatedAt: zod.coerce.date(),
   timezone: zod.enum(["Europe/Rome"]),
+  definitionRevision: zod.string().optional(),
+  excludedSources: zod
+    .array(
+      zod.object({
+        code: zod.string(),
+        params: zod
+          .record(zod.string(), zod.union([zod.string(), zod.number()]))
+          .optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -20271,6 +20367,9 @@ export const GetReportMagazzinoLogisticaResponse = zod.object({
       ]),
       availability: zod.enum(["ok", "derivable", "missing"]),
       drilldownMetric: zod.string().nullable(),
+      numerator: zod.string().optional(),
+      denominator: zod.string().optional(),
+      presentationDecimals: zod.number().optional(),
     }),
   ),
   series: zod.array(
@@ -20281,6 +20380,8 @@ export const GetReportMagazzinoLogisticaResponse = zod.object({
           label: zod.string(),
           value: zod.number(),
           secondaryValue: zod.number().nullish(),
+          exactValue: zod.string().optional(),
+          exactSecondaryValue: zod.string().nullish(),
         }),
       ),
     }),
@@ -20318,6 +20419,17 @@ export const GetReportMagazzinoLogisticaResponse = zod.object({
   ),
   generatedAt: zod.coerce.date(),
   timezone: zod.enum(["Europe/Rome"]),
+  definitionRevision: zod.string().optional(),
+  excludedSources: zod
+    .array(
+      zod.object({
+        code: zod.string(),
+        params: zod
+          .record(zod.string(), zod.union([zod.string(), zod.number()]))
+          .optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -20403,6 +20515,9 @@ export const GetReportFsePlusIntegratoResponse = zod.object({
       ]),
       availability: zod.enum(["ok", "derivable", "missing"]),
       drilldownMetric: zod.string().nullable(),
+      numerator: zod.string().optional(),
+      denominator: zod.string().optional(),
+      presentationDecimals: zod.number().optional(),
     }),
   ),
   series: zod.array(
@@ -20413,6 +20528,8 @@ export const GetReportFsePlusIntegratoResponse = zod.object({
           label: zod.string(),
           value: zod.number(),
           secondaryValue: zod.number().nullish(),
+          exactValue: zod.string().optional(),
+          exactSecondaryValue: zod.string().nullish(),
         }),
       ),
     }),
@@ -20450,6 +20567,17 @@ export const GetReportFsePlusIntegratoResponse = zod.object({
   ),
   generatedAt: zod.coerce.date(),
   timezone: zod.enum(["Europe/Rome"]),
+  definitionRevision: zod.string().optional(),
+  excludedSources: zod
+    .array(
+      zod.object({
+        code: zod.string(),
+        params: zod
+          .record(zod.string(), zod.union([zod.string(), zod.number()]))
+          .optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -20526,6 +20654,248 @@ export const GetReportDrilldownResponse = zod.object({
 });
 
 /**
+ * Repeatable-read bounded, autorizzazione rivalidata prima e dopo; no-store. Massimo 10000 righe per insieme, 1000 dettagli espliciti e 8 MiB. Non modifica fatti contabili.
+ * @summary Prepara un dataset read-only coerente e autorizzato per PDF, stampa e XLSX
+ */
+export const prepareReportExportQueryLanguageDefault = `it`;
+export const prepareReportExportQueryDetailDefault = `none`;
+export const prepareReportExportQueryAnnoMin = 2000;
+export const prepareReportExportQueryAnnoMax = 2100;
+
+export const PrepareReportExportQueryParams = zod.object({
+  section: zod.enum([
+    "generale",
+    "pacchi",
+    "centro-ascolto",
+    "emporio",
+    "mensa",
+    "uds",
+    "magazzino-logistica",
+    "fse-plus",
+  ]),
+  language: zod
+    .enum(["it", "en", "es", "fr", "de", "ar"])
+    .default(prepareReportExportQueryLanguageDefault),
+  detail: zod
+    .enum(["none", "fse-control"])
+    .default(prepareReportExportQueryDetailDefault),
+  da: zod
+    .date()
+    .optional()
+    .describe("Data civile iniziale Europe\/Rome (YYYY-MM-DD)"),
+  a: zod
+    .date()
+    .optional()
+    .describe("Data civile finale Europe\/Rome (YYYY-MM-DD)"),
+  anno: zod.coerce
+    .number()
+    .min(prepareReportExportQueryAnnoMin)
+    .max(prepareReportExportQueryAnnoMax)
+    .optional(),
+  areaOperativaId: zod.coerce
+    .number()
+    .optional()
+    .describe(
+      "Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa",
+    ),
+  centroAscoltoId: zod.coerce
+    .number()
+    .optional()
+    .describe(
+      "Gli utenti con Centro assegnato restano vincolati al proprio perimetro",
+    ),
+  magazzinoId: zod.coerce.number().optional(),
+  mensaId: zod.coerce.number().optional(),
+  zonaUdsId: zod.coerce.number().optional(),
+  operatoreId: zod.coerce.number().optional(),
+  tipoIntervento: zod.coerce.string().optional(),
+  tipoServizio: zod.coerce.string().optional(),
+});
+
+export const PrepareReportExportResponse = zod.object({
+  datasetId: zod.string().uuid(),
+  language: zod.string(),
+  definitionRevision: zod.string(),
+  report: zod.object({
+    reportingModelVersion: zod.enum(["REPORTING_2_0_V1"]),
+    section: zod.enum([
+      "generale",
+      "pacchi",
+      "centro-ascolto",
+      "emporio",
+      "mensa",
+      "uds",
+      "magazzino-logistica",
+      "fse-plus",
+    ]),
+    filters: zod.object({
+      da: zod.coerce.date(),
+      a: zod.coerce.date(),
+      anno: zod.number(),
+      areaOperativaId: zod.number().nullable(),
+      centroAscoltoId: zod.number().nullable(),
+      magazzinoId: zod.number().nullable(),
+      mensaId: zod.number().nullable(),
+      zonaUdsId: zod.number().nullable(),
+      operatoreId: zod.number().nullable(),
+      tipoIntervento: zod.string().nullable(),
+      tipoServizio: zod.string().nullable(),
+    }),
+    kpi: zod.array(
+      zod.object({
+        key: zod.string(),
+        value: zod.number().nullable(),
+        exactValue: zod
+          .string()
+          .nullable()
+          .describe(
+            "Valore decimale esatto; le decisioni non usano la proiezione number.",
+          ),
+        unit: zod.enum([
+          "count",
+          "pieces",
+          "kgLt",
+          "percentage",
+          "credit",
+          "days",
+          "average",
+          "quantity",
+          "kg",
+        ]),
+        availability: zod.enum(["ok", "derivable", "missing"]),
+        drilldownMetric: zod.string().nullable(),
+        numerator: zod.string().optional(),
+        denominator: zod.string().optional(),
+        presentationDecimals: zod.number().optional(),
+      }),
+    ),
+    series: zod.array(
+      zod.object({
+        key: zod.string(),
+        points: zod.array(
+          zod.object({
+            label: zod.string(),
+            value: zod.number(),
+            secondaryValue: zod.number().nullish(),
+            exactValue: zod.string().optional(),
+            exactSecondaryValue: zod.string().nullish(),
+          }),
+        ),
+      }),
+    ),
+    tables: zod.array(
+      zod.object({
+        key: zod.string(),
+        columns: zod.array(zod.string()),
+        rows: zod.array(zod.record(zod.string(), zod.unknown())),
+      }),
+    ),
+    quality: zod.array(
+      zod.object({
+        key: zod.string(),
+        count: zod.number().nullable(),
+        availability: zod.enum(["ok", "derivable", "missing"]),
+        note: zod.union([
+          zod.object({
+            code: zod.string(),
+            params: zod
+              .record(zod.string(), zod.union([zod.string(), zod.number()]))
+              .optional(),
+          }),
+          zod.null(),
+        ]),
+      }),
+    ),
+    definitions: zod.array(
+      zod.object({
+        code: zod.string(),
+        params: zod
+          .record(zod.string(), zod.union([zod.string(), zod.number()]))
+          .optional(),
+      }),
+    ),
+    generatedAt: zod.coerce.date(),
+    timezone: zod.enum(["Europe/Rome"]),
+    definitionRevision: zod.string().optional(),
+    excludedSources: zod
+      .array(
+        zod.object({
+          code: zod.string(),
+          params: zod
+            .record(zod.string(), zod.union([zod.string(), zod.number()]))
+            .optional(),
+        }),
+      )
+      .optional(),
+  }),
+  options: zod.object({
+    section: zod.enum([
+      "generale",
+      "pacchi",
+      "centro-ascolto",
+      "emporio",
+      "mensa",
+      "uds",
+      "magazzino-logistica",
+      "fse-plus",
+    ]),
+    areeOperative: zod.array(
+      zod.object({
+        id: zod.number(),
+        nome: zod.string(),
+        areaOperativaId: zod.number().nullable(),
+        centroAscoltoId: zod.number().nullish(),
+      }),
+    ),
+    centres: zod.array(
+      zod.object({
+        id: zod.number(),
+        nome: zod.string(),
+        areaOperativaId: zod.number().nullable(),
+        centroAscoltoId: zod.number().nullish(),
+      }),
+    ),
+    warehouses: zod.array(
+      zod.object({
+        id: zod.number(),
+        nome: zod.string(),
+        areaOperativaId: zod.number().nullable(),
+        centroAscoltoId: zod.number().nullish(),
+      }),
+    ),
+    mense: zod.array(
+      zod.object({
+        id: zod.number(),
+        nome: zod.string(),
+        areaOperativaId: zod.number().nullable(),
+        centroAscoltoId: zod.number().nullish(),
+      }),
+    ),
+    zones: zod.array(
+      zod.object({
+        id: zod.number(),
+        nome: zod.string(),
+        areaOperativaId: zod.number().nullable(),
+        centroAscoltoId: zod.number().nullish(),
+      }),
+    ),
+  }),
+  detail: zod.union([
+    zod.object({
+      reportingModelVersion: zod.enum(["REPORTING_2_0_V1"]),
+      section: zod.string(),
+      metric: zod.string(),
+      page: zod.number(),
+      pageSize: zod.number(),
+      total: zod.number(),
+      columns: zod.array(zod.string()),
+      rows: zod.array(zod.record(zod.string(), zod.unknown())),
+    }),
+    zod.null(),
+  ]),
+});
+
+/**
  * @summary Opzioni read-only autorizzate per i filtri della reportistica
  */
 export const GetReportFilterOptionsQueryParams = zod.object({
@@ -20544,6 +20914,12 @@ export const GetReportFilterOptionsQueryParams = zod.object({
     .optional()
     .describe(
       "Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa",
+    ),
+  centroAscoltoId: zod.coerce
+    .number()
+    .optional()
+    .describe(
+      "Gli utenti con Centro assegnato restano vincolati al proprio perimetro",
     ),
 });
 

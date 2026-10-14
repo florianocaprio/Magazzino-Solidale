@@ -9353,6 +9353,57 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ReportDrilldown" }
 
+  /report/prepare:
+    post:
+      operationId: prepareReportExport
+      tags: [report]
+      summary: Prepara un dataset read-only coerente e autorizzato per PDF, stampa e XLSX
+      description: Repeatable-read bounded, autorizzazione rivalidata prima e dopo; no-store. Massimo 10000 righe per insieme, 1000 dettagli espliciti e 8 MiB. Non modifica fatti contabili.
+      parameters:
+        - name: section
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              [
+                generale,
+                pacchi,
+                centro-ascolto,
+                emporio,
+                mensa,
+                uds,
+                magazzino-logistica,
+                fse-plus,
+              ]
+        - name: language
+          in: query
+          schema: { type: string, enum: [it, en, es, fr, de, ar], default: it }
+        - name: detail
+          in: query
+          schema: { type: string, enum: [none, fse-control], default: none }
+        - $ref: "#/components/parameters/ReportDa"
+        - $ref: "#/components/parameters/ReportA"
+        - $ref: "#/components/parameters/ReportAnno"
+        - $ref: "#/components/parameters/ReportAreaOperativaId"
+        - $ref: "#/components/parameters/ReportCentroId"
+        - $ref: "#/components/parameters/ReportMagazzinoId"
+        - $ref: "#/components/parameters/ReportMensaId"
+        - $ref: "#/components/parameters/ReportZonaUdsId"
+        - $ref: "#/components/parameters/ReportOperatoreId"
+        - $ref: "#/components/parameters/ReportTipoIntervento"
+        - $ref: "#/components/parameters/ReportTipoServizio"
+      responses:
+        "200":
+          description: Dataset completo della sezione; nessun DTO contabile fornito dal client
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PreparedReportingExport" }
+        "401": { description: Sessione terminata }
+        "403": { description: Scope o permessi insufficienti o revocati }
+        "409": { description: Contesto cambiato durante la preparazione }
+        "413": { description: Report eccedente i limiti; restringere i filtri }
+
   /report/filter-options:
     get:
       operationId: getReportFilterOptions
@@ -9376,6 +9427,7 @@ paths:
                 fse-plus,
               ]
         - $ref: "#/components/parameters/ReportAreaOperativaId"
+        - $ref: "#/components/parameters/ReportCentroId"
       responses:
         "200":
           description: Opzioni filtrate per scope, aree, moduli e permessi del chiamante
@@ -11957,6 +12009,21 @@ components:
         provider: { type: string, enum: [openstreetmap-directions] }
         url: { type: string, format: uri }
 
+    PreparedReportingExport:
+      type: object
+      required:
+        [datasetId, language, definitionRevision, report, options, detail]
+      properties:
+        datasetId: { type: string, format: uuid }
+        language: { type: string }
+        definitionRevision: { type: string }
+        report: { $ref: "#/components/schemas/ReportingDashboard" }
+        options: { $ref: "#/components/schemas/ReportFilterOptions" }
+        detail:
+          oneOf:
+            - $ref: "#/components/schemas/ReportDrilldown"
+            - type: "null"
+
     ReportingDashboard:
       type: object
       required:
@@ -12008,6 +12075,10 @@ components:
           items: { $ref: "#/components/schemas/ReportText" }
         generatedAt: { type: string, format: date-time }
         timezone: { type: string, enum: [Europe/Rome] }
+        definitionRevision: { type: string }
+        excludedSources:
+          type: array
+          items: { $ref: "#/components/schemas/ReportText" }
 
     ReportAppliedFilters:
       type: object
@@ -12065,6 +12136,9 @@ components:
           }
         availability: { type: string, enum: [ok, derivable, missing] }
         drilldownMetric: { type: [string, "null"] }
+        numerator: { type: string }
+        denominator: { type: string }
+        presentationDecimals: { type: integer }
 
     ReportSeries:
       type: object
@@ -12080,6 +12154,8 @@ components:
               label: { type: string }
               value: { type: number }
               secondaryValue: { type: [number, "null"] }
+              exactValue: { type: string }
+              exactSecondaryValue: { type: [string, "null"] }
 
     ReportTable:
       type: object

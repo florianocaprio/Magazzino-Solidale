@@ -1,8 +1,21 @@
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { ReportDrilldown, ReportingDashboard, ReportText } from "@workspace/api-client-react";
+import type {
+  ReportDrilldown,
+  ReportingDashboard,
+  ReportText,
+} from "@workspace/api-client-react";
 import { todayEuropeRome } from "@/lib/europe-rome";
+import type { ReportingDocumentInput } from "./reporting-document";
+
+/** Load the complete reporting renderer only when a document is requested. */
+export async function buildReportingPdf(
+  input: ReportingDocumentInput,
+): Promise<Blob> {
+  const renderer = await import("./reporting-document");
+  return renderer.buildReportingPdf(input);
+}
 
 export type ExportColumn<T> = {
   header: string;
@@ -17,11 +30,29 @@ function cellValue<T>(col: ExportColumn<T>, row: T): string | number {
 
 /** Neutralizza formule in valori testuali controllati dall'utente senza alterare i numeri reali. */
 export function sanitizeSpreadsheetCell(value: unknown): unknown {
-  return typeof value === "string" && /^[=+\-@]/.test(value) ? `'${value}` : value;
+  return typeof value === "string" && /^[=+\-@]/.test(value)
+    ? `'${value}`
+    : value;
 }
 
 function worksheetFromRows(rows: unknown[][]): XLSX.WorkSheet {
-  return XLSX.utils.aoa_to_sheet(rows.map((row) => row.map(sanitizeSpreadsheetCell)));
+  return XLSX.utils.aoa_to_sheet(
+    rows.map((row) => row.map(sanitizeSpreadsheetCell)),
+  );
+}
+
+/** Exact decimals stay typed text (including negative values), never formulas.
+ * Do not pass arbitrary strings through a Number conversion. */
+function reportingWorksheet(rows: unknown[][]): XLSX.WorkSheet {
+  return XLSX.utils.aoa_to_sheet(
+    rows.map((row) =>
+      row.map((value) =>
+        typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value)
+          ? { t: "s", v: value }
+          : sanitizeSpreadsheetCell(value),
+      ),
+    ),
+  );
 }
 
 function timestamp(): string {
@@ -70,37 +101,67 @@ async function drawImageFit(
   return drawH;
 }
 
-async function drawBrandingHeader(doc: jsPDF, branding: PdfExportBranding | null | undefined, marginX: number): Promise<number> {
+async function drawBrandingHeader(
+  doc: jsPDF,
+  branding: PdfExportBranding | null | undefined,
+  marginX: number,
+): Promise<number> {
   if (!branding) return 32;
   const pageW = doc.internal.pageSize.getWidth();
   const textWidth = pageW - marginX * 2 - 110;
 
   if (branding.logoDataUrl) {
-    await drawImageFit(doc, branding.logoDataUrl, pageW - marginX - 90, 24, 90, 38);
+    await drawImageFit(
+      doc,
+      branding.logoDataUrl,
+      pageW - marginX - 90,
+      24,
+      90,
+      38,
+    );
   }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(20);
-  doc.text(doc.splitTextToSize(branding.nomeDocumento, textWidth)[0] ?? branding.nomeDocumento, marginX, 34);
+  doc.text(
+    doc.splitTextToSize(branding.nomeDocumento, textWidth)[0] ??
+      branding.nomeDocumento,
+    marginX,
+    34,
+  );
 
   let y = 47;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(110);
   if (branding.sottotitoloDocumento) {
-    doc.text(doc.splitTextToSize(branding.sottotitoloDocumento, textWidth)[0] ?? branding.sottotitoloDocumento, marginX, y);
+    doc.text(
+      doc.splitTextToSize(branding.sottotitoloDocumento, textWidth)[0] ??
+        branding.sottotitoloDocumento,
+      marginX,
+      y,
+    );
     y += 11;
   }
   if (branding.contattiDocumento) {
-    doc.text(doc.splitTextToSize(branding.contattiDocumento, textWidth)[0] ?? branding.contattiDocumento, marginX, y);
+    doc.text(
+      doc.splitTextToSize(branding.contattiDocumento, textWidth)[0] ??
+        branding.contattiDocumento,
+      marginX,
+      y,
+    );
     y += 11;
   }
 
   return Math.max(y + 6, 58);
 }
 
-function drawBrandingFooters(doc: jsPDF, branding: PdfExportBranding | null | undefined, marginX: number): void {
+function drawBrandingFooters(
+  doc: jsPDF,
+  branding: PdfExportBranding | null | undefined,
+  marginX: number,
+): void {
   if (!branding?.footerDocumenti) return;
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
@@ -113,7 +174,10 @@ function drawBrandingFooters(doc: jsPDF, branding: PdfExportBranding | null | un
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(110);
-    const lines = doc.splitTextToSize(branding.footerDocumenti, pageW - marginX * 2) as string[];
+    const lines = doc.splitTextToSize(
+      branding.footerDocumenti,
+      pageW - marginX * 2,
+    ) as string[];
     doc.text(lines.slice(0, 2), marginX, pageH - 18);
   }
 }
@@ -159,7 +223,17 @@ export async function exportToPdf<T>(opts: {
     locale: string;
   };
 }): Promise<void> {
-  const { filename, title, subtitle, rows, columns, orientation = "portrait", generatedBy, branding, metadataLabels } = opts;
+  const {
+    filename,
+    title,
+    subtitle,
+    rows,
+    columns,
+    orientation = "portrait",
+    generatedBy,
+    branding,
+    metadataLabels,
+  } = opts;
   const doc = new jsPDF({ orientation, unit: "pt", format: "a4" });
   const marginX = 40;
   const headerBottomY = await drawBrandingHeader(doc, branding, marginX);
@@ -174,7 +248,8 @@ export async function exportToPdf<T>(opts: {
   const meta = subtitle ? `${subtitle}  •  ` : "";
   const generatedAtLabel = metadataLabels?.generatedAt ?? "Generato il";
   const rowsLabel = metadataLabels?.rows ?? "righe";
-  const generatedByLabel = metadataLabels?.reportGeneratedBy ?? "Report generato da";
+  const generatedByLabel =
+    metadataLabels?.reportGeneratedBy ?? "Report generato da";
   const by = generatedBy ? `  •  ${generatedByLabel}: ${generatedBy}` : "";
   const metaY = titleY + 16;
   doc.text(
@@ -190,7 +265,11 @@ export async function exportToPdf<T>(opts: {
     styles: { fontSize: 8, cellPadding: 4 },
     headStyles: { fillColor: [51, 65, 85], textColor: 255 },
     alternateRowStyles: { fillColor: [241, 245, 249] },
-    margin: { left: marginX, right: marginX, bottom: branding?.footerDocumenti ? 42 : 20 },
+    margin: {
+      left: marginX,
+      right: marginX,
+      bottom: branding?.footerDocumenti ? 42 : 20,
+    },
   });
 
   drawBrandingFooters(doc, branding, marginX);
@@ -206,6 +285,7 @@ export function buildReportingWorkbook(
   labels: ReportingExportLabels,
   scopeNames: ReportingScopeNames = {},
   fseControl?: ReportDrilldown | null,
+  datasetId?: string,
 ): XLSX.WorkBook {
   const scopeValue = (
     id: number | null | undefined,
@@ -217,37 +297,90 @@ export function buildReportingWorkbook(
     [labels.title],
     [labels.metadata.from, report.filters.da],
     [labels.metadata.to, report.filters.a],
-    [labels.metadata.areaOperativa, scopeValue(report.filters.areaOperativaId, scopeNames.areaOperativa, labels.metadata.allAreeOperative)],
-    [labels.metadata.centre, scopeValue(report.filters.centroAscoltoId, scopeNames.centre, labels.metadata.allCentres)],
-    [labels.metadata.warehouse, scopeValue(report.filters.magazzinoId, scopeNames.warehouse, labels.metadata.allWarehouses)],
-    [labels.metadata.mensa, scopeValue(report.filters.mensaId, scopeNames.mensa, labels.metadata.allMense)],
-    [labels.metadata.zone, scopeValue(report.filters.zonaUdsId, scopeNames.zone, labels.metadata.allZones)],
+    [
+      labels.metadata.areaOperativa,
+      scopeValue(
+        report.filters.areaOperativaId,
+        scopeNames.areaOperativa,
+        labels.metadata.allAreeOperative,
+      ),
+    ],
+    [
+      labels.metadata.centre,
+      scopeValue(
+        report.filters.centroAscoltoId,
+        scopeNames.centre,
+        labels.metadata.allCentres,
+      ),
+    ],
+    [
+      labels.metadata.warehouse,
+      scopeValue(
+        report.filters.magazzinoId,
+        scopeNames.warehouse,
+        labels.metadata.allWarehouses,
+      ),
+    ],
+    [
+      labels.metadata.mensa,
+      scopeValue(
+        report.filters.mensaId,
+        scopeNames.mensa,
+        labels.metadata.allMense,
+      ),
+    ],
+    [
+      labels.metadata.zone,
+      scopeValue(
+        report.filters.zonaUdsId,
+        scopeNames.zone,
+        labels.metadata.allZones,
+      ),
+    ],
     [labels.metadata.generatedAt, report.generatedAt],
     [labels.metadata.application, "Magazzino Solidale"],
     ["Europe/Rome"],
     [],
-    [labels.metadata.indicator, labels.metadata.value, labels.metadata.unit, labels.metadata.availability],
+    [
+      labels.metadata.indicator,
+      labels.metadata.value,
+      labels.metadata.unit,
+      labels.metadata.availability,
+    ],
     ...report.kpi.map((item) => [
       labels.kpi(item.key),
       item.exactValue ?? labels.unavailable,
       labels.unit(item.unit),
-      labels.availability(item.availability),
+      `${labels.availability(item.availability)}${item.denominator == null ? "" : ` (${item.numerator}/${item.denominator}; ${item.presentationDecimals} dec.)`}`,
     ]),
     [],
     [labels.metadata.definitions],
     ...report.definitions.map((definition) => [labels.text(definition)]),
   ];
-  const summarySheet = worksheetFromRows(summary);
+  summary.push(
+    ["Dataset", datasetId ?? ""],
+    [
+      "Definition revision",
+      report.definitionRevision ?? report.reportingModelVersion,
+    ],
+  );
+  for (const item of report.excludedSources ?? [])
+    summary.push([labels.text(item)]);
+  const summarySheet = reportingWorksheet(summary);
   summarySheet["!cols"] = [{ wch: 42 }, { wch: 24 }, { wch: 18 }, { wch: 18 }];
   XLSX.utils.book_append_sheet(workbook, summarySheet, "00_Riepilogo");
 
   for (const table of report.tables) {
-    const sheet = worksheetFromRows([
+    const sheet = reportingWorksheet([
       table.columns.map(labels.column),
-      ...table.rows.map((row) => table.columns.map((column) => {
-        const value = row[column];
-        return typeof value === "string" ? labels.text(value) : (value ?? "");
-      })),
+      ...table.rows.map((row) =>
+        table.columns.map((column) => {
+          const value = row[column];
+          return typeof value === "string"
+            ? labels.text(value)
+            : (value ?? labels.unavailable);
+        }),
+      ),
     ]);
     sheet["!cols"] = table.columns.map((column) => ({
       wch: Math.min(
@@ -266,8 +399,30 @@ export function buildReportingWorkbook(
     );
   }
 
+  for (const [index, series] of report.series.entries()) {
+    const sheet = reportingWorksheet([
+      [labels.table(series.key)],
+      [
+        labels.column("data"),
+        labels.metadata.value,
+        labels.column("valoreSecondario"),
+      ],
+      ...series.points.map((point) => [
+        point.label,
+        point.exactValue ?? String(point.value),
+        point.exactSecondaryValue ?? point.secondaryValue ?? labels.unavailable,
+      ]),
+    ]);
+    XLSX.utils.book_append_sheet(workbook, sheet, `Serie_${index + 1}`);
+  }
+
   const qualityRows = [
-    [labels.metadata.indicator, labels.metadata.value, labels.metadata.availability, labels.metadata.notes],
+    [
+      labels.metadata.indicator,
+      labels.metadata.value,
+      labels.metadata.availability,
+      labels.metadata.notes,
+    ],
     ...report.quality.map((item) => [
       labels.quality(item.key),
       item.count ?? labels.unavailable,
@@ -277,20 +432,28 @@ export function buildReportingWorkbook(
   ];
   XLSX.utils.book_append_sheet(
     workbook,
-    worksheetFromRows(qualityRows),
+    reportingWorksheet(qualityRows),
     report.section === "fse-plus" ? "08_Qualita_Dati" : "Qualita_Dati",
   );
 
   if (report.section === "fse-plus") {
     if (fseControl) {
-      const controlSheet = worksheetFromRows([
+      const controlSheet = reportingWorksheet([
         fseControl.columns.map(labels.column),
-        ...fseControl.rows.map((row) => fseControl.columns.map((column) => {
-          const value = row[column];
-          return typeof value === "string" ? labels.text(value) : (value ?? "");
-        })),
+        ...fseControl.rows.map((row) =>
+          fseControl.columns.map((column) => {
+            const value = row[column];
+            return typeof value === "string"
+              ? labels.text(value)
+              : (value ?? "");
+          }),
+        ),
       ]);
-      XLSX.utils.book_append_sheet(workbook, controlSheet, "09_Dettaglio_Controllo");
+      XLSX.utils.book_append_sheet(
+        workbook,
+        controlSheet,
+        "09_Dettaglio_Controllo",
+      );
     }
     const existing = new Set(workbook.SheetNames);
     const required = [
@@ -308,7 +471,12 @@ export function buildReportingWorkbook(
       if (existing.has(name)) continue;
       const sheet = worksheetFromRows([
         [labels.column("stato"), labels.unavailable],
-        [labels.column("nota"), labels.text("Il modello operativo non rende disponibile questo dettaglio senza inferenze.")],
+        [
+          labels.column("nota"),
+          labels.text(
+            "Il modello operativo non rende disponibile questo dettaglio senza inferenze.",
+          ),
+        ],
       ]);
       XLSX.utils.book_append_sheet(workbook, sheet, name);
     }
@@ -323,8 +491,12 @@ export function exportReportingWorkbook(
   labels: Parameters<typeof buildReportingWorkbook>[1],
   scopeNames?: ReportingScopeNames,
   fseControl?: ReportDrilldown | null,
+  datasetId?: string,
 ): void {
-  XLSX.writeFile(buildReportingWorkbook(report, labels, scopeNames, fseControl), `${filename}_${timestamp()}.xlsx`);
+  XLSX.writeFile(
+    buildReportingWorkbook(report, labels, scopeNames, fseControl, datasetId),
+    `${filename}_${timestamp()}.xlsx`,
+  );
 }
 
 export async function exportReportingPdf(opts: {
@@ -337,41 +509,21 @@ export async function exportReportingPdf(opts: {
   scopeNames?: ReportingScopeNames;
   generatedBy?: string;
   branding?: PdfExportBranding | null;
+  datasetId: string;
+  detail?: ReportDrilldown | null;
 }): Promise<void> {
-  const rows = opts.report.kpi.map((item) => ({
-    indicatore: opts.kpiLabel(item.key),
-    valore: item.exactValue ?? opts.unavailable,
-    unita: item.unit,
-    disponibilita: item.availability,
-  }));
-  const scope = [
-    opts.report.filters.areaOperativaId != null ? `${opts.labels.metadata.areaOperativa}: ${opts.scopeNames?.areaOperativa ?? opts.report.filters.areaOperativaId}` : null,
-    opts.report.filters.centroAscoltoId != null ? `${opts.labels.metadata.centre}: ${opts.scopeNames?.centre ?? opts.report.filters.centroAscoltoId}` : null,
-    opts.report.filters.magazzinoId != null ? `${opts.labels.metadata.warehouse}: ${opts.scopeNames?.warehouse ?? opts.report.filters.magazzinoId}` : null,
-    opts.report.filters.mensaId != null ? `${opts.labels.metadata.mensa}: ${opts.scopeNames?.mensa ?? opts.report.filters.mensaId}` : null,
-    opts.report.filters.zonaUdsId != null ? `${opts.labels.metadata.zone}: ${opts.scopeNames?.zone ?? opts.report.filters.zonaUdsId}` : null,
-  ].filter(Boolean).join(" · ");
-  await exportToPdf({
-    filename: opts.filename,
-    title: opts.title,
-    subtitle: `${opts.report.filters.da} – ${opts.report.filters.a} · Europe/Rome${scope ? ` · ${scope}` : ""}`,
-    rows,
-    columns: [
-      { header: opts.labels.metadata.indicator, accessor: (row) => row.indicatore },
-      { header: opts.labels.metadata.value, accessor: (row) => row.valore },
-      { header: opts.labels.metadata.unit, accessor: (row) => opts.labels.unit(row.unita) },
-      { header: opts.labels.metadata.availability, accessor: (row) => opts.labels.availability(row.disponibilita) },
-    ],
-    orientation: "landscape",
-    generatedBy: opts.generatedBy,
-    branding: opts.branding,
-    metadataLabels: {
-      generatedAt: opts.labels.metadata.generatedAt,
-      rows: opts.labels.metadata.rows,
-      reportGeneratedBy: opts.labels.metadata.reportGeneratedBy,
-      locale: opts.labels.locale,
-    },
-  });
+  const blob = await buildReportingPdf(opts);
+  downloadReportingBlob(blob, `${opts.filename}.pdf`);
+}
+
+export function downloadReportingBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  // The browser has accepted the download; keep the URL alive through that turn.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 export type ReportingScopeNames = {
@@ -419,7 +571,10 @@ export type ReportingExportLabels = {
   };
 };
 
-export type SchedaLabelValue = { label: string; value: string | number | null | undefined };
+export type SchedaLabelValue = {
+  label: string;
+  value: string | number | null | undefined;
+};
 
 export type SchedaSection = {
   title: string;
@@ -442,7 +597,14 @@ export function exportSchedaXlsx(opts: {
   anagrafica: SchedaLabelValue[];
   sections: SchedaSection[];
 }): void {
-  const { filename, anagraficaSheetName, campoHeader, valoreHeader, anagrafica, sections } = opts;
+  const {
+    filename,
+    anagraficaSheetName,
+    campoHeader,
+    valoreHeader,
+    anagrafica,
+    sections,
+  } = opts;
   const wb = XLSX.utils.book_new();
 
   const anagAoa: (string | number)[][] = [
@@ -461,7 +623,10 @@ export function exportSchedaXlsx(opts: {
     ];
     const ws = worksheetFromRows(aoa);
     ws["!cols"] = sec.headers.map((h, i) => {
-      const maxLen = Math.max(h.length, ...sec.rows.map((r) => toCell(r[i]).length));
+      const maxLen = Math.max(
+        h.length,
+        ...sec.rows.map((r) => toCell(r[i]).length),
+      );
       return { wch: Math.min(Math.max(maxLen + 2, 10), 50) };
     });
     let name = sec.title.slice(0, 31);
@@ -489,7 +654,17 @@ export async function exportSchedaPdf(opts: {
   sections: SchedaSection[];
   branding?: PdfExportBranding | null;
 }): Promise<void> {
-  const { filename, title, subtitle, anagraficaTitle, campoHeader, valoreHeader, anagrafica, sections, branding } = opts;
+  const {
+    filename,
+    title,
+    subtitle,
+    anagraficaTitle,
+    campoHeader,
+    valoreHeader,
+    anagrafica,
+    sections,
+    branding,
+  } = opts;
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const marginX = 40;
   const headerBottomY = await drawBrandingHeader(doc, branding, marginX);
@@ -503,7 +678,11 @@ export async function exportSchedaPdf(opts: {
   doc.setTextColor(120);
   const meta = subtitle ? `${subtitle}  •  ` : "";
   const metaY = titleY + 16;
-  doc.text(`${meta}Generato il ${new Date().toLocaleString("it-IT")}`, marginX, metaY);
+  doc.text(
+    `${meta}Generato il ${new Date().toLocaleString("it-IT")}`,
+    marginX,
+    metaY,
+  );
 
   doc.setFontSize(12);
   doc.setTextColor(20);
@@ -517,11 +696,17 @@ export async function exportSchedaPdf(opts: {
     headStyles: { fillColor: [51, 65, 85], textColor: 255 },
     alternateRowStyles: { fillColor: [241, 245, 249] },
     columnStyles: { 0: { cellWidth: 160, fontStyle: "bold" } },
-    margin: { left: marginX, right: marginX, bottom: branding?.footerDocumenti ? 42 : 20 },
+    margin: {
+      left: marginX,
+      right: marginX,
+      bottom: branding?.footerDocumenti ? 42 : 20,
+    },
   });
 
   for (const sec of sections) {
-    let y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 24;
+    let y =
+      (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+        .finalY + 24;
     if (y > doc.internal.pageSize.getHeight() - 80) {
       doc.addPage();
       y = 48;
@@ -538,7 +723,11 @@ export async function exportSchedaPdf(opts: {
         startY: y + 22,
         head: [[""]],
         body: [],
-        margin: { left: marginX, right: marginX, bottom: branding?.footerDocumenti ? 42 : 20 },
+        margin: {
+          left: marginX,
+          right: marginX,
+          bottom: branding?.footerDocumenti ? 42 : 20,
+        },
         styles: { fontSize: 1, cellPadding: 0 },
         tableLineWidth: 0,
       });
@@ -552,7 +741,11 @@ export async function exportSchedaPdf(opts: {
       styles: { fontSize: 8, cellPadding: 4 },
       headStyles: { fillColor: [51, 65, 85], textColor: 255 },
       alternateRowStyles: { fillColor: [241, 245, 249] },
-      margin: { left: marginX, right: marginX, bottom: branding?.footerDocumenti ? 42 : 20 },
+      margin: {
+        left: marginX,
+        right: marginX,
+        bottom: branding?.footerDocumenti ? 42 : 20,
+      },
     });
   }
 

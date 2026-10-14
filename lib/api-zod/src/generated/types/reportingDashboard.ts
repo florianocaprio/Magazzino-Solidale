@@ -26,4 +26,6 @@ export interface ReportingDashboard {
   definitions: ReportText[];
   generatedAt: Date;
   timezone: ReportingDashboardTimezone;
+  definitionRevision?: string;
+  excludedSources?: ReportText[];
 }

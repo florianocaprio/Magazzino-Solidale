@@ -86,6 +86,7 @@ const reportAppAs = (centro: number | null) =>
   makeScopedApp(reportRouter, {
     id: operatoreId,
     centroAscoltoId: centro,
+    isAdmin: true, // D01: global reporting is explicit; writer actors unchanged.
     aree: ["analisi", "sociale", "magazzino"],
     permessi: ["magazzino.fse.view"],
   });

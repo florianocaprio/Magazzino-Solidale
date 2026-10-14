@@ -18,6 +18,7 @@ import {
   callerZonaUdsId,
 } from "../centroScope";
 import type { ReportFilters } from "./types";
+import { currentMensaIds, MensaScopeError } from "../mensaScope";
 
 export class ReportingError extends Error {
   constructor(
@@ -26,6 +27,26 @@ export class ReportingError extends Error {
   ) {
     super(message);
   }
+}
+
+/** Read policy only: never derive global report access from a missing scope. */
+export function assertReportTerritory(req: Request): void {
+  const user = req.user;
+  if (!user) throw new ReportingError(401, "Non autenticato");
+  if (!user.isAdmin && user.areaOperativaId == null)
+    throw new ReportingError(
+      403,
+      "Perimetro territoriale Reporting non assegnato",
+    );
+  if (user.areaOperativaId != null && user.areaOperativaAttiva === false)
+    throw new ReportingError(403, "Area Operativa non attiva");
+  if (
+    user.centroAscoltoId != null &&
+    (user.centroAscoltoAttivo === false ||
+      (user.centroAscoltoAreaOperativaId != null &&
+        user.centroAscoltoAreaOperativaId !== user.areaOperativaId))
+  )
+    throw new ReportingError(403, "Centro fuori dal perimetro corrente");
 }
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -80,6 +101,7 @@ function scopedId(
 }
 
 export function parseReportFilters(req: Request): ReportFilters {
+  assertReportTerritory(req);
   const today = dataCivileEuropeRome();
   const currentYear = Number(today.slice(0, 4));
   const annoRaw = optionalPositiveInt(req.query.anno, "anno");
@@ -88,15 +110,21 @@ export function parseReportFilters(req: Request): ReportFilters {
     throw new ReportingError(400, "anno non valido");
   }
 
-  const da = req.query.da == null || req.query.da === ""
-    ? `${anno}-01-01`
-    : String(req.query.da);
-  const a = req.query.a == null || req.query.a === ""
-    ? (anno === currentYear ? today : `${anno}-12-31`)
-    : String(req.query.a);
-  if (!isCivilDate(da)) throw new ReportingError(400, "da non è una data valida");
+  const da =
+    req.query.da == null || req.query.da === ""
+      ? `${anno}-01-01`
+      : String(req.query.da);
+  const a =
+    req.query.a == null || req.query.a === ""
+      ? anno === currentYear
+        ? today
+        : `${anno}-12-31`
+      : String(req.query.a);
+  if (!isCivilDate(da))
+    throw new ReportingError(400, "da non è una data valida");
   if (!isCivilDate(a)) throw new ReportingError(400, "a non è una data valida");
-  if (da > a) throw new ReportingError(400, "da non può essere successiva ad a");
+  if (da > a)
+    throw new ReportingError(400, "da non può essere successiva ad a");
 
   const areaOperativa = scopedId(
     optionalPositiveInt(req.query.areaOperativaId, "areaOperativaId"),
@@ -132,13 +160,18 @@ export function parseReportFilters(req: Request): ReportFilters {
     callerAreas: req.user?.aree ?? [],
     callerPermissions: req.user?.permessi ?? [],
     callerIsAdmin: req.user?.isAdmin ?? false,
+    callerUserId: req.user?.id,
   };
 }
 
-export function parsePagination(req: Request): { page: number; pageSize: number } {
+export function parsePagination(req: Request): {
+  page: number;
+  pageSize: number;
+} {
   const page = optionalPositiveInt(req.query.page, "page") ?? 1;
   const pageSize = optionalPositiveInt(req.query.pageSize, "pageSize") ?? 25;
-  if (pageSize > 100) throw new ReportingError(400, "pageSize non può superare 100");
+  if (pageSize > 100)
+    throw new ReportingError(400, "pageSize non può superare 100");
   return { page, pageSize };
 }
 
@@ -146,6 +179,23 @@ export async function assertReportFilterScope(
   req: Request,
   filters: ReportFilters,
 ): Promise<void> {
+  assertReportTerritory(req);
+  filters.callerMensaIds = req.user?.isAdmin ? null : [];
+  if (
+    !req.user?.isAdmin &&
+    req.user?.aree.includes("mensa") &&
+    req.user.permessi.includes("mensa.reports.view")
+  ) {
+    try {
+      const current = await db.transaction((tx) =>
+        currentMensaIds(tx, req.user!.id),
+      );
+      filters.callerMensaIds = current.ids;
+    } catch (error) {
+      if (!(error instanceof MensaScopeError)) throw error;
+      throw new ReportingError(403, error.message);
+    }
+  }
   const callerArea = callerAreaOperativaId(req);
   const callerCentre = callerCentroId(req);
   const callerZone = callerZonaUdsId(req);
@@ -171,6 +221,11 @@ export async function assertReportFilterScope(
     throw forbidden();
   }
   if (filters.mensaId != null) {
+    if (
+      filters.callerMensaIds !== null &&
+      !filters.callerMensaIds?.includes(filters.mensaId)
+    )
+      throw forbidden();
     const [canteen] = await db
       .select({
         id: menseTable.id,

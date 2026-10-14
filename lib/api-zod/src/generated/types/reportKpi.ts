@@ -21,4 +21,7 @@ export interface ReportKpi {
   availability: ReportKpiAvailability;
   /** @nullable */
   drilldownMetric: string | null;
+  numerator?: string;
+  denominator?: string;
+  presentationDecimals?: number;
 }

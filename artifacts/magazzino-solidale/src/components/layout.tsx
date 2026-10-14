@@ -734,7 +734,7 @@ export function isNavItemEnabledByAccess(
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, hasArea, hasPermission, logout } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const canAskMaps = canAccessMapsApplication(user, hasArea, hasPermission);
   const { data: mapsCapabilities } = useGetMapsCapabilities({
@@ -781,7 +781,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex h-screen w-full bg-background overflow-hidden">
-        <Sidebar className="border-r border-border">
+        <Sidebar
+          side={
+            location.startsWith("/report") && i18n.dir() === "rtl"
+              ? "right"
+              : "left"
+          }
+          className="border-r border-border"
+        >
           <div className="px-4 py-3 flex items-center border-b border-border">
             <img
               src="/logo-aim.png"

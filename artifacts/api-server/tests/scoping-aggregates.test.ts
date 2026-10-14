@@ -31,7 +31,9 @@ let magNull: number;
 let magB: number;
 let prod: number;
 
-const appAs = (router: Parameters<typeof makeScopedApp>[0], centro: number | null) => makeScopedApp(router, { id: operatoreId, centroAscoltoId: centro });
+// These legacy fixtures isolate Centre scoping. D01 requires explicit global
+// authority, including when testing a territorially constrained administrator.
+const appAs = (router: Parameters<typeof makeScopedApp>[0], centro: number | null) => makeScopedApp(router, { id: operatoreId, centroAscoltoId: centro, ...(router === reportRouter ? { isAdmin: true } : {}) });
 
 beforeAll(async () => {
   bootScope = newScope();

@@ -54,6 +54,8 @@ const appAs = (centro: number | null, areaOperativa: number | null) =>
     id: operatoreId,
     centroAscoltoId: centro,
     areaOperativaId: areaOperativa,
+    // The historical unscoped fixture represents an explicit global admin.
+    isAdmin: centro === null && areaOperativa === null,
   });
 
 beforeAll(async () => {

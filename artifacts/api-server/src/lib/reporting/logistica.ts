@@ -2,8 +2,12 @@ import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
 import { dashboard, kpi, quality, text } from "./shared";
-import { isModuloAttivo } from "../featureFlags";
+import { isReportModuleActive as isModuloAttivo } from "./queryContext";
 import { signedPhysicalMovementSql } from "../movementPhysicalEffect";
+import { appendReportPanels, requestReportPanel } from "./requests";
+import { volunteerReportPanel } from "./volunteers";
+import { availableStockPanel } from "./stock";
+import { emptyReportPanel } from "./requests";
 
 function warehouseConditions(
   filters: ReportFilters,
@@ -35,6 +39,19 @@ function movementConditions(filters: ReportFilters): SQL[] {
     sql`mv.data_movimento BETWEEN ${filters.da} AND ${filters.a}`,
     ...warehouseConditions(filters),
   ];
+}
+
+export function transferStateCondition(metric: string): SQL {
+  switch (metric) {
+    case "trasferimentiRichiesti":
+      return sql`tr.stato = 'richiesto'`;
+    case "trasferimentiInTransito":
+      return sql`tr.stato IN ('avviato', 'in_transito', 'rientro_atteso')`;
+    case "trasferimentiCompletati":
+      return sql`tr.stato IN ('completato', 'confermato')`;
+    default:
+      return sql`true`;
+  }
 }
 
 function transferCondition(filters: ReportFilters): SQL {
@@ -166,9 +183,9 @@ export async function buildLogisticaReport(filters: ReportFilters) {
       WHERE ${movementWhere}
     `),
     rows<Record<string, unknown>>(sql`
-      SELECT COUNT(*) FILTER (WHERE tr.stato = 'richiesto') AS richiesti,
-             COUNT(*) FILTER (WHERE tr.stato IN ('avviato', 'in_transito', 'rientro_atteso')) AS in_transito,
-             COUNT(*) FILTER (WHERE tr.stato IN ('completato', 'confermato')) AS completati
+      SELECT COUNT(*) FILTER (WHERE ${transferStateCondition("trasferimentiRichiesti")}) AS richiesti,
+             COUNT(*) FILTER (WHERE ${transferStateCondition("trasferimentiInTransito")}) AS in_transito,
+             COUNT(*) FILTER (WHERE ${transferStateCondition("trasferimentiCompletati")}) AS completati
       FROM trasferimenti tr
       JOIN magazzini mo ON mo.id = tr.magazzino_origine_id
       JOIN magazzini md ON md.id = tr.magazzino_destino_id
@@ -330,19 +347,19 @@ export async function buildLogisticaReport(filters: ReportFilters) {
         "trasferimentiRichiesti",
         number(tr.richiesti),
         "count",
-        "trasferimenti",
+        "trasferimentiRichiesti",
       ),
       kpi(
         "trasferimentiInTransito",
         number(tr.in_transito),
         "count",
-        "trasferimenti",
+        "trasferimentiInTransito",
       ),
       kpi(
         "trasferimentiCompletati",
         number(tr.completati),
         "count",
-        "trasferimenti",
+        "trasferimentiCompletati",
       ),
     );
   }
@@ -353,95 +370,107 @@ export async function buildLogisticaReport(filters: ReportFilters) {
   if (mezziEnabled)
     reportKpi.push(kpi("mezziUtilizzati", number(means[0]?.mezzi)));
 
-  return dashboard({
-    section: "magazzino-logistica",
-    filters,
-    kpi: reportKpi,
-    series:
-      magazzinoEnabled || lottiEnabled
+  const [requests, volunteers, available] = await Promise.all([
+    requestReportPanel(filters),
+    volunteerReportPanel(filters),
+    magazzinoEnabled || lottiEnabled
+      ? availableStockPanel(filters)
+      : emptyReportPanel(),
+  ]);
+  return appendReportPanels(
+    dashboard({
+      section: "magazzino-logistica",
+      filters,
+      kpi: reportKpi,
+      series:
+        magazzinoEnabled || lottiEnabled
+          ? [
+              {
+                key: "movimentiPerMese",
+                points: monthSeries(monthly, "carichi", "scarichi"),
+              },
+            ]
+          : [],
+      tables: [
+        ...(magazzinoEnabled || lottiEnabled
+          ? [
+              {
+                key: "giacenze",
+                columns: [
+                  "magazzinoId",
+                  "magazzinoNome",
+                  "unitaMisura",
+                  "prodotti",
+                  "quantita",
+                  "scaduti",
+                ],
+                rows: warehouses.map((r) => ({
+                  magazzinoId: number(r.magazzino_id),
+                  magazzinoNome: String(r.magazzino_nome),
+                  unitaMisura:
+                    r.unita_misura == null ? null : String(r.unita_misura),
+                  prodotti: number(r.prodotti),
+                  quantita: number(r.quantita),
+                  scaduti: number(r.scaduti),
+                })),
+              },
+              {
+                key: "causali",
+                columns: [
+                  "tipo",
+                  "causale",
+                  "unitaMisura",
+                  "movimenti",
+                  "quantita",
+                ],
+                rows: movementTypes.map((r) => ({
+                  tipo: String(r.tipo),
+                  causale: String(r.causale),
+                  unitaMisura: String(r.unita_misura),
+                  movimenti: number(r.movimenti),
+                  quantita: number(r.quantita),
+                })),
+              },
+            ]
+          : []),
+        ...(trasferimentiEnabled
+          ? [
+              {
+                key: "trasferimenti",
+                columns: ["stato", "totale"],
+                rows: transferStates.map((r) => ({
+                  stato: String(r.stato),
+                  totale: number(r.totale),
+                })),
+              },
+            ]
+          : []),
+      ],
+      quality: lottiEnabled
         ? [
-            {
-              key: "movimentiPerMese",
-              points: monthSeries(monthly, "carichi", "scarichi"),
-            },
+            quality(
+              "scadenzaMancante",
+              number(dq.scadenza_mancante),
+              number(dq.scadenza_mancante) ? "derivable" : "ok",
+            ),
+            quality(
+              "provenienzaMancante",
+              number(dq.provenienza_mancante),
+              number(dq.provenienza_mancante) ? "missing" : "ok",
+            ),
           ]
         : [],
-    tables: [
-      ...(magazzinoEnabled || lottiEnabled
-        ? [
-            {
-              key: "giacenze",
-              columns: [
-                "magazzinoId",
-                "magazzinoNome",
-                "unitaMisura",
-                "prodotti",
-                "quantita",
-                "scaduti",
-              ],
-              rows: warehouses.map((r) => ({
-                magazzinoId: number(r.magazzino_id),
-                magazzinoNome: String(r.magazzino_nome),
-                unitaMisura:
-                  r.unita_misura == null ? null : String(r.unita_misura),
-                prodotti: number(r.prodotti),
-                quantita: number(r.quantita),
-                scaduti: number(r.scaduti),
-              })),
-            },
-            {
-              key: "causali",
-              columns: [
-                "tipo",
-                "causale",
-                "unitaMisura",
-                "movimenti",
-                "quantita",
-              ],
-              rows: movementTypes.map((r) => ({
-                tipo: String(r.tipo),
-                causale: String(r.causale),
-                unitaMisura: String(r.unita_misura),
-                movimenti: number(r.movimenti),
-                quantita: number(r.quantita),
-              })),
-            },
-          ]
-        : []),
-      ...(trasferimentiEnabled
-        ? [
-            {
-              key: "trasferimenti",
-              columns: ["stato", "totale"],
-              rows: transferStates.map((r) => ({
-                stato: String(r.stato),
-                totale: number(r.totale),
-              })),
-            },
-          ]
-        : []),
-    ],
-    quality: lottiEnabled
-      ? [
-          quality(
-            "scadenzaMancante",
-            number(dq.scadenza_mancante),
-            number(dq.scadenza_mancante) ? "derivable" : "ok",
-          ),
-          quality(
-            "provenienzaMancante",
-            number(dq.provenienza_mancante),
-            number(dq.provenienza_mancante) ? "missing" : "ok",
-          ),
-        ]
-      : [],
-    definitions: [
-      text("logisticsStock"),
-      text("logisticsExpiryLedgerDate", { date: filters.a }),
-      text("logisticsMovements"),
-      text("logisticsUnits"),
-    ],
-  });
+      definitions: [
+        text("logisticsStock"),
+        text("logisticsExpiryLedgerDate", { date: filters.a }),
+        text("logisticsMovements"),
+        text("logisticsUnits"),
+      ],
+    }),
+    requests,
+    volunteers,
+    available,
+  );
 }
 
 export { warehouseConditions, movementConditions, transferCondition };

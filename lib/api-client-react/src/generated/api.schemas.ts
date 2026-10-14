@@ -1242,13 +1242,6 @@ export const ReportingDashboardSection = {
   "fse-plus": "fse-plus",
 } as const;
 
-export type ReportingDashboardTimezone =
-  (typeof ReportingDashboardTimezone)[keyof typeof ReportingDashboardTimezone];
-
-export const ReportingDashboardTimezone = {
-  "Europe/Rome": "Europe/Rome",
-} as const;
-
 export interface ReportAppliedFilters {
   da: string;
   a: string;
@@ -1307,6 +1300,9 @@ export interface ReportKpi {
   availability: ReportKpiAvailability;
   /** @nullable */
   drilldownMetric: string | null;
+  numerator?: string;
+  denominator?: string;
+  presentationDecimals?: number;
 }
 
 export type ReportSeriesPointsItem = {
@@ -1314,6 +1310,9 @@ export type ReportSeriesPointsItem = {
   value: number;
   /** @nullable */
   secondaryValue?: number | null;
+  exactValue?: string;
+  /** @nullable */
+  exactSecondaryValue?: string | null;
 };
 
 export interface ReportSeries {
@@ -1353,6 +1352,13 @@ export interface ReportQualityItem {
   note: ReportText | null;
 }
 
+export type ReportingDashboardTimezone =
+  (typeof ReportingDashboardTimezone)[keyof typeof ReportingDashboardTimezone];
+
+export const ReportingDashboardTimezone = {
+  "Europe/Rome": "Europe/Rome",
+} as const;
+
 export interface ReportingDashboard {
   reportingModelVersion: ReportingDashboardReportingModelVersion;
   section: ReportingDashboardSection;
@@ -1364,6 +1370,40 @@ export interface ReportingDashboard {
   definitions: ReportText[];
   generatedAt: string;
   timezone: ReportingDashboardTimezone;
+  definitionRevision?: string;
+  excludedSources?: ReportText[];
+}
+
+export type ReportFilterOptionsSection =
+  (typeof ReportFilterOptionsSection)[keyof typeof ReportFilterOptionsSection];
+
+export const ReportFilterOptionsSection = {
+  generale: "generale",
+  pacchi: "pacchi",
+  "centro-ascolto": "centro-ascolto",
+  emporio: "emporio",
+  mensa: "mensa",
+  uds: "uds",
+  "magazzino-logistica": "magazzino-logistica",
+  "fse-plus": "fse-plus",
+} as const;
+
+export interface ReportFilterOption {
+  id: number;
+  nome: string;
+  /** @nullable */
+  areaOperativaId: number | null;
+  /** @nullable */
+  centroAscoltoId?: number | null;
+}
+
+export interface ReportFilterOptions {
+  section: ReportFilterOptionsSection;
+  areeOperative: ReportFilterOption[];
+  centres: ReportFilterOption[];
+  warehouses: ReportFilterOption[];
+  mense: ReportFilterOption[];
+  zones: ReportFilterOption[];
 }
 
 export type ReportDrilldownReportingModelVersion =
@@ -1386,36 +1426,13 @@ export interface ReportDrilldown {
   rows: ReportDrilldownRowsItem[];
 }
 
-export interface ReportFilterOption {
-  id: number;
-  nome: string;
-  /** @nullable */
-  areaOperativaId: number | null;
-  /** @nullable */
-  centroAscoltoId?: number | null;
-}
-
-export type ReportFilterOptionsSection =
-  (typeof ReportFilterOptionsSection)[keyof typeof ReportFilterOptionsSection];
-
-export const ReportFilterOptionsSection = {
-  generale: "generale",
-  pacchi: "pacchi",
-  "centro-ascolto": "centro-ascolto",
-  emporio: "emporio",
-  mensa: "mensa",
-  uds: "uds",
-  "magazzino-logistica": "magazzino-logistica",
-  "fse-plus": "fse-plus",
-} as const;
-
-export interface ReportFilterOptions {
-  section: ReportFilterOptionsSection;
-  areeOperative: ReportFilterOption[];
-  centres: ReportFilterOption[];
-  warehouses: ReportFilterOption[];
-  mense: ReportFilterOption[];
-  zones: ReportFilterOption[];
+export interface PreparedReportingExport {
+  datasetId: string;
+  language: string;
+  definitionRevision: string;
+  report: ReportingDashboard;
+  options: ReportFilterOptions;
+  detail: ReportDrilldown | null;
 }
 
 export type ReportFsePlusProdottiItem = {
@@ -12204,12 +12221,83 @@ export const GetReportDrilldownSection = {
   "fse-plus": "fse-plus",
 } as const;
 
+export type PrepareReportExportParams = {
+  section: PrepareReportExportSection;
+  language?: PrepareReportExportLanguage;
+  detail?: PrepareReportExportDetail;
+  /**
+   * Data civile iniziale Europe/Rome (YYYY-MM-DD)
+   */
+  da?: ReportDaParameter;
+  /**
+   * Data civile finale Europe/Rome (YYYY-MM-DD)
+   */
+  a?: ReportAParameter;
+  /**
+   * @minimum 2000
+   * @maximum 2100
+   */
+  anno?: ReportAnnoParameter;
+  /**
+   * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
+   */
+  areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
+  magazzinoId?: ReportMagazzinoIdParameter;
+  mensaId?: ReportMensaIdParameter;
+  zonaUdsId?: ReportZonaUdsIdParameter;
+  operatoreId?: ReportOperatoreIdParameter;
+  tipoIntervento?: ReportTipoInterventoParameter;
+  tipoServizio?: ReportTipoServizioParameter;
+};
+
+export type PrepareReportExportSection =
+  (typeof PrepareReportExportSection)[keyof typeof PrepareReportExportSection];
+
+export const PrepareReportExportSection = {
+  generale: "generale",
+  pacchi: "pacchi",
+  "centro-ascolto": "centro-ascolto",
+  emporio: "emporio",
+  mensa: "mensa",
+  uds: "uds",
+  "magazzino-logistica": "magazzino-logistica",
+  "fse-plus": "fse-plus",
+} as const;
+
+export type PrepareReportExportLanguage =
+  (typeof PrepareReportExportLanguage)[keyof typeof PrepareReportExportLanguage];
+
+export const PrepareReportExportLanguage = {
+  it: "it",
+  en: "en",
+  es: "es",
+  fr: "fr",
+  de: "de",
+  ar: "ar",
+} as const;
+
+export type PrepareReportExportDetail =
+  (typeof PrepareReportExportDetail)[keyof typeof PrepareReportExportDetail];
+
+export const PrepareReportExportDetail = {
+  none: "none",
+  "fse-control": "fse-control",
+} as const;
+
 export type GetReportFilterOptionsParams = {
   section: GetReportFilterOptionsSection;
   /**
    * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
    */
   areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
 };
 
 export type GetReportFilterOptionsSection =

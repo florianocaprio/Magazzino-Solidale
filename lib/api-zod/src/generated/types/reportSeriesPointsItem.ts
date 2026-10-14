@@ -11,4 +11,7 @@ export type ReportSeriesPointsItem = {
   value: number;
   /** @nullable */
   secondaryValue?: number | null;
+  exactValue?: string;
+  /** @nullable */
+  exactSecondaryValue?: string | null;
 };

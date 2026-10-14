@@ -17,7 +17,7 @@ let scope: SeedScope;
 beforeEach(async () => { scope = newScope(); await createRuoloVolontario(scope); });
 afterEach(async () => { await listeners.close(); await db.delete(auditConfigurazioniTable).where(eq(auditConfigurazioniTable.area, "logistica")); await cleanup(scope); });
 afterAll(async () => { await pool.end(); });
-const app = (router: Parameters<typeof makeScopedApp>[0]) => listeners.open(router, () => makeScopedApp(router, { id: 0, centroAscoltoId: null, areaOperativaId: null }));
+const app = (router: Parameters<typeof makeScopedApp>[0]) => listeners.open(router, () => makeScopedApp(router, { id: 0, centroAscoltoId: null, areaOperativaId: null, ...(router === reportRouter ? { isAdmin: true } : {}) }));
 const areaApp = (router: Parameters<typeof makeScopedApp>[0], areaOperativaId: number) => listeners.open(`${areaOperativaId}:${router === approvazioniRouter ? "approval" : router === turniRouter ? "turni" : router === consegneRouter ? "consegne" : "mezzi"}`, () => makeScopedApp(router, { id: 0, centroAscoltoId: null, areaOperativaId }));
 const start = <T>(requestPromise: PromiseLike<T>): Promise<T> => Promise.resolve(requestPromise);
 const letRequestReachLock = () => new Promise((resolve) => setTimeout(resolve, 50));

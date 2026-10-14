@@ -37,7 +37,7 @@ let operatoreId: number;
 let magNull: number;
 
 const appAs = (centro: number | null, areaOperativa: number | null) =>
-  makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: centro, areaOperativaId: areaOperativa });
+  makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: centro, areaOperativaId: areaOperativa, isAdmin: centro == null && areaOperativa == null });
 
 type Riga = {
   mezzoId: number;
@@ -158,7 +158,7 @@ describe("Report allocazione mezzi — conteggi per mezzo", () => {
     await insertTurno(scope, { centroAscoltoId: centroB.id, mezzoId: mezzo });
 
     // Chiamante scoped sul centro A: vede solo i record del proprio centro.
-    const body = (await request(appAs(centroA.id, null)).get(Q)).body as Report;
+    const body = (await request(appAs(centroA.id, areaOperativa)).get(Q)).body as Report;
     const riga = body.mezzi.find((m) => m.mezzoId === mezzo);
     expect(riga).toBeDefined();
     expect(riga!.consegne).toBe(1); // consegna del centro A

@@ -1,7 +1,10 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
-import { dashboard, kpi, quality, text } from "./shared";
+import { dashboard, kpi, quality, text, numericMetrics } from "./shared";
+import { InventoryDecimal } from "../inventoryDecimal";
+import { appendReportPanels } from "./requests";
+import { distributionFlowPanel } from "./distributionFlow";
 import {
   effectiveBollaRigaId,
   fseDistributionNatureCondition,
@@ -48,13 +51,13 @@ export async function pacchiMetrics(filters: ReportFilters) {
     SELECT COALESCE(SUM(numero_componenti), 0) AS persone
     FROM famiglie
   `);
-  return {
-    pacchi: number(totals?.pacchi),
-    nuclei: number(totals?.nuclei),
-    persone: number(people?.persone),
-    domiciliari: number(totals?.domiciliari),
-    sede: number(totals?.sede),
-  };
+  return numericMetrics({
+    pacchi: totals?.pacchi,
+    nuclei: totals?.nuclei,
+    persone: people?.persone,
+    domiciliari: totals?.domiciliari,
+    sede: totals?.sede,
+  });
 }
 
 export async function buildPacchiReport(filters: ReportFilters) {
@@ -144,87 +147,133 @@ export async function buildPacchiReport(filters: ReportFilters) {
   ]);
 
   const rowsTotal = products.reduce((sum, row) => sum + number(row.righe), 0);
-  const distinctProducts = new Set(products.map((row) => number(row.prodotto_id))).size;
-  const calculableKg = products.filter((row) => String(row.unita_misura).toLowerCase() === "kg").reduce((sum, row) => sum + number(row.quantita), 0);
+  const distinctProducts = new Set(
+    products.map((row) => number(row.prodotto_id)),
+  ).size;
+  const calculableKg = products
+    .filter((row) => String(row.unita_misura).toLowerCase() === "kg")
+    .reduce((sum, row) => sum + number(row.quantita), 0);
   const dq = dataQuality[0] ?? {};
+  const preciseKg = products
+    .filter((row) => String(row.unita_misura).toLowerCase() === "kg")
+    .reduce(
+      (sum, row) =>
+        sum.add(
+          InventoryDecimal.parse(String(row.quantita), { allowNegative: true }),
+        ),
+      InventoryDecimal.zero(),
+    )
+    .toCanonical();
 
-  return dashboard({
-    section: "pacchi",
-    filters,
-    kpi: [kpi("pacchiDistribuiti", metrics.pacchi, "count", "pacchiDistribuiti"), kpi("nucleiServiti", metrics.nuclei, "count", "nucleiServiti"), kpi("personeRaggiunte", metrics.persone, "count", "personeRaggiunte"), kpi("distribuzioniSede", metrics.sede), kpi("distribuzioniDomiciliari", metrics.domiciliari), kpi("prodottiDistinti", distinctProducts), kpi("righeProdotto", rowsTotal), kpi("kgCalcolabili", calculableKg, "kg")],
-    series: [
-      {
-        key: "pacchiPerMese",
-        points: monthSeries(monthly, "totale", "nuclei"),
+  const flow = await distributionFlowPanel(filters, false);
+  return appendReportPanels(
+    dashboard({
+      section: "pacchi",
+      filters,
+      exactKpi: {
+        pacchiDistribuiti: metrics.exact.pacchi,
+        nucleiServiti: metrics.exact.nuclei,
+        personeRaggiunte: metrics.exact.persone,
+        distribuzioniSede: metrics.exact.sede,
+        distribuzioniDomiciliari: metrics.exact.domiciliari,
+        righeProdotto: products
+          .reduce((sum, row) => sum + BigInt(String(row.righe)), 0n)
+          .toString(),
+        kgCalcolabili: preciseKg,
       },
-    ],
-    tables: [
-      {
-        key: "prodotti",
-        columns: ["prodottoId", "prodottoNome", "unitaMisura", "righe", "quantita", "quantitaFse", "quantitaNonFse"],
-        rows: products.map((row) => ({
-          prodottoId: number(row.prodotto_id),
-          prodottoNome: String(row.prodotto_nome),
-          unitaMisura: String(row.unita_misura),
-          righe: number(row.righe),
-          quantita: number(row.quantita),
-          quantitaFse: number(row.quantita_fse),
-          quantitaNonFse: number(row.quantita_non_fse),
-        })),
-      },
-      {
-        key: "centri",
-        columns: ["centro", "pacchi", "nuclei"],
-        rows: centres.map((row) => ({
-          centro: String(row.centro),
-          pacchi: number(row.pacchi),
-          nuclei: number(row.nuclei),
-        })),
-      },
-    ],
-    quality: [
-      quality(
-        "dataNascitaMancante",
-        number(dq.nascita_mancante),
-        number(dq.nascita_mancante) ? "derivable" : "ok",
-      ),
-      quality(
-        "sessoMancante",
-        number(dq.sesso_mancante),
-        number(dq.sesso_mancante) ? "derivable" : "ok",
-      ),
-      quality(
-        "nucleoIncompleto",
-        number(dq.nucleo_incompleto),
-        number(dq.nucleo_incompleto) ? "derivable" : "ok",
-      ),
-      quality(
-        "territorioStoricoDerivato",
-        number(dq.territorio_legacy),
-        number(dq.territorio_legacy) ? "derivable" : "ok",
-        text("qualityParcelLegacyTerritory"),
-      ),
-      quality(
-        "nucleoStoricoDerivato",
-        number(dq.nucleo_storico_legacy),
-        number(dq.nucleo_storico_legacy) ? "derivable" : "ok",
-        text("qualityParcelLegacyHousehold"),
-      ),
-      quality(
-        "eventoSenzaLineage",
-        number(dq.evento_senza_lineage),
-        number(dq.evento_senza_lineage) ? "missing" : "ok",
-        text("qualityParcelMissingLineage"),
-      ),
-    ],
-    definitions: [
-      text("parcelDelivered"),
-      text("parcelHousehold"),
-      text("parcelPeopleSnapshot"),
-      text("parcelFseLedger"),
-      text("parcelUnits"),
-    ],
-  });
+      kpi: [
+        kpi("pacchiDistribuiti", metrics.pacchi, "count", "pacchiDistribuiti"),
+        kpi("nucleiServiti", metrics.nuclei, "count", "nucleiServiti"),
+        kpi("personeRaggiunte", metrics.persone, "count", "personeRaggiunte"),
+        kpi("distribuzioniSede", metrics.sede),
+        kpi("distribuzioniDomiciliari", metrics.domiciliari),
+        kpi("prodottiDistinti", distinctProducts),
+        kpi("righeProdotto", rowsTotal),
+        kpi("kgCalcolabili", calculableKg, "kg"),
+      ],
+      series: [
+        {
+          key: "pacchiPerMese",
+          points: monthSeries(monthly, "totale", "nuclei"),
+        },
+      ],
+      tables: [
+        {
+          key: "prodotti",
+          columns: [
+            "prodottoId",
+            "prodottoNome",
+            "unitaMisura",
+            "righe",
+            "quantita",
+            "quantitaFse",
+            "quantitaNonFse",
+          ],
+          rows: products.map((row) => ({
+            prodottoId: number(row.prodotto_id),
+            prodottoNome: String(row.prodotto_nome),
+            unitaMisura: String(row.unita_misura),
+            righe: String(row.righe),
+            quantita: String(row.quantita),
+            quantitaFse: String(row.quantita_fse),
+            quantitaNonFse: String(row.quantita_non_fse),
+          })),
+        },
+        {
+          key: "centri",
+          columns: ["centro", "pacchi", "nuclei"],
+          rows: centres.map((row) => ({
+            centro: String(row.centro),
+            pacchi: String(row.pacchi),
+            nuclei: String(row.nuclei),
+          })),
+        },
+      ],
+      quality: [
+        quality(
+          "dataNascitaMancante",
+          number(dq.nascita_mancante),
+          number(dq.nascita_mancante) ? "derivable" : "ok",
+        ),
+        quality(
+          "sessoMancante",
+          number(dq.sesso_mancante),
+          number(dq.sesso_mancante) ? "derivable" : "ok",
+        ),
+        quality(
+          "nucleoIncompleto",
+          number(dq.nucleo_incompleto),
+          number(dq.nucleo_incompleto) ? "derivable" : "ok",
+        ),
+        quality(
+          "territorioStoricoDerivato",
+          number(dq.territorio_legacy),
+          number(dq.territorio_legacy) ? "derivable" : "ok",
+          text("qualityParcelLegacyTerritory"),
+        ),
+        quality(
+          "nucleoStoricoDerivato",
+          number(dq.nucleo_storico_legacy),
+          number(dq.nucleo_storico_legacy) ? "derivable" : "ok",
+          text("qualityParcelLegacyHousehold"),
+        ),
+        quality(
+          "eventoSenzaLineage",
+          number(dq.evento_senza_lineage),
+          number(dq.evento_senza_lineage) ? "missing" : "ok",
+          text("qualityParcelMissingLineage"),
+        ),
+      ],
+      definitions: [
+        text("parcelDelivered"),
+        text("parcelHousehold"),
+        text("parcelPeopleSnapshot"),
+        text("parcelFseLedger"),
+        text("parcelUnits"),
+      ],
+    }),
+    flow,
+  );
 }
 
 export { pacchiConditions };

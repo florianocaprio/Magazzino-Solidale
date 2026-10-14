@@ -1,10 +1,14 @@
 import { sql, type SQL } from "drizzle-orm";
-import { isModuloAttivo } from "../featureFlags";
+import { isReportModuleActive as isModuloAttivo } from "./queryContext";
 import type { ReportFilters, ReportKpi } from "./types";
 import { andSql, number, rows } from "./sql";
 import { dashboard, kpi, text } from "./shared";
 import { pacchiConditions, pacchiMetrics } from "./pacchi";
-import { socialCompletedConditions, socialMetrics, socialEventDate } from "./centroAscolto";
+import {
+  socialCompletedConditions,
+  socialMetrics,
+  socialEventDate,
+} from "./centroAscolto";
 import { emporioMetrics, speseConditions } from "./emporio";
 import { mealConditions, mensaMetrics } from "./mensa";
 import { udsBaseConditions, udsEventDate, udsMetrics } from "./uds";
@@ -40,7 +44,7 @@ async function activeSources(filters: ReportFilters): Promise<ActiveSources> {
     pacchi: magazzino && bolle && canRead("sociale"),
     sociale: sociale && canRead("sociale"),
     emporio: emporio && canRead("emporio"),
-    mensa: mensa && canReadMensa,
+    mensa: mensa && canReadMensa && filters.callerMensaIds?.length !== 0,
     uds: uds && canReadUds,
   };
 }
@@ -85,6 +89,34 @@ function eventUnions(filters: ReportFilters, active: ActiveSources): SQL[] {
 
 export async function buildGeneralReport(filters: ReportFilters) {
   const active = await activeSources(filters);
+  const excludedSources = [];
+  // Explicit query dimensions are not silently projected onto unrelated facts.
+  const compatibility: Array<[boolean, string, Array<keyof ActiveSources>]> = [
+    [
+      filters.centroAscoltoId != null,
+      "centroAscoltoId",
+      ["pacchi", "sociale", "emporio", "mensa"],
+    ],
+    [
+      filters.magazzinoId != null,
+      "magazzinoId",
+      ["pacchi", "emporio", "mensa"],
+    ],
+    [filters.mensaId != null, "mensaId", ["mensa"]],
+    [filters.zonaMode === "query", "zonaUdsId", ["uds"]],
+    [filters.tipoIntervento != null, "tipoIntervento", ["sociale", "uds"]],
+    [filters.tipoServizio != null, "tipoServizio", ["mensa"]],
+    [filters.operatoreId != null, "operatoreId", ["sociale", "mensa", "uds"]],
+  ];
+  for (const [selected, dimension, supported] of compatibility) {
+    if (!selected) continue;
+    for (const source of Object.keys(active) as Array<keyof ActiveSources>) {
+      if (active[source] && !supported.includes(source)) {
+        active[source] = false;
+        excludedSources.push(text("sourceExcluded", { source, dimension }));
+      }
+    }
+  }
   const [pacchi, sociale, emporio, mensa, uds] = await Promise.all([
     active.pacchi ? pacchiMetrics(filters) : null,
     active.sociale ? socialMetrics(filters) : null,
@@ -107,78 +139,166 @@ export async function buildGeneralReport(filters: ReportFilters) {
         SELECT COUNT(DISTINCT beneficiario_id) AS persone FROM eventi
       `)
     : [];
-  const geographicRows = unions.length && filters.areaOperativaId == null && filters.centroAscoltoId == null
-    ? await rows<Record<string, unknown>>(sql`
+  const geographicRows =
+    unions.length &&
+    filters.areaOperativaId == null &&
+    filters.centroAscoltoId == null
+      ? await rows<Record<string, unknown>>(sql`
         WITH eventi AS (${sql.join(unions, sql` UNION ALL `)})
-        SELECT e.area_operativa_id, COALESCE(ao.nome, 'Senza area operativa') AS areaOperativa,
+        SELECT e.area_operativa_id, COALESCE(ao.nome, 'Senza area operativa') AS "areaOperativa",
                e.centro_ascolto_id, COALESCE(ca.nome, 'Senza centro') AS centro,
                COUNT(*) AS eventi, COUNT(DISTINCT e.beneficiario_id) AS persone
         FROM eventi e
         LEFT JOIN aree_operative ao ON ao.id = e.area_operativa_id
         LEFT JOIN centri_di_ascolto ca ON ca.id = e.centro_ascolto_id
         GROUP BY e.area_operativa_id, ao.nome, e.centro_ascolto_id, ca.nome
-        ORDER BY eventi DESC, areaOperativa, centro
+        ORDER BY eventi DESC, "areaOperativa", centro
       `)
-    : [];
+      : [];
 
   const allKpi: ReportKpi[] = [
     kpi("personeUnicheComplessive", number(uniqueRows[0]?.persone)),
   ];
   if (pacchi) {
-    allKpi.push(kpi("pacchiDistribuiti", pacchi.pacchi), kpi("nucleiPacchi", pacchi.nuclei));
+    allKpi.push(
+      kpi("pacchiDistribuiti", pacchi.pacchi),
+      kpi("nucleiPacchi", pacchi.nuclei),
+    );
   }
   if (sociale) {
-    allKpi.push(kpi("interventiCentroAscolto", sociale.interventi), kpi("personeCentroAscolto", sociale.persone));
+    allKpi.push(
+      kpi("interventiCentroAscolto", sociale.interventi),
+      kpi("personeCentroAscolto", sociale.persone),
+    );
   }
   if (emporio) {
-    allKpi.push(kpi("accessiEmporio", emporio.accessi), kpi("speseEmporio", emporio.spese), kpi("prodottiEmporio", emporio.prodottiDistinti), kpi("creditoUtilizzato", emporio.credito, "credit"));
+    allKpi.push(
+      kpi("accessiEmporio", emporio.accessi),
+      kpi("speseEmporio", emporio.spese),
+      kpi("prodottiEmporio", emporio.prodottiDistinti),
+      kpi("creditoUtilizzato", emporio.credito, "credit"),
+    );
   }
   if (mensa) {
-    allKpi.push(kpi("pastiErogati", mensa.pasti), kpi("utentiMensa", mensa.persone));
+    allKpi.push(
+      kpi("pastiErogati", mensa.pasti),
+      kpi("utentiMensa", mensa.persone),
+    );
   }
   if (uds) {
-    allKpi.push(kpi("interventiUds", uds.interventi), kpi("personeUds", uds.persone));
+    allKpi.push(
+      kpi("interventiUds", uds.interventi),
+      kpi("personeUds", uds.persone),
+    );
   }
 
-  const byMonth = new Map<string, { label: string; value: number; secondaryValue: number }>();
+  const byMonth = new Map<
+    string,
+    {
+      label: string;
+      value: number;
+      secondaryValue: number;
+      exactValue: string;
+      exactSecondaryValue: string;
+    }
+  >();
   for (const row of eventRows) {
     const key = `${String(row.mese)}:${String(row.area)}`;
     byMonth.set(key, {
       label: key,
       value: number(row.eventi),
       secondaryValue: number(row.persone),
+      exactValue: String(row.eventi),
+      exactSecondaryValue: String(row.persone),
     });
   }
   const areaTable = Array.from(
     eventRows.reduce((map, row) => {
       const area = String(row.area);
-      const current = map.get(area) ?? { eventi: 0, personeMese: 0 };
-      current.eventi += number(row.eventi);
-      current.personeMese += number(row.persone);
+      const current = map.get(area) ?? { eventi: 0n, personeMese: 0n };
+      current.eventi += BigInt(String(row.eventi));
+      current.personeMese += BigInt(String(row.persone));
       map.set(area, current);
       return map;
-    }, new Map<string, { eventi: number; personeMese: number }>()),
-  ).map(([area, values]) => ({ area, ...values }));
+    }, new Map<string, { eventi: bigint; personeMese: bigint }>()),
+  ).map(([area, values]) => ({
+    area,
+    eventi: values.eventi.toString(),
+    personeMese: values.personeMese.toString(),
+  }));
 
   return dashboard({
     section: "generale",
     filters,
+    excludedSources,
+    exactKpi: {
+      personeUnicheComplessive: String(uniqueRows[0]?.persone ?? "0"),
+      ...(pacchi
+        ? {
+            pacchiDistribuiti: pacchi.exact.pacchi,
+            nucleiPacchi: pacchi.exact.nuclei,
+          }
+        : {}),
+      ...(sociale
+        ? {
+            interventiCentroAscolto: sociale.exact.interventi,
+            personeCentroAscolto: sociale.exact.persone,
+          }
+        : {}),
+      ...(emporio
+        ? {
+            accessiEmporio: emporio.exact.accessi,
+            speseEmporio: emporio.exact.spese,
+            prodottiEmporio: emporio.exact.prodottiDistinti,
+            creditoUtilizzato: emporio.exact.credito,
+          }
+        : {}),
+      ...(mensa
+        ? { pastiErogati: mensa.exact.pasti, utentiMensa: mensa.exact.persone }
+        : {}),
+      ...(uds
+        ? { interventiUds: uds.exact.interventi, personeUds: uds.exact.persone }
+        : {}),
+    },
     kpi: allKpi,
-    series: [{ key: "attivitaPerMeseArea", points: Array.from(byMonth.values()) }],
+    series: [
+      { key: "attivitaPerMeseArea", points: Array.from(byMonth.values()) },
+    ],
     tables: [
-      { key: "confrontoAree", columns: ["area", "eventi", "personeMese"], rows: areaTable },
-      ...(geographicRows.length ? [{
-        key: "distribuzioneTerritoriale",
-        columns: ["areaOperativaId", "areaOperativa", "centroId", "centro", "eventi", "persone"],
-        rows: geographicRows.map((row) => ({
-          areaOperativaId: row.area_operativa_id == null ? null : number(row.area_operativa_id),
-          areaOperativa: String(row.areaOperativa),
-          centroId: row.centro_ascolto_id == null ? null : number(row.centro_ascolto_id),
-          centro: String(row.centro),
-          eventi: number(row.eventi),
-          persone: number(row.persone),
-        })),
-      }] : []),
+      {
+        key: "confrontoAree",
+        columns: ["area", "eventi", "personeMese"],
+        rows: areaTable,
+      },
+      ...(geographicRows.length
+        ? [
+            {
+              key: "distribuzioneTerritoriale",
+              columns: [
+                "areaOperativaId",
+                "areaOperativa",
+                "centroId",
+                "centro",
+                "eventi",
+                "persone",
+              ],
+              rows: geographicRows.map((row) => ({
+                areaOperativaId:
+                  row.area_operativa_id == null
+                    ? null
+                    : number(row.area_operativa_id),
+                areaOperativa: String(row.areaOperativa),
+                centroId:
+                  row.centro_ascolto_id == null
+                    ? null
+                    : number(row.centro_ascolto_id),
+                centro: String(row.centro),
+                eventi: String(row.eventi),
+                persone: String(row.persone),
+              })),
+            },
+          ]
+        : []),
     ],
     definitions: [
       text("generalUniquePerson"),

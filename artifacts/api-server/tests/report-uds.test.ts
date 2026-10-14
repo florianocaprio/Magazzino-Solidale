@@ -28,7 +28,7 @@ let scope: SeedScope;
 let bootScope: SeedScope;
 let operatoreId: number;
 
-const appGlobal = () => makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: null });
+const appGlobal = () => makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: null, isAdmin: true });
 const appAreaOperativa = (areaOperativaId: number) =>
   makeScopedApp(reportRouter, { id: operatoreId, centroAscoltoId: null, areaOperativaId });
 

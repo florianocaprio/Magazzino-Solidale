@@ -7,6 +7,7 @@
  */
 import type { GetReportFilterOptionsSection } from "./getReportFilterOptionsSection";
 import type { ReportAreaOperativaIdParameter } from "./reportAreaOperativaIdParameter";
+import type { ReportCentroIdParameter } from "./reportCentroIdParameter";
 
 export type GetReportFilterOptionsParams = {
   section: GetReportFilterOptionsSection;
@@ -14,4 +15,8 @@ export type GetReportFilterOptionsParams = {
    * Ignorabile solo per utenti globali; gli utenti scoped restano vincolati alla propria area operativa
    */
   areaOperativaId?: ReportAreaOperativaIdParameter;
+  /**
+   * Gli utenti con Centro assegnato restano vincolati al proprio perimetro
+   */
+  centroAscoltoId?: ReportCentroIdParameter;
 };

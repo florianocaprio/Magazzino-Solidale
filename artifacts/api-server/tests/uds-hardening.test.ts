@@ -59,6 +59,7 @@ const UDS_PERMISSIONS = [
 let scope: SeedScope;
 let bootScope: SeedScope;
 let userId: number;
+let reportAreaId: number;
 
 function combinedRouter() {
   const router = Router();
@@ -92,7 +93,7 @@ function appWithRealAreaGuard(aree: string[], permessi: readonly string[]) {
     {
       id: userId,
       centroAscoltoId: null,
-      areaOperativaId: null,
+      areaOperativaId: reportAreaId,
       zonaUdsId: null,
       aree,
       permessi: [...permessi],
@@ -128,6 +129,7 @@ function appAsPureUds(
 beforeAll(async () => {
   bootScope = newScope();
   userId = await createUtente(bootScope, {});
+  reportAreaId = await createAreaOperativa(bootScope);
   await updateModuloAmbiente("UDS", true, null);
 });
 
@@ -186,7 +188,11 @@ describe("UDS hardening territoriale e storico", () => {
 
     const missingOrigin = await request(udsApp)
       .post("/beneficiari")
-      .send({ ...base, areaProvenienza: undefined, fasciaEtaPresunta: "18_29" });
+      .send({
+        ...base,
+        areaProvenienza: undefined,
+        fasciaEtaPresunta: "18_29",
+      });
     expect(missingOrigin.status).toBe(400);
     expect(missingOrigin.body.error).toMatch(/Area di provenienza/i);
 
@@ -269,7 +275,6 @@ describe("UDS hardening territoriale e storico", () => {
       uds: true,
       fasciaEtaCorrente: "30_64",
     });
-
   });
 
   it("espone a un operatore UDS puro solo candidati non-UDS attivi della stessa Area con DTO minimizzato", async () => {
@@ -368,9 +373,9 @@ describe("UDS hardening territoriale e storico", () => {
         .get("/uds/directory/link-candidates")
         .query({ search });
       expect(internalMatch.status).toBe(200);
-      expect(internalMatch.body.map((item: { id: number }) => item.id)).toEqual([
-        candidateId,
-      ]);
+      expect(internalMatch.body.map((item: { id: number }) => item.id)).toEqual(
+        [candidateId],
+      );
       expect(internalMatch.body[0]).not.toHaveProperty("codiceFiscale");
       expect(internalMatch.body[0]).not.toHaveProperty("telefono");
     }
@@ -404,16 +409,16 @@ describe("UDS hardening territoriale e storico", () => {
 
     expect(
       (
-        await request(
-          appAsPureUds(area, null, ["beneficiari.manage"]),
-        ).get(path)
+        await request(appAsPureUds(area, null, ["beneficiari.manage"])).get(
+          path,
+        )
       ).status,
     ).toBe(403);
     expect(
       (
-        await request(
-          appAsPureUds(area, null, ["uds.directory.view"]),
-        ).get(path)
+        await request(appAsPureUds(area, null, ["uds.directory.view"])).get(
+          path,
+        )
       ).status,
     ).toBe(403);
     expect(
@@ -1153,7 +1158,18 @@ describe("UDS hardening territoriale e storico", () => {
       .update(beneficiariTable)
       .set({ zonaUdsId: null, uds: false })
       .where(eq(beneficiariTable.id, persona));
-    const report = await request(app)
+    // D01: the original snapshot remains visible in its historical Zone,
+    // not to an actor assigned only to the new Zone.
+    const outsideZone = await request(app)
+      .get("/report/uds/interventi-per-zona")
+      .query({ da: "2026-01-01", a: "2026-12-31" });
+    expect(outsideZone.status).toBe(200);
+    expect(
+      outsideZone.body.find(
+        (item: { zonaId: number }) => item.zonaId === zonaStorica.id,
+      ),
+    ).toBeUndefined();
+    const report = await request(appAs(area, zonaStorica.id))
       .get("/report/uds/interventi-per-zona")
       .query({ da: "2026-01-01", a: "2026-12-31" });
     expect(report.status).toBe(200);

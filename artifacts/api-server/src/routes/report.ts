@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { sql, type SQL } from "drizzle-orm";
 import { callerCentroId, callerAreaOperativaId } from "../lib/centroScope";
@@ -9,6 +9,8 @@ import { buildFsePlusReport } from "../lib/reporting/fsePlus";
 import {
   assertReportFilterScope,
   parseReportFilters,
+  assertReportTerritory,
+  ReportingError,
 } from "../lib/reporting/filters";
 
 const router: IRouter = Router();
@@ -63,6 +65,24 @@ router.use("/report", (req, res, next) => {
   res.status(403).json({ error: "Area Analisi richiesta" });
 });
 router.use("/report/uds", requirePermission("uds.reports.view"));
+router.use("/report", (req, res, next) => {
+  try {
+    assertReportTerritory(req);
+    const zone = req.query.zonaUdsId;
+    if (
+      req.user?.zonaUdsId != null &&
+      zone != null &&
+      zone !== "" &&
+      Number(zone) !== req.user.zonaUdsId
+    )
+      throw new ReportingError(403, "Zona fuori dal perimetro corrente");
+    next();
+  } catch (error) {
+    if (error instanceof ReportingError)
+      res.status(error.status).json({ error: error.message });
+    else next(error);
+  }
+});
 
 function ownOrNullSql(col: SQL, caller: number | null): SQL | undefined {
   if (caller == null) return undefined;
@@ -503,10 +523,12 @@ router.get(
  * ──────────────────────────────────────────────────────────────────────── */
 
 function udsHistoricalScopeConds(
-  req: { query: Record<string, unknown> },
+  req: Request,
   callerAreaOperativa: number | null,
 ): SQL[] {
   const conds: SQL[] = [sql`i.ambito = 'uds'`];
+  if (req.user?.zonaUdsId != null)
+    conds.push(sql`i.zona_uds_id_snapshot = ${req.user.zonaUdsId}`);
   if (callerAreaOperativa != null)
     conds.push(sql`i.area_operativa_id_snapshot = ${callerAreaOperativa}`);
   const qAreaOperativa = parseIntParam(req.query.areaOperativaId);
@@ -518,10 +540,12 @@ function udsHistoricalScopeConds(
 }
 
 function udsCurrentPeopleScopeConds(
-  req: { query: Record<string, unknown> },
+  req: Request,
   callerAreaOperativa: number | null,
 ): SQL[] {
   const conds: SQL[] = [sql`be.uds = true`];
+  if (req.user?.zonaUdsId != null)
+    conds.push(sql`be.zona_uds_id = ${req.user.zonaUdsId}`);
   if (callerAreaOperativa != null)
     conds.push(sql`be.area_operativa_id = ${callerAreaOperativa}`);
   const qAreaOperativa = parseIntParam(req.query.areaOperativaId);

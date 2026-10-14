@@ -209,7 +209,7 @@ describe("prerequisiti combinati sulle route reali", () => {
     const app = makeScopedApp(reportRouter, {
       id: 0,
       centroAscoltoId: null,
-      areaOperativaId: null,
+      areaOperativaId: await createAreaOperativa(scope),
     });
 
     await setModulo("CENTRO_ASCOLTO", false);
@@ -246,7 +246,7 @@ describe("prerequisiti combinati sulle route reali", () => {
     const user = {
       id: 0,
       centroAscoltoId: null,
-      areaOperativaId: null,
+      areaOperativaId: await createAreaOperativa(scope),
       aree: ["analisi", "magazzino"],
       permessi: ["magazzino.fse.view"],
     };

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { formatReportingDecimal } from "@/lib/reporting-number";
 
 export function ReportKpiCard({
   item,
@@ -12,13 +13,12 @@ export function ReportKpiCard({
   item: ReportKpi;
   onOpen?: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const unavailable = item.exactValue == null;
-  const formatted = item.exactValue == null
-    ? t("reporting.unavailable")
-    : new Intl.NumberFormat(undefined, {
-        maximumFractionDigits: item.unit === "average" || item.unit === "credit" ? 2 : 6,
-      }).format(Number(item.exactValue));
+  const formatted =
+    item.exactValue == null
+      ? t("reporting.unavailable")
+      : formatReportingDecimal(item.exactValue, i18n.resolvedLanguage);
   return (
     <Card className={unavailable ? "border-dashed" : undefined}>
       <CardHeader className="space-y-2 pb-2">
@@ -27,7 +27,11 @@ export function ReportKpiCard({
             {t(`reporting.kpi.${item.key}`)}
           </CardTitle>
           {item.availability !== "ok" && (
-            <Badge variant={item.availability === "missing" ? "destructive" : "secondary"}>
+            <Badge
+              variant={
+                item.availability === "missing" ? "destructive" : "secondary"
+              }
+            >
               {t(`reporting.availability.${item.availability}`)}
             </Badge>
           )}
@@ -47,6 +51,7 @@ export function ReportKpiCard({
             <Button
               variant="ghost"
               size="sm"
+              className="min-h-11 min-w-11"
               onClick={onOpen}
               aria-label={t("reporting.drilldown.open")}
             >

@@ -1,5 +1,5 @@
 import { sql, type SQL } from "drizzle-orm";
-import { isModuloAttivo } from "../featureFlags";
+import { isReportModuleActive as isModuloAttivo } from "./queryContext";
 import type { ReportFilters } from "./types";
 import { andSql, number, reportScope, rows } from "./sql";
 import { dashboard, kpi, quality, text } from "./shared";
@@ -12,6 +12,9 @@ import {
   fseSignedQuantity,
 } from "./fseCanonicalFacts";
 import { authoritativeSnapshotOrderForAliasS } from "./fseSnapshotOrder";
+import { appendReportPanels } from "./requests";
+import { fseQueuePanel } from "./fseQueue";
+import { InventoryDecimal } from "../inventoryDecimal";
 
 function fseScope(filters: ReportFilters) {
   return andSql(
@@ -25,32 +28,42 @@ function fseScope(filters: ReportFilters) {
 
 export function fseAuthorizedMovementCondition(
   filters: ReportFilters,
-  channels?: string[],
+  channels: string[],
 ): SQL {
   const warehouseOversight = filters.callerAreas.some(
     (area) => area === "magazzino" || area === "logistica",
   );
-  const allowedChannels =
-    channels ??
-    (filters.callerIsAdmin || warehouseOversight
-      ? [
-          "PACCHI",
-          "RITIRO_SEDE",
-          "DOMICILIARE",
-          "EMPORIO",
-          "MENSA",
-          "UDS_STRADA",
-        ]
-      : [
-          ...(filters.callerAreas.includes("sociale")
-            ? ["PACCHI", "RITIRO_SEDE", "DOMICILIARE"]
-            : []),
-          ...(filters.callerAreas.includes("emporio") ? ["EMPORIO"] : []),
-          ...(filters.callerAreas.includes("mensa") ? ["MENSA"] : []),
-          ...(filters.callerAreas.includes("uds") ? ["UDS_STRADA"] : []),
-        ]);
+  // Channels already combine the caller's source rights with current flags.
+  // Even administrative oversight does not reactivate a disabled source.
+  const allowedChannels = channels;
+  const legacyEmporio = sql`EXISTS (SELECT 1 FROM spese_emporio source_se
+    WHERE source_se.bolla_id=b.id AND source_se.stato_spesa='chiusa')`;
+  const legacySource = sql`((${channels.includes("EMPORIO")} AND ${legacyEmporio})
+    OR (${channels.includes("PACCHI")} AND NOT ${legacyEmporio}))`;
   const bollaScope = fseScope(filters);
   const bollaSource = fseBollaSourceCondition(filters);
+  const assignedMensa =
+    filters.callerIsAdmin || warehouseOversight
+      ? sql`true`
+      : filters.callerMensaIds?.length
+        ? sql`EXISTS (SELECT 1 FROM operazioni_distribuzione_magazzino assigned_op
+          JOIN mensa_giornate_servizio assigned_day ON assigned_op.entita_origine_tipo='mensa_giornata_servizio'
+            AND assigned_day.id=assigned_op.entita_origine_id
+          WHERE assigned_op.id=COALESCE(mv.operazione_distribuzione_id,original.operazione_distribuzione_id)
+            AND assigned_day.mensa_id IN (${sql.join(
+              filters.callerMensaIds.map((id) => sql`${id}`),
+              sql`, `,
+            )}))`
+        : sql`false`;
+  const assignedZone =
+    filters.zonaUdsId == null
+      ? sql`true`
+      : sql`EXISTS (
+    SELECT 1 FROM operazioni_distribuzione_magazzino assigned_op
+    JOIN interventi assigned_i ON assigned_i.id=assigned_op.entita_origine_id
+      AND assigned_op.entita_origine_tipo=('intervento_materiali_' || assigned_op.magazzino_id::text)
+    WHERE assigned_op.id=COALESCE(mv.operazione_distribuzione_id,original.operazione_distribuzione_id)
+      AND assigned_i.zona_uds_id_snapshot=${filters.zonaUdsId})`;
   const territorialScope =
     filters.areaOperativaId == null
       ? sql`true`
@@ -67,20 +80,21 @@ export function fseAuthorizedMovementCondition(
             OR territory_op.centro_ascolto_id_snapshot = ${filters.centroAscoltoId})
       )`;
   return sql`(
-    (mv.natura_contabile <> 'LEGACY' AND ${territorialScope} AND ${
-      filters.callerIsAdmin || warehouseOversight
-        ? sql`true`
-        : allowedChannels.length
+    (mv.natura_contabile <> 'LEGACY' AND ${territorialScope}
+      AND (COALESCE(mv.canale_operativo,original.canale_operativo) IS DISTINCT FROM 'MENSA' OR ${assignedMensa})
+      AND (COALESCE(mv.canale_operativo,original.canale_operativo) IS DISTINCT FROM 'UDS_STRADA' OR ${assignedZone})
+      AND ${
+        allowedChannels.length
           ? sql`COALESCE(mv.canale_operativo, original.canale_operativo) IN (${sql.join(
               allowedChannels.map((channel) => sql`${channel}`),
               sql`, `,
             )})`
           : sql`false`
-    })
+      })
     OR (mv.natura_contabile = 'LEGACY' AND ${filters.areaOperativaId == null ? sql`true` : sql`false`} AND EXISTS (
       SELECT 1 FROM bolle b
       JOIN beneficiari be ON be.id = b.beneficiario_id
-      WHERE b.id = mv.bolla_id AND ${bollaScope} AND ${bollaSource}
+      WHERE b.id = mv.bolla_id AND ${bollaScope} AND ${bollaSource} AND ${legacySource}
     ))
   )`;
 }
@@ -92,7 +106,9 @@ type FseSources = {
   uds: boolean;
 };
 
-async function activeFseSources(filters: ReportFilters): Promise<FseSources> {
+export async function activeFseSources(
+  filters: ReportFilters,
+): Promise<FseSources> {
   const [magazzino, bolle, emporio, mensa, uds] = await Promise.all([
     isModuloAttivo("MAGAZZINO_SOLIDALE"),
     isModuloAttivo("BOLLE"),
@@ -109,6 +125,15 @@ async function activeFseSources(filters: ReportFilters): Promise<FseSources> {
     mensa: mensa && (canRead("mensa") || canSuperviseWarehouse),
     uds: uds && (canRead("uds") || canSuperviseWarehouse),
   };
+}
+
+export function fseCanonicalChannels(sources: FseSources): string[] {
+  return [
+    ...(sources.pacchi ? ["PACCHI", "RITIRO_SEDE", "DOMICILIARE"] : []),
+    ...(sources.emporio ? ["EMPORIO"] : []),
+    ...(sources.mensa ? ["MENSA"] : []),
+    ...(sources.uds ? ["UDS_STRADA"] : []),
+  ];
 }
 
 export function fseBollaSourceCondition(filters: ReportFilters): SQL {
@@ -133,6 +158,11 @@ export function fseBollaSourceCondition(filters: ReportFilters): SQL {
 
 export async function buildFsePlusReport(filters: ReportFilters) {
   const sources = await activeFseSources(filters);
+  const warehouseAdministration =
+    filters.callerIsAdmin ||
+    filters.callerAreas.some(
+      (area) => area === "magazzino" || area === "logistica",
+    );
   const warehouseScope = andSql(
     reportScope(
       filters,
@@ -144,12 +174,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
       { sharedAreaOperativa: true, sharedCentro: true },
     ),
   );
-  const allowedCanonicalChannels = [
-    ...(sources.pacchi ? ["PACCHI", "RITIRO_SEDE", "DOMICILIARE"] : []),
-    ...(sources.emporio ? ["EMPORIO"] : []),
-    ...(sources.mensa ? ["MENSA"] : []),
-    ...(sources.uds ? ["UDS_STRADA"] : []),
-  ];
+  const allowedCanonicalChannels = fseCanonicalChannels(sources);
   const authorizedFseMovement = fseAuthorizedMovementCondition(
     filters,
     allowedCanonicalChannels,
@@ -361,7 +386,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
           AND mv.data_movimento BETWEEN ${filters.da} AND ${filters.a}
           AND ${warehouseScope}
           AND (
-            mv.natura_contabile NOT IN ('DISTRIBUZIONE_FINALE', 'STORNO', 'LEGACY')
+            (mv.natura_contabile NOT IN ('DISTRIBUZIONE_FINALE', 'STORNO', 'LEGACY') AND ${warehouseAdministration})
             OR (
               ${authorizedFseMovement}
               AND (mv.natura_contabile = 'DISTRIBUZIONE_FINALE'
@@ -389,19 +414,19 @@ export async function buildFsePlusReport(filters: ReportFilters) {
         COALESCE((SELECT SUM(CASE WHEN lower(p.unita_misura)='pz' THEN l.quantita_residua::numeric
           WHEN l.fattore_kg_lt_pezzo IS NOT NULL THEN l.quantita_residua::numeric/l.fattore_kg_lt_pezzo::numeric ELSE 0 END)
           FROM lotti l JOIN prodotti p ON p.id=l.prodotto_id JOIN magazzini mg ON mg.id=l.magazzino_id
-          WHERE l.fondo_origine='FSE_PLUS' AND ${warehouseScope}),0)::text AS corrente_pezzi,
+          WHERE l.fondo_origine='FSE_PLUS' AND ${warehouseScope} AND ${warehouseAdministration}),0)::text AS corrente_pezzi,
         COALESCE((SELECT SUM(CASE WHEN lower(p.unita_misura) IN ('kg','lt','l') THEN l.quantita_residua::numeric
           WHEN lower(p.unita_misura)='pz' AND l.fattore_kg_lt_pezzo IS NOT NULL THEN l.quantita_residua::numeric*l.fattore_kg_lt_pezzo::numeric ELSE 0 END)
           FROM lotti l JOIN prodotti p ON p.id=l.prodotto_id JOIN magazzini mg ON mg.id=l.magazzino_id
-          WHERE l.fondo_origine='FSE_PLUS' AND ${warehouseScope}),0)::text AS corrente_kg_lt,
+          WHERE l.fondo_origine='FSE_PLUS' AND ${warehouseScope} AND ${warehouseAdministration}),0)::text AS corrente_kg_lt,
         COALESCE((SELECT SUM(${signedPieces})
           FROM movimenti mv LEFT JOIN movimenti original ON original.id=mv.movimento_origine_id
           JOIN magazzini mg ON mg.id=mv.magazzino_id
-          WHERE mv.fondo_origine='FSE_PLUS' AND mv.data_movimento<=${filters.a} AND ${warehouseScope}),0)::text AS asof_pezzi,
+          WHERE mv.fondo_origine='FSE_PLUS' AND mv.data_movimento<=${filters.a} AND ${warehouseScope} AND ${warehouseAdministration}),0)::text AS asof_pezzi,
         COALESCE((SELECT SUM(${signedKgLt})
           FROM movimenti mv LEFT JOIN movimenti original ON original.id=mv.movimento_origine_id
           JOIN magazzini mg ON mg.id=mv.magazzino_id
-          WHERE mv.fondo_origine='FSE_PLUS' AND mv.data_movimento<=${filters.a} AND ${warehouseScope}),0)::text AS asof_kg_lt,
+          WHERE mv.fondo_origine='FSE_PLUS' AND mv.data_movimento<=${filters.a} AND ${warehouseScope} AND ${warehouseAdministration}),0)::text AS asof_kg_lt,
         count(*) FILTER (WHERE natura_contabile='CARICO') AS carichi,
         count(*) FILTER (WHERE natura_contabile='DISTRIBUZIONE_FINALE') AS distribuzioni_lorde,
         count(*) FILTER (WHERE natura_contabile='STORNO') AS storni,
@@ -409,8 +434,8 @@ export async function buildFsePlusReport(filters: ReportFilters) {
         COALESCE(SUM(abs(quantita_kg_lt::numeric)) FILTER (WHERE natura_contabile='DISTRIBUZIONE_FINALE'),0)::text AS distribuzioni_lorde_kg_lt,
         COALESCE(SUM(abs(quantita_pezzi::numeric)) FILTER (WHERE natura_contabile='STORNO' AND original_nature='DISTRIBUZIONE_FINALE'),0)::text AS storni_distribuzioni_pezzi,
         COALESCE(SUM(abs(quantita_kg_lt::numeric)) FILTER (WHERE natura_contabile='STORNO' AND original_nature='DISTRIBUZIONE_FINALE'),0)::text AS storni_distribuzioni_kg_lt,
-        COALESCE(SUM(${signedMovementSql(sql`quantita_pezzi`, sql`natura_contabile`, sql`original_nature`)}) FILTER (WHERE natura_contabile IN ('DISTRIBUZIONE_FINALE','STORNO')),0)::text AS distribuzioni_nette_pezzi,
-        COALESCE(SUM(${signedMovementSql(sql`quantita_kg_lt`, sql`natura_contabile`, sql`original_nature`)}) FILTER (WHERE natura_contabile IN ('DISTRIBUZIONE_FINALE','STORNO')),0)::text AS distribuzioni_nette_kg_lt,
+        (-COALESCE(SUM(${signedMovementSql(sql`quantita_pezzi`, sql`natura_contabile`, sql`original_nature`)}) FILTER (WHERE natura_contabile='DISTRIBUZIONE_FINALE' OR (natura_contabile='STORNO' AND original_nature='DISTRIBUZIONE_FINALE')),0))::text AS distribuzioni_nette_pezzi,
+        (-COALESCE(SUM(${signedMovementSql(sql`quantita_kg_lt`, sql`natura_contabile`, sql`original_nature`)}) FILTER (WHERE natura_contabile='DISTRIBUZIONE_FINALE' OR (natura_contabile='STORNO' AND original_nature='DISTRIBUZIONE_FINALE')),0))::text AS distribuzioni_nette_kg_lt,
         count(*) FILTER (WHERE natura_contabile='RESO') AS resi,
         count(*) FILTER (WHERE natura_contabile IN ('RETTIFICA_POSITIVA','RETTIFICA_NEGATIVA','SCARTO')) AS rettifiche,
         (SELECT count(*) FROM fse_events WHERE NOT annullato_netto) AS eventi,
@@ -441,24 +466,27 @@ export async function buildFsePlusReport(filters: ReportFilters) {
             AND ${warehouseScope}
             AND ${allowedCanonicalChannelCondition}
             AND ${fseDistributionNatureCondition}
-            AND op_quality.territorio_classificazione = 'legacy_sconosciuto'
+            AND op_quality.territorio_classificazione = 'legacy_sconosciuto' AND ${warehouseAdministration}
         ) AS eventi_esclusi_mancanza_attribuzione,
         count(*) FILTER (WHERE natura_contabile='DISTRIBUZIONE_FINALE' AND operazione_distribuzione_id IS NULL) AS bloccati,
         (SELECT count(*) FROM rilevazioni_monitoraggio_fse rm JOIN magazzini mg ON mg.id=rm.magazzino_id
-          WHERE rm.data_riferimento BETWEEN ${filters.da} AND ${filters.a} AND ${warehouseScope}) AS rilevazioni_monitoraggio
+          WHERE rm.data_riferimento BETWEEN ${filters.da} AND ${filters.a} AND ${warehouseScope} AND ${warehouseAdministration}) AS rilevazioni_monitoraggio
       FROM fse_period
     `),
-    rows<Record<string, unknown>>(sql`
+    warehouseAdministration
+      ? rows<Record<string, unknown>>(sql`
       SELECT
         (SELECT count(DISTINCT COALESCE(
             'DISTRIBUZIONE:' || mv.operazione_distribuzione_id::text,
             'MOVIMENTO:' || mv.id::text
           ))
          FROM movimenti mv
+         LEFT JOIN movimenti original ON original.id=mv.movimento_origine_id
          JOIN magazzini mg ON mg.id = mv.magazzino_id
          WHERE mv.fondo_origine = 'FSE_PLUS'
            AND mv.data_movimento <= ${filters.a}
            AND ${warehouseScope}
+           AND ${fseAuthorizedMovementCondition(filters, allowedCanonicalChannels)}
            AND NOT EXISTS (
              SELECT 1 FROM esportazioni_fse_eventi ee
              JOIN esportazioni_fse ex ON ex.id = ee.esportazione_id
@@ -481,6 +509,7 @@ export async function buildFsePlusReport(filters: ReportFilters) {
          JOIN esportazioni_fse ex ON ex.id = ee.esportazione_id
          JOIN magazzini mg ON mg.id = ex.magazzino_id
          WHERE ex.stato = 'INSERITA_MANUALMENTE'
+           AND ee.active_coverage = true
            AND ex.data_a <= ${filters.a}
            AND ${warehouseScope}) AS inseriti_manualmente,
         (SELECT count(*) FROM esportazioni_fse_eventi ee
@@ -509,7 +538,8 @@ export async function buildFsePlusReport(filters: ReportFilters) {
            AND rr.blocking = true
            AND rf.stato IN ('CALCOLATA', 'DA_RIVEDERE')
            AND ${warehouseScope}) AS scostamenti_aperti
-    `),
+    `)
+      : Promise.resolve([{} as Record<string, unknown>]),
   ]);
   const persons = people[0] ?? {};
   const dq = qualityRows[0] ?? {};
@@ -518,10 +548,18 @@ export async function buildFsePlusReport(filters: ReportFilters) {
   const distinctProducts = new Set(
     products.map((row) => number(row.prodotto_id)),
   ).size;
-  const kg = products.reduce(
-    (sum, row) => sum + (row.kg == null ? 0 : number(row.kg)),
-    0,
-  );
+  const exactKg = products
+    .reduce(
+      (sum, row) =>
+        sum.add(
+          InventoryDecimal.parse(String(row.kg ?? "0"), {
+            allowNegative: true,
+          }),
+        ),
+      InventoryDecimal.zero(),
+    )
+    .toCanonical();
+  const kg = Number(exactKg);
   const unconvertible = products.filter((row) => row.kg == null).length;
   const totalFseHouseholds = number(persons.nuclei);
   const householdsWithSnapshot = number(persons.con_snapshot);
@@ -625,404 +663,445 @@ export async function buildFsePlusReport(filters: ReportFilters) {
     filters.callerIsAdmin ||
     filters.callerPermissions.includes("beneficiari.fse.view");
 
-  return dashboard({
-    section: "fse-plus",
+  const queue = await fseQueuePanel(
     filters,
-    kpi: [
-      kpi(
-        "giacenzaFseCorrentePezzi",
-        number(ac.corrente_pezzi),
-        "pieces",
-        null,
-        "ok",
-        String(ac.corrente_pezzi ?? "0"),
-      ),
-      kpi(
-        "giacenzaFseCorrenteKgLt",
-        number(ac.corrente_kg_lt),
-        "kgLt",
-        null,
-        "ok",
-        String(ac.corrente_kg_lt ?? "0"),
-      ),
-      kpi(
-        "giacenzaFseAsOfPezzi",
-        number(ac.asof_pezzi),
-        "pieces",
-        null,
-        "ok",
-        String(ac.asof_pezzi ?? "0"),
-      ),
-      kpi(
-        "giacenzaFseAsOfKgLt",
-        number(ac.asof_kg_lt),
-        "kgLt",
-        null,
-        "ok",
-        String(ac.asof_kg_lt ?? "0"),
-      ),
-      kpi("carichiFse", number(ac.carichi)),
-      kpi("distribuzioniFseLorde", number(ac.distribuzioni_lorde)),
-      kpi("storniFse", number(ac.storni)),
-      kpi(
-        "distribuzioniFseLordePezzi",
-        number(ac.distribuzioni_lorde_pezzi),
-        "pieces",
-        null,
-        "ok",
-        String(ac.distribuzioni_lorde_pezzi ?? "0"),
-      ),
-      kpi(
-        "distribuzioniFseLordeKgLt",
-        number(ac.distribuzioni_lorde_kg_lt),
-        "kgLt",
-        null,
-        "ok",
-        String(ac.distribuzioni_lorde_kg_lt ?? "0"),
-      ),
-      kpi(
-        "storniDistribuzioniPezzi",
-        number(ac.storni_distribuzioni_pezzi),
-        "pieces",
-        null,
-        "ok",
-        String(ac.storni_distribuzioni_pezzi ?? "0"),
-      ),
-      kpi(
-        "storniDistribuzioniKgLt",
-        number(ac.storni_distribuzioni_kg_lt),
-        "kgLt",
-        null,
-        "ok",
-        String(ac.storni_distribuzioni_kg_lt ?? "0"),
-      ),
-      kpi(
-        "distribuzioniFseNettePezzi",
-        Math.abs(number(ac.distribuzioni_nette_pezzi)),
-        "pieces",
-        null,
-        "ok",
-        String(ac.distribuzioni_nette_pezzi ?? "0").replace(/^-/, ""),
-      ),
-      kpi(
-        "distribuzioniFseNetteKgLt",
-        Math.abs(number(ac.distribuzioni_nette_kg_lt)),
-        "kgLt",
-        null,
-        "ok",
-        String(ac.distribuzioni_nette_kg_lt ?? "0").replace(/^-/, ""),
-      ),
-      kpi("eventiDistribuzione", number(ac.eventi)),
-      kpi("saltuari", number(ac.saltuari)),
-      kpi("continuativi", number(ac.continuativi)),
-      kpi("resiOpc", number(ac.resi)),
-      kpi("modificheGiacenza", number(ac.rettifiche)),
-      kpi("eventiBloccati", number(ac.bloccati)),
-      kpi("rilevazioniMonitoraggio", number(ac.rilevazioni_monitoraggio)),
-      kpi("eventiDaRendicontare", number(administrative.da_rendicontare)),
-      kpi("eventiInEsportazione", number(administrative.in_esportazione)),
-      kpi(
-        "eventiInseritiManualmente",
-        number(administrative.inseriti_manualmente),
-      ),
-      kpi("eventiArretrati", number(administrative.arretrati)),
-      kpi("righeRiconciliate", number(administrative.righe_riconciliate)),
-      kpi("scostamentiAperti", number(administrative.scostamenti_aperti)),
-      kpi(
-        "prodottiFseDistinti",
-        distinctProducts,
-        "count",
-        "prodottiFseDistinti",
-      ),
-      kpi("kgCalcolabili", kg, "kgLt"),
-      kpi(
-        "nucleiRaggiunti",
-        number(persons.nuclei),
-        "count",
-        canViewIndividualFse ? "nucleiRaggiunti" : null,
-      ),
-      kpi(
-        "personeRaggiunte",
-        peopleValue,
-        "count",
-        canViewIndividualFse && peopleValue != null ? "personeRaggiunte" : null,
-        peopleValue == null
-          ? "missing"
-          : peopleCoverage < totalFseHouseholds
-            ? "derivable"
-            : "ok",
-      ),
-      ...(sources.pacchi ? [kpi("pacchiDistribuiti", number(ac.pacchi))] : []),
-      ...(sources.mensa ? [kpi("pastiDistribuiti", number(ac.pasti))] : []),
-    ],
-    series: [
-      {
-        key: "canali",
-        points: channels.map((r) => ({
-          label: String(r.canale),
-          value: number(r.documenti),
-          secondaryValue: r.nuclei == null ? null : number(r.nuclei),
-        })),
-      },
-    ],
-    tables: [
-      {
-        key: "01_Prodotti_FSE",
-        columns: [
-          "prodottoId",
-          "prodottoNome",
-          "unitaMisura",
-          "quantitaFse",
-          "quantitaTotale",
-          "percentualeFse",
-          "kg",
-        ],
-        rows: products.map((r) => ({
-          prodottoId: number(r.prodotto_id),
-          prodottoNome: String(r.prodotto_nome),
-          unitaMisura: String(r.unita_misura),
-          quantitaFse: number(r.quantita_fse),
-          quantitaTotale: number(r.quantita_totale),
-          percentualeFse:
-            r.percentuale_fse == null ? null : number(r.percentuale_fse),
-          kg: r.kg == null ? null : number(r.kg),
-        })),
-      },
-      {
-        key: "02_Continuativi",
-        columns: ["stato", "nota"],
-        rows: [
-          {
-            stato: statisticsAvailability,
-            nota:
-              statisticsAvailability === "MANCANTE"
-                ? "Nessuna statistica evento o rilevazione mensile disponibile"
-                : "Aggregato disponibile; non identifica persone uniche",
-          },
-        ],
-      },
-      {
-        key: "03_Saltuari_Mensa",
-        columns: ["stato", "nota"],
-        rows: [
-          {
-            stato: statisticsAvailability,
-            nota: "Statistiche aggregate evento/rilevazione; nessuna persona anonima viene deduplicata",
-          },
-        ],
-      },
-      {
-        key: "04_Saltuari_Pacchi",
-        columns: ["stato", "nota"],
-        rows: [
-          {
-            stato: statisticsAvailability,
-            nota: "Statistiche aggregate evento/rilevazione; non anagrafica individuale",
-          },
-        ],
-      },
-      {
-        key: "05_Saltuari_Strada",
-        columns: ["stato", "nota"],
-        rows: [
-          {
-            stato: statisticsAvailability,
-            nota: "Canale UDS_STRADA dal ledger canonico; valori aggregati se rilevati",
-          },
-        ],
-      },
-      {
-        key: "06_Pacchi_Pasti",
-        columns: ["pacchi", "pasti"],
-        rows: [
-          {
-            pacchi: sources.pacchi ? number(ac.pacchi) : null,
-            pasti: sources.mensa ? number(ac.pasti) : null,
-          },
-        ],
-      },
-      {
-        key: "07_Misure_Accompagnamento",
-        columns: ["stato", "nota"],
-        rows: [
-          {
-            stato: "MANCANTE",
-            nota: "Tipologie intervento non mappate a misure FSE+",
-          },
-        ],
-      },
-      {
-        key: "fasceEta",
-        columns: ["fascia", "persone"],
-        rows: ageRows.map((r) => ({
-          fascia: String(r.fascia),
-          persone: number(r.persone),
-        })),
-      },
-      {
-        key: "sesso",
-        columns: ["sesso", "persone"],
-        rows: sexRows.map((r) => ({
-          sesso: String(r.sesso),
-          persone: number(r.persone),
-        })),
-      },
-      {
-        key: "canali",
-        columns: ["canale", "documenti", "nuclei"],
-        rows: channels.map((r) => ({
-          canale: String(r.canale),
-          documenti: number(r.documenti),
-          nuclei: r.nuclei == null ? null : number(r.nuclei),
-        })),
-      },
-      {
-        key: "quantitaPerCanaleUnita",
-        columns: ["canale", "unitaMisura", "quantita"],
-        rows: channelQuantities.map((r) => ({
-          canale: String(r.canale),
-          unitaMisura: String(r.unita_misura),
-          quantita: number(r.quantita),
-        })),
-      },
-      {
-        key: "dimensioniFseBeneficiari",
-        columns: [
-          "campo",
-          "valore",
-          "nucleiCoperti",
-          "nucleiTotali",
-          "nucleiSenzaDato",
-          "disponibilita",
-        ],
-        rows: [
-          [
-            "numeroComponenti",
-            persons.persone,
-            persons.copertura_numero_componenti,
-          ],
-          ["sesso", persons.persone_sesso_note, persons.copertura_sesso],
-          ["fasceEta", persons.persone_eta_note, persons.copertura_eta],
-          [
-            "origineStranieraMinoranze",
-            persons.origine_straniera_minoranze,
-            persons.copertura_origine,
-          ],
-          [
-            "personeDisabilita",
-            persons.persone_disabilita,
-            persons.copertura_disabilita,
-          ],
-          [
-            "cittadiniPaesiTerzi",
-            persons.cittadini_paesi_terzi,
-            persons.copertura_paesi_terzi,
-          ],
-          [
-            "esclusioneAbitativa",
-            persons.esclusione_abitativa,
-            persons.copertura_esclusione,
-          ],
-        ].map(([campo, valore, copertura]) => ({
-          campo: String(campo),
-          valore: valore == null ? null : number(valore),
-          nucleiCoperti: number(copertura),
-          nucleiTotali: totalFseHouseholds,
-          nucleiSenzaDato: Math.max(0, totalFseHouseholds - number(copertura)),
-          disponibilita:
-            number(copertura) === 0
-              ? "MANCANTE"
-              : number(copertura) < totalFseHouseholds
-                ? "PARZIALE"
-                : "DISPONIBILE",
-        })),
-      },
-      {
-        key: "disponibilitaSifead",
-        columns: ["campo", "disponibilita", "fonte", "note"],
-        rows: availabilityRows.map(([campo, disponibilita, fonte, note]) => ({
-          campo,
-          disponibilita,
-          fonte,
-          note,
-        })),
-      },
-    ],
-    quality: [
-      quality(
-        "snapshotFseMancante",
-        number(dq.snapshot_mancante),
-        number(dq.snapshot_mancante) ? "missing" : "ok",
-        text("qualityFseSnapshotMissing"),
-      ),
-      quality(
-        "snapshotFseIncompleto",
-        number(dq.snapshot_incompleto),
-        number(dq.snapshot_incompleto) ? "missing" : "ok",
-        text("qualityFseSnapshotIncomplete"),
-      ),
-      quality(
-        "snapshotFseDerivato",
-        number(dq.snapshot_derivato),
-        number(dq.snapshot_derivato) ? "derivable" : "ok",
-        text("qualityFseSnapshotDerived"),
-      ),
-      quality(
-        "statisticheEventoStornoParziale",
-        number(ac.eventi_storno_parziale),
-        number(ac.eventi_storno_parziale) ? "derivable" : "ok",
-        text("qualityFsePartialReversal"),
-      ),
-      quality(
-        "territorioEventoLegacyMancante",
-        number(ac.eventi_territorio_legacy),
-        number(ac.eventi_territorio_legacy) ? "missing" : "ok",
-        text("qualityFseLegacyTerritory"),
-      ),
-      quality(
-        "eventoUniversale",
-        number(ac.eventi_universali),
-        number(ac.eventi_universali) ? "derivable" : "ok",
-        text("qualityFseUniversalEvents"),
-      ),
-      quality(
-        "eventoEsclusoMancanzaAttribuzione",
-        number(ac.eventi_esclusi_mancanza_attribuzione),
-        number(ac.eventi_esclusi_mancanza_attribuzione) ? "missing" : "ok",
-        text("qualityFseExcludedTerritory"),
-      ),
-      quality(
-        "unitaPesoNonNormalizzabile",
-        unconvertible,
-        unconvertible ? "missing" : "ok",
-        text("qualityKgOnly"),
-      ),
-      quality(
-        "dimensioniSifeadMancanti",
-        missingSifeadDimensions,
-        missingSifeadDimensions ? "missing" : "ok",
-        text("qualityMissingFields"),
-      ),
-    ],
-    definitions: [
-      text("fseProvenance"),
-      text("fseSnapshotAtDate"),
-      text("fseFutureSnapshotsExcluded", { date: filters.a }),
-      peopleCoverage < totalFseHouseholds
-        ? text("fsePeoplePartialCoverage", {
-            covered: peopleCoverage,
-            total: totalFseHouseholds,
-          })
-        : text("fsePeopleFullCoverage"),
-      text("fseSources"),
-      text("fseCanonicalChannels"),
-      text("fseAdministrativeDates", {
-        exportDate: String(administrative.ultima_esportazione ?? "—"),
-        importDate: String(administrative.ultima_importazione ?? "—"),
-        reconciliationDate: String(
-          administrative.ultima_riconciliazione ?? "—",
+    warehouseScope,
+    fseAuthorizedMovementCondition(filters, allowedCanonicalChannels),
+  );
+  return appendReportPanels(
+    dashboard({
+      section: "fse-plus",
+      filters,
+      kpi: [
+        kpi(
+          "giacenzaFseCorrentePezzi",
+          number(ac.corrente_pezzi),
+          "pieces",
+          null,
+          "ok",
+          String(ac.corrente_pezzi ?? "0"),
         ),
-      }),
-    ],
-  });
+        kpi(
+          "giacenzaFseCorrenteKgLt",
+          number(ac.corrente_kg_lt),
+          "kgLt",
+          null,
+          "ok",
+          String(ac.corrente_kg_lt ?? "0"),
+        ),
+        kpi(
+          "giacenzaFseAsOfPezzi",
+          number(ac.asof_pezzi),
+          "pieces",
+          null,
+          "ok",
+          String(ac.asof_pezzi ?? "0"),
+        ),
+        kpi(
+          "giacenzaFseAsOfKgLt",
+          number(ac.asof_kg_lt),
+          "kgLt",
+          null,
+          "ok",
+          String(ac.asof_kg_lt ?? "0"),
+        ),
+        kpi("carichiFse", number(ac.carichi)),
+        kpi("distribuzioniFseLorde", number(ac.distribuzioni_lorde)),
+        kpi("storniFse", number(ac.storni)),
+        kpi(
+          "distribuzioniFseLordePezzi",
+          number(ac.distribuzioni_lorde_pezzi),
+          "pieces",
+          null,
+          "ok",
+          String(ac.distribuzioni_lorde_pezzi ?? "0"),
+        ),
+        kpi(
+          "distribuzioniFseLordeKgLt",
+          number(ac.distribuzioni_lorde_kg_lt),
+          "kgLt",
+          null,
+          "ok",
+          String(ac.distribuzioni_lorde_kg_lt ?? "0"),
+        ),
+        kpi(
+          "storniDistribuzioniPezzi",
+          number(ac.storni_distribuzioni_pezzi),
+          "pieces",
+          null,
+          "ok",
+          String(ac.storni_distribuzioni_pezzi ?? "0"),
+        ),
+        kpi(
+          "storniDistribuzioniKgLt",
+          number(ac.storni_distribuzioni_kg_lt),
+          "kgLt",
+          null,
+          "ok",
+          String(ac.storni_distribuzioni_kg_lt ?? "0"),
+        ),
+        kpi(
+          "distribuzioniFseNettePezzi",
+          number(ac.distribuzioni_nette_pezzi),
+          "pieces",
+          null,
+          "ok",
+          String(ac.distribuzioni_nette_pezzi ?? "0"),
+        ),
+        kpi(
+          "distribuzioniFseNetteKgLt",
+          number(ac.distribuzioni_nette_kg_lt),
+          "kgLt",
+          null,
+          "ok",
+          String(ac.distribuzioni_nette_kg_lt ?? "0"),
+        ),
+        kpi("eventiDistribuzione", number(ac.eventi)),
+        kpi("saltuari", number(ac.saltuari)),
+        kpi("continuativi", number(ac.continuativi)),
+        kpi("resiOpc", number(ac.resi)),
+        kpi("modificheGiacenza", number(ac.rettifiche)),
+        kpi("eventiBloccati", number(ac.bloccati)),
+        kpi("rilevazioniMonitoraggio", number(ac.rilevazioni_monitoraggio)),
+        kpi("eventiDaRendicontare", number(administrative.da_rendicontare)),
+        kpi("eventiInEsportazione", number(administrative.in_esportazione)),
+        kpi(
+          "eventiInseritiManualmente",
+          number(administrative.inseriti_manualmente),
+        ),
+        kpi("eventiArretrati", number(administrative.arretrati)),
+        kpi("righeRiconciliate", number(administrative.righe_riconciliate)),
+        kpi("scostamentiAperti", number(administrative.scostamenti_aperti)),
+        kpi(
+          "prodottiFseDistinti",
+          distinctProducts,
+          "count",
+          "prodottiFseDistinti",
+        ),
+        kpi("kgCalcolabili", kg, "kgLt", null, "ok", exactKg),
+        kpi(
+          "nucleiRaggiunti",
+          number(persons.nuclei),
+          "count",
+          canViewIndividualFse ? "nucleiRaggiunti" : null,
+        ),
+        kpi(
+          "personeRaggiunte",
+          peopleValue,
+          "count",
+          canViewIndividualFse && peopleValue != null
+            ? "personeRaggiunte"
+            : null,
+          peopleValue == null
+            ? "missing"
+            : peopleCoverage < totalFseHouseholds
+              ? "derivable"
+              : "ok",
+        ),
+        ...(sources.pacchi
+          ? [kpi("pacchiDistribuiti", number(ac.pacchi))]
+          : []),
+        ...(sources.mensa ? [kpi("pastiDistribuiti", number(ac.pasti))] : []),
+      ].map((item) =>
+        !warehouseAdministration &&
+        [
+          "giacenzaFseCorrentePezzi",
+          "giacenzaFseCorrenteKgLt",
+          "giacenzaFseAsOfPezzi",
+          "giacenzaFseAsOfKgLt",
+          "carichiFse",
+          "resiOpc",
+          "modificheGiacenza",
+          "rilevazioniMonitoraggio",
+          "eventiDaRendicontare",
+          "eventiInEsportazione",
+          "eventiInseritiManualmente",
+          "eventiArretrati",
+          "righeRiconciliate",
+          "scostamentiAperti",
+        ].includes(item.key)
+          ? {
+              ...item,
+              value: null,
+              exactValue: null,
+              availability: "missing" as const,
+            }
+          : item,
+      ),
+      series: [
+        {
+          key: "canali",
+          points: channels.map((r) => ({
+            label: String(r.canale),
+            value: number(r.documenti),
+            exactValue: String(r.documenti),
+            secondaryValue: r.nuclei == null ? null : number(r.nuclei),
+          })),
+        },
+      ],
+      tables: [
+        {
+          key: "01_Prodotti_FSE",
+          columns: [
+            "prodottoId",
+            "prodottoNome",
+            "unitaMisura",
+            "quantitaFse",
+            "quantitaTotale",
+            "percentualeFse",
+            "kg",
+          ],
+          rows: products.map((r) => ({
+            prodottoId: number(r.prodotto_id),
+            prodottoNome: String(r.prodotto_nome),
+            unitaMisura: String(r.unita_misura),
+            quantitaFse: String(r.quantita_fse),
+            quantitaTotale: String(r.quantita_totale),
+            percentualeFse:
+              r.percentuale_fse == null ? null : String(r.percentuale_fse),
+            kg: r.kg == null ? null : String(r.kg),
+          })),
+        },
+        {
+          key: "02_Continuativi",
+          columns: ["stato", "nota"],
+          rows: [
+            {
+              stato: statisticsAvailability,
+              nota:
+                statisticsAvailability === "MANCANTE"
+                  ? "Nessuna statistica evento o rilevazione mensile disponibile"
+                  : "Aggregato disponibile; non identifica persone uniche",
+            },
+          ],
+        },
+        {
+          key: "03_Saltuari_Mensa",
+          columns: ["stato", "nota"],
+          rows: [
+            {
+              stato: statisticsAvailability,
+              nota: "Statistiche aggregate evento/rilevazione; nessuna persona anonima viene deduplicata",
+            },
+          ],
+        },
+        {
+          key: "04_Saltuari_Pacchi",
+          columns: ["stato", "nota"],
+          rows: [
+            {
+              stato: statisticsAvailability,
+              nota: "Statistiche aggregate evento/rilevazione; non anagrafica individuale",
+            },
+          ],
+        },
+        {
+          key: "05_Saltuari_Strada",
+          columns: ["stato", "nota"],
+          rows: [
+            {
+              stato: statisticsAvailability,
+              nota: "Canale UDS_STRADA dal ledger canonico; valori aggregati se rilevati",
+            },
+          ],
+        },
+        {
+          key: "06_Pacchi_Pasti",
+          columns: ["pacchi", "pasti"],
+          rows: [
+            {
+              pacchi: sources.pacchi ? number(ac.pacchi) : null,
+              pasti: sources.mensa ? number(ac.pasti) : null,
+            },
+          ],
+        },
+        {
+          key: "07_Misure_Accompagnamento",
+          columns: ["stato", "nota"],
+          rows: [
+            {
+              stato: "MANCANTE",
+              nota: "Tipologie intervento non mappate a misure FSE+",
+            },
+          ],
+        },
+        {
+          key: "fasceEta",
+          columns: ["fascia", "persone"],
+          rows: ageRows.map((r) => ({
+            fascia: String(r.fascia),
+            persone: number(r.persone),
+          })),
+        },
+        {
+          key: "sesso",
+          columns: ["sesso", "persone"],
+          rows: sexRows.map((r) => ({
+            sesso: String(r.sesso),
+            persone: number(r.persone),
+          })),
+        },
+        {
+          key: "canali",
+          columns: ["canale", "documenti", "nuclei"],
+          rows: channels.map((r) => ({
+            canale: String(r.canale),
+            documenti: number(r.documenti),
+            nuclei: r.nuclei == null ? null : number(r.nuclei),
+          })),
+        },
+        {
+          key: "quantitaPerCanaleUnita",
+          columns: ["canale", "unitaMisura", "quantita"],
+          rows: channelQuantities.map((r) => ({
+            canale: String(r.canale),
+            unitaMisura: String(r.unita_misura),
+            quantita: String(r.quantita),
+          })),
+        },
+        {
+          key: "dimensioniFseBeneficiari",
+          columns: [
+            "campo",
+            "valore",
+            "nucleiCoperti",
+            "nucleiTotali",
+            "nucleiSenzaDato",
+            "disponibilita",
+          ],
+          rows: [
+            [
+              "numeroComponenti",
+              persons.persone,
+              persons.copertura_numero_componenti,
+            ],
+            ["sesso", persons.persone_sesso_note, persons.copertura_sesso],
+            ["fasceEta", persons.persone_eta_note, persons.copertura_eta],
+            [
+              "origineStranieraMinoranze",
+              persons.origine_straniera_minoranze,
+              persons.copertura_origine,
+            ],
+            [
+              "personeDisabilita",
+              persons.persone_disabilita,
+              persons.copertura_disabilita,
+            ],
+            [
+              "cittadiniPaesiTerzi",
+              persons.cittadini_paesi_terzi,
+              persons.copertura_paesi_terzi,
+            ],
+            [
+              "esclusioneAbitativa",
+              persons.esclusione_abitativa,
+              persons.copertura_esclusione,
+            ],
+          ].map(([campo, valore, copertura]) => ({
+            campo: String(campo),
+            valore: valore == null ? null : number(valore),
+            nucleiCoperti: number(copertura),
+            nucleiTotali: totalFseHouseholds,
+            nucleiSenzaDato: Math.max(
+              0,
+              totalFseHouseholds - number(copertura),
+            ),
+            disponibilita:
+              number(copertura) === 0
+                ? "MANCANTE"
+                : number(copertura) < totalFseHouseholds
+                  ? "PARZIALE"
+                  : "DISPONIBILE",
+          })),
+        },
+        {
+          key: "disponibilitaSifead",
+          columns: ["campo", "disponibilita", "fonte", "note"],
+          rows: availabilityRows.map(([campo, disponibilita, fonte, note]) => ({
+            campo,
+            disponibilita,
+            fonte,
+            note,
+          })),
+        },
+      ],
+      quality: [
+        quality(
+          "snapshotFseMancante",
+          number(dq.snapshot_mancante),
+          number(dq.snapshot_mancante) ? "missing" : "ok",
+          text("qualityFseSnapshotMissing"),
+        ),
+        quality(
+          "snapshotFseIncompleto",
+          number(dq.snapshot_incompleto),
+          number(dq.snapshot_incompleto) ? "missing" : "ok",
+          text("qualityFseSnapshotIncomplete"),
+        ),
+        quality(
+          "snapshotFseDerivato",
+          number(dq.snapshot_derivato),
+          number(dq.snapshot_derivato) ? "derivable" : "ok",
+          text("qualityFseSnapshotDerived"),
+        ),
+        quality(
+          "statisticheEventoStornoParziale",
+          number(ac.eventi_storno_parziale),
+          number(ac.eventi_storno_parziale) ? "derivable" : "ok",
+          text("qualityFsePartialReversal"),
+        ),
+        quality(
+          "territorioEventoLegacyMancante",
+          number(ac.eventi_territorio_legacy),
+          number(ac.eventi_territorio_legacy) ? "missing" : "ok",
+          text("qualityFseLegacyTerritory"),
+        ),
+        quality(
+          "eventoUniversale",
+          number(ac.eventi_universali),
+          number(ac.eventi_universali) ? "derivable" : "ok",
+          text("qualityFseUniversalEvents"),
+        ),
+        quality(
+          "eventoEsclusoMancanzaAttribuzione",
+          number(ac.eventi_esclusi_mancanza_attribuzione),
+          number(ac.eventi_esclusi_mancanza_attribuzione) ? "missing" : "ok",
+          text("qualityFseExcludedTerritory"),
+        ),
+        quality(
+          "unitaPesoNonNormalizzabile",
+          unconvertible,
+          unconvertible ? "missing" : "ok",
+          text("qualityKgOnly"),
+        ),
+        quality(
+          "dimensioniSifeadMancanti",
+          missingSifeadDimensions,
+          missingSifeadDimensions ? "missing" : "ok",
+          text("qualityMissingFields"),
+        ),
+      ],
+      definitions: [
+        text("fseProvenance"),
+        text("fseSnapshotAtDate"),
+        text("fseFutureSnapshotsExcluded", { date: filters.a }),
+        peopleCoverage < totalFseHouseholds
+          ? text("fsePeoplePartialCoverage", {
+              covered: peopleCoverage,
+              total: totalFseHouseholds,
+            })
+          : text("fsePeopleFullCoverage"),
+        text("fseSources"),
+        text("fseCanonicalChannels"),
+        text("fseAdministrativeDates", {
+          exportDate: String(administrative.ultima_esportazione ?? "—"),
+          importDate: String(administrative.ultima_importazione ?? "—"),
+          reconciliationDate: String(
+            administrative.ultima_riconciliazione ?? "—",
+          ),
+        }),
+      ],
+    }),
+    queue,
+  );
 }

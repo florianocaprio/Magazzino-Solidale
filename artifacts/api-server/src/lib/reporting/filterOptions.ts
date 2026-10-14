@@ -1,15 +1,27 @@
 import {
   areeOperativeTable,
   centriAscoltoTable,
-  db,
   magazziniTable,
   menseTable,
   zoneUdsTable,
 } from "@workspace/db";
-import { and, asc, eq, isNull, or, type Column, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  isNull,
+  or,
+  inArray,
+  sql,
+  type Column,
+  type SQL,
+} from "drizzle-orm";
 import type { Request } from "express";
-import { isModuloAttivo } from "../featureFlags";
-import type { ReportSection } from "./types";
+import {
+  isReportModuleActive as isModuloAttivo,
+  reportExecutor,
+} from "./queryContext";
+import type { ReportSection, ReportFilters } from "./types";
 
 export type ReportFilterOption = {
   id: number;
@@ -28,11 +40,16 @@ export type ReportFilterOptions = {
 };
 
 function where(...conditions: Array<SQL | undefined>): SQL | undefined {
-  const present = conditions.filter((condition): condition is SQL => condition != null);
+  const present = conditions.filter(
+    (condition): condition is SQL => condition != null,
+  );
   return present.length > 1 ? and(...present) : present[0];
 }
 
-function areaOperativaCondition(column: Column, areaOperativaId: number | null): SQL | undefined {
+function areaOperativaCondition(
+  column: Column,
+  areaOperativaId: number | null,
+): SQL | undefined {
   return areaOperativaId == null ? undefined : eq(column, areaOperativaId);
 }
 
@@ -40,33 +57,46 @@ export async function buildReportFilterOptions(
   req: Request,
   section: ReportSection,
   requestedAreaOperativaId: number | null,
+  filters?: ReportFilters,
 ): Promise<ReportFilterOptions> {
+  const db = reportExecutor();
   const user = req.user;
   const ownAreaOperativaId = user?.areaOperativaId ?? null;
-  const ownCentreId = user?.centroAscoltoId ?? null;
+  const ownCentreId = user?.centroAscoltoId ?? filters?.centroAscoltoId ?? null;
   const ownZoneId = user?.zonaUdsId ?? null;
-  const effectiveAreaOperativaId = ownAreaOperativaId ?? requestedAreaOperativaId;
+  const effectiveAreaOperativaId =
+    ownAreaOperativaId ?? requestedAreaOperativaId;
   const isAdmin = user?.isAdmin ?? false;
-  const hasArea = (area: string) => isAdmin || Boolean(user?.aree.includes(area));
+  const hasArea = (area: string) =>
+    isAdmin || Boolean(user?.aree.includes(area));
   const hasPermission = (permission: string) =>
     isAdmin || Boolean(user?.permessi.includes(permission));
 
-  const [magazzino, bolle, centroAscolto, emporio, mensa, uds, lotti, trasferimenti] =
-    await Promise.all([
-      isModuloAttivo("MAGAZZINO_SOLIDALE"),
-      isModuloAttivo("BOLLE"),
-      isModuloAttivo("CENTRO_ASCOLTO"),
-      isModuloAttivo("EMPORIO_SOLIDALE"),
-      isModuloAttivo("MENSA"),
-      isModuloAttivo("UDS"),
-      isModuloAttivo("LOTTI"),
-      isModuloAttivo("TRASFERIMENTI"),
-    ]);
+  const [
+    magazzino,
+    bolle,
+    centroAscolto,
+    emporio,
+    mensa,
+    uds,
+    lotti,
+    trasferimenti,
+  ] = await Promise.all([
+    isModuloAttivo("MAGAZZINO_SOLIDALE"),
+    isModuloAttivo("BOLLE"),
+    isModuloAttivo("CENTRO_ASCOLTO"),
+    isModuloAttivo("EMPORIO_SOLIDALE"),
+    isModuloAttivo("MENSA"),
+    isModuloAttivo("UDS"),
+    isModuloAttivo("LOTTI"),
+    isModuloAttivo("TRASFERIMENTI"),
+  ]);
 
   const pacchiSource = hasArea("sociale") && magazzino && bolle;
   const socialSource = hasArea("sociale") && centroAscolto;
   const emporioSource = hasArea("emporio") && emporio;
-  const mensaSource = hasArea("mensa") && hasPermission("mensa.reports.view") && mensa;
+  const mensaSource =
+    hasArea("mensa") && hasPermission("mensa.reports.view") && mensa;
   const udsSource = hasArea("uds") && hasPermission("uds.reports.view") && uds;
   const logisticsSource =
     (hasArea("magazzino") || hasArea("logistica")) &&
@@ -82,7 +112,12 @@ export async function buildReportFilterOptions(
 
   const sectionSourceEnabled =
     section === "generale"
-      ? pacchiSource || socialSource || emporioSource || mensaSource || udsSource || logisticsSource
+      ? pacchiSource ||
+        socialSource ||
+        emporioSource ||
+        mensaSource ||
+        udsSource ||
+        logisticsSource
       : section === "pacchi"
         ? pacchiSource
         : section === "centro-ascolto"
@@ -106,79 +141,135 @@ export async function buildReportFilterOptions(
     (section === "fse-plus" && fseSource);
   const includeMense = section === "mensa" && mensaSource;
   const includeZones = section === "uds" && udsSource;
+  // A Mensa-only FSE reader must not learn another canteen's warehouse name
+  // through filter options even when the movement dataset is already scoped.
+  const assignedMensaWarehouses =
+    section === "fse-plus" &&
+    mensaSource &&
+    !logisticsSource &&
+    !pacchiSource &&
+    !emporioSource &&
+    !udsSource;
 
-  const [areeOperative, centres, warehouses, canteens, zones] = await Promise.all([
-    sectionSourceEnabled
-      ? db
-          .select({ id: areeOperativeTable.id, nome: areeOperativeTable.nome, areaOperativaId: areeOperativeTable.id })
-          .from(areeOperativeTable)
-          .where(ownAreaOperativaId == null ? undefined : eq(areeOperativeTable.id, ownAreaOperativaId))
-          .orderBy(asc(areeOperativeTable.nome))
-      : Promise.resolve([]),
-    sectionSourceEnabled
-      ? db
-          .select({ id: centriAscoltoTable.id, nome: centriAscoltoTable.nome, areaOperativaId: centriAscoltoTable.areaOperativaId })
-          .from(centriAscoltoTable)
-          .where(
-            ownCentreId != null
-              ? eq(centriAscoltoTable.id, ownCentreId)
-              : areaOperativaCondition(centriAscoltoTable.areaOperativaId, effectiveAreaOperativaId),
-          )
-          .orderBy(asc(centriAscoltoTable.nome))
-      : Promise.resolve([]),
-    includeWarehouses
-      ? db
-          .select({
-            id: magazziniTable.id,
-            nome: magazziniTable.nome,
-            areaOperativaId: magazziniTable.areaOperativaId,
-            centroAscoltoId: magazziniTable.centroAscoltoId,
-          })
-          .from(magazziniTable)
-          .where(
-            where(
-              areaOperativaCondition(magazziniTable.areaOperativaId, effectiveAreaOperativaId),
-              ownCentreId == null
+  const [areeOperative, centres, warehouses, canteens, zones] =
+    await Promise.all([
+      sectionSourceEnabled
+        ? db
+            .select({
+              id: areeOperativeTable.id,
+              nome: areeOperativeTable.nome,
+              areaOperativaId: areeOperativeTable.id,
+            })
+            .from(areeOperativeTable)
+            .where(
+              ownAreaOperativaId == null
                 ? undefined
-                : or(eq(magazziniTable.centroAscoltoId, ownCentreId), isNull(magazziniTable.centroAscoltoId)),
-            ),
-          )
-          .orderBy(asc(magazziniTable.nome))
-      : Promise.resolve([]),
-    includeMense
-      ? db
-          .select({
-            id: menseTable.id,
-            nome: menseTable.nome,
-            areaOperativaId: menseTable.areaOperativaId,
-            centroAscoltoId: magazziniTable.centroAscoltoId,
-          })
-          .from(menseTable)
-          .innerJoin(magazziniTable, eq(menseTable.magazzinoId, magazziniTable.id))
-          .where(
-            where(
-              effectiveAreaOperativaId == null ? undefined : eq(menseTable.areaOperativaId, effectiveAreaOperativaId),
-              ownCentreId == null
-                ? undefined
-                : or(eq(magazziniTable.centroAscoltoId, ownCentreId), isNull(magazziniTable.centroAscoltoId)),
-            ),
-          )
-          .orderBy(asc(menseTable.nome))
-      : Promise.resolve([]),
-    includeZones
-      ? db
-          .select({ id: zoneUdsTable.id, nome: zoneUdsTable.nome, areaOperativaId: zoneUdsTable.areaOperativaId })
-          .from(zoneUdsTable)
-          .where(
-            ownZoneId != null
-              ? eq(zoneUdsTable.id, ownZoneId)
-              : effectiveAreaOperativaId == null
-                ? undefined
-                : eq(zoneUdsTable.areaOperativaId, effectiveAreaOperativaId),
-          )
-          .orderBy(asc(zoneUdsTable.nome))
-      : Promise.resolve([]),
-  ]);
+                : eq(areeOperativeTable.id, ownAreaOperativaId),
+            )
+            .orderBy(asc(areeOperativeTable.nome))
+        : Promise.resolve([]),
+      sectionSourceEnabled
+        ? db
+            .select({
+              id: centriAscoltoTable.id,
+              nome: centriAscoltoTable.nome,
+              areaOperativaId: centriAscoltoTable.areaOperativaId,
+            })
+            .from(centriAscoltoTable)
+            .where(
+              ownCentreId != null
+                ? eq(centriAscoltoTable.id, ownCentreId)
+                : areaOperativaCondition(
+                    centriAscoltoTable.areaOperativaId,
+                    effectiveAreaOperativaId,
+                  ),
+            )
+            .orderBy(asc(centriAscoltoTable.nome))
+        : Promise.resolve([]),
+      includeWarehouses
+        ? db
+            .select({
+              id: magazziniTable.id,
+              nome: magazziniTable.nome,
+              areaOperativaId: magazziniTable.areaOperativaId,
+              centroAscoltoId: magazziniTable.centroAscoltoId,
+            })
+            .from(magazziniTable)
+            .where(
+              where(
+                areaOperativaCondition(
+                  magazziniTable.areaOperativaId,
+                  effectiveAreaOperativaId,
+                ),
+                assignedMensaWarehouses
+                  ? filters?.callerMensaIds?.length
+                    ? sql`${magazziniTable.id} IN (SELECT magazzino_id FROM mense WHERE id IN (${sql.join(
+                        filters.callerMensaIds.map((id) => sql`${id}`),
+                        sql`, `,
+                      )}))`
+                    : sql`false`
+                  : undefined,
+                ownCentreId == null
+                  ? undefined
+                  : or(
+                      eq(magazziniTable.centroAscoltoId, ownCentreId),
+                      isNull(magazziniTable.centroAscoltoId),
+                    ),
+              ),
+            )
+            .orderBy(asc(magazziniTable.nome))
+        : Promise.resolve([]),
+      includeMense
+        ? db
+            .select({
+              id: menseTable.id,
+              nome: menseTable.nome,
+              areaOperativaId: menseTable.areaOperativaId,
+              centroAscoltoId: magazziniTable.centroAscoltoId,
+            })
+            .from(menseTable)
+            .innerJoin(
+              magazziniTable,
+              eq(menseTable.magazzinoId, magazziniTable.id),
+            )
+            .where(
+              where(
+                effectiveAreaOperativaId == null
+                  ? undefined
+                  : eq(menseTable.areaOperativaId, effectiveAreaOperativaId),
+                filters?.callerMensaIds == null
+                  ? undefined
+                  : filters.callerMensaIds.length
+                    ? inArray(menseTable.id, filters.callerMensaIds)
+                    : sql`false`,
+                ownCentreId == null
+                  ? undefined
+                  : or(
+                      eq(magazziniTable.centroAscoltoId, ownCentreId),
+                      isNull(magazziniTable.centroAscoltoId),
+                    ),
+              ),
+            )
+            .orderBy(asc(menseTable.nome))
+        : Promise.resolve([]),
+      includeZones
+        ? db
+            .select({
+              id: zoneUdsTable.id,
+              nome: zoneUdsTable.nome,
+              areaOperativaId: zoneUdsTable.areaOperativaId,
+            })
+            .from(zoneUdsTable)
+            .where(
+              ownZoneId != null
+                ? eq(zoneUdsTable.id, ownZoneId)
+                : effectiveAreaOperativaId == null
+                  ? undefined
+                  : eq(zoneUdsTable.areaOperativaId, effectiveAreaOperativaId),
+            )
+            .orderBy(asc(zoneUdsTable.nome))
+        : Promise.resolve([]),
+    ]);
 
   return {
     section,

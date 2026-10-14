@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
-import { dashboard, kpi, quality, text } from "./shared";
+import { dashboard, kpi, quality, text, numericMetrics } from "./shared";
 import { intervalloGiornoEuropeRome } from "../interventiViste";
 
 const eventDate = sql`(
@@ -21,12 +21,13 @@ function socialConditions(filters: ReportFilters): SQL[] {
     ...reportScope(filters, {
       areaOperativa: sql`COALESCE(i.area_operativa_id_snapshot, be.area_operativa_id)`,
       centro: sql`COALESCE(i.centro_ascolto_id_snapshot, be.centro_ascolto_id)`,
-      zona: sql`be.zona_uds_id`,
       operatore: sql`i.operatore_id`,
     }),
   ];
   if (filters.tipoIntervento) {
-    conditions.push(sql`${filters.tipoIntervento} = ANY(regexp_split_to_array(i.tipo_intervento, '\s*,\s*'))`);
+    conditions.push(
+      sql`${filters.tipoIntervento} = ANY(regexp_split_to_array(i.tipo_intervento, '\s*,\s*'))`,
+    );
   }
   return conditions;
 }
@@ -80,24 +81,25 @@ export async function socialMetrics(filters: ReportFilters) {
     SELECT COUNT(DISTINCT be.id) AS totale
     FROM beneficiari be
     WHERE be.data_presa_in_carico BETWEEN ${filters.da} AND ${filters.a}
-      AND ${andSql(reportScope(filters, {
-        areaOperativa: sql`be.area_operativa_id`,
-        centro: sql`be.centro_ascolto_id`,
-        zona: sql`be.zona_uds_id`,
-      }))}
+      AND ${andSql(
+        reportScope(filters, {
+          areaOperativa: sql`be.area_operativa_id`,
+          centro: sql`be.centro_ascolto_id`,
+        }),
+      )}
   `);
-  return {
-    preseInCarico: number(taken?.totale),
-    persone: number(row?.persone),
-    interventi: number(row?.interventi),
-    daPianificare: number(row?.da_pianificare),
-    pianificati: number(row?.pianificati),
-    conclusi: number(row?.conclusi),
-    mancatePresentazioni: number(row?.mancati),
-    annullati: number(row?.annullati),
-    scaduti: number(row?.scaduti),
-    operatori: number(row?.operatori),
-  };
+  return numericMetrics({
+    preseInCarico: taken?.totale,
+    persone: row?.persone,
+    interventi: row?.interventi,
+    daPianificare: row?.da_pianificare,
+    pianificati: row?.pianificati,
+    conclusi: row?.conclusi,
+    mancatePresentazioni: row?.mancati,
+    annullati: row?.annullati,
+    scaduti: row?.scaduti,
+    operatori: row?.operatori,
+  });
 }
 
 export async function buildCentroAscoltoReport(filters: ReportFilters) {
@@ -155,8 +157,24 @@ export async function buildCentroAscoltoReport(filters: ReportFilters) {
   return dashboard({
     section: "centro-ascolto",
     filters,
+    exactKpi: {
+      personePreseInCarico: metrics.exact.preseInCarico,
+      personeServite: metrics.exact.persone,
+      interventiEffettuati: metrics.exact.interventi,
+      daPianificare: metrics.exact.daPianificare,
+      pianificati: metrics.exact.pianificati,
+      mancatePresentazioni: metrics.exact.mancatePresentazioni,
+      annullati: metrics.exact.annullati,
+      scaduti: metrics.exact.scaduti,
+      operatoriCoinvolti: metrics.exact.operatori,
+    },
     kpi: [
-      kpi("personePreseInCarico", metrics.preseInCarico, "count", "personePreseInCarico"),
+      kpi(
+        "personePreseInCarico",
+        metrics.preseInCarico,
+        "count",
+        "personePreseInCarico",
+      ),
       kpi("personeServite", metrics.persone, "count", "personeServite"),
       kpi("interventiEffettuati", metrics.interventi, "count", "interventi"),
       kpi("colloquiAccoglienza", null, "count", null, "missing"),
@@ -236,4 +254,9 @@ export async function buildCentroAscoltoReport(filters: ReportFilters) {
   });
 }
 
-export { socialConditions, socialCompletedConditions, plannedCutoff, eventDate as socialEventDate };
+export {
+  socialConditions,
+  socialCompletedConditions,
+  plannedCutoff,
+  eventDate as socialEventDate,
+};

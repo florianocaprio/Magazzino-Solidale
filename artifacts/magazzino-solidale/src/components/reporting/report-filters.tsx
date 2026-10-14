@@ -106,6 +106,7 @@ export function ReportFilters({
   } = useGetReportFilterOptions({
     section,
     areaOperativaId: value.areaOperativaId ?? undefined,
+    centroAscoltoId: value.centroAscoltoId ?? undefined,
   });
   const areeOperative = options?.areeOperative ?? [];
   const centres = options?.centres ?? [];
@@ -165,7 +166,7 @@ export function ReportFilters({
     ) : null;
   return (
     <Card>
-      <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-5">
+      <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-5 [&_button]:min-h-11 [&_button]:min-w-11 [&_input]:min-h-11">
         {section === "fse-plus" ? (
           <div className="space-y-1.5">
             <Label htmlFor="report-anno">{t("reporting.filters.year")}</Label>

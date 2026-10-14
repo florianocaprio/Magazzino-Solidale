@@ -392,6 +392,8 @@ import type {
   PoliticaCreditoSolidaleInput,
   PoliticaCreditoSolidaleUpdate,
   PreparazioneConsegne,
+  PrepareReportExportParams,
+  PreparedReportingExport,
   PreviewBulkVolontariInsurance200,
   ProdottiBulkInput,
   Prodotto,
@@ -34868,6 +34870,108 @@ export function useGetReportDrilldown<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+export const getPrepareReportExportUrl = (
+  params: PrepareReportExportParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/report/prepare?${stringifiedParams}`
+    : `/api/report/prepare`;
+};
+
+/**
+ * Repeatable-read bounded, autorizzazione rivalidata prima e dopo; no-store. Massimo 10000 righe per insieme, 1000 dettagli espliciti e 8 MiB. Non modifica fatti contabili.
+ * @summary Prepara un dataset read-only coerente e autorizzato per PDF, stampa e XLSX
+ */
+export const prepareReportExport = async (
+  params: PrepareReportExportParams,
+  options?: RequestInit,
+): Promise<PreparedReportingExport> => {
+  return customFetch<PreparedReportingExport>(
+    getPrepareReportExportUrl(params),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getPrepareReportExportMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareReportExport>>,
+    TError,
+    { params: PrepareReportExportParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof prepareReportExport>>,
+  TError,
+  { params: PrepareReportExportParams },
+  TContext
+> => {
+  const mutationKey = ["prepareReportExport"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof prepareReportExport>>,
+    { params: PrepareReportExportParams }
+  > = (props) => {
+    const { params } = props ?? {};
+
+    return prepareReportExport(params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PrepareReportExportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof prepareReportExport>>
+>;
+
+export type PrepareReportExportMutationError = ErrorType<void>;
+
+/**
+ * @summary Prepara un dataset read-only coerente e autorizzato per PDF, stampa e XLSX
+ */
+export const usePrepareReportExport = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof prepareReportExport>>,
+    TError,
+    { params: PrepareReportExportParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof prepareReportExport>>,
+  TError,
+  { params: PrepareReportExportParams },
+  TContext
+> => {
+  return useMutation(getPrepareReportExportMutationOptions(options));
+};
 
 export const getGetReportFilterOptionsUrl = (
   params: GetReportFilterOptionsParams,

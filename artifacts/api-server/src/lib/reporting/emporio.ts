@@ -1,7 +1,10 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { ReportFilters } from "./types";
 import { andSql, monthSeries, number, reportScope, rows } from "./sql";
-import { dashboard, kpi, quality, text } from "./shared";
+import { dashboard, kpi, quality, text, numericMetrics } from "./shared";
+import { appendReportPanels } from "./requests";
+import { distributionFlowPanel } from "./distributionFlow";
+import { creditFlowPanel } from "./credit";
 import {
   effectiveBollaRigaId,
   fseDistributionNatureCondition,
@@ -116,18 +119,18 @@ export async function emporioMetrics(filters: ReportFilters) {
   const a = accessi[0] ?? {};
   const e = enabled[0] ?? {};
   const st = stock[0] ?? {};
-  return {
-    abilitati: number(e.abilitati),
-    utenti: number(s.utenti),
-    accessi: number(a.accessi),
-    spese: number(s.spese),
-    prodottiDistinti: number(s.prodotti_distinti),
-    credito: number(s.credito),
-    creditoMedio: number(s.credito_medio),
-    saldo: number(e.saldo),
-    prodottiGiacenza: number(st.prodotti_giacenza),
-    sottoScorta: number(st.sotto_scorta),
-  };
+  return numericMetrics({
+    abilitati: e.abilitati,
+    utenti: s.utenti,
+    accessi: a.accessi,
+    spese: s.spese,
+    prodottiDistinti: s.prodotti_distinti,
+    credito: s.credito,
+    creditoMedio: s.credito_medio,
+    saldo: e.saldo,
+    prodottiGiacenza: st.prodotti_giacenza,
+    sottoScorta: st.sotto_scorta,
+  });
 }
 
 export async function buildEmporioReport(filters: ReportFilters) {
@@ -194,51 +197,112 @@ export async function buildEmporioReport(filters: ReportFilters) {
   ]);
   const dq = dqRows[0] ?? {};
 
-  return dashboard({
-    section: "emporio",
-    filters,
-    kpi: [kpi("utentiAbilitatiCredito", metrics.abilitati), kpi("utentiServiti", metrics.utenti, "count", "utentiServiti"), kpi("accessi", metrics.accessi, "count", "accessi"), kpi("speseConcluse", metrics.spese, "count", "speseConcluse"), kpi("prodottiDistintiDistribuiti", metrics.prodottiDistinti, "count", "prodottiDistintiDistribuiti"), kpi("creditoUtilizzato", metrics.credito, "credit"), kpi("creditoMedioSpesa", metrics.creditoMedio, "credit"), kpi("saldoResiduo", metrics.saldo, "credit"), kpi("prodottiInGiacenza", metrics.prodottiGiacenza), kpi("prodottiSottoScorta", metrics.sottoScorta)],
-    series: [
-      {
-        key: "spesePerMese",
-        points: monthSeries(monthly, "totale", "credito"),
+  const [flow, credit] = await Promise.all([
+    distributionFlowPanel(filters, true),
+    creditFlowPanel(filters),
+  ]);
+  return appendReportPanels(
+    dashboard({
+      section: "emporio",
+      filters,
+      exactKpi: {
+        utentiAbilitatiCredito: metrics.exact.abilitati,
+        utentiServiti: metrics.exact.utenti,
+        accessi: metrics.exact.accessi,
+        speseConcluse: metrics.exact.spese,
+        prodottiDistintiDistribuiti: metrics.exact.prodottiDistinti,
+        creditoUtilizzato: metrics.exact.credito,
+        creditoMedioSpesa: metrics.exact.creditoMedio,
+        saldoResiduo: metrics.exact.saldo,
+        prodottiInGiacenza: metrics.exact.prodottiGiacenza,
+        prodottiSottoScorta: metrics.exact.sottoScorta,
       },
-    ],
-    tables: [
-      {
-        key: "prodotti",
-        columns: ["prodottoId", "prodottoNome", "unitaMisura", "quantita", "quantitaFse", "quantitaNonFse"],
-        rows: products.map((r) => ({
-          prodottoId: number(r.prodotto_id),
-          prodottoNome: String(r.prodotto_nome),
-          unitaMisura: String(r.unita_misura),
-          quantita: number(r.quantita),
-          quantitaFse: number(r.quantita_fse),
-          quantitaNonFse: number(r.quantita_non_fse),
-        })),
-      },
-      {
-        key: "centri",
-        columns: ["centro", "spese", "utenti", "credito"],
-        rows: centres.map((r) => ({
-          centro: String(r.centro),
-          spese: number(r.spese),
-          utenti: number(r.utenti),
-          credito: number(r.credito),
-        })),
-      },
-      {
-        key: "frequenza",
-        columns: ["beneficiarioCodice", "spese"],
-        rows: frequency.map((r) => ({
-          beneficiarioCodice: String(r.beneficiario_codice),
-          spese: number(r.spese),
-        })),
-      },
-    ],
-    quality: [quality("lottoMancante", number(dq.lotto_mancante), number(dq.lotto_mancante) ? "derivable" : "ok", text("qualityMissingLot")), quality("centroMancante", number(dq.centro_mancante), number(dq.centro_mancante) ? "derivable" : "ok")],
-    definitions: [text("emporioExpense"), text("emporioDistinctProductsLedger"), text("emporioServedUser"), text("emporioFseLot"), text("emporioUnits")],
-  });
+      kpi: [
+        kpi("utentiAbilitatiCredito", metrics.abilitati),
+        kpi("utentiServiti", metrics.utenti, "count", "utentiServiti"),
+        kpi("accessi", metrics.accessi, "count", "accessi"),
+        kpi("speseConcluse", metrics.spese, "count", "speseConcluse"),
+        kpi(
+          "prodottiDistintiDistribuiti",
+          metrics.prodottiDistinti,
+          "count",
+          "prodottiDistintiDistribuiti",
+        ),
+        kpi("creditoUtilizzato", metrics.credito, "credit"),
+        kpi("creditoMedioSpesa", metrics.creditoMedio, "credit"),
+        kpi("saldoResiduo", metrics.saldo, "credit"),
+        kpi("prodottiInGiacenza", metrics.prodottiGiacenza),
+        kpi("prodottiSottoScorta", metrics.sottoScorta),
+      ],
+      series: [
+        {
+          key: "spesePerMese",
+          points: monthSeries(monthly, "totale", "credito"),
+        },
+      ],
+      tables: [
+        {
+          key: "prodotti",
+          columns: [
+            "prodottoId",
+            "prodottoNome",
+            "unitaMisura",
+            "quantita",
+            "quantitaFse",
+            "quantitaNonFse",
+          ],
+          rows: products.map((r) => ({
+            prodottoId: number(r.prodotto_id),
+            prodottoNome: String(r.prodotto_nome),
+            unitaMisura: String(r.unita_misura),
+            quantita: number(r.quantita),
+            quantitaFse: number(r.quantita_fse),
+            quantitaNonFse: number(r.quantita_non_fse),
+          })),
+        },
+        {
+          key: "centri",
+          columns: ["centro", "spese", "utenti", "credito"],
+          rows: centres.map((r) => ({
+            centro: String(r.centro),
+            spese: number(r.spese),
+            utenti: number(r.utenti),
+            credito: number(r.credito),
+          })),
+        },
+        {
+          key: "frequenza",
+          columns: ["beneficiarioCodice", "spese"],
+          rows: frequency.map((r) => ({
+            beneficiarioCodice: String(r.beneficiario_codice),
+            spese: number(r.spese),
+          })),
+        },
+      ],
+      quality: [
+        quality(
+          "lottoMancante",
+          number(dq.lotto_mancante),
+          number(dq.lotto_mancante) ? "derivable" : "ok",
+          text("qualityMissingLot"),
+        ),
+        quality(
+          "centroMancante",
+          number(dq.centro_mancante),
+          number(dq.centro_mancante) ? "derivable" : "ok",
+        ),
+      ],
+      definitions: [
+        text("emporioExpense"),
+        text("emporioDistinctProductsLedger"),
+        text("emporioServedUser"),
+        text("emporioFseLot"),
+        text("emporioUnits"),
+      ],
+    }),
+    flow,
+    credit,
+  );
 }
 
 export { speseConditions, accessConditions };

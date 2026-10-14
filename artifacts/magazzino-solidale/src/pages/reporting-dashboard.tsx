@@ -31,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import { localizeReportingText } from "@/lib/reporting-text";
 import { FseOperations } from "@/components/reporting/fse-operations";
 import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 
 type Section = ReportingDashboardSection;
 
@@ -150,6 +151,16 @@ function QueryContent({
 }) {
   const { t } = useTranslation();
   const [metric, setMetric] = useState<string | null>(null);
+  const { user } = useAuth();
+  const detailContext = JSON.stringify([
+    section,
+    filters,
+    user?.id,
+    user?.permessi,
+  ]);
+  useEffect(() => {
+    setMetric(null);
+  }, [detailContext]);
   if (query.isLoading) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -209,17 +220,22 @@ function QueryContent({
         <ReportEmptyState />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {report.kpi.map((item) => (
-            <ReportKpiCard
-              key={item.key}
-              item={item}
-              onOpen={
-                item.drilldownMetric
-                  ? () => setMetric(item.drilldownMetric)
-                  : undefined
-              }
-            />
-          ))}
+          {report.kpi
+            .filter(
+              (item) =>
+                !["colloquiAccoglienza", "colloquiFollowup"].includes(item.key),
+            )
+            .map((item) => (
+              <ReportKpiCard
+                key={item.key}
+                item={item}
+                onOpen={
+                  item.drilldownMetric
+                    ? () => setMetric(item.drilldownMetric)
+                    : undefined
+                }
+              />
+            ))}
         </section>
       )}
       {report.series.length > 0 && (
@@ -229,6 +245,24 @@ function QueryContent({
           ))}
         </section>
       )}
+      <nav className="flex flex-wrap gap-3">
+        {report.kpi.some((item) => item.key === "volontariIscritti") && (
+          <Link
+            className="inline-flex min-h-11 items-center underline"
+            href="/volontari"
+          >
+            {t("nav.items.volontari")}
+          </Link>
+        )}
+        {report.tables.some((item) => item.key === "disponibilitaCorrente") && (
+          <Link
+            className="inline-flex min-h-11 items-center underline"
+            href="/giacenze"
+          >
+            {t("nav.items.giacenze")}
+          </Link>
+        )}
+      </nav>
       {report.tables.length > 0 && (
         <section className="grid gap-4 xl:grid-cols-2">
           {report.tables.map((table) => (
@@ -237,12 +271,23 @@ function QueryContent({
         </section>
       )}
       <ReportDataQuality items={report.quality} />
+      {(report.excludedSources?.length ?? 0) > 0 && (
+        <Alert>
+          <AlertDescription>
+            {report.excludedSources?.map((source, index) => (
+              <p key={index}>{localizeReportingText(t, source)}</p>
+            ))}
+          </AlertDescription>
+        </Alert>
+      )}
       {report.definitions.length > 0 && (
         <section className="rounded-lg border bg-muted/30 p-4">
           <h2 className="font-semibold">{t("reporting.definitions.title")}</h2>
           <ul className="mt-2 list-disc space-y-1 ps-5 text-sm text-muted-foreground">
             {report.definitions.map((definition) => (
-              <li key={`${definition.code}:${JSON.stringify(definition.params ?? {})}`}>
+              <li
+                key={`${definition.code}:${JSON.stringify(definition.params ?? {})}`}
+              >
                 {localizeReportingText(t, definition)}
               </li>
             ))}

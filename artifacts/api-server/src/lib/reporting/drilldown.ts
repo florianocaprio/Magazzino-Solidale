@@ -8,8 +8,16 @@ import { socialCompletedConditions, socialEventDate } from "./centroAscolto";
 import { accessConditions, speseConditions } from "./emporio";
 import { mealConditions, mensaAccessConditions } from "./mensa";
 import { udsBaseConditions, udsEventDate } from "./uds";
-import { movementConditions, transferCondition } from "./logistica";
-import { fseAuthorizedMovementCondition } from "./fsePlus";
+import {
+  movementConditions,
+  transferCondition,
+  transferStateCondition,
+} from "./logistica";
+import {
+  activeFseSources,
+  fseCanonicalChannels,
+  fseAuthorizedMovementCondition,
+} from "./fsePlus";
 import {
   effectiveBollaRigaId,
   fseDistributionNatureCondition,
@@ -46,6 +54,9 @@ const ALLOWED_METRICS: Record<ReportSection, Set<string>> = {
     "movimentiCarico",
     "movimentiScarico",
     "trasferimenti",
+    "trasferimentiRichiesti",
+    "trasferimentiInTransito",
+    "trasferimentiCompletati",
   ]),
   "fse-plus": new Set([
     "prodottiFse",
@@ -55,13 +66,13 @@ const ALLOWED_METRICS: Record<ReportSection, Set<string>> = {
   ]),
 };
 
-function detailDefinition(
+async function detailDefinition(
   section: ReportSection,
   metric: string,
   filters: ReportFilters,
   limit: number,
   offset: number,
-): DetailDefinition {
+): Promise<DetailDefinition> {
   if (!ALLOWED_METRICS[section].has(metric)) {
     throw new ReportingError(
       400,
@@ -406,7 +417,7 @@ function detailDefinition(
           sql`area_operativa_id_snapshot = ${filters.areaOperativaId}`,
         );
       }
-      if (filters.zonaUdsId != null && filters.zonaMode === "query") {
+      if (filters.zonaUdsId != null && filters.zonaMode !== "all") {
         periodFilters.push(sql`zona_uds_id_snapshot = ${filters.zonaUdsId}`);
       }
       if (filters.operatoreId != null)
@@ -458,7 +469,7 @@ function detailDefinition(
       `,
     };
   }
-  if (section === "magazzino-logistica" && metric === "trasferimenti") {
+  if (section === "magazzino-logistica" && metric.startsWith("trasferimenti")) {
     return {
       columns: ["id", "codice", "data", "origine", "destinazione", "stato"],
       query: sql`
@@ -469,6 +480,7 @@ function detailDefinition(
         JOIN magazzini md ON md.id = tr.magazzino_destino_id
         WHERE tr.data_richiesta BETWEEN ${filters.da} AND ${filters.a}
           AND ${transferCondition(filters)}
+          AND ${transferStateCondition(metric)}
         ORDER BY tr.data_richiesta DESC, tr.id DESC ${pagination}
       `,
     };
@@ -509,7 +521,10 @@ function detailDefinition(
         { sharedAreaOperativa: true, sharedCentro: true },
       ),
     );
-    const authorizedMovement = fseAuthorizedMovementCondition(filters);
+    const authorizedMovement = fseAuthorizedMovementCondition(
+      filters,
+      fseCanonicalChannels(await activeFseSources(filters)),
+    );
     const netDistributedQuantity = fseNetDistributedQuantity(sql`mv.quantita`);
     if (metric === "nucleiRaggiunti" || metric === "personeRaggiunte") {
       const peopleCte = sql`
@@ -672,7 +687,7 @@ export async function buildDrilldown(input: {
   page: number;
   pageSize: number;
 }): Promise<ReportDrilldown> {
-  const definition = detailDefinition(
+  const definition = await detailDefinition(
     input.section,
     input.metric,
     input.filters,
@@ -680,13 +695,29 @@ export async function buildDrilldown(input: {
     (input.page - 1) * input.pageSize,
   );
   const result = await rows<Record<string, unknown>>(definition.query);
+  // An empty page does not imply an empty authorized universe. Use the same
+  // definition (including DISTINCT/grouping), not a different count predicate.
+  const first =
+    result.length || input.page === 1
+      ? result
+      : await rows<Record<string, unknown>>(
+          (
+            await detailDefinition(
+              input.section,
+              input.metric,
+              input.filters,
+              1,
+              0,
+            )
+          ).query,
+        );
   return {
     reportingModelVersion: REPORTING_MODEL_VERSION,
     section: input.section,
     metric: input.metric,
     page: input.page,
     pageSize: input.pageSize,
-    total: number(result[0]?.full_count),
+    total: number(first[0]?.full_count),
     columns: definition.columns,
     rows: result.map(({ full_count: _fullCount, ...row }) =>
       Object.fromEntries(

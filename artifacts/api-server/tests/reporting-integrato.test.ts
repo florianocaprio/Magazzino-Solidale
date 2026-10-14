@@ -105,15 +105,21 @@ afterAll(async () => {
 describe("filtri condivisi dei report", () => {
   it("valida date, ordine e anno", () => {
     expect(() =>
-      parseReportFilters(requestFor({ da: "2026-02-30", a: "2026-03-01" })),
+      parseReportFilters(
+        requestFor({ da: "2026-02-30", a: "2026-03-01" }, { isAdmin: true }),
+      ),
     ).toThrowError(ReportingError);
     expect(() =>
-      parseReportFilters(requestFor({ da: "2026-03-02", a: "2026-03-01" })),
+      parseReportFilters(
+        requestFor({ da: "2026-03-02", a: "2026-03-01" }, { isAdmin: true }),
+      ),
     ).toThrowError(/successiva/);
-    expect(() => parseReportFilters(requestFor({ anno: "1999" }))).toThrowError(
-      /anno/,
+    expect(() =>
+      parseReportFilters(requestFor({ anno: "1999" }, { isAdmin: true })),
+    ).toThrowError(/anno/);
+    const parsed = parseReportFilters(
+      requestFor({ anno: "2025" }, { isAdmin: true }),
     );
-    const parsed = parseReportFilters(requestFor({ anno: "2025" }));
     expect(parsed.da).toBe("2025-01-01");
     expect(parsed.a).toBe("2025-12-31");
   });
@@ -126,11 +132,16 @@ describe("filtri condivisi dei report", () => {
     ).toThrowError(/perimetro/);
     expect(() =>
       parseReportFilters(
-        requestFor({ centroAscoltoId: "3" }, { centroAscoltoId: 2 }),
+        requestFor(
+          { centroAscoltoId: "3" },
+          { areaOperativaId: 1, centroAscoltoId: 2 },
+        ),
       ),
     ).toThrowError(/perimetro/);
     expect(() =>
-      parseReportFilters(requestFor({ zonaUdsId: "4" }, { zonaUdsId: 3 })),
+      parseReportFilters(
+        requestFor({ zonaUdsId: "4" }, { areaOperativaId: 1, zonaUdsId: 3 }),
+      ),
     ).toThrowError(/perimetro/);
     const parsed = parseReportFilters(
       requestFor({}, { areaOperativaId: 1, centroAscoltoId: 2, zonaUdsId: 3 }),
@@ -148,16 +159,21 @@ describe("filtri condivisi dei report", () => {
   it("accetta filtri espliciti per un utente globale ma rifiuta identificativi malformati", () => {
     expect(
       parseReportFilters(
-        requestFor({
-          areaOperativaId: "5",
-          centroAscoltoId: "6",
-          zonaUdsId: "7",
-        }),
+        requestFor(
+          {
+            areaOperativaId: "5",
+            centroAscoltoId: "6",
+            zonaUdsId: "7",
+          },
+          { isAdmin: true },
+        ),
       ),
     ).toMatchObject({ areaOperativaId: 5, centroAscoltoId: 6, zonaUdsId: 7 });
     for (const value of ["x", "0", "-2", "1.5"]) {
       expect(() =>
-        parseReportFilters(requestFor({ areaOperativaId: value })),
+        parseReportFilters(
+          requestFor({ areaOperativaId: value }, { isAdmin: true }),
+        ),
       ).toThrowError(/areaOperativaId/);
     }
   });
@@ -914,9 +930,9 @@ describe("regole di conteggio Pacchi e FSE+", () => {
       expect(parcelProducts).toEqual([
         expect.objectContaining({
           unitaMisura: "kg",
-          quantita: 4,
-          quantitaFse: 1,
-          quantitaNonFse: 3,
+          quantita: "4.00",
+          quantitaFse: "1.00",
+          quantitaNonFse: "3.00",
         }),
       ]);
 
@@ -998,9 +1014,9 @@ describe("regole di conteggio Pacchi e FSE+", () => {
         fseReport.tables.find((table) => table.key === "01_Prodotti_FSE")
           ?.rows[0],
       ).toMatchObject({
-        quantitaFse: 1,
-        quantitaTotale: 4,
-        percentualeFse: 25,
+        quantitaFse: "1.00",
+        quantitaTotale: "4.00",
+        percentualeFse: "25.00",
       });
       const fseDetails = await buildDrilldown({
         section: "fse-plus",

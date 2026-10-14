@@ -678,10 +678,10 @@ describe("Reporting 2.0: accettazione FSE canonica", () => {
     );
     expect(channelRows).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ canale: "RITIRO_SEDE", quantita: 8 }),
-        expect.objectContaining({ canale: "DOMICILIARE", quantita: 0 }),
-        expect.objectContaining({ canale: "MENSA", quantita: 6 }),
-        expect.objectContaining({ canale: "UDS_STRADA", quantita: 7 }),
+        expect.objectContaining({ canale: "RITIRO_SEDE", quantita: "8.00" }),
+        expect.objectContaining({ canale: "DOMICILIARE", quantita: "0.00" }),
+        expect.objectContaining({ canale: "MENSA", quantita: "6.00" }),
+        expect.objectContaining({ canale: "UDS_STRADA", quantita: "7.00" }),
       ]),
     );
     expect(
@@ -712,13 +712,13 @@ describe("Reporting 2.0: accettazione FSE canonica", () => {
       expect.arrayContaining([
         expect.objectContaining({
           prodottoId: productKg,
-          quantitaFse: 11,
-          quantitaTotale: 13,
+          quantitaFse: "11.00",
+          quantitaTotale: "13.00",
         }),
         expect.objectContaining({
           prodottoId: productPieces,
-          quantitaFse: 20,
-          quantitaTotale: 20,
+          quantitaFse: "20.00",
+          quantitaTotale: "20.00",
         }),
       ]),
     );
@@ -735,7 +735,11 @@ describe("Reporting 2.0: accettazione FSE canonica", () => {
       return result;
     }, {});
     for (const product of productRows) {
-      expect(totals[String(product.prodottoNome)]).toBe(product.quantitaFse);
+      // SQL exact decimals are strings in revision M66_BC_1; the small fixture
+      // still proves the identical numeric sum of its signed ledger rows.
+      expect(totals[String(product.prodottoNome)]).toBe(
+        Number(product.quantitaFse),
+      );
     }
     expect(JSON.stringify(detail)).not.toContain(`BA-${suffix}`);
     expect(detail.columns).not.toContain("beneficiarioCodice");
