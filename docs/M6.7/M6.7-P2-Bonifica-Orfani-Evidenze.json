@@ -1,0 +1,609 @@
+{
+  "base": "cf7fe93bbc4da67a3d36a4edb58d54831df7bf7c",
+  "preflightResult": "GO_ON_REPAIRED_DISPOSABLE_CLONE",
+  "officialDatabaseAccessed": false,
+  "officialDeletionPerformed": false,
+  "deploymentPerformed": false,
+  "previousFingerprint": "d01f7f82848b5954a02082801fe1629dabcb5b2a9db64d69f0547b7fc7c4992e",
+  "previousFilesUnchanged": 32,
+  "fingerprint": "6e2367a8dd25fd8abccaa61976dfce9b5b39070fb7465a503cc52732de98ac71",
+  "algorithm": "SHA-256 of sha256 + two spaces + relative path + LF, path-sorted UTF-8",
+  "newFiles": [
+    {
+      "path": "lib/db/scripts/m67-orphan-assignments.mjs",
+      "sha256": "23b18ccfe1f5f2702b6ea90669567ba375c73851ce622c9ac90faa914e437a95"
+    },
+    {
+      "path": "lib/db/scripts/m67-orphan-assignments.integration.mjs",
+      "sha256": "0b840b82051af9ec8d3fe7753be00dda66fd05a8e978a5d96ff3bc2b10b2e729"
+    }
+  ],
+  "files": [
+    {
+      "path": "artifacts/api-server/src/lib/supplyValidation.ts",
+      "sha256": "c06a32d7354c66847ad2367fb5a52210a991c7351bd4639e41c5f7f0e2c28217"
+    },
+    {
+      "path": "artifacts/api-server/src/middlewares/warehouseReadScope.ts",
+      "sha256": "761586f510ac3674072e7300788c77c95d956ca2e757e9df56c52ea66df96c09"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/approvvigionamenti.ts",
+      "sha256": "9c08393c6bee8752bedb2afa04c6fdf005829ea765a72fe4cb52fc22bea4a848"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/consegne.ts",
+      "sha256": "a966051a6519afd897411ff14f230907ba0226a31d293f7628a19bc9c0197cf0"
+    },
+    {
+      "path": "artifacts/api-server/tests/bolle-prenotazioni.test.ts",
+      "sha256": "7cc6641954f9366763e6bbb358e5b2b6afbbbb3f95d22d4f01f3f6725d019cde"
+    },
+    {
+      "path": "artifacts/api-server/tests/bug-05-approvvigionamenti-area.test.ts",
+      "sha256": "8e6aa508df378b1c38f91b432d987708ac9851b25f91debf3eccaa7c05e6ad00"
+    },
+    {
+      "path": "artifacts/api-server/tests/consegne-pagination-rbac.test.ts",
+      "sha256": "f52de12d506bbc859d8d94c75a4161e939158f2642f37cccfbc77711c1da072d"
+    },
+    {
+      "path": "artifacts/api-server/tests/helpers/persisted-session-app.ts",
+      "sha256": "26b8f1d1d85aa0b04953576270f5664f947070487e8d5d6408cd41a55c49d830"
+    },
+    {
+      "path": "artifacts/api-server/tests/m5c2a-handoff-bolla-pronta.test.ts",
+      "sha256": "fcfc34ad3a724df9c4a50842973596376e90d0907715fc3fc315680b18f8f52a"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67-review-supply.test.ts",
+      "sha256": "a585c696d9f6f727544eea0e873835f5782a84449a43559f93e3575ab475ff44"
+    },
+    {
+      "path": "artifacts/api-server/tests/moduli-route-combinati.test.ts",
+      "sha256": "644527fad275d2954ef2b29208e422398cb50089adc35f888c371de0bf8a4b27"
+    },
+    {
+      "path": "artifacts/api-server/tests/scoping-beneficiario.test.ts",
+      "sha256": "060dfd5a3b0a77993f5bfeb1a26a592bc884d6a9bc8634b4c317f41b0ee4004d"
+    },
+    {
+      "path": "artifacts/api-server/tests/scoping-direct.test.ts",
+      "sha256": "cc3ec5b7b3a4c52c9531b7bea294423b752788815dab596fc51c6c5ed988657a"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67-review-supply.spec.ts",
+      "sha256": "272fb9e24180024d9b2a2ae8b432f995551a97a99526f3e8aa4d473811175f62"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/supply-receipt.test.tsx",
+      "sha256": "f54d4184f2771aa910a0ae9d5aa9a6a618ed4c212bb5d023bcc55f828e77521a"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/supply-receipt.tsx",
+      "sha256": "ef956357939b43e3e51c5cb69ff1877c4539cb8a3c833ffb81dbbe0127256bec"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/i18n/namespaces/approvvigionamenti.ts",
+      "sha256": "4826042ed9a42e9fe99b5834d33f5c358ecdd8c7514caadc3ef3fbf7e26a8054"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/approvvigionamenti.tsx",
+      "sha256": "619427762b8fddb4e39f91056bf9524479344fe3411ad3d60dab17ecd603b875"
+    },
+    {
+      "path": "lib/api-client-react/src/generated/api.schemas.ts",
+      "sha256": "faa0a3a2143c309f514b951a8ddc882840e0ebbaef4d6cede712428921fefcdc"
+    },
+    {
+      "path": "lib/api-spec/openapi.yaml",
+      "sha256": "3b3ab036550905f8cb14cdb96cc094eb5ddf7e6433e3e8144263d4e32e1abfbf"
+    },
+    {
+      "path": "lib/api-zod/src/generated/api.ts",
+      "sha256": "620c4f7cf577e5c42f144a19bc094f3f6bd113d86857b4433fe559ef93d0a4a0"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoPartita.ts",
+      "sha256": "535b2fd46f6a2afdd74daf4bbe26949d96ba28021168c5a7f02ab14a0d23a389"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoRiga.ts",
+      "sha256": "ff1df2a77753d5ebd22e0904372370b919f28e2cd1223d1d8026d77a156f6fa0"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoRigaInput.ts",
+      "sha256": "63fb90b7fd12b77f53c67ec131b395f57e7388dbb0aaac95e6b61e0d2843dbba"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoUpdate.ts",
+      "sha256": "442e13cdf622f3f70767564e4d8e5bfa7cc8af0b83457f26d9c389226d671461"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/index.ts",
+      "sha256": "87b77f776196bb3e6f2464e245bb73d50a2f78046a239af62012f74760c4fbc5"
+    },
+    {
+      "path": "lib/db/scripts/m67-orphan-assignments.integration.mjs",
+      "sha256": "0b840b82051af9ec8d3fe7753be00dda66fd05a8e978a5d96ff3bc2b10b2e729"
+    },
+    {
+      "path": "lib/db/scripts/m67-orphan-assignments.mjs",
+      "sha256": "23b18ccfe1f5f2702b6ea90669567ba375c73851ce622c9ac90faa914e437a95"
+    },
+    {
+      "path": "lib/db/scripts/m67-schema-reconciliation.integration.mjs",
+      "sha256": "1e995a4dca6acd09a479ec83df51948d4d388e194c24b602686ca9d787cd6a0b"
+    },
+    {
+      "path": "lib/db/scripts/m67-schema-reconciliation.mjs",
+      "sha256": "e60938aeeb7395c8443f63ea4d81014be60cce36777a2c96927251b25201e5a7"
+    },
+    {
+      "path": "lib/db/scripts/m67-schema-reconciliation.test.mjs",
+      "sha256": "92283ab800e2706b0d29c912e40ee9ac4502e2f61b2b9dabd5595ed1146f94a1"
+    },
+    {
+      "path": "lib/db/src/schema/approvvigionamenti.ts",
+      "sha256": "5d89c2989dc954d23b24b3f5881822aba3117e6ff1b934ccb3ec401a687c4907"
+    },
+    {
+      "path": "lib/db/updates/20261016_approvvigionamenti_precisione.sql",
+      "sha256": "c710fbbba1ba82e4bcedc687fb3a639ddf6612c5d6672127ae9431a06a5e73d2"
+    },
+    {
+      "path": "lib/db/updates/20261016_z_schema_invariant_reconciliation.sql",
+      "sha256": "608c9258ae095eb6daada8512555df572b73d196f2dc0e5fcb01340367d60811"
+    }
+  ],
+  "history": {
+    "root": "/Users/florianocaprio/Backups/Magazzino-Solidale",
+    "targetCount": 375,
+    "uniqueTurni": 250,
+    "uniqueVolontari": 375,
+    "cohortFingerprint": "2fa32efb092fc8238b78d43e62aa5d89f420f2d621b616c683b8c42a3cf3866a",
+    "backups": [
+      {
+        "file": "M6.1-a2c3239-20261008-SGnnDk/database.dump",
+        "size": 950643,
+        "sha256": "a7a96851f136dff44505bee0f6715686c69d5550674078b36348dd93ef86e95c",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M6.2-A-46f900c-20261009-EbsoLcfp/official-database.dump",
+        "size": 960153,
+        "sha256": "a5e377b86255e19bc1c8ecb8b4375a4819c6d6bc1f02ec180dcd412466759ea5",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M6.2-A-46f900c-20261009-EbsoLcfp/preview-database.dump",
+        "size": 971824,
+        "sha256": "1c3a2b375dbcdc4fc1fa007855872668d0c96751ee6c98d57fcedee2bff96a38",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M6.2-A-f6b0d06-20261008-oaXd8I/database.dump",
+        "size": 958763,
+        "sha256": "60b447c4ac048f67fb64fc2f1ac3e3354b8e8d592a3b77565fb58ab97aef2294",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M6.2-B-2171aa1-20261009-wCpqSoFG/official-database.dump",
+        "size": 967024,
+        "sha256": "eebee1a23d0b5085bf65280d8d1dd0c2b14324a1e57b000accc0e3bcb269ece6",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M6.2-B-2171aa1-20261009-wCpqSoFG/preview-database.dump",
+        "size": 971884,
+        "sha256": "b5a4759fc28c202007958a1e16ca7e458f2e5ab3c1c21f43ea09ca60a5a21ff9",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M6.2-C-6326ef6-20261010-sSVB0K5c/official-database.dump",
+        "size": 968406,
+        "sha256": "042476a460fdff1b92ff758cad93ebf4a00dc0edc606fc47237c40249fc73a76",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M6.2-C-F1-20261011-YmCfJI4u/preview-database.dump",
+        "size": 983855,
+        "sha256": "5c4676f2c746b526f20607343bc1c24812e2bb8ad4a68eaf6f5d726662fcfc71",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M6.2-C-Ufficiale-4115982-20261011-xNitbO7Q/official/database.dump",
+        "size": 968406,
+        "sha256": "61e6e2e7e3f47cfee0eff91e09c5f75b5837805d80f80475115f19e68b35a458",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M6.2-C-Ufficiale-4115982-20261011-xNitbO7Q/preview/database.dump",
+        "size": 995316,
+        "sha256": "af426a035e5a275e4faf3a27902970f9998c757cc6163a937c0222668562b4fb",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M6.3-Ufficiale-eb5c3a7-20261011-t02kmt/database.dump",
+        "size": 984356,
+        "sha256": "fbbea9257bece035a2a2f0219576b2e2affad0c0416d337a0962f46a5e66d4f0",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M6.4-Ufficiale-df9c9a9-2026-10-12T194316-991Z/database.dump",
+        "size": 986057,
+        "sha256": "f03cebe9c65fafa74273a91f48629e5e23bbb8c9928241c4260fe77f3272b6f7",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M66-Review-8082-2026-10-14T095628-971Z/database.dump",
+        "size": 1051734,
+        "sha256": "65045c57e96e45aff10406791f3388a6f462fe1c9c65a24f2616ab80182563d0",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M66-Ufficiale-879d96c-2026-10-15T062300-707Z/database.dump",
+        "size": 1052577,
+        "sha256": "e28fc70317b798d35697fbf2fc2d7e15fdbd2d2afcd30cc693fc91fb67a7d15e",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M67-P2-cf7fe93-20261016-vAFkja/database.dump",
+        "size": 1056103,
+        "sha256": "e51b7b4c46a30d23544c9ef339cfa3d73be0e6b9e818f07ff2537f10618cc9ba",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "M67-UAT-3073ada-2026-10-16T112114-582Z/database.dump",
+        "size": 1054404,
+        "sha256": "da0f4b7aaf8bd086fe62ff0d1a9d76fb40901a8dec6718115ae511cd62120524",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "Mensa-Magazzino-535e5a403fd7-2026-10-12T215233-897Z/database.dump",
+        "size": 986642,
+        "sha256": "8c77e7d714de1445be563147940e226e630f2878bbb2022a1da6d39757c2a51d",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "Mensa-Preferenza55-535e5a403fd7-2026-10-13T075258-126Z/database.dump",
+        "size": 1045546,
+        "sha256": "4e29a3a7d7a4c7fdbbe73e854988855d998ae7c6d2dd71d66ca1877e0e909e4c",
+        "tables": {
+          "turni": 3,
+          "turni_volontari": 378,
+          "volontari": 11
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      },
+      {
+        "file": "magazzino-pre-migrazione-20260822-142802.dump",
+        "size": 314639,
+        "sha256": "42159e2d7bf70bf398cecfcb613d7eb5d8df7cc49b8f6cbf158be29595221594",
+        "tables": {
+          "turni": 2,
+          "turni_volontari": 377,
+          "volontari": 10
+        },
+        "sameCohortRows": 375,
+        "missingTurno": 375,
+        "missingVolontario": 375,
+        "bothParentsPresent": 0,
+        "anyParentPresent": 0
+      }
+    ]
+  },
+  "archive": {
+    "path": "/Users/florianocaprio/Backups/Magazzino-Solidale/M67-Orfani-20261016-dUGR2r/quarantine-private.json",
+    "sha256": "d3f86295b169aea48def04f1390718930ef93731e980d4487036e5b2eee0b0fe",
+    "rows": 375,
+    "cohortFingerprint": "c7dcae81e4bdc5da88cf6f135e695bd9e0868e56950804151401dc9640aa17cb",
+    "sourceBackupSha256": "e51b7b4c46a30d23544c9ef339cfa3d73be0e6b9e818f07ff2537f10618cc9ba",
+    "verified": true
+  },
+  "repair": {
+    "result": "PASS",
+    "migrations": 58,
+    "pending": 0,
+    "deleted": 375,
+    "retained": 3,
+    "addedAudit": 375,
+    "otherTablesUnchanged": 134,
+    "quantityAggregatesUnchanged": true,
+    "semanticParity": {
+      "checksMissingInFresh": [],
+      "checksMissingInHistorical": [],
+      "indexesOnlyHistorical": [],
+      "indexesOnlyFresh": [],
+      "foreignOnlyHistorical": [],
+      "foreignOnlyFresh": [],
+      "primaryOnlyHistorical": [],
+      "primaryOnlyFresh": [],
+      "unsafeIndexes": []
+    },
+    "remainingLegacyConstraints": 29,
+    "legacyDataGate": "PASS"
+  },
+  "tests": {
+    "pass": 12,
+    "fail": 0,
+    "skip": 0,
+    "results": [
+      {
+        "name": "exact archived cohort and three valid assignments",
+        "result": "PASS"
+      },
+      {
+        "name": "non-disposable environment rejected without writes",
+        "result": "PASS"
+      },
+      {
+        "name": "wrong PostgreSQL system identity rejected",
+        "result": "PASS"
+      },
+      {
+        "name": "count or archive mismatch rejected",
+        "result": "PASS"
+      },
+      {
+        "name": "changed cohort fingerprint rolls back",
+        "result": "PASS"
+      },
+      {
+        "name": "unexpected dependent FK prevents deletion",
+        "result": "PASS"
+      },
+      {
+        "name": "audit failure after DELETE rolls back rows and validation",
+        "result": "PASS"
+      },
+      {
+        "name": "concurrent repairs serialize on observable PostgreSQL lock; one deletion",
+        "result": "PASS"
+      },
+      {
+        "name": "valid assignments preserved and only 375 audit preimages added",
+        "result": "PASS"
+      },
+      {
+        "name": "replay is idempotent and does not add audit",
+        "result": "PASS"
+      },
+      {
+        "name": "canonical foreign keys validated and reject new orphans",
+        "result": "PASS"
+      },
+      {
+        "name": "all remaining NOT VALID constraints validate on repaired clone",
+        "result": "PASS"
+      }
+    ],
+    "deleted": 375,
+    "retained": 3,
+    "auditAdded": 375,
+    "remainingOrphans": 0
+  },
+  "apiTests": {
+    "pass": 16,
+    "fail": 0,
+    "skip": 0
+  },
+  "typecheck": "PASS",
+  "cleanup": {
+    "remaining": "",
+    "volumesCreated": 0,
+    "networksCreated": 0
+  },
+  "evidenceDirectory": "/private/tmp/magazzino-m67-orphans-EnrZS9",
+  "evidence": [
+    {
+      "file": "backup-history.json",
+      "sha256": "56ed3f29f502169dfccd6584dff1b8011e8acd5fbd191f7bba019e8a88ebf7f6"
+    },
+    {
+      "file": "archive-verification.json",
+      "sha256": "99c5301265a78a8f9d43017c5fb4e3b85a67b4d898a477772541057cb24649f1"
+    },
+    {
+      "file": "before.json",
+      "sha256": "b8b2593be66a1c58b25f36ba6b50e3c0790d8d858fb7f0be441c6f321b3d5cdc"
+    },
+    {
+      "file": "after.json",
+      "sha256": "a5c48cf4495353f15545abd9fccbd3645771d9680ba752ee1a01b001c1bee01e"
+    },
+    {
+      "file": "after-catalog.json",
+      "sha256": "fd4da59192f2ebcf006309171b6f980fd8b713d6c8c154b643169b6dd63d51c5"
+    },
+    {
+      "file": "repair-tests.json",
+      "sha256": "b4b3f53776522c2f6bba9f16a64cd853cc064ba0e0d71a65e97fd08655c4aead"
+    },
+    {
+      "file": "schema-regressions.json",
+      "sha256": "1534b42e0b92fd58a891e7e15e28faa7d8cb4f8f7d328004d9ffe8f6d2dd5951"
+    },
+    {
+      "file": "rehearsal-result.json",
+      "sha256": "8476b82b4fd80f1fec7bbf7465247030a9ee781c6f61600bc6807b0e431d15f5"
+    },
+    {
+      "file": "rehearsal-isolation.json",
+      "sha256": "a5b1fcd81f811c6724dae1618696ebb41df54a98a8a6db5ceefb44f429ff1cf0"
+    },
+    {
+      "file": "rehearsal-cleanup.json",
+      "sha256": "0ed2587c994386756d776f6e230de6fdc1f64d1b75054f27ebc7fb480e3b1e88"
+    },
+    {
+      "file": "api-logistica-tests.log",
+      "sha256": "ebf12d8a0799996d119febc4ebba2242e322a78c280a45766e609d5b1aaa8918"
+    },
+    {
+      "file": "rehearsal-m67_reconcile_clone-migrations-verify.log",
+      "sha256": "dc535059daec2ededf4deee703e29ee3635651cf443e5cfe9e5ed31a07f3a2a2"
+    },
+    {
+      "file": "rehearsal-m67_reconcile_clone-migrations-status.log",
+      "sha256": "1737c9e7dc7af1699ed5b51c7830c323b02fe292ae182fca1cae84a1ab8631bc"
+    }
+  ]
+}

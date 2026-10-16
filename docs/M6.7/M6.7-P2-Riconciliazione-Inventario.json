@@ -1,0 +1,2067 @@
+{
+  "base": "cf7fe93bbc4da67a3d36a4edb58d54831df7bf7c",
+  "publishedFingerprint": "a7f4c7e6ea9680a5f9e709f809784702f5d7f8804ae3d87483a5426e63d9cc8d",
+  "publishedFilesUnchanged": 28,
+  "trackedMigrationsUnchanged": 57,
+  "newFilesFingerprint": "19213ebf1cf2453f1a4074fba448161c3c46614fca1d7abcbc64d050a37d110b",
+  "candidateFingerprint": "d01f7f82848b5954a02082801fe1629dabcb5b2a9db64d69f0547b7fc7c4992e",
+  "fingerprintAlgorithm": "SHA-256 of sorted sha256 + two spaces + relative path + LF; UTF-8",
+  "newFiles": [
+    {
+      "path": "lib/db/scripts/m67-schema-reconciliation.integration.mjs",
+      "sha256": "1e995a4dca6acd09a479ec83df51948d4d388e194c24b602686ca9d787cd6a0b"
+    },
+    {
+      "path": "lib/db/scripts/m67-schema-reconciliation.mjs",
+      "sha256": "e60938aeeb7395c8443f63ea4d81014be60cce36777a2c96927251b25201e5a7"
+    },
+    {
+      "path": "lib/db/scripts/m67-schema-reconciliation.test.mjs",
+      "sha256": "92283ab800e2706b0d29c912e40ee9ac4502e2f61b2b9dabd5595ed1146f94a1"
+    },
+    {
+      "path": "lib/db/updates/20261016_z_schema_invariant_reconciliation.sql",
+      "sha256": "608c9258ae095eb6daada8512555df572b73d196f2dc0e5fcb01340367d60811"
+    }
+  ],
+  "files": [
+    {
+      "path": "artifacts/api-server/src/lib/supplyValidation.ts",
+      "sha256": "c06a32d7354c66847ad2367fb5a52210a991c7351bd4639e41c5f7f0e2c28217"
+    },
+    {
+      "path": "artifacts/api-server/src/middlewares/warehouseReadScope.ts",
+      "sha256": "761586f510ac3674072e7300788c77c95d956ca2e757e9df56c52ea66df96c09"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/approvvigionamenti.ts",
+      "sha256": "9c08393c6bee8752bedb2afa04c6fdf005829ea765a72fe4cb52fc22bea4a848"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/consegne.ts",
+      "sha256": "a966051a6519afd897411ff14f230907ba0226a31d293f7628a19bc9c0197cf0"
+    },
+    {
+      "path": "artifacts/api-server/tests/bolle-prenotazioni.test.ts",
+      "sha256": "7cc6641954f9366763e6bbb358e5b2b6afbbbb3f95d22d4f01f3f6725d019cde"
+    },
+    {
+      "path": "artifacts/api-server/tests/bug-05-approvvigionamenti-area.test.ts",
+      "sha256": "8e6aa508df378b1c38f91b432d987708ac9851b25f91debf3eccaa7c05e6ad00"
+    },
+    {
+      "path": "artifacts/api-server/tests/consegne-pagination-rbac.test.ts",
+      "sha256": "f52de12d506bbc859d8d94c75a4161e939158f2642f37cccfbc77711c1da072d"
+    },
+    {
+      "path": "artifacts/api-server/tests/helpers/persisted-session-app.ts",
+      "sha256": "26b8f1d1d85aa0b04953576270f5664f947070487e8d5d6408cd41a55c49d830"
+    },
+    {
+      "path": "artifacts/api-server/tests/m5c2a-handoff-bolla-pronta.test.ts",
+      "sha256": "fcfc34ad3a724df9c4a50842973596376e90d0907715fc3fc315680b18f8f52a"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67-review-supply.test.ts",
+      "sha256": "a585c696d9f6f727544eea0e873835f5782a84449a43559f93e3575ab475ff44"
+    },
+    {
+      "path": "artifacts/api-server/tests/moduli-route-combinati.test.ts",
+      "sha256": "644527fad275d2954ef2b29208e422398cb50089adc35f888c371de0bf8a4b27"
+    },
+    {
+      "path": "artifacts/api-server/tests/scoping-beneficiario.test.ts",
+      "sha256": "060dfd5a3b0a77993f5bfeb1a26a592bc884d6a9bc8634b4c317f41b0ee4004d"
+    },
+    {
+      "path": "artifacts/api-server/tests/scoping-direct.test.ts",
+      "sha256": "cc3ec5b7b3a4c52c9531b7bea294423b752788815dab596fc51c6c5ed988657a"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67-review-supply.spec.ts",
+      "sha256": "272fb9e24180024d9b2a2ae8b432f995551a97a99526f3e8aa4d473811175f62"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/supply-receipt.test.tsx",
+      "sha256": "f54d4184f2771aa910a0ae9d5aa9a6a618ed4c212bb5d023bcc55f828e77521a"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/supply-receipt.tsx",
+      "sha256": "ef956357939b43e3e51c5cb69ff1877c4539cb8a3c833ffb81dbbe0127256bec"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/i18n/namespaces/approvvigionamenti.ts",
+      "sha256": "4826042ed9a42e9fe99b5834d33f5c358ecdd8c7514caadc3ef3fbf7e26a8054"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/approvvigionamenti.tsx",
+      "sha256": "619427762b8fddb4e39f91056bf9524479344fe3411ad3d60dab17ecd603b875"
+    },
+    {
+      "path": "lib/api-client-react/src/generated/api.schemas.ts",
+      "sha256": "faa0a3a2143c309f514b951a8ddc882840e0ebbaef4d6cede712428921fefcdc"
+    },
+    {
+      "path": "lib/api-spec/openapi.yaml",
+      "sha256": "3b3ab036550905f8cb14cdb96cc094eb5ddf7e6433e3e8144263d4e32e1abfbf"
+    },
+    {
+      "path": "lib/api-zod/src/generated/api.ts",
+      "sha256": "620c4f7cf577e5c42f144a19bc094f3f6bd113d86857b4433fe559ef93d0a4a0"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoPartita.ts",
+      "sha256": "535b2fd46f6a2afdd74daf4bbe26949d96ba28021168c5a7f02ab14a0d23a389"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoRiga.ts",
+      "sha256": "ff1df2a77753d5ebd22e0904372370b919f28e2cd1223d1d8026d77a156f6fa0"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoRigaInput.ts",
+      "sha256": "63fb90b7fd12b77f53c67ec131b395f57e7388dbb0aaac95e6b61e0d2843dbba"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoUpdate.ts",
+      "sha256": "442e13cdf622f3f70767564e4d8e5bfa7cc8af0b83457f26d9c389226d671461"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/index.ts",
+      "sha256": "87b77f776196bb3e6f2464e245bb73d50a2f78046a239af62012f74760c4fbc5"
+    },
+    {
+      "path": "lib/db/scripts/m67-schema-reconciliation.integration.mjs",
+      "sha256": "1e995a4dca6acd09a479ec83df51948d4d388e194c24b602686ca9d787cd6a0b"
+    },
+    {
+      "path": "lib/db/scripts/m67-schema-reconciliation.mjs",
+      "sha256": "e60938aeeb7395c8443f63ea4d81014be60cce36777a2c96927251b25201e5a7"
+    },
+    {
+      "path": "lib/db/scripts/m67-schema-reconciliation.test.mjs",
+      "sha256": "92283ab800e2706b0d29c912e40ee9ac4502e2f61b2b9dabd5595ed1146f94a1"
+    },
+    {
+      "path": "lib/db/src/schema/approvvigionamenti.ts",
+      "sha256": "5d89c2989dc954d23b24b3f5881822aba3117e6ff1b934ccb3ec401a687c4907"
+    },
+    {
+      "path": "lib/db/updates/20261016_approvvigionamenti_precisione.sql",
+      "sha256": "c710fbbba1ba82e4bcedc687fb3a639ddf6612c5d6672127ae9431a06a5e73d2"
+    },
+    {
+      "path": "lib/db/updates/20261016_z_schema_invariant_reconciliation.sql",
+      "sha256": "608c9258ae095eb6daada8512555df572b73d196f2dc0e5fcb01340367d60811"
+    }
+  ],
+  "rules": [
+    {
+      "table": "carichi_magazzino",
+      "name": "carichi_magazzino_origine_check",
+      "definition": "CHECK (((origine_carico)::text = ANY (ARRAY[('AGEA_SIFEAD'::character varying)::text, ('RACCOLTA_ALIMENTARE'::character varying)::text, ('DONAZIONE'::character varying)::text, ('ACQUISTO'::character varying)::text, ('FORNITORE'::character varying)::text, ('RETTIFICA_INVENTARIO'::character varying)::text, ('SALDO_INIZIALE'::character varying)::text, ('ALTRO'::character varying)::text, ('LEGACY'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "carichi_magazzino_righe",
+      "name": "carichi_magazzino_righe_fondo_check",
+      "definition": "CHECK (((fondo_origine)::text = ANY (ARRAY[('FSE_PLUS'::character varying)::text, ('FONDO_NAZIONALE'::character varying)::text, ('FONDO_NAZIONALE_COFINANZIATO'::character varying)::text, ('NESSUN_FONDO'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "corsi_dei_volontari",
+      "name": "corsi_dei_volontari_versione_check",
+      "definition": "CHECK ((versione > 0))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "corsi_volontari_catalogo",
+      "name": "corsi_volontari_catalogo_versione_check",
+      "definition": "CHECK ((versione > 0))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "emissioni_registro_volontari",
+      "name": "emissioni_registro_volontari_numero_righe_check",
+      "definition": "CHECK ((numero_righe >= 0))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse",
+      "name": "esportazioni_fse_counts_check",
+      "definition": "CHECK (((eventi_totali >= 0) AND (righe_totali >= 0) AND (righe_bloccanti >= 0) AND (righe_warning >= 0)))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse",
+      "name": "esportazioni_fse_format_check",
+      "definition": "CHECK (((format_code)::text = ANY (ARRAY[('FSE_CANONICAL_AUDIT_XLSX_V1'::character varying)::text, ('SIFEAD_REGISTRO_OSSERVATO_CONTROLLO_V1'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_eventi",
+      "name": "esportazioni_fse_eventi_counts_check",
+      "definition": "CHECK ((((packs IS NULL) OR (packs >= 0)) AND ((meals IS NULL) OR (meals >= 0)) AND ((occasional_people IS NULL) OR (occasional_people >= 0)) AND ((continuous_people IS NULL) OR (continuous_people >= 0))))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_indicatori",
+      "name": "esportazioni_fse_indicatori_hash_check",
+      "definition": "CHECK (((content_hash)::text ~ '^[0-9a-f]{64}$'::text))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_saldi",
+      "name": "esportazioni_fse_saldi_hash_check",
+      "definition": "CHECK (((content_hash)::text ~ '^[0-9a-f]{64}$'::text))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "importazioni_agea",
+      "name": "importazioni_agea_dimensione_bytes_check",
+      "definition": "CHECK (((dimensione_bytes > 0) AND (dimensione_bytes <= 10485760)))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "importazioni_agea",
+      "name": "importazioni_agea_modalita_check",
+      "definition": "CHECK (((modalita)::text = ANY (ARRAY[('PRIMA_ACQUISIZIONE'::character varying)::text, ('AGGIORNAMENTO'::character varying)::text, ('SOLO_ANALISI'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "importazioni_agea",
+      "name": "importazioni_agea_stato_check",
+      "definition": "CHECK (((stato)::text = ANY (ARRAY[('ANALIZZATA'::character varying)::text, ('DA_MAPPARE'::character varying)::text, ('BLOCCATA'::character varying)::text, ('PRONTA'::character varying)::text, ('CONFERMATA'::character varying)::text, ('ANNULLATA'::character varying)::text, ('ERRORE'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "importazioni_agea_righe",
+      "name": "importazioni_agea_righe_content_hash_check",
+      "definition": "CHECK (((content_hash)::text ~ '^[0-9a-f]{64}$'::text))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "importazioni_agea_righe",
+      "name": "importazioni_agea_righe_identity_base_hash_check",
+      "definition": "CHECK (((identity_base_hash)::text ~ '^[0-9a-f]{64}$'::text))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "importazioni_agea_righe",
+      "name": "importazioni_agea_righe_identity_occurrence_check",
+      "definition": "CHECK ((identity_occurrence > 0))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "importazioni_agea_righe",
+      "name": "importazioni_agea_righe_numero_riga_check",
+      "definition": "CHECK ((numero_riga >= 2))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "importazioni_volontari",
+      "name": "importazioni_volontari_counts_check",
+      "definition": "CHECK (((numero_righe >= 0) AND (creati >= 0) AND (aggiornati >= 0) AND (invariati >= 0) AND (esclusi >= 0) AND (errori >= 0)))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "importazioni_volontari",
+      "name": "importazioni_volontari_dimensione_bytes_check",
+      "definition": "CHECK ((dimensione_bytes > 0))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "importazioni_volontari_righe",
+      "name": "importazioni_volontari_righe_hash_riga_check",
+      "definition": "CHECK (((hash_riga)::text ~ '^[0-9a-f]{64}$'::text))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "importazioni_volontari_righe",
+      "name": "importazioni_volontari_righe_stato_riga_check",
+      "definition": "CHECK (((stato_riga)::text = ANY (ARRAY[('NUOVO'::character varying)::text, ('AGGIORNAMENTO_CERTO'::character varying)::text, ('INVARIATO'::character varying)::text, ('POSSIBILE_DUPLICATO'::character varying)::text, ('ERRORE'::character varying)::text, ('DA_VERIFICARE'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "interventi_attivita",
+      "name": "interventi_attivita_descrizione_check",
+      "definition": "CHECK ((length(TRIM(BOTH FROM descrizione)) > 0))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "interventi_attivita",
+      "name": "interventi_attivita_snapshot_check",
+      "definition": "CHECK ((length(TRIM(BOTH FROM tipologia_snapshot)) > 0))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "interventi_storico_stati",
+      "name": "interventi_storico_stato_nuovo_check",
+      "definition": "CHECK (((stato_nuovo)::text = ANY (ARRAY[('da_pianificare'::character varying)::text, ('pianificato'::character varying)::text, ('in_corso'::character varying)::text, ('concluso'::character varying)::text, ('annullato'::character varying)::text, ('mancata_presentazione'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "interventi_storico_stati",
+      "name": "interventi_storico_stato_precedente_check",
+      "definition": "CHECK (((stato_precedente IS NULL) OR ((stato_precedente)::text = ANY (ARRAY[('da_pianificare'::character varying)::text, ('pianificato'::character varying)::text, ('in_corso'::character varying)::text, ('concluso'::character varying)::text, ('annullato'::character varying)::text, ('mancata_presentazione'::character varying)::text]))))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "mappature_prodotti_esterni",
+      "name": "mappature_prodotti_esterni_fonte_check",
+      "definition": "CHECK (((fonte)::text = 'AGEA_SIFEAD'::text))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "mappature_prodotti_esterni",
+      "name": "mappature_prodotti_esterni_versione_check",
+      "definition": "CHECK ((versione > 0))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "maps_geocode_cache",
+      "name": "maps_geocode_cache_status_check",
+      "definition": "CHECK (((status)::text = ANY (ARRAY[('resolved'::character varying)::text, ('not_found'::character varying)::text, ('error'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "movimenti_esterni_agea",
+      "name": "movimenti_esterni_agea_accepted_content_hash_check",
+      "definition": "CHECK (((accepted_content_hash)::text ~ '^[0-9a-f]{64}$'::text))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "movimenti_esterni_agea",
+      "name": "movimenti_esterni_agea_identity_base_hash_check",
+      "definition": "CHECK (((identity_base_hash)::text ~ '^[0-9a-f]{64}$'::text))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "movimenti_esterni_agea",
+      "name": "movimenti_esterni_agea_identity_occurrence_check",
+      "definition": "CHECK ((identity_occurrence > 0))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "movimenti_esterni_agea",
+      "name": "movimenti_esterni_agea_stato_applicazione_check",
+      "definition": "CHECK (((stato_applicazione)::text = ANY (ARRAY[('NON_APPLICABILE_RIFERIMENTO'::character varying)::text, ('DA_APPLICARE'::character varying)::text, ('APPLICATO_INCREMENTALE'::character varying)::text, ('ASSORBITO_SALDO_INIZIALE'::character varying)::text, ('CONFLITTO_CONTENUTO'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "operazioni_distribuzione_magazzino",
+      "name": "operazioni_distribuzione_canale_check",
+      "definition": "CHECK (((canale_operativo)::text = ANY (ARRAY[('PACCHI'::character varying)::text, ('RITIRO_SEDE'::character varying)::text, ('DOMICILIARE'::character varying)::text, ('EMPORIO'::character varying)::text, ('MENSA'::character varying)::text, ('UDS_STRADA'::character varying)::text, ('ALTRO'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "qualifiche_dei_volontari",
+      "name": "qualifiche_dei_volontari_versione_check",
+      "definition": "CHECK ((versione > 0))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "qualifiche_volontari_catalogo",
+      "name": "qualifiche_volontari_catalogo_versione_check",
+      "definition": "CHECK ((versione > 0))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "registro_volontari_eventi",
+      "name": "registro_volontari_eventi_hash_evento_check",
+      "definition": "CHECK (((hash_evento)::text ~ '^[0-9a-f]{64}$'::text))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse",
+      "name": "riconciliazioni_fse_counts_check",
+      "definition": "CHECK (((totale_righe >= 0) AND (riconciliate >= 0) AND (solo_locali >= 0) AND (solo_agea >= 0) AND (scostamenti >= 0) AND (ambigue >= 0) AND (bloccanti >= 0)))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse",
+      "name": "riconciliazioni_fse_state_check",
+      "definition": "CHECK (((stato)::text = ANY (ARRAY[('CALCOLATA'::character varying)::text, ('DA_RIVEDERE'::character varying)::text, ('RICONCILIATA'::character varying)::text, ('CHIUSA_CON_SCOSTAMENTI'::character varying)::text, ('ANNULLATA'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_risoluzioni",
+      "name": "riconciliazioni_fse_risoluzioni_action_check",
+      "definition": "CHECK (((azione)::text = ANY (ARRAY[('ABBINA'::character varying)::text, ('DISABBINA'::character varying)::text, ('ACCETTA_SCOSTAMENTO'::character varying)::text, ('SEGNALA_DA_CORREGGERE'::character varying)::text, ('RIAPRI'::character varying)::text])))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "rilevazioni_monitoraggio_fse",
+      "name": "rilevazioni_monitoraggio_fse_counts_check",
+      "definition": "CHECK ((((minori_18 IS NULL) OR (minori_18 >= 0)) AND ((giovani_18_29 IS NULL) OR (giovani_18_29 >= 0)) AND ((donne IS NULL) OR (donne >= 0)) AND ((over_65 IS NULL) OR (over_65 >= 0)) AND ((persone_disabilita IS NULL) OR (persone_disabilita >= 0)) AND ((cittadini_paesi_terzi IS NULL) OR (cittadini_paesi_terzi >= 0)) AND ((origine_straniera_minoranze IS NULL) OR (origine_straniera_minoranze >= 0)) AND ((senzatetto_esclusione_abitativa IS NULL) OR (senzatetto_esclusione_abitativa >= 0)) AND ((totale_saltuari IS NULL) OR (totale_saltuari >= 0))))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "spese_emporio_storni_righe",
+      "name": "spese_emporio_storni_righe_quantita_check",
+      "definition": "CHECK ((quantita > (0)::numeric))",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse",
+      "name": "esportazioni_fse_annullato_da_fkey",
+      "definition": "FOREIGN KEY (annullato_da) REFERENCES utenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse",
+      "name": "esportazioni_fse_creato_da_fkey",
+      "definition": "FOREIGN KEY (creato_da) REFERENCES utenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse",
+      "name": "esportazioni_fse_magazzino_id_fkey",
+      "definition": "FOREIGN KEY (magazzino_id) REFERENCES magazzini(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse",
+      "name": "esportazioni_fse_marcato_inserito_da_fkey",
+      "definition": "FOREIGN KEY (marcato_inserito_da) REFERENCES utenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_eventi",
+      "name": "esportazioni_fse_eventi_esportazione_id_fkey",
+      "definition": "FOREIGN KEY (esportazione_id) REFERENCES esportazioni_fse(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_indicatori",
+      "name": "esportazioni_fse_indicatori_esportazione_id_fkey",
+      "definition": "FOREIGN KEY (esportazione_id) REFERENCES esportazioni_fse(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_indicatori",
+      "name": "esportazioni_fse_indicatori_rilevazione_id_fkey",
+      "definition": "FOREIGN KEY (rilevazione_id) REFERENCES rilevazioni_monitoraggio_fse(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_righe",
+      "name": "esportazioni_fse_righe_esportazione_evento_id_fkey",
+      "definition": "FOREIGN KEY (esportazione_evento_id) REFERENCES esportazioni_fse_eventi(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_righe",
+      "name": "esportazioni_fse_righe_lot_id_fkey",
+      "definition": "FOREIGN KEY (lot_id) REFERENCES lotti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_righe",
+      "name": "esportazioni_fse_righe_movimento_id_fkey",
+      "definition": "FOREIGN KEY (movimento_id) REFERENCES movimenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_righe",
+      "name": "esportazioni_fse_righe_movimento_origine_id_fkey",
+      "definition": "FOREIGN KEY (movimento_origine_id) REFERENCES movimenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_righe",
+      "name": "esportazioni_fse_righe_product_id_fkey",
+      "definition": "FOREIGN KEY (product_id) REFERENCES prodotti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_saldi",
+      "name": "esportazioni_fse_saldi_esportazione_id_fkey",
+      "definition": "FOREIGN KEY (esportazione_id) REFERENCES esportazioni_fse(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_saldi",
+      "name": "esportazioni_fse_saldi_lotto_id_fkey",
+      "definition": "FOREIGN KEY (lotto_id) REFERENCES lotti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_saldi",
+      "name": "esportazioni_fse_saldi_magazzino_id_fkey",
+      "definition": "FOREIGN KEY (magazzino_id) REFERENCES magazzini(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "esportazioni_fse_saldi",
+      "name": "esportazioni_fse_saldi_prodotto_id_fkey",
+      "definition": "FOREIGN KEY (prodotto_id) REFERENCES prodotti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "movimenti_esterni_agea",
+      "name": "movimenti_esterni_agea_accepted_import_row_id_fkey",
+      "definition": "FOREIGN KEY (accepted_import_row_id) REFERENCES importazioni_agea_righe(id)",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse",
+      "name": "riconciliazioni_fse_annullato_da_fkey",
+      "definition": "FOREIGN KEY (annullato_da) REFERENCES utenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse",
+      "name": "riconciliazioni_fse_chiuso_da_fkey",
+      "definition": "FOREIGN KEY (chiuso_da) REFERENCES utenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse",
+      "name": "riconciliazioni_fse_creato_da_fkey",
+      "definition": "FOREIGN KEY (creato_da) REFERENCES utenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse",
+      "name": "riconciliazioni_fse_importazione_agea_id_fkey",
+      "definition": "FOREIGN KEY (importazione_agea_id) REFERENCES importazioni_agea(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse",
+      "name": "riconciliazioni_fse_importazione_agea_precedente_id_fkey",
+      "definition": "FOREIGN KEY (importazione_agea_precedente_id) REFERENCES importazioni_agea(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse",
+      "name": "riconciliazioni_fse_magazzino_id_fkey",
+      "definition": "FOREIGN KEY (magazzino_id) REFERENCES magazzini(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse",
+      "name": "riconciliazioni_fse_ricalcolato_da_fkey",
+      "definition": "FOREIGN KEY (ricalcolato_da) REFERENCES utenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_righe",
+      "name": "riconciliazioni_fse_righe_importazione_agea_riga_id_fkey",
+      "definition": "FOREIGN KEY (importazione_agea_riga_id) REFERENCES importazioni_agea_righe(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_righe",
+      "name": "riconciliazioni_fse_righe_movimento_id_fkey",
+      "definition": "FOREIGN KEY (movimento_id) REFERENCES movimenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_righe",
+      "name": "riconciliazioni_fse_righe_operazione_distribuzione_id_fkey",
+      "definition": "FOREIGN KEY (operazione_distribuzione_id) REFERENCES operazioni_distribuzione_magazzino(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_righe",
+      "name": "riconciliazioni_fse_righe_product_id_external_fkey",
+      "definition": "FOREIGN KEY (product_id_external) REFERENCES prodotti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_righe",
+      "name": "riconciliazioni_fse_righe_product_id_local_fkey",
+      "definition": "FOREIGN KEY (product_id_local) REFERENCES prodotti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_righe",
+      "name": "riconciliazioni_fse_righe_riconciliazione_id_fkey",
+      "definition": "FOREIGN KEY (riconciliazione_id) REFERENCES riconciliazioni_fse(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_risoluzioni",
+      "name": "riconciliazioni_fse_risoluzion_target_importazione_riga_id_fkey",
+      "definition": "FOREIGN KEY (target_importazione_riga_id) REFERENCES importazioni_agea_righe(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_risoluzioni",
+      "name": "riconciliazioni_fse_risoluzioni_creato_da_fkey",
+      "definition": "FOREIGN KEY (creato_da) REFERENCES utenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_risoluzioni",
+      "name": "riconciliazioni_fse_risoluzioni_riconciliazione_id_fkey",
+      "definition": "FOREIGN KEY (riconciliazione_id) REFERENCES riconciliazioni_fse(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_risoluzioni",
+      "name": "riconciliazioni_fse_risoluzioni_riconciliazione_riga_id_fkey",
+      "definition": "FOREIGN KEY (riconciliazione_riga_id) REFERENCES riconciliazioni_fse_righe(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "riconciliazioni_fse_risoluzioni",
+      "name": "riconciliazioni_fse_risoluzioni_target_movimento_id_fkey",
+      "definition": "FOREIGN KEY (target_movimento_id) REFERENCES movimenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "rilevazioni_monitoraggio_fse",
+      "name": "rilevazioni_monitoraggio_fse_aggiornato_da_fkey",
+      "definition": "FOREIGN KEY (aggiornato_da) REFERENCES utenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "rilevazioni_monitoraggio_fse",
+      "name": "rilevazioni_monitoraggio_fse_creato_da_fkey",
+      "definition": "FOREIGN KEY (creato_da) REFERENCES utenti(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "rilevazioni_monitoraggio_fse",
+      "name": "rilevazioni_monitoraggio_fse_magazzino_id_fkey",
+      "definition": "FOREIGN KEY (magazzino_id) REFERENCES magazzini(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "rilevazioni_monitoraggio_fse",
+      "name": "rilevazioni_monitoraggio_fse_operazione_distribuzione_id_fkey",
+      "definition": "FOREIGN KEY (operazione_distribuzione_id) REFERENCES operazioni_distribuzione_magazzino(id) ON DELETE RESTRICT",
+      "historicalAlreadyPresent": true,
+      "freshAlreadyPresent": false
+    },
+    {
+      "table": "fse_fascicoli_sociali",
+      "name": "fse_fascicoli_sociali_disabilita_nonnegative_check",
+      "definition": "CHECK (persone_disabilita IS NULL OR persone_disabilita >= 0)",
+      "historicalAlreadyPresent": false,
+      "freshAlreadyPresent": false
+    }
+  ],
+  "counts": {
+    "before": {
+      "historicalConstraints": 873,
+      "freshConstraints": 838
+    },
+    "after": {
+      "historicalConstraints": 874,
+      "freshConstraints": 919,
+      "indexes": 446,
+      "columns": 2017,
+      "triggers": 54,
+      "functions": 60
+    }
+  },
+  "physicalConstraintsBefore": {
+    "historicalOnly": [
+      "audit_eventi.audit_eventi_actor_user_id_fkey",
+      "audit_eventi.audit_eventi_initiated_by_user_id_fkey",
+      "audit_eventi.audit_eventi_previous_event_id_fkey",
+      "bisogni_pianificati_storico.bisogni_pianificati_storico_operatore_id_fkey",
+      "carichi_magazzino.carichi_magazzino_creato_da_fkey",
+      "carichi_magazzino.carichi_magazzino_fornitore_id_fkey",
+      "carichi_magazzino.carichi_magazzino_magazzino_id_fkey",
+      "carichi_magazzino.carichi_magazzino_origine_check",
+      "carichi_magazzino_righe.carichi_magazzino_righe_carico_magazzino_id_fkey",
+      "carichi_magazzino_righe.carichi_magazzino_righe_fondo_check",
+      "carichi_magazzino_righe.carichi_magazzino_righe_lotto_id_fkey",
+      "carichi_magazzino_righe.carichi_magazzino_righe_numero_unique",
+      "carichi_magazzino_righe.carichi_magazzino_righe_prodotto_id_fkey",
+      "carico_integrazione_righe.carico_integrazione_righe_carico_integrazione_id_fkey",
+      "carico_integrazione_righe.carico_integrazione_righe_carico_magazzino_riga_id_fkey",
+      "carico_integrazione_righe.carico_integrazione_righe_carico_pratica_riga_id_fkey",
+      "carico_integrazioni.carico_integrazioni_attore_id_fkey",
+      "carico_integrazioni.carico_integrazioni_carico_magazzino_id_fkey",
+      "carico_integrazioni.carico_integrazioni_carico_pratica_id_fkey",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_attore_id_fkey",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_audit_evento_id_fkey",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_carico_integrazione_riga_id_fkey",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_carico_pratica_riga_id_fkey",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_lotto_id_fkey",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_movimento_id_fkey",
+      "carico_pratica_righe.carico_pratica_righe_aggiornato_da_fkey",
+      "carico_pratica_righe.carico_pratica_righe_carico_pratica_id_fkey",
+      "carico_pratica_righe.carico_pratica_righe_creato_da_fkey",
+      "carico_pratica_righe.carico_pratica_righe_prodotto_id_fkey",
+      "carico_pratiche.carico_pratiche_aggiornato_da_fkey",
+      "carico_pratiche.carico_pratiche_area_operativa_id_fkey",
+      "carico_pratiche.carico_pratiche_creato_da_fkey",
+      "carico_pratiche.carico_pratiche_fornitore_id_fkey",
+      "carico_pratiche.carico_pratiche_lotto_logico_id_fkey",
+      "carico_pratiche.carico_pratiche_magazzino_id_fkey",
+      "comandi_operativi.comandi_operativi_tipo_chiave_unique",
+      "configurazioni_matricole_volontari.configurazioni_matricole_volontari_aggiornata_da_fkey",
+      "configurazioni_matricole_volontari.configurazioni_matricole_volontari_ambito_progressivo_check",
+      "configurazioni_matricole_volontari.configurazioni_matricole_volontari_cifre_progressivo_check",
+      "configurazioni_matricole_volontari.configurazioni_matricole_volontari_numero_iniziale_check",
+      "configurazioni_matricole_volontari.configurazioni_matricole_volontari_scope_tipo_check",
+      "configurazioni_matricole_volontari.configurazioni_matricole_volontari_separatore_check",
+      "configurazioni_matricole_volontari.configurazioni_matricole_volontari_versione_key",
+      "coperture_assicurative_volontari.coperture_assicurative_volontari_annullata_da_fkey",
+      "coperture_assicurative_volontari.coperture_assicurative_volontari_creato_da_fkey",
+      "coperture_assicurative_volontari.coperture_assicurative_volontari_durata_mesi_check",
+      "coperture_assicurative_volontari.coperture_assicurative_volontari_tipo_operazione_check",
+      "coperture_assicurative_volontari.coperture_assicurative_volontari_volontario_id_fkey",
+      "corsi_dei_volontari.corsi_dei_volontari_corso_id_fkey",
+      "corsi_dei_volontari.corsi_dei_volontari_verificato_da_fkey",
+      "corsi_dei_volontari.corsi_dei_volontari_versione_check",
+      "corsi_dei_volontari.corsi_dei_volontari_volontario_id_fkey",
+      "corsi_volontari_catalogo.corsi_volontari_catalogo_codice_key",
+      "corsi_volontari_catalogo.corsi_volontari_catalogo_ore_check",
+      "corsi_volontari_catalogo.corsi_volontari_catalogo_validita_mesi_check",
+      "corsi_volontari_catalogo.corsi_volontari_catalogo_versione_check",
+      "corsi_volontari_ruoli.corsi_volontari_ruoli_corso_id_fkey",
+      "corsi_volontari_ruoli.corsi_volontari_ruoli_ruolo_volontario_id_fkey",
+      "corsi_volontari_ruoli.corsi_volontari_ruoli_unique",
+      "credito_ricariche_destinatari.credito_ricariche_destinatari_beneficiario_id_fkey",
+      "credito_ricariche_destinatari.credito_ricariche_destinatari_movimento_id_fkey",
+      "credito_ricariche_destinatari.credito_ricariche_destinatari_periodo_fkey",
+      "emissioni_registro_volontari.emissioni_registro_volontari_centro_ascolto_id_fkey",
+      "emissioni_registro_volontari.emissioni_registro_volontari_generato_da_fkey",
+      "emissioni_registro_volontari.emissioni_registro_volontari_hash_file_check",
+      "emissioni_registro_volontari.emissioni_registro_volontari_hash_snapshot_check",
+      "emissioni_registro_volontari.emissioni_registro_volontari_numero_righe_check",
+      "emissioni_registro_volontari.emissioni_registro_volontari_scope_area_operativa_id_fkey",
+      "emissioni_registro_volontari.emissioni_registro_volontari_scope_centro_id_fkey",
+      "emissioni_registro_volontari.emissioni_registro_volontari_tipo_check",
+      "emporio_abilitazioni.emporio_abilitazioni_area_operativa_id_fkey",
+      "emporio_abilitazioni.emporio_abilitazioni_beneficiario_id_fkey",
+      "emporio_abilitazioni.emporio_abilitazioni_operatore_id_fkey",
+      "enti_destinatari.enti_destinatari_area_operativa_id_fkey",
+      "esportazioni_fse.esportazioni_fse_annullato_da_fkey",
+      "esportazioni_fse.esportazioni_fse_counts_check",
+      "esportazioni_fse.esportazioni_fse_creato_da_fkey",
+      "esportazioni_fse.esportazioni_fse_format_check",
+      "esportazioni_fse.esportazioni_fse_magazzino_id_fkey",
+      "esportazioni_fse.esportazioni_fse_marcato_inserito_da_fkey",
+      "esportazioni_fse_eventi.esportazioni_fse_eventi_counts_check",
+      "esportazioni_fse_eventi.esportazioni_fse_eventi_esportazione_id_fkey",
+      "esportazioni_fse_eventi.esportazioni_fse_eventi_key_unique",
+      "esportazioni_fse_indicatori.esportazioni_fse_indicatori_esportazione_id_fkey",
+      "esportazioni_fse_indicatori.esportazioni_fse_indicatori_hash_check",
+      "esportazioni_fse_indicatori.esportazioni_fse_indicatori_rilevazione_id_fkey",
+      "esportazioni_fse_indicatori.esportazioni_fse_indicatori_unique",
+      "esportazioni_fse_rappresentazioni.esportazioni_fse_rappresentazioni_creato_da_fkey",
+      "esportazioni_fse_rappresentazioni.esportazioni_fse_rappresentazioni_esportazione_id_fkey",
+      "esportazioni_fse_righe.esportazioni_fse_righe_esportazione_evento_id_fkey",
+      "esportazioni_fse_righe.esportazioni_fse_righe_key_unique",
+      "esportazioni_fse_righe.esportazioni_fse_righe_lot_id_fkey",
+      "esportazioni_fse_righe.esportazioni_fse_righe_movimento_id_fkey",
+      "esportazioni_fse_righe.esportazioni_fse_righe_movimento_origine_id_fkey",
+      "esportazioni_fse_righe.esportazioni_fse_righe_product_id_fkey",
+      "esportazioni_fse_saldi.esportazioni_fse_saldi_esportazione_id_fkey",
+      "esportazioni_fse_saldi.esportazioni_fse_saldi_hash_check",
+      "esportazioni_fse_saldi.esportazioni_fse_saldi_lotto_id_fkey",
+      "esportazioni_fse_saldi.esportazioni_fse_saldi_magazzino_id_fkey",
+      "esportazioni_fse_saldi.esportazioni_fse_saldi_prodotto_id_fkey",
+      "fse_administrative_files.fse_administrative_files_file_id_fkey",
+      "fse_administrative_files.fse_administrative_files_version_id_fkey",
+      "fse_administrative_lineage.fse_administrative_lineage_claim_id_fkey",
+      "fse_administrative_lineage.fse_administrative_lineage_load_row_id_fkey",
+      "fse_administrative_lineage.fse_administrative_lineage_observation_id_fkey",
+      "fse_administrative_observations.fse_administrative_observations_revision_id_fkey",
+      "fse_administrative_observations.fse_administrative_observations_row_id_fkey",
+      "fse_administrative_observations.fse_administrative_observations_source_file_id_fkey",
+      "fse_administrative_observations.fse_administrative_observations_stock_row_id_fkey",
+      "fse_administrative_observations.fse_administrative_observations_version_id_fkey",
+      "fse_administrative_versions.fse_administrative_versions_creato_da_fkey",
+      "fse_administrative_versions.fse_administrative_versions_magazzino_id_fkey",
+      "fse_administrative_versions.fse_administrative_versions_session_id_fkey",
+      "fse_administrative_versions.fse_administrative_versions_source_registry_id_fkey",
+      "fse_fascicoli_sociali.fse_fascicoli_sociali_beneficiario_id_fkey",
+      "fse_fascicoli_sociali.fse_fascicoli_sociali_ultimo_import_batch_id_fkey",
+      "fse_fascicoli_sociali_snapshot.fse_fascicoli_sociali_snapshot_beneficiario_id_fkey",
+      "fse_fascicoli_sociali_snapshot.fse_fascicoli_sociali_snapshot_import_batch_id_fkey",
+      "fse_fascicoli_sociali_snapshot.fse_fascicoli_sociali_snapshot_utente_id_fkey",
+      "fse_import_attach_commands.fse_import_attach_commands_creato_da_fkey",
+      "fse_import_attach_commands.fse_import_attach_commands_sessione_id_fkey",
+      "fse_import_batches.fse_import_batches_area_operativa_id_fkey",
+      "fse_import_batches.fse_import_batches_centro_ascolto_id_fkey",
+      "fse_import_batches.fse_import_batches_utente_id_fkey",
+      "fse_import_files.fse_import_files_acquisito_da_fkey",
+      "fse_import_files.fse_import_files_sessione_id_fkey",
+      "fse_import_row_revisions.fse_import_row_revisions_creato_da_fkey",
+      "fse_import_row_revisions.fse_import_row_revisions_riga_id_fkey",
+      "fse_import_rows.fse_import_rows_aggiornato_da_fkey",
+      "fse_import_rows.fse_import_rows_file_id_fkey",
+      "fse_import_rows.fse_import_rows_prodotto_id_fkey",
+      "fse_import_rows.fse_import_rows_sessione_id_fkey",
+      "fse_import_sessions.fse_import_sessions_aggiornato_da_fkey",
+      "fse_import_sessions.fse_import_sessions_area_operativa_id_fkey",
+      "fse_import_sessions.fse_import_sessions_carico_pratica_id_fkey",
+      "fse_import_sessions.fse_import_sessions_creato_da_fkey",
+      "fse_import_sessions.fse_import_sessions_lotto_logico_id_fkey",
+      "fse_import_sessions.fse_import_sessions_magazzino_id_fkey",
+      "fse_import_sessions.fse_import_sessions_source_registry_id_fkey",
+      "fse_import_stock_rows.fse_import_stock_rows_file_id_fkey",
+      "fse_import_stock_rows.fse_import_stock_rows_prodotto_id_fkey",
+      "fse_import_stock_rows.fse_import_stock_rows_sessione_id_fkey",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_attivata_da_fkey",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_carico_pratica_id_fkey",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_magazzino_id_fkey",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_sessione_id_fkey",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_source_registry_id_fkey",
+      "fse_movement_claims.fse_movement_claims_accepted_revision_id_fkey",
+      "fse_movement_claims.fse_movement_claims_carico_magazzino_riga_id_fkey",
+      "fse_movement_claims.fse_movement_claims_carico_pratica_riga_id_fkey",
+      "fse_movement_claims.fse_movement_claims_magazzino_id_snapshot_fkey",
+      "fse_movement_claims.fse_movement_claims_source_registry_id_fkey",
+      "fse_movement_identity_aliases.fse_movement_identity_aliases_created_from_revision_id_fkey",
+      "fse_movement_identity_aliases.fse_movement_identity_aliases_source_registry_id_fkey",
+      "fse_reconciliation_runs.fse_reconciliation_runs_administrative_version_id_fkey",
+      "fse_reconciliation_runs.fse_reconciliation_runs_baseline_run_id_fkey",
+      "fse_reconciliation_runs.fse_reconciliation_runs_creato_da_fkey",
+      "fse_reconciliation_runs.fse_reconciliation_runs_legacy_import_id_fkey",
+      "fse_reconciliation_runs.fse_reconciliation_runs_reconciliation_id_fkey",
+      "fse_source_registries.fse_source_registries_area_operativa_id_fkey",
+      "fse_source_registries.fse_source_registries_creato_da_fkey",
+      "giornate_servizio_volontari.giornate_servizio_volontari_centro_ascolto_id_fkey",
+      "giornate_servizio_volontari.giornate_servizio_volontari_creato_da_fkey",
+      "giornate_servizio_volontari.giornate_servizio_volontari_stato_check",
+      "giornate_servizio_volontari.giornate_servizio_volontari_versione_check",
+      "giornate_servizio_volontari.giornate_servizio_volontari_volontario_id_fkey",
+      "importazioni_agea.importazioni_agea_annullato_da_fkey",
+      "importazioni_agea.importazioni_agea_bootstrap_carico_id_fkey",
+      "importazioni_agea.importazioni_agea_confermato_da_fkey",
+      "importazioni_agea.importazioni_agea_creato_da_fkey",
+      "importazioni_agea.importazioni_agea_dimensione_bytes_check",
+      "importazioni_agea.importazioni_agea_magazzino_id_fkey",
+      "importazioni_agea.importazioni_agea_modalita_check",
+      "importazioni_agea.importazioni_agea_sha256_file_check",
+      "importazioni_agea.importazioni_agea_stato_check",
+      "importazioni_agea_partite.importazioni_agea_partite_corretto_da_fkey",
+      "importazioni_agea_partite.importazioni_agea_partite_existing_lotto_id_fkey",
+      "importazioni_agea_partite.importazioni_agea_partite_importazione_id_fkey",
+      "importazioni_agea_partite.importazioni_agea_partite_prodotto_id_fkey",
+      "importazioni_agea_righe.importazioni_agea_righe_carico_magazzino_riga_id_fkey",
+      "importazioni_agea_righe.importazioni_agea_righe_content_hash_check",
+      "importazioni_agea_righe.importazioni_agea_righe_corretto_da_fkey",
+      "importazioni_agea_righe.importazioni_agea_righe_identity_base_hash_check",
+      "importazioni_agea_righe.importazioni_agea_righe_identity_occurrence_check",
+      "importazioni_agea_righe.importazioni_agea_righe_importazione_id_fkey",
+      "importazioni_agea_righe.importazioni_agea_righe_mapping_prodotto_id_fkey",
+      "importazioni_agea_righe.importazioni_agea_righe_numero_riga_check",
+      "importazioni_agea_righe.importazioni_agea_righe_prodotto_id_snapshot_fkey",
+      "importazioni_volontari.importazioni_volontari_centro_ascolto_id_fkey",
+      "importazioni_volontari.importazioni_volontari_confermato_da_fkey",
+      "importazioni_volontari.importazioni_volontari_counts_check",
+      "importazioni_volontari.importazioni_volontari_creato_da_fkey",
+      "importazioni_volontari.importazioni_volontari_dimensione_bytes_check",
+      "importazioni_volontari.importazioni_volontari_hash_contenuto_normalizzato_check",
+      "importazioni_volontari.importazioni_volontari_scope_area_operativa_id_fkey",
+      "importazioni_volontari.importazioni_volontari_scope_centro_id_fkey",
+      "importazioni_volontari.importazioni_volontari_sha256_file_check",
+      "importazioni_volontari_righe.importazioni_volontari_righe_centro_proposto_id_fkey",
+      "importazioni_volontari_righe.importazioni_volontari_righe_hash_riga_check",
+      "importazioni_volontari_righe.importazioni_volontari_righe_importazione_id_fkey",
+      "importazioni_volontari_righe.importazioni_volontari_righe_ruolo_proposto_id_fkey",
+      "importazioni_volontari_righe.importazioni_volontari_righe_stato_riga_check",
+      "importazioni_volontari_righe.importazioni_volontari_righe_unique",
+      "importazioni_volontari_righe.importazioni_volontari_righe_volontario_candidato_id_fkey",
+      "importazioni_volontari_righe.importazioni_volontari_righe_volontario_risultato_id_fkey",
+      "interventi.interventi_precedente_id_interventi_id_fk",
+      "interventi_attivita.interventi_attivita_descrizione_check",
+      "interventi_attivita.interventi_attivita_intervento_id_fkey",
+      "interventi_attivita.interventi_attivita_operatore_id_fkey",
+      "interventi_attivita.interventi_attivita_snapshot_check",
+      "interventi_attivita.interventi_attivita_tipologia_id_fkey",
+      "interventi_deleghe_m4.interventi_deleghe_m4_delegato_da_fkey",
+      "interventi_deleghe_m4.interventi_deleghe_m4_intervento_id_fkey",
+      "interventi_deleghe_m4.interventi_deleghe_m4_prima_richiesta_id_fkey",
+      "interventi_documenti.interventi_documenti_intervento_id_fkey",
+      "interventi_materiali.interventi_materiali_intervento_id_fkey",
+      "interventi_materiali.interventi_materiali_magazzino_id_fkey",
+      "interventi_materiali.interventi_materiali_prodotto_id_fkey",
+      "interventi_storico_stati.interventi_storico_operatore_id_utenti_id_fk",
+      "interventi_storico_stati.interventi_storico_stato_nuovo_check",
+      "interventi_storico_stati.interventi_storico_stato_precedente_check",
+      "lotti_logici.lotti_logici_aggiornato_da_fkey",
+      "lotti_logici.lotti_logici_area_operativa_id_fkey",
+      "lotti_logici.lotti_logici_creato_da_fkey",
+      "mappature_prodotti_esterni.mappature_prodotti_esterni_aggiornato_da_fkey",
+      "mappature_prodotti_esterni.mappature_prodotti_esterni_creato_da_fkey",
+      "mappature_prodotti_esterni.mappature_prodotti_esterni_fonte_check",
+      "mappature_prodotti_esterni.mappature_prodotti_esterni_prodotto_id_fkey",
+      "mappature_prodotti_esterni.mappature_prodotti_esterni_versione_check",
+      "maps_geocode_cache.maps_geocode_cache_status_check",
+      "matricole_volontari.matricole_volontari_assegnata_da_fkey",
+      "matricole_volontari.matricole_volontari_configurazione_id_fkey",
+      "matricole_volontari.matricole_volontari_matricola_normalizzata_key",
+      "matricole_volontari.matricole_volontari_tipo_identificativo_check",
+      "matricole_volontari.matricole_volontari_volontario_id_fkey",
+      "mensa_abilitazioni.mensa_abilitazioni_beneficiario_id_fkey",
+      "mensa_abilitazioni.mensa_abilitazioni_created_by_fkey",
+      "mensa_abilitazioni.mensa_abilitazioni_mensa_id_fkey",
+      "mensa_accessi.mensa_accessi_autorizzazione_temporanea_id_fkey",
+      "mensa_accessi.mensa_accessi_beneficiario_id_fkey",
+      "mensa_accessi.mensa_accessi_mensa_id_fkey",
+      "mensa_accessi.mensa_accessi_operatore_id_fkey",
+      "mensa_accessi.mensa_accessi_tessera_id_fkey",
+      "mensa_autorizzazioni_temporanee.mensa_autorizzazioni_temporanee_beneficiario_id_fkey",
+      "mensa_autorizzazioni_temporanee.mensa_autorizzazioni_temporanee_mensa_id_fkey",
+      "mensa_autorizzazioni_temporanee.mensa_autorizzazioni_temporanee_operatore_id_fkey",
+      "mensa_consumi.mensa_consumi_giornata_servizio_id_fkey",
+      "mensa_consumi.mensa_consumi_mensa_id_fkey",
+      "mensa_consumi.mensa_consumi_operatore_id_fkey",
+      "mensa_consumi.mensa_consumi_prodotto_id_fkey",
+      "mensa_consumi.mensa_consumi_scarico_id_fkey",
+      "mensa_consumi_storni.mensa_consumi_storni_consumo_id_fkey",
+      "mensa_consumi_storni.mensa_consumi_storni_operatore_id_fkey",
+      "mensa_eccezioni.mensa_eccezioni_accesso_mensa_id_fkey",
+      "mensa_eccezioni.mensa_eccezioni_beneficiario_id_fkey",
+      "mensa_eccezioni.mensa_eccezioni_mensa_destinazione_id_fkey",
+      "mensa_eccezioni.mensa_eccezioni_mensa_principale_id_fkey",
+      "mensa_eccezioni.mensa_eccezioni_operatore_id_fkey",
+      "mensa_giornate_servizio.mensa_giornate_servizio_aperta_da_fkey",
+      "mensa_giornate_servizio.mensa_giornate_servizio_chiusa_da_fkey",
+      "mensa_giornate_servizio.mensa_giornate_servizio_mensa_id_fkey",
+      "mensa_giornate_servizio.mensa_giornate_servizio_riaperta_da_fkey",
+      "mensa_pasti.mensa_pasti_accesso_mensa_id_fkey",
+      "mensa_pasti.mensa_pasti_beneficiario_id_fkey",
+      "mensa_pasti.mensa_pasti_eccezione_id_fkey",
+      "mensa_pasti.mensa_pasti_mensa_id_fkey",
+      "mensa_pasti.mensa_pasti_operatore_id_fkey",
+      "mense.mense_created_by_fkey",
+      "mense.mense_magazzino_id_fkey",
+      "movimenti_esterni_agea.movimenti_esterni_agea_accepted_content_hash_check",
+      "movimenti_esterni_agea.movimenti_esterni_agea_accepted_import_row_id_fkey",
+      "movimenti_esterni_agea.movimenti_esterni_agea_assorbito_da_bootstrap_riga_id_fkey",
+      "movimenti_esterni_agea.movimenti_esterni_agea_carico_magazzino_riga_id_fkey",
+      "movimenti_esterni_agea.movimenti_esterni_agea_first_seen_import_id_fkey",
+      "movimenti_esterni_agea.movimenti_esterni_agea_identity_base_hash_check",
+      "movimenti_esterni_agea.movimenti_esterni_agea_identity_occurrence_check",
+      "movimenti_esterni_agea.movimenti_esterni_agea_last_seen_import_id_fkey",
+      "movimenti_esterni_agea.movimenti_esterni_agea_magazzino_id_fkey",
+      "movimenti_esterni_agea.movimenti_esterni_agea_prodotto_id_snapshot_fkey",
+      "movimenti_esterni_agea.movimenti_esterni_agea_stato_applicazione_check",
+      "operazioni_distribuzione_magazzino.operazioni_distribuzione_canale_check",
+      "operazioni_distribuzione_magazzino.operazioni_distribuzione_magazzino_creato_da_fkey",
+      "operazioni_distribuzione_magazzino.operazioni_distribuzione_magazzino_magazzino_id_fkey",
+      "progressivi_matricole_volontari.progressivi_matricole_config_scope_unique",
+      "progressivi_matricole_volontari.progressivi_matricole_volontari_area_operativa_id_fkey",
+      "progressivi_matricole_volontari.progressivi_matricole_volontari_configurazione_id_fkey",
+      "progressivi_matricole_volontari.progressivi_matricole_volontari_scope_tipo_check",
+      "progressivi_matricole_volontari.progressivi_matricole_volontari_ultimo_numero_check",
+      "qualifiche_dei_volontari.qualifiche_dei_volontari_corso_origine_id_fkey",
+      "qualifiche_dei_volontari.qualifiche_dei_volontari_qualifica_id_fkey",
+      "qualifiche_dei_volontari.qualifiche_dei_volontari_versione_check",
+      "qualifiche_dei_volontari.qualifiche_dei_volontari_volontario_id_fkey",
+      "qualifiche_volontari_catalogo.qualifiche_volontari_catalogo_codice_key",
+      "qualifiche_volontari_catalogo.qualifiche_volontari_catalogo_validita_mesi_check",
+      "qualifiche_volontari_catalogo.qualifiche_volontari_catalogo_versione_check",
+      "qualifiche_volontari_ruoli.qualifiche_volontari_ruoli_qualifica_id_fkey",
+      "qualifiche_volontari_ruoli.qualifiche_volontari_ruoli_ruolo_volontario_id_fkey",
+      "qualifiche_volontari_ruoli.qualifiche_volontari_ruoli_unique",
+      "registro_volontari_eventi.registro_volontari_eventi_centro_ascolto_id_fkey",
+      "registro_volontari_eventi.registro_volontari_eventi_hash_evento_check",
+      "registro_volontari_eventi.registro_volontari_eventi_hash_evento_key",
+      "registro_volontari_eventi.registro_volontari_eventi_progressivo_key",
+      "registro_volontari_eventi.registro_volontari_eventi_sezione_check",
+      "registro_volontari_eventi.registro_volontari_eventi_utente_id_fkey",
+      "registro_volontari_eventi.registro_volontari_eventi_volontario_id_fkey",
+      "richieste_magazzino.richieste_magazzino_annullato_da_fkey",
+      "richieste_magazzino.richieste_magazzino_area_operativa_id_fkey",
+      "richieste_magazzino.richieste_magazzino_beneficiario_id_fkey",
+      "richieste_magazzino.richieste_magazzino_centro_ascolto_id_fkey",
+      "richieste_magazzino.richieste_magazzino_ente_destinatario_id_fkey",
+      "richieste_magazzino.richieste_magazzino_intervento_id_fkey",
+      "richieste_magazzino.richieste_magazzino_inviato_da_fkey",
+      "richieste_magazzino.richieste_magazzino_magazzino_destinatario_id_fkey",
+      "richieste_magazzino.richieste_magazzino_magazzino_richiesto_id_fkey",
+      "richieste_magazzino.richieste_magazzino_mensa_id_fkey",
+      "richieste_magazzino.richieste_magazzino_preso_in_carico_da_fkey",
+      "richieste_magazzino_documenti.richieste_magazzino_documenti_bolla_id_fkey",
+      "richieste_magazzino_documenti.richieste_magazzino_documenti_cessato_da_fkey",
+      "richieste_magazzino_documenti.richieste_magazzino_documenti_creato_da_fkey",
+      "richieste_magazzino_documenti.richieste_magazzino_documenti_richiesta_id_fkey",
+      "richieste_magazzino_documenti.richieste_magazzino_documenti_trasferimento_id_fkey",
+      "riconciliazioni_fse.riconciliazioni_fse_administrative_version_id_fkey",
+      "riconciliazioni_fse.riconciliazioni_fse_annullato_da_fkey",
+      "riconciliazioni_fse.riconciliazioni_fse_chiuso_da_fkey",
+      "riconciliazioni_fse.riconciliazioni_fse_counts_check",
+      "riconciliazioni_fse.riconciliazioni_fse_creato_da_fkey",
+      "riconciliazioni_fse.riconciliazioni_fse_importazione_agea_id_fkey",
+      "riconciliazioni_fse.riconciliazioni_fse_importazione_agea_precedente_id_fkey",
+      "riconciliazioni_fse.riconciliazioni_fse_magazzino_id_fkey",
+      "riconciliazioni_fse.riconciliazioni_fse_ricalcolato_da_fkey",
+      "riconciliazioni_fse.riconciliazioni_fse_state_check",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_aggregate_version_id_fkey",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_importazione_agea_riga_id_fkey",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_key_unique",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_movimento_id_fkey",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_observation_id_fkey",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_operazione_distribuzione_id_fkey",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_product_id_external_fkey",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_product_id_local_fkey",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_riconciliazione_id_fkey",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzion_target_importazione_riga_id_fkey",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_action_check",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_creato_da_fkey",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_riconciliazione_id_fkey",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_riconciliazione_riga_id_fkey",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_target_movimento_id_fkey",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_target_observation_id_fkey",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_aggiornato_da_fkey",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_counts_check",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_creato_da_fkey",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_magazzino_id_fkey",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_month_unique",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_operazione_distribuzione_id_fkey",
+      "spese_emporio_storni.spese_emporio_storni_movimento_credito_solidale_id_fkey",
+      "spese_emporio_storni.spese_emporio_storni_operatore_id_fkey",
+      "spese_emporio_storni.spese_emporio_storni_spesa_emporio_id_fkey",
+      "spese_emporio_storni_righe.spese_emporio_storni_righe_movimento_inventario_id_fkey",
+      "spese_emporio_storni_righe.spese_emporio_storni_righe_movimento_inventario_originale__fkey",
+      "spese_emporio_storni_righe.spese_emporio_storni_righe_quantita_check",
+      "spese_emporio_storni_righe.spese_emporio_storni_righe_spesa_riga_id_fkey",
+      "spese_emporio_storni_righe.spese_emporio_storni_righe_storno_id_fkey",
+      "stati_volontari.stati_volontari_creato_da_fkey",
+      "stati_volontari.stati_volontari_tipo_evento_check",
+      "stati_volontari.stati_volontari_volontario_id_fkey",
+      "tessere_beneficiari.tessere_beneficiari_beneficiario_id_fkey",
+      "tessere_beneficiari.tessere_beneficiari_created_by_fkey",
+      "utenti_mense.utenti_mense_assegnata_da_fkey",
+      "utenti_mense.utenti_mense_mensa_id_fkey",
+      "utenti_mense.utenti_mense_revocata_da_fkey",
+      "utenti_mense.utenti_mense_utente_id_fkey"
+    ],
+    "freshOnly": [
+      "audit_eventi.audit_eventi_actor_user_id_utenti_id_fk",
+      "audit_eventi.audit_eventi_initiated_by_user_id_utenti_id_fk",
+      "audit_eventi.audit_eventi_previous_event_id_audit_eventi_id_fk",
+      "bisogni_pianificati_storico.bisogni_pianificati_storico_bisogno_id_bisogni_pianificati_id_f",
+      "bisogni_pianificati_storico.bisogni_pianificati_storico_operatore_id_utenti_id_fk",
+      "bolla_righe.bolla_righe_id_bolla_unique",
+      "bolle.bolle_area_operativa_id_snapshot_aree_operative_id_fk",
+      "bolle.bolle_centro_ascolto_id_snapshot_centri_di_ascolto_id_fk",
+      "bolle.bolle_ente_destinatario_id_enti_destinatari_id_fk",
+      "carichi_magazzino.carichi_magazzino_creato_da_utenti_id_fk",
+      "carichi_magazzino.carichi_magazzino_fornitore_id_fornitori_id_fk",
+      "carichi_magazzino.carichi_magazzino_magazzino_id_magazzini_id_fk",
+      "carichi_magazzino_righe.carichi_magazzino_righe_carico_magazzino_id_carichi_magazzino_i",
+      "carichi_magazzino_righe.carichi_magazzino_righe_lotto_id_lotti_id_fk",
+      "carichi_magazzino_righe.carichi_magazzino_righe_prodotto_id_prodotti_id_fk",
+      "carico_integrazione_righe.carico_integrazione_righe_carico_integrazione_id_carico_integra",
+      "carico_integrazione_righe.carico_integrazione_righe_carico_magazzino_riga_id_carichi_maga",
+      "carico_integrazione_righe.carico_integrazione_righe_carico_pratica_riga_id_carico_pratica",
+      "carico_integrazioni.carico_integrazioni_attore_id_utenti_id_fk",
+      "carico_integrazioni.carico_integrazioni_carico_magazzino_id_carichi_magazzino_id_fk",
+      "carico_integrazioni.carico_integrazioni_carico_pratica_id_carico_pratiche_id_fk",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_attore_id_utenti_id_fk",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_audit_evento_id_audit_eventi_id_fk",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_carico_integrazione_riga_id_carico_in",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_carico_pratica_riga_id_carico_pratica",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_lotto_id_lotti_id_fk",
+      "carico_pratica_rettifiche.carico_pratica_rettifiche_movimento_id_movimenti_id_fk",
+      "carico_pratica_righe.carico_pratica_righe_aggiornato_da_utenti_id_fk",
+      "carico_pratica_righe.carico_pratica_righe_carico_pratica_id_carico_pratiche_id_fk",
+      "carico_pratica_righe.carico_pratica_righe_creato_da_utenti_id_fk",
+      "carico_pratica_righe.carico_pratica_righe_prodotto_id_prodotti_id_fk",
+      "carico_pratiche.carico_pratiche_aggiornato_da_utenti_id_fk",
+      "carico_pratiche.carico_pratiche_area_operativa_id_aree_operative_id_fk",
+      "carico_pratiche.carico_pratiche_creato_da_utenti_id_fk",
+      "carico_pratiche.carico_pratiche_fornitore_id_fornitori_id_fk",
+      "carico_pratiche.carico_pratiche_lotto_logico_id_lotti_logici_id_fk",
+      "carico_pratiche.carico_pratiche_magazzino_id_magazzini_id_fk",
+      "configurazioni_matricole_volontari.config_matricole_ambito_check",
+      "configurazioni_matricole_volontari.config_matricole_cifre_check",
+      "configurazioni_matricole_volontari.config_matricole_iniziale_check",
+      "configurazioni_matricole_volontari.config_matricole_scope_check",
+      "configurazioni_matricole_volontari.config_matricole_separatore_check",
+      "configurazioni_matricole_volontari.configurazioni_matricole_volontari_aggiornata_da_utenti_id_fk",
+      "consegne.consegne_area_operativa_id_snapshot_aree_operative_id_fk",
+      "consegne.consegne_centro_ascolto_id_snapshot_centri_di_ascolto_id_fk",
+      "consegne.consegne_mezzo_id_mezzi_id_fk",
+      "consegne.consegne_volontario_id_volontari_id_fk",
+      "coperture_assicurative_volontari.coperture_assicurative_volontari_annullata_da_utenti_id_fk",
+      "coperture_assicurative_volontari.coperture_assicurative_volontari_creato_da_utenti_id_fk",
+      "coperture_assicurative_volontari.coperture_assicurative_volontari_volontario_id_volontari_id_fk",
+      "coperture_assicurative_volontari.coperture_durata_check",
+      "coperture_assicurative_volontari.coperture_tipo_operazione_check",
+      "corsi_dei_volontari.corsi_dei_volontari_corso_id_corsi_volontari_catalogo_id_fk",
+      "corsi_dei_volontari.corsi_dei_volontari_verificato_da_utenti_id_fk",
+      "corsi_dei_volontari.corsi_dei_volontari_volontario_id_volontari_id_fk",
+      "corsi_volontari_catalogo.corsi_volontari_ore_check",
+      "corsi_volontari_catalogo.corsi_volontari_validita_check",
+      "corsi_volontari_ruoli.corsi_volontari_ruoli_corso_id_corsi_volontari_catalogo_id_fk",
+      "corsi_volontari_ruoli.corsi_volontari_ruoli_ruolo_volontario_id_ruoli_volontari_id_fk",
+      "credito_ricariche_destinatari.credito_ricariche_destinatari_beneficiario_id_beneficiari_id_fk",
+      "credito_ricariche_destinatari.credito_ricariche_destinatari_movimento_id_credito_solidale_mov",
+      "credito_ricariche_destinatari.credito_ricariche_destinatari_periodo_credito_ricariche_mensili",
+      "emissioni_registro_volontari.emissioni_registro_hash_check",
+      "emissioni_registro_volontari.emissioni_registro_tipo_check",
+      "emissioni_registro_volontari.emissioni_registro_volontari_centro_ascolto_id_centri_di_ascolt",
+      "emissioni_registro_volontari.emissioni_registro_volontari_generato_da_utenti_id_fk",
+      "emissioni_registro_volontari.emissioni_registro_volontari_scope_area_operativa_id_aree_opera",
+      "emissioni_registro_volontari.emissioni_registro_volontari_scope_centro_id_centri_di_ascolto_",
+      "emporio_abilitazioni.emporio_abilitazioni_area_operativa_id_aree_operative_id_fk",
+      "emporio_abilitazioni.emporio_abilitazioni_beneficiario_id_beneficiari_id_fk",
+      "emporio_abilitazioni.emporio_abilitazioni_operatore_id_utenti_id_fk",
+      "enti_destinatari.enti_destinatari_area_operativa_id_aree_operative_id_fk",
+      "esportazioni_fse.esportazioni_fse_annullato_da_utenti_id_fk",
+      "esportazioni_fse.esportazioni_fse_creato_da_utenti_id_fk",
+      "esportazioni_fse.esportazioni_fse_magazzino_id_magazzini_id_fk",
+      "esportazioni_fse.esportazioni_fse_marcato_inserito_da_utenti_id_fk",
+      "esportazioni_fse_eventi.esportazioni_fse_eventi_esportazione_id_esportazioni_fse_id_fk",
+      "esportazioni_fse_indicatori.esportazioni_fse_indicatori_esportazione_id_esportazioni_fse_id",
+      "esportazioni_fse_indicatori.esportazioni_fse_indicatori_rilevazione_id_rilevazioni_monitora",
+      "esportazioni_fse_rappresentazioni.esportazioni_fse_rappresentazioni_creato_da_utenti_id_fk",
+      "esportazioni_fse_rappresentazioni.esportazioni_fse_rappresentazioni_esportazione_id_esportazioni_",
+      "esportazioni_fse_righe.esportazioni_fse_righe_esportazione_evento_id_esportazioni_fse_",
+      "esportazioni_fse_righe.esportazioni_fse_righe_lot_id_lotti_id_fk",
+      "esportazioni_fse_righe.esportazioni_fse_righe_movimento_id_movimenti_id_fk",
+      "esportazioni_fse_righe.esportazioni_fse_righe_movimento_origine_id_movimenti_id_fk",
+      "esportazioni_fse_righe.esportazioni_fse_righe_product_id_prodotti_id_fk",
+      "esportazioni_fse_saldi.esportazioni_fse_saldi_esportazione_id_esportazioni_fse_id_fk",
+      "esportazioni_fse_saldi.esportazioni_fse_saldi_lotto_id_lotti_id_fk",
+      "esportazioni_fse_saldi.esportazioni_fse_saldi_magazzino_id_magazzini_id_fk",
+      "esportazioni_fse_saldi.esportazioni_fse_saldi_prodotto_id_prodotti_id_fk",
+      "fse_administrative_files.fse_administrative_files_file_id_fse_import_files_id_fk",
+      "fse_administrative_files.fse_administrative_files_version_id_fse_administrative_versions",
+      "fse_administrative_lineage.fse_administrative_lineage_claim_id_fse_movement_claims_id_fk",
+      "fse_administrative_lineage.fse_administrative_lineage_load_row_id_carichi_magazzino_righe_",
+      "fse_administrative_lineage.fse_administrative_lineage_observation_id_fse_administrative_ob",
+      "fse_administrative_observations.fse_administrative_observations_revision_id_fse_import_row_revi",
+      "fse_administrative_observations.fse_administrative_observations_row_id_fse_import_rows_id_fk",
+      "fse_administrative_observations.fse_administrative_observations_source_file_id_fse_administrati",
+      "fse_administrative_observations.fse_administrative_observations_stock_row_id_fse_import_stock_r",
+      "fse_administrative_observations.fse_administrative_observations_version_id_fse_administrative_v",
+      "fse_administrative_versions.fse_administrative_versions_creato_da_utenti_id_fk",
+      "fse_administrative_versions.fse_administrative_versions_magazzino_id_magazzini_id_fk",
+      "fse_administrative_versions.fse_administrative_versions_session_id_fse_import_sessions_id_f",
+      "fse_administrative_versions.fse_administrative_versions_source_registry_id_fse_source_regis",
+      "fse_fascicoli_sociali.fse_fascicoli_sociali_beneficiario_id_beneficiari_id_fk",
+      "fse_fascicoli_sociali.fse_fascicoli_sociali_ultimo_import_batch_id_fse_import_batches",
+      "fse_fascicoli_sociali_snapshot.fse_fascicoli_sociali_snapshot_beneficiario_id_beneficiari_id_f",
+      "fse_fascicoli_sociali_snapshot.fse_fascicoli_sociali_snapshot_import_batch_id_fse_import_batch",
+      "fse_fascicoli_sociali_snapshot.fse_fascicoli_sociali_snapshot_utente_id_utenti_id_fk",
+      "fse_import_attach_commands.fse_import_attach_commands_creato_da_utenti_id_fk",
+      "fse_import_attach_commands.fse_import_attach_commands_sessione_id_fse_import_sessions_id_f",
+      "fse_import_batches.fse_import_batches_area_operativa_id_aree_operative_id_fk",
+      "fse_import_batches.fse_import_batches_centro_ascolto_id_centri_di_ascolto_id_fk",
+      "fse_import_batches.fse_import_batches_utente_id_utenti_id_fk",
+      "fse_import_files.fse_import_files_acquisito_da_utenti_id_fk",
+      "fse_import_files.fse_import_files_sessione_id_fse_import_sessions_id_fk",
+      "fse_import_row_revisions.fse_import_row_revisions_creato_da_utenti_id_fk",
+      "fse_import_row_revisions.fse_import_row_revisions_riga_id_fse_import_rows_id_fk",
+      "fse_import_rows.fse_import_rows_aggiornato_da_utenti_id_fk",
+      "fse_import_rows.fse_import_rows_file_id_fse_import_files_id_fk",
+      "fse_import_rows.fse_import_rows_prodotto_id_prodotti_id_fk",
+      "fse_import_rows.fse_import_rows_sessione_id_fse_import_sessions_id_fk",
+      "fse_import_sessions.fse_import_sessions_aggiornato_da_utenti_id_fk",
+      "fse_import_sessions.fse_import_sessions_area_operativa_id_aree_operative_id_fk",
+      "fse_import_sessions.fse_import_sessions_carico_pratica_id_carico_pratiche_id_fk",
+      "fse_import_sessions.fse_import_sessions_creato_da_utenti_id_fk",
+      "fse_import_sessions.fse_import_sessions_lotto_logico_id_lotti_logici_id_fk",
+      "fse_import_sessions.fse_import_sessions_magazzino_id_magazzini_id_fk",
+      "fse_import_sessions.fse_import_sessions_source_registry_id_fse_source_registries_id",
+      "fse_import_stock_rows.fse_import_stock_rows_file_id_fse_import_files_id_fk",
+      "fse_import_stock_rows.fse_import_stock_rows_prodotto_id_prodotti_id_fk",
+      "fse_import_stock_rows.fse_import_stock_rows_sessione_id_fse_import_sessions_id_fk",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_attivata_da_utenti_id_fk",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_carico_pratica_id_carico_pratiche_",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_magazzino_id_magazzini_id_fk",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_sessione_id_fse_import_sessions_id",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_source_registry_id_fse_source_regi",
+      "fse_movement_claims.fse_movement_claims_accepted_revision_id_fse_import_row_revisio",
+      "fse_movement_claims.fse_movement_claims_carico_magazzino_riga_id_carichi_magazzino_",
+      "fse_movement_claims.fse_movement_claims_carico_pratica_riga_id_carico_pratica_righe",
+      "fse_movement_claims.fse_movement_claims_magazzino_id_snapshot_magazzini_id_fk",
+      "fse_movement_claims.fse_movement_claims_source_registry_id_fse_source_registries_id",
+      "fse_movement_identity_aliases.fse_movement_identity_aliases_created_from_revision_id_fse_impo",
+      "fse_movement_identity_aliases.fse_movement_identity_aliases_source_registry_id_fse_source_reg",
+      "fse_reconciliation_runs.fse_reconciliation_runs_administrative_version_id_fse_administr",
+      "fse_reconciliation_runs.fse_reconciliation_runs_baseline_run_id_fse_reconciliation_runs",
+      "fse_reconciliation_runs.fse_reconciliation_runs_creato_da_utenti_id_fk",
+      "fse_reconciliation_runs.fse_reconciliation_runs_legacy_import_id_importazioni_agea_id_f",
+      "fse_reconciliation_runs.fse_reconciliation_runs_reconciliation_id_riconciliazioni_fse_i",
+      "fse_source_registries.fse_source_registries_area_operativa_id_aree_operative_id_fk",
+      "fse_source_registries.fse_source_registries_creato_da_utenti_id_fk",
+      "giornate_servizio_volontari.giornate_servizio_stato_check",
+      "giornate_servizio_volontari.giornate_servizio_versione_check",
+      "giornate_servizio_volontari.giornate_servizio_volontari_centro_ascolto_id_centri_di_ascolto",
+      "giornate_servizio_volontari.giornate_servizio_volontari_creato_da_utenti_id_fk",
+      "giornate_servizio_volontari.giornate_servizio_volontari_volontario_id_volontari_id_fk",
+      "importazioni_agea.importazioni_agea_annullato_da_utenti_id_fk",
+      "importazioni_agea.importazioni_agea_bootstrap_carico_id_carichi_magazzino_id_fk",
+      "importazioni_agea.importazioni_agea_confermato_da_utenti_id_fk",
+      "importazioni_agea.importazioni_agea_creato_da_utenti_id_fk",
+      "importazioni_agea.importazioni_agea_magazzino_id_magazzini_id_fk",
+      "importazioni_agea.importazioni_agea_sha_check",
+      "importazioni_agea_partite.importazioni_agea_partite_corretto_da_utenti_id_fk",
+      "importazioni_agea_partite.importazioni_agea_partite_existing_lotto_id_lotti_id_fk",
+      "importazioni_agea_partite.importazioni_agea_partite_importazione_id_importazioni_agea_id_",
+      "importazioni_agea_partite.importazioni_agea_partite_prodotto_id_prodotti_id_fk",
+      "importazioni_agea_righe.importazioni_agea_righe_carico_magazzino_riga_id_carichi_magazz",
+      "importazioni_agea_righe.importazioni_agea_righe_corretto_da_utenti_id_fk",
+      "importazioni_agea_righe.importazioni_agea_righe_importazione_id_importazioni_agea_id_fk",
+      "importazioni_agea_righe.importazioni_agea_righe_mapping_prodotto_id_mappature_prodotti_",
+      "importazioni_agea_righe.importazioni_agea_righe_prodotto_id_snapshot_prodotti_id_fk",
+      "importazioni_volontari.importazioni_volontari_centro_ascolto_id_centri_di_ascolto_id_f",
+      "importazioni_volontari.importazioni_volontari_confermato_da_utenti_id_fk",
+      "importazioni_volontari.importazioni_volontari_creato_da_utenti_id_fk",
+      "importazioni_volontari.importazioni_volontari_scope_area_operativa_id_aree_operative_i",
+      "importazioni_volontari.importazioni_volontari_scope_centro_id_centri_di_ascolto_id_fk",
+      "importazioni_volontari.importazioni_volontari_sha_check",
+      "importazioni_volontari_righe.importazioni_volontari_righe_centro_proposto_id_centri_di_ascol",
+      "importazioni_volontari_righe.importazioni_volontari_righe_importazione_id_importazioni_volon",
+      "importazioni_volontari_righe.importazioni_volontari_righe_ruolo_proposto_id_ruoli_volontari_",
+      "importazioni_volontari_righe.importazioni_volontari_righe_volontario_candidato_id_volontari_",
+      "importazioni_volontari_righe.importazioni_volontari_righe_volontario_risultato_id_volontari_",
+      "interventi.interventi_beneficiario_id_beneficiari_id_fk",
+      "interventi.interventi_bolla_id_bolle_id_fk",
+      "interventi.interventi_centro_ascolto_id_snapshot_centri_di_ascolto_id_fk",
+      "interventi.interventi_intervento_precedente_id_interventi_id_fk",
+      "interventi_attivita.interventi_attivita_intervento_id_interventi_id_fk",
+      "interventi_attivita.interventi_attivita_operatore_id_utenti_id_fk",
+      "interventi_attivita.interventi_attivita_tipologia_id_tipi_intervento_id_fk",
+      "interventi_deleghe_m4.interventi_deleghe_m4_delegato_da_utenti_id_fk",
+      "interventi_deleghe_m4.interventi_deleghe_m4_intervento_id_interventi_id_fk",
+      "interventi_deleghe_m4.interventi_deleghe_m4_prima_richiesta_id_richieste_magazzino_id",
+      "interventi_documenti.interventi_documenti_intervento_id_interventi_id_fk",
+      "interventi_materiali.interventi_materiali_intervento_id_interventi_id_fk",
+      "interventi_materiali.interventi_materiali_magazzino_id_magazzini_id_fk",
+      "interventi_materiali.interventi_materiali_prodotto_id_prodotti_id_fk",
+      "interventi_storico_stati.interventi_storico_stati_intervento_id_interventi_id_fk",
+      "interventi_storico_stati.interventi_storico_stati_operatore_id_utenti_id_fk",
+      "lotti_logici.lotti_logici_aggiornato_da_utenti_id_fk",
+      "lotti_logici.lotti_logici_area_operativa_id_aree_operative_id_fk",
+      "lotti_logici.lotti_logici_creato_da_utenti_id_fk",
+      "mappature_prodotti_esterni.mappature_prodotti_esterni_aggiornato_da_utenti_id_fk",
+      "mappature_prodotti_esterni.mappature_prodotti_esterni_creato_da_utenti_id_fk",
+      "mappature_prodotti_esterni.mappature_prodotti_esterni_prodotto_id_prodotti_id_fk",
+      "matricole_volontari.matricole_volontari_assegnata_da_utenti_id_fk",
+      "matricole_volontari.matricole_volontari_configurazione_id_configurazioni_matricole_",
+      "matricole_volontari.matricole_volontari_tipo_check",
+      "matricole_volontari.matricole_volontari_volontario_id_volontari_id_fk",
+      "mensa_abilitazioni.mensa_abilitazioni_beneficiario_id_beneficiari_id_fk",
+      "mensa_abilitazioni.mensa_abilitazioni_created_by_utenti_id_fk",
+      "mensa_abilitazioni.mensa_abilitazioni_mensa_id_mense_id_fk",
+      "mensa_accessi.mensa_accessi_beneficiario_id_beneficiari_id_fk",
+      "mensa_accessi.mensa_accessi_mensa_id_mense_id_fk",
+      "mensa_accessi.mensa_accessi_operatore_id_utenti_id_fk",
+      "mensa_accessi.mensa_accessi_tessera_id_tessere_beneficiari_id_fk",
+      "mensa_autorizzazioni_temporanee.mensa_autorizzazioni_temporanee_beneficiario_id_beneficiari_id_",
+      "mensa_autorizzazioni_temporanee.mensa_autorizzazioni_temporanee_mensa_id_mense_id_fk",
+      "mensa_autorizzazioni_temporanee.mensa_autorizzazioni_temporanee_operatore_id_utenti_id_fk",
+      "mensa_consumi.mensa_consumi_giornata_servizio_id_mensa_giornate_servizio_id_f",
+      "mensa_consumi.mensa_consumi_mensa_id_mense_id_fk",
+      "mensa_consumi.mensa_consumi_operatore_id_utenti_id_fk",
+      "mensa_consumi.mensa_consumi_prodotto_id_prodotti_id_fk",
+      "mensa_consumi.mensa_consumi_scarico_id_scarichi_id_fk",
+      "mensa_consumi_storni.mensa_consumi_storni_consumo_id_mensa_consumi_id_fk",
+      "mensa_consumi_storni.mensa_consumi_storni_operatore_id_utenti_id_fk",
+      "mensa_eccezioni.mensa_eccezioni_accesso_mensa_id_mensa_accessi_id_fk",
+      "mensa_eccezioni.mensa_eccezioni_beneficiario_id_beneficiari_id_fk",
+      "mensa_eccezioni.mensa_eccezioni_mensa_destinazione_id_mense_id_fk",
+      "mensa_eccezioni.mensa_eccezioni_mensa_principale_id_mense_id_fk",
+      "mensa_eccezioni.mensa_eccezioni_operatore_id_utenti_id_fk",
+      "mensa_giornate_servizio.mensa_giornate_servizio_aperta_da_utenti_id_fk",
+      "mensa_giornate_servizio.mensa_giornate_servizio_chiusa_da_utenti_id_fk",
+      "mensa_giornate_servizio.mensa_giornate_servizio_mensa_id_mense_id_fk",
+      "mensa_giornate_servizio.mensa_giornate_servizio_riaperta_da_utenti_id_fk",
+      "mensa_pasti.mensa_pasti_accesso_mensa_id_mensa_accessi_id_fk",
+      "mensa_pasti.mensa_pasti_beneficiario_id_beneficiari_id_fk",
+      "mensa_pasti.mensa_pasti_eccezione_id_mensa_eccezioni_id_fk",
+      "mensa_pasti.mensa_pasti_mensa_id_mense_id_fk",
+      "mensa_pasti.mensa_pasti_operatore_id_utenti_id_fk",
+      "mense.mense_created_by_utenti_id_fk",
+      "mense.mense_magazzino_id_magazzini_id_fk",
+      "movimenti_esterni_agea.movimenti_esterni_agea_assorbito_da_bootstrap_riga_id_carichi_m",
+      "movimenti_esterni_agea.movimenti_esterni_agea_carico_magazzino_riga_id_carichi_magazzi",
+      "movimenti_esterni_agea.movimenti_esterni_agea_first_seen_import_id_importazioni_agea_i",
+      "movimenti_esterni_agea.movimenti_esterni_agea_last_seen_import_id_importazioni_agea_id",
+      "movimenti_esterni_agea.movimenti_esterni_agea_magazzino_id_magazzini_id_fk",
+      "movimenti_esterni_agea.movimenti_esterni_agea_prodotto_id_snapshot_prodotti_id_fk",
+      "operazioni_distribuzione_magazzino.operazioni_distribuzione_magazzino_area_operativa_id_snapshot_a",
+      "operazioni_distribuzione_magazzino.operazioni_distribuzione_magazzino_centro_ascolto_id_snapshot_c",
+      "operazioni_distribuzione_magazzino.operazioni_distribuzione_magazzino_creato_da_utenti_id_fk",
+      "operazioni_distribuzione_magazzino.operazioni_distribuzione_magazzino_magazzino_id_magazzini_id_fk",
+      "prenotazioni_magazzino.prenotazioni_magazzino_riga_trasferimento_id_trasferimento_righ",
+      "prenotazioni_magazzino.prenotazioni_magazzino_trasferimento_id_trasferimenti_id_fk",
+      "progressivi_matricole_volontari.progressivi_matricole_numero_check",
+      "progressivi_matricole_volontari.progressivi_matricole_scope_check",
+      "progressivi_matricole_volontari.progressivi_matricole_volontari_area_operativa_id_aree_operativ",
+      "progressivi_matricole_volontari.progressivi_matricole_volontari_configurazione_id_configurazion",
+      "qualifiche_dei_volontari.qualifiche_dei_volontari_corso_origine_id_corsi_dei_volontari_i",
+      "qualifiche_dei_volontari.qualifiche_dei_volontari_qualifica_id_qualifiche_volontari_cata",
+      "qualifiche_dei_volontari.qualifiche_dei_volontari_volontario_id_volontari_id_fk",
+      "qualifiche_volontari_catalogo.qualifiche_volontari_validita_check",
+      "qualifiche_volontari_ruoli.qualifiche_volontari_ruoli_qualifica_id_qualifiche_volontari_ca",
+      "qualifiche_volontari_ruoli.qualifiche_volontari_ruoli_ruolo_volontario_id_ruoli_volontari_",
+      "registro_volontari_eventi.registro_volontari_eventi_centro_ascolto_id_centri_di_ascolto_i",
+      "registro_volontari_eventi.registro_volontari_eventi_utente_id_utenti_id_fk",
+      "registro_volontari_eventi.registro_volontari_eventi_volontario_id_volontari_id_fk",
+      "registro_volontari_eventi.registro_volontari_sezione_check",
+      "richieste_magazzino.richieste_magazzino_annullato_da_utenti_id_fk",
+      "richieste_magazzino.richieste_magazzino_area_operativa_id_aree_operative_id_fk",
+      "richieste_magazzino.richieste_magazzino_beneficiario_id_beneficiari_id_fk",
+      "richieste_magazzino.richieste_magazzino_centro_ascolto_id_centri_di_ascolto_id_fk",
+      "richieste_magazzino.richieste_magazzino_ente_destinatario_id_enti_destinatari_id_fk",
+      "richieste_magazzino.richieste_magazzino_intervento_id_interventi_id_fk",
+      "richieste_magazzino.richieste_magazzino_inviato_da_utenti_id_fk",
+      "richieste_magazzino.richieste_magazzino_magazzino_destinatario_id_magazzini_id_fk",
+      "richieste_magazzino.richieste_magazzino_magazzino_richiesto_id_magazzini_id_fk",
+      "richieste_magazzino.richieste_magazzino_mensa_id_mense_id_fk",
+      "richieste_magazzino.richieste_magazzino_preso_in_carico_da_utenti_id_fk",
+      "richieste_magazzino_documenti.richieste_magazzino_documenti_bolla_id_bolle_id_fk",
+      "richieste_magazzino_documenti.richieste_magazzino_documenti_cessato_da_utenti_id_fk",
+      "richieste_magazzino_documenti.richieste_magazzino_documenti_creato_da_utenti_id_fk",
+      "richieste_magazzino_documenti.richieste_magazzino_documenti_richiesta_id_richieste_magazzino_",
+      "richieste_magazzino_documenti.richieste_magazzino_documenti_trasferimento_id_trasferimenti_id",
+      "riconciliazioni_fse.riconciliazioni_fse_administrative_version_id_fse_administrativ",
+      "riconciliazioni_fse.riconciliazioni_fse_annullato_da_utenti_id_fk",
+      "riconciliazioni_fse.riconciliazioni_fse_chiuso_da_utenti_id_fk",
+      "riconciliazioni_fse.riconciliazioni_fse_creato_da_utenti_id_fk",
+      "riconciliazioni_fse.riconciliazioni_fse_importazione_agea_id_importazioni_agea_id_f",
+      "riconciliazioni_fse.riconciliazioni_fse_importazione_agea_precedente_id_importazion",
+      "riconciliazioni_fse.riconciliazioni_fse_magazzino_id_magazzini_id_fk",
+      "riconciliazioni_fse.riconciliazioni_fse_ricalcolato_da_utenti_id_fk",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_aggregate_version_id_fse_administrati",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_importazione_agea_riga_id_importazion",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_movimento_id_movimenti_id_fk",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_observation_id_fse_administrative_obs",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_operazione_distribuzione_id_operazion",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_product_id_external_prodotti_id_fk",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_product_id_local_prodotti_id_fk",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_riconciliazione_id_riconciliazioni_fs",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_creato_da_utenti_id_fk",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_riconciliazione_id_riconciliazi",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_riconciliazione_riga_id_riconci",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_target_importazione_riga_id_imp",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_target_movimento_id_movimenti_i",
+      "riconciliazioni_fse_risoluzioni.riconciliazioni_fse_risoluzioni_target_observation_id_fse_admin",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_aggiornato_da_utenti_id_fk",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_creato_da_utenti_id_fk",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_magazzino_id_magazzini_id_fk",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_operazione_distribuzione_id_operaz",
+      "spese_emporio_storni.spese_emporio_storni_movimento_credito_solidale_id_credito_soli",
+      "spese_emporio_storni.spese_emporio_storni_operatore_id_utenti_id_fk",
+      "spese_emporio_storni.spese_emporio_storni_spesa_emporio_id_spese_emporio_id_fk",
+      "spese_emporio_storni_righe.spese_emporio_storni_righe_movimento_inventario_id_movimenti_id",
+      "spese_emporio_storni_righe.spese_emporio_storni_righe_movimento_inventario_originale_id_mo",
+      "spese_emporio_storni_righe.spese_emporio_storni_righe_spesa_riga_id_spese_emporio_righe_id",
+      "spese_emporio_storni_righe.spese_emporio_storni_righe_storno_id_spese_emporio_storni_id_fk",
+      "stati_volontari.stati_volontari_creato_da_utenti_id_fk",
+      "stati_volontari.stati_volontari_tipo_check",
+      "stati_volontari.stati_volontari_volontario_id_volontari_id_fk",
+      "tessere_beneficiari.tessere_beneficiari_beneficiario_id_beneficiari_id_fk",
+      "tessere_beneficiari.tessere_beneficiari_created_by_utenti_id_fk",
+      "trasferimento_righe.trasferimento_righe_id_trasferimento_unique",
+      "turni.turni_centro_ascolto_id_centri_di_ascolto_id_fk",
+      "turni.turni_mezzo_id_mezzi_id_fk",
+      "turni_consegne.turni_consegne_consegna_id_consegne_id_fk",
+      "turni_consegne.turni_consegne_mezzo_id_mezzi_id_fk",
+      "turni_consegne.turni_consegne_turno_id_turni_id_fk",
+      "turni_consegne.turni_consegne_volontario_id_volontari_id_fk",
+      "turni_volontari.turni_volontari_volontario_id_volontari_id_fk",
+      "utenti_mense.utenti_mense_assegnata_da_utenti_id_fk",
+      "utenti_mense.utenti_mense_mensa_id_mense_id_fk",
+      "utenti_mense.utenti_mense_revocata_da_utenti_id_fk",
+      "utenti_mense.utenti_mense_utente_id_utenti_id_fk",
+      "volontari.volontari_ruolo_volontario_id_ruoli_volontari_id_fk",
+      "zone_uds.zone_uds_id_area_unique"
+    ],
+    "sameNameDifferentDefinition": [
+      "audit_eventi.audit_eventi_actor_type_check",
+      "beneficiari.beneficiari_stato_anagrafica_check",
+      "beneficiari.beneficiari_zona_area_fk",
+      "beneficiari.beneficiari_zona_richiede_area_check",
+      "beneficiari.beneficiari_zona_richiede_uds_check",
+      "bisogni_pianificati.bisogni_pianificati_priorita_check",
+      "bisogni_pianificati.bisogni_pianificati_stato_check",
+      "bisogni_pianificati.bisogni_pianificati_tipo_check",
+      "carichi_magazzino.carichi_magazzino_request_hash_check",
+      "carichi_magazzino.carichi_magazzino_stato_check",
+      "carico_pratiche.carico_pratiche_stato_check",
+      "carico_pratiche.carico_pratiche_tipo_check",
+      "corsi_volontari_ruoli.corsi_volontari_ruoli_livello_check",
+      "credito_ricariche_destinatari.credito_ricariche_ricevuta_check",
+      "credito_ricariche_destinatari.credito_ricariche_stato_check",
+      "emporio_abilitazioni.emporio_abilitazioni_stato_check",
+      "esportazioni_fse.esportazioni_fse_coverage_purpose_check",
+      "esportazioni_fse.esportazioni_fse_state_check",
+      "esportazioni_fse_eventi.esportazioni_fse_eventi_admin_state_check",
+      "esportazioni_fse_rappresentazioni.esportazioni_fse_rappresentazioni_format_check",
+      "fse_administrative_files.fse_administrative_files_check",
+      "fse_administrative_versions.fse_administrative_versions_mode_check",
+      "fse_fascicoli_sociali.fse_fascicoli_sociali_origine_fascicolo_check",
+      "fse_fascicoli_sociali.fse_fascicoli_sociali_specific_counts_check",
+      "fse_fascicoli_sociali_snapshot.fse_fascicoli_snapshot_origin_check",
+      "fse_import_batches.fse_import_batches_stato_check",
+      "fse_import_files.fse_import_files_formato_check",
+      "fse_import_files.fse_import_files_profilo_check",
+      "fse_import_sessions.fse_import_sessions_modalita_check",
+      "fse_import_sessions.fse_import_sessions_stato_check",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_stato_check",
+      "fse_movement_claims.fse_movement_claims_stato_check",
+      "importazioni_volontari.importazioni_volontari_stato_check",
+      "interventi.interventi_ambito_check",
+      "interventi.interventi_area_operativa_id_snapshot_aree_operative_id_fk",
+      "interventi.interventi_beneficiario_fk",
+      "interventi.interventi_bolla_fk",
+      "interventi.interventi_priorita_check",
+      "interventi.interventi_stato_check",
+      "interventi.interventi_uds_zona_area_snapshot_fk",
+      "interventi.interventi_zona_uds_id_snapshot_zone_uds_id_fk",
+      "interventi_documenti.interventi_documenti_stato_check",
+      "interventi_materiali.interventi_materiali_stato_check",
+      "lotti.lotti_fondo_origine_check",
+      "lotti_logici.lotti_logici_stato_check",
+      "matricole_volontari.matricole_volontari_origine_check",
+      "matricole_volontari.matricole_volontari_stato_check",
+      "mensa_abilitazioni.mensa_abilitazioni_stato_check",
+      "mensa_accessi.mensa_accessi_esito_check",
+      "mensa_accessi.mensa_accessi_modalita_check",
+      "mensa_accessi.mensa_accessi_tipo_servizio_check",
+      "mensa_autorizzazioni_temporanee.mensa_autorizzazioni_temporanee_tipo_servizio_check",
+      "mensa_consumi.mensa_consumi_causale_check",
+      "mensa_consumi.mensa_consumi_tipo_check",
+      "mensa_giornate_servizio.mensa_giornate_servizio_stato_check",
+      "mensa_giornate_servizio.mensa_giornate_servizio_tipo_check",
+      "mensa_pasti.mensa_pasti_tipo_canonico_check",
+      "mensa_pasti.mensa_pasti_tipo_check",
+      "mezzi.mezzi_stato_approvazione_check",
+      "mezzi.mezzi_stato_check",
+      "movimenti.movimenti_fondo_origine_check",
+      "operazioni_distribuzione_magazzino.operazioni_distribuzione_stato_check",
+      "operazioni_distribuzione_magazzino.operazioni_distribuzione_territorio_check",
+      "qualifiche_dei_volontari.qualifiche_dei_volontari_stato_check",
+      "qualifiche_volontari_ruoli.qualifiche_volontari_ruoli_livello_check",
+      "registro_volontari_eventi.registro_volontari_evento_check",
+      "richieste_magazzino.richieste_magazzino_contenuto_check",
+      "richieste_magazzino.richieste_magazzino_modalita_check",
+      "richieste_magazzino.richieste_magazzino_presa_check",
+      "richieste_magazzino.richieste_magazzino_priorita_check",
+      "richieste_magazzino.richieste_magazzino_sorgente_check",
+      "richieste_magazzino.richieste_magazzino_stato_check",
+      "riconciliazioni_fse_righe.riconciliazioni_fse_righe_workflow_check",
+      "rientro_trasporto_righe.rientro_trasporto_righe_tipo_esito_check",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_channel_check",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_completeness_check",
+      "rilevazioni_monitoraggio_fse.rilevazioni_monitoraggio_fse_source_check",
+      "spese_emporio_storni.spese_emporio_storni_tipo_check",
+      "tessere_beneficiari.tessere_beneficiari_stato_check",
+      "turni.turni_fascia_check",
+      "turni.turni_stato_check",
+      "turni_volontari.turni_volontari_volontario_fk",
+      "utenti.utenti_zona_area_fk",
+      "utenti.utenti_zona_richiede_area_check",
+      "volontari.volontari_stato_approvazione_check",
+      "volontari.volontari_tipo_check"
+    ]
+  },
+  "physicalIndexesBefore": {
+    "historicalOnly": [
+      "configurazioni_matricole_volontari.configurazioni_matricole_volontari_versione_key",
+      "corsi_volontari_catalogo.corsi_volontari_catalogo_codice_key",
+      "matricole_volontari.matricole_volontari_matricola_normalizzata_key",
+      "qualifiche_volontari_catalogo.qualifiche_volontari_catalogo_codice_key",
+      "registro_volontari_eventi.registro_volontari_eventi_hash_evento_key",
+      "registro_volontari_eventi.registro_volontari_eventi_progressivo_key"
+    ],
+    "freshOnly": [
+      "configurazioni_matricole_volontari.config_matricole_versione_unique",
+      "corsi_volontari_catalogo.corsi_volontari_codice_unique",
+      "matricole_volontari.matricole_volontari_normalizzata_unique",
+      "qualifiche_volontari_catalogo.qualifiche_volontari_codice_unique",
+      "registro_volontari_eventi.registro_volontari_hash_unique",
+      "registro_volontari_eventi.registro_volontari_progressivo_unique"
+    ],
+    "sameNameDifferentDefinition": [
+      "carichi_magazzino.carichi_magazzino_idempotency_unique",
+      "emissioni_registro_volontari.emissioni_registro_scope_owner_idx",
+      "fse_fascicoli_sociali_snapshot.fse_fascicoli_snapshot_asof_idx",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_source_active_unique",
+      "fse_initial_balance_coverage.fse_initial_balance_coverage_warehouse_active_unique",
+      "richieste_magazzino.richieste_magazzino_intervento_attivo_unique",
+      "zone_uds.zone_uds_area_nome_attiva_unique"
+    ]
+  },
+  "schemaValidation": {
+    "schemaResult": "PASS",
+    "legacyDataResult": "SEE_SEPARATE_DIAGNOSTICS",
+    "migration": 58,
+    "historicalConstraints": 874,
+    "freshConstraints": 919,
+    "indexes": 446,
+    "columns": 2017,
+    "semanticDiff": {
+      "checksMissingInFresh": [],
+      "checksMissingInHistorical": [],
+      "indexesOnlyHistorical": [],
+      "indexesOnlyFresh": [],
+      "foreignOnlyHistorical": [],
+      "foreignOnlyFresh": [],
+      "primaryOnlyHistorical": [],
+      "primaryOnlyFresh": [],
+      "unsafeIndexes": []
+    },
+    "dataTablesUnchanged": 136
+  },
+  "diagnostics": {
+    "historical": {
+      "rulesPassed": 81,
+      "sqlChecks": 42,
+      "foreignKeys": 39,
+      "disability": {
+        "validValues": 3,
+        "negativeRejected": "23514"
+      },
+      "semanticProof": {
+        "meal_enum_implies_nonblank": true,
+        "trim_equivalent": true,
+        "and_check_equivalent": true
+      },
+      "uniqueNullProofs": 2,
+      "historicalNotValidDiagnostics": [
+        {
+          "table_name": "beneficiari",
+          "name": "beneficiari_zona_area_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "beneficiari",
+          "name": "beneficiari_zona_richiede_area_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "beneficiari",
+          "name": "beneficiari_zona_richiede_uds_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "carichi_magazzino",
+          "name": "carichi_magazzino_request_hash_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "consegne",
+          "name": "consegne_mezzo_id_fkey",
+          "result": "PASS"
+        },
+        {
+          "table_name": "consegne",
+          "name": "consegne_volontario_id_fkey",
+          "result": "PASS"
+        },
+        {
+          "table_name": "interventi",
+          "name": "interventi_area_operativa_id_snapshot_aree_operative_id_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "interventi",
+          "name": "interventi_beneficiario_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "interventi",
+          "name": "interventi_bolla_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "interventi",
+          "name": "interventi_uds_zona_area_snapshot_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "interventi",
+          "name": "interventi_zona_uds_id_snapshot_zone_uds_id_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "mezzi",
+          "name": "mezzi_capacita_colli_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "mezzi",
+          "name": "mezzi_capacita_kg_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "mezzi",
+          "name": "mezzi_stato_approvazione_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "mezzi",
+          "name": "mezzi_stato_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "movimenti",
+          "name": "movimenti_carico_magazzino_riga_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "movimenti",
+          "name": "movimenti_fattore_kg_lt_pezzo_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "movimenti",
+          "name": "movimenti_operazione_distribuzione_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni",
+          "name": "turni_fascia_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni",
+          "name": "turni_stato_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni_consegne",
+          "name": "turni_consegne_consegna_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni_consegne",
+          "name": "turni_consegne_mezzo_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni_consegne",
+          "name": "turni_consegne_turno_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni_consegne",
+          "name": "turni_consegne_volontario_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni_volontari",
+          "name": "turni_volontari_turno_restrict_fk",
+          "result": "FAIL",
+          "sqlState": "23503"
+        },
+        {
+          "table_name": "turni_volontari",
+          "name": "turni_volontari_volontario_fk",
+          "result": "FAIL",
+          "sqlState": "23503"
+        },
+        {
+          "table_name": "utenti",
+          "name": "utenti_zona_area_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "utenti",
+          "name": "utenti_zona_richiede_area_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "volontari",
+          "name": "volontari_max_consegne_turno_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "volontari",
+          "name": "volontari_ruolo_volontario_id_fkey",
+          "result": "PASS"
+        },
+        {
+          "table_name": "volontari",
+          "name": "volontari_stato_approvazione_check",
+          "result": "PASS"
+        }
+      ],
+      "orphanCounts": {
+        "missing_turno": 375,
+        "missing_volontario": 375,
+        "distinct_orphan_rows": 375
+      },
+      "legacyDataGate": "FAIL"
+    },
+    "fresh": {
+      "rulesPassed": 81,
+      "sqlChecks": 42,
+      "foreignKeys": 39,
+      "disability": {
+        "validValues": 3,
+        "negativeRejected": "23514"
+      },
+      "semanticProof": {
+        "meal_enum_implies_nonblank": true,
+        "trim_equivalent": true,
+        "and_check_equivalent": true
+      },
+      "uniqueNullProofs": 2,
+      "historicalNotValidDiagnostics": [
+        {
+          "table_name": "consegne",
+          "name": "consegne_mezzo_id_fkey",
+          "result": "PASS"
+        },
+        {
+          "table_name": "consegne",
+          "name": "consegne_volontario_id_fkey",
+          "result": "PASS"
+        },
+        {
+          "table_name": "mezzi",
+          "name": "mezzi_capacita_colli_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "mezzi",
+          "name": "mezzi_capacita_kg_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "mezzi",
+          "name": "mezzi_stato_approvazione_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "mezzi",
+          "name": "mezzi_stato_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "movimenti",
+          "name": "movimenti_carico_magazzino_riga_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "movimenti",
+          "name": "movimenti_fattore_kg_lt_pezzo_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "movimenti",
+          "name": "movimenti_operazione_distribuzione_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni",
+          "name": "turni_fascia_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni",
+          "name": "turni_stato_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni_consegne",
+          "name": "turni_consegne_consegna_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni_consegne",
+          "name": "turni_consegne_mezzo_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni_consegne",
+          "name": "turni_consegne_turno_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni_consegne",
+          "name": "turni_consegne_volontario_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "turni_volontari",
+          "name": "turni_volontari_turno_restrict_fk",
+          "result": "PASS"
+        },
+        {
+          "table_name": "volontari",
+          "name": "volontari_max_consegne_turno_check",
+          "result": "PASS"
+        },
+        {
+          "table_name": "volontari",
+          "name": "volontari_ruolo_volontario_id_fkey",
+          "result": "PASS"
+        },
+        {
+          "table_name": "volontari",
+          "name": "volontari_stato_approvazione_check",
+          "result": "PASS"
+        }
+      ],
+      "orphanCounts": {
+        "missing_turno": 0,
+        "missing_volontario": 0,
+        "distinct_orphan_rows": 0
+      },
+      "legacyDataGate": "PASS"
+    }
+  },
+  "newTestCounts": {
+    "catalogUnit": {
+      "pass": 14,
+      "fail": 0,
+      "skip": 0
+    },
+    "migrationRunner": {
+      "pass": 24,
+      "fail": 0,
+      "skip": 0
+    },
+    "apiTargeted": {
+      "pass": 10,
+      "fail": 0,
+      "skip": 0
+    }
+  },
+  "cleanup": {
+    "validation": {
+      "remaining": "",
+      "volumesCreated": 0,
+      "networksCreated": 0
+    },
+    "apiTargeted": {
+      "remaining": "",
+      "volumesCreated": 0,
+      "networksCreated": 0
+    }
+  },
+  "privateEvidenceDirectory": "/private/tmp/magazzino-m67-p2-reconcile-S5Vi4g",
+  "evidence": [
+    {
+      "path": "api-targeted-cleanup.json",
+      "sha256": "0ed2587c994386756d776f6e230de6fdc1f64d1b75054f27ebc7fb480e3b1e88"
+    },
+    {
+      "path": "api-targeted-drizzle.sql",
+      "sha256": "1c76cf1939be18ca88f82717f372876a2e748cf1b9ad4b1c21868e56dc29bc48"
+    },
+    {
+      "path": "api-targeted-isolation.json",
+      "sha256": "757236f64c47577aef3cd08487227a11d4db795fb72d36b0f9c3d5e610a0c0e4"
+    },
+    {
+      "path": "api-targeted-m67_reconcile_fresh-update.log",
+      "sha256": "4c1b6adade14aec61a3b8481dff6bb0f0c429001bb4a6f12a82a4998959db525"
+    },
+    {
+      "path": "api-targeted-restore.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "api-targeted-tests.log",
+      "sha256": "a3f61cf8920e4c72d005de08d448c50f21dab03dcc2588d0f92711b4b94e0c09"
+    },
+    {
+      "path": "probe-cleanup.json",
+      "sha256": "0ed2587c994386756d776f6e230de6fdc1f64d1b75054f27ebc7fb480e3b1e88"
+    },
+    {
+      "path": "probe-drizzle.sql",
+      "sha256": "1c76cf1939be18ca88f82717f372876a2e748cf1b9ad4b1c21868e56dc29bc48"
+    },
+    {
+      "path": "probe-isolation.json",
+      "sha256": "b25e645ddf5c0bc6a09c071ec3b84a50b6eb68974db12f25b750eed7cd1c9f19"
+    },
+    {
+      "path": "probe-m67_reconcile_clone-migrations-verify.log",
+      "sha256": "f9497f0d1f580a46879b0306bf6747a988f7e1ebfc21d287d107ef42f519d267"
+    },
+    {
+      "path": "probe-m67_reconcile_clone-update.log",
+      "sha256": "8be474e0c93ae6cb38a5db067b97654c2c3fce2441d283095fa2038b6b3a391b"
+    },
+    {
+      "path": "probe-m67_reconcile_clone.json",
+      "sha256": "6abfde6cf2418785c530744ba9c00e5e61242dedffaeb00c2d1e72e4ba17d745"
+    },
+    {
+      "path": "probe-m67_reconcile_fresh-migrations-verify.log",
+      "sha256": "f9497f0d1f580a46879b0306bf6747a988f7e1ebfc21d287d107ef42f519d267"
+    },
+    {
+      "path": "probe-m67_reconcile_fresh-update.log",
+      "sha256": "10357da83668193c89de92664881326341d5f67ae8f7c8f61b94c560b6ae0f05"
+    },
+    {
+      "path": "probe-m67_reconcile_fresh.json",
+      "sha256": "5058c9e5a75c2d65264939ecac6b25c04d9690e8a5693fc913aa3b2be34fe914"
+    },
+    {
+      "path": "probe-restore.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "validation-business-after.json",
+      "sha256": "b8b2593be66a1c58b25f36ba6b50e3c0790d8d858fb7f0be441c6f321b3d5cdc"
+    },
+    {
+      "path": "validation-business-before.json",
+      "sha256": "b8b2593be66a1c58b25f36ba6b50e3c0790d8d858fb7f0be441c6f321b3d5cdc"
+    },
+    {
+      "path": "validation-cleanup.json",
+      "sha256": "0ed2587c994386756d776f6e230de6fdc1f64d1b75054f27ebc7fb480e3b1e88"
+    },
+    {
+      "path": "validation-drizzle.sql",
+      "sha256": "1c76cf1939be18ca88f82717f372876a2e748cf1b9ad4b1c21868e56dc29bc48"
+    },
+    {
+      "path": "validation-isolation.json",
+      "sha256": "0062c782a1191712e4681e9681d7ae96277ef7a77b46cea3712125b978403547"
+    },
+    {
+      "path": "validation-m67_reconcile_clone-migrations-status.log",
+      "sha256": "ec847cb187007da4a711f6f1922acd16dfbf9f33b8f2ba9176cf6de613e6c3a2"
+    },
+    {
+      "path": "validation-m67_reconcile_clone-migrations-verify.log",
+      "sha256": "dc535059daec2ededf4deee703e29ee3635651cf443e5cfe9e5ed31a07f3a2a2"
+    },
+    {
+      "path": "validation-m67_reconcile_clone-regressions.json",
+      "sha256": "5bc13249fe930d7ef241e1946bc6c82393d4e186058b285c08227d40d99d8285"
+    },
+    {
+      "path": "validation-m67_reconcile_clone-replay.json",
+      "sha256": "413d9def81fe1f4373b7854f98382ed697f1bb78af79a0b4874e8cc76d972544"
+    },
+    {
+      "path": "validation-m67_reconcile_clone-update.log",
+      "sha256": "177dc12cfbdca900b5c588f958dcce335e30d0c46761c863e26c6d7aaede5050"
+    },
+    {
+      "path": "validation-m67_reconcile_clone.json",
+      "sha256": "a518d117ad2474af4fd9f559adf34a5c007514c2627913bad14413832ef4e00d"
+    },
+    {
+      "path": "validation-m67_reconcile_fresh-migrations-status.log",
+      "sha256": "8533b778f89014140c993cde97f5ea16f689526350ed392b7b6a2044749772a8"
+    },
+    {
+      "path": "validation-m67_reconcile_fresh-migrations-verify.log",
+      "sha256": "dc535059daec2ededf4deee703e29ee3635651cf443e5cfe9e5ed31a07f3a2a2"
+    },
+    {
+      "path": "validation-m67_reconcile_fresh-regressions.json",
+      "sha256": "9e9b8b9d75760313b03c2a1df98c3aa049db2d60d47a7511484fa1e52f89665d"
+    },
+    {
+      "path": "validation-m67_reconcile_fresh-replay.json",
+      "sha256": "413d9def81fe1f4373b7854f98382ed697f1bb78af79a0b4874e8cc76d972544"
+    },
+    {
+      "path": "validation-m67_reconcile_fresh-update.log",
+      "sha256": "9b2217b8d1fae6cb69bdf42b6e1fcfafef756f6d4de9a3fdba9e3262f5926569"
+    },
+    {
+      "path": "validation-m67_reconcile_fresh.json",
+      "sha256": "fa87abd1ea8873965207ebb51b8394c767a8e2c56a3e2dac5bfd149dec48a0e6"
+    },
+    {
+      "path": "validation-restore.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "validation-result.json",
+      "sha256": "34b14fa8c4938a679beabec00a926907bedb6c548fbf1dfd4d6c2223e39be8d1"
+    },
+    {
+      "path": "validation-runner-tests.log",
+      "sha256": "80b66e0e159696eb004bc3187c3eb642596844fad40d9c77df62a8d4febec033"
+    },
+    {
+      "path": "validation-semantic-diff.json",
+      "sha256": "5b493d769de6dffbb015ead8f459c3fd72940fdf73932ddf33e3df44f5c0ab5f"
+    }
+  ]
+}
