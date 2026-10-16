@@ -15268,6 +15268,11 @@ components:
     ApprovvigionamentoUpdate:
       type: object
       properties:
+        partite:
+          type: array
+          description: Partite fisiche per completare tutte le righe residue. La somma per riga deve coincidere esattamente col residuo; nessuna ricezione parziale.
+          items:
+            $ref: "#/components/schemas/ApprovvigionamentoPartita"
         versione:
           type: integer
           minimum: 1
@@ -15296,6 +15301,19 @@ components:
     ApprovvigionamentoRiga:
       type: object
       properties:
+        quantitaResiduaEsatta:
+          type: string
+          description: Residuo calcolato con aritmetica decimale esatta.
+        lottoFisicoObbligatorio:
+          type: boolean
+        gestioneScadenza:
+          type: boolean
+        quantitaRichiestaEsatta:
+          type: string
+          description: Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione.
+        quantitaRicevutaEsatta:
+          type: string
+          description: Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione.
         id:
           type: integer
         prodottoId:
@@ -15319,12 +15337,27 @@ components:
         prodottoId:
           type: integer
         quantitaRichiesta:
-          type: number
+          type: [number, string]
+          description: Quantità positiva, massimo sei decimali e 99999999.999999. Usare stringa decimale per esattezza; unità e frazionabilità dal Catalogo.
         unitaMisura:
           type: string
         note:
           type: string
       required: [prodottoId, quantitaRichiesta, unitaMisura]
+
+    ApprovvigionamentoPartita:
+      type: object
+      properties:
+        rigaId:
+          type: integer
+        quantita:
+          type: [number, string]
+        codiceLotto:
+          type: string
+        dataScadenza:
+          type: string
+          format: date
+      required: [rigaId, quantita]
 
     # ── Turni ─────────────────────────────────────────────────────────────
     Turno:

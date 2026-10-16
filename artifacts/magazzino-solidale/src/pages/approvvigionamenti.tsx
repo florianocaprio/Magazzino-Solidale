@@ -1,3 +1,4 @@
+import { SupplyReceipt } from "@/components/supply-receipt";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import {
@@ -19,15 +20,49 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButtons } from "@/components/export-buttons";
-import { Plus, ShoppingCart, Pencil, Send, CheckCircle2, XCircle, Mail } from "lucide-react";
+import {
+  Plus,
+  ShoppingCart,
+  Pencil,
+  Send,
+  CheckCircle2,
+  XCircle,
+  Mail,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -88,13 +123,25 @@ export default function Approvvigionamenti() {
   }, [isCentroLocked, lockedCentroId]);
   useEffect(() => setPage(1), [filterMagazzinoId, filterCentroId, filterStato]);
 
-  const listParams: { magazzinoId?: number; centroAscoltoId?: number; stato?: string; page?: number; limit?: number } = { page, limit: pageSize };
-  if (filterMagazzinoId !== "all") listParams.magazzinoId = parseInt(filterMagazzinoId);
-  if (filterCentroId !== "all") listParams.centroAscoltoId = parseInt(filterCentroId);
+  const listParams: {
+    magazzinoId?: number;
+    centroAscoltoId?: number;
+    stato?: string;
+    page?: number;
+    limit?: number;
+  } = { page, limit: pageSize };
+  if (filterMagazzinoId !== "all")
+    listParams.magazzinoId = parseInt(filterMagazzinoId);
+  if (filterCentroId !== "all")
+    listParams.centroAscoltoId = parseInt(filterCentroId);
   if (filterStato !== "all") listParams.stato = filterStato;
-  const filtersActive = filterMagazzinoId !== "all" || filterStato !== "all" || (isGlobal && filterCentroId !== "all");
+  const filtersActive =
+    filterMagazzinoId !== "all" ||
+    filterStato !== "all" ||
+    (isGlobal && filterCentroId !== "all");
 
-  const { data: approvvigionamenti, isLoading } = useListApprovvigionamenti(listParams);
+  const { data: approvvigionamenti, isLoading } =
+    useListApprovvigionamenti(listParams);
   const { data: fornitori } = useListFornitori();
   const { data: areaOperativa } = useListAreeOperative();
   const { data: magazzini } = useListMagazzini();
@@ -104,8 +151,15 @@ export default function Approvvigionamenti() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [receivingId, setReceivingId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [righeDraft, setRigheDraft] = useState<Array<{ prodottoId: number; quantitaRichiesta: number; unitaMisura: string }>>([]);
+  const [righeDraft, setRigheDraft] = useState<
+    Array<{
+      prodottoId: number;
+      quantitaRichiesta: string;
+      unitaMisura: string;
+    }>
+  >([]);
   const [draftProdottoId, setDraftProdottoId] = useState("");
   const [draftQuantita, setDraftQuantita] = useState("1");
 
@@ -121,15 +175,27 @@ export default function Approvvigionamenti() {
     },
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListApprovvigionamentiQueryKey() });
+  const invalidate = () =>
+    queryClient.invalidateQueries({
+      queryKey: getListApprovvigionamentiQueryKey(),
+    });
 
   const selectedAreaOperativaId = form.watch("areaOperativaId");
-  const fornitoriArea = fornitoriAttiviPerArea(fornitori ?? [], selectedAreaOperativaId);
+  const fornitoriArea = fornitoriAttiviPerArea(
+    fornitori ?? [],
+    selectedAreaOperativaId,
+  );
   const fornitoreAreaOperativaId = selectedAreaOperativaId ?? null;
   const matchesAreaOperativa = (areaOperativaId?: number | null) =>
-    fornitoreAreaOperativaId == null || areaOperativaId == null || areaOperativaId === fornitoreAreaOperativaId;
-  const filteredMagazzini = (magazzini ?? []).filter((m) => m.stato === "attivo" && matchesAreaOperativa(m.areaOperativaId));
-  const filteredCentri = (centri ?? []).filter((c) => c.attivo && matchesAreaOperativa(c.areaOperativaId));
+    fornitoreAreaOperativaId == null ||
+    areaOperativaId == null ||
+    areaOperativaId === fornitoreAreaOperativaId;
+  const filteredMagazzini = (magazzini ?? []).filter(
+    (m) => m.stato === "attivo" && matchesAreaOperativa(m.areaOperativaId),
+  );
+  const filteredCentri = (centri ?? []).filter(
+    (c) => c.attivo && matchesAreaOperativa(c.areaOperativaId),
+  );
 
   const handleFornitoreChange = (val: string) => {
     form.setValue("fornitoreId", Number(val));
@@ -139,13 +205,15 @@ export default function Approvvigionamenti() {
     const magId = form.getValues("magazzinoId");
     if (magId != null) {
       const m = (magazzini ?? []).find((x) => x.id === Number(magId));
-      if (m && m.areaOperativaId != null && m.areaOperativaId !== cid) form.resetField("magazzinoId");
+      if (m && m.areaOperativaId != null && m.areaOperativaId !== cid)
+        form.resetField("magazzinoId");
     }
     if (!isCentroLocked) {
       const cenId = form.getValues("centroAscoltoId");
       if (cenId != null) {
         const c = (centri ?? []).find((x) => x.id === Number(cenId));
-        if (c && c.areaOperativaId != null && c.areaOperativaId !== cid) form.setValue("centroAscoltoId", undefined);
+        if (c && c.areaOperativaId != null && c.areaOperativaId !== cid)
+          form.setValue("centroAscoltoId", undefined);
       }
     }
   };
@@ -159,7 +227,13 @@ export default function Approvvigionamenti() {
 
   const openCreate = () => {
     setEditingId(null);
-    form.reset({ areaOperativaId: user?.areaOperativaId ?? undefined, dataRichiesta: todayEuropeRome(), note: "", centroAscoltoId: isCentroLocked && lockedCentroId != null ? lockedCentroId : undefined });
+    form.reset({
+      areaOperativaId: user?.areaOperativaId ?? undefined,
+      dataRichiesta: todayEuropeRome(),
+      note: "",
+      centroAscoltoId:
+        isCentroLocked && lockedCentroId != null ? lockedCentroId : undefined,
+    });
     setRigheDraft([]);
     setDraftProdottoId("");
     setDraftQuantita("1");
@@ -173,8 +247,12 @@ export default function Approvvigionamenti() {
       areaOperativaId: a.areaOperativaId ?? undefined,
       magazzinoId: a.magazzinoId ?? undefined,
       centroAscoltoId: a.centroAscoltoId ?? undefined,
-      dataRichiesta: a.dataRichiesta ? a.dataRichiesta.substring(0, 10) : todayEuropeRome(),
-      dataPrevista: a.dataPrevista ? a.dataPrevista.substring(0, 10) : undefined,
+      dataRichiesta: a.dataRichiesta
+        ? a.dataRichiesta.substring(0, 10)
+        : todayEuropeRome(),
+      dataPrevista: a.dataPrevista
+        ? a.dataPrevista.substring(0, 10)
+        : undefined,
       note: a.note ?? "",
     });
     setIsFormOpen(true);
@@ -183,7 +261,15 @@ export default function Approvvigionamenti() {
   const onSubmit = (data: FormValues) => {
     if (editingId !== null) {
       updateApprovvigionamento.mutate(
-        { id: editingId, data: { ...data, versione: (approvvigionamenti ?? []).find((a) => a.id === editingId)?.versione ?? 0 } },
+        {
+          id: editingId,
+          data: {
+            ...data,
+            versione:
+              (approvvigionamenti ?? []).find((a) => a.id === editingId)
+                ?.versione ?? 0,
+          },
+        },
         {
           onSuccess: () => {
             invalidate();
@@ -212,31 +298,30 @@ export default function Approvvigionamenti() {
       {
         onSuccess: () => {
           invalidate();
-          toast({ title: t("approvvigionamenti.toastSubmitted"), description: t("approvvigionamenti.toastSubmittedDesc") });
+          toast({
+            title: t("approvvigionamenti.toastSubmitted"),
+            description: t("approvvigionamenti.toastSubmittedDesc"),
+          });
         },
       },
     );
   };
 
-  const handleCompleta = (a: OrderRow) => {
-    updateApprovvigionamento.mutate(
-      { id: a.id, data: { stato: "completato", versione: a.versione } },
-      {
-        onSuccess: () => {
-          invalidate();
-          toast({ title: t("approvvigionamenti.toastCompleted") });
-        },
-      },
-    );
-  };
+  const handleCompleta = (a: OrderRow) => setReceivingId(a.id);
 
   const addRiga = () => {
-    const prodotto = (prodotti ?? []).find((item) => item.id === Number(draftProdottoId));
+    const prodotto = (prodotti ?? []).find(
+      (item) => item.id === Number(draftProdottoId),
+    );
     const quantita = Number(draftQuantita);
     if (!prodotto || !Number.isFinite(quantita) || quantita <= 0) return;
     setRigheDraft((current) => [
       ...current.filter((row) => row.prodottoId !== prodotto.id),
-      { prodottoId: prodotto.id, quantitaRichiesta: quantita, unitaMisura: prodotto.unitaMisura },
+      {
+        prodottoId: prodotto.id,
+        quantitaRichiesta: draftQuantita.trim().replace(",", "."),
+        unitaMisura: prodotto.unitaMisura,
+      },
     ]);
     setDraftProdottoId("");
     setDraftQuantita("1");
@@ -260,18 +345,57 @@ export default function Approvvigionamenti() {
   const getStatusBadge = (stato: string) => {
     switch (stato) {
       case "bozza":
-        return <Badge variant="secondary">{t("approvvigionamenti.stati.bozza")}</Badge>;
+        return (
+          <Badge variant="secondary">
+            {t("approvvigionamenti.stati.bozza")}
+          </Badge>
+        );
       case "sottomesso":
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{t("approvvigionamenti.stati.sottomesso")}</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-blue-50 text-blue-700 border-blue-200"
+          >
+            {t("approvvigionamenti.stati.sottomesso")}
+          </Badge>
+        );
       case "completato":
-        return <Badge variant="outline" className="bg-green-500/10 text-green-700 border-none">{t("approvvigionamenti.stati.completato")}</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-green-500/10 text-green-700 border-none"
+          >
+            {t("approvvigionamenti.stati.completato")}
+          </Badge>
+        );
       // legacy values
       case "inviata":
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{t("approvvigionamenti.stati.inviata")}</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-blue-50 text-blue-700 border-blue-200"
+          >
+            {t("approvvigionamenti.stati.inviata")}
+          </Badge>
+        );
       case "confermata":
-        return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">{t("approvvigionamenti.stati.confermata")}</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-purple-50 text-purple-700 border-purple-200"
+          >
+            {t("approvvigionamenti.stati.confermata")}
+          </Badge>
+        );
       case "completata":
-        return <Badge variant="outline" className="bg-green-500/10 text-green-700 border-none">{t("approvvigionamenti.stati.completata")}</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-green-500/10 text-green-700 border-none"
+          >
+            {t("approvvigionamenti.stati.completata")}
+          </Badge>
+        );
       default:
         return <Badge>{stato}</Badge>;
     }
@@ -279,67 +403,151 @@ export default function Approvvigionamenti() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {receivingId !== null && (
+        <SupplyReceipt
+          key={receivingId}
+          id={receivingId}
+          onClose={() => setReceivingId(null)}
+          onSuccess={() => {
+            invalidate();
+            setReceivingId(null);
+            toast({ title: t("approvvigionamenti.toastCompleted") });
+          }}
+        />
+      )}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("approvvigionamenti.title")}</h1>
-          <p className="text-muted-foreground">{t("approvvigionamenti.subtitle")}</p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("approvvigionamenti.title")}
+          </h1>
+          <p className="text-muted-foreground">
+            {t("approvvigionamenti.subtitle")}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButtons
             rows={approvvigionamenti ?? []}
-            loadRows={() => loadAllPages((exportPage, limit) => listApprovvigionamenti({ ...listParams, page: exportPage, limit }))}
+            loadRows={() =>
+              loadAllPages((exportPage, limit) =>
+                listApprovvigionamenti({
+                  ...listParams,
+                  page: exportPage,
+                  limit,
+                }),
+              )
+            }
             columns={[
               { header: t("common.code"), accessor: (a) => a.codice },
-              { header: t("approvvigionamenti.dataRichiesta"), accessor: (a) => (a.dataRichiesta ? new Date(a.dataRichiesta).toLocaleDateString("it-IT") : "") },
-              { header: t("approvvigionamenti.fornitore"), accessor: (a) => a.fornitoreNome ?? "" },
-              { header: t("approvvigionamenti.magazzino"), accessor: (a) => a.magazzinoNome ?? "" },
-              { header: t("approvvigionamenti.centroAscolto"), accessor: (a) => a.centroAscoltoNome ?? "" },
-              { header: t("approvvigionamenti.dataPrevista"), accessor: (a) => (a.dataPrevista ? new Date(a.dataPrevista).toLocaleDateString("it-IT") : "") },
+              {
+                header: t("approvvigionamenti.dataRichiesta"),
+                accessor: (a) =>
+                  a.dataRichiesta
+                    ? new Date(a.dataRichiesta).toLocaleDateString("it-IT")
+                    : "",
+              },
+              {
+                header: t("approvvigionamenti.fornitore"),
+                accessor: (a) => a.fornitoreNome ?? "",
+              },
+              {
+                header: t("approvvigionamenti.magazzino"),
+                accessor: (a) => a.magazzinoNome ?? "",
+              },
+              {
+                header: t("approvvigionamenti.centroAscolto"),
+                accessor: (a) => a.centroAscoltoNome ?? "",
+              },
+              {
+                header: t("approvvigionamenti.dataPrevista"),
+                accessor: (a) =>
+                  a.dataPrevista
+                    ? new Date(a.dataPrevista).toLocaleDateString("it-IT")
+                    : "",
+              },
               { header: t("common.status"), accessor: (a) => a.stato },
             ]}
             filename="approvvigionamenti"
             title={t("approvvigionamenti.exportTitle")}
           />
-          {canManage && <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" /> {t("approvvigionamenti.newOrdine")}</Button>}
+          {canManage && (
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="h-4 w-4" /> {t("approvvigionamenti.newOrdine")}
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">{t("approvvigionamenti.magazzino")}</Label>
-          <Select value={filterMagazzinoId} onValueChange={setFilterMagazzinoId}>
-            <SelectTrigger className="w-[200px]"><SelectValue placeholder={t("approvvigionamenti.tuttiMagazzini")} /></SelectTrigger>
+          <Label className="text-xs text-muted-foreground">
+            {t("approvvigionamenti.magazzino")}
+          </Label>
+          <Select
+            value={filterMagazzinoId}
+            onValueChange={setFilterMagazzinoId}
+          >
+            <SelectTrigger className="w-[200px]">
+              <SelectValue
+                placeholder={t("approvvigionamenti.tuttiMagazzini")}
+              />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("approvvigionamenti.tuttiMagazzini")}</SelectItem>
+              <SelectItem value="all">
+                {t("approvvigionamenti.tuttiMagazzini")}
+              </SelectItem>
               {(magazzini ?? []).map((m) => (
-                <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
+                <SelectItem key={m.id} value={String(m.id)}>
+                  {m.nome}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         {isGlobal && (
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">{t("approvvigionamenti.centroAscolto")}</Label>
+            <Label className="text-xs text-muted-foreground">
+              {t("approvvigionamenti.centroAscolto")}
+            </Label>
             <Select value={filterCentroId} onValueChange={setFilterCentroId}>
-              <SelectTrigger className="w-[200px]"><SelectValue placeholder={t("approvvigionamenti.tuttiCentri")} /></SelectTrigger>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue
+                  placeholder={t("approvvigionamenti.tuttiCentri")}
+                />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("approvvigionamenti.tuttiCentri")}</SelectItem>
+                <SelectItem value="all">
+                  {t("approvvigionamenti.tuttiCentri")}
+                </SelectItem>
                 {(centri ?? []).map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.nome}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
         )}
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">{t("common.status")}</Label>
+          <Label className="text-xs text-muted-foreground">
+            {t("common.status")}
+          </Label>
           <Select value={filterStato} onValueChange={setFilterStato}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder={t("approvvigionamenti.tuttiStati")} /></SelectTrigger>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder={t("approvvigionamenti.tuttiStati")} />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("approvvigionamenti.tuttiStati")}</SelectItem>
-              <SelectItem value="bozza">{t("approvvigionamenti.stati.bozza")}</SelectItem>
-              <SelectItem value="sottomesso">{t("approvvigionamenti.stati.sottomesso")}</SelectItem>
-              <SelectItem value="completato">{t("approvvigionamenti.stati.completato")}</SelectItem>
+              <SelectItem value="all">
+                {t("approvvigionamenti.tuttiStati")}
+              </SelectItem>
+              <SelectItem value="bozza">
+                {t("approvvigionamenti.stati.bozza")}
+              </SelectItem>
+              <SelectItem value="sottomesso">
+                {t("approvvigionamenti.stati.sottomesso")}
+              </SelectItem>
+              <SelectItem value="completato">
+                {t("approvvigionamenti.stati.completato")}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -347,9 +555,14 @@ export default function Approvvigionamenti() {
           <Button
             variant="ghost"
             className="gap-1.5 text-muted-foreground"
-            onClick={() => { setFilterMagazzinoId("all"); setFilterCentroId("all"); setFilterStato("all"); }}
+            onClick={() => {
+              setFilterMagazzinoId("all");
+              setFilterCentroId("all");
+              setFilterStato("all");
+            }}
           >
-            <XCircle className="h-4 w-4" /> {t("approvvigionamenti.azzeraFiltri")}
+            <XCircle className="h-4 w-4" />{" "}
+            {t("approvvigionamenti.azzeraFiltri")}
           </Button>
         )}
       </div>
@@ -363,102 +576,200 @@ export default function Approvvigionamenti() {
                 <TableHead>{t("approvvigionamenti.dataRichiesta")}</TableHead>
                 <TableHead>{t("approvvigionamenti.fornitore")}</TableHead>
                 <TableHead>{t("approvvigionamenti.magazzino")}</TableHead>
-                {isGlobal && <TableHead>{t("approvvigionamenti.centroAscolto")}</TableHead>}
-                <TableHead className="text-center">{t("common.status")}</TableHead>
-                <TableHead className="text-right">{t("common.actions")}</TableHead>
+                {isGlobal && (
+                  <TableHead>{t("approvvigionamenti.centroAscolto")}</TableHead>
+                )}
+                <TableHead className="text-center">
+                  {t("common.status")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {t("common.actions")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                Array(3).fill(0).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    {isGlobal && <TableCell><Skeleton className="h-5 w-32" /></TableCell>}
-                    <TableCell><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
-                  </TableRow>
-                ))
+                Array(3)
+                  .fill(0)
+                  .map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <Skeleton className="h-5 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-40" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-32" />
+                      </TableCell>
+                      {isGlobal && (
+                        <TableCell>
+                          <Skeleton className="h-5 w-32" />
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <Skeleton className="h-6 w-20 mx-auto rounded-full" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-8 w-24 ml-auto" />
+                      </TableCell>
+                    </TableRow>
+                  ))
               ) : approvvigionamenti?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isGlobal ? 7 : 6} className="h-32 text-center text-muted-foreground">{t("approvvigionamenti.empty")}</TableCell>
-                </TableRow>
-              ) : approvvigionamenti?.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-mono text-sm font-medium">
-                    <span className="flex items-center gap-2">
-                      <ShoppingCart className="h-4 w-4 text-muted-foreground" /> {a.codice}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm">{format(new Date(a.dataRichiesta), "dd MMM yyyy", { locale: it })}</TableCell>
-                  <TableCell className="font-medium">{a.fornitoreNome || <span className="text-muted-foreground italic">-</span>}</TableCell>
-                  <TableCell className="text-sm">{a.magazzinoNome || <span className="text-muted-foreground italic">-</span>}</TableCell>
-                  {isGlobal && (
-                    <TableCell className="text-sm">{a.centroAscoltoNome || <span className="text-muted-foreground italic">-</span>}</TableCell>
-                  )}
-                  <TableCell className="text-center">{getStatusBadge(a.stato)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {a.stato === "bozza" && canManage && (
-                        <>
-                          <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => openEdit(a)}>
-                            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="gap-1.5"
-                            disabled={submitApprovvigionamento.isPending}
-                            onClick={() => handleSottometti(a)}
-                          >
-                            <Send className="h-3.5 w-3.5" /> {t("approvvigionamenti.sottometti")}
-                          </Button>
-                        </>
-                      )}
-                      {a.stato === "sottomesso" && (canManage || canReceive) && (
-                        <>
-                          {canManage && (orderMailto(a) ? (
-                            <Button asChild size="sm" variant="ghost" className="gap-1.5">
-                              <a href={orderMailto(a)!} aria-label={`Prepara email per l'ordine ${a.codice}`}>
-                                <Mail className="h-3.5 w-3.5" /> {t("approvvigionamenti.inviaEmail")}
-                              </a>
-                            </Button>
-                          ) : (
-                            <Button size="sm" variant="ghost" className="gap-1.5" disabled title="Il fornitore selezionato non dispone di un indirizzo e-mail.">
-                              <Mail className="h-3.5 w-3.5" /> {t("approvvigionamenti.inviaEmail")}
-                            </Button>
-                          ))}
-                          {canReceive && <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
-                            disabled={updateApprovvigionamento.isPending}
-                            onClick={() => handleCompleta(a)}
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" /> {t("approvvigionamenti.completatoBtn")}
-                          </Button>}
-                        </>
-                      )}
-                    </div>
+                  <TableCell
+                    colSpan={isGlobal ? 7 : 6}
+                    className="h-32 text-center text-muted-foreground"
+                  >
+                    {t("approvvigionamenti.empty")}
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                approvvigionamenti?.map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="font-mono text-sm font-medium">
+                      <span className="flex items-center gap-2">
+                        <ShoppingCart className="h-4 w-4 text-muted-foreground" />{" "}
+                        {a.codice}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {format(new Date(a.dataRichiesta), "dd MMM yyyy", {
+                        locale: it,
+                      })}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {a.fornitoreNome || (
+                        <span className="text-muted-foreground italic">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {a.magazzinoNome || (
+                        <span className="text-muted-foreground italic">-</span>
+                      )}
+                    </TableCell>
+                    {isGlobal && (
+                      <TableCell className="text-sm">
+                        {a.centroAscoltoNome || (
+                          <span className="text-muted-foreground italic">
+                            -
+                          </span>
+                        )}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-center">
+                      {getStatusBadge(a.stato)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {a.stato === "bozza" && canManage && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="gap-1.5"
+                              onClick={() => openEdit(a)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />{" "}
+                              {t("common.edit")}
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="gap-1.5"
+                              disabled={submitApprovvigionamento.isPending}
+                              onClick={() => handleSottometti(a)}
+                            >
+                              <Send className="h-3.5 w-3.5" />{" "}
+                              {t("approvvigionamenti.sottometti")}
+                            </Button>
+                          </>
+                        )}
+                        {a.stato === "sottomesso" &&
+                          (canManage || canReceive) && (
+                            <>
+                              {canManage &&
+                                (orderMailto(a) ? (
+                                  <Button
+                                    asChild
+                                    size="sm"
+                                    variant="ghost"
+                                    className="gap-1.5"
+                                  >
+                                    <a
+                                      href={orderMailto(a)!}
+                                      aria-label={`Prepara email per l'ordine ${a.codice}`}
+                                    >
+                                      <Mail className="h-3.5 w-3.5" />{" "}
+                                      {t("approvvigionamenti.inviaEmail")}
+                                    </a>
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="gap-1.5"
+                                    disabled
+                                    title="Il fornitore selezionato non dispone di un indirizzo e-mail."
+                                  >
+                                    <Mail className="h-3.5 w-3.5" />{" "}
+                                    {t("approvvigionamenti.inviaEmail")}
+                                  </Button>
+                                ))}
+                              {canReceive && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
+                                  disabled={updateApprovvigionamento.isPending}
+                                  onClick={() => handleCompleta(a)}
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" />{" "}
+                                  {t("approvvigionamenti.completatoBtn")}
+                                </Button>
+                              )}
+                            </>
+                          )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
       <div className="flex items-center justify-end gap-2">
-        <Button variant="outline" size="sm" disabled={page === 1 || isLoading} onClick={() => setPage((value) => Math.max(1, value - 1))}>Precedente</Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page === 1 || isLoading}
+          onClick={() => setPage((value) => Math.max(1, value - 1))}
+        >
+          Precedente
+        </Button>
         <span className="text-sm text-muted-foreground">Pagina {page}</span>
-        <Button variant="outline" size="sm" disabled={isLoading || (approvvigionamenti?.length ?? 0) < pageSize} onClick={() => setPage((value) => value + 1)}>Successiva</Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isLoading || (approvvigionamenti?.length ?? 0) < pageSize}
+          onClick={() => setPage((value) => value + 1)}
+        >
+          Successiva
+        </Button>
       </div>
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editingId !== null ? t("approvvigionamenti.sheetEditTitle") : t("approvvigionamenti.sheetNewTitle")}</SheetTitle>
+            <SheetTitle>
+              {editingId !== null
+                ? t("approvvigionamenti.sheetEditTitle")
+                : t("approvvigionamenti.sheetNewTitle")}
+            </SheetTitle>
             <SheetDescription>
               {editingId !== null
                 ? t("approvvigionamenti.sheetEditDesc")
@@ -467,94 +778,292 @@ export default function Approvvigionamenti() {
           </SheetHeader>
           <div className="mt-6">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Area</FormLabel>
-                    <Select onValueChange={handleAreaOperativaChange} value={field.value ? String(field.value) : undefined}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Seleziona prima l'area" /></SelectTrigger></FormControl>
-                      <SelectContent>{(areaOperativa ?? []).map((area) => <SelectItem key={area.id} value={String(area.id)}>{area.nome}</SelectItem>)}</SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="fornitoreId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("approvvigionamenti.fornitoreDonatore")}</FormLabel>
-                    <Select onValueChange={handleFornitoreChange} value={field.value ? String(field.value) : undefined} disabled={!selectedAreaOperativaId}>
-                      <FormControl><SelectTrigger><SelectValue placeholder={selectedAreaOperativaId ? t("approvvigionamenti.seleziona") : "Seleziona prima l'area"} /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {fornitoriArea.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {selectedAreaOperativaId && fornitoriArea.length === 0 && <p className="text-sm text-muted-foreground">Nessun fornitore associato all'area selezionata.</p>}
-                  </FormItem>
-                )} />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="magazzinoId" render={({ field }) => (
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4"
+              >
+                <FormField
+                  control={form.control}
+                  name="areaOperativaId"
+                  render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("approvvigionamenti.magazzino")}</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
-                        <FormControl><SelectTrigger><SelectValue placeholder={t("approvvigionamenti.seleziona")} /></SelectTrigger></FormControl>
+                      <FormLabel>Area</FormLabel>
+                      <Select
+                        onValueChange={handleAreaOperativaChange}
+                        value={field.value ? String(field.value) : undefined}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleziona prima l'area" />
+                          </SelectTrigger>
+                        </FormControl>
                         <SelectContent>
-                          {filteredMagazzini.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>)}
+                          {(areaOperativa ?? []).map((area) => (
+                            <SelectItem key={area.id} value={String(area.id)}>
+                              {area.nome}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
                     </FormItem>
-                  )} />
-                  <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="fornitoreId"
+                  render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("approvvigionamenti.centroAscolto")}</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined} disabled={isCentroLocked}>
-                        <FormControl><SelectTrigger><SelectValue placeholder={t("approvvigionamenti.seleziona")} /></SelectTrigger></FormControl>
+                      <FormLabel>
+                        {t("approvvigionamenti.fornitoreDonatore")}
+                      </FormLabel>
+                      <Select
+                        onValueChange={handleFornitoreChange}
+                        value={field.value ? String(field.value) : undefined}
+                        disabled={!selectedAreaOperativaId}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                selectedAreaOperativaId
+                                  ? t("approvvigionamenti.seleziona")
+                                  : "Seleziona prima l'area"
+                              }
+                            />
+                          </SelectTrigger>
+                        </FormControl>
                         <SelectContent>
-                          {filteredCentri.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                          {fornitoriArea.map((f) => (
+                            <SelectItem key={f.id} value={String(f.id)}>
+                              {f.nome}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      {selectedAreaOperativaId &&
+                        fornitoriArea.length === 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            Nessun fornitore associato all'area selezionata.
+                          </p>
+                        )}
                     </FormItem>
-                  )} />
-                </div>
-                {editingId === null && <div className="space-y-3 rounded-lg border p-3">
-                  <Label>Prodotti richiesti</Label>
-                  <div className="grid grid-cols-[1fr_120px_auto] gap-2">
-                    <Select value={draftProdottoId} onValueChange={setDraftProdottoId}>
-                      <SelectTrigger><SelectValue placeholder="Seleziona prodotto" /></SelectTrigger>
-                      <SelectContent>{(prodotti ?? []).filter((p) => p.attivo && !righeDraft.some((r) => r.prodottoId === p.id)).map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}</SelectContent>
-                    </Select>
-                    <Input type="number" min="0.01" step="0.01" value={draftQuantita} onChange={(event) => setDraftQuantita(event.target.value)} />
-                    <Button type="button" variant="outline" onClick={addRiga} disabled={!draftProdottoId || Number(draftQuantita) <= 0}>Aggiungi</Button>
-                  </div>
-                  {righeDraft.map((riga) => <div key={riga.prodottoId} className="flex items-center justify-between text-sm">
-                    <span>{prodotti?.find((p) => p.id === riga.prodottoId)?.nome} · {riga.quantitaRichiesta} {riga.unitaMisura}</span>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => setRigheDraft((rows) => rows.filter((row) => row.prodottoId !== riga.prodottoId))}>Rimuovi</Button>
-                  </div>)}
-                  {righeDraft.length === 0 && <p className="text-xs text-muted-foreground">Aggiungi almeno un prodotto prima di salvare la bozza.</p>}
-                </div>}
+                  )}
+                />
                 <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="dataRichiesta" render={({ field }) => (
-                    <FormItem><FormLabel>{t("approvvigionamenti.dataRichiesta")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="dataPrevista" render={({ field }) => (
-                    <FormItem><FormLabel>{t("approvvigionamenti.dataPrevistaConsegna")}</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
-                  )} />
+                  <FormField
+                    control={form.control}
+                    name="magazzinoId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t("approvvigionamenti.magazzino")}
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value ? String(field.value) : undefined}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={t("approvvigionamenti.seleziona")}
+                              />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {filteredMagazzini.map((m) => (
+                              <SelectItem key={m.id} value={String(m.id)}>
+                                {m.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="centroAscoltoId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t("approvvigionamenti.centroAscolto")}
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value ? String(field.value) : undefined}
+                          disabled={isCentroLocked}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={t("approvvigionamenti.seleziona")}
+                              />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {filteredCentri.map((c) => (
+                              <SelectItem key={c.id} value={String(c.id)}>
+                                {c.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
                 </div>
-                <FormField control={form.control} name="note" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("approvvigionamenti.noteMateriale")}</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        rows={10}
-                        placeholder={t("approvvigionamenti.noteMaterialePlaceholder")}
-                        className="min-h-[200px] resize-y"
-                        {...field}
+                {editingId === null && (
+                  <div className="space-y-3 rounded-lg border p-3">
+                    <Label>Prodotti richiesti</Label>
+                    <div className="grid grid-cols-[1fr_120px_auto] gap-2">
+                      <Select
+                        value={draftProdottoId}
+                        onValueChange={setDraftProdottoId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleziona prodotto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(prodotti ?? [])
+                            .filter(
+                              (p) =>
+                                p.attivo &&
+                                !righeDraft.some((r) => r.prodottoId === p.id),
+                            )
+                            .map((p) => (
+                              <SelectItem key={p.id} value={String(p.id)}>
+                                {p.nome}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={draftQuantita}
+                        onChange={(event) =>
+                          setDraftQuantita(event.target.value)
+                        }
                       />
-                    </FormControl>
-                  </FormItem>
-                )} />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addRiga}
+                        disabled={
+                          !draftProdottoId || Number(draftQuantita) <= 0
+                        }
+                      >
+                        Aggiungi
+                      </Button>
+                    </div>
+                    {righeDraft.map((riga) => (
+                      <div
+                        key={riga.prodottoId}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span>
+                          {
+                            prodotti?.find((p) => p.id === riga.prodottoId)
+                              ?.nome
+                          }{" "}
+                          · {riga.quantitaRichiesta} {riga.unitaMisura}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setRigheDraft((rows) =>
+                              rows.filter(
+                                (row) => row.prodottoId !== riga.prodottoId,
+                              ),
+                            )
+                          }
+                        >
+                          Rimuovi
+                        </Button>
+                      </div>
+                    ))}
+                    {righeDraft.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Aggiungi almeno un prodotto prima di salvare la bozza.
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="dataRichiesta"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t("approvvigionamenti.dataRichiesta")}
+                        </FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="dataPrevista"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t("approvvigionamenti.dataPrevistaConsegna")}
+                        </FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="note"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {t("approvvigionamenti.noteMateriale")}
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={10}
+                          placeholder={t(
+                            "approvvigionamenti.noteMaterialePlaceholder",
+                          )}
+                          className="min-h-[200px] resize-y"
+                          {...field}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
                 <div className="pt-4 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>{t("common.cancel")}</Button>
-                  <Button type="submit" disabled={createApprovvigionamento.isPending || updateApprovvigionamento.isPending || (editingId === null && righeDraft.length === 0)}>
-                    {editingId !== null ? t("approvvigionamenti.saveModifiche") : t("approvvigionamenti.saveBozza")}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsFormOpen(false)}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={
+                      createApprovvigionamento.isPending ||
+                      updateApprovvigionamento.isPending ||
+                      (editingId === null && righeDraft.length === 0)
+                    }
+                  >
+                    {editingId !== null
+                      ? t("approvvigionamenti.saveModifiche")
+                      : t("approvvigionamenti.saveBozza")}
                   </Button>
                 </div>
               </form>

@@ -5,9 +5,12 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ApprovvigionamentoPartita } from "./approvvigionamentoPartita";
 import type { ApprovvigionamentoRigaInput } from "./approvvigionamentoRigaInput";
 
 export interface ApprovvigionamentoUpdate {
+  /** Partite fisiche per completare tutte le righe residue. La somma per riga deve coincidere esattamente col residuo; nessuna ricezione parziale. */
+  partite?: ApprovvigionamentoPartita[];
   /** @minimum 1 */
   versione: number;
   stato?: string;

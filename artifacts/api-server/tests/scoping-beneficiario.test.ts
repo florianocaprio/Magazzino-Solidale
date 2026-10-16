@@ -28,6 +28,7 @@ import {
   insertIntervento,
 } from "./scope-helpers";
 import { createPersistedSocialActor } from "./persisted-social-actor";
+import { persistedSessionApp } from "./helpers/persisted-session-app";
 
 /**
  * Centro scoping for indirect-link entities (consegne, bolle, interventi):
@@ -50,6 +51,8 @@ let magB: number;
 let socialActor: Awaited<ReturnType<typeof createPersistedSocialActor>>;
 let globalSocialActor: typeof socialActor;
 let unassignedSocialActor: typeof socialActor;
+let deliveryActor: typeof socialActor;
+let globalDeliveryActor: typeof socialActor;
 
 const idsOf = (body: unknown) => {
   const rows = Array.isArray(body)
@@ -61,14 +64,19 @@ const appAs = (
   router: Parameters<typeof makeScopedApp>[0],
   centro: number | null,
 ) =>
-  makeScopedApp(
-    router,
-    router === interventiRouter
-      ? centro === null
-        ? globalSocialActor
-        : socialActor
-      : { id: operatoreId, centroAscoltoId: centro },
-  );
+  router === consegneRouter
+    ? persistedSessionApp(
+        router,
+        (centro == null ? globalDeliveryActor : deliveryActor).id,
+      )
+    : makeScopedApp(
+        router,
+        router === interventiRouter
+          ? centro === null
+            ? globalSocialActor
+            : socialActor
+          : { id: operatoreId, centroAscoltoId: centro },
+      );
 const commandKey = (label: string) => `${label}-${randomUUID()}`;
 
 beforeAll(async () => {
@@ -84,7 +92,7 @@ beforeEach(async () => {
   benA = await createBeneficiario(scope, centroA, { areaOperativaId });
   benB = await createBeneficiario(scope, centroB, { areaOperativaId });
   benNull = await createBeneficiario(scope, null, { areaOperativaId });
-  magNull = await createMagazzino(scope, null);
+  magNull = await createMagazzino(scope, null, { areaOperativaId });
   magB = await createMagazzino(scope, centroB);
   const actors = [];
   for (const input of [
@@ -106,6 +114,27 @@ beforeEach(async () => {
     scope.ruoloIds.push(actor.ruoloId);
   }
   [socialActor, globalSocialActor, unassignedSocialActor] = actors;
+  const deliveries = [];
+  for (const input of [
+    { areaOperativaId, centroAscoltoId: centroA, isAdmin: false },
+    { areaOperativaId: null, centroAscoltoId: null, isAdmin: true },
+  ]) {
+    const actor = await createPersistedSocialActor({
+      ...input,
+      aree: ["sociale"],
+      permessi: [
+        "consegne.view",
+        "consegne.manage",
+        "consegne.complete",
+        "consegne.cancel",
+        "consegne.export",
+      ],
+    });
+    deliveries.push(actor);
+    scope.utenteIds.push(actor.id);
+    scope.ruoloIds.push(actor.ruoloId);
+  }
+  [deliveryActor, globalDeliveryActor] = deliveries;
 });
 
 afterEach(async () => {

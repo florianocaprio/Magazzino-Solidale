@@ -9,6 +9,8 @@ import {
 } from "vitest";
 import { randomUUID } from "node:crypto";
 import request from "supertest";
+import { persistedSessionApp } from "./helpers/persisted-session-app";
+import { createPersistedSocialActor } from "./persisted-social-actor";
 import express from "express";
 import {
   db,
@@ -3462,6 +3464,19 @@ describe("Consegne — completa converte le prenotazioni bolla", () => {
   });
 
   it("applica replay, mismatch, stale e concorrenza senza scaricare due volte", async () => {
+    const deliveryArea = await createAreaOperativa(scope);
+    await pool.query(
+      "update centri_di_ascolto set area_operativa_id=$1 where id=$2",
+      [deliveryArea, centroA],
+    );
+    await pool.query(
+      "update beneficiari set area_operativa_id=$1 where id=$2",
+      [deliveryArea, benA],
+    );
+    await pool.query("update magazzini set area_operativa_id=$1 where id=$2", [
+      deliveryArea,
+      magA,
+    ]);
     const consegnaId = await insertConsegna(scope, {
       beneficiarioId: benA,
       magazzinoId: magA,
@@ -3490,7 +3505,23 @@ describe("Consegne — completa converte le prenotazioni bolla", () => {
       ).status,
     ).toBe(200);
     const versioneConfermata = await bollaVersione(bollaId);
-    const list = await request(consegneAppAs(centroA)).get("/consegne");
+    const centre = (
+      await pool.query(
+        "select area_operativa_id from centri_di_ascolto where id=$1",
+        [centroA],
+      )
+    ).rows[0];
+    const viewer = await createPersistedSocialActor({
+      areaOperativaId: centre.area_operativa_id,
+      centroAscoltoId: centroA,
+      aree: ["sociale"],
+      permessi: ["consegne.view", "bolle.view"],
+    });
+    scope.utenteIds.push(viewer.id);
+    scope.ruoloIds.push(viewer.ruoloId);
+    const list = await request(
+      persistedSessionApp(consegneRouter, viewer.id),
+    ).get("/consegne");
     expect(list.status, list.text).toBe(200);
     expect(
       list.body.items.find((item: { id: number }) => item.id === consegnaId),

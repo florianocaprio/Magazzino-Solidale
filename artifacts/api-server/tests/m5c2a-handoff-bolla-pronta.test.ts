@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
 import express from "express";
 import request from "supertest";
+import { persistedSessionApp } from "./helpers/persisted-session-app";
 import {
   auditEventiTable,
   bolleTable,
@@ -229,13 +230,7 @@ beforeAll(async () => {
     documentiOperativiRouter,
     interventiRouter,
   );
-  app = makeScopedApp(router, {
-    id: actorId,
-    centroAscoltoId: centroId,
-    areaOperativaId: areaId,
-    aree: ["sociale", "magazzino"],
-    permessi: grants,
-  });
+  app = persistedSessionApp(router, actorId);
 });
 
 afterAll(async () => {
@@ -914,12 +909,10 @@ describe("M5C2-A — handoff Bolla pronta", () => {
       .where(eq(utentiTable.id, actorId));
     try {
       const queue = await request(app).get("/consegne/da-pianificare");
-      expect(queue.status, queue.text).toBe(200);
-      expect(
-        queue.body.some(
-          (row: { bollaId: number }) => row.bollaId === ready.bollaId,
-        ),
-      ).toBe(false);
+      // EXT67-02: no territorial assignment denies the whole read, not just
+      // a filtered empty queue. Commands retain their own M5B boundary.
+      expect(queue.status, queue.text).toBe(403);
+      expect(queue.body).not.toHaveProperty("items");
       const denied = await request(app)
         .post(`/consegne/da-bolla/${ready.bollaId}`)
         .send(payload);

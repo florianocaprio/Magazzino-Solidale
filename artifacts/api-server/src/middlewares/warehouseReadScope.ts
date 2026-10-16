@@ -7,9 +7,12 @@ import { isGlobalAdmin } from "../lib/adminScope";
  * SessionUser is reloaded from persisted user/role/territory on every request.
  * This guard neither grants capabilities nor replaces row/document predicates.
  */
-export const requireWarehouseReadScope: RequestHandler = (req, res, next) => {
-  if (req.method !== "GET" && req.method !== "HEAD") return next();
+export const requireWarehouseScope: RequestHandler = (req, res, next) => {
   const actor = req.user;
+  if (!actor) {
+    res.status(401).json({ error: "Non autenticato" });
+    return;
+  }
   const global = isGlobalAdmin(actor) && actor?.centroAscoltoId == null;
   const assigned =
     actor?.areaOperativaId != null &&
@@ -25,4 +28,9 @@ export const requireWarehouseReadScope: RequestHandler = (req, res, next) => {
     return;
   }
   next();
+};
+
+export const requireWarehouseReadScope: RequestHandler = (req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") return next();
+  return requireWarehouseScope(req, res, next);
 };

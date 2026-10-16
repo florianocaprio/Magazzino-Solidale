@@ -3721,6 +3721,14 @@ export interface FornitoreUpdate {
 }
 
 export interface ApprovvigionamentoRiga {
+  /** Residuo calcolato con aritmetica decimale esatta. */
+  quantitaResiduaEsatta?: string;
+  lottoFisicoObbligatorio?: boolean;
+  gestioneScadenza?: boolean;
+  /** Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione. */
+  quantitaRichiestaEsatta?: string;
+  /** Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione. */
+  quantitaRicevutaEsatta?: string;
   id: number;
   prodottoId: number;
   /** @nullable */
@@ -3764,7 +3772,8 @@ export interface Approvvigionamento {
 
 export interface ApprovvigionamentoRigaInput {
   prodottoId: number;
-  quantitaRichiesta: number;
+  /** Quantità positiva, massimo sei decimali e 99999999.999999. Usare stringa decimale per esattezza; unità e frazionabilità dal Catalogo. */
+  quantitaRichiesta: number | string;
   unitaMisura: string;
   note?: string;
 }
@@ -3780,7 +3789,16 @@ export interface ApprovvigionamentoInput {
   righe: ApprovvigionamentoRigaInput[];
 }
 
+export interface ApprovvigionamentoPartita {
+  rigaId: number;
+  quantita: number | string;
+  codiceLotto?: string;
+  dataScadenza?: string;
+}
+
 export interface ApprovvigionamentoUpdate {
+  /** Partite fisiche per completare tutte le righe residue. La somma per riga deve coincidere esattamente col residuo; nessuna ricezione parziale. */
+  partite?: ApprovvigionamentoPartita[];
   /** @minimum 1 */
   versione: number;
   stato?: string;

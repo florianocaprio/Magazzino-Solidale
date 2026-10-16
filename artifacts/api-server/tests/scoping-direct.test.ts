@@ -1,5 +1,15 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from "vitest";
 import request from "supertest";
+import { Router } from "express";
+import { requireAuth } from "../src/middlewares/auth";
 import { pool } from "@workspace/db";
 import fornitoriRouter from "../src/routes/fornitori";
 import volontariRouter from "../src/routes/volontari";
@@ -8,7 +18,27 @@ import utentiRouter from "../src/routes/utenti";
 import scarichiRouter from "../src/routes/scarichi";
 import approvvigionamentiRouter from "../src/routes/approvvigionamenti";
 import beneficiariRouter from "../src/routes/beneficiari";
-import { makeScopedApp, makeSessionApp, newScope, cleanup, type SeedScope, createCentroRec, createMagazzino, createProdotto, createBeneficiario, createAreaOperativa, createFornitore, createVolontario, createMezzo, createRuolo, createRuoloVolontario, createUtente, createLotto, insertScarico, insertApprovvigionamento } from "./scope-helpers";
+import {
+  makeScopedApp,
+  makeSessionApp,
+  newScope,
+  cleanup,
+  type SeedScope,
+  createCentroRec,
+  createMagazzino,
+  createProdotto,
+  createBeneficiario,
+  createAreaOperativa,
+  createFornitore,
+  createVolontario,
+  createMezzo,
+  createRuolo,
+  createRuoloVolontario,
+  createUtente,
+  createLotto,
+  insertScarico,
+  insertApprovvigionamento,
+} from "./scope-helpers";
 
 /**
  * Centro scoping for direct-column entities: each row carries its own
@@ -25,7 +55,8 @@ let areaOperativaA: number;
 let areaOperativaB: number;
 let ruoloVolontarioId: number;
 
-const idsOf = (body: unknown) => (body as Array<{ id: number }>).map((r) => r.id);
+const idsOf = (body: unknown) =>
+  (body as Array<{ id: number }>).map((r) => r.id);
 
 beforeAll(async () => {
   bootScope = newScope();
@@ -36,8 +67,10 @@ beforeEach(async () => {
   scope = newScope();
   areaOperativaA = await createAreaOperativa(scope);
   areaOperativaB = await createAreaOperativa(scope);
-  centroA = (await createCentroRec(scope, { areaOperativaId: areaOperativaA })).id;
-  centroB = (await createCentroRec(scope, { areaOperativaId: areaOperativaB })).id;
+  centroA = (await createCentroRec(scope, { areaOperativaId: areaOperativaA }))
+    .id;
+  centroB = (await createCentroRec(scope, { areaOperativaId: areaOperativaB }))
+    .id;
   ruoloVolontarioId = await createRuoloVolontario(scope);
 });
 
@@ -55,7 +88,12 @@ describe("Fornitori — scoping per area operativa", () => {
     const fA = await createFornitore(scope, areaOperativaA);
     const fB = await createFornitore(scope, areaOperativaB);
     const fNull = await createFornitore(scope, null);
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA })).get("/fornitori");
+    const res = await request(
+      makeScopedApp(fornitoriRouter, {
+        id: operatoreId,
+        areaOperativaId: areaOperativaA,
+      }),
+    ).get("/fornitori");
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(fA);
@@ -66,20 +104,39 @@ describe("Fornitori — scoping per area operativa", () => {
   it("lista: il caller globale vede tutti", async () => {
     const fA = await createFornitore(scope, areaOperativaA);
     const fB = await createFornitore(scope, areaOperativaB);
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: null })).get("/fornitori");
+    const res = await request(
+      makeScopedApp(fornitoriRouter, {
+        id: operatoreId,
+        areaOperativaId: null,
+      }),
+    ).get("/fornitori");
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([fA, fB]));
   });
 
   it("GET /:id fuori area operativa → 403", async () => {
     const fB = await createFornitore(scope, areaOperativaB);
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA })).get(`/fornitori/${fB}`);
+    const res = await request(
+      makeScopedApp(fornitoriRouter, {
+        id: operatoreId,
+        areaOperativaId: areaOperativaA,
+      }),
+    ).get(`/fornitori/${fB}`);
     expect(res.status).toBe(403);
   });
 
   it("POST auto-assegna e blocca la area operativa del caller", async () => {
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA }))
+    const res = await request(
+      makeScopedApp(fornitoriRouter, {
+        id: operatoreId,
+        areaOperativaId: areaOperativaA,
+      }),
+    )
       .post("/fornitori")
-      .send({ nome: "Fornitore X", tipo: "azienda", areaOperativaId: areaOperativaB });
+      .send({
+        nome: "Fornitore X",
+        tipo: "azienda",
+        areaOperativaId: areaOperativaB,
+      });
     expect(res.status).toBe(201);
     scope.fornitoreIds.push(res.body.id);
     expect(res.body.areaOperativaId).toBe(areaOperativaA);
@@ -87,7 +144,12 @@ describe("Fornitori — scoping per area operativa", () => {
 
   it("PATCH /:id fuori area operativa → 403", async () => {
     const fB = await createFornitore(scope, areaOperativaB);
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA }))
+    const res = await request(
+      makeScopedApp(fornitoriRouter, {
+        id: operatoreId,
+        areaOperativaId: areaOperativaA,
+      }),
+    )
       .patch(`/fornitori/${fB}`)
       .send({ nome: "Hack" });
     expect(res.status).toBe(403);
@@ -95,7 +157,12 @@ describe("Fornitori — scoping per area operativa", () => {
 
   it("DELETE /:id fuori area operativa → 403", async () => {
     const fB = await createFornitore(scope, areaOperativaB);
-    const res = await request(makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA })).delete(`/fornitori/${fB}`);
+    const res = await request(
+      makeScopedApp(fornitoriRouter, {
+        id: operatoreId,
+        areaOperativaId: areaOperativaA,
+      }),
+    ).delete(`/fornitori/${fB}`);
     expect(res.status).toBe(403);
   });
 });
@@ -228,7 +295,9 @@ describe("Mezzi — scoping per centro", () => {
       centroId: null,
       volontarioId: volB,
     });
-    const res = await request(makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: centroA })).get("/mezzi");
+    const res = await request(
+      makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: centroA }),
+    ).get("/mezzi");
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(mA);
@@ -240,18 +309,24 @@ describe("Mezzi — scoping per centro", () => {
   it("lista: il caller globale vede tutti", async () => {
     const mA = await createMezzo(scope, { centroId: centroA });
     const mB = await createMezzo(scope, { centroId: centroB });
-    const res = await request(makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: null })).get("/mezzi");
+    const res = await request(
+      makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: null }),
+    ).get("/mezzi");
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([mA, mB]));
   });
 
   it("GET /:id fuori centro → 403", async () => {
     const mB = await createMezzo(scope, { centroId: centroB });
-    const res = await request(makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: centroA })).get(`/mezzi/${mB}`);
+    const res = await request(
+      makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: centroA }),
+    ).get(`/mezzi/${mB}`);
     expect(res.status).toBe(403);
   });
 
   it("POST auto-assegna il centro del caller", async () => {
-    const res = await request(makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: centroA }))
+    const res = await request(
+      makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: centroA }),
+    )
       .post("/mezzi")
       .send({
         codice: `MZ${Date.now()}`,
@@ -267,7 +342,9 @@ describe("Mezzi — scoping per centro", () => {
   it("PATCH IDOR: assegnare un volontario di un altro centro → 403", async () => {
     const mA = await createMezzo(scope, { centroId: centroA });
     const volB = await createVolontario(scope, centroB);
-    const res = await request(makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: centroA }))
+    const res = await request(
+      makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: centroA }),
+    )
       .patch(`/mezzi/${mA}`)
       .send({ volontarioId: volB, versione: 1 });
     expect(res.status).toBe(403);
@@ -275,7 +352,9 @@ describe("Mezzi — scoping per centro", () => {
 
   it("DELETE /:id fuori centro → 403", async () => {
     const mB = await createMezzo(scope, { centroId: centroB });
-    const res = await request(makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: centroA })).delete(`/mezzi/${mB}`);
+    const res = await request(
+      makeScopedApp(mezziRouter, { id: operatoreId, centroAscoltoId: centroA }),
+    ).delete(`/mezzi/${mB}`);
     expect(res.status).toBe(403);
   });
 });
@@ -302,7 +381,9 @@ describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
     const uA = await createUtente(scope, { centroId: centroA });
     const uB = await createUtente(scope, { centroId: centroB });
     const uNull = await createUtente(scope, { centroId: null });
-    const res = await request(makeSessionApp(utentiRouter, adminA)).get("/utenti");
+    const res = await request(makeSessionApp(utentiRouter, adminA)).get(
+      "/utenti",
+    );
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(uA);
@@ -314,7 +395,9 @@ describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
     const uA = await createUtente(scope, { centroId: centroA });
     const uB = await createUtente(scope, { centroId: centroB });
     const uNull = await createUtente(scope, { centroId: null });
-    const res = await request(makeSessionApp(utentiRouter, adminNull)).get("/utenti");
+    const res = await request(makeSessionApp(utentiRouter, adminNull)).get(
+      "/utenti",
+    );
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([uA, uB, uNull]));
   });
 
@@ -344,19 +427,25 @@ describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
 
   it("PATCH /:id fuori centro → 403", async () => {
     const uB = await createUtente(scope, { centroId: centroB });
-    const res = await request(makeSessionApp(utentiRouter, adminA)).patch(`/utenti/${uB}`).send({ nome: "Hack" });
+    const res = await request(makeSessionApp(utentiRouter, adminA))
+      .patch(`/utenti/${uB}`)
+      .send({ nome: "Hack" });
     expect(res.status).toBe(403);
   });
 
   it("DELETE /:id fuori centro → 403", async () => {
     const uB = await createUtente(scope, { centroId: centroB });
-    const res = await request(makeSessionApp(utentiRouter, adminA)).delete(`/utenti/${uB}`);
+    const res = await request(makeSessionApp(utentiRouter, adminA)).delete(
+      `/utenti/${uB}`,
+    );
     expect(res.status).toBe(403);
   });
 
   it("POST /:id/reset-password fuori centro → 403", async () => {
     const uB = await createUtente(scope, { centroId: centroB });
-    const res = await request(makeSessionApp(utentiRouter, adminA)).post(`/utenti/${uB}/reset-password`).send({ newPassword: "password123" });
+    const res = await request(makeSessionApp(utentiRouter, adminA))
+      .post(`/utenti/${uB}/reset-password`)
+      .send({ newPassword: "password123" });
     expect(res.status).toBe(403);
   });
 });
@@ -457,9 +546,15 @@ describe("Beneficiari — scoping per centro", () => {
       centroAscoltoId: centroA,
       areaOperativaId: areaOperativaA,
     });
-    expect((await request(appA).get(`/beneficiari/${bB}/nucleo`)).status).toBe(403);
-    expect((await request(appA).post(`/beneficiari/${bB}/nucleo`).send({})).status).toBe(403);
-    expect((await request(appA).delete(`/beneficiari/${bB}/nucleo/1`)).status).toBe(403);
+    expect((await request(appA).get(`/beneficiari/${bB}/nucleo`)).status).toBe(
+      403,
+    );
+    expect(
+      (await request(appA).post(`/beneficiari/${bB}/nucleo`).send({})).status,
+    ).toBe(403);
+    expect(
+      (await request(appA).delete(`/beneficiari/${bB}/nucleo/1`)).status,
+    ).toBe(403);
   });
 });
 
@@ -501,7 +596,9 @@ describe("Scarichi — scoping per centro", () => {
       magazzinoId: mag,
       centroId: centroB,
     });
-    const res = await request(makeScopedApp(scarichiRouter, { id: operatoreId, centroAscoltoId: null })).get("/scarichi");
+    const res = await request(
+      makeScopedApp(scarichiRouter, { id: operatoreId, centroAscoltoId: null }),
+    ).get("/scarichi");
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([sA, sB]));
   });
 
@@ -548,8 +645,30 @@ describe("Scarichi — scoping per centro", () => {
 });
 
 describe("Approvvigionamenti — scoping per centro", () => {
+  async function supplyApp(centre: number | null) {
+    const role = await createRuolo(scope, { isAdmin: centre == null });
+    await pool.query("update ruoli set aree=$1, permessi=$2 where id=$3", [
+      JSON.stringify(["logistica"]),
+      JSON.stringify([
+        "approvvigionamenti.view",
+        "approvvigionamenti.manage",
+        "approvvigionamenti.receive",
+      ]),
+      role,
+    ]);
+    const id = await createUtente(scope, { centroId: centre, ruoloId: role });
+    await pool.query("update utenti set area_operativa_id=$1 where id=$2", [
+      centre == null ? null : areaOperativaA,
+      id,
+    ]);
+    const router = Router();
+    router.use(requireAuth, approvvigionamentiRouter);
+    return makeSessionApp(router, id);
+  }
   it("lista: A vede A + comuni, non B", async () => {
-    const mag = await createMagazzino(scope, null);
+    const mag = await createMagazzino(scope, null, {
+      areaOperativaId: areaOperativaA,
+    });
     const aA = await insertApprovvigionamento(scope, {
       magazzinoId: mag,
       centroId: centroA,
@@ -562,12 +681,9 @@ describe("Approvvigionamenti — scoping per centro", () => {
       magazzinoId: mag,
       centroId: null,
     });
-    const res = await request(
-      makeScopedApp(approvvigionamentiRouter, {
-        id: operatoreId,
-        centroAscoltoId: centroA,
-      }),
-    ).get("/approvvigionamenti");
+    const res = await request(await supplyApp(centroA)).get(
+      "/approvvigionamenti",
+    );
     expect(res.status).toBe(200);
     const ids = idsOf(res.body);
     expect(ids).toContain(aA);
@@ -576,7 +692,9 @@ describe("Approvvigionamenti — scoping per centro", () => {
   });
 
   it("lista: il caller globale vede tutti", async () => {
-    const mag = await createMagazzino(scope, null);
+    const mag = await createMagazzino(scope, null, {
+      areaOperativaId: areaOperativaA,
+    });
     const aA = await insertApprovvigionamento(scope, {
       magazzinoId: mag,
       centroId: centroA,
@@ -585,40 +703,31 @@ describe("Approvvigionamenti — scoping per centro", () => {
       magazzinoId: mag,
       centroId: centroB,
     });
-    const res = await request(
-      makeScopedApp(approvvigionamentiRouter, {
-        id: operatoreId,
-        centroAscoltoId: null,
-      }),
-    ).get("/approvvigionamenti");
+    const res = await request(await supplyApp(null)).get("/approvvigionamenti");
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([aA, aB]));
   });
 
   it("GET /:id fuori centro → 403", async () => {
-    const mag = await createMagazzino(scope, null);
+    const mag = await createMagazzino(scope, null, {
+      areaOperativaId: areaOperativaA,
+    });
     const aB = await insertApprovvigionamento(scope, {
       magazzinoId: mag,
       centroId: centroB,
     });
-    const res = await request(
-      makeScopedApp(approvvigionamentiRouter, {
-        id: operatoreId,
-        centroAscoltoId: centroA,
-      }),
-    ).get(`/approvvigionamenti/${aB}`);
+    const res = await request(await supplyApp(centroA)).get(
+      `/approvvigionamenti/${aB}`,
+    );
     expect(res.status).toBe(403);
   });
 
   it("POST auto-assegna il centro del caller", async () => {
-    const mag = await createMagazzino(scope, null, { areaOperativaId: areaOperativaA });
+    const mag = await createMagazzino(scope, null, {
+      areaOperativaId: areaOperativaA,
+    });
     const prod = await createProdotto(scope);
     const fornitore = await createFornitore(scope, areaOperativaA);
-    const res = await request(
-      makeScopedApp(approvvigionamentiRouter, {
-        id: operatoreId,
-        centroAscoltoId: centroA,
-      }),
-    )
+    const res = await request(await supplyApp(centroA))
       .post("/approvvigionamenti")
       .send({
         dataRichiesta: "2026-06-24",
@@ -633,35 +742,31 @@ describe("Approvvigionamenti — scoping per centro", () => {
   });
 
   it("PATCH IDOR: spostare l'ordine su un magazzino di un altro centro → 403", async () => {
-    const magNull = await createMagazzino(scope, null);
+    const magNull = await createMagazzino(scope, null, {
+      areaOperativaId: areaOperativaA,
+    });
     const magB = await createMagazzino(scope, centroB);
     const ordA = await insertApprovvigionamento(scope, {
       magazzinoId: magNull,
       centroId: centroA,
     });
-    const res = await request(
-      makeScopedApp(approvvigionamentiRouter, {
-        id: operatoreId,
-        centroAscoltoId: centroA,
-      }),
-    )
+    const res = await request(await supplyApp(centroA))
       .patch(`/approvvigionamenti/${ordA}`)
       .send({ versione: 1, magazzinoId: magB });
     expect(res.status).toBe(403);
   });
 
   it("POST /:id/sottometti fuori centro → 403", async () => {
-    const mag = await createMagazzino(scope, null);
+    const mag = await createMagazzino(scope, null, {
+      areaOperativaId: areaOperativaA,
+    });
     const aB = await insertApprovvigionamento(scope, {
       magazzinoId: mag,
       centroId: centroB,
     });
-    const res = await request(
-      makeScopedApp(approvvigionamentiRouter, {
-        id: operatoreId,
-        centroAscoltoId: centroA,
-      }),
-    ).post(`/approvvigionamenti/${aB}/sottometti`).send({ versione: 1 });
+    const res = await request(await supplyApp(centroA))
+      .post(`/approvvigionamenti/${aB}/sottometti`)
+      .send({ versione: 1 });
     expect(res.status).toBe(403);
   });
 });

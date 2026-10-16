@@ -1,0 +1,118 @@
+{
+  "base": "3073ada55578c577edd826a67de321458fffecbf",
+  "fingerprint": "a7f4c7e6ea9680a5f9e709f809784702f5d7f8804ae3d87483a5426e63d9cc8d",
+  "files": [
+    {
+      "path": "artifacts/api-server/src/lib/supplyValidation.ts",
+      "sha256": "c06a32d7354c66847ad2367fb5a52210a991c7351bd4639e41c5f7f0e2c28217"
+    },
+    {
+      "path": "artifacts/api-server/src/middlewares/warehouseReadScope.ts",
+      "sha256": "761586f510ac3674072e7300788c77c95d956ca2e757e9df56c52ea66df96c09"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/approvvigionamenti.ts",
+      "sha256": "9c08393c6bee8752bedb2afa04c6fdf005829ea765a72fe4cb52fc22bea4a848"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/consegne.ts",
+      "sha256": "a966051a6519afd897411ff14f230907ba0226a31d293f7628a19bc9c0197cf0"
+    },
+    {
+      "path": "artifacts/api-server/tests/bolle-prenotazioni.test.ts",
+      "sha256": "7cc6641954f9366763e6bbb358e5b2b6afbbbb3f95d22d4f01f3f6725d019cde"
+    },
+    {
+      "path": "artifacts/api-server/tests/bug-05-approvvigionamenti-area.test.ts",
+      "sha256": "8e6aa508df378b1c38f91b432d987708ac9851b25f91debf3eccaa7c05e6ad00"
+    },
+    {
+      "path": "artifacts/api-server/tests/consegne-pagination-rbac.test.ts",
+      "sha256": "f52de12d506bbc859d8d94c75a4161e939158f2642f37cccfbc77711c1da072d"
+    },
+    {
+      "path": "artifacts/api-server/tests/helpers/persisted-session-app.ts",
+      "sha256": "26b8f1d1d85aa0b04953576270f5664f947070487e8d5d6408cd41a55c49d830"
+    },
+    {
+      "path": "artifacts/api-server/tests/m5c2a-handoff-bolla-pronta.test.ts",
+      "sha256": "fcfc34ad3a724df9c4a50842973596376e90d0907715fc3fc315680b18f8f52a"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67-review-supply.test.ts",
+      "sha256": "a585c696d9f6f727544eea0e873835f5782a84449a43559f93e3575ab475ff44"
+    },
+    {
+      "path": "artifacts/api-server/tests/moduli-route-combinati.test.ts",
+      "sha256": "644527fad275d2954ef2b29208e422398cb50089adc35f888c371de0bf8a4b27"
+    },
+    {
+      "path": "artifacts/api-server/tests/scoping-beneficiario.test.ts",
+      "sha256": "060dfd5a3b0a77993f5bfeb1a26a592bc884d6a9bc8634b4c317f41b0ee4004d"
+    },
+    {
+      "path": "artifacts/api-server/tests/scoping-direct.test.ts",
+      "sha256": "cc3ec5b7b3a4c52c9531b7bea294423b752788815dab596fc51c6c5ed988657a"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67-review-supply.spec.ts",
+      "sha256": "272fb9e24180024d9b2a2ae8b432f995551a97a99526f3e8aa4d473811175f62"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/supply-receipt.test.tsx",
+      "sha256": "f54d4184f2771aa910a0ae9d5aa9a6a618ed4c212bb5d023bcc55f828e77521a"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/supply-receipt.tsx",
+      "sha256": "ef956357939b43e3e51c5cb69ff1877c4539cb8a3c833ffb81dbbe0127256bec"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/i18n/namespaces/approvvigionamenti.ts",
+      "sha256": "4826042ed9a42e9fe99b5834d33f5c358ecdd8c7514caadc3ef3fbf7e26a8054"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/approvvigionamenti.tsx",
+      "sha256": "619427762b8fddb4e39f91056bf9524479344fe3411ad3d60dab17ecd603b875"
+    },
+    {
+      "path": "lib/api-client-react/src/generated/api.schemas.ts",
+      "sha256": "faa0a3a2143c309f514b951a8ddc882840e0ebbaef4d6cede712428921fefcdc"
+    },
+    {
+      "path": "lib/api-spec/openapi.yaml",
+      "sha256": "3b3ab036550905f8cb14cdb96cc094eb5ddf7e6433e3e8144263d4e32e1abfbf"
+    },
+    {
+      "path": "lib/api-zod/src/generated/api.ts",
+      "sha256": "620c4f7cf577e5c42f144a19bc094f3f6bd113d86857b4433fe559ef93d0a4a0"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoPartita.ts",
+      "sha256": "535b2fd46f6a2afdd74daf4bbe26949d96ba28021168c5a7f02ab14a0d23a389"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoRiga.ts",
+      "sha256": "ff1df2a77753d5ebd22e0904372370b919f28e2cd1223d1d8026d77a156f6fa0"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoRigaInput.ts",
+      "sha256": "63fb90b7fd12b77f53c67ec131b395f57e7388dbb0aaac95e6b61e0d2843dbba"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/approvvigionamentoUpdate.ts",
+      "sha256": "442e13cdf622f3f70767564e4d8e5bfa7cc8af0b83457f26d9c389226d671461"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/index.ts",
+      "sha256": "87b77f776196bb3e6f2464e245bb73d50a2f78046a239af62012f74760c4fbc5"
+    },
+    {
+      "path": "lib/db/src/schema/approvvigionamenti.ts",
+      "sha256": "5d89c2989dc954d23b24b3f5881822aba3117e6ff1b934ccb3ec401a687c4907"
+    },
+    {
+      "path": "lib/db/updates/20261016_approvvigionamenti_precisione.sql",
+      "sha256": "c710fbbba1ba82e4bcedc687fb3a639ddf6612c5d6672127ae9431a06a5e73d2"
+    }
+  ]
+}

@@ -1,5 +1,13 @@
 export const approvvigionamenti = {
   it: {
+    receiptTitle: "Ricevi approvvigionamento",
+    receiptDescription:
+      "Indica le partite reali. La somma per riga deve coincidere con il residuo; nessun carico parziale.",
+    receiptError: "Ricezione non riuscita",
+    receiptLot: "Codice lotto produttore",
+    receiptExpiry: "Scadenza",
+    receiptAddParty: "Aggiungi partita",
+    receiptConfirm: "Conferma ricezione",
     title: "Ordini & Approvvigionamenti",
     subtitle: "Gestisci gli ordini in entrata e le donazioni programmate.",
     exportTitle: "Approvvigionamenti",
@@ -29,13 +37,16 @@ export const approvvigionamenti = {
     completatoBtn: "Completato",
     sheetEditTitle: "Modifica Ordine",
     sheetNewTitle: "Nuovo Ordine",
-    sheetEditDesc: "Modifica l'ordine. Resta in bozza finché non clicchi Sottometti.",
-    sheetNewDesc: "Crea una bozza d'ordine. Potrai modificarla finché non la sottometti.",
+    sheetEditDesc:
+      "Modifica l'ordine. Resta in bozza finché non clicchi Sottometti.",
+    sheetNewDesc:
+      "Crea una bozza d'ordine. Potrai modificarla finché non la sottometti.",
     fornitoreDonatore: "Fornitore / Donatore",
     seleziona: "Seleziona...",
     dataPrevistaConsegna: "Data Prevista Consegna",
     noteMateriale: "Note / Materiale richiesto",
-    noteMaterialePlaceholder: "Elenca tutto il materiale necessario per questo ordine...",
+    noteMaterialePlaceholder:
+      "Elenca tutto il materiale necessario per questo ordine...",
     saveModifiche: "Salva modifiche",
     saveBozza: "Salva bozza",
     toastUpdated: "Ordine aggiornato",
@@ -45,6 +56,14 @@ export const approvvigionamenti = {
     toastCompleted: "Ordine completato",
   },
   es: {
+    receiptTitle: "Recibir pedido",
+    receiptDescription:
+      "Indique los lotes reales. La suma por línea debe coincidir con el saldo; sin recepción parcial.",
+    receiptError: "Error de recepción",
+    receiptLot: "Código de lote del fabricante",
+    receiptExpiry: "Caducidad",
+    receiptAddParty: "Añadir lote",
+    receiptConfirm: "Confirmar recepción",
     title: "Pedidos y Aprovisionamientos",
     subtitle: "Gestiona los pedidos entrantes y las donaciones programadas.",
     exportTitle: "Aprovisionamientos",
@@ -74,13 +93,16 @@ export const approvvigionamenti = {
     completatoBtn: "Completado",
     sheetEditTitle: "Editar Pedido",
     sheetNewTitle: "Nuevo Pedido",
-    sheetEditDesc: "Edita el pedido. Permanece en borrador hasta que pulses Enviar.",
-    sheetNewDesc: "Crea un borrador de pedido. Podrás editarlo hasta que lo envíes.",
+    sheetEditDesc:
+      "Edita el pedido. Permanece en borrador hasta que pulses Enviar.",
+    sheetNewDesc:
+      "Crea un borrador de pedido. Podrás editarlo hasta que lo envíes.",
     fornitoreDonatore: "Proveedor / Donante",
     seleziona: "Seleccionar...",
     dataPrevistaConsegna: "Fecha Prevista de Entrega",
     noteMateriale: "Notas / Material solicitado",
-    noteMaterialePlaceholder: "Enumera todo el material necesario para este pedido...",
+    noteMaterialePlaceholder:
+      "Enumera todo el material necesario para este pedido...",
     saveModifiche: "Guardar cambios",
     saveBozza: "Guardar borrador",
     toastUpdated: "Pedido actualizado",
@@ -90,6 +112,14 @@ export const approvvigionamenti = {
     toastCompleted: "Pedido completado",
   },
   en: {
+    receiptTitle: "Receive supply order",
+    receiptDescription:
+      "Enter the actual batches. Each line total must equal its remaining quantity; no partial receipt.",
+    receiptError: "Receipt failed",
+    receiptLot: "Manufacturer lot code",
+    receiptExpiry: "Expiry date",
+    receiptAddParty: "Add batch",
+    receiptConfirm: "Confirm receipt",
     title: "Orders & Procurement",
     subtitle: "Manage incoming orders and scheduled donations.",
     exportTitle: "Procurement",
@@ -119,7 +149,8 @@ export const approvvigionamenti = {
     completatoBtn: "Completed",
     sheetEditTitle: "Edit Order",
     sheetNewTitle: "New Order",
-    sheetEditDesc: "Edit the order. It stays as a draft until you click Submit.",
+    sheetEditDesc:
+      "Edit the order. It stays as a draft until you click Submit.",
     sheetNewDesc: "Create an order draft. You can edit it until you submit it.",
     fornitoreDonatore: "Supplier / Donor",
     seleziona: "Select...",
@@ -135,6 +166,14 @@ export const approvvigionamenti = {
     toastCompleted: "Order completed",
   },
   fr: {
+    receiptTitle: "Réceptionner la commande",
+    receiptDescription:
+      "Indiquez les lots réels. Le total par ligne doit égaler le reste ; aucune réception partielle.",
+    receiptError: "Échec de la réception",
+    receiptLot: "Code lot fabricant",
+    receiptExpiry: "Date de péremption",
+    receiptAddParty: "Ajouter un lot",
+    receiptConfirm: "Confirmer la réception",
     title: "Commandes et approvisionnements",
     subtitle: "Gérez les commandes entrantes et les dons programmés.",
     exportTitle: "Approvisionnements",
@@ -164,13 +203,16 @@ export const approvvigionamenti = {
     completatoBtn: "Terminée",
     sheetEditTitle: "Modifier la commande",
     sheetNewTitle: "Nouvelle commande",
-    sheetEditDesc: "Modifiez la commande. Elle reste en brouillon jusqu'à ce que vous cliquiez sur Soumettre.",
-    sheetNewDesc: "Créez un brouillon de commande. Vous pourrez le modifier jusqu'à sa soumission.",
+    sheetEditDesc:
+      "Modifiez la commande. Elle reste en brouillon jusqu'à ce que vous cliquiez sur Soumettre.",
+    sheetNewDesc:
+      "Créez un brouillon de commande. Vous pourrez le modifier jusqu'à sa soumission.",
     fornitoreDonatore: "Fournisseur / Donateur",
     seleziona: "Sélectionner...",
     dataPrevistaConsegna: "Date de livraison prévue",
     noteMateriale: "Notes / Matériel demandé",
-    noteMaterialePlaceholder: "Énumérez tout le matériel nécessaire pour cette commande...",
+    noteMaterialePlaceholder:
+      "Énumérez tout le matériel nécessaire pour cette commande...",
     saveModifiche: "Enregistrer les modifications",
     saveBozza: "Enregistrer le brouillon",
     toastUpdated: "Commande mise à jour",
@@ -180,6 +222,14 @@ export const approvvigionamenti = {
     toastCompleted: "Commande terminée",
   },
   de: {
+    receiptTitle: "Lieferung empfangen",
+    receiptDescription:
+      "Tatsächliche Chargen angeben. Jede Zeilensumme muss der Restmenge entsprechen; kein Teilempfang.",
+    receiptError: "Empfang fehlgeschlagen",
+    receiptLot: "Hersteller-Chargencode",
+    receiptExpiry: "Verfallsdatum",
+    receiptAddParty: "Charge hinzufügen",
+    receiptConfirm: "Empfang bestätigen",
     title: "Bestellungen & Beschaffung",
     subtitle: "Verwalten Sie eingehende Bestellungen und geplante Spenden.",
     exportTitle: "Beschaffung",
@@ -209,22 +259,34 @@ export const approvvigionamenti = {
     completatoBtn: "Abgeschlossen",
     sheetEditTitle: "Bestellung bearbeiten",
     sheetNewTitle: "Neue Bestellung",
-    sheetEditDesc: "Bearbeiten Sie die Bestellung. Sie bleibt ein Entwurf, bis Sie auf Einreichen klicken.",
-    sheetNewDesc: "Erstellen Sie einen Bestellentwurf. Sie können ihn bis zur Einreichung bearbeiten.",
+    sheetEditDesc:
+      "Bearbeiten Sie die Bestellung. Sie bleibt ein Entwurf, bis Sie auf Einreichen klicken.",
+    sheetNewDesc:
+      "Erstellen Sie einen Bestellentwurf. Sie können ihn bis zur Einreichung bearbeiten.",
     fornitoreDonatore: "Lieferant / Spender",
     seleziona: "Auswählen...",
     dataPrevistaConsegna: "Voraussichtliches Lieferdatum",
     noteMateriale: "Notizen / Angefordertes Material",
-    noteMaterialePlaceholder: "Listen Sie das gesamte für diese Bestellung benötigte Material auf...",
+    noteMaterialePlaceholder:
+      "Listen Sie das gesamte für diese Bestellung benötigte Material auf...",
     saveModifiche: "Änderungen speichern",
     saveBozza: "Entwurf speichern",
     toastUpdated: "Bestellung aktualisiert",
     toastBozza: "Entwurf gespeichert",
     toastSubmitted: "Bestellung eingereicht",
-    toastSubmittedDesc: "Die Bestellung wurde an die Verwaltung weitergeleitet.",
+    toastSubmittedDesc:
+      "Die Bestellung wurde an die Verwaltung weitergeleitet.",
     toastCompleted: "Bestellung abgeschlossen",
   },
   ar: {
+    receiptTitle: "استلام التوريد",
+    receiptDescription:
+      "أدخل الدفعات الفعلية. يجب أن يساوي مجموع كل بند الكمية المتبقية؛ لا استلام جزئي.",
+    receiptError: "تعذر الاستلام",
+    receiptLot: "رمز دفعة المصنع",
+    receiptExpiry: "تاريخ الصلاحية",
+    receiptAddParty: "إضافة دفعة",
+    receiptConfirm: "تأكيد الاستلام",
     title: "الطلبات والتموين",
     subtitle: "إدارة الطلبات الواردة والتبرعات المجدولة.",
     exportTitle: "التموين",

@@ -7,6 +7,14 @@
  */
 
 export interface ApprovvigionamentoRiga {
+  /** Residuo calcolato con aritmetica decimale esatta. */
+  quantitaResiduaEsatta?: string;
+  lottoFisicoObbligatorio?: boolean;
+  gestioneScadenza?: boolean;
+  /** Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione. */
+  quantitaRichiestaEsatta?: string;
+  /** Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione. */
+  quantitaRicevutaEsatta?: string;
   id: number;
   prodottoId: number;
   /** @nullable */

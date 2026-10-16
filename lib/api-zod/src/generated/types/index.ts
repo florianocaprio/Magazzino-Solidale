@@ -57,6 +57,7 @@ export * from "./approvazioneVolontario";
 export * from "./approvazioniLogistica";
 export * from "./approvvigionamento";
 export * from "./approvvigionamentoInput";
+export * from "./approvvigionamentoPartita";
 export * from "./approvvigionamentoRiga";
 export * from "./approvvigionamentoRigaInput";
 export * from "./approvvigionamentoUpdate";

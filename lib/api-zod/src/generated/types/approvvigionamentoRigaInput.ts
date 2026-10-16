@@ -8,7 +8,8 @@
 
 export interface ApprovvigionamentoRigaInput {
   prodottoId: number;
-  quantitaRichiesta: number;
+  /** Quantità positiva, massimo sei decimali e 99999999.999999. Usare stringa decimale per esattezza; unità e frazionabilità dal Catalogo. */
+  quantitaRichiesta: number | string;
   unitaMisura: string;
   note?: string;
 }

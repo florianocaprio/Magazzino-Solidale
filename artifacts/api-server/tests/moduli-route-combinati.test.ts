@@ -36,6 +36,7 @@ import {
   type SeedScope,
 } from "./scope-helpers";
 import { createPersistedSocialActor } from "./persisted-social-actor";
+import { persistedSessionApp } from "./helpers/persisted-session-app";
 
 const MODULI_TEST = [
   "CENTRO_ASCOLTO",
@@ -315,18 +316,33 @@ describe("prerequisiti combinati sulle route reali", () => {
   });
 
   it("richiede Centro di Ascolto e Consegne senza rendere indisponibili i dati", async () => {
-    const centroId = await createCentro(scope);
-    const magazzinoId = await createMagazzino(scope, centroId);
-    const beneficiarioId = await createBeneficiario(scope, centroId);
+    const areaOperativaId = await createAreaOperativa(scope);
+    const centroId = (await createCentroRec(scope, { areaOperativaId })).id;
+    const magazzinoId = await createMagazzino(scope, centroId, {
+      areaOperativaId,
+    });
+    const beneficiarioId = await createBeneficiario(scope, centroId, {
+      areaOperativaId,
+    });
     const consegnaId = await insertConsegna(scope, {
       beneficiarioId,
       magazzinoId,
     });
-    const app = makeScopedApp(consegneRouter, {
-      id: 0,
-      centroAscoltoId: null,
-      areaOperativaId: null,
+    const centre = (
+      await pool.query(
+        "select area_operativa_id from centri_di_ascolto where id=$1",
+        [centroId],
+      )
+    ).rows[0];
+    const actor = await createPersistedSocialActor({
+      areaOperativaId: centre.area_operativa_id,
+      centroAscoltoId: centroId,
+      aree: ["sociale"],
+      permessi: ["consegne.view"],
     });
+    scope.utenteIds.push(actor.id);
+    scope.ruoloIds.push(actor.ruoloId);
+    const app = persistedSessionApp(consegneRouter, actor.id);
 
     await setModulo("CENTRO_ASCOLTO", false);
     expect((await request(app).get(`/consegne/${consegnaId}`)).status).toBe(

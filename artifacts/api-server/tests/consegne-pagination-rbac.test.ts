@@ -6,6 +6,7 @@ import request from "supertest";
 import { db, beneficiariTable, consegneTable, pool } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import consegneRouter from "../src/routes/consegne";
+import { requireAuth } from "../src/middlewares/auth";
 import {
   cleanup,
   createAreaOperativa,
@@ -13,7 +14,9 @@ import {
   createCentroRec,
   createMagazzino,
   insertConsegna,
-  makeScopedApp,
+  makeSessionApp,
+  createRuolo,
+  createUtente,
   newScope,
   type SeedScope,
 } from "./scope-helpers";
@@ -32,16 +35,31 @@ afterAll(async () => {
   await pool.end();
 });
 
-const globalApp = (permessi: string[]) => makeScopedApp(consegneRouter, {
-  id: 1,
-  centroAscoltoId: null,
-  areaOperativaId: null,
-  permessi,
-});
+async function scopedApp(
+  area: number,
+  centre: number | null,
+  grants: string[],
+) {
+  const role = await createRuolo(scope);
+  await pool.query("update ruoli set aree=$1,permessi=$2 where id=$3", [
+    JSON.stringify(["sociale"]),
+    JSON.stringify(grants),
+    role,
+  ]);
+  const id = await createUtente(scope, { centroId: centre, ruoloId: role });
+  await pool.query("update utenti set area_operativa_id=$1 where id=$2", [
+    area,
+    id,
+  ]);
+  const router = express.Router();
+  router.use(requireAuth, consegneRouter);
+  return makeSessionApp(router, id);
+}
 
 describe("Consegne: paginazione, RBAC e scope storico", () => {
   it("pagina lato server, conta l'intero dataset e usa l'export dedicato", async () => {
-    const centro = await createCentroRec(scope);
+    const area = await createAreaOperativa(scope);
+    const centro = await createCentroRec(scope, { areaOperativaId: area });
     const magazzinoId = await createMagazzino(scope, centro.id);
     const beneficiarioId = await createBeneficiario(scope, centro.id);
 
@@ -49,17 +67,23 @@ describe("Consegne: paginazione, RBAC e scope storico", () => {
     for (let index = 0; index < 205; index += 1) {
       ids.push(await insertConsegna(scope, { beneficiarioId, magazzinoId }));
     }
-    await db.update(consegneTable).set({ codice: "CON-RICERCA-UNIVOCA" }).where(eq(consegneTable.id, ids[117]));
+    await db
+      .update(consegneTable)
+      .set({ codice: "CON-RICERCA-UNIVOCA" })
+      .where(eq(consegneTable.id, ids[117]));
 
-    const app = makeScopedApp(consegneRouter, {
-      id: 1,
-      centroAscoltoId: centro.id,
-      areaOperativaId: null,
-      permessi: ["consegne.view", "consegne.export"],
-    });
+    const app = await scopedApp(area, centro.id, [
+      "consegne.view",
+      "consegne.export",
+    ]);
     const first = await request(app).get("/consegne?page=1&pageSize=25");
     expect(first.status).toBe(200);
-    expect(first.body).toMatchObject({ page: 1, pageSize: 25, total: 205, totalPages: 9 });
+    expect(first.body).toMatchObject({
+      page: 1,
+      pageSize: 25,
+      total: 205,
+      totalPages: 9,
+    });
     expect(first.body.items).toHaveLength(25);
 
     const last = await request(app).get("/consegne?page=9&pageSize=25");
@@ -78,10 +102,14 @@ describe("Consegne: paginazione, RBAC e scope storico", () => {
   });
 
   it("separa view, manage, complete, cancel ed export", async () => {
-    const viewOnly = globalApp(["consegne.view"]);
+    const viewOnly = await scopedApp(await createAreaOperativa(scope), null, [
+      "consegne.view",
+    ]);
     expect((await request(viewOnly).get("/consegne")).status).toBe(200);
     expect((await request(viewOnly).get("/consegne/export")).status).toBe(403);
-    expect((await request(viewOnly).post("/consegne").send({})).status).toBe(403);
+    expect((await request(viewOnly).post("/consegne").send({})).status).toBe(
+      403,
+    );
 
     const app = express();
     app.use(express.json());
@@ -94,43 +122,57 @@ describe("Consegne: paginazione, RBAC e scope storico", () => {
     const areaB = await createAreaOperativa(scope);
     const centroA = await createCentroRec(scope, { areaOperativaId: areaA });
     const centroB = await createCentroRec(scope, { areaOperativaId: areaB });
-    const magazzinoId = await createMagazzino(scope, centroA.id, { areaOperativaId: areaA });
-    const beneficiarioId = await createBeneficiario(scope, centroA.id, { areaOperativaId: areaA });
-    const consegnaId = await insertConsegna(scope, { beneficiarioId, magazzinoId, stato: "effettuata" });
-    await db.update(consegneTable).set({
-      centroAscoltoIdSnapshot: centroA.id,
-      areaOperativaIdSnapshot: areaA,
-    }).where(eq(consegneTable.id, consegnaId));
-    await db.update(beneficiariTable).set({
-      centroAscoltoId: centroB.id,
-      areaOperativaId: areaB,
-    }).where(eq(beneficiariTable.id, beneficiarioId));
-
-    const scopedA = makeScopedApp(consegneRouter, {
-      id: 2,
-      centroAscoltoId: centroA.id,
+    const magazzinoId = await createMagazzino(scope, centroA.id, {
       areaOperativaId: areaA,
-      permessi: ["consegne.view"],
     });
-    const scopedB = makeScopedApp(consegneRouter, {
-      id: 3,
-      centroAscoltoId: centroB.id,
-      areaOperativaId: areaB,
-      permessi: ["consegne.view"],
+    const beneficiarioId = await createBeneficiario(scope, centroA.id, {
+      areaOperativaId: areaA,
     });
+    const consegnaId = await insertConsegna(scope, {
+      beneficiarioId,
+      magazzinoId,
+      stato: "effettuata",
+    });
+    await db
+      .update(consegneTable)
+      .set({
+        centroAscoltoIdSnapshot: centroA.id,
+        areaOperativaIdSnapshot: areaA,
+      })
+      .where(eq(consegneTable.id, consegnaId));
+    await db
+      .update(beneficiariTable)
+      .set({
+        centroAscoltoId: centroB.id,
+        areaOperativaId: areaB,
+      })
+      .where(eq(beneficiariTable.id, beneficiarioId));
+
+    const scopedA = await scopedApp(areaA, centroA.id, ["consegne.view"]);
+    const scopedB = await scopedApp(areaB, centroB.id, ["consegne.view"]);
 
     const listA = await request(scopedA).get("/consegne");
     expect(listA.status).toBe(200);
-    expect(listA.body.items.map((item: { id: number }) => item.id)).toContain(consegnaId);
-    expect(listA.body.items.find((item: { id: number }) => item.id === consegnaId)).toMatchObject({
+    expect(listA.body.items.map((item: { id: number }) => item.id)).toContain(
+      consegnaId,
+    );
+    expect(
+      listA.body.items.find((item: { id: number }) => item.id === consegnaId),
+    ).toMatchObject({
       centroAscoltoId: centroA.id,
       centroAscoltoNome: centroA.nome,
     });
-    expect((await request(scopedA).get(`/consegne/${consegnaId}`)).status).toBe(200);
+    expect((await request(scopedA).get(`/consegne/${consegnaId}`)).status).toBe(
+      200,
+    );
 
     const listB = await request(scopedB).get("/consegne");
     expect(listB.status).toBe(200);
-    expect(listB.body.items.map((item: { id: number }) => item.id)).not.toContain(consegnaId);
-    expect((await request(scopedB).get(`/consegne/${consegnaId}`)).status).toBe(403);
+    expect(
+      listB.body.items.map((item: { id: number }) => item.id),
+    ).not.toContain(consegnaId);
+    expect((await request(scopedB).get(`/consegne/${consegnaId}`)).status).toBe(
+      403,
+    );
   });
 });

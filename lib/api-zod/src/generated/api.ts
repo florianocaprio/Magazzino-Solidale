@@ -7506,6 +7506,24 @@ export const ListApprovvigionamentiResponseItem = zod.object({
   righe: zod
     .array(
       zod.object({
+        quantitaResiduaEsatta: zod
+          .string()
+          .optional()
+          .describe("Residuo calcolato con aritmetica decimale esatta."),
+        lottoFisicoObbligatorio: zod.boolean().optional(),
+        gestioneScadenza: zod.boolean().optional(),
+        quantitaRichiestaEsatta: zod
+          .string()
+          .optional()
+          .describe(
+            "Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione.",
+          ),
+        quantitaRicevutaEsatta: zod
+          .string()
+          .optional()
+          .describe(
+            "Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione.",
+          ),
         id: zod.number(),
         prodottoId: zod.number(),
         prodottoNome: zod.string().nullish(),
@@ -7533,7 +7551,18 @@ export const CreateApprovvigionamentoBody = zod.object({
   righe: zod.array(
     zod.object({
       prodottoId: zod.number(),
-      quantitaRichiesta: zod.number(),
+      quantitaRichiesta: zod.union([
+        zod
+          .number()
+          .describe(
+            "Quantità positiva, massimo sei decimali e 99999999.999999. Usare stringa decimale per esattezza; unità e frazionabilità dal Catalogo.",
+          ),
+        zod
+          .string()
+          .describe(
+            "Quantità positiva, massimo sei decimali e 99999999.999999. Usare stringa decimale per esattezza; unità e frazionabilità dal Catalogo.",
+          ),
+      ]),
       unitaMisura: zod.string(),
       note: zod.string().optional(),
     }),
@@ -7563,6 +7592,24 @@ export const GetApprovvigionamentoResponse = zod.object({
   righe: zod
     .array(
       zod.object({
+        quantitaResiduaEsatta: zod
+          .string()
+          .optional()
+          .describe("Residuo calcolato con aritmetica decimale esatta."),
+        lottoFisicoObbligatorio: zod.boolean().optional(),
+        gestioneScadenza: zod.boolean().optional(),
+        quantitaRichiestaEsatta: zod
+          .string()
+          .optional()
+          .describe(
+            "Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione.",
+          ),
+        quantitaRicevutaEsatta: zod
+          .string()
+          .optional()
+          .describe(
+            "Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione.",
+          ),
         id: zod.number(),
         prodottoId: zod.number(),
         prodottoNome: zod.string().nullish(),
@@ -7581,6 +7628,19 @@ export const UpdateApprovvigionamentoParams = zod.object({
 });
 
 export const UpdateApprovvigionamentoBody = zod.object({
+  partite: zod
+    .array(
+      zod.object({
+        rigaId: zod.number(),
+        quantita: zod.union([zod.number(), zod.string()]),
+        codiceLotto: zod.string().optional(),
+        dataScadenza: zod.coerce.date().optional(),
+      }),
+    )
+    .optional()
+    .describe(
+      "Partite fisiche per completare tutte le righe residue. La somma per riga deve coincidere esattamente col residuo; nessuna ricezione parziale.",
+    ),
   versione: zod.number().min(1),
   stato: zod.string().optional(),
   fornitoreId: zod.number().nullish(),
@@ -7594,7 +7654,18 @@ export const UpdateApprovvigionamentoBody = zod.object({
     .array(
       zod.object({
         prodottoId: zod.number(),
-        quantitaRichiesta: zod.number(),
+        quantitaRichiesta: zod.union([
+          zod
+            .number()
+            .describe(
+              "Quantità positiva, massimo sei decimali e 99999999.999999. Usare stringa decimale per esattezza; unità e frazionabilità dal Catalogo.",
+            ),
+          zod
+            .string()
+            .describe(
+              "Quantità positiva, massimo sei decimali e 99999999.999999. Usare stringa decimale per esattezza; unità e frazionabilità dal Catalogo.",
+            ),
+        ]),
         unitaMisura: zod.string(),
         note: zod.string().optional(),
       }),
@@ -7621,6 +7692,24 @@ export const UpdateApprovvigionamentoResponse = zod.object({
   righe: zod
     .array(
       zod.object({
+        quantitaResiduaEsatta: zod
+          .string()
+          .optional()
+          .describe("Residuo calcolato con aritmetica decimale esatta."),
+        lottoFisicoObbligatorio: zod.boolean().optional(),
+        gestioneScadenza: zod.boolean().optional(),
+        quantitaRichiestaEsatta: zod
+          .string()
+          .optional()
+          .describe(
+            "Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione.",
+          ),
+        quantitaRicevutaEsatta: zod
+          .string()
+          .optional()
+          .describe(
+            "Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione.",
+          ),
         id: zod.number(),
         prodottoId: zod.number(),
         prodottoNome: zod.string().nullish(),
@@ -7664,6 +7753,24 @@ export const SubmitApprovvigionamentoResponse = zod.object({
   righe: zod
     .array(
       zod.object({
+        quantitaResiduaEsatta: zod
+          .string()
+          .optional()
+          .describe("Residuo calcolato con aritmetica decimale esatta."),
+        lottoFisicoObbligatorio: zod.boolean().optional(),
+        gestioneScadenza: zod.boolean().optional(),
+        quantitaRichiestaEsatta: zod
+          .string()
+          .optional()
+          .describe(
+            "Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione.",
+          ),
+        quantitaRicevutaEsatta: zod
+          .string()
+          .optional()
+          .describe(
+            "Quantità decimale esatta a sei cifre, autorevole per calcoli e visualizzazione.",
+          ),
         id: zod.number(),
         prodottoId: zod.number(),
         prodottoNome: zod.string().nullish(),

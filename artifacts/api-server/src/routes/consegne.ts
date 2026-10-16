@@ -103,6 +103,7 @@ const router: IRouter = Router();
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 router.use("/consegne", requireAllModuli(["CENTRO_ASCOLTO", "CONSEGNE"]));
+router.use("/consegne", requireWarehouseReadScope);
 
 // Exact legacy identity lookup, not a directory search or a Mensa card command.
 router.get(
