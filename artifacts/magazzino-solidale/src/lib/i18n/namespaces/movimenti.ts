@@ -1,5 +1,9 @@
 export const movimenti = {
   it: {
+    exportError: "Esportazione non completata",
+    physicalEffect: "Effetto fisico",
+    noPhysicalChange: "Nessuna variazione fisica",
+    unknownPhysicalEffect: "Effetto fisico non determinabile",
     title: "Movimenti",
     subtitle: "Registro carichi e scarichi di magazzino.",
     exportTitle: "Movimenti di Magazzino",
@@ -49,6 +53,10 @@ export const movimenti = {
     filterReset: "Azzera filtri",
   },
   es: {
+    exportError: "Exportación no completada",
+    physicalEffect: "Efecto físico",
+    noPhysicalChange: "Sin variación física",
+    unknownPhysicalEffect: "Efecto físico indeterminado",
     title: "Movimientos",
     subtitle: "Registro de entradas y salidas de almacén.",
     exportTitle: "Movimientos de Almacén",
@@ -98,6 +106,10 @@ export const movimenti = {
     filterReset: "Limpiar filtros",
   },
   en: {
+    exportError: "Export not completed",
+    physicalEffect: "Physical effect",
+    noPhysicalChange: "No physical change",
+    unknownPhysicalEffect: "Physical effect unavailable",
     title: "Movements",
     subtitle: "Warehouse loads and unloads log.",
     exportTitle: "Warehouse Movements",
@@ -147,6 +159,10 @@ export const movimenti = {
     filterReset: "Clear filters",
   },
   fr: {
+    exportError: "Exportation non terminée",
+    physicalEffect: "Effet physique",
+    noPhysicalChange: "Aucune variation physique",
+    unknownPhysicalEffect: "Effet physique indéterminé",
     title: "Mouvements",
     subtitle: "Registre des entrées et sorties d'entrepôt.",
     exportTitle: "Mouvements d'Entrepôt",
@@ -196,6 +212,10 @@ export const movimenti = {
     filterReset: "Réinitialiser les filtres",
   },
   de: {
+    exportError: "Export nicht abgeschlossen",
+    physicalEffect: "Physische Wirkung",
+    noPhysicalChange: "Keine physische Änderung",
+    unknownPhysicalEffect: "Physische Wirkung unbestimmt",
     title: "Bewegungen",
     subtitle: "Protokoll der Lagerzugänge und -abgänge.",
     exportTitle: "Lagerbewegungen",
@@ -245,6 +265,10 @@ export const movimenti = {
     filterReset: "Filter zurücksetzen",
   },
   ar: {
+    exportError: "لم يكتمل التصدير",
+    physicalEffect: "الأثر المادي",
+    noPhysicalChange: "لا تغيير مادي",
+    unknownPhysicalEffect: "الأثر المادي غير محدد",
     title: "الحركات",
     subtitle: "سجل عمليات الإدخال والإخراج في المستودع.",
     exportTitle: "حركات المستودع",

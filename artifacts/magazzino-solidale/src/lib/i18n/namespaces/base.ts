@@ -1,6 +1,13 @@
 export const base = {
   it: {
     common: {
+      readdenied:
+        "Accesso negato o sessione scaduta. I dati precedenti non sono consultabili.",
+      readfailed:
+        "Impossibile caricare i dati. Non è un elenco vuoto: riprova la lettura.",
+      readstale:
+        "Dati precedenti non aggiornati. Per sicurezza non vengono mostrati finché la lettura non riesce.",
+      readRetry: "Riprova lettura",
       logout: "Esci",
       noRole: "Nessun ruolo",
       language: "Lingua",
@@ -278,6 +285,13 @@ export const base = {
   },
   en: {
     common: {
+      readdenied:
+        "Access denied or session expired. Previous data is not accessible.",
+      readfailed:
+        "Unable to load data. This is not an empty list: retry the read.",
+      readstale:
+        "Previous data is out of date. It remains hidden until the read succeeds.",
+      readRetry: "Retry read",
       logout: "Log out",
       noRole: "No role",
       language: "Language",

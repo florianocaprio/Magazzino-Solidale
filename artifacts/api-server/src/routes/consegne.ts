@@ -82,6 +82,7 @@ import {
   isBeneficiarioActive,
 } from "../lib/beneficiarioPolicy";
 import { requirePermission } from "../middlewares/auth";
+import { requireWarehouseReadScope } from "../middlewares/warehouseReadScope";
 import { operationalStatesForRows } from "../lib/volontariOperational";
 import {
   DocumentCommandError,
@@ -102,6 +103,67 @@ const router: IRouter = Router();
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 router.use("/consegne", requireAllModuli(["CENTRO_ASCOLTO", "CONSEGNE"]));
+
+// Exact legacy identity lookup, not a directory search or a Mensa card command.
+router.get(
+  "/consegne/beneficiario-da-codice",
+  requirePermission("consegne.manage"),
+  requirePermission("beneficiari.view"),
+  requireWarehouseReadScope,
+  async (req, res) => {
+    const codice =
+      typeof req.query.codice === "string" ? req.query.codice.trim() : "";
+    if (!codice || codice.length > 100) {
+      res.status(400).json({ error: "Codice non valido" });
+      return;
+    }
+    const conditions: SQL[] = [
+      sql`lower(${beneficiariTable.codice}) = lower(${codice})`,
+      eq(beneficiariTable.attivo, true),
+    ];
+    for (const [key, column] of [
+      ["areaOperativaId", beneficiariTable.areaOperativaId],
+      ["centroAscoltoId", beneficiariTable.centroAscoltoId],
+    ] as const) {
+      if (req.query[key] == null) continue;
+      const id = Number(req.query[key]);
+      if (!Number.isSafeInteger(id) || id < 1) {
+        res.status(400).json({ error: `${key} non valido` });
+        return;
+      }
+      conditions.push(eq(column, id));
+    }
+    for (const filter of [
+      areaOperativaScopeFilter(
+        beneficiariTable.areaOperativaId,
+        callerAreaOperativaId(req),
+      ),
+      centroScopeFilter(beneficiariTable.centroAscoltoId, callerCentroId(req)),
+      zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req)),
+    ])
+      if (filter) conditions.push(filter);
+    const matches = codice.startsWith("MS-")
+      ? []
+      : await db
+          .select({
+            id: beneficiariTable.id,
+            codice: beneficiariTable.codice,
+            nome: beneficiariTable.nome,
+            cognome: beneficiariTable.cognome,
+            centroAscoltoId: beneficiariTable.centroAscoltoId,
+          })
+          .from(beneficiariTable)
+          .where(and(...conditions))
+          .limit(2);
+    if (matches.length !== 1) {
+      res.status(404).json({
+        error: "Beneficiario non disponibile per questo codice e contesto",
+      });
+      return;
+    }
+    res.json(matches[0]);
+  },
+);
 
 function handlePlanningError(error: unknown, res: Response): boolean {
   if (isPlanningConcurrencyError(error)) {
@@ -369,6 +431,7 @@ function listConditions(req: Request): SQL[] | null {
     dataFine,
     beneficiarioId,
     centroAscoltoId,
+    areaOperativaId,
     q,
   } = req.query as Record<string, string>;
   const dateRe = /^\d{4}-\d{2}-\d{2}$/;
@@ -417,6 +480,17 @@ function listConditions(req: Request): SQL[] | null {
     ),
   );
   if (areaOperativaFilter) conditions.push(areaOperativaFilter);
+  if (areaOperativaId != null) {
+    const id = Number(areaOperativaId);
+    if (!Number.isSafeInteger(id) || id < 1) return null;
+    conditions.push(
+      historicalScopeFilter(
+        consegneTable.areaOperativaIdSnapshot,
+        eq(consegneTable.areaOperativaIdSnapshot, id),
+        eq(beneficiariTable.areaOperativaId, id),
+      )!,
+    );
+  }
   const zonaFilter = zonaUdsScopeFilter(
     beneficiariTable.zonaUdsId,
     callerZonaUdsId(req),
@@ -659,6 +733,19 @@ router.get(
   "/consegne/da-pianificare",
   requirePermission("consegne.view"),
   async (req, res) => {
+    const selected: SQL[] = [];
+    for (const [key, column] of [
+      ["areaOperativaId", richiesteMagazzinoTable.areaOperativaId],
+      ["centroAscoltoId", richiesteMagazzinoTable.centroAscoltoId],
+    ] as const) {
+      if (req.query[key] == null) continue;
+      const id = Number(req.query[key]);
+      if (!Number.isSafeInteger(id) || id < 1) {
+        res.status(400).json({ error: `${key} non valido` });
+        return;
+      }
+      selected.push(eq(column, id));
+    }
     try {
       const items = await db.transaction(async (tx) => {
         const actor = await requireCurrentM5bActor(
@@ -729,6 +816,7 @@ router.get(
               eq(bolleTable.stato, "confermato"),
               isNull(bolleTable.consegnaId),
               m5bRequestScopePredicate(actor),
+              ...selected,
             ),
           )
           .orderBy(asc(richiesteMagazzinoTable.dataCreazione));

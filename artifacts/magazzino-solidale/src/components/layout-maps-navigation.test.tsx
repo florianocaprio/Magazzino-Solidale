@@ -86,7 +86,39 @@ vi.mock("wouter", () => ({
   ),
 }));
 
-import { AppLayout } from "./layout";
+import { AppLayout, NAV_ITEMS, isNavItemEnabledByAccess } from "./layout";
+
+it.each([
+  "mensa.transfers.request",
+  "mensa.transfers.receive",
+  "mensa.transfers.manage",
+])(
+  "M67-10/11 Rifornimenti menu supports %s without other grants",
+  (permission) => {
+    const item = NAV_ITEMS.find((item) => item.key === "mensaTrasferimenti")!;
+    expect(
+      isNavItemEnabledByAccess(
+        item,
+        (area) => area === "mensa",
+        (p) => p === permission,
+      ),
+    ).toBe(true);
+    expect(
+      isNavItemEnabledByAccess(
+        item,
+        (area) => area === "mensa",
+        (p) => p === "mensa.reports.view",
+      ),
+    ).toBe(false);
+    expect(
+      isNavItemEnabledByAccess(
+        item,
+        () => false,
+        (p) => p === permission,
+      ),
+    ).toBe(false);
+  },
+);
 
 function sidebarGroup(label: string): HTMLElement | undefined {
   return Array.from(

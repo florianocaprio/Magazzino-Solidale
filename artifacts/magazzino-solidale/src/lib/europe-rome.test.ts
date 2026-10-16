@@ -9,6 +9,21 @@ import {
 } from "./europe-rome";
 
 describe("date civili Europe/Rome", () => {
+  it.each([
+    "2026-01-01",
+    "2026-03-08",
+    "2026-03-29",
+    "2026-06-01",
+    "2026-10-25",
+    "2026-11-01",
+    "2026-12-31",
+  ])(
+    "E-FIX-02 preserves civil %s across month/year and DST boundaries",
+    (date) => {
+      const [year, month, day] = date.split("-");
+      expect(formatDateEuropeRome(date)).toBe(`${day}/${month}/${year}`);
+    },
+  );
   it("cambia giorno secondo Roma vicino alla mezzanotte", () => {
     expect(civilDateEuropeRome("2026-08-14T21:59:59Z")).toBe("2026-08-14");
     expect(civilDateEuropeRome("2026-08-14T22:00:00Z")).toBe("2026-08-15");

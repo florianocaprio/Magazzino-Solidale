@@ -6,10 +6,11 @@ const mocks = vi.hoisted(() => ({
   exportToXlsx: vi.fn(),
   exportToPdf: vi.fn(),
   loadBranding: vi.fn(),
+  user: undefined as undefined | { id: number; username: string },
 }));
 
 vi.mock("@/lib/auth", () => ({
-  useAuth: () => ({ user: undefined }),
+  useAuth: () => ({ user: mocks.user }),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -70,6 +71,7 @@ describe("ExportButtons", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     mocks.exportToXlsx.mockReset();
+    mocks.user = undefined;
     mocks.exportToPdf.mockReset();
     mocks.loadBranding.mockReset().mockResolvedValue({
       branding: {},
@@ -144,6 +146,68 @@ describe("ExportButtons", () => {
     expect(mocks.exportToPdf).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledWith(denied);
     expect(trigger().disabled).toBe(false);
+  });
+
+  it.each(["context", "identity", "logout"])(
+    "M67-37 blocks a late XLSX after %s changes",
+    async (change) => {
+      let ready!: (rows: Row[]) => void;
+      const loadRows = vi.fn(
+        () =>
+          new Promise<Row[]>((resolve) => {
+            ready = resolve;
+          }),
+      );
+      const onError = vi.fn();
+      mocks.user = { id: 1, username: "synthetic-a" };
+      const render = (contextKey: string) => (
+        <ExportButtons<Row>
+          rows={[]}
+          loadRows={loadRows}
+          columns={[]}
+          title="Movimenti"
+          filename="movimenti"
+          contextKey={contextKey}
+          onError={onError}
+        />
+      );
+      await act(async () => root.render(render("area-a")));
+      await openMenu(trigger());
+      await act(async () => menuItem("common.exportExcel").click());
+      if (change === "identity")
+        mocks.user = { id: 2, username: "synthetic-b" };
+      if (change === "logout") mocks.user = undefined;
+      await act(async () =>
+        root.render(render(change === "context" ? "area-b" : "area-a")),
+      );
+      await act(async () => ready([{ id: 1, nome: "Private A" }]));
+      expect(mocks.exportToXlsx).not.toHaveBeenCalled();
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(loadRows).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("M67-37 denies download when the current server authorization has been revoked", async () => {
+    const denied = new Error("Revoked");
+    const validateDownload = vi.fn().mockRejectedValue(denied),
+      onError = vi.fn();
+    await act(async () =>
+      root.render(
+        <ExportButtons<Row>
+          rows={[{ id: 1, nome: "Synthetic" }]}
+          columns={[]}
+          title="Movimenti"
+          filename="movimenti"
+          validateDownload={validateDownload}
+          onError={onError}
+        />,
+      ),
+    );
+    await openMenu(trigger());
+    await act(async () => menuItem("common.exportExcel").click());
+    expect(validateDownload).toHaveBeenCalledTimes(1);
+    expect(mocks.exportToXlsx).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(denied);
   });
 
   it("mostra il pending e impedisce esportazioni duplicate", async () => {

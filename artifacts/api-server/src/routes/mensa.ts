@@ -121,6 +121,7 @@ import {
   MensaScopeError,
 } from "../lib/mensaScope";
 import { lockInventoryLotsInGlobalOrder } from "../lib/inventoryLocks";
+import { canReadMensaRequests } from "../lib/m5bRequestAccess";
 import {
   commandRequestHash,
   isDocumentCommandError,
@@ -1087,7 +1088,10 @@ async function sendReplayMensaScope(
 
 router.get(
   "/mensa/mense",
-  requirePermission("mensa.view"),
+  (req, res, next) =>
+    req.user && canReadMensaRequests(req.user)
+      ? next()
+      : requirePermission("mensa.view")(req, res, next),
   async (req, res) => {
     try {
       const conditions: SQL[] = [mensaScopeCondition(req, menseTable.id)];

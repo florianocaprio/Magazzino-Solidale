@@ -139,9 +139,41 @@ describe("permission gate della navigazione operativa", () => {
   });
 
   it("espone le viste operative Mensa con permessi separati", () => {
+    const transfers = NAV_ITEMS.find(
+      (item) => item.key === "mensaTrasferimenti",
+    )!;
+    expect(transfers.anyPermissions).toEqual([
+      "mensa.transfers.request",
+      "mensa.transfers.receive",
+      "mensa.transfers.manage",
+    ]);
+    for (const grant of [
+      "mensa.transfers.request",
+      "mensa.transfers.receive",
+      "mensa.transfers.manage",
+    ])
+      expect(
+        isNavItemEnabledByAccess(
+          transfers,
+          (area) => area === "mensa",
+          (permission) => permission === grant,
+        ),
+      ).toBe(true);
+    for (const grant of ["mensa.reports.view", "magazzino.view", ""])
+      expect(
+        isNavItemEnabledByAccess(
+          transfers,
+          (area) => area === "mensa",
+          (permission) => permission === grant,
+        ),
+      ).toBe(false);
     expect(
-      NAV_ITEMS.find((item) => item.key === "mensaTrasferimenti")?.permission,
-    ).toBe("mensa.transfers.request");
+      isNavItemEnabledByAccess(
+        transfers,
+        () => false,
+        () => true,
+      ),
+    ).toBe(false);
     expect(
       NAV_ITEMS.find((item) => item.key === "mensaConsumi")?.permission,
     ).toBe("mensa.consumption.manage");

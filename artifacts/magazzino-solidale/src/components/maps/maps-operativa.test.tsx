@@ -5,12 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const apiState = vi.hoisted(() => ({
   markerActions: ["open", "route"],
   deliveryError: null as unknown,
+  retainDataOnError: false,
   deliveryDate: "2026-08-22",
   socialDate: null as string | null,
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
   getMapsRouteConsegna: vi.fn(),
+  getGetMapsCapabilitiesQueryKey: () => ["maps", "capabilities"],
   getGetMapsConsegneQueryKey: () => ["maps", "deliveries"],
   getGetMapsInterventiSocialiQueryKey: () => ["maps", "social"],
   getGetMapsPuntiOperativiQueryKey: () => ["maps", "points"],
@@ -40,22 +42,23 @@ vi.mock("@workspace/api-client-react", () => ({
     isLoading: false,
   }),
   useGetMapsConsegne: () => ({
-    data: apiState.deliveryError
-      ? undefined
-      : [
-          {
-            id: "pacchi.consegna:1",
-            layer: "pacchi.consegne",
-            entityType: "consegna",
-            entityId: 1,
-            title: "Consegna CON-1",
-            subtitle: null,
-            status: "pianificata",
-            address: "Via Test 1",
-            date: apiState.deliveryDate,
-            actions: apiState.markerActions,
-          },
-        ],
+    data:
+      apiState.deliveryError && !apiState.retainDataOnError
+        ? undefined
+        : [
+            {
+              id: "pacchi.consegna:1",
+              layer: "pacchi.consegne",
+              entityType: "consegna",
+              entityId: 1,
+              title: "Consegna CON-1",
+              subtitle: null,
+              status: "pianificata",
+              address: "Via Test 1",
+              date: apiState.deliveryDate,
+              actions: apiState.markerActions,
+            },
+          ],
     isLoading: false,
     isError: apiState.deliveryError != null,
     error: apiState.deliveryError,
@@ -214,6 +217,7 @@ describe("MAPS operativa", () => {
   });
 
   it("mantiene gli altri layer utilizzabili e mostra l'errore specifico del layer", async () => {
+    apiState.socialDate = "2026-08-22";
     apiState.deliveryError = {
       data: { error: "Restringi l'intervallo o i filtri" },
     };
@@ -221,6 +225,27 @@ describe("MAPS operativa", () => {
     expect(document.body.textContent).toContain(
       "Restringi l'intervallo o i filtri",
     );
-    expect(document.body.textContent).toContain("maps.empty");
+    expect(document.body.textContent).not.toContain("maps.empty");
+    expect(document.body.textContent).toContain("Intervento 2");
+  });
+  it("M67-17: revocation hides cached markers and an already open detail; later network failure cannot resurrect them", async () => {
+    apiState.deliveryError = null;
+    apiState.socialDate = null;
+    await act(async () => root.render(<MapsOperativa />));
+    const details = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent === "maps.markerDetails",
+    );
+    await act(async () => details?.click());
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    apiState.retainDataOnError = true;
+    for (const status of [403, 500]) {
+      apiState.deliveryError = { status };
+      await act(async () => root.render(<MapsOperativa />));
+      expect(document.body.textContent).not.toContain("Consegna CON-1");
+      expect(document.body.textContent).not.toContain("Via Test 1");
+      expect(document.querySelector('[role="dialog"]')).toBeNull();
+      expect(document.body.textContent).not.toContain("maps.empty");
+    }
+    apiState.retainDataOnError = false;
   });
 });

@@ -1,0 +1,674 @@
+{
+  "phase": "M6.7-B development; not formal certification; bundle budget FAIL",
+  "head": "879d96ca04f6355b94c709e271482603db306bf6",
+  "branch": "codex/magazzino-workflow-unificato",
+  "technical": {
+    "files": 2136,
+    "sha256": "f9f5e6e772ebaa2228718aa0afd01b2b6ffa776cfb6278daf43c96b0b128dd04",
+    "fullManifest": "/private/tmp/magazzino-m67b-ME1J89/technical-full-manifest.json",
+    "algorithm": "SHA-256 of compact JSON of sorted {path,sha256}; docs and ignored files excluded; deleted paths have null hash"
+  },
+  "components": {
+    "api": {
+      "files": 389,
+      "sha256": "34e07b28c6670717feda61b70b86ba94184550a6545805155fd2a459defec923"
+    },
+    "web": {
+      "files": 478,
+      "sha256": "9d06e0abecd14140978a5388481adcf6ea2b4c5146414faa08f6afc3b2026b35"
+    },
+    "db": {
+      "files": 140,
+      "sha256": "3cac8b191ff01a552d84486cd9bc99bac4dc3714002d4c527145ba9cc0754c9b"
+    },
+    "contracts": {
+      "files": 966,
+      "sha256": "8dda4872178d6d5a4115aed55841cccf6b890bec5606818c7d088eff15c359b1"
+    },
+    "dependencies": {
+      "files": 3,
+      "sha256": "7ec48ef044f1c21e948b4782893244916b180384e39f16eb699f36f55fdadb7b"
+    }
+  },
+  "priorA": {
+    "technical": {
+      "files": 2124,
+      "sha256": "c6888d2280772959c24436af940b446f4d7c263b876b03544e6506a24980b31f",
+      "fullManifest": "/private/tmp/magazzino-m67a-MzRXMC/technical-full-manifest.json"
+    },
+    "changedByB": ["artifacts/magazzino-solidale/src/pages/movimenti.tsx"],
+    "preservedFiles": [
+      "artifacts/api-server/src/middlewares/warehouseReadScope.ts",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/api-server/src/routes/mensa.ts",
+      "artifacts/api-server/tests/helpers/m67a-mensa-fixture.ts",
+      "artifacts/api-server/tests/m67a-authorization.test.ts",
+      "artifacts/api-server/tests/m67a-mensa-access.test.ts",
+      "artifacts/magazzino-solidale/e2e/m67a-access.spec.ts",
+      "artifacts/magazzino-solidale/src/App.tsx",
+      "artifacts/magazzino-solidale/src/components/layout-maps-navigation.test.tsx",
+      "artifacts/magazzino-solidale/src/components/layout.tsx",
+      "artifacts/magazzino-solidale/src/components/mensa-rifornimenti.test.tsx",
+      "artifacts/magazzino-solidale/src/components/mensa-rifornimenti.tsx",
+      "artifacts/magazzino-solidale/src/components/reporting/report-table.tsx",
+      "artifacts/magazzino-solidale/src/lib/i18n/namespaces/mensa.ts",
+      "artifacts/magazzino-solidale/src/lib/mensa-request-access.ts"
+    ]
+  },
+  "bFiles": [
+    {
+      "path": "artifacts/api-server/src/routes/consegne.ts",
+      "sha256": "d73cf0144fe305444b76ba5a2f12fba3a0a6e1d9a6b68bbe6d86d8503ab64e06"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/movimenti.ts",
+      "sha256": "164f53515172359e16205e6fa9a005e3e8ec46af865beec6a8fd5892a64d6ea9"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67b-movement-effect.test.ts",
+      "sha256": "d1e52f09862bc2b2a33b1dcc999cfd4e08fe5f3e7811466af71f2bd9a7a52b32"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67b-paths.test.ts",
+      "sha256": "04d6c2e8a19eddae8ab7efdfdfce98cde02dbe021bb0354ae6eabbf6cf322ee4"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67b-paths.spec.ts",
+      "sha256": "4106f6d533ceb2e2f737579ab96a2edd6df18bb694a513f9a473c98d38f830b4"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/hooks/use-consegna-scan.test.tsx",
+      "sha256": "2d220b650c050653d9df9f89f4dfc7b0afa4b26a4358ed893744e5a7bba79440"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/hooks/use-consegna-scan.ts",
+      "sha256": "1d292e8bd46a3aa52b3bf60f331aab18ee0e51888988f1f68d6f8c32f04e1297"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/i18n/namespaces/movimenti.ts",
+      "sha256": "4ef63dc304170b521e6106747c014b73bdeaa6a1ad1b429c00ed52014adfd688"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/movement-presentation.test.ts",
+      "sha256": "6ab1eccad1eae925c389cbe0345ee71bfed0d9959a24a437228030a35bee8e98"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/movement-presentation.ts",
+      "sha256": "a567c64599cf923abd842bfb7d51065298f3e2f862c5aa598538d5042c16a99e"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/consegne.tsx",
+      "sha256": "6969f4242f456cca9718315372cf340a7ec525c01d7b9003b356d222944bf5ae"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/movimenti.test.tsx",
+      "sha256": "4892ff9d91f77933965ddb89c87153be280bd26ec5f541661bf8e7201daef437"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/movimenti.tsx",
+      "sha256": "34494a983e2339cb85efddda496eb57b733469d81b7e0cef3ba139b47bc60ef6"
+    },
+    {
+      "path": "lib/api-client-react/src/generated/api.schemas.ts",
+      "sha256": "700a362d19cc8803ad3c50af5f81a60d3557dc9ad21b893bedf72ee23f2a5131"
+    },
+    {
+      "path": "lib/api-client-react/src/generated/api.ts",
+      "sha256": "ff277ca54757e6a7eba8497426fe83919a018b62f01c8786778ff71e60cd4245"
+    },
+    {
+      "path": "lib/api-spec/openapi.yaml",
+      "sha256": "bf2c224ec4d35705232c86ed8b9d2fb77943d2fad8a40c7770a00bc61a447db0"
+    },
+    {
+      "path": "lib/api-zod/src/generated/api.ts",
+      "sha256": "fe92a47e99ad94688649ffa4829c1796b138e0fcd3d5670fe28f7a0be9a8e5ce"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/exportConsegneParams.ts",
+      "sha256": "b53f64ff83181bf9c1b759e7b254c80d9844031cdaa9e5f0be099b9d33567d7d"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/getConsegnaBeneficiarioDaCodice200.ts",
+      "sha256": "4552d6c10e2c433785e87e646d77050a5af87d938b2d841085d3e93985df537d"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/getConsegnaBeneficiarioDaCodiceParams.ts",
+      "sha256": "9f333ad453d60f781201a2aba9276096021f5e72f5c739d4477ea5e530f86a92"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/index.ts",
+      "sha256": "936234bd0e06fa211120eb8490acd08956c27031ba975172a943e0c3065396c2"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/listBollePronteDaPianificareParams.ts",
+      "sha256": "d4929b3594c40e673f6608110849bd70d7006445faa53f80cc46fc4fdb791376"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/listConsegneParams.ts",
+      "sha256": "70db64ac29f47651715da0573bbc965111e31f4e4abee3bffbb71276a931bf87"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/movimento.ts",
+      "sha256": "16efd2e42f400c1d2e4d260963c2f0bebe448638835b9cd62a2fb44d661bb4fc"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/movimentoEffettoFisico.ts",
+      "sha256": "a05ebafc03705af3d5bf8ef06bd718a5640ac62786420f3c6dac8839647093ab"
+    }
+  ],
+  "allLocalTechnicalChanges": [
+    {
+      "path": "artifacts/api-server/src/middlewares/warehouseReadScope.ts",
+      "sha256": "c883e5753c1be4673154d84bcc21d335c194933154551536211b00d6f5cc5a99"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/consegne.ts",
+      "sha256": "d73cf0144fe305444b76ba5a2f12fba3a0a6e1d9a6b68bbe6d86d8503ab64e06"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/index.ts",
+      "sha256": "d0f65221c4d7cb3cdd0780ad13474de8e558822fd4f4e8afe7a48b8458f4a410"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/mensa.ts",
+      "sha256": "5233412260339de584574c4979ac7249132638d29cfbcd5ddc2d74f6a1931c1c"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/movimenti.ts",
+      "sha256": "164f53515172359e16205e6fa9a005e3e8ec46af865beec6a8fd5892a64d6ea9"
+    },
+    {
+      "path": "artifacts/api-server/tests/helpers/m67a-mensa-fixture.ts",
+      "sha256": "5c15301541a7eacc2fd064ce663fb11ba370e69d9cfbd1becfa2cbb092becafb"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67a-authorization.test.ts",
+      "sha256": "400454ff04b7067435bc9d479f59ee8330a4ed319ebaf5cb02b9bcda96ec776a"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67a-mensa-access.test.ts",
+      "sha256": "932e5231ae8590fe145c32871fdb2f7e699dd5e0e65f5a8affe90ea1bc7d659d"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67b-movement-effect.test.ts",
+      "sha256": "d1e52f09862bc2b2a33b1dcc999cfd4e08fe5f3e7811466af71f2bd9a7a52b32"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67b-paths.test.ts",
+      "sha256": "04d6c2e8a19eddae8ab7efdfdfce98cde02dbe021bb0354ae6eabbf6cf322ee4"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67a-access.spec.ts",
+      "sha256": "8d7807c80dd1fa71ec80b6d42af7f0a28e07264745f513d1f2a0c89d8e93d402"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67b-paths.spec.ts",
+      "sha256": "4106f6d533ceb2e2f737579ab96a2edd6df18bb694a513f9a473c98d38f830b4"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/App.tsx",
+      "sha256": "92fdcd32d33a45bca9276c83c9db5c29a452a27646bc5a2542c964455bdd7452"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/layout-maps-navigation.test.tsx",
+      "sha256": "33fcda933bf463c122f5b576abbed987d604959ab6f94e5019d6ca03af9e3c43"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/layout.tsx",
+      "sha256": "a523baef71ae6d413a341676e49a67f114c310ac72d22dac4e7f063a3765c8f4"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/mensa-rifornimenti.test.tsx",
+      "sha256": "44271f0111fb381b59f5a92e9270497e333f0d6d03f3fb539207d5414eebc61c"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/mensa-rifornimenti.tsx",
+      "sha256": "6c1a57ed17c4956997264e51c70c268df8c46a682d0e1cb383add1a785ae0c47"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/reporting/report-table.tsx",
+      "sha256": "ed859c830151ae48430620403f508f46b3d5685b7b09865e917f3e2165e7ca90"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/hooks/use-consegna-scan.test.tsx",
+      "sha256": "2d220b650c050653d9df9f89f4dfc7b0afa4b26a4358ed893744e5a7bba79440"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/hooks/use-consegna-scan.ts",
+      "sha256": "1d292e8bd46a3aa52b3bf60f331aab18ee0e51888988f1f68d6f8c32f04e1297"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/i18n/namespaces/mensa.ts",
+      "sha256": "6cb65ab8da6ddd6152ed946c78d5de24fb8028dca2ecb7d3df57d422ffc05f26"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/i18n/namespaces/movimenti.ts",
+      "sha256": "4ef63dc304170b521e6106747c014b73bdeaa6a1ad1b429c00ed52014adfd688"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/mensa-request-access.ts",
+      "sha256": "d2c56964df72ea2b4c1e90085f7de9a8516c5b5778a77ea3f3caa3379df44421"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/movement-presentation.test.ts",
+      "sha256": "6ab1eccad1eae925c389cbe0345ee71bfed0d9959a24a437228030a35bee8e98"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/movement-presentation.ts",
+      "sha256": "a567c64599cf923abd842bfb7d51065298f3e2f862c5aa598538d5042c16a99e"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/consegne.tsx",
+      "sha256": "6969f4242f456cca9718315372cf340a7ec525c01d7b9003b356d222944bf5ae"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/movimenti.test.tsx",
+      "sha256": "4892ff9d91f77933965ddb89c87153be280bd26ec5f541661bf8e7201daef437"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/movimenti.tsx",
+      "sha256": "34494a983e2339cb85efddda496eb57b733469d81b7e0cef3ba139b47bc60ef6"
+    },
+    {
+      "path": "lib/api-client-react/src/generated/api.schemas.ts",
+      "sha256": "700a362d19cc8803ad3c50af5f81a60d3557dc9ad21b893bedf72ee23f2a5131"
+    },
+    {
+      "path": "lib/api-client-react/src/generated/api.ts",
+      "sha256": "ff277ca54757e6a7eba8497426fe83919a018b62f01c8786778ff71e60cd4245"
+    },
+    {
+      "path": "lib/api-spec/openapi.yaml",
+      "sha256": "bf2c224ec4d35705232c86ed8b9d2fb77943d2fad8a40c7770a00bc61a447db0"
+    },
+    {
+      "path": "lib/api-zod/src/generated/api.ts",
+      "sha256": "fe92a47e99ad94688649ffa4829c1796b138e0fcd3d5670fe28f7a0be9a8e5ce"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/exportConsegneParams.ts",
+      "sha256": "b53f64ff83181bf9c1b759e7b254c80d9844031cdaa9e5f0be099b9d33567d7d"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/getConsegnaBeneficiarioDaCodice200.ts",
+      "sha256": "4552d6c10e2c433785e87e646d77050a5af87d938b2d841085d3e93985df537d"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/getConsegnaBeneficiarioDaCodiceParams.ts",
+      "sha256": "9f333ad453d60f781201a2aba9276096021f5e72f5c739d4477ea5e530f86a92"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/index.ts",
+      "sha256": "936234bd0e06fa211120eb8490acd08956c27031ba975172a943e0c3065396c2"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/listBollePronteDaPianificareParams.ts",
+      "sha256": "d4929b3594c40e673f6608110849bd70d7006445faa53f80cc46fc4fdb791376"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/listConsegneParams.ts",
+      "sha256": "70db64ac29f47651715da0573bbc965111e31f4e4abee3bffbb71276a931bf87"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/movimento.ts",
+      "sha256": "16efd2e42f400c1d2e4d260963c2f0bebe448638835b9cd62a2fb44d661bb4fc"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/movimentoEffettoFisico.ts",
+      "sha256": "a05ebafc03705af3d5bf8ef06bd718a5640ac62786420f3c6dac8839647093ab"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-final.json",
+      "sha256": "f07e7d2f6946424333c6cc0aa070951b230dca9cc6983794c00f3c3d4fd23a16"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-final.log",
+      "sha256": "5ec72e04904b012e631dda492f96110964e291b725edb7595c6834298e129159"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-paths-fixed.json",
+      "sha256": "89af85e4daea668f27e4fe4e3d25647f491eeb5fa11a3a28110ec5187528182f"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-paths-fixed.log",
+      "sha256": "59c5e8cba4fe564be2c95dd7760b23001a8a05b3c8630e61b449a1118ed1be55"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-paths.json",
+      "sha256": "253d9ebc9c6629e251caf8d6d9e3566018603b587d37b88ee4441f5e8b0a7096"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-paths.log",
+      "sha256": "d30cbc747b0e77baddafa5189aa73d5311569f0efc67429d8d7f96d340bde302"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-ready-fixed.json",
+      "sha256": "4862c244a9954a880debf514a30ffee34d2a45aea65f95f852850695776c0b2c"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-ready-fixed.log",
+      "sha256": "3ab1a79aa8b854b3acecf38fdab1cd007e97721d3b002b3753a54d5587993ce8"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-ready-revocation.json",
+      "sha256": "935268a6b2ef5d5ded14ddb83d8668428f19605e8e07eec1f0f3e2d9143362f4"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-ready-revocation.log",
+      "sha256": "e26a6e995c85fe7957eb3f19c3a87d0b5c7040c32a8d9bdba4c0c8f685e19ba0"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-writers-bolla.json",
+      "sha256": "4da51dd2832037c7b5d4596d1d816971fd53b78fbcecdfa51f92d41bee289c04"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-writers-bolla.log",
+      "sha256": "464413a052c2d22a584459e602fa8c0f27bb50802e3b01c9c005d0e119001707"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-writers-fixed.json",
+      "sha256": "1cbac90a73f1959c3a221de8e76f452f311a2dc5f9d99bf49e3b5b0b73879579"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-writers-fixed.log",
+      "sha256": "4925966f66b0aac69d34e126c358d1318f635dcee8fd48a706640570aa925cf9"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-writers.json",
+      "sha256": "737c7c7f5590efeb897ea937e654c88d91cc42124d2bae4b6ab15ac9d4211252"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/api-writers.log",
+      "sha256": "e07181841252c2e485fa86a40743ef63e63047c20958e56a823bc28daf2d1fc0"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/baseline-paths.json",
+      "sha256": "15653344d2dab94e9eeed6f86f7cfcd0ff1d19783adf9a14f5ccade0fd4e24dc"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/baseline-paths.log",
+      "sha256": "aecd81b3a38036be6d083d7139b6377474a567aecf2d6c99f168b9cd1761c434"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/baseline-scanner.spec.ts",
+      "sha256": "4c40f61c7b657ebe52ef3f358111310bb7b189f8da74b3e2f8f6716001dd7190"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-a-regression.json",
+      "sha256": "6db3de12320ac018c089c1602a125c859bcb71ab34ee938b2f9bd2267e0c18a4"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-a-regression.log",
+      "sha256": "ff574f8b4396fe4bbe5331155a8c82c326ceaa3e131bfd3dad5546bae1b0525d"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-api.ts",
+      "sha256": "7a51637313683b5c12e4c8a09af8b0b742eb8d9db6b36d6183625751fcf88820"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-baseline-app.json",
+      "sha256": "f553571a0ce4fe4537ed065d3913e502b22eaa3e3ca6915af5c4dc1fbc2b70b0"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-baseline-app.log",
+      "sha256": "713615d88bdf3218c27cf27c4617ceaf52ad93d03d81e60a0fc040c5b8311f1e"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-baseline-ui.json",
+      "sha256": "bb9a59ae333aacf2a252fb42f3af1ccc89a911e94c30fdf94808fb7272bc17e7"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-baseline-ui.log",
+      "sha256": "3e147697cdc90f03913ea918384fc4555d9be1efbafffc382f8e52d9bf7cb4aa"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-baseline.json",
+      "sha256": "d265fc1c0b1cea13abc4e5c05fea28a97c3cceb9c04a8da3184f071badc57566"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-baseline.log",
+      "sha256": "19723723ef3ea83b6e0fe531bcee37d50c155f929040d3de000b6f2ec1c95036"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-civil-final.json",
+      "sha256": "02f9e214447ca9fdbbb3fb5931822336d884299895b7ebc6952a6ab22ce21120"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-civil-final.log",
+      "sha256": "ecdf7cb95b31b37a516fb8185213866b462bb362bcd03ca6c2b50c6ab68a46c7"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-final.json",
+      "sha256": "5f032aa76668c67ed9b9122fc07ca6fd3842fe5dd3324c60a85bb75fa29b16f3"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-final.log",
+      "sha256": "95ce0e56da5f67481ee3bd0de72f1c43b190d3c63f98b3d652ee9f40166f6564"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-fixed-harness.json",
+      "sha256": "820d9b1409a61a4fbbdc356b43e3d367ac5e82aa2591b4b1374190c312fd45ed"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-fixed-harness.log",
+      "sha256": "fa190681605763e1648c6a826e582e96f726f2697315812d60b628b1d2fffa18"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-fixed.json",
+      "sha256": "b507e9931d33272389548aa5bbc9b78f1c50a576ee1522c050ff191d9f141208"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-fixed.log",
+      "sha256": "8d58f7ee50ce5d27576eb1f4609a207bee97dd6e51e4732c54cecf2b54b49862"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-typeahead.json",
+      "sha256": "bfbabdfce1205d4c1579292f42172f120b8612624b204c1674ca38bbe632bcff"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-typeahead.log",
+      "sha256": "65c1271ac3be338945997c056e16fd47b00fb7201cd2889601c36d40af963d4b"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/cleanup-container.log",
+      "sha256": "66ad63ec70c295c930dbc8d2085eb501d54c4381d9db3d284124f4a278a541e1"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/cleanup-network.log",
+      "sha256": "87d41a561ceb60f385f94801182f1022585d5bc0ae8960e5967dbe86917dc91c"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/codegen-civil.log",
+      "sha256": "c430d1c5e2fa915e32a9d6458c15765969ffcdbfedeb79f5a6a9710cc6389d6d"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/codegen-determinism.json",
+      "sha256": "0adb53f96548b97d0028a31e97f772935fdfa0fd90baec3ad295398a3df1dd5e"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/codegen-final.log",
+      "sha256": "d8b3270943a59163c2e9f1c39dd4a6536fc20c8e161ffda175d8740d90026018"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/codegen.log",
+      "sha256": "d28c661bf7ecfef36021749a5227e45a5a79d0334f92d97ca0df4151e0798cff"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/consegne-before.tsx",
+      "sha256": "45d9249d3b84dc2a1f062497b2b3980581884253652bd7a71c8612e17b8d7742"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/container.log",
+      "sha256": "87adde9aa27eb1fd86d04c54b1b4dae502ac51fdf8ff31a8b1501c530c5d04e3"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/formatting-final.log",
+      "sha256": "c40a824203b62e5a62326fc3996032019182fe80cea4ba1b51aeb2127b64424a"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/formatting-post-final.log",
+      "sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/formatting-semantic-identity.json",
+      "sha256": "872a1a493d7409510f892e76b24370aed88a818ebacf6e30a0e4d783341adc03"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/frontend-final.log",
+      "sha256": "df74015e21100ce58221d235ba1e4e7e0ba6a8dbf6088c25dd5c2c11c84dc892"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/frontend-invalidation.log",
+      "sha256": "0f163105b100c429f412b0101b12d4eafd4ee5d9d7b7fa45613c75cc8a64c485"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/frontend-scanner.log",
+      "sha256": "5fdd1bf474b2905c7d624d7b3f4c2b929f6029519f91e1d2c3f0721443565ba6"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/frontend-targeted.log",
+      "sha256": "ac7016dd5f3e6c63c7dcee7d6584dbe47ee89768f8832296c05efd4525618a51"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/inspect-export-final.log",
+      "sha256": "b91b2f855d181b4478156319f01a4bd5d27fd9baa2bb39cecca0e591dc25d17a"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/inspect-export.log",
+      "sha256": "73372bd02ad75c65f73772a580715501c99d5643243a440ad025f70f3cd17e34"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/inspect-export.mjs",
+      "sha256": "800f0e20edb3edf3a9b641e99f698564782dc496e99d47fff79fe4c4dd8b3c2a"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/install.log",
+      "sha256": "8611abbd2b659eb485243fceaa5a8fa47019277eab8ccbdb270f891dc3836bf5"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/inventory-final.log",
+      "sha256": "9344325cb02fad33b6a2e0f2229b52488e2b86bf1be042f31c83bbe7313b9288"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/inventory.mjs",
+      "sha256": "7dfd02d36bd4878e18dc902c3e0046da1d2cadb5590938cd5ad0f2c634fd71d0"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/isolation.json",
+      "sha256": "577065e6434b2810fb8ef1e3a01c79c5ed281216bc536172ea61ba3624de28c2"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/linux-build-final.log",
+      "sha256": "45604c060b95f4c24c30896b1197e146d16630473c8ade4fdbd8b83c874a5273"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/linux-build.mjs",
+      "sha256": "befa2ecd39d63778412d626d13ea46681513930d9b17b0a47363cf411db34bb2"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/linux-source-files-final.json",
+      "sha256": "d0ff5a4a88f0504087947e540eb48def36f2799931177b86e87c5e98310e061f"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/migrations-status.log",
+      "sha256": "c27653ceaecc926a08a834412aea6a918076d0b8b1dbe0a1cab9628c6cef3189"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/migrations-verify.log",
+      "sha256": "1a8b25a5de57461c21b650bce3d6a1cf35768b5e1a7f963aaa3e056e75908c2c"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/movimenti-before.tsx",
+      "sha256": "32d30e0188aa27804553c47850bf787192f6417d901b20a71278072cb4894a2e"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/network.log",
+      "sha256": "a584752ca6c7303888e9942f5ce6e7265d876ad0606241788e49ce19ad8ff935"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/package.json",
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/pdf-extract-final.json",
+      "sha256": "aed243710e8a813708d980d6ce4fecccae6483a818a81ad822916453d91122c9"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/playwright.config.ts",
+      "sha256": "6f4d28e9f1d29cf4682697d9122ec619a40c00990c211556c737044732e2a896"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/ready.log",
+      "sha256": "9e1aac722f6f1d12dea8d169e32e46ef58ba15ed4f1411e0028692b91f53e028"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/run.mjs",
+      "sha256": "bab04b7ceb44c60e67ef2eecbbaa07e5f98c7c655cbd9a29c308be03c3eddb7c"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/scanner-baseline.json",
+      "sha256": "a7ef56f9ed4d0815b384cf6cfac97cb40848e82a80486eeb1f9ccab7d140e9b5"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/scanner-baseline.log",
+      "sha256": "fd4fca24fd99c2f8f65ee1f56fd7e9fc851ae0c88c0d1a3c6af89754d0e4c588"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/scanner-fixed.json",
+      "sha256": "eedbca38e5268e656b4415c86ef7bc087ac724c90b12c41bcb49608f5fa1a8a1"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/scanner-fixed.log",
+      "sha256": "07a71109eeba0908d59be2016386391f7138a30dcd11a721708f25ca849d01b0"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/schema.log",
+      "sha256": "42a2b5c1d2dff77829053285c8a75ae6a9ee61844cc5423891c90e40fa080cea"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/typecheck-final.log",
+      "sha256": "d783c834a7884527f906f0c4295b8057f4551538a0a26b969b860f83b0670a67"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/typecheck-post-format.log",
+      "sha256": "3de26e52e43bf53be94b1979d234a9cf33a2868e8d11f626ee8cb3546dc2a643"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/typecheck.log",
+      "sha256": "d783c834a7884527f906f0c4295b8057f4551538a0a26b969b860f83b0670a67"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/update.log",
+      "sha256": "e33b04bf1f029f87274d47a886b9cf5eff50e8281dfe689393082dc06d32aa27"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/vite.config.ts",
+      "sha256": "f5356757638defe209f7ce6c58ce474fbd4b0ea7ad691abe1718c1766b0055ef"
+    }
+  ],
+  "exportFiles": [
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-final-results/m67b-paths-M67-08-09-real--5f2c9--civil-dates-in-UI-and-XLSX-la-tablet/movimenti.pdf",
+      "sha256": "f649b0f2342acf93107cc80d7ea6da5d5d71a2919408e09799a9a006c963707d"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-final-results/m67b-paths-M67-08-09-real--5f2c9--civil-dates-in-UI-and-XLSX-la-tablet/movimenti.xlsx",
+      "sha256": "47027751800487b3e61b4e0e5a0c559e67b2d0b25d0b7f3ce370a7b2a418d9e7"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-final-results/m67b-paths-M67-08-09-real--5f2c9--civil-dates-in-UI-and-XLSX-rome-desktop/movimenti.pdf",
+      "sha256": "aa0e6f462eb96b06008dfa7f56e5a3e531f2c72bc075287cffd176bcbe8f457d"
+    },
+    {
+      "path": "/private/tmp/magazzino-m67b-ME1J89/browser-final-results/m67b-paths-M67-08-09-real--5f2c9--civil-dates-in-UI-and-XLSX-rome-desktop/movimenti.xlsx",
+      "sha256": "6c18a6e6cd1e0e401dc554a703b9a24be238bfe122b6749ab33869b68dbbaf5a"
+    }
+  ],
+  "sourceZip": {
+    "path": "/Users/florianocaprio/Downloads/M6.7_Review_879d96ca_Evidenze.zip",
+    "sha256": "cd700f42b6840fe248502363fae2aa549de663936c02b31ecd7a53ff3809bb02"
+  }
+}

@@ -142,7 +142,7 @@ export default function RichiesteMagazzino() {
     navigate(`${window.location.pathname}?${params.toString()}`);
   };
   const setStatus = (value: typeof status) =>
-    navigationGuard.requestClose(() => {
+    requestClose(() => {
       const params = new URLSearchParams(window.location.search);
       params.set("vista", value);
       params.delete("page");
@@ -178,28 +178,117 @@ export default function RichiesteMagazzino() {
   const [warehouseId, setWarehouseId] = useState<string | null>(null);
   const [transferRows, setTransferRows] = useState<RigaDraft[]>([newRiga()]);
   const [documentDirty, setDocumentDirty] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const [initialDraft, setInitialDraft] = useState({
+    beneficiaryId: contextBeneficiaryId,
+    bisogno: "",
+    note: "",
+    priority: "normale" as typeof priority,
+    desiredDate: "",
+    modality: "da_definire" as typeof modality,
+  });
+  const newDraftDirty =
+    creating &&
+    JSON.stringify({
+      beneficiaryId,
+      bisogno,
+      note,
+      priority,
+      desiredDate,
+      modality,
+    }) !== JSON.stringify(initialDraft);
+  const discardNewDraft = () => {
+    if (!creating) return;
+    setBeneficiaryId(initialDraft.beneficiaryId);
+    setBisogno(initialDraft.bisogno);
+    setNote(initialDraft.note);
+    setPriority(initialDraft.priority);
+    setDesiredDate(initialDraft.desiredDate);
+    setModality(initialDraft.modality);
+    setBeneficiarySearch("");
+    setAttempted(false);
+    setCreating(false);
+    setError("");
+  };
   const documentSelection = parseDocumentoSelection(
     new URLSearchParams(search).get("documento"),
   );
-  const dirty = documentDirty || edit || !!warehouseId || cancelOpen;
+  const dirty =
+    newDraftDirty || documentDirty || edit || !!warehouseId || cancelOpen;
   const navigationGuard = useUnsavedChangesGuard(dirty);
+  const requestClose = (close: () => void) =>
+    navigationGuard.requestClose(() => {
+      discardNewDraft();
+      close();
+    });
   const safeLocation = useRef(
     window.location.pathname + window.location.search,
   );
   useEffect(() => {
-    safeLocation.current = window.location.pathname + window.location.search;
-  }, [search]);
+    // Record committed programmatic navigation, not a render while Back is pending.
+    const remember = () => {
+      safeLocation.current = window.location.pathname + window.location.search;
+    };
+    window.addEventListener("pushState", remember);
+    window.addEventListener("replaceState", remember);
+    return () => {
+      window.removeEventListener("pushState", remember);
+      window.removeEventListener("replaceState", remember);
+    };
+  }, []);
   useEffect(() => {
-    const onBack = () => {
+    const onBack = (event: PopStateEvent) => {
+      const previousLocation = safeLocation.current;
       if (dirty && !window.confirm(t("common.unsavedChangesDesc"))) {
-        navigate(safeLocation.current, { replace: true });
+        event.stopImmediatePropagation();
+        window.history.pushState(null, "", previousLocation);
+      } else {
+        safeLocation.current =
+          window.location.pathname + window.location.search;
+        if (dirty) discardNewDraft();
       }
     };
-    window.addEventListener("popstate", onBack);
-    return () => window.removeEventListener("popstate", onBack);
-  }, [dirty, navigate, t]);
+    window.addEventListener("popstate", onBack, true);
+    return () => window.removeEventListener("popstate", onBack, true);
+  }, [dirty, creating, initialDraft, t]);
+  useEffect(() => {
+    if (!dirty) return;
+    const onLink = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      const anchor =
+        event.target instanceof Element
+          ? event.target.closest("a[href]")
+          : null;
+      if (
+        !(anchor instanceof HTMLAnchorElement) ||
+        anchor.hasAttribute("download") ||
+        (anchor.target && anchor.target !== "_self")
+      )
+        return;
+      const url = new URL(anchor.href);
+      if (
+        url.origin !== window.location.origin ||
+        url.href === window.location.href
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      requestClose(() => navigate(`${url.pathname}${url.search}${url.hash}`));
+    };
+    document.addEventListener("click", onLink, true);
+    return () => document.removeEventListener("click", onLink, true);
+  }, [dirty, creating, initialDraft, navigationGuard.requestClose, navigate]);
   const openDocument = (selection: DocumentoOperativoSelection | null) =>
-    navigationGuard.requestClose(() => {
+    requestClose(() => {
       const params = new URLSearchParams(window.location.search);
       if (selection)
         params.set("documento", documentoSelectionValue(selection));
@@ -240,6 +329,14 @@ export default function RichiesteMagazzino() {
     if (!intervention || contextLoaded.current === intervention.id) return;
     contextLoaded.current = intervention.id;
     const defaults = interventionRequestPrefill(intervention);
+    setInitialDraft({
+      beneficiaryId: defaults.beneficiarioId,
+      bisogno: "",
+      note: "",
+      priority: defaults.priorita,
+      desiredDate: defaults.dataDesiderata,
+      modality: defaults.modalitaPreferita,
+    });
     setBeneficiaryId(defaults.beneficiarioId);
     setPriority(defaults.priorita);
     setDesiredDate(defaults.dataDesiderata);
@@ -457,8 +554,12 @@ export default function RichiesteMagazzino() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    setAttempted(true);
     if (!beneficiaryId || !bisogno.trim()) {
       setError(t("richiesteMagazzino.required"));
+      document
+        .getElementById(!beneficiaryId ? "rm-beneficiary" : "rm-need")
+        ?.focus();
       return;
     }
     if (contextInterventionId && !contextIntervention.data) {
@@ -491,6 +592,7 @@ export default function RichiesteMagazzino() {
       createRichiestaMagazzino(body),
     );
     if (ok) {
+      discardNewDraft();
       setCreating(false);
       setConfirmation(t("richiesteMagazzino.sent"));
       setBisogno("");
@@ -615,11 +717,13 @@ export default function RichiesteMagazzino() {
         </div>
         {canSocial && (
           <Button
-            onClick={() => {
-              setCreating(true);
-              setEdit(false);
-              setError("");
-            }}
+            onClick={() =>
+              requestClose(() => {
+                setCreating(true);
+                setEdit(false);
+                setError("");
+              })
+            }
           >
             {t("richiesteMagazzino.new")}
           </Button>
@@ -656,16 +760,18 @@ export default function RichiesteMagazzino() {
                 <button
                   type="button"
                   className="underline"
-                  onClick={() => {
-                    selectRequest(activeForIntervention.data!.items[0].id);
-                    setCreating(false);
-                  }}
+                  onClick={() =>
+                    requestClose(() => {
+                      selectRequest(activeForIntervention.data!.items[0].id);
+                      setCreating(false);
+                    })
+                  }
                 >
                   {t("richiesteMagazzino.openExisting")}
                 </button>
               </p>
             ) : (
-              <form className="grid gap-4" onSubmit={submit}>
+              <form className="grid gap-4" onSubmit={submit} noValidate>
                 {beneficiaryId == null ? (
                   <div className="grid gap-2">
                     <Label htmlFor="rm-search">
@@ -680,8 +786,16 @@ export default function RichiesteMagazzino() {
                       placeholder={t("richiesteMagazzino.searchBeneficiary")}
                     />
                     <select
+                      id="rm-beneficiary"
                       aria-label={t("richiesteMagazzino.beneficiary")}
-                      className="rounded border p-2"
+                      aria-required="true"
+                      aria-invalid={attempted && !beneficiaryId}
+                      aria-describedby={
+                        attempted && !beneficiaryId
+                          ? "rm-beneficiary-error"
+                          : undefined
+                      }
+                      className={`min-h-11 rounded border p-2 ${attempted && !beneficiaryId ? "border-destructive" : ""}`}
                       value=""
                       onChange={(event) =>
                         setBeneficiaryId(Number(event.target.value))
@@ -696,6 +810,14 @@ export default function RichiesteMagazzino() {
                         </option>
                       ))}
                     </select>
+                    {attempted && !beneficiaryId && (
+                      <p
+                        id="rm-beneficiary-error"
+                        className="text-sm text-destructive"
+                      >
+                        {t("common.requiredField")}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <p>
@@ -719,10 +841,12 @@ export default function RichiesteMagazzino() {
                         type="button"
                         key={request.id}
                         className="block underline"
-                        onClick={() => {
-                          selectRequest(request.id);
-                          setCreating(false);
-                        }}
+                        onClick={() =>
+                          requestClose(() => {
+                            selectRequest(request.id);
+                            setCreating(false);
+                          })
+                        }
                       >
                         {request.codice} — {request.stato}
                       </button>
@@ -736,10 +860,24 @@ export default function RichiesteMagazzino() {
                   <Textarea
                     id="rm-need"
                     required
+                    aria-invalid={attempted && !bisogno.trim()}
+                    aria-describedby={
+                      attempted && !bisogno.trim() ? "rm-need-error" : undefined
+                    }
+                    className={
+                      attempted && !bisogno.trim()
+                        ? "border-destructive"
+                        : undefined
+                    }
                     maxLength={2000}
                     value={bisogno}
                     onChange={(event) => setBisogno(event.target.value)}
                   />
+                  {attempted && !bisogno.trim() && (
+                    <p id="rm-need-error" className="text-sm text-destructive">
+                      {t("common.requiredField")}
+                    </p>
+                  )}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="rm-priority">
@@ -809,16 +947,13 @@ export default function RichiesteMagazzino() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    type="submit"
-                    disabled={pending || !beneficiaryId || !bisogno.trim()}
-                  >
+                  <Button type="submit" disabled={pending}>
                     {t("richiesteMagazzino.send")}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setCreating(false)}
+                    onClick={() => requestClose(() => setCreating(false))}
                   >
                     {t("common.cancel")}
                   </Button>
@@ -872,12 +1007,14 @@ export default function RichiesteMagazzino() {
                   type="button"
                   key={request.id}
                   className="w-full rounded border p-3 text-start hover:bg-muted"
-                  onClick={() => {
-                    selectRequest(request.id);
-                    setEdit(false);
-                    setCreating(false);
-                    setError("");
-                  }}
+                  onClick={() =>
+                    requestClose(() => {
+                      selectRequest(request.id);
+                      setEdit(false);
+                      setCreating(false);
+                      setError("");
+                    })
+                  }
                 >
                   <span className="font-medium">
                     {request.codice} —{" "}
@@ -935,7 +1072,7 @@ export default function RichiesteMagazzino() {
         <Sheet
           open
           onOpenChange={(open) => {
-            if (!open) navigationGuard.requestClose(() => selectRequest(null));
+            if (!open) requestClose(() => selectRequest(null));
           }}
         >
           <SheetContent

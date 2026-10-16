@@ -3,6 +3,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  focused: { data: undefined as unknown, isError: false, isFetching: false },
+  search: "",
   create: vi.fn(),
   receive: vi.fn(),
   invalidate: vi.fn(),
@@ -29,6 +31,11 @@ const mocks = vi.hoisted(() => ({
   suppliers: [{ id: 11, nome: "Deposito richiesto", areaOperativaId: 3 }],
 }));
 vi.mock("@workspace/api-client-react", () => ({
+  useGetRichiestaMagazzino: () => mocks.focused,
+  getGetRichiestaMagazzinoQueryKey: (id: number) => [
+    "/api/richieste-magazzino",
+    id,
+  ],
   useCreateRichiestaMagazzino: () => ({ mutateAsync: mocks.create }),
   useCancelRichiestaMagazzino: () => ({ mutateAsync: vi.fn() }),
   useListRichiesteMagazzino: (params: unknown) => {
@@ -63,6 +70,12 @@ vi.mock("@workspace/api-client-react", () => ({
   ],
   getGetTrasferimentoQueryKey: (id: number) => ["/api/trasferimenti", id],
 }));
+vi.mock("wouter", () => ({
+  useSearch: () => mocks.search,
+  Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
 vi.mock("./mensa-operational-context", () => ({
   useMensaContext: () => ({
     areaId: 3,
@@ -94,6 +107,8 @@ import { MensaRifornimenti } from "./mensa-rifornimenti";
 
 let root: Root, host: HTMLDivElement;
 beforeEach(async () => {
+  mocks.search = "";
+  mocks.focused = { data: undefined, isError: false, isFetching: false };
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.clearAllMocks();
   mocks.queryError = false;
@@ -359,4 +374,51 @@ it("Preferenza: elenco vuoto e deposito non più autorizzato non lasciano una se
   expect(host.querySelector<HTMLSelectElement>("#mensa-supplier")!.value).toBe(
     "",
   );
+});
+
+it("M67-12 opens the exact canonical request outside the list page and retains report filters", async () => {
+  mocks.search =
+    "richiestaId=93&returnTo=%2Freport%2Fmensa%3Fda%3D2026-01-01%26mensaId%3D7";
+  mocks.focused.data = {
+    id: 93,
+    mensaId: 7,
+    codice: "RM-EXACT",
+    stato: "inviata",
+    bisogno: "Richiesta selezionata",
+    versione: 1,
+  };
+  await act(async () => root.render(<MensaRifornimenti />));
+  expect(
+    host.querySelector('article[aria-label="RM-EXACT"]')?.textContent,
+  ).toContain("Richiesta selezionata");
+  expect(host.querySelector("a")?.getAttribute("href")).toBe(
+    "/report/mensa?da=2026-01-01&mensaId=7",
+  );
+  expect(host.querySelector("#mensa-needs")).toBeNull();
+  expect(mocks.create).not.toHaveBeenCalled();
+});
+it.each(["denied", "revalidating", "different-mensa", "different-request"])(
+  "M67-12 does not show protected cached data: %s",
+  async (cause) => {
+    mocks.search = "richiestaId=93";
+    mocks.focused.data = {
+      id: cause === "different-request" ? 94 : 93,
+      mensaId: cause === "different-mensa" ? 8 : 7,
+      codice: "RM-HIDDEN",
+      stato: "inviata",
+      bisogno: "Confidential",
+      versione: 1,
+    };
+    mocks.focused.isError = cause === "denied";
+    mocks.focused.isFetching = cause === "revalidating";
+    await act(async () => root.render(<MensaRifornimenti />));
+    expect(host.textContent).not.toContain("Confidential");
+    expect(host.querySelector("article")).toBeNull();
+  },
+);
+it("M67-12 rejects external return links and malformed request IDs", async () => {
+  mocks.search = "richiestaId=invalid&returnTo=https%3A%2F%2Fexample.com";
+  await act(async () => root.render(<MensaRifornimenti />));
+  expect(host.querySelector("a")).toBeNull();
+  expect(host.textContent).toContain("mensa.requestUnavailable");
 });

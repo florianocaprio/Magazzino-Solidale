@@ -16,14 +16,28 @@ import {
   visibleMagazzinoIds,
   magazzinoScopeFilter,
 } from "../lib/centroScope";
-import { requirePermission } from "../middlewares/auth";
+import { loadSessionUser, requirePermission } from "../middlewares/auth";
+import { alias } from "drizzle-orm/pg-core";
+import { movementPhysicalEffect } from "../lib/movementPhysicalEffect";
 
 const router: IRouter = Router();
+const originalMovement = alias(movimentiTable, "original_movement");
 
 router.get(
-  "/movimenti",
+  ["/movimenti", "/movimenti/export"],
   requirePermission("magazzino.view"),
   async (req, res) => {
+    const exporting = req.path === "/movimenti/export";
+    const initialUser = req.user;
+    const sessionUserId = req.session?.userId;
+    if (exporting && !sessionUserId) {
+      res.status(401).json({ error: "Sessione richiesta" });
+      return;
+    }
+    if (exporting && (req.query.page != null || req.query.limit != null)) {
+      res.status(400).json({ error: "L'export non usa paginazione" });
+      return;
+    }
     const {
       tipo,
       magazzinoId,
@@ -44,11 +58,9 @@ router.get(
       limit < 1 ||
       limit > 100
     ) {
-      res
-        .status(400)
-        .json({
-          error: "Paginazione non valida: page >= 1 e limit tra 1 e 100",
-        });
+      res.status(400).json({
+        error: "Paginazione non valida: page >= 1 e limit tra 1 e 100",
+      });
       return;
     }
     for (const [name, raw] of [
@@ -87,57 +99,139 @@ router.get(
       conditions.push(eq(movimentiTable.naturaContabile, naturaContabile));
     if (canaleOperativo)
       conditions.push(eq(movimentiTable.canaleOperativo, canaleOperativo));
-    const scope = magazzinoScopeFilter(
-      movimentiTable.magazzinoId,
-      await visibleMagazzinoIds(
-        callerCentroId(req),
-        callerAreaOperativaId(req),
-      ),
+    const visibleIds = await visibleMagazzinoIds(
+      callerCentroId(req),
+      callerAreaOperativaId(req),
     );
+    const scope = magazzinoScopeFilter(movimentiTable.magazzinoId, visibleIds);
     if (scope) conditions.push(scope);
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
-    const [{ total }] = await db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(movimentiTable)
-      .leftJoin(
-        magazziniTable,
-        eq(movimentiTable.magazzinoId, magazziniTable.id),
-      )
-      .where(where);
-    const rows = await db
-      .select({
-        mov: movimentiTable,
-        prodottoNome: prodottiTable.nome,
-        magazzinoNome: magazziniTable.nome,
-        auditActorCode: auditEventiTable.actorCodeSnapshot,
-        operatoreMatricola: utentiTable.matricola,
-        operatoreUsername: utentiTable.username,
-      })
-      .from(movimentiTable)
-      .leftJoin(prodottiTable, eq(movimentiTable.prodottoId, prodottiTable.id))
-      .leftJoin(
-        magazziniTable,
-        eq(movimentiTable.magazzinoId, magazziniTable.id),
-      )
-      .leftJoin(
-        auditEventiTable,
-        eq(movimentiTable.auditEventoId, auditEventiTable.id),
-      )
-      .leftJoin(utentiTable, eq(movimentiTable.operatoreId, utentiTable.id))
-      .where(where)
-      .orderBy(desc(movimentiTable.dataCreazione))
-      .limit(limit)
-      .offset((page - 1) * limit);
+    const [{ total }] = exporting
+      ? [{ total: 0 }]
+      : await db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(movimentiTable)
+          .leftJoin(
+            magazziniTable,
+            eq(movimentiTable.magazzinoId, magazziniTable.id),
+          )
+          .where(where);
+    const readRows = (executor: Pick<typeof db, "select">) =>
+      executor
+        .select({
+          mov: movimentiTable,
+          originalType: originalMovement.tipoMovimento,
+          originalDetail: originalMovement.tipoDettaglio,
+          prodottoNome: prodottiTable.nome,
+          magazzinoNome: magazziniTable.nome,
+          auditActorCode: auditEventiTable.actorCodeSnapshot,
+          operatoreMatricola: utentiTable.matricola,
+          operatoreUsername: utentiTable.username,
+        })
+        .from(movimentiTable)
+        .leftJoin(
+          originalMovement,
+          eq(movimentiTable.movimentoOrigineId, originalMovement.id),
+        )
+        .leftJoin(
+          prodottiTable,
+          eq(movimentiTable.prodottoId, prodottiTable.id),
+        )
+        .leftJoin(
+          magazziniTable,
+          eq(movimentiTable.magazzinoId, magazziniTable.id),
+        )
+        .leftJoin(
+          auditEventiTable,
+          eq(movimentiTable.auditEventoId, auditEventiTable.id),
+        )
+        .leftJoin(utentiTable, eq(movimentiTable.operatoreId, utentiTable.id))
+        .where(where)
+        .orderBy(desc(movimentiTable.dataCreazione), desc(movimentiTable.id))
+        .limit(exporting ? 10001 : limit)
+        .offset(exporting ? 0 : (page - 1) * limit);
 
-    res.setHeader("X-Total-Count", String(total));
+    // One PostgreSQL snapshot, not independently paged HTTP reads. The extra
+    // row detects overflow; never silently truncate or deduplicate an export.
+    const rows = exporting
+      ? await db.transaction(
+          async (tx) => {
+            await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+            return readRows(tx);
+          },
+          { isolationLevel: "repeatable read", accessMode: "read only" },
+        )
+      : await readRows(db);
+
+    if (exporting) {
+      // Revalidate OUTSIDE the snapshot, including same-session revocation and
+      // warehouse territorial changes. Never reissue a logged-out session.
+      const validSession = await new Promise<boolean>((resolve) =>
+        req.session.reload((error) => resolve(!error)),
+      );
+      const currentSessionUserId = req.session?.userId;
+      // This read-only response may arrive after logout/login in another tab.
+      // Do not roll the captured session cookie over the newer login. Detaching
+      // this request does not destroy the stored session or change other routes.
+      Reflect.deleteProperty(req, "session");
+      if (!validSession || currentSessionUserId !== sessionUserId) {
+        res.status(401).json({ error: "Sessione terminata o cambiata" });
+        return;
+      }
+      const currentUser = await loadSessionUser(sessionUserId!);
+      const currentIds = await visibleMagazzinoIds(
+        callerCentroId(req),
+        callerAreaOperativaId(req),
+      );
+      if (
+        !currentUser ||
+        JSON.stringify(currentUser) !== JSON.stringify(initialUser) ||
+        JSON.stringify(currentIds?.sort((a, b) => a - b)) !==
+          JSON.stringify(visibleIds?.sort((a, b) => a - b))
+      ) {
+        res
+          .status(403)
+          .json({ error: "Autorizzazione cambiata durante l'export" });
+        return;
+      }
+      if (
+        rows.length > 10000 ||
+        Buffer.byteLength(JSON.stringify(rows), "utf8") > 16 * 1024 * 1024
+      ) {
+        res.status(413).json({
+          error:
+            "Export troppo ampio: restringere i filtri (massimo 10000 righe / 16 MiB)",
+        });
+        return;
+      }
+      res.setHeader("Cache-Control", "no-store");
+    }
+
+    res.setHeader("X-Total-Count", String(exporting ? rows.length : total));
     res.setHeader("X-Page", String(page));
-    res.setHeader("X-Page-Size", String(limit));
+    res.setHeader("X-Page-Size", String(exporting ? rows.length : limit));
     res.json(
       rows.map((r) => ({
         id: r.mov.id,
         tipoMovimento: r.mov.tipoMovimento,
         tipoDettaglio: r.mov.tipoDettaglio,
+        effettoFisico: (() => {
+          try {
+            return movementPhysicalEffect(
+              r.mov,
+              r.originalType && r.originalDetail
+                ? {
+                    tipoMovimento: r.originalType,
+                    tipoDettaglio: r.originalDetail,
+                  }
+                : null,
+            );
+          } catch {
+            // Incomplete legacy reversals must not be assigned an invented sign.
+            return null;
+          }
+        })(),
         dataMovimento: r.mov.dataMovimento,
         magazzinoId: r.mov.magazzinoId,
         magazzinoNome: r.magazzinoNome ?? null,

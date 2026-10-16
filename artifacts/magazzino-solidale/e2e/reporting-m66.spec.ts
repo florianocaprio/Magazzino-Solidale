@@ -15,6 +15,11 @@ import {
   bolleTable,
 } from "../../../lib/db/src/index";
 import { base } from "../src/lib/i18n/namespaces/base";
+import i18n from "../src/lib/i18n";
+import {
+  localizeReportingText,
+  reportingColumnLabel,
+} from "../src/lib/reporting-text";
 
 const requireApi = createRequire(
   new URL("../../api-server/package.json", import.meta.url),
@@ -38,6 +43,23 @@ const sections = [
   "magazzino-logistica",
   "fse-plus",
 ];
+const externalRequests: string[] = [];
+test.beforeEach(async ({ page }) => {
+  externalRequests.length = 0;
+  await page.route("**/*", async (route) => {
+    const host = new URL(route.request().url()).hostname;
+    if (["127.0.0.1", "localhost"].includes(host)) return route.fallback();
+    if (host === "fonts.googleapis.com")
+      return route.fulfill({
+        status: 200,
+        contentType: "text/css",
+        body: "/* offline font fixture */",
+      });
+    externalRequests.push(host);
+    return route.abort();
+  });
+});
+test.afterEach(() => expect(externalRequests).toEqual([]));
 const privateSentinels = [
   "PDF_PRIVATE_NAME",
   "PDF_PRIVATE_NOTE",
@@ -284,18 +306,25 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
       JSON.stringify(dataset, null, 2),
     );
     await (await downloaded).saveAs(`${output}/${section}.pdf`);
-    // Reuse exactly the server-prepared payload through the application's real
-    // workbook builder; no reconstruction of accounting data in the harness.
+    // Replay only the captured prepare response, then exercise the real built
+    // UI workbook path. A second live XLSX request below checks the endpoint.
+    const preparePattern = (url: URL) => url.pathname === "/api/report/prepare";
+    let preparedReplayCount = 0;
+    await page.route(preparePattern, (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      preparedReplayCount++;
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(dataset),
+      });
+    });
     const sameDownload = page.waitForEvent("download");
-    const expected = await page.evaluate(async (prepared) => {
-      const exportPath = "/src/lib/export.ts",
-        i18nPath = "/src/lib/i18n/index.ts",
-        textPath = "/src/lib/reporting-text.ts";
-      const exports = await import(exportPath),
-        { default: i18n } = await import(i18nPath),
-        { localizeReportingText, reportingColumnLabel } = await import(
-          textPath
-        );
+    await page
+      .getByRole("button", { name: "Esporta in Excel (XLSX)", exact: true })
+      .click();
+    await i18n.changeLanguage("it");
+    const expected = ((prepared: typeof dataset) => {
       const t = i18n.t.bind(i18n);
       const metadata = Object.fromEntries(
         [
@@ -339,28 +368,6 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
         locale: "it",
         metadata,
       };
-      const names = Object.fromEntries(
-        [
-          ["areaOperativa", "areeOperative", "areaOperativaId"],
-          ["centre", "centres", "centroAscoltoId"],
-          ["warehouse", "warehouses", "magazzinoId"],
-          ["mensa", "mense", "mensaId"],
-          ["zone", "zones", "zonaUdsId"],
-        ].map(([key, list, id]) => [
-          key,
-          prepared.options[list].find(
-            (row: { id: number }) => row.id === prepared.report.filters[id],
-          )?.nome,
-        ]),
-      );
-      exports.exportReportingWorkbook(
-        "same-dataset",
-        prepared.report,
-        labels,
-        names,
-        prepared.detail,
-        prepared.datasetId,
-      );
       return {
         tables: prepared.report.tables.map(
           (table: {
@@ -433,8 +440,10 @@ test("PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export", asy
         ),
         unavailable: labels.unavailable,
       };
-    }, dataset);
+    })(dataset);
     await (await sameDownload).saveAs(`${output}/${section}-same-dataset.xlsx`);
+    await page.unroute(preparePattern);
+    expect(preparedReplayCount).toBe(1);
     await writeFile(
       `${output}/${section}-expected.json`,
       JSON.stringify(expected, null, 2),

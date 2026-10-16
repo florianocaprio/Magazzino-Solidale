@@ -1,16 +1,15 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { MENSA_REQUEST_READ_PERMISSIONS } from "@/lib/mensa-request-access";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Loader2 } from "lucide-react";
-import NotFound from "@/pages/not-found";
 import NotAuthorized from "@/pages/not-authorized";
 import Login from "@/pages/login";
 import ChangePassword from "@/pages/change-password";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
-import Setup from "@/pages/setup";
 import { AppLayout } from "@/components/layout";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { useIdleLogout } from "@/lib/use-idle-logout";
@@ -38,6 +37,8 @@ const IDLE_KEEPALIVE_MS = 5 * 60 * 1000;
 
 import type { MensaView } from "@/pages/mensa";
 
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Setup = lazy(() => import("@/pages/setup"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const Magazzini = lazy(() => import("@/pages/magazzini"));
 const Prodotti = lazy(() => import("@/pages/prodotti"));
@@ -266,11 +267,15 @@ function RequirePermission({
   permission,
   children,
 }: {
-  permission: string;
+  permission: string | readonly string[];
   children: React.ReactNode;
 }) {
   const { hasPermission } = useAuth();
-  if (!hasPermission(permission)) return <NotAuthorized />;
+  const allowed =
+    typeof permission === "string"
+      ? hasPermission(permission)
+      : permission.some(hasPermission);
+  if (!allowed) return <NotAuthorized />;
   return <>{children}</>;
 }
 
@@ -287,7 +292,7 @@ function MensaRoute({
   permission,
 }: {
   view: MensaView;
-  permission: string;
+  permission: string | readonly string[];
 }) {
   return (
     <Guard area="mensa">
@@ -639,7 +644,7 @@ function AppRoutes() {
             {() => (
               <MensaRoute
                 view="trasferimenti"
-                permission="mensa.transfers.request"
+                permission={MENSA_REQUEST_READ_PERMISSIONS}
               />
             )}
           </Route>
@@ -1066,7 +1071,14 @@ function AuthGate() {
     // First-run: no administrator exists yet. Anyone may create the system
     // users (one of which must be an admin) until an admin exists, after which
     // the app locks down to the normal login.
-    if (bootstrap) return <Setup />;
+    if (bootstrap)
+      return (
+        <Suspense
+          fallback={<Loader2 className="mx-auto mt-16 h-6 w-6 animate-spin" />}
+        >
+          <Setup />
+        </Suspense>
+      );
     return <PublicAuthRoutes />;
   }
   if (user.mustChangePassword) return <ChangePassword />;

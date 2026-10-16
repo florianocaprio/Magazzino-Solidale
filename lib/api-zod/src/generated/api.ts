@@ -5917,6 +5917,9 @@ export const ListMovimentiQueryParams = zod.object({
     .default(listMovimentiQueryLimitDefault),
 });
 
+export const listMovimentiResponseDataMovimentoRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
 export const listMovimentiResponseQuantitaPrecisaRegExp = new RegExp(
   "^[0-9]+(?:\\.[0-9]{1,6})?$",
 );
@@ -5928,7 +5931,16 @@ export const ListMovimentiResponseItem = zod.object({
   id: zod.number(),
   tipoMovimento: zod.string(),
   tipoDettaglio: zod.string(),
-  dataMovimento: zod.string(),
+  effettoFisico: zod
+    .union([zod.literal(-1), zod.literal(0), zod.literal(1), zod.literal(null)])
+    .nullish()
+    .describe(
+      "Segno fisico canonico, inclusa inversione dello storno. Null se non determinabile da dati legacy; zero significa nessuna variazione fisica.",
+    ),
+  dataMovimento: zod
+    .string()
+    .regex(listMovimentiResponseDataMovimentoRegExp)
+    .describe("Data civile operativa YYYY-MM-DD, senza ora o fuso orario."),
   magazzinoId: zod.number(),
   magazzinoNome: zod.string().nullish(),
   prodottoId: zod.number(),
@@ -5985,6 +5997,110 @@ export const ListMovimentiResponseItem = zod.object({
   dataCreazione: zod.string(),
 });
 export const ListMovimentiResponse = zod.array(ListMovimentiResponseItem);
+
+/**
+ * Un solo snapshot PostgreSQL, ordine dataCreazione DESC e id DESC. Massimo 10000 righe e 16 MiB; nessuna troncatura. Sessione e scope rivalidati prima della risposta. Non accetta page o limit.
+ * @summary Export coerente del ledger filtrato
+ */
+export const ExportMovimentiQueryParams = zod.object({
+  tipo: zod.coerce.string().optional(),
+  magazzinoId: zod.coerce.number().optional(),
+  prodottoId: zod.coerce.number().optional(),
+  centroAscoltoId: zod.coerce.number().optional(),
+  da: zod.coerce.string().optional(),
+  a: zod.coerce.string().optional(),
+  fondoOrigine: zod
+    .enum([
+      "FSE_PLUS",
+      "FONDO_NAZIONALE",
+      "FONDO_NAZIONALE_COFINANZIATO",
+      "NESSUN_FONDO",
+    ])
+    .optional(),
+  naturaContabile: zod.coerce.string().optional(),
+  canaleOperativo: zod.coerce.string().optional(),
+});
+
+export const exportMovimentiResponseDataMovimentoRegExp = new RegExp(
+  "^\\d{4}-\\d{2}-\\d{2}$",
+);
+export const exportMovimentiResponseQuantitaPrecisaRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const exportMovimentiResponseFattoreKgLtPezzoOneRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,9})?$",
+);
+
+export const ExportMovimentiResponseItem = zod.object({
+  id: zod.number(),
+  tipoMovimento: zod.string(),
+  tipoDettaglio: zod.string(),
+  effettoFisico: zod
+    .union([zod.literal(-1), zod.literal(0), zod.literal(1), zod.literal(null)])
+    .nullish()
+    .describe(
+      "Segno fisico canonico, inclusa inversione dello storno. Null se non determinabile da dati legacy; zero significa nessuna variazione fisica.",
+    ),
+  dataMovimento: zod
+    .string()
+    .regex(exportMovimentiResponseDataMovimentoRegExp)
+    .describe("Data civile operativa YYYY-MM-DD, senza ora o fuso orario."),
+  magazzinoId: zod.number(),
+  magazzinoNome: zod.string().nullish(),
+  prodottoId: zod.number(),
+  prodottoNome: zod.string().nullish(),
+  lottoId: zod.number().nullish(),
+  quantita: zod.number(),
+  quantitaPrecisa: zod
+    .string()
+    .regex(exportMovimentiResponseQuantitaPrecisaRegExp)
+    .describe(
+      "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+    ),
+  quantitaPezzi: zod.string().nullish(),
+  quantitaKgLt: zod.string().nullish(),
+  fattoreKgLtPezzo: zod
+    .union([
+      zod
+        .string()
+        .regex(exportMovimentiResponseFattoreKgLtPezzoOneRegExp)
+        .describe(
+          "Fattore Kg\/Lt per pezzo esatto, positivo, scala massima 9.",
+        ),
+      zod.null(),
+    ])
+    .optional(),
+  unitaMisura: zod.string(),
+  fornitoreId: zod.number().nullish(),
+  beneficiarioId: zod.number().nullish(),
+  movimentoOrigineId: zod.number().nullish(),
+  fondoOrigine: zod.enum([
+    "FSE_PLUS",
+    "FONDO_NAZIONALE",
+    "FONDO_NAZIONALE_COFINANZIATO",
+    "NESSUN_FONDO",
+  ]),
+  naturaContabile: zod.string(),
+  dominioOrigine: zod.string().nullish(),
+  entitaOrigineTipo: zod.string().nullish(),
+  entitaOrigineId: zod.number().nullish(),
+  rigaOrigineId: zod.number().nullish(),
+  caricoMagazzinoRigaId: zod.number().nullish(),
+  operazioneDistribuzioneId: zod.number().nullish(),
+  canaleOperativo: zod.string().nullish(),
+  operatoreId: zod.number().nullish(),
+  operatoreCodice: zod
+    .string()
+    .nullish()
+    .describe(
+      "Snapshot del codice attore audit; fallback all'operatore legacy corrente.",
+    ),
+  auditEventoId: zod.number().nullish(),
+  documentoRiferimento: zod.string().nullish(),
+  note: zod.string().nullish(),
+  dataCreazione: zod.string(),
+});
+export const ExportMovimentiResponse = zod.array(ExportMovimentiResponseItem);
 
 export const ListGiacenzeQueryParams = zod.object({
   areaOperativaId: zod.coerce
@@ -11704,6 +11820,13 @@ export const listConsegneQueryPageSizeDefault = 25;
 export const listConsegneQueryPageSizeMax = 100;
 
 export const ListConsegneQueryParams = zod.object({
+  areaOperativaId: zod.coerce
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Intersezione con lo scope corrente; snapshot per le consegne effettuate.",
+    ),
   page: zod.coerce.number().min(1).default(listConsegneQueryPageDefault),
   pageSize: zod.coerce
     .number()
@@ -11785,7 +11908,9 @@ export const CreateConsegnaBody = zod.object({
 /**
  * @summary Restituisce tutte le consegne autorizzate per i filtri richiesti
  */
+
 export const ExportConsegneQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1).optional(),
   q: zod.coerce.string().optional(),
   stato: zod.coerce.string().optional(),
   data: zod.coerce.string().optional(),
@@ -11835,6 +11960,12 @@ export const ExportConsegneResponse = zod.object({
 /**
  * @summary Coda derivata delle Bolle M5 pronte nel perimetro del Centro
  */
+
+export const ListBollePronteDaPianificareQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  centroAscoltoId: zod.coerce.number().min(1).optional(),
+});
+
 export const ListBollePronteDaPianificareResponseItem = zod.object({
   richiestaId: zod.number(),
   richiestaCodice: zod.string(),
@@ -11860,6 +11991,28 @@ export const ListBollePronteDaPianificareResponseItem = zod.object({
 export const ListBollePronteDaPianificareResponse = zod.array(
   ListBollePronteDaPianificareResponseItem,
 );
+
+/**
+ * @summary Identità esatta da codice beneficiario legacy attivo entro scope; non risolve token tessera MS
+ */
+export const getConsegnaBeneficiarioDaCodiceQueryCodiceMax = 100;
+
+export const GetConsegnaBeneficiarioDaCodiceQueryParams = zod.object({
+  codice: zod.coerce
+    .string()
+    .min(1)
+    .max(getConsegnaBeneficiarioDaCodiceQueryCodiceMax),
+  areaOperativaId: zod.coerce.number().min(1).optional(),
+  centroAscoltoId: zod.coerce.number().min(1).optional(),
+});
+
+export const GetConsegnaBeneficiarioDaCodiceResponse = zod.object({
+  id: zod.number(),
+  codice: zod.string(),
+  nome: zod.string(),
+  cognome: zod.string(),
+  centroAscoltoId: zod.number().nullable(),
+});
 
 /**
  * @summary Crea atomicamente la Consegna e associa la Bolla M5 pronta

@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { MENSA_REQUEST_READ_PERMISSIONS } from "@/lib/mensa-request-access";
 import {
   LayoutDashboard,
   Warehouse,
@@ -96,6 +97,7 @@ export type NavItem = {
   globalAdmin?: boolean;
   public?: boolean;
   permission?: string;
+  anyPermissions?: readonly string[];
   sourceAreas?: readonly string[];
   requiresMapsLayer?: boolean;
 };
@@ -332,7 +334,7 @@ export const NAV_ITEMS: NavItem[] = [
     groupKey: "mensa",
     area: "mensa",
     moduloCodice: "MENSA",
-    permission: "mensa.transfers.request",
+    anyPermissions: MENSA_REQUEST_READ_PERMISSIONS,
   },
   {
     key: "mensaConsumi",
@@ -727,7 +729,8 @@ export function isNavItemEnabledByAccess(
   return (
     itemAreas.some(hasArea) &&
     (!item.sourceAreas || item.sourceAreas.some(hasArea)) &&
-    (!item.permission || hasPermission(item.permission))
+    (!item.permission || hasPermission(item.permission)) &&
+    (!item.anyPermissions || item.anyPermissions.some(hasPermission))
   );
 }
 
@@ -790,6 +793,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           className="border-r border-border"
         >
           <div className="px-4 py-3 flex items-center border-b border-border">
+            <SidebarTrigger
+              className="h-11 w-11 mr-2 md:hidden"
+              aria-label={t("common.close")}
+            />
             <img
               src="/logo-aim.png"
               alt="Angeli in Moto"
@@ -860,8 +867,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </SidebarFooter>
         </Sidebar>
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4 md:hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
             <SidebarTrigger
               className="h-11 w-11"
               aria-label={t("common.openMenu")}

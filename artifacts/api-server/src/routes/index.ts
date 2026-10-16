@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { requireWarehouseReadScope } from "../middlewares/warehouseReadScope";
 import healthRouter from "./health";
 import dashboardRouter from "./dashboard";
 import magazziniRouter from "./magazzini";
@@ -78,6 +79,29 @@ router.use(requireAuth);
 // Force first-login password rotation before any business endpoint is reachable.
 router.use(requirePasswordChange);
 router.use(areaGuard);
+
+// Lists/counts, direct details and exports share the actor boundary; existing
+// per-row scopes still apply. Maps, Mensa, Emporio and Reporting retain their
+// dedicated authorization policies (no blanket change to legacy NULL helpers).
+router.use(
+  [
+    "/dashboard",
+    "/magazzini",
+    "/movimenti",
+    "/giacenze",
+    "/carichi",
+    "/carico-pratiche",
+    "/lotti",
+    "/lotti-logici",
+    "/preparazione-consegne",
+    "/scarichi",
+    "/bolle",
+    "/trasferimenti",
+    "/documenti-operativi",
+    "/approvvigionamenti",
+  ],
+  requireWarehouseReadScope,
+);
 
 router.use(dashboardRouter);
 router.use(magazziniRouter);

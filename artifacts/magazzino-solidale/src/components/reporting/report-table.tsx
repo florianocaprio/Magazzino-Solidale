@@ -12,6 +12,7 @@ import { ReportEmptyState } from "./report-empty-state";
 import { useTranslation } from "react-i18next";
 import { localizeReportingText } from "@/lib/reporting-text";
 import { Link } from "wouter";
+import { useAuth } from "@/lib/auth";
 
 function cell(
   value: unknown,
@@ -25,6 +26,15 @@ function cell(
 
 export function ReportTable({ table }: { table: ReportTableData }) {
   const { t } = useTranslation();
+  const { hasArea, hasPermission } = useAuth();
+  const requestPath =
+    (hasArea("sociale") || hasArea("magazzino")) &&
+    hasPermission("richieste_magazzino.view")
+      ? "/richieste-magazzino"
+      : "/mensa/trasferimenti";
+  const returnTo = encodeURIComponent(
+    window.location.pathname + window.location.search,
+  );
   return (
     <Card>
       <CardHeader>
@@ -67,7 +77,7 @@ export function ReportTable({ table }: { table: ReportTableData }) {
                         typeof row.id === "number" ? (
                           <Link
                             className="inline-flex min-h-11 items-center underline"
-                            href={`/richieste-magazzino?richiestaId=${row.id}`}
+                            href={`${requestPath}?richiestaId=${row.id}&returnTo=${returnTo}`}
                           >
                             {cell(row[column], t)}
                           </Link>

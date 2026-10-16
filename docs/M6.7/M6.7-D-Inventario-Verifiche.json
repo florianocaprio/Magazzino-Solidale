@@ -1,0 +1,2982 @@
+{
+  "date": "2026-10-16T06:41:13.490Z",
+  "identity": {
+    "hash": "1778dbdcba1d96c946a8a528b30226c02a8bfdcaa5c5cf38aa7c4bfdc20a8fca",
+    "count": 2142,
+    "reviewVerified": 10,
+    "deltaFromC": [
+      {
+        "path": "artifacts/api-server/tests/m67d-social-chain.test.ts",
+        "sha256": "d148ea7319dd07908d702d655f7a6ac5cebbc718b1e58be7848369e3d483c11f"
+      },
+      {
+        "path": "artifacts/api-server/tests/m67d-verifications.test.ts",
+        "sha256": "a37df598f703d6dad0bea8763cc84c3c9053a3eda5ae73a1a67fe6ae9223b221"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/m67a-access.spec.ts",
+        "sha256": "31a4150462753077041c59331a9dfc1c6e3cfac126b693cb3c0209a842bfec1b"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/m67d-integrated.spec.ts",
+        "sha256": "dd040ccd6d8be469172b2f0a96b44af666e3e722663833a92ac8f7b619ef7c38"
+      }
+    ]
+  },
+  "changedFromC": [
+    {
+      "path": "artifacts/api-server/tests/m67d-social-chain.test.ts",
+      "sha256": "d148ea7319dd07908d702d655f7a6ac5cebbc718b1e58be7848369e3d483c11f"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67d-verifications.test.ts",
+      "sha256": "a37df598f703d6dad0bea8763cc84c3c9053a3eda5ae73a1a67fe6ae9223b221"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67a-access.spec.ts",
+      "sha256": "31a4150462753077041c59331a9dfc1c6e3cfac126b693cb3c0209a842bfec1b"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67d-integrated.spec.ts",
+      "sha256": "dd040ccd6d8be469172b2f0a96b44af666e3e722663833a92ac8f7b619ef7c38"
+    }
+  ],
+  "sourceChanged": [],
+  "runs": [
+    {
+      "name": "api-integrated",
+      "passed": 238,
+      "failed": 2,
+      "skipped": 1
+    },
+    {
+      "name": "api-maps-isolated",
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "api-handoff-isolated",
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "api-mensa",
+      "passed": 109,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "api-emporio",
+      "passed": 143,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "api-supply",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "api-characterization-final",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "api-social-chain3",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "api-d-final",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "totals": {
+    "passed": 502,
+    "skipped": 1
+  },
+  "inventory": [
+    {
+      "path": "artifacts/api-server/tests/beneficiari-uds.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "POST /beneficiari (uds) crea una persona UDS con la area operativa e ritorna uds=true",
+          "status": "passed"
+        },
+        {
+          "title": "POST /beneficiari (uds) continua a creare persone UDS quando il servizio Centro di Ascolto è disabilitato",
+          "status": "passed"
+        },
+        {
+          "title": "POST /beneficiari (uds) rifiuta la creazione senza sesso",
+          "status": "passed"
+        },
+        {
+          "title": "POST /beneficiari (uds) crea un beneficiario con sesso valido: Maschio",
+          "status": "passed"
+        },
+        {
+          "title": "POST /beneficiari (uds) crea un beneficiario con sesso valido: Femmina",
+          "status": "passed"
+        },
+        {
+          "title": "POST /beneficiari (uds) crea un beneficiario con sesso valido: Altro",
+          "status": "passed"
+        },
+        {
+          "title": "POST /beneficiari (uds) rifiuta la creazione con sesso non valido",
+          "status": "passed"
+        },
+        {
+          "title": "POST /beneficiari (uds) rifiuta una persona UDS senza area operativa per un caller globale (400)",
+          "status": "passed"
+        },
+        {
+          "title": "POST /beneficiari (uds) rifiuta uds passato come stringa \"true\" senza area operativa (no type-confusion bypass)",
+          "status": "passed"
+        },
+        {
+          "title": "POST /beneficiari (uds) un caller con area operativa pinnata può creare una persona UDS senza inviare areaOperativaId",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS calcola il giorno prima del diciottesimo compleanno usando giorno, mese e anno",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS calcola il giorno del diciottesimo compleanno usando giorno, mese e anno",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS calcola il giorno dopo il diciottesimo compleanno usando giorno, mese e anno",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS calcola il limite dei 29 anni usando giorno, mese e anno",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS calcola il passaggio da 29 a 30 anni usando giorno, mese e anno",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS calcola il limite dei 64 anni usando giorno, mese e anno",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS calcola il passaggio da 64 a 65 anni usando giorno, mese e anno",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS usa sempre la data civile Europe/Rome anche con TZ del processo UTC",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS usa sempre la data civile Europe/Rome anche con TZ del processo America/New_York",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS usa sempre la data civile Europe/Rome anche con TZ del processo Asia/Tokyo",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS cambia fascia esattamente al compleanno secondo la mezzanotte italiana",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS usa la fascia presunta solo in assenza della data di nascita",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS restituisce non determinata per un record legacy senza entrambi i valori",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS persiste la fascia presunta ma restituisce quella calcolata quando è presente la data",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS dopo la rimozione della data torna alla fascia presunta conservata",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS ricalcola immediatamente la fascia quando cambia la data di nascita",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS rifiuta una data futura o non valida: 2027-01-01",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS rifiuta una data futura o non valida: 2025-02-30",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS rifiuta una data futura o non valida: 15/06/2000",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS rifiuta una fascia presunta fuori dall'insieme previsto",
+          "status": "passed"
+        },
+        {
+          "title": "fascia d'età UDS espone come non determinato un beneficiario storico con valori null",
+          "status": "passed"
+        },
+        {
+          "title": "Credito Solidale beneficiari accetta un magazzino emporio come emporio preferito e abilita con stato attivo",
+          "status": "passed"
+        },
+        {
+          "title": "Credito Solidale beneficiari accetta un magazzino misto come emporio preferito e abilita con stato attivo",
+          "status": "passed"
+        },
+        {
+          "title": "Credito Solidale beneficiari rifiuta l'abilitazione Credito Solidale senza Centro di Ascolto",
+          "status": "passed"
+        },
+        {
+          "title": "Credito Solidale beneficiari rifiuta un magazzino logistico come emporio preferito",
+          "status": "passed"
+        },
+        {
+          "title": "Credito Solidale beneficiari alla prima abilitazione via PATCH valorizza la data e la conserva in disabilitazione",
+          "status": "passed"
+        },
+        {
+          "title": "Credito Solidale beneficiari rifiuta l'abilitazione via PATCH se il beneficiario non ha Centro di Ascolto",
+          "status": "passed"
+        },
+        {
+          "title": "Credito Solidale beneficiari abilita via PATCH quando assegna il Centro nello stesso payload senza creare movimenti o cambiare saldo",
+          "status": "passed"
+        },
+        {
+          "title": "Credito Solidale beneficiari un utente UDS con Centro assegnato abilita Credito Solidale su beneficiario UDS condiviso",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) collega a UDS un beneficiario Sociale della stessa area operativa senza duplicarlo, ignorando centro e zona del caller",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) rifiuta il collegamento UDS senza una area di provenienza risultante",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) rifiuta il collegamento UDS senza data di nascita o fascia di età risultante",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) collega a UDS trasferendo area di provenienza e data di nascita",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) collega a UDS conservando area di provenienza e fascia già presenti",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) nega il collegamento UDS di una persona appartenente a un'altra area",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) non trasforma il collegamento UDS in un bypass generico per una persona già UDS di un'altra zona",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) un caller globale non può attivare uds su una persona senza area operativa (400)",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) un caller globale può attivare uds se la persona ha una area operativa",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) rifiuta uds=\"true\" (stringa) su una persona senza area operativa per un caller globale",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) un caller con area operativa attiva uds su un record legacy senza area operativa auto-assegnando la propria area operativa",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) un caller globale può attivare uds assegnando contestualmente la area operativa",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) permette di modificare e salvare il sesso Altro",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) permette una PATCH parziale del flag UDS su un legacy senza sesso",
+          "status": "passed"
+        },
+        {
+          "title": "PATCH /beneficiari/:id (uds boundary) rifiuta la modifica di un beneficiario legacy senza sesso",
+          "status": "passed"
+        },
+        {
+          "title": "GET /beneficiari?uds ritorna solo le persone con uds=true",
+          "status": "passed"
+        },
+        {
+          "title": "GET /beneficiari?uds filtra per parte del nome rispettando lo scope area operativa",
+          "status": "passed"
+        },
+        {
+          "title": "GET /beneficiari?uds filtra anche per codice tessera e codice fiscale",
+          "status": "passed"
+        },
+        {
+          "title": "GET /beneficiari?uds un caller con zona vede solo beneficiari della propria zona",
+          "status": "passed"
+        },
+        {
+          "title": "GET /beneficiari?uds mostra le persone uds+centro ma MAI le persone solo-centro",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/bug-05-logo-upload.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "logo Centro di Ascolto salva un PNG, persiste il riferimento e lo serve dall'URL pubblico",
+          "status": "passed"
+        },
+        {
+          "title": "logo Centro di Ascolto rifiuta tipo non valido e dimensione oltre 2 MB",
+          "status": "passed"
+        },
+        {
+          "title": "logo Centro di Ascolto richiede un amministratore",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/carico-pratiche-m3a.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "M3A — pratica persistente e registrazioni incrementali salva una bozza incompleta, la recupera da un'altra sessione e non muove stock",
+          "status": "passed"
+        },
+        {
+          "title": "M3A — pratica persistente e registrazioni incrementali rileva il conflitto di versione tra due operatori senza perdita silenziosa",
+          "status": "passed"
+        },
+        {
+          "title": "M3A — pratica persistente e registrazioni incrementali contabilizza 80 più una nuova riga 20 ottenendo 100 senza riscrivere la prima",
+          "status": "passed"
+        },
+        {
+          "title": "M3A — pratica persistente e registrazioni incrementali registra solo il gruppo completo e fa rollback atomico se una riga è incompleta",
+          "status": "passed"
+        },
+        {
+          "title": "M3A — pratica persistente e registrazioni incrementali deduplica retry sequenziali e concorrenti e rifiuta key o righe incompatibili",
+          "status": "passed"
+        },
+        {
+          "title": "M3A — pratica persistente e registrazioni incrementali rifiuta PATCH e DELETE manuali su righe già registrate",
+          "status": "passed"
+        },
+        {
+          "title": "M3A — pratica persistente e registrazioni incrementali collega rettifiche motivate, impedisce eccedenze e impegni e rollbacka se l'audit fallisce",
+          "status": "passed"
+        },
+        {
+          "title": "M3A — pratica persistente e registrazioni incrementali gestisce chiusura, replay dopo chiusura e annullamento motivato di una bozza",
+          "status": "passed"
+        },
+        {
+          "title": "M3A — pratica persistente e registrazioni incrementali serializza nuova registrazione contro chiusura e rifiuta righe estranee o lotto chiuso",
+          "status": "passed"
+        },
+        {
+          "title": "M3A — pratica persistente e registrazioni incrementali blocca Area diversa, deposito inattivo, deposito legacy e lotto di altra Area",
+          "status": "passed"
+        },
+        {
+          "title": "M3A — pratica persistente e registrazioni incrementali valida quantità indivisibili e tracciabilità fisica solo alla registrazione",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/fse-import-practice-m3b.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce R64-07 acquisisce 5000 Giacenze senza stock, con mapping, ownership, hash e replay",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce R64-07 acquisisce 10000 Giacenze senza stock, con mapping, ownership, hash e replay",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce R64-07 errore oltre il primo batch Giacenze annulla sessione, file, righe e audit",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce riserva la configurazione sorgente agli amministratori e serializza i codici duplicati",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce riprende un import parziale, rende idempotente il comando e non muove stock prima di Registra",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce conserva l'identità esterna originale e riconcilia gli alias verificati di lotto, documento e data",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce serializza forma originale e corretta concorrenti sulla stessa claim canonica",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce rilegge la pratica dopo il lock e rifiuta versione o stato divenuti obsoleti",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce serializza due attach sulla stessa pratica e consente il retry con versione aggiornata",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce aggiunge solo il sottoinsieme ordinario valido e mantiene atomico il saldo iniziale",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce non rimappa righe già riservate durante la ripresa parziale",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce impedisce due claim concorrenti della stessa sorgente anche su magazzini diversi",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce riconosce come da verificare un evento legacy applicato in un altro magazzino della stessa Area",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce blocca il writer legacy in un altro magazzino dopo l'attivazione della sorgente M3B",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce classifica come dato modificato la stessa identità senza applicare delta o nuovo carico",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce nega dettaglio e replay dopo la revoca dello scope senza esporre dati della sessione",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce rilascia e traccia una claim annullata prima della contabilizzazione",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce fa rollback di pratica, claim e stock quando l'audit fallisce",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce blocca un saldo iniziale se il Registro ha un saldo positivo assente dalle Giacenze",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce blocca il saldo iniziale non riconciliato: quantita-diversa",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce blocca il saldo iniziale non riconciliato: solo-giacenze",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce blocca il saldo iniziale non riconciliato: data-diversa",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce serializza il saldo con un writer inventariale già in volo e lascia la proposta assente",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce rifiuta senza residui un upload ordinario mentre il saldo è PROPOSTA",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce isola le righe coperte e conserva i nuovi eventi post-taglio e retrodatati",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce serializza davvero proposta saldo e acquisizione ordinaria sulla stessa sorgente",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce prepara e registra il saldo iniziale in modo atomico",
+          "status": "passed"
+        },
+        {
+          "title": "M3B — import FSE+ nella pratica Carico Merce T25 registra i sette saldi originali per 1177 pezzi e copre gli 80 carichi storici senza duplicarli",
+          "status": "skipped"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/logistica-hardening.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "hardening Logistica separa permission view e manage lato server",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica forza pending/inattivo e pending/non disponibile su create normali",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica forza il workflow pending anche su BULK e quick-create",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica accetta solo ruoli catalogati attivi e preserva la normalizzazione",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica impedisce a un caller Area-scoped di creare risorse globali NULL",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica approva solo da in_attesa con versione CAS",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica blocca pending e doppia assegnazione volontario, ma separa le fasce",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica serializza due richieste reali sullo stesso volontario e slot",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica serializza due richieste reali sullo stesso mezzo e slot",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica non perde gli assegnatari esistenti quando un update del turno fallisce",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica usa centro effettivo del proprietario e blocca scadenze sulla data operativa",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica rifiuta risorse respinte, inattive, pending o non disponibili e valida i mezzi",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica protegge la pianificazione Consegne cross-Area e le assegnazioni non operative",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica preserva il turno annullato, libera il mezzo e registra audit/versione",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica rende atomico il limite consegne per data+fascia e il sync turno",
+          "status": "passed"
+        },
+        {
+          "title": "hardening Logistica fa rollback della consegna se il turno collegato è completato",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/m5c2a-handoff-bolla-pronta.test.ts",
+      "evidence": "api-handoff-isolated.json",
+      "tests": [
+        {
+          "title": "M5C2-A — handoff Bolla pronta Latte usa l'unità l e il lotto Automatico FEFO; il lotto obbligatorio resta vincolante",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta mostra solo la Bolla confermata e non associata; la lista Interventi espone lo stesso raccordo",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta la conversione logistica diretta M4 non bypassa l'handoff del Centro",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta pianifica atomicamente una volta, serializza due operatori e il replay; completa stock/Richiesta senza Intervento duplicato",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta R2: dry-run senza scritture, apply esplicito request-only, conflitto e replay senza doppio stock",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta R2: non propone una riconciliazione se l'Area della Richiesta non coincide con quella della Bolla",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta F1-T01: esclude una Bolla il cui Magazzino origine è passato a un'altra Area",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta F1-T03: esclude un Centro diverso da quello del Beneficiario e della Bolla",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta F1-T04/T05: esclude destinatario differente e link non corrente",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta F1-T06/T07: non promuove stati M4 non terminali né una Richiesta già chiusa",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta F1-T08: apply rifiuta un piano divenuto territorialmente incoerente anche per un admin globale",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta annullando la Consegna, la Bolla ritorna pianificabile ma il vecchio replay non restituisce una Consegna eliminata",
+          "status": "passed"
+        },
+        {
+          "title": "M5C2-A — handoff Bolla pronta revoca Centro/Area: la coda e la pianificazione non ampliano il perimetro della sessione esistente",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/m67a-authorization.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "M67-01 ordinary actor without Area/Centro is denied, not global",
+          "status": "passed"
+        },
+        {
+          "title": "M67-02 explicit administrative global role retains cross-Area reads",
+          "status": "passed"
+        },
+        {
+          "title": "M67-02 scoped Admin stays in Area A",
+          "status": "passed"
+        },
+        {
+          "title": "M67-02 Centro A sees own and shared, not other Centre or Area",
+          "status": "passed"
+        },
+        {
+          "title": "M67-03 removing territory in the same HTTP session must not become global",
+          "status": "passed"
+        },
+        {
+          "title": "M67-03 current role grants are reloaded in the same HTTP session",
+          "status": "passed"
+        },
+        {
+          "title": "M67-03 removing only Centre retains Area A, never all Areas",
+          "status": "passed"
+        },
+        {
+          "title": "M67-01/03 common read boundary covers list, count, detail, export and projections",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/m67a-mensa-access.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "M67-10/11 receiver can read its request and supplies",
+          "status": "passed"
+        },
+        {
+          "title": "M67-10/11 requester can read its request and supplies",
+          "status": "passed"
+        },
+        {
+          "title": "M67-10/11 manager can read its request and supplies",
+          "status": "passed"
+        },
+        {
+          "title": "M67-10/11 mixed can read its request and supplies",
+          "status": "passed"
+        },
+        {
+          "title": "M67-10/11 admin can read its request and supplies",
+          "status": "passed"
+        },
+        {
+          "title": "M67-11 receiver cannot read unassigned M2 in the same Area",
+          "status": "passed"
+        },
+        {
+          "title": "M67-11 requester cannot read unassigned M2 in the same Area",
+          "status": "passed"
+        },
+        {
+          "title": "M67-11 manager cannot read unassigned M2 in the same Area",
+          "status": "passed"
+        },
+        {
+          "title": "M67-11 reports-only does not acquire request or supply access",
+          "status": "passed"
+        },
+        {
+          "title": "M67-11 mixed retains separately authorized Warehouse/Admin visibility",
+          "status": "passed"
+        },
+        {
+          "title": "M67-11 admin retains separately authorized Warehouse/Admin visibility",
+          "status": "passed"
+        },
+        {
+          "title": "M67-12 reporting exposes the exact authorized request and no other Mensa",
+          "status": "passed"
+        },
+        {
+          "title": "M67-10 receive-only receives the real M4 supply exactly once, without request/dispatch rights",
+          "status": "passed"
+        },
+        {
+          "title": "M67-03/11 revoking Mensa assignment and then read grant affects the same session",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/m67b-movement-effect.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "canonical reversal of carico/donazione has physical effect -1",
+          "status": "passed"
+        },
+        {
+          "title": "canonical reversal of trasferimento/entrata has physical effect -1",
+          "status": "passed"
+        },
+        {
+          "title": "canonical reversal of scarico/consegna has physical effect 1",
+          "status": "passed"
+        },
+        {
+          "title": "canonical reversal of trasferimento/uscita has physical effect 1",
+          "status": "passed"
+        },
+        {
+          "title": "canonical reversal of esito/consegna has physical effect 0",
+          "status": "passed"
+        },
+        {
+          "title": "never assigns an arbitrary effect to a reversal without its original",
+          "status": "passed"
+        },
+        {
+          "title": "rejects an unknown original rather than presenting a guessed sign",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/m67b-paths.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "M67-04/05 Area selection intersects scope and historical snapshots, including count/export",
+          "status": "passed"
+        },
+        {
+          "title": "M67-06/07 exact legacy resolver beyond 50/100, scoped and inactive negatives; MS is not legacy",
+          "status": "passed"
+        },
+        {
+          "title": "M67-08 writer-backed transfer receipt/return/outcome, unload and reversal have the canonical effect",
+          "status": "passed"
+        },
+        {
+          "title": "M67-04/05 ready Bolla queue applies selected Area/Centro to real prepared documents",
+          "status": "passed"
+        },
+        {
+          "title": "M67-07 current grants/territory, shared Centro NULL and same-session revocation",
+          "status": "passed"
+        },
+        {
+          "title": "M67-08/09 real load and adjustments expose canonical sign and precise civil date without mutating ledger",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/maps.test.ts",
+      "evidence": "api-maps-isolated.json",
+      "tests": [
+        {
+          "title": "MAPS — capability, scope e routing eredita la permission Interventi sia nelle capability sia nell'endpoint",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing eredita bolle.view e rende convert_delivery dipendente da bolle.deliver",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing espone le capability a 'Admin' senza aree o permessi espliciti",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing espone le capability a 'SuperAdmin' senza aree o permessi espliciti",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing non espone layer senza maps.operational e non inventa capability UDS",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing dichiara routeSupported solo con layer Consegne visibile e maps.route",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing non propone open per pagine amministrative a un caller standard",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing separa il bypass applicativo Admin dagli scope area operativa, centro e zona",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing applica gli scope anche alle route di Admin e SuperAdmin, lasciando globali solo i caller senza scope",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing restituisce solo consegne della area operativa e del centro del caller",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing interseca sempre lo scope Beneficiario con lo scope Magazzino",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing mostra solo consegne pianificate e rifiuta la route di una consegna effettuata",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing rifiuta esplicitamente N+1 attività invece di troncare il layer",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing impone e conserva lo snapshot dell'indirizzo nelle POST/PATCH Consegna",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing costruisce un URL minimizzato con i soli indirizzi e nega una consegna fuori scope",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing rifiuta route per ritiro in sede e intervalli oltre il limite",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing rifiuta route con moduli disabilitati o indirizzi mancanti",
+          "status": "passed"
+        },
+        {
+          "title": "MAPS — capability, scope e routing localizza un ritiro mancato solo sul domicilio utilizzabile, mai sul magazzino",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/mensa-magazzino-correttivo.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "Magazzino richiesto: obbligatorio, lista per Mensa/Area e nessuna scelta inattiva, propria o fuori scope",
+          "status": "passed"
+        },
+        {
+          "title": "Preferenza persistita e immutabile: il Magazzino può fornire da un'origine diversa",
+          "status": "passed"
+        },
+        {
+          "title": "La stessa sessione rivalida lo scope Centro per elenco e preferenza inviata",
+          "status": "passed"
+        },
+        {
+          "title": "RIC-01/02/03 TRA-01/03/05 IDE-01: due operatori, fabbisogno 20 / fornitura 12, M4 una sola volta",
+          "status": "passed"
+        },
+        {
+          "title": "AO-02/03 SEC-01: payload manipolati e scope Mensa non ampliano l'accesso",
+          "status": "passed"
+        },
+        {
+          "title": "TRA-03: grant legacy origine non riabilitano creazione/preparazione/spedizione Mensa",
+          "status": "passed"
+        },
+        {
+          "title": "TRA-01/02: diretto visibile, compatibilità nulla solo provabile, nessun backfill",
+          "status": "passed"
+        },
+        {
+          "title": "ABI-01: beneficiario mai abilitato ricercabile nell'Area, non cross Area",
+          "status": "passed"
+        },
+        {
+          "title": "SEC-02: ruolo misto conserva lettura Magazzino ma non estende la scrittura Mensa",
+          "status": "passed"
+        },
+        {
+          "title": "RIC-04: annullamento Mensa pre-uscita rilascia le prenotazioni M4 senza scarico",
+          "status": "passed"
+        },
+        {
+          "title": "SEC-01: revoca con sessione aperta nega anche replay richiesta senza nuovo effetto",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/transport-return-m4b2.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "CR-M4-01 — incaricato esclusivo in Affida CR-M4-01-A: usa il volontario assegnato senza nome esterno né distribuzione",
+          "status": "passed"
+        },
+        {
+          "title": "CR-M4-01 — incaricato esclusivo in Affida CR-M4-01-B: rifiuta nome esterno se il volontario è già assegnato",
+          "status": "passed"
+        },
+        {
+          "title": "CR-M4-01 — incaricato esclusivo in Affida CR-M4-01-C: conserva il nome esterno già assegnato senza reinvio",
+          "status": "passed"
+        },
+        {
+          "title": "CR-M4-01 — incaricato esclusivo in Affida CR-M4-01-D: senza incaricato il nome è obbligatorio",
+          "status": "passed"
+        },
+        {
+          "title": "CR-M4-01 — incaricato esclusivo in Affida CR-M4-01-E: salva soltanto un nome libero valido e scarica una volta",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata REPORT-M4-A: Bolla diretta riduce 20 fisici e distribuisce 20 una sola volta",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata REPORT-M4-B: Logistica/FSE leggono -20 fisico all'affidamento e +20 distribuito solo alla consegna",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata REPORT-M4-B-KG: l'esito distribuisce kg FSE senza un secondo effetto fisico",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata REPORT-M4-C: rientro 18 idonei, 1 deteriorato e 1 mancante lascia 98 fisici e zero distribuiti",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata BOLLA-DIRECT-REG: il percorso diretto mantiene un solo scarico fisico",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata AFF-01/02/03, DEL-01/02/04: affida una volta, finalizza con esito neutro e distribuzione unica",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata DEL-03: la consegna a Ente dopo affidamento è un esito senza secondo scarico né fatto sociale",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata DEL-SHARED: la pagina Consegne finalizza la stessa Bolla affidata senza secondo scarico",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata RET-01..10: 18 idonei, 1 avariato e 1 mancante producono stock 98 senza distribuzione",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata RET-03/05: scaduta e rubata restano distinte, netto fisico zero",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata CONC-AFF-01: due affidamenti in attesa sullo stesso lock serializzano una sola uscita",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata CONC-RET-01: due riconciliazioni sullo stesso lock producono un solo rientro",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata CONC-AFF-02: Affida conteso con Annulla non reintegra merce fuori scaffale",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata CONC-AFF-03: Affida conteso con Storno non crea una falsa compensazione",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata CONC-DEL-01: due conferme trasportate creano un solo esito e nessun secondo scarico",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata CONC-DEL-02: Conferma consegna e Mancata consegna non producono due stati terminali",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata CONC-FAIL-01: due segnalazioni di mancata consegna non duplicano l'esito",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata CONC-RET-02: un over-return conteso non altera il rientro valido",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata CONC-RET-04: due operatori sulla stessa uscita non duplicano il rientro",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata CONC-RET-03: Rientro e Conferma consegna non generano due esiti",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata IDEMP-M4B2: replay, mismatch e versione stale non ripetono l'affidamento",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata AUDIT-M4B2: errore audit annulla uscita e receipt dell'affidamento",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata RECEIPT-M4B2: errore nel receipt rollbacka audit e uscita fisica",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata DB-RET-01: la FK composta impedisce di attribuire un'uscita fisica alla Bolla sbagliata",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata DB-RET-02: owner esclusivo, quantità, partita reale e unicità sono vincoli PostgreSQL",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata AUTH-M4B2: revoca del permesso durante l'attesa del lock impedisce l'uscita",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — effetto fisico e Bolla affidata SCOPE-M4B2: cambio Centro durante l'attesa del lock impedisce l'uscita",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — Trasferimento rientrato CONC-TR-01: ricezione destino e mancato arrivo non possono entrambe prevalere",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — Trasferimento rientrato CONC-TR-02: rientro origine e ricezione destino non duplicano il carico",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — Trasferimento rientrato TR-RET-01..05: rientra all'origine, nessuna entrata al destino e stato terminale",
+          "status": "passed"
+        },
+        {
+          "title": "M4B.2 — Trasferimento rientrato TR-RET-FEFO: due partite uscite senza lotto esplicito rientrano sulle due partite originarie",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/uds-hardening.test.ts",
+      "evidence": "api-integrated.json",
+      "tests": [
+        {
+          "title": "UDS hardening territoriale e storico applica i soli dati minimi e la classificazione età alle nuove persone UDS",
+          "status": "passed"
+        },
+        {
+          "title": "UDS hardening territoriale e storico espone a un operatore UDS puro solo candidati non-UDS attivi della stessa Area con DTO minimizzato",
+          "status": "passed"
+        },
+        {
+          "title": "UDS hardening territoriale e storico richiede Area UDS e i due permessi dedicati senza concedere la full duplicate search",
+          "status": "passed"
+        },
+        {
+          "title": "UDS hardening territoriale e storico scopre il candidato senza aprire il dossier e lo collega sullo stesso id preservando il Centro",
+          "status": "passed"
+        },
+        {
+          "title": "UDS hardening territoriale e storico classifica i report UDS attraverso areaGuard reale senza ampliare gli altri report",
+          "status": "passed"
+        },
+        {
+          "title": "UDS hardening territoriale e storico consente cross-Zona minimizzato nella stessa Area e nega sempre l'altra Area",
+          "status": "passed"
+        },
+        {
+          "title": "UDS hardening territoriale e storico autorizza e audita l'export server-side della sola directory minimizzata",
+          "status": "passed"
+        },
+        {
+          "title": "UDS hardening territoriale e storico mantiene accessibile il legacy UDS esplicito senza inventare snapshot",
+          "status": "passed"
+        },
+        {
+          "title": "UDS hardening territoriale e storico mantiene snapshot, terminalità, nota/rettifica auditata e Bisogni versionati",
+          "status": "passed"
+        },
+        {
+          "title": "Zone UDS lifecycle rifiuta uds=false finché la Zona non viene rimossa esplicitamente",
+          "status": "passed"
+        },
+        {
+          "title": "Zone UDS lifecycle normalizza unicità, rende l'Area immutabile e usa locking/soft deactivate",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/mensa.test.ts",
+      "evidence": "api-mensa.json",
+      "tests": [
+        {
+          "title": "Modulo Mensa M61-F4 audit riapertura F4-T1/T2/T3/T7: due riaperture persistono snapshot e attore senza effetti inventariali",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-F4 audit riapertura F4-T4: fotografa l'associazione corrente alla riapertura e conserva lo storico",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-F4 audit riapertura F4-T5: revoca grant nella sessione aperta nega riapertura e audit",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-F4 audit riapertura F4-T5: revoca scope nella sessione aperta nega riapertura e audit",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-F4 audit riapertura F4-T5: revoca assegnazione nella sessione aperta nega riapertura e audit",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-F4 audit riapertura F4-T6: due invii concorrenti e retry su aperta producono un solo evento",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-F4 audit riapertura F4-T6: errore PostgreSQL nell'audit annulla atomicamente la riapertura",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-F4 audit riapertura F4-T8: audit chiusura, consumo, scarto e storno conserva il contratto M4",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-F4 audit riapertura F4: associazioni assenti, orfane o duplicate sono respinte dai vincoli senza fallback",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-D1: revoca concorrente prevale prima del lock autorizzativo corrente",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-13: chiusura concorrente con pasto produce snapshot e stock coerenti",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-13: chiusura concorrente con consumo produce snapshot e stock coerenti",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-13: chiusura concorrente con storno produce snapshot e stock coerenti",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-11: nessuna PII di altra Mensa nella stessa Area, affiliation attiva",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-11: nessuna PII di altra Mensa nella stessa Area, affiliation revocata",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-11: nessuna PII di altra Mensa nella stessa Area, affiliation temporanea",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-01/04: ciclo M4 reale Mensa, ricezione idempotente e lineage",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-01/04: ciclo M4 reale Mensa, mancata ricezione idempotente e lineage",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-03: ultima quantità contesa tra consumo e consumo, un solo effetto reale",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-03: ultima quantità contesa tra consumo e Bolla, un solo effetto reale",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-03: ultima quantità contesa tra consumo e Trasferimento, un solo effetto reale",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-10: Mensa inattiva non autorizza una nuova persona temporanea",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-D2: revoca beneficiario tra scan negato ed eccezione non autorizza il pasto",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-D2: revoca tessera tra scan negato ed eccezione non autorizza il pasto",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-08: revoca Area efficace nella stessa sessione reale",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-08: revoca Centro efficace nella stessa sessione reale",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-08: revoca grant efficace nella stessa sessione reale",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-D1: Admin assegna e revoca esplicitamente con audit; Centro non concede altra Mensa",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-06: risposta persa post-commit e retry concorrenti hanno un solo scarico/ledger/audit",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-07: motivo scarto/lotto/data corrente obbligatori; scarto fisico esatto e rollback",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-15: oltre 200 lotti, total e ricerca server-side non nascondono partite",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-D1: assegnazione esplicita, multi-Mensa e revoca nella stessa sessione reale",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-D2: revoca beneficiario dopo scansione prevale sul pasto",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-D2: revoca tessera dopo scansione prevale sul pasto",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-D2: revoca abilitazione dopo scansione prevale sul pasto",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M61-D4: chiusura a zero pasti, replay, cena indipendente e snapshot riapertura",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa non somma quantità appartenenti a unità di misura eterogenee",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa separa lo storico dello stesso Prodotto quando cambia l'unità registrata",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa calcola la data servizio Europe/Rome a mezzanotte: 2026-01-14T22:59:59Z",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa calcola la data servizio Europe/Rome a mezzanotte: 2026-01-14T23:00:00Z",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa calcola la data servizio Europe/Rome a mezzanotte: 2026-08-14T21:59:59Z",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa calcola la data servizio Europe/Rome a mezzanotte: 2026-08-14T22:00:00Z",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa considera non valido per il pasto un accesso di un istante prima della mezzanotte Europe/Rome",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa calcola lo stato sintetico Mensa  come non_abilitato",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa calcola lo stato sintetico Mensa [object Object] come programmata",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa calcola lo stato sintetico Mensa [object Object] come scaduta",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa calcola lo stato sintetico Mensa [object Object] come attiva",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa calcola lo stato sintetico Mensa [object Object] come sospesa",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa calcola lo stato sintetico Mensa [object Object] come revocata",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa restituisce un riepilogo batch minimale, deduplicato e senza PII",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa protegge il riepilogo con modulo, area Mensa e permesso mensa.view",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa valida gli ID del riepilogo e accetta una lista vuota",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa applica al riepilogo gli scope area operativa, Centro di Ascolto e zona UDS",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa scade la principale terminata ieri e consente una nuova abilitazione oggi",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa rifiuta una nuova principale se quella esistente è ancora temporalmente valida",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa mantiene esplicita e protetta l'abilitazione dalla scheda Beneficiario",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa non considera bloccante una principale sospesa",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa non considera bloccante una principale revocata",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa activeEligibility applica la data civile Europe/Rome vicino a mezzanotte",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa gestisce più Mense nella stessa area operativa e non espone quelle di altre area operativa",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa nega anche dalle route logistiche generiche i trasferimenti Mensa di un'altra area operativa",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa non usa le chiavi idempotenti come capability di lettura cross-Area",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa separa richiesta, spedizione e ricezione dei rifornimenti Mensa",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa R2-04: propone solo lotti trasferibili e conserva il lotto scelto fino alla prenotazione M4",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa crea atomicamente Mensa e magazzino dedicato con Area, Centro e codice automatico",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa non converte né associa un magazzino logistico esistente",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa vincola Centro di Ascolto e Area e non crea record parziali",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa M6.1 nega globalità implicita da Area nulla e impedisce override territoriali",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa impedisce operazioni Mensa quando il magazzino associato è inattivo",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa separa la disattivazione del servizio dallo stato del magazzino Mensa",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa vieta già a DB i magazzini senza Area prima della consultazione logistica",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa consente la tessera valida nella Mensa assegnata senza esporre dati sociali",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa registra il rifiuto per tessera inesistente",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa nega una tessera sospesa",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa nega una tessera revocata",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa nega una tessera scaduta",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa propone e registra un'eccezione esplicita soltanto tra Mense della stessa area operativa",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa rende la chiusura dominante e blocca eccezioni su accessi precedenti",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa serializza chiusura ed eccezione concorrenti senza eccezioni post-snapshot",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa nega l'altra area operativa e non restituisce identità o informazioni alimentari",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa applica le sospensioni, revoche, scadenze e lo stato del beneficiario",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa nega l'accesso a una Mensa disattivata",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa consente la ricerca manuale solo col permesso dedicato e non aggira l'abilitazione",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa crea e conserva lo storico di abilitazione e tessera",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa applica le transizioni terminali di Tessere e Abilitazioni",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa rende accesso e pasto idempotenti, blocca il secondo pasto e protegge l'override",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa crea una persona provvisoria e un accesso temporaneo senza tessera o abilitazione permanente",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa autorizza separatamente pranzo e cena temporanei nella stessa data",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa nega gli accessi dopo la chiusura del solo servizio interessato",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa crea una persona provvisoria anche con il servizio Centro di Ascolto disabilitato",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa continua a verificare accessi quando il servizio Magazzino Solidale è disabilitato",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa impone la conferma dei duplicati e permette di scegliere un esistente senza abilitazione",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa consente l'accesso temporaneo dopo un'abilitazione temporalmente scaduta",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa nega l'accesso temporaneo con abilitazione sospesa",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa nega l'accesso temporaneo con abilitazione revocata",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa indirizza al flusso ordinario una persona con abilitazione valida",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa protegge accessi temporanei con permesso dedicato e scope area operativa",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa emette dal Sociale solo tessere opache e soltanto dopo il completamento dell'anagrafica",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa rifiuta un pasto con accesso del giorno precedente e un'autorizzazione temporanea di altra data",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa conta un beneficiario una sola volta nel report anche se servito in più Mense",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa aggrega nel report tutte le categorie storiche di sesso, fascia età e temporaneità",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa pagina senza limiti silenziosi Accessi, Pasti, Eccezioni e Trasferimenti",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa ammette periodi principali futuri disgiunti e rifiuta sovrapposizioni anche concorrenti",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa normalizza i tipi servizio canonici e conserva lo snapshot storico",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa rifiuta un consumo futuro senza modificare Lotto, Giornata o Movimenti",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa espone e fotografa consumi multi-unit senza un totale cross-unit",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa registra consumo FEFO idempotente, rollback insufficiente, chiusura, riapertura e storno compensativo",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa rifiuta un consumo frazionario per un Prodotto non frazionabile",
+          "status": "passed"
+        },
+        {
+          "title": "Modulo Mensa Magazzino 2.0A-R2 — riconcilia il riuso della stessa giornata dopo uno storno completo",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/cassa-emporio.test.ts",
+      "evidence": "api-emporio.json",
+      "tests": [
+        {
+          "title": "Cassa Emporio M66 AC-10 real checkout and refund straddle Rome midnight without double counting credit",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C04/C05 credito intero con quantità frazionaria, rifiuto senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C07/C08/C12/C13/C14/C16/C18 credito-only poi totale, replay e recupero GET",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C08 errore amministrativo 12−4=8: nessun rientro inventato, audit e ledger riconciliati",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C12 stessa chiave in parallelo: una ricevuta e un solo rimborso",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C23 confine anno Europe/Rome 2026-12-31T23:30:00Z: il reso resta nel mese originale",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C23 confine anno Europe/Rome 2026-12-31T22:30:00Z: il reso resta nel mese originale",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C15 GET di esito assente non dichiara successo e non crea fatti",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C12/C27 chiave legacy senza hash: diniego conservativo e storico leggibile",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C27 storico frazionario saldi leggibile ma non rettificabile, anche se la somma è intera",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C27 storico frazionario rimborsi leggibile ma non rettificabile, anche se la somma è intera",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C06/C10 FEFO multi-lotto non definisce il rimborso; nessun resto redistribuito",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C09/C23 solo reso quantitativo riduce il mese della Spesa originaria",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C24 sei decimali preservati UI-contract → API → DB → risposta",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C28 fault lotti: stock, credito, ricevuta e audit annullati insieme",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C28 fault credito_solidale_movimenti: stock, credito, ricevuta e audit annullati insieme",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C28 fault comandi_operativi: stock, credito, ricevuta e audit annullati insieme",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C28 fault audit_eventi: stock, credito, ricevuta e audit annullati insieme",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C02 input frazionario diretto non crea rettifiche",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C17 reso non distribuibile: scarto M4, saldo corretto, lotto sano invariato",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C19/C20 storni esterni credito e Bolla Emporio rifiutati prima degli effetti",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C11 due rimborsi concorrenti, barriera PostgreSQL osservata sulla Spesa",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C22 replay e recupero rivalidano la revoca corrente senza alterare sessione",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C11 parziale contro totale: quantità e rimborso cumulativi sotto lock",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C19/C20 rettifica in corso contro compensazione esterna credito",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C19/C20 rettifica in corso contro compensazione esterna bolla",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C22 revoca concorrente dopo il preliminare: rivalidazione transazionale",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C11 rientro contro writer indipendente dello stesso lotto: nessun lost update",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio C17 lotto divenuto scaduto: no reso idoneo, scarto atomico consentito",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B25 R2 concorrenza PostgreSQL revoca-prima: contabilità atomica",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B25 R2 concorrenza PostgreSQL checkout-prima: contabilità atomica",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B18/B19 Catalogo cambiato dopo preparazione: {\"attivo\":false}",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B18/B19 Catalogo cambiato dopo preparazione: {\"abilitatoEmporio\":false}",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B18/B19 Catalogo cambiato dopo preparazione: {\"unitaMisura\":\"l\"}",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B18/B19 Catalogo cambiato dopo preparazione: {\"quantitaFrazionabile\":false}",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B18/B19 Catalogo cambiato dopo preparazione: {\"quantitaMassimaPerSpesa\":\"0.25\"}",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B34 una Spesa con UOM pz/kg conserva dimensioni e un unico fatto distributivo",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B15 stesso Beneficiario: serializza saldo con due checkout da 8",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B15 stesso Beneficiario: serializza limite mensile con due checkout da 8",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B25/B26 revoca grant sulla stessa sessione reale: zero effetti",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B25/B26 revoca area sulla stessa sessione reale: zero effetti",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B25/B26 revoca emporio sulla stessa sessione reale: zero effetti",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B25/B26 revoca abilitazione sulla stessa sessione reale: zero effetti",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B27 fault injection PostgreSQL: rollback totale",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B28 fault injection PostgreSQL: rollback totale",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B29-credito fault injection PostgreSQL: rollback totale",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B29-audit/B31 fault injection PostgreSQL: rollback totale",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B12/B34 FEFO 3+5, fondi e fattori fisici diversi conservati nei movimenti",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B13 stock 10 prenotato 7: 4 negato, 3 consentito, prenotazione intatta",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B07…B10 Cassa contro Bolla: stock e prenotazioni entro disponibilità",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B07…B10 Cassa contro Trasferimento: stock e prenotazioni entro disponibilità",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B07…B10 Cassa contro Scarico: stock e prenotazioni entro disponibilità",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B07…B10 Cassa contro Mensa: stock e prenotazioni entro disponibilità",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B22/B24 recupero GET della propria sessione senza sales.view; niente directory o stampa",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B18 PATCH non riscrive la UOM salvata dopo modifica Catalogo",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B06 due Casse ultimo pezzo: lock PostgreSQL osservabile, una sola uscita",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B16/B17 congela il prezzo all'aggiunta anche dopo PATCH quantità",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio B30 collega checkout e movimenti a un unico audit comune con attore e correlation",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio applica RBAC dedicato a Cassa, force e Spese anche per utenti non-admin",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio apre una sessione da Accesso Emporio valido e marca l'accesso effettuato",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio impedisce due Sessioni concorrenti sullo stesso Accesso",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio rifiuta una seconda mutazione con versione stale",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio recupera oltre 100 Sessioni e oltre 200 Spese senza cap silenziosi",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio blocca apertura se Emporio è disabilitato",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio blocca apertura e Accesso forzato su Emporio inattivo",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio blocca apertura da accesso annullato",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio blocca apertura da accesso non_presentato",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio blocca apertura se beneficiario non è abilitato al Credito Solidale",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio blocca apertura se Credito Solidale non è attivo",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio blocca apertura su magazzino logistico",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio non crea due sessioni attive per lo stesso accesso e restituisce quella esistente",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio forza un Accesso Emporio dalla Cassa e apre una sessione tracciata",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio ricerca beneficiario per codice tessera/codice a barre e include accessi validi",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio mostra beneficiari accreditati anche senza Accesso Emporio pianificato",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio non cerca in Cassa beneficiari di altra Area anche con Emporio preferito locale",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio non mostra beneficiari Cassa senza Area o Emporio e scarta beneficiari non eleggibili",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio mostra beneficiari accreditati e filtra gli accessi validi per data, area ed Emporio",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio filtra le sessioni per data, area ed Emporio",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio ricerca prodotto per nome, codice e codice a barre solo se abilitato Emporio",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio ricerca prodotto mostra solo prodotti disponibili nell'Emporio e l'aggiunta blocca la giacenza assente",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio blocca prodotto non abilitato Emporio e prodotto senza Valore Credito Solidale",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio aggiunta, modifica quantità e rimozione aggiornano il totale Credito previsto",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio blocca quantità zero o negativa",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio blocca limite per singola spesa e limite mensile netto del Beneficiario",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio applica il limite mensile netto tra Sessioni ed Empori e libera quantità dopo storno",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio blocca giacenza insufficiente senza scaricare il lotto",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio saldo insufficiente e carrello vuoto impediscono pronta_per_chiusura",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio ricalcola il credito residuo usando il saldo corrente del beneficiario",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio Cassa non forza la ricarica mensile: refresh dismesso e lettura senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio pronta_per_chiusura non crea movimenti, non scala saldo, non scarica giacenza, non crea bolle o scarichi",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio supporta quantità decimali e mantiene la UOM kg su Sessione, Spesa, Bolla e Movimento",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio non scarica un Lotto diventato scaduto dopo la preparazione e rollbacka ogni effetto",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio applica FEFO soltanto ai Lotti distribuibili lasciando invariato quello scaduto",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio chiude una sessione pronta creando Spesa Emporio, bolla, scarico, movimento credito e aggiornando saldo e giacenza",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio genera numeri Spesa e Bolla distinti per due checkout concorrenti",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio prepara la Bolla via mailto manuale e registra il click senza invio SMTP",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio prepara link e testo Bolla anche quando non esiste un destinatario email",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio non chiude una sessione non pronta",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio non chiude due volte la stessa sessione",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio mantiene chiusa una Sessione terminale e non altera stock o Credito su annullamento successivo",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio serializza modifica carrello e checkout evitando una Spesa su carrello mezzo vecchio",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio storna parzialmente e poi serializza due storni concorrenti senza over-storno",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio rollbacka integralmente uno storno quando manca il legame inventariale storico",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio annulla atomicamente la chiusura se la giacenza diventa insufficiente",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio rifiuta atomicamente un'incoerenza legacy tra Accesso e Sessione",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio applica scope Area a Sessioni, Spese, Bolla, email e storno",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio preserva la UOM deterministica nel fallback Bolla legacy senza inventare pz",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio espone data documento Europe/Rome e provenienza FSE+ reale nella Bolla Emporio",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio impone quantità intere per pz e conserva i decimali per kg e l",
+          "status": "passed"
+        },
+        {
+          "title": "Cassa Emporio sospende, riprende e annulla con motivo; sessione annullata non è modificabile",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/credito-automatico-f1.test.ts",
+      "evidence": "api-emporio.json",
+      "tests": [
+        {
+          "title": "F1 rettifica autonoma e sicurezza R02/R03/R04/R05/R10 delta 12, motivo non determina il segno",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R02/R03/R04/R05/R10 delta -12, motivo non determina il segno",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R02/R03/R04/R05/R10 delta -210, motivo non determina il segno",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R05/R06 limite esatto 10 e diniego oltre saldo atomico",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R07 rifiuta 0 senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R07 rifiuta 1.5 senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R07 rifiuta -1.5 senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R07 rifiuta 100000000 senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R07 rifiuta  senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R07 rifiuta null senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R07 rifiuta 3.01 senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R07 motivo whitespace obbligatorio, errore contestuale",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R08 doppio click, replay esatto, GET risposta persa e conflitto payload",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza R09 riduzioni concorrenti serializzate",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza rettifica: fault audit_eventi annulla saldo, movimento, audit e ricevuta",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza rettifica: fault comandi_operativi annulla saldo, movimento, audit e ricevuta",
+          "status": "passed"
+        },
+        {
+          "title": "F1 rettifica autonoma e sicurezza replay e GET negati dopo revoca grant corrente",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M01/M03/M12 due worker, quota sommata una sola volta e rettifica non riapre ricevuta",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M02 calendario Rome fine anno e DST indipendente da UTC",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M04 riprende gruppo persistito senza ampliare destinatari",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M05 storico mensile stornato resta già eseguito",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M06 esclusione sospeso senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M06 esclusione inattivo senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M06 esclusione senza_diritto senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M06 esclusione quota_zero senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M06 esclusione territorio senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M06 esclusione saldo_frazionario senza effetti",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M07/M08 rollback su credito_solidale_movimenti, altri beneficiari completati e retry tecnico",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M07/M08 rollback su audit_eventi, altri beneficiari completati e retry tecnico",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M07/M08 rollback su credito_ricariche_destinatari, altri beneficiari completati e retry tecnico",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M09 tutti gli ingressi pubblici dismessi anche SuperAdmin=false",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M09 tutti gli ingressi pubblici dismessi anche SuperAdmin=true",
+          "status": "passed"
+        },
+        {
+          "title": "F1 scheduler backend M10/M11 letture e primo avvio a mese iniziato non accreditano",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/bug-05-approvvigionamenti-area.test.ts",
+      "evidence": "api-supply.json",
+      "tests": [
+        {
+          "title": "Area territoriale e fornitori negli ordini esegue rollback di testata e righe quando una FK Prodotto fallisce",
+          "status": "passed"
+        },
+        {
+          "title": "Area territoriale e fornitori negli ordini accetta Area A con fornitore A e Area B con fornitore B",
+          "status": "passed"
+        },
+        {
+          "title": "Area territoriale e fornitori negli ordini rifiuta Area A con fornitore B e il fornitore inattivo",
+          "status": "passed"
+        },
+        {
+          "title": "Area territoriale e fornitori negli ordini consente il cambio Area soltanto insieme a un fornitore coerente",
+          "status": "passed"
+        },
+        {
+          "title": "Area territoriale e fornitori negli ordini mantiene leggibile un ordine storico privo di fornitore",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/m67d-verifications.test.ts",
+      "evidence": "api-d-final.json",
+      "tests": [
+        {
+          "title": "V67-02 characterizes independent Maps grant after same-session Consegne revocation (not policy approval)",
+          "status": "passed"
+        },
+        {
+          "title": "V67-03 characterizes offset export drift under an actual intervening writer, then same-session revocation",
+          "status": "passed"
+        },
+        {
+          "title": "D67-01 controlled Rome day 1/day 2: no new late run, existing run resumes idempotently",
+          "status": "passed"
+        },
+        {
+          "title": "M67-38 synthetic branding is public, private operational exports require a live authorized session",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/api-server/tests/m67d-social-chain.test.ts",
+      "evidence": "api-d-final.json",
+      "tests": [
+        {
+          "title": "M67-18/19 actual Social and Warehouse sessions: intervention to delivery, replay, no duplicate stock or intervention",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "dbReuse": {
+    "source": "/private/tmp/magazzino-m66-certgo-HAfQi7/candidate-go.json",
+    "checked": 143,
+    "delta": []
+  },
+  "buildReuse": {
+    "snapshot": "/private/tmp/magazzino-m67c-nBXBao/linux-source-candidate2",
+    "checked": 1535,
+    "delta": [
+      {
+        "path": "artifacts/magazzino-solidale/src/components/maps/maps-operativa.test.tsx",
+        "sha256": "7227f01691878ae8d989bd73400e77e0ba57b0992ced95d5da29f9993b76ab20"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/src/pages/richieste-magazzino.test.tsx",
+        "sha256": "c85f99d252d394068b432260812102bd5b2eaa4c7b3a573c228303c7012a3521"
+      }
+    ]
+  },
+  "evidences": [
+    {
+      "name": "api-characterization-final.json",
+      "sha256": "39cc7916266673ff5c4f0290132092ba7b7eb10eba587269b90a20ec6399e463"
+    },
+    {
+      "name": "api-characterization-final.log",
+      "sha256": "b7c60e1f519d6417a39fec507dc0e763965f492f5ec6b28c4fc218a1420eb1b6"
+    },
+    {
+      "name": "api-characterization.json",
+      "sha256": "ffc9d2ab23098fd4f8e2f923b938e82fc66d595e890921f7330f78c400213dcc"
+    },
+    {
+      "name": "api-characterization.log",
+      "sha256": "5b8d787b4a468cde4270fe37e51b2db25ec53732079070cf1cf8213eb3be1a4c"
+    },
+    {
+      "name": "api-characterization2.json",
+      "sha256": "f494e6099d6148b9d50ea49a8a6b21ff658b53d6131a2b3cd951992ceb0f211d"
+    },
+    {
+      "name": "api-characterization2.log",
+      "sha256": "bc099aacbca9e9b5c90b7454d2403d3cb7f80e67f28b84d8e9dc97f889c1a18d"
+    },
+    {
+      "name": "api-d-final.json",
+      "sha256": "80171de0c767169bbc6ec0d07ca853821bb12974b3614c23bd2c72ed614bc8ba"
+    },
+    {
+      "name": "api-d-final.log",
+      "sha256": "e3158d8d6e3b20b0637d4ff23a535da31dcdd4818ee7eb63c0a40e3389007b4a"
+    },
+    {
+      "name": "api-emporio.json",
+      "sha256": "a73e541e4cddaa7953bcf682f709ee66df5c78aa63afe79feeef14a76c27ff22"
+    },
+    {
+      "name": "api-emporio.log",
+      "sha256": "0f2c7ea18c3829459a7f466fd09d66b69e6b99a3a7390fdcb02ca2e5f9fc5c99"
+    },
+    {
+      "name": "api-handoff-isolated.json",
+      "sha256": "a78a853958aafdd1a06623e039703cc796179d07db009ce5aa9b5b374af0883a"
+    },
+    {
+      "name": "api-handoff-isolated.log",
+      "sha256": "d6373089a9ff478d32c041d847adcf0d3337c5ee4e44cf3e26cfd90cd91178a2"
+    },
+    {
+      "name": "api-integrated.json",
+      "sha256": "5224987d3a45c2423d43332493e3eee627e2c3ef5350b690b10e2238359c2b6d"
+    },
+    {
+      "name": "api-integrated.log",
+      "sha256": "2f5c178f7c8f5e09afe6098a5f9e6a39b7355011dae5a834819c76cf139223c9"
+    },
+    {
+      "name": "api-maps-isolated.json",
+      "sha256": "dba075814ec8f6f3ae620d4ba9008b304544be41ecf0949786575b731c07822f"
+    },
+    {
+      "name": "api-maps-isolated.log",
+      "sha256": "87f7e64c7e50e33f5ebf410f7e5c53344805bf9236b28aee1b55083a22296ce9"
+    },
+    {
+      "name": "api-mensa.json",
+      "sha256": "16d472d78a9f1ffa203ae260707247120e67aaed127470056474647d7474d5f9"
+    },
+    {
+      "name": "api-mensa.log",
+      "sha256": "74e686b28c8ad2242acd941cd21e0735f8e2c9df190aaf3cc0c2adf7116d8718"
+    },
+    {
+      "name": "api-social-chain.json",
+      "sha256": "6af89140ce7f10b73f9523ba16e81ae50414e5bc4b346f3cfc8568b7463d16bb"
+    },
+    {
+      "name": "api-social-chain.log",
+      "sha256": "e1d855621a5bea8f26e13164492c118e76477efcab1af29f557663e9d49780f0"
+    },
+    {
+      "name": "api-social-chain2.json",
+      "sha256": "fcd6e1c3232af736b6905c8fdaca2aa8e4a9b19b34d37871ec3edf4e93d1841d"
+    },
+    {
+      "name": "api-social-chain2.log",
+      "sha256": "56754e2f2bc5fcea088f5c4baab50771e9f5f91f36c5e04568a373aea79e6c9a"
+    },
+    {
+      "name": "api-social-chain3.json",
+      "sha256": "aabeb7c30e7849d67c3f7518d17086e112de9676789b41a451a5a95895369912"
+    },
+    {
+      "name": "api-social-chain3.log",
+      "sha256": "ab1aa936812edd1fcad0ec7548aa15d0bb6d76609ff283a4ae4fab0a313243ed"
+    },
+    {
+      "name": "api-supply.json",
+      "sha256": "8381fc8ca000350a2e40b2ba2dd5db94e8bebe5824efadb28d97a454d8e37361"
+    },
+    {
+      "name": "api-supply.log",
+      "sha256": "fbd033522d49a836e881a12bc6d8694ee36e25e7b2ba3f588e537f569041dae8"
+    },
+    {
+      "name": "audit.mjs",
+      "sha256": "0b85176148a082aa328795062db47200df3b1a1ec77f228468fdb64cc01df221"
+    },
+    {
+      "name": "browser-a-final.json",
+      "sha256": "d8dfd0ee3205071c3cff04b3f401cba257d97097fa525b73e47428a0b38ffd48"
+    },
+    {
+      "name": "browser-a-final.log",
+      "sha256": "77e1a16ee7d5bbecd8f78dec20acfd0c96fec08b424c9227e71ec2c95d2a0598"
+    },
+    {
+      "name": "browser-a-final2.json",
+      "sha256": "68745c1c7ae2dad0b4cc4aefc29de0e1e51be8bb08e99fb1c92e6baf0a38a1e0"
+    },
+    {
+      "name": "browser-a-final2.log",
+      "sha256": "48ed739890ab31703eb3f6d4375a27924a80ed12d860b891d3f63693e427649d"
+    },
+    {
+      "name": "browser-a-integrated.json",
+      "sha256": "7f422697a733fc545f902b395c28975dca2ef6a52c66949015147024c7f983f3"
+    },
+    {
+      "name": "browser-a-integrated.log",
+      "sha256": "11a9738b6759c7521901c13667f7faa5e834003c90e6fe5416cb8c23d80c64c0"
+    },
+    {
+      "name": "browser-api.ts",
+      "sha256": "7a51637313683b5c12e4c8a09af8b0b742eb8d9db6b36d6183625751fcf88820"
+    },
+    {
+      "name": "browser-d1.json",
+      "sha256": "f6c3014cd2f044c8e88f5a2de753c7994f1714235373f8e872d9feb0059446b6"
+    },
+    {
+      "name": "browser-d1.log",
+      "sha256": "03b0b3a9c1fdc97a8da20cde36e9eb2188155bb2b2c687f79648a874c83eca27"
+    },
+    {
+      "name": "browser-d2.json",
+      "sha256": "02e5b1f831f78708d7b7f1064bf965990ae62ec9bc94f5f2b46163e32534333a"
+    },
+    {
+      "name": "browser-d2.log",
+      "sha256": "021fdad5c52eecea11fb9285c7c865a95372702d187904ce884c1d3b34aaf61d"
+    },
+    {
+      "name": "browser-d3.json",
+      "sha256": "eee080a0aae3a8689112ebb48645c8afb5f753b0660fbb44ce4ec60f43f0cc2c"
+    },
+    {
+      "name": "browser-d3.log",
+      "sha256": "564b5e4ddbc98b3092eece81985059aebfb76585da0d5341a96c30f7827ea62e"
+    },
+    {
+      "name": "browser-d4.json",
+      "sha256": "99d8f7721050f526b5110b6ec706c16d4e2a5d33f4ebc62fd84c0a8bc34e79a3"
+    },
+    {
+      "name": "browser-d4.log",
+      "sha256": "e70f05c1d3fe0059e8de2a14e96e624f175c16a5561835647adb0c3b2c8a0862"
+    },
+    {
+      "name": "cleanup-container.log",
+      "sha256": "27e3b00e835a02df1b2928648b6c755ed6bda564e18d6a90d17269b88daf890c"
+    },
+    {
+      "name": "cleanup-network.log",
+      "sha256": "a5199532a39b769a4bf7e39edeea81c97e88bc0cffc42314f37199ad62e6c47d"
+    },
+    {
+      "name": "container.log",
+      "sha256": "df39cad9a8f8196be315bc036118ae3c24d42d8ae6244f919aeea45c1ec39e04"
+    },
+    {
+      "name": "date-parity.json",
+      "sha256": "b4ba01a65b87e11ccf829e3e8f67a51a829d0107146d84c603abe27b63dd949f"
+    },
+    {
+      "name": "date-parity.py",
+      "sha256": "a2bb3c60c4adaf99b483a2961e27bf5210b3dd061e1b832e85151d4b339c6aed"
+    },
+    {
+      "name": "documents-inspection.json",
+      "sha256": "1c39e713bc64bbc42fe69881e6e31eaf1bfdd729d1efc1817ba9e5588612401b"
+    },
+    {
+      "name": "domains-cleanup.log",
+      "sha256": "ed81c8a83bcd0eb4555bb565597cea52d33a8b78f5a2ed012d2a590f93deea19"
+    },
+    {
+      "name": "domains-container.log",
+      "sha256": "f09a99cf589a58534d39aa50914f7af97b77872463c74b83f50f3478dc1622e3"
+    },
+    {
+      "name": "domains-isolation.json",
+      "sha256": "a7730e8081915c4e260d04ae8972fdbef137785258d6652b5879ddf41aa2c3ad"
+    },
+    {
+      "name": "domains-ready.log",
+      "sha256": "9e1aac722f6f1d12dea8d169e32e46ef58ba15ed4f1411e0028692b91f53e028"
+    },
+    {
+      "name": "domains.mjs",
+      "sha256": "3f78d22e80403b816aa011612851849df96e3f81b200b2a9c15e4ae0e9430292"
+    },
+    {
+      "name": "evidence-audit.json",
+      "sha256": "9d3509a86ae42fb361e8b61961400087cc30189691e80eed7152e3025a25e7e7"
+    },
+    {
+      "name": "final-identity.json",
+      "sha256": "55bbb64a68b816f7d21047afafeb3ecda1b82e06b1ce66d70776d3d63d9c920b"
+    },
+    {
+      "name": "final-manifest.json",
+      "sha256": "21129e9fc4cc4f3e5f0e8979e6dce3d6f46cdf43dda0a156756a57aac4bd3296"
+    },
+    {
+      "name": "identity.mjs",
+      "sha256": "5ecfeb0f4ad456162ba04eac5f16f7bdec35d06aefe730856d4d09d773b928e9"
+    },
+    {
+      "name": "initial-identity.json",
+      "sha256": "9f6addbd92126befea5eba13d4214767149949801ad66736b59e15200480a624"
+    },
+    {
+      "name": "initial-manifest.json",
+      "sha256": "62b56d879585c17800465945dea4f5fb7113443cd6aabe2bc22c14eb2f69b4b1"
+    },
+    {
+      "name": "inspect-documents.py",
+      "sha256": "1b6ebc66222a601d1b033c334fc56f3df3f3311d2046ddd67b81f08b4e8dfacd"
+    },
+    {
+      "name": "isolation.json",
+      "sha256": "36a2171bf91a05f5489ac096cdb6307652779fd0ebca10924ef0ee48bb3d76f3"
+    },
+    {
+      "name": "m5c2a_r2_d-create.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "m5c2a_r2_d-migrations-status.log",
+      "sha256": "9a3979cde36bf1e87a03109ba87fa1ffafb54e5296c55a354d62b081f255e7fa"
+    },
+    {
+      "name": "m5c2a_r2_d-migrations-verify.log",
+      "sha256": "1a8b25a5de57461c21b650bce3d6a1cf35768b5e1a7f963aaa3e056e75908c2c"
+    },
+    {
+      "name": "m5c2a_r2_d-schema.log",
+      "sha256": "42a2b5c1d2dff77829053285c8a75ae6a9ee61844cc5423891c90e40fa080cea"
+    },
+    {
+      "name": "m5c2a_r2_d-update.log",
+      "sha256": "851b7cb909ffbced7809d0425ecfbc67d1826852240a1df1d607e231052a28b0"
+    },
+    {
+      "name": "m61_m67d-create.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "m61_m67d-migrations-status.log",
+      "sha256": "3de7e6ca3590e4d1b8d94074a99526f10a301dcd71840d4b08e39548cd60275a"
+    },
+    {
+      "name": "m61_m67d-migrations-verify.log",
+      "sha256": "1a8b25a5de57461c21b650bce3d6a1cf35768b5e1a7f963aaa3e056e75908c2c"
+    },
+    {
+      "name": "m61_m67d-schema.log",
+      "sha256": "42a2b5c1d2dff77829053285c8a75ae6a9ee61844cc5423891c90e40fa080cea"
+    },
+    {
+      "name": "m61_m67d-update.log",
+      "sha256": "4a7a1b8c6217bd7d0dbb523d252c60cd388d374d8c59e1150ebb72803bb96f8e"
+    },
+    {
+      "name": "m62a-migrations-status.log",
+      "sha256": "d6243879ba58d00613ac40ddcf7007c69fbeeeeb3e0d13798a3b33aa93194922"
+    },
+    {
+      "name": "m62a-migrations-verify.log",
+      "sha256": "1a8b25a5de57461c21b650bce3d6a1cf35768b5e1a7f963aaa3e056e75908c2c"
+    },
+    {
+      "name": "m62a-schema.log",
+      "sha256": "42a2b5c1d2dff77829053285c8a75ae6a9ee61844cc5423891c90e40fa080cea"
+    },
+    {
+      "name": "m62a-update.log",
+      "sha256": "3aff6ef3d86aa617476fa5d33a49390fe780d6cde000aa750678289bd37ae819"
+    },
+    {
+      "name": "m67d_maps-create.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "m67d_maps-migrations-status.log",
+      "sha256": "4574f4613158ce59a0c0e5759d7252367fb600f5dbf239a82aeb2fc43b0f6845"
+    },
+    {
+      "name": "m67d_maps-migrations-verify.log",
+      "sha256": "1a8b25a5de57461c21b650bce3d6a1cf35768b5e1a7f963aaa3e056e75908c2c"
+    },
+    {
+      "name": "m67d_maps-schema.log",
+      "sha256": "42a2b5c1d2dff77829053285c8a75ae6a9ee61844cc5423891c90e40fa080cea"
+    },
+    {
+      "name": "m67d_maps-update.log",
+      "sha256": "e4936e5314daa2b83e572c8290746cc28f38fb9390fd197221475d30880c7f2e"
+    },
+    {
+      "name": "migrations-status.log",
+      "sha256": "b6c7704e88b7e660a8705b163575d1f74f9266df961b2caccbeb0af55e619615"
+    },
+    {
+      "name": "migrations-verify.log",
+      "sha256": "1a8b25a5de57461c21b650bce3d6a1cf35768b5e1a7f963aaa3e056e75908c2c"
+    },
+    {
+      "name": "network.log",
+      "sha256": "b39d93f4635312234d512639543958998a7b6464eb9f25fd4f207f4ad0a52afa"
+    },
+    {
+      "name": "package.json",
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "name": "playwright.config.ts",
+      "sha256": "9f168250e7b216ef3ba9ff2cf118c204192ac4595dde0ec0a892927aec8d2ef8"
+    },
+    {
+      "name": "progress-identity.json",
+      "sha256": "5eb80de6c03b34decb6ab6d9d4a096e99a58478d2e0a42f29e2f9c1c374a78e9"
+    },
+    {
+      "name": "progress-manifest.json",
+      "sha256": "f84fdbe679bc179002489d3c589eed529a852b906a9ae6cf5f5e15aee4b7f430"
+    },
+    {
+      "name": "ready.log",
+      "sha256": "9e1aac722f6f1d12dea8d169e32e46ef58ba15ed4f1411e0028692b91f53e028"
+    },
+    {
+      "name": "run.mjs",
+      "sha256": "263ccff7b654a71dee1a55c3ec9cef4a7baf9e1262a318eea4cdffc35ba713b5"
+    },
+    {
+      "name": "schema.log",
+      "sha256": "42a2b5c1d2dff77829053285c8a75ae6a9ee61844cc5423891c90e40fa080cea"
+    },
+    {
+      "name": "update.log",
+      "sha256": "98fc21e5c2cc4ff740ce7631cf9a752aff359bfe31967f775aa53cedf29000b6"
+    },
+    {
+      "name": "vite.config.ts",
+      "sha256": "1bfef7037db9623a630f8a2a998d8c8aac03833baf0e9b331e63c902872bb3cc"
+    }
+  ],
+  "browserTests": [
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-11 requester: menu and direct route respect source capabilities",
+      "project": "rome-desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-11 manager: menu and direct route respect source capabilities",
+      "project": "rome-desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-11 reporter: menu and direct route respect source capabilities",
+      "project": "rome-desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-11 mixed: menu and direct route respect source capabilities",
+      "project": "rome-desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-03 warehouse page revalidates cached rows after same-session territory revocation",
+      "project": "rome-desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-10/12 receive-only navigation, exact request beyond page one, report return and same-session revocation",
+      "project": "rome-desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-11 requester: menu and direct route respect source capabilities",
+      "project": "la-tablet",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-11 manager: menu and direct route respect source capabilities",
+      "project": "la-tablet",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-11 reporter: menu and direct route respect source capabilities",
+      "project": "la-tablet",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-11 mixed: menu and direct route respect source capabilities",
+      "project": "la-tablet",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-03 warehouse page revalidates cached rows after same-session territory revocation",
+      "project": "la-tablet",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-a-final2.json",
+      "title": "M67-10/12 receive-only navigation, exact request beyond page one, report return and same-session revocation",
+      "project": "la-tablet",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-d4.json",
+      "title": "M67-08 real transfer receipt, return, outcome and unload reversal in binary exports",
+      "project": "rome-desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-d4.json",
+      "title": "M67-04 Area all Centres, page 2 and complete binary export match the database",
+      "project": "rome-desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-d4.json",
+      "title": "M67-08 real transfer receipt, return, outcome and unload reversal in binary exports",
+      "project": "la-tablet",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-d4.json",
+      "title": "M67-04 Area all Centres, page 2 and complete binary export match the database",
+      "project": "la-tablet",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0
+        }
+      ]
+    }
+  ],
+  "browser": [
+    {
+      "evidence": "browser-a-final2.json",
+      "stats": {
+        "startTime": "2026-10-16T06:28:44.408Z",
+        "duration": 35902.346999999994,
+        "expected": 12,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "projects": [
+        {
+          "name": "rome-desktop",
+          "retries": 0
+        },
+        {
+          "name": "la-tablet",
+          "retries": 0
+        }
+      ]
+    },
+    {
+      "evidence": "browser-d4.json",
+      "stats": {
+        "startTime": "2026-10-16T06:18:17.794Z",
+        "duration": 19821.032,
+        "expected": 4,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "projects": [
+        {
+          "name": "rome-desktop",
+          "retries": 0
+        },
+        {
+          "name": "la-tablet",
+          "retries": 0
+        }
+      ]
+    }
+  ],
+  "documentInspection": [
+    {
+      "pdf": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-tablet/consegne-134.pdf",
+      "xlsx": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-tablet/consegne-134.xlsx",
+      "rows": 27,
+      "pages": 2,
+      "pdfSHA256": "cc4cb7f9bb41d841726fdeb8a89d99e99953d2ba6893f76e8ecdf3cb4ab624f6",
+      "xlsxSHA256": "3137580c96177b5d087ae9485568f241473357501a1c9c66b72f5abe5ca10468",
+      "contentParity": "PASS",
+      "rendered": 2
+    },
+    {
+      "pdf": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-tablet/consegne-135.pdf",
+      "xlsx": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-tablet/consegne-135.xlsx",
+      "rows": 27,
+      "pages": 2,
+      "pdfSHA256": "475a32c70b18e8b9b9a5dad7558ff8f0135a8bd0eea5e8717c6b413f13232fbf",
+      "xlsxSHA256": "bb523ed2b4ff5fe652bd40f0390751f8f7a2c87b13f11042fd98885ff993e36d",
+      "contentParity": "PASS",
+      "rendered": 2
+    },
+    {
+      "pdf": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-desktop/consegne-131.pdf",
+      "xlsx": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-desktop/consegne-131.xlsx",
+      "rows": 27,
+      "pages": 2,
+      "pdfSHA256": "6532d7eaa8d48f621f231975fc5b3a5c09871ecef0e72fdef558c7b32f3045ab",
+      "xlsxSHA256": "359dc64f85d95fe315842ff3d9b87b4ffb6e230090038f1f5f4a33f7a5f7b1a8",
+      "contentParity": "PASS",
+      "rendered": 2
+    },
+    {
+      "pdf": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-desktop/consegne-132.pdf",
+      "xlsx": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-desktop/consegne-132.xlsx",
+      "rows": 27,
+      "pages": 2,
+      "pdfSHA256": "47705d5e473873ec8f991d5456037cb0026193604d3c29697ee6ce8551535771",
+      "xlsxSHA256": "328341477ea61db98c574437bb7937af022a2a87274536b62622f78b0faef17b",
+      "contentParity": "PASS",
+      "rendered": 2
+    },
+    {
+      "pdf": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-la-tablet/movimenti.pdf",
+      "xlsx": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-la-tablet/movimenti.xlsx",
+      "rows": 10,
+      "pages": 1,
+      "pdfSHA256": "a13f292e23be35948e871a554f54ba4c5982613d704bf566e434b5091c4a31ff",
+      "xlsxSHA256": "816f547e5ca708de283d32381daa3cd174d27cd29a694d5a0eb36223e60cdd91",
+      "contentParity": "PASS",
+      "rendered": 1
+    },
+    {
+      "pdf": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-rome-desktop/movimenti.pdf",
+      "xlsx": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-rome-desktop/movimenti.xlsx",
+      "rows": 10,
+      "pages": 1,
+      "pdfSHA256": "b27f6cc420480d60154c8c76198210dd6d1ef47635212059e5c917031f86f6bc",
+      "xlsxSHA256": "ee0da3f3a253017c07344551e285d59f89ecc0dab5b22a2085846b273c3898c6",
+      "contentParity": "PASS",
+      "rendered": 1
+    }
+  ],
+  "dateParity": {
+    "databaseOracle": "2026-06-01|108",
+    "finding": "M67D-F02",
+    "results": [
+      {
+        "xlsx": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-tablet/consegne-134.xlsx",
+        "databaseDate": "2026-06-01",
+        "xlsxDates": ["31/05/2026"],
+        "pdfDates": {
+          "01/06/2026": 0,
+          "31/05/2026": 27
+        },
+        "status": "FAIL"
+      },
+      {
+        "xlsx": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-tablet/consegne-135.xlsx",
+        "databaseDate": "2026-06-01",
+        "xlsxDates": ["31/05/2026"],
+        "pdfDates": {
+          "01/06/2026": 0,
+          "31/05/2026": 27
+        },
+        "status": "FAIL"
+      },
+      {
+        "xlsx": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-desktop/consegne-131.xlsx",
+        "databaseDate": "2026-06-01",
+        "xlsxDates": ["01/06/2026"],
+        "pdfDates": {
+          "01/06/2026": 27,
+          "31/05/2026": 0
+        },
+        "status": "PASS"
+      },
+      {
+        "xlsx": "/private/tmp/magazzino-m67d-X3g0GX/browser-d4-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-desktop/consegne-132.xlsx",
+        "databaseDate": "2026-06-01",
+        "xlsxDates": ["01/06/2026"],
+        "pdfDates": {
+          "01/06/2026": 27,
+          "31/05/2026": 0
+        },
+        "status": "PASS"
+      }
+    ]
+  },
+  "evidenceScope": "Caratterizzazione PASS non equivale ad accettazione: M67-35 e M67-36 FAIL; vedere registro",
+  "cleanup": {
+    "containers": [],
+    "networks": [],
+    "volumes": [],
+    "secretFilesPresent": false,
+    "checkedLabel": "codex.task=m67d-x3g0gx"
+  }
+}

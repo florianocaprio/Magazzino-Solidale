@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  getGetMapsCapabilitiesQueryKey,
   getGetMapsConsegneQueryKey,
   getGetMapsInterventiSocialiQueryKey,
   getGetMapsPuntiOperativiQueryKey,
@@ -38,6 +39,8 @@ import {
   todayEuropeRome,
 } from "@/lib/europe-rome";
 import { withDocumentoOperativoSelection } from "@/lib/documenti-operativi-location";
+import { useAuth } from "@/lib/auth";
+import { ReadQueryFeedback } from "@/components/read-query-feedback";
 
 const LAYER_LABELS: Record<MapsLayerCode, string> = {
   "sociale.interventi_pianificati": "maps.layerSocialInterventions",
@@ -80,40 +83,64 @@ function mapsLayerError(error: unknown, fallback: string): string {
 
 export default function MapsOperativa() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { toast } = useToast();
   const today = useMemo(todayEuropeRome, []);
   const [da, setDa] = useState(today);
   const [a, setA] = useState(addDaysToCivilDate(today, 7));
-  const { data: capabilities, isLoading: loadingCapabilities } =
-    useGetMapsCapabilities();
+  const capabilitiesQuery = useGetMapsCapabilities({
+    query: {
+      queryKey: [...getGetMapsCapabilitiesQueryKey(), "actor", user],
+      retry: false,
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: "always",
+    },
+  });
+  const loadingCapabilities =
+    capabilitiesQuery.isLoading || capabilitiesQuery.isFetching;
+  const capabilities =
+    capabilitiesQuery.isError || loadingCapabilities
+      ? undefined
+      : capabilitiesQuery.data;
   const available = capabilities?.layers ?? [];
   const [disabled, setDisabled] = useState<Set<MapsLayerCode>>(new Set());
-  const [selectedMarker, setSelectedMarker] = useState<MapsMarker | null>(null);
+  const [markerSelection, setSelectedMarker] = useState<MapsMarker | null>(
+    null,
+  );
   const enabled = (code: MapsLayerCode) =>
     available.some((layer) => layer.code === code) && !disabled.has(code);
   const validRange = da <= a;
   const range = { da, a };
   const social = useGetMapsInterventiSociali(range, {
     query: {
-      queryKey: getGetMapsInterventiSocialiQueryKey(range),
+      queryKey: [...getGetMapsInterventiSocialiQueryKey(range), "actor", user],
+      retry: false,
       enabled: validRange && enabled("sociale.interventi_pianificati"),
     },
   });
   const deliveries = useGetMapsConsegne(range, {
     query: {
-      queryKey: getGetMapsConsegneQueryKey(range),
+      queryKey: [...getGetMapsConsegneQueryKey(range), "actor", user],
+      retry: false,
       enabled: validRange && enabled("pacchi.consegne"),
     },
   });
   const missed = useGetMapsRitiriNonEffettuati(range, {
     query: {
-      queryKey: getGetMapsRitiriNonEffettuatiQueryKey(range),
+      queryKey: [
+        ...getGetMapsRitiriNonEffettuatiQueryKey(range),
+        "actor",
+        user,
+      ],
+      retry: false,
       enabled: validRange && enabled("pacchi.ritiri_non_effettuati"),
     },
   });
   const points = useGetMapsPuntiOperativi({
     query: {
-      queryKey: getGetMapsPuntiOperativiQueryKey(),
+      queryKey: [...getGetMapsPuntiOperativiQueryKey(), "actor", user],
+      retry: false,
       enabled: enabled("centro.punti_operativi"),
     },
   });
@@ -121,23 +148,46 @@ export default function MapsOperativa() {
     () =>
       [
         enabled("sociale.interventi_pianificati") && validRange
-          ? social.data
+          ? social.isError || social.isFetching
+            ? []
+            : social.data
           : [],
-        enabled("pacchi.consegne") && validRange ? deliveries.data : [],
+        enabled("pacchi.consegne") && validRange
+          ? deliveries.isError || deliveries.isFetching
+            ? []
+            : deliveries.data
+          : [],
         enabled("pacchi.ritiri_non_effettuati") && validRange
-          ? missed.data
+          ? missed.isError || missed.isFetching
+            ? []
+            : missed.data
           : [],
-        enabled("centro.punti_operativi") ? points.data : [],
+        enabled("centro.punti_operativi")
+          ? points.isError || points.isFetching
+            ? []
+            : points.data
+          : [],
       ].flatMap((rows) => rows ?? []),
     [
       social.data,
       deliveries.data,
       missed.data,
       points.data,
+      social.isError,
+      social.isFetching,
+      deliveries.isError,
+      deliveries.isFetching,
+      missed.isError,
+      missed.isFetching,
+      points.isError,
+      points.isFetching,
       disabled,
       available,
       validRange,
     ],
+  );
+  const selectedMarker = markers.find(
+    (marker) => marker.id === markerSelection?.id,
   );
   const layerErrors = [
     { code: "sociale.interventi_pianificati" as const, query: social },
@@ -203,6 +253,12 @@ export default function MapsOperativa() {
       <div className="p-6 space-y-4">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  if (capabilitiesQuery.isError)
+    return (
+      <div className="p-6">
+        <ReadQueryFeedback query={capabilitiesQuery} />
       </div>
     );
   if (!capabilities?.operational || available.length === 0) {
@@ -313,7 +369,8 @@ export default function MapsOperativa() {
         <CardContent className="space-y-3">
           {isLoading ? (
             <Skeleton className="h-24 w-full" />
-          ) : markers.length === 0 ? (
+          ) : markers.length === 0 &&
+            layerErrors.length > 0 ? null : markers.length === 0 ? (
             <p className="py-8 text-center text-muted-foreground">
               {t("maps.empty")}
             </p>

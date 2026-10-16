@@ -7,6 +7,10 @@
  */
 
 export type ExportConsegneParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   q?: string;
   stato?: string;
   data?: string;

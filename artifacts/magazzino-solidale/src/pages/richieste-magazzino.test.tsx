@@ -49,15 +49,16 @@ vi.mock("@workspace/api-client-react", () => ({
   getListMagazziniQueryKey: () => ["warehouses"],
   getListProdottiQueryKey: () => ["products"],
   useGetIntervento: () => ({ data: undefined }),
-  useListBeneficiari: () => ({ data: { items: [] } }),
+  useListBeneficiari: () => ({ data: [] }),
   useListMagazzini: () => ({
     data: [{ id: 4, nome: "Magazzino", areaOperativaId: 1, stato: "attivo" }],
   }),
   useListProdotti: () => ({ data: [] }),
-  useListRichiesteMagazzino: (params: any) => {
+  useListRichiesteMagazzino: (params: any, options?: any) => {
     mock.list(params);
     return useQuery({
       queryKey: ["requests", params],
+      enabled: options?.query?.enabled,
       queryFn: async () => {
         const visible =
           params.stato === "aperte"
@@ -173,6 +174,85 @@ async function input(id: string, value: string) {
   });
 }
 describe("M5C2-A-R1 Sheet richieste", () => {
+  it("M67-13: selecting another record asks before discarding the new draft", async () => {
+    await mount();
+    await click("richiesteMagazzino.new");
+    await input("rm-need", "New synthetic draft");
+    await click("RM-TEST");
+    expect(sheet()).toBeNull();
+    await click("common.stayAndEdit");
+    expect(
+      (document.getElementById("rm-need") as HTMLTextAreaElement).value,
+    ).toBe("New synthetic draft");
+    await click("RM-TEST");
+    await click("common.discardChanges");
+    expect(sheet()).not.toBeNull();
+    expect(sheet().textContent).toContain("Bisogno test");
+    expect(document.getElementById("rm-need")).toBeNull();
+  });
+  it("M67-14: attempted submit marks only mandatory fields and focuses the first invalid control", async () => {
+    await mount();
+    await click("richiesteMagazzino.new");
+    const form = document.querySelector("form")!;
+    await act(async () =>
+      form.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      ),
+    );
+    expect(
+      document.getElementById("rm-beneficiary")?.getAttribute("aria-invalid"),
+    ).toBe("true");
+    expect(
+      document.getElementById("rm-need")?.getAttribute("aria-invalid"),
+    ).toBe("true");
+    expect(
+      document.getElementById("rm-need")?.getAttribute("aria-describedby"),
+    ).toBe("rm-need-error");
+    expect(document.activeElement?.id).toBe("rm-beneficiary");
+    expect(document.getElementById("rm-beneficiary")?.className).toContain(
+      "border-destructive",
+    );
+    expect(document.getElementById("rm-need")?.className).toContain(
+      "border-destructive",
+    );
+    expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(2);
+  });
+  it("M67-13: need alone protects cancel and reload; stay preserves, discard clears only the new draft", async () => {
+    await mount();
+    await click("richiesteMagazzino.new");
+    await input("rm-need", "Synthetic unsaved need");
+    const unload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(unload);
+    expect(unload.defaultPrevented).toBe(true);
+    await click("common.cancel");
+    expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
+    await click("common.stayAndEdit");
+    expect(
+      (document.getElementById("rm-need") as HTMLTextAreaElement).value,
+    ).toBe("Synthetic unsaved need");
+    await click("common.cancel");
+    await click("common.discardChanges");
+    await click("richiesteMagazzino.new");
+    expect(
+      (document.getElementById("rm-need") as HTMLTextAreaElement).value,
+    ).toBe("");
+    expect(mock.row.bisogno).toBe("Bisogno test");
+    const cleanUnload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(cleanUnload);
+    expect(cleanUnload.defaultPrevented).toBe(false);
+  });
+  it("M67-13: untouched beneficiary prefill is not dirty", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/richieste-magazzino?beneficiarioId=11",
+    );
+    await mount();
+    if (!document.getElementById("rm-need"))
+      await click("richiesteMagazzino.new");
+    await click("common.cancel");
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  });
   it("separa le tre viste, preserva il deep-link e azzera la pagina al cambio vista", async () => {
     window.history.replaceState(
       {},

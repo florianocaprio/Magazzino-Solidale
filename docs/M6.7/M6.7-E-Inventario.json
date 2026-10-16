@@ -1,0 +1,2628 @@
+{
+  "head": "879d96ca04f6355b94c709e271482603db306bf6",
+  "branch": "codex/magazzino-workflow-unificato",
+  "staging": "",
+  "source": "fd0d4a7fe99f31c873b22d24157a4f90fb1166dd7bf108f92470d49a130af4ba",
+  "sourceDeltaFromE21": [
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67a-access.spec.ts",
+      "sha256": "7aad0f0aa11143bdf21d3942d4d147dec41a7060e2f98ba61a3ff7a81ef8217a"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67c-ux.spec.ts",
+      "sha256": "a622f0f0458dbbbbc449d952c2d20bb58da6e2fe391901dbcb765aedb7772fce"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/mensa-magazzino-correttivo.spec.ts",
+      "sha256": "483c28a16ae454be7d4f7af1310c41c12c4dbd9843d44fb1268a4febb7ca21b5"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/reporting-m66.spec.ts",
+      "sha256": "c1fb2cad579881b54f6188479beb2764981400130ee6388954238816a262ca58"
+    }
+  ],
+  "currentMismatch": [],
+  "harnessMismatch": [],
+  "buildMismatch": [],
+  "reusedBuildDelta": [],
+  "files": [
+    {
+      "path": "artifacts/api-server/src/middlewares/warehouseReadScope.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "c883e5753c1be4673154d84bcc21d335c194933154551536211b00d6f5cc5a99"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/consegne.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "d73cf0144fe305444b76ba5a2f12fba3a0a6e1d9a6b68bbe6d86d8503ab64e06"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/index.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "d0f65221c4d7cb3cdd0780ad13474de8e558822fd4f4e8afe7a48b8458f4a410"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/mensa.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "5233412260339de584574c4979ac7249132638d29cfbcd5ddc2d74f6a1931c1c"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/movimenti.ts",
+      "origin": "E",
+      "sha256": "d3c80ae04caad6f1c52c7aa6e5c65ae53ba2c58db1919e74a254972719b6a782"
+    },
+    {
+      "path": "artifacts/api-server/tests/helpers/m67a-mensa-fixture.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "5c15301541a7eacc2fd064ce663fb11ba370e69d9cfbd1becfa2cbb092becafb"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67a-authorization.test.ts",
+      "origin": "E",
+      "sha256": "047022b1f0f82eee22be9f1406b4949ad8969a639cf9929e83c9f7f5d3e6c8a5"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67a-mensa-access.test.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "932e5231ae8590fe145c32871fdb2f7e699dd5e0e65f5a8affe90ea1bc7d659d"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67b-movement-effect.test.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "d1e52f09862bc2b2a33b1dcc999cfd4e08fe5f3e7811466af71f2bd9a7a52b32"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67b-paths.test.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "04d6c2e8a19eddae8ab7efdfdfce98cde02dbe021bb0354ae6eabbf6cf322ee4"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67d-social-chain.test.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "d148ea7319dd07908d702d655f7a6ac5cebbc718b1e58be7848369e3d483c11f"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67d-verifications.test.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "a37df598f703d6dad0bea8763cc84c3c9053a3eda5ae73a1a67fe6ae9223b221"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67e-movement-export.test.ts",
+      "origin": "E",
+      "sha256": "8403173ed14205c2ba7ad7ce5ffcaeecab4fd89c4d88a67e9d946aa3ad3e5cf1"
+    },
+    {
+      "path": "artifacts/api-server/tests/m67e-supply.test.ts",
+      "origin": "E",
+      "sha256": "84f34bbc5d95348647f8f9fe2c40ad440febe70e8317bbaacb25dc902886b4ff"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67a-access.spec.ts",
+      "origin": "E",
+      "sha256": "7aad0f0aa11143bdf21d3942d4d147dec41a7060e2f98ba61a3ff7a81ef8217a"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67b-paths.spec.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "4106f6d533ceb2e2f737579ab96a2edd6df18bb694a513f9a473c98d38f830b4"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67c-ux.spec.ts",
+      "origin": "E",
+      "sha256": "a622f0f0458dbbbbc449d952c2d20bb58da6e2fe391901dbcb765aedb7772fce"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67d-integrated.spec.ts",
+      "origin": "E",
+      "sha256": "58d1456faf9203dbdb98dd19a53539c7fc0f03b1bb9ded82fdf8dee2399538ee"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/mensa-magazzino-correttivo.spec.ts",
+      "origin": "E",
+      "sha256": "483c28a16ae454be7d4f7af1310c41c12c4dbd9843d44fb1268a4febb7ca21b5"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/e2e/reporting-m66.spec.ts",
+      "origin": "E",
+      "sha256": "c1fb2cad579881b54f6188479beb2764981400130ee6388954238816a262ca58"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/App.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "7af0f3eaeffbebec0f284917e34adbf2c888f34f8483976a4385b9aa49e3d564"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/export-buttons.test.tsx",
+      "origin": "E",
+      "sha256": "72a5650d49f1689c3148e1bae046c076d9f79624965ac25300d3143bbafca3ef"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/export-buttons.tsx",
+      "origin": "E",
+      "sha256": "ee1835f0a8f9d0d633e7004787ebc2935a94c6d5a55743eb378ffe435885443e"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/layout-maps-navigation.test.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "33fcda933bf463c122f5b576abbed987d604959ab6f94e5019d6ca03af9e3c43"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/layout.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "7895fbaf40a4c81bbd98429e0b67ae318b3390bc692c70310f50bd813e7af33c"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/maps/maps-operativa.test.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "7227f01691878ae8d989bd73400e77e0ba57b0992ced95d5da29f9993b76ab20"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/mensa-rifornimenti.test.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "44271f0111fb381b59f5a92e9270497e333f0d6d03f3fb539207d5414eebc61c"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/mensa-rifornimenti.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "6c1a57ed17c4956997264e51c70c268df8c46a682d0e1cb383add1a785ae0c47"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/read-query-feedback.test.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "30d63691e97e25cd351e61d0f59a725e883055cf14122ec89bba3ecd326adcb8"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/read-query-feedback.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "7071d71fda99eba69824b27c1b2ee84ff49d9dfd3b7fee8fc2ad4f762f38b107"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/reporting/report-table.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "ed859c830151ae48430620403f508f46b3d5685b7b09865e917f3e2165e7ca90"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/hooks/use-consegna-scan.test.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "2d220b650c050653d9df9f89f4dfc7b0afa4b26a4358ed893744e5a7bba79440"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/hooks/use-consegna-scan.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "1d292e8bd46a3aa52b3bf60f331aab18ee0e51888988f1f68d6f8c32f04e1297"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/europe-rome.test.ts",
+      "origin": "E",
+      "sha256": "11271e753ad31d55cc31800f907d423026fc14bbc418fb0cd966a2094430321d"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/export.ts",
+      "origin": "E",
+      "sha256": "2b8df1a627de121d620b8a8f377b6b73ddbded365549f1bd892d377a14930a6f"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/i18n/namespaces/base.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "6731b7ede422b9bf19c881181b7c28b6f59568408638b52c461e16c71cfb7526"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/i18n/namespaces/mensa.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "6cb65ab8da6ddd6152ed946c78d5de24fb8028dca2ecb7d3df57d422ffc05f26"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/i18n/namespaces/movimenti.ts",
+      "origin": "E",
+      "sha256": "cc29dccf981acaaca9f196bd436cc00daa9d684483464de69f4ae6f16cf7504d"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/mensa-request-access.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "d2c56964df72ea2b4c1e90085f7de9a8516c5b5778a77ea3f3caa3379df44421"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/movement-presentation.test.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "6ab1eccad1eae925c389cbe0345ee71bfed0d9959a24a437228030a35bee8e98"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/movement-presentation.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "a567c64599cf923abd842bfb7d51065298f3e2f862c5aa598538d5042c16a99e"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/navigation-permissions.test.ts",
+      "origin": "E",
+      "sha256": "331469f941918f97c657228d7624800c0227c92aa4e1184715031d1813be1014"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/consegne.tsx",
+      "origin": "E",
+      "sha256": "7fce1f87c3dfddfc2367ffa3b3128a4e877c0900c4b775b27783ba64569c89df"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/maps.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "800aa107bc75e769ec8c8e749b0924a1280b42dbc379a0cdba5810cbf1d300e4"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/movimenti.test.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "4892ff9d91f77933965ddb89c87153be280bd26ec5f541661bf8e7201daef437"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/movimenti.tsx",
+      "origin": "E",
+      "sha256": "eb2ca42c154b88736a1ca2e468314b067e34030ff34c021725a6edad73294558"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/richieste-magazzino.test.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "c85f99d252d394068b432260812102bd5b2eaa4c7b3a573c228303c7012a3521"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/richieste-magazzino.tsx",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "103aac9544ad90a21dc904766c13b5ad5e50a066b234ac2c39b0bc216955ebff"
+    },
+    {
+      "path": "docs/M6.2-A-Rilascio-Ufficiale-20261009.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.2-C-Pubblicazione-Preview.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.6-BC-Rilascio-Ufficiale-Chiusura.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-A-Esito.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-A-Fingerprint.json",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-A-Registro-Casi.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-B-Esito.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-B-Fingerprint.json",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-B-Registro-Casi.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-C-Esito.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-C-Fingerprint.json",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-C-Registro-Casi.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-D-Esito.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-D-Fingerprint.json",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-D-Inventario-Verifiche.json",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-D-Rilievi-Decisioni.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-E-Certificazione.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-E-Fingerprint.json",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-E-Fix-Report.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-E-Registro-Finale.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-E2.2-Fingerprint.json",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-E2.3-Fingerprint.json",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-E2.4-Fingerprint.json",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-Piano-Certificazione.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-Registro-Accettazione.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "docs/M6.7/M6.7-UAT-Tablet.md",
+      "origin": "documentation",
+      "sha256": null
+    },
+    {
+      "path": "lib/api-client-react/src/generated/api.schemas.ts",
+      "origin": "E",
+      "sha256": "b195b769a1907eec936c382c795d6ab86bc437a7dc91ea7f50db781cf48f3d07"
+    },
+    {
+      "path": "lib/api-client-react/src/generated/api.ts",
+      "origin": "E",
+      "sha256": "09e852ed18f4eca3c2de63a874e11a8b6b59458a1c5586fb043a0b1f9ed40188"
+    },
+    {
+      "path": "lib/api-spec/openapi.yaml",
+      "origin": "E",
+      "sha256": "98cce7eb07a5efc650fd9a2ae3e309e5273548dcd29bbf9d9f67417400a39089"
+    },
+    {
+      "path": "lib/api-zod/src/generated/api.ts",
+      "origin": "E",
+      "sha256": "e186d6e32131d774fff762c1e177f339d529592582779afa6ce975d05cc5a50c"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/exportConsegneParams.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "b53f64ff83181bf9c1b759e7b254c80d9844031cdaa9e5f0be099b9d33567d7d"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/exportMovimentiParams.ts",
+      "origin": "E",
+      "sha256": "0aaa044d3a30334870022c31cf40558caf16eddae260135dd8c4025f29b21576"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/getConsegnaBeneficiarioDaCodice200.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "4552d6c10e2c433785e87e646d77050a5af87d938b2d841085d3e93985df537d"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/getConsegnaBeneficiarioDaCodiceParams.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "9f333ad453d60f781201a2aba9276096021f5e72f5c739d4477ea5e530f86a92"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/index.ts",
+      "origin": "E",
+      "sha256": "8238b4f94cbdb8dba8064e1bcdabf4224738e421068f9e0c37671facc6c137b7"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/listBollePronteDaPianificareParams.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "d4929b3594c40e673f6608110849bd70d7006445faa53f80cc46fc4fdb791376"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/listConsegneParams.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "70db64ac29f47651715da0573bbc965111e31f4e4abee3bffbb71276a931bf87"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/movimento.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "16efd2e42f400c1d2e4d260963c2f0bebe448638835b9cd62a2fb44d661bb4fc"
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/movimentoEffettoFisico.ts",
+      "origin": "preexisting-A-B-C-D",
+      "sha256": "a05ebafc03705af3d5bf8ef06bd718a5640ac62786420f3c6dac8839647093ab"
+    },
+    {
+      "path": "docs/M6.7/M6.7-E-Inventario.json",
+      "origin": "documentation",
+      "sha256": null
+    }
+  ],
+  "api": {
+    "counts": {
+      "passed": 625,
+      "skipped": 1,
+      "failed": 1
+    },
+    "fileCount": 29,
+    "executions": [
+      {
+        "path": "e2-api-core.json",
+        "sha256": "11fc971ddef77372d45b2337545dc7ec8a227316d46db9a5508129496c4eb3f2",
+        "pass": 278,
+        "fail": 4,
+        "skip": 1,
+        "files": [
+          "artifacts/api-server/tests/beneficiari-uds.test.ts",
+          "artifacts/api-server/tests/bug-05-approvvigionamenti-area.test.ts",
+          "artifacts/api-server/tests/bug-05-logo-upload.test.ts",
+          "artifacts/api-server/tests/carico-pratiche-m3a.test.ts",
+          "artifacts/api-server/tests/fse-import-practice-m3b.test.ts",
+          "artifacts/api-server/tests/fse-m64-administrative-source.test.ts",
+          "artifacts/api-server/tests/fse-m64-regressions.test.ts",
+          "artifacts/api-server/tests/fse-m64-representations.test.ts",
+          "artifacts/api-server/tests/logistica-hardening.test.ts",
+          "artifacts/api-server/tests/m67a-authorization.test.ts",
+          "artifacts/api-server/tests/m67a-mensa-access.test.ts",
+          "artifacts/api-server/tests/m67b-movement-effect.test.ts",
+          "artifacts/api-server/tests/m67b-paths.test.ts",
+          "artifacts/api-server/tests/m67d-social-chain.test.ts",
+          "artifacts/api-server/tests/m67d-verifications.test.ts",
+          "artifacts/api-server/tests/m67e-movement-export.test.ts",
+          "artifacts/api-server/tests/m67e-supply.test.ts",
+          "artifacts/api-server/tests/mensa-magazzino-correttivo.test.ts",
+          "artifacts/api-server/tests/transport-return-m4b2.test.ts",
+          "artifacts/api-server/tests/uds-hardening.test.ts"
+        ],
+        "nonPass": [
+          {
+            "file": "artifacts/api-server/tests/fse-import-practice-m3b.test.ts",
+            "title": "M3B — import FSE+ nella pratica Carico Merce T25 registra i sette saldi originali per 1177 pezzi e copre gli 80 carichi storici senza duplicarli",
+            "status": "skipped",
+            "evidence": "e2-api-core.json"
+          },
+          {
+            "file": "artifacts/api-server/tests/m67e-supply.test.ts",
+            "title": "M67-25 real scoped session receives 1.000001 kg once under concurrent commands and replay; catalogue UOM and exact stock",
+            "status": "failed",
+            "evidence": "e2-api-core.json"
+          },
+          {
+            "file": "artifacts/api-server/tests/transport-return-m4b2.test.ts",
+            "title": "M4B.2 — effetto fisico e Bolla affidata REPORT-M4-B-KG: l'esito distribuisce kg FSE senza un secondo effetto fisico",
+            "status": "failed",
+            "evidence": "e2-api-core.json"
+          },
+          {
+            "file": "artifacts/api-server/tests/transport-return-m4b2.test.ts",
+            "title": "M4B.2 — effetto fisico e Bolla affidata REPORT-M4-C: rientro 18 idonei, 1 deteriorato e 1 mancante lascia 98 fisici e zero distribuiti",
+            "status": "failed",
+            "evidence": "e2-api-core.json"
+          },
+          {
+            "file": "artifacts/api-server/tests/transport-return-m4b2.test.ts",
+            "title": "M4B.2 — effetto fisico e Bolla affidata DEL-03: la consegna a Ente dopo affidamento è un esito senza secondo scarico né fatto sociale",
+            "status": "failed",
+            "evidence": "e2-api-core.json"
+          }
+        ]
+      },
+      {
+        "path": "e2-api-maps.json",
+        "sha256": "2fe136b608a98b6b5c802be0b2cda4d23ee3d3d7b227f7ef45c48969c3974e07",
+        "pass": 18,
+        "fail": 0,
+        "skip": 0,
+        "files": ["artifacts/api-server/tests/maps.test.ts"],
+        "nonPass": []
+      },
+      {
+        "path": "e2-api-handoff.json",
+        "sha256": "be49b7b6c20fe69b6933031c7568875655f7b5b555122ee1069521295e75ef54",
+        "pass": 13,
+        "fail": 0,
+        "skip": 0,
+        "files": [
+          "artifacts/api-server/tests/m5c2a-handoff-bolla-pronta.test.ts"
+        ],
+        "nonPass": []
+      },
+      {
+        "path": "api-mensa.json",
+        "sha256": "ec8b788be8d801b61e3bb980a1a594d2b8f8dcb5046a5dd02c5f92be5b966a52",
+        "pass": 109,
+        "fail": 0,
+        "skip": 0,
+        "files": ["artifacts/api-server/tests/mensa.test.ts"],
+        "nonPass": []
+      },
+      {
+        "path": "api-emporio.json",
+        "sha256": "b803f9e1230897ea0330ee6a16a4cb791e1afac41061c258fc7f392a007af1fc",
+        "pass": 143,
+        "fail": 0,
+        "skip": 0,
+        "files": [
+          "artifacts/api-server/tests/cassa-emporio.test.ts",
+          "artifacts/api-server/tests/credito-automatico-f1.test.ts"
+        ],
+        "nonPass": []
+      },
+      {
+        "path": "api-reporting.json",
+        "sha256": "29eb7695ea0684adf75e872c6568d958e7dd199bf1392c9371911b0376927e26",
+        "pass": 61,
+        "fail": 0,
+        "skip": 0,
+        "files": [
+          "artifacts/api-server/tests/reporting-m66-certification.test.ts",
+          "artifacts/api-server/tests/reporting-m66-grant-revocation.test.ts",
+          "artifacts/api-server/tests/reporting-m66-residual-security.test.ts",
+          "artifacts/api-server/tests/reporting-m66-security.test.ts"
+        ],
+        "nonPass": []
+      },
+      {
+        "path": "e2-api-return-isolated.json",
+        "sha256": "59f06ca5553695015ae3ae149ce90b4628e2dbf344f928736e3d788d693f9aa3",
+        "pass": 36,
+        "fail": 0,
+        "skip": 0,
+        "files": ["artifacts/api-server/tests/transport-return-m4b2.test.ts"],
+        "nonPass": []
+      }
+    ]
+  },
+  "browser": [
+    {
+      "path": "e2-browser-m67d-integrated.json",
+      "sha256": "11e83777e48b37a55d7ea97add8e979ff3ccb4de3915bc5e5aaf1473a96b15ef",
+      "stats": {
+        "startTime": "2026-10-16T09:15:16.078Z",
+        "duration": 79546.964,
+        "expected": 24,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 24,
+      "nonPass": []
+    },
+    {
+      "path": "e2-browser-m67a-access.json",
+      "sha256": "b365d4e15e3bae22535c224dfd3437833226bc566dda1b0788746c35ab7cd691",
+      "stats": {
+        "startTime": "2026-10-16T09:16:36.676Z",
+        "duration": 268192.933,
+        "expected": 30,
+        "skipped": 0,
+        "unexpected": 6,
+        "flaky": 0
+      },
+      "cases": 36,
+      "nonPass": [
+        {
+          "file": "m67a-access.spec.ts",
+          "title": "M67-11 requester: menu and direct route respect source capabilities",
+          "project": "la-mobile",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "timedOut",
+              "duration": 30021
+            }
+          ]
+        },
+        {
+          "file": "m67a-access.spec.ts",
+          "title": "M67-11 manager: menu and direct route respect source capabilities",
+          "project": "la-mobile",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "timedOut",
+              "duration": 30021
+            }
+          ]
+        },
+        {
+          "file": "m67a-access.spec.ts",
+          "title": "M67-11 reporter: menu and direct route respect source capabilities",
+          "project": "la-mobile",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "timedOut",
+              "duration": 30021
+            }
+          ]
+        },
+        {
+          "file": "m67a-access.spec.ts",
+          "title": "M67-11 mixed: menu and direct route respect source capabilities",
+          "project": "la-mobile",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "timedOut",
+              "duration": 30022
+            }
+          ]
+        },
+        {
+          "file": "m67a-access.spec.ts",
+          "title": "M67-03 warehouse page revalidates cached rows after same-session territory revocation",
+          "project": "la-mobile",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "timedOut",
+              "duration": 30024
+            }
+          ]
+        },
+        {
+          "file": "m67a-access.spec.ts",
+          "title": "M67-10/12 receive-only navigation, exact request beyond page one, report return and same-session revocation",
+          "project": "la-mobile",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "timedOut",
+              "duration": 30022
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "e2-browser-report.json",
+      "sha256": "ed44e2946e56a1f37cf935042877553294a82cc989b4d9612f97f6d7d05fdbaa",
+      "stats": {
+        "startTime": "2026-10-16T09:21:06.748Z",
+        "duration": 27176.341,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 3,
+        "flaky": 0
+      },
+      "cases": 3,
+      "nonPass": [
+        {
+          "file": "reporting-m66.spec.ts",
+          "title": "PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export",
+          "project": "rome-desktop",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "failed",
+              "duration": 8967
+            }
+          ]
+        },
+        {
+          "file": "reporting-m66.spec.ts",
+          "title": "PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export",
+          "project": "la-tablet",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "failed",
+              "duration": 6097
+            }
+          ]
+        },
+        {
+          "file": "reporting-m66.spec.ts",
+          "title": "PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export",
+          "project": "webkit-tablet",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "failed",
+              "duration": 5986
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "e12-access.json",
+      "sha256": "b6c7c68f5d9a7ee04ae1d7277f92bc419fae17afbaa4aa8cef21623720396bb6",
+      "stats": {
+        "startTime": "2026-10-16T09:23:19.130Z",
+        "duration": 23567.053,
+        "expected": 6,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 6,
+      "nonPass": []
+    },
+    {
+      "path": "e12-mensa.json",
+      "sha256": "7c194544df3ee4d35d729a1c8faf36271157907000461b4c28f38c1517a48eab",
+      "stats": {
+        "startTime": "2026-10-16T09:23:43.932Z",
+        "duration": 13664.261,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 1,
+      "nonPass": []
+    },
+    {
+      "path": "e12-report.json",
+      "sha256": "698b8ed12c6ce69e5b5fe1741b0d6e2009fd1960b55fb2e34172d0352d3295d9",
+      "stats": {
+        "startTime": "2026-10-16T09:23:58.377Z",
+        "duration": 12722.435000000001,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "cases": 1,
+      "nonPass": [
+        {
+          "file": "reporting-m66.spec.ts",
+          "title": "PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export",
+          "project": "rome-desktop",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "failed",
+              "duration": 9163
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "e12-report2.json",
+      "sha256": "84df8e8bf2b674898620d750ec9e5a26de1fb0423e5a07945f9f6da3aec495cf",
+      "stats": {
+        "startTime": "2026-10-16T09:25:06.772Z",
+        "duration": 11601.304,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "cases": 1,
+      "nonPass": [
+        {
+          "file": "reporting-m66.spec.ts",
+          "title": "PDF/XLSX reali delle otto sezioni, tabella 301 righe e revoca export",
+          "project": "rome-desktop",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "failed",
+              "duration": 7857
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "e12-report3.json",
+      "sha256": "2babc500afde301b45ff2fea3d89e09dfb980a79cd4aed8847db63650476dd51",
+      "stats": {
+        "startTime": "2026-10-16T09:25:59.582Z",
+        "duration": 30584.83,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 1,
+      "nonPass": []
+    },
+    {
+      "path": "e22-integrated.json",
+      "sha256": "392bb01244c8e9c12c042c7ec1ff95e16bd1910037c9c9aef8cc5edd5e686d30",
+      "stats": {
+        "startTime": "2026-10-16T09:27:26.318Z",
+        "duration": 75474.126,
+        "expected": 24,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 24,
+      "nonPass": []
+    },
+    {
+      "path": "e22-access.json",
+      "sha256": "2458b167d69b02f89d443738f46b1fbc93fc90c971cb58196e04109f96de2744",
+      "stats": {
+        "startTime": "2026-10-16T09:28:42.940Z",
+        "duration": 92263.217,
+        "expected": 36,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 36,
+      "nonPass": []
+    },
+    {
+      "path": "e22-paths.json",
+      "sha256": "2196f6bf38420923e97df34aa16745ae6b23aab3de2079b31f54fa077dc47573",
+      "stats": {
+        "startTime": "2026-10-16T09:30:16.496Z",
+        "duration": 64156.861000000004,
+        "expected": 12,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 12,
+      "nonPass": []
+    },
+    {
+      "path": "e22-ux.json",
+      "sha256": "2d17a7786a80fa90e68dc81fd7f285e9c4a9be64571ae845c5fda0f437383b3a",
+      "stats": {
+        "startTime": "2026-10-16T09:31:22.092Z",
+        "duration": 252694.15300000002,
+        "expected": 209,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "cases": 210,
+      "nonPass": [
+        {
+          "file": "m67c-ux.spec.ts",
+          "title": "M67-13 browser back/reload stay and menu discard protect the draft",
+          "project": "la-mobile",
+          "status": "unexpected",
+          "results": [
+            {
+              "status": "timedOut",
+              "duration": 30016
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "e13-ux.json",
+      "sha256": "97bc8fda50c6e64fa6074fbc3d3984a1cf7ea88d0a243d8935ff10389ffc246c",
+      "stats": {
+        "startTime": "2026-10-16T09:36:05.168Z",
+        "duration": 4984.379,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 1,
+      "nonPass": []
+    },
+    {
+      "path": "e23-ux.json",
+      "sha256": "82889db7e5e90adc8c3b698bafbfddb2497e207138bd85b8e336990fd3242f67",
+      "stats": {
+        "startTime": "2026-10-16T09:37:15.310Z",
+        "duration": 226229.954,
+        "expected": 210,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 210,
+      "nonPass": []
+    },
+    {
+      "path": "e14-mensa.json",
+      "sha256": "665f90cc1a19b38b83b8a8ad9c0ecd446d6bc7252f4e00222cdf7ae65c412488",
+      "stats": {
+        "startTime": "2026-10-16T09:41:54.283Z",
+        "duration": 13371.597,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 1,
+      "nonPass": []
+    },
+    {
+      "path": "e14-mensa-profile.json",
+      "sha256": "93f48e106ec0cb7320707fa53970c9e135022a4608a76cf281639cada561d794",
+      "stats": {
+        "startTime": "2026-10-16T09:42:53.536Z",
+        "duration": 13209.531,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 1,
+      "nonPass": []
+    },
+    {
+      "path": "e14-report.json",
+      "sha256": "b0d19d3de3ac11844d16e37a24f04b00a998f9286d058460b1687640e2359d11",
+      "stats": {
+        "startTime": "2026-10-16T09:42:08.338Z",
+        "duration": 32674.398,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 1,
+      "nonPass": []
+    },
+    {
+      "path": "e24-mensa.json",
+      "sha256": "58a3ae1167954b0558409a65f8e82d0b8164b1c44506aa48f7c5033fb0461741",
+      "stats": {
+        "startTime": "2026-10-16T09:43:43.322Z",
+        "duration": 71469.141,
+        "expected": 6,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 6,
+      "nonPass": []
+    },
+    {
+      "path": "e24-report.json",
+      "sha256": "b455121d2a7559c0dd9f51f134fdc3e8941c00a83dfd41fb92cbb671a546c759",
+      "stats": {
+        "startTime": "2026-10-16T09:44:55.600Z",
+        "duration": 89821.67300000001,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "cases": 3,
+      "nonPass": []
+    }
+  ],
+  "build": {
+    "sha256": "9e345fb6f8291fce65883c6f5df9824dea876b8be296509ad8d81d346e2a89db",
+    "files": [
+      {
+        "path": "api/index.mjs",
+        "sha256": "c02f4d9d3d533a5af6a7caf23f5f0ec4dc65e99caa3058dc15fc813f8479c8fa"
+      },
+      {
+        "path": "api/index.mjs.map",
+        "sha256": "2e4f6536e58be1c719959d9be745fea3e8101fa8e51ee701691ff51a1be85bf8"
+      },
+      {
+        "path": "api/pino-file.mjs",
+        "sha256": "fb5c107892de099b236f3bbfec29b337ea4058b94404a5178a257ddc53645ec5"
+      },
+      {
+        "path": "api/pino-file.mjs.map",
+        "sha256": "584f96eca122362f63d1c34eddcdbd89a7b613bc522aa1ec95164acd71d2b134"
+      },
+      {
+        "path": "api/pino-pretty.mjs",
+        "sha256": "8ec29acfa6e2f6a12dabc1575048c98b1f8758359d10961865b9c651ae99a75d"
+      },
+      {
+        "path": "api/pino-pretty.mjs.map",
+        "sha256": "c03b3bd316b8ea6c8b5f98fdfc181c471282d1acf3efecf03c1a50112097011f"
+      },
+      {
+        "path": "api/pino-worker.mjs",
+        "sha256": "9b393bb0084c6241b0fbf5d96aac84bd2d376d756d0343eae279cc983f0dd89b"
+      },
+      {
+        "path": "api/pino-worker.mjs.map",
+        "sha256": "fce23aa8a0996e419b29003933355c321a1bc143618f213bbfc8d66abc401b6d"
+      },
+      {
+        "path": "api/thread-stream-worker.mjs",
+        "sha256": "2ccd27fdf3740f942d9a8be902735a225f52329e6bb0282f56e0e7d3617f9862"
+      },
+      {
+        "path": "api/thread-stream-worker.mjs.map",
+        "sha256": "807261d6df1fbca6d6f79c94f942808ae461705075f4f458f31da25d1e54a2fc"
+      },
+      {
+        "path": "web/assets/Amiri-Regular-DuMToiWY.ttf",
+        "sha256": "ab391c4147d054c48976e98322ad0eefe1427aa0e0502a12a4c75d80a70cfcd7"
+      },
+      {
+        "path": "web/assets/api-error-CZ1O1MBp.js",
+        "sha256": "eed1a7e40b54855c73676008c88ee60ea6d60d21bfc86983166ffd08f6a8ff3e"
+      },
+      {
+        "path": "web/assets/api.schemas-CCquT9xV.js",
+        "sha256": "747ad87f03b19ebddfa2f1ed4b390ce0f034fa1b31b8196b1bddc732edb3fcea"
+      },
+      {
+        "path": "web/assets/approvazioni-logistica-Y8pNQMvn.js",
+        "sha256": "9af92640755c5a65440c058223bf6807a51239590d24d0ce41566d179714e024"
+      },
+      {
+        "path": "web/assets/approvvigionamenti-CYen5LFx.js",
+        "sha256": "ae99714c78bf0cb9a514a35d4e2d24b50ab582b4114954a752dbe983d454f795"
+      },
+      {
+        "path": "web/assets/aree-operative-DzL7zSO0.js",
+        "sha256": "7829b4c69bd23fb58bc85a0e33c039cb241dda5fddd557cad150f74bfd709d79"
+      },
+      {
+        "path": "web/assets/arrow-right-C8PAu7o2.js",
+        "sha256": "9ec3ece17ac2ed2687062f51b214f6df0b625319ce54b5c71e32e00a36243a70"
+      },
+      {
+        "path": "web/assets/badge-DNhm3d8c.js",
+        "sha256": "716ab7e594a4efb55bd77f80d5b2b4257538b3070db3fb1cea6cca2fe1567301"
+      },
+      {
+        "path": "web/assets/barcode-scanner-button-DeRRPNeM.js",
+        "sha256": "8ff8a8f18e81de5c07beb9f838aec34d2ae787693f71b0af000b30bed0fd6639"
+      },
+      {
+        "path": "web/assets/beneficiari-BmBvcdxg.js",
+        "sha256": "1f667f2356e101f13771373662ef65a0d60862d116b1867fb166ac63945b0571"
+      },
+      {
+        "path": "web/assets/beneficiario-combobox-CSj5RLeL.js",
+        "sha256": "fd4e284d52aa228bdfeb53f74166c6f3c5948b1162dec84e59d08146a8a5f8a5"
+      },
+      {
+        "path": "web/assets/beneficiario-dettaglio--kB-F3wG.js",
+        "sha256": "3bdd75024976f39c784d8754c4d6435ff3cb47012a4168476c56b4890962d3d2"
+      },
+      {
+        "path": "web/assets/bolla-pdf-CGZWg3iP.js",
+        "sha256": "f2a1169fbf82f23be25b4fc7e34e5d8a76af9dbda1d62b01bd6c64ff810d4b76"
+      },
+      {
+        "path": "web/assets/bolla-query-invalidation-B7c5396K.js",
+        "sha256": "989612a965e79e5b99ed198018fbcf072da5c2dfe91cad14ff118c5fd086ba5b"
+      },
+      {
+        "path": "web/assets/bolle-DmK0dlht.js",
+        "sha256": "acd0aa7c07b6e2b15c3522b5efb80a80a91af54e65ea43ea92834144d56b5b3b"
+      },
+      {
+        "path": "web/assets/building-BbL4Hsyu.js",
+        "sha256": "7d660f634a28fd2b4ed67138d3676a5f906b8ab5e81dfed9126a7c62c5ae5c73"
+      },
+      {
+        "path": "web/assets/bulk-import-dialog-DcedwomZ.js",
+        "sha256": "a7a7592e7a762ba32191fd39259611051bf08efc1016eb16331136cd5d13c836"
+      },
+      {
+        "path": "web/assets/calendar-vwQueCbu.js",
+        "sha256": "19431a40beeff79e516ebdcc49fc008fd696fd35410d47da6da720a369c53cf4"
+      },
+      {
+        "path": "web/assets/carico-merce-I3cNyNwN.js",
+        "sha256": "2488d2e8249bd9986270be82c8d803f2313a03b199d180934ef797bf01a30e6b"
+      },
+      {
+        "path": "web/assets/centri-ascolto-CiKTlsmp.js",
+        "sha256": "c7e569c3315bb32e344028b5efb4917affd55544a2bfb33cbc466e85acf569a3"
+      },
+      {
+        "path": "web/assets/checkbox-CLF2MK26.js",
+        "sha256": "4f42d33ec5469a2aff4a4549e590234e81efcf87e5bdf45cae1823f19c9ea538"
+      },
+      {
+        "path": "web/assets/chevron-left-4Lif85O7.js",
+        "sha256": "766e8cd06febf84c116d9dacbcf2af2b9a5bef003ef176d853c755f023948e68"
+      },
+      {
+        "path": "web/assets/circle-alert-zACZDrZS.js",
+        "sha256": "a0de0c0a4a161131162f61048f60185ae4ea99553a21133de3c616536e6cad56"
+      },
+      {
+        "path": "web/assets/circle-check-42Bho-1i.js",
+        "sha256": "cf632b987edc6d013ec3a36ffecb75ad9dd0bc38dfcd51649c19cf067d001aff"
+      },
+      {
+        "path": "web/assets/circle-check-big-DUvNkwdj.js",
+        "sha256": "feef8e7048bb309276b86486f8b9fd3265d73f8a7ddc27cb17fb1bf5fc2c7a62"
+      },
+      {
+        "path": "web/assets/circle-x-DMXWB1tG.js",
+        "sha256": "cf023122b6f1c35085c10af1d138c8c77f6d1e48d8bf0d1aea285fe272498b24"
+      },
+      {
+        "path": "web/assets/consegne-BeqymcAq.js",
+        "sha256": "9c134e880ebab20de96d9df1c99bc8a0cf45dee2284ea1a9ca1e6fbf800695de"
+      },
+      {
+        "path": "web/assets/copy-DWRnNINW.js",
+        "sha256": "578538de4540dae7f5ca138dd9eb61915a57e78cef5837b687889b41d57a1f67"
+      },
+      {
+        "path": "web/assets/credito-rettifica-dialog-Dm7Nj0u_.js",
+        "sha256": "d4950bc3d20b918add458fb4787eaccb7fc75e9985fc594afec03f2886b277ab"
+      },
+      {
+        "path": "web/assets/dashboard-JGiwOmA1.js",
+        "sha256": "c05072fb1e6ee09d62e3f496ed8c8c3e78265a834614906898a9ef78f6f0686e"
+      },
+      {
+        "path": "web/assets/dialog-C9tkrsOJ.js",
+        "sha256": "00910564333b568787b2415d73ba1ed7838cbdeba39f6c9a5ea3bcb6e2ee448b"
+      },
+      {
+        "path": "web/assets/documenti-operativi-url-CufxSa6G.js",
+        "sha256": "60946773ef3681bb211103513b19c24cb41358c53e2fd531996b8d8cae1b2b93"
+      },
+      {
+        "path": "web/assets/documento-operativo-CGLrZIu3.js",
+        "sha256": "a164542e13795bbbb2135f34ead2d358aa8baec372ede51d850c51a2f67d4b90"
+      },
+      {
+        "path": "web/assets/download-Da8fbZlc.js",
+        "sha256": "8044e5c4762aaa86fff623489f108f9be2c75c172882b866f2c00d720e21508e"
+      },
+      {
+        "path": "web/assets/dropdown-menu-CPt7JIfY.js",
+        "sha256": "de1ce76d1905a67e5069d5553a9c222c352a22e1b80a1d00b009945ff2776b4f"
+      },
+      {
+        "path": "web/assets/ellipsis-D3VYdIj2.js",
+        "sha256": "526e7811af6ae2cb0235885d9af7754652de506e58b6bec06757bef5e81f1c51"
+      },
+      {
+        "path": "web/assets/emporio-accessi-wUNPGzjh.js",
+        "sha256": "88130b729637d4b4dc1d5f6518d618de906895d34ec4da580c681e443e0954d5"
+      },
+      {
+        "path": "web/assets/emporio-bolla-stampa-D2tLnOHj.js",
+        "sha256": "2c6f8fd1130a8eff14bbe2614d5128677c094b0bfff7a7bfda1e169ca3b31165"
+      },
+      {
+        "path": "web/assets/emporio-cassa-L32pRJMa.js",
+        "sha256": "9cabfe01824dd6907736339c33274a9bbecf75584a9c3ec6abd77f2f180e37e6"
+      },
+      {
+        "path": "web/assets/emporio-crediti-saldo-U2MGJzXf.js",
+        "sha256": "20a6c27f2023438277758728d6c247f3a492bff45799cdd7ad12fe329e54f507"
+      },
+      {
+        "path": "web/assets/emporio-spese-Ci3hsJxB.js",
+        "sha256": "d596079ea4557b162a98044a2028d33a4381eb1d05ecb085717e7edb2dc7b855"
+      },
+      {
+        "path": "web/assets/enti-esterni-Cz9G25MF.js",
+        "sha256": "9afb0ac69357b736f5ea07bf31eaf90011b0e5526f719b8b0c7471fef2b55448"
+      },
+      {
+        "path": "web/assets/europe-rome-DRXmEvk5.js",
+        "sha256": "2c2ee3d7f56272ee8a6e9ecb77a22e78fb82cda06bf38fc86ca5d87c085eddf7"
+      },
+      {
+        "path": "web/assets/export-buttons-DN7pojjL.js",
+        "sha256": "7502af76f783590adfeb0848086f985126c6ec7e9602dd396605a08cda3ea541"
+      },
+      {
+        "path": "web/assets/export-CRTzA5Ii.js",
+        "sha256": "8fc1c341280f900383e68146cf18ced772f398bc20bb2d327364ac99e4a56e2f"
+      },
+      {
+        "path": "web/assets/external-link-r53LFH_s.js",
+        "sha256": "d87e3ad751d80e5326453ef5ff53db0a35cbfed682f1b01882b251df9a2b421d"
+      },
+      {
+        "path": "web/assets/fascia-eta-Ca4Zz0yx.js",
+        "sha256": "c83dfcc0ae36449a7689d02654a62b4502f8a537ad48c8eb292d083720ae36bd"
+      },
+      {
+        "path": "web/assets/file-down-B7KjxKVU.js",
+        "sha256": "20d22db8115e03e60e4408c9edf19db37b74fd894946d112e8b1072d8ad39796"
+      },
+      {
+        "path": "web/assets/file-spreadsheet-BHwlv6cZ.js",
+        "sha256": "576184ba0019cb1d5bf825ef022237e7663c1bd4640fe08aacdbc9db852b5685"
+      },
+      {
+        "path": "web/assets/format-pjlopsJQ.js",
+        "sha256": "2ac96b33061e39cdae7a9da9204184b9d0d8b8a1cd79c81d2beeb13a0ac90339"
+      },
+      {
+        "path": "web/assets/fornitori-TqpQjxZN.js",
+        "sha256": "e2c08d22ddf9a3f568de4c882f4f6fbb8c232bcbf8d4072e4ec99061a243ee82"
+      },
+      {
+        "path": "web/assets/funnel-Dke8DM1w.js",
+        "sha256": "13dd29936dfb5eaf094ec89ef3b753009322d5bb109500bc05b8520f2302d72f"
+      },
+      {
+        "path": "web/assets/giacenze-Cg5wuUmR.js",
+        "sha256": "e9ea52e80f5757362ee30666795deb5e2c7962d91bec6d27aec28ce655f3d978"
+      },
+      {
+        "path": "web/assets/history-ci7jLl0z.js",
+        "sha256": "c3f1c8a01a4d238f86d5646bf60408f50e6d19fff616dc94890dc890f029eace"
+      },
+      {
+        "path": "web/assets/html2canvas.esm-DXEQVQnt.js",
+        "sha256": "7b07a9ca175c614e8e7de447198d35b0d161dd50db2c63b5f7fd6ea0e1e876f2"
+      },
+      {
+        "path": "web/assets/impostazioni-moduli-BBrKVXm3.js",
+        "sha256": "b6db108f952a724179b814b617ad2ca61eb92d4ca1ffaab0d2d1eb46b6c0cf8a"
+      },
+      {
+        "path": "web/assets/impostazioni-stampa-xfnBPLu4.js",
+        "sha256": "ef5647950c560d4b91e36aae5603e8ee643844d4ad56849307bc7b33c61875b8"
+      },
+      {
+        "path": "web/assets/index-B-xSMVVf.js",
+        "sha256": "22eb6a928899cd9eb4cb993de26a73baf0349308f7fe90e335c593b3402fc5de"
+      },
+      {
+        "path": "web/assets/index-Be6_fMeC.css",
+        "sha256": "be1bf3fe7a23027674298323c692528fc467ff68b6b12032abbabe7027e76cd5"
+      },
+      {
+        "path": "web/assets/index-BlWjH6Ry.js",
+        "sha256": "d1695b66a4d1ac4f908186f505245c126e5c817b66e53eaff9fba3771639448c"
+      },
+      {
+        "path": "web/assets/index.es-D-wKCXVz.js",
+        "sha256": "73414d1691025c60afe8e6c29d9177fd17a1e8b2aceffd4d5b9edf83921dcb40"
+      },
+      {
+        "path": "web/assets/info-BDJ6Enhy.js",
+        "sha256": "897169624096493db47c4b407b20355e701f65d099acf37011822ef814d1a6d4"
+      },
+      {
+        "path": "web/assets/interventi-DlrX-2RN.js",
+        "sha256": "1ac7281cdc578bd6d29da55fe46b1bfbf11502ea2c9ee6dd18dab5f4605755c3"
+      },
+      {
+        "path": "web/assets/intervento-workflow-C0eLCbbJ.js",
+        "sha256": "51b26d785b7d823577d2c496073020c41d98ebf6b2c3f7a1f4969709fba9147c"
+      },
+      {
+        "path": "web/assets/it-BeNgz2DM.js",
+        "sha256": "fb22859fe3ba500a6810000a9bbf2cf21e359cee670f3d6ca7f16bb2e25f9059"
+      },
+      {
+        "path": "web/assets/JsBarcode-xK_IAEJQ.js",
+        "sha256": "f60d3b13569f0290104d593621c6bc24413e9bf596d7661710f6fc1dcf298ee8"
+      },
+      {
+        "path": "web/assets/jspdf.plugin.autotable-CiR7catW.js",
+        "sha256": "dba41951341e02581e8d49a05631806a6892b408bcffc0ceb6ee4abb88a061d6"
+      },
+      {
+        "path": "web/assets/magazzini-CpXEhF8H.js",
+        "sha256": "e00cda8cda5c7e5ec2dad3dadc3868d2c4b05a3f621748dc7870387e9a556682"
+      },
+      {
+        "path": "web/assets/mail-D3lxVv4G.js",
+        "sha256": "b1ae93a38b6a7b29630a9c509a15af51c9d896c2acacc2f2ffd7e687c51e377e"
+      },
+      {
+        "path": "web/assets/maps-CIGW-MKW.css",
+        "sha256": "fcd9fbeec3e87013f776847f0e76395d4d7eba07d982964933a41bd07503e6fe"
+      },
+      {
+        "path": "web/assets/maps-EFzF_KG9.js",
+        "sha256": "7d0c9330c79ea258b315d374ffd39224e0c911bd0c6bce41b4acdc337ba513c1"
+      },
+      {
+        "path": "web/assets/mensa-DYl8Wsj3.js",
+        "sha256": "96e16868d908941fb9294317fb9cda19450e13e41845c03ead75d0eb68cd93d0"
+      },
+      {
+        "path": "web/assets/mensa-ui-x4-i9P7h.js",
+        "sha256": "37b9acc2576eb8529b4d2ab854d4c79de8aeed1f0c404f848da89b5f2e598312"
+      },
+      {
+        "path": "web/assets/mezzi-DmIYg9Xj.js",
+        "sha256": "7601dbae10e6e1df2e6686327150dd23e9caeceb0033fc76a4e29c7483fea2e6"
+      },
+      {
+        "path": "web/assets/movimenti-BzJlyCvM.js",
+        "sha256": "993dbc7929932695c29df2bd420fc4755e38cd606dfb1d842ae79a76ca5244c0"
+      },
+      {
+        "path": "web/assets/not-found-DO-PAMcV.js",
+        "sha256": "a8a5c3dc8bd8a72b7630f16c38b8f51b9c6ba3049bfbc37acfd2dc72ddbb3054"
+      },
+      {
+        "path": "web/assets/package-plus-DXksQK3X.js",
+        "sha256": "5f2ec02c6921efa99e77f5238f73d66f91863ae72f30a0ad22db68e344934eb7"
+      },
+      {
+        "path": "web/assets/paged-export-CPQLrEps.js",
+        "sha256": "abda5118a8da8595c5902608b5be242e5f7d276b301d0a56acfa4a623bb1ab0b"
+      },
+      {
+        "path": "web/assets/pencil-o8Y1tbYe.js",
+        "sha256": "c8fc654e958dd9aadf1006baaadfd25d1341538c16a8bac255861a7313512c1a"
+      },
+      {
+        "path": "web/assets/phone-CQskgB2T.js",
+        "sha256": "d57c05dc1fb3a0827fd32aba31213bb38ab94d2daf0c24b285fbcdf7f351a9f8"
+      },
+      {
+        "path": "web/assets/play-CeZKm7bf.js",
+        "sha256": "6b1cab8b835a89d9dc13132e8f1d302c6d659a22daaa92d972bf329f1ea1b08b"
+      },
+      {
+        "path": "web/assets/plus-C7ef8E9d.js",
+        "sha256": "771e64328e4b7b01d6ec24581129d2db19b1b8c67497a7999f515c401a59a9e5"
+      },
+      {
+        "path": "web/assets/politiche-credito-solidale-CBNrD54U.js",
+        "sha256": "2b4bc0d08ac34b5443ee11d25fc482aad3588d0d2757e3d8180d425495b34dff"
+      },
+      {
+        "path": "web/assets/power-55ER0SHW.js",
+        "sha256": "45d1757939050638249e130f924009fda5fb489db9e1fdd91e2dddcf61a5cc70"
+      },
+      {
+        "path": "web/assets/preparazione-consegne-DvOHz-Ar.js",
+        "sha256": "ce68f552ddae177ad796b3c7e9ee4b30559d7ff5f60a2ab4702dbba641751726"
+      },
+      {
+        "path": "web/assets/prodotti-C33GDP1v.js",
+        "sha256": "eb2aa9771dd014b0ff47ecabef536f4344fabbc66d26baf7ae0b08a695b40cfb"
+      },
+      {
+        "path": "web/assets/product-lot-requirement-label-CqD3s376.js",
+        "sha256": "f7dbf7dd01c046c9086db6a803b5b10dff2abd6d8e14714e0c0b6873e1dee062"
+      },
+      {
+        "path": "web/assets/purify.es-CC4Brkr_.js",
+        "sha256": "b5dc5cd3a3a9285b3eaa12dfb71034020ce1366fe09001deee48909c9ed6336f"
+      },
+      {
+        "path": "web/assets/read-query-feedback-PGmZQumL.js",
+        "sha256": "e8a7d41e42ec3149b3dfdc925065fd2aafa2ebc08417d952d2b9d31f82efae95"
+      },
+      {
+        "path": "web/assets/refresh-cw-BmXRvMmD.js",
+        "sha256": "a33627852d3d66a4c58ee6f443e45d068ebcc59075c958d2d6530073fc305cbe"
+      },
+      {
+        "path": "web/assets/reporting-dashboard-CKD0VGkc.js",
+        "sha256": "849999f27ed603800fadcb556dce92f86c7d8375dd4a5c270419220e74c3d5b9"
+      },
+      {
+        "path": "web/assets/reporting-document-B4nGVh14.js",
+        "sha256": "c1314b6a5ba30a16792227edacb6ab637bfad80c955ae3930867c3e328eb0e21"
+      },
+      {
+        "path": "web/assets/reporting-landing-CNjP1EUO.js",
+        "sha256": "edbd70d6c44dc74d2d0586b68aba978f1a1cc6c787c3a048071f064187d59ce4"
+      },
+      {
+        "path": "web/assets/richiesta-documento-navigation-CshrI7qJ.js",
+        "sha256": "de93dc992655ccc6297da06ed8432a8c352870a01676e2566c5c1bc383039039"
+      },
+      {
+        "path": "web/assets/richieste-magazzino-BEpAtLBz.js",
+        "sha256": "dcefd7ca9a48419b844af5c4283c639de24d022041a9819ed0dc662783a8ef7e"
+      },
+      {
+        "path": "web/assets/rotate-ccw-CmPQ-mR9.js",
+        "sha256": "533321186f4fc02444052570659c5686bde4e7c1cdcd5a1dabf2d705a4908506"
+      },
+      {
+        "path": "web/assets/route-actions-X2b-9aqr.js",
+        "sha256": "2e2cb5936970a44f5cf5dd74cf1115663e38bf25e8ef16c8dfa52ac55c81bb10"
+      },
+      {
+        "path": "web/assets/ruoli-BAePQzKB.js",
+        "sha256": "6b9020e313b34f5f83abf3eb41caa374dd00385afcc3c7e05909836b4ff2f84c"
+      },
+      {
+        "path": "web/assets/ruoli-volontari-BHiDEDkQ.js",
+        "sha256": "6f981583c7e41d0b2ae1caed748d1a6d23e9bab85ed64906a18d60955141910c"
+      },
+      {
+        "path": "web/assets/save-Bw5MTAXu.js",
+        "sha256": "84a2bd83f48283f5716eb0068e2f694993770288a3142ee6e8bd2295743dd322"
+      },
+      {
+        "path": "web/assets/scarichi-CwRY-TCz.js",
+        "sha256": "a926972f9e6d8acda8832cc4e070c1be7884f9c04ac434f9d1ed4fba9893ee92"
+      },
+      {
+        "path": "web/assets/scroll-area-CMec8vhJ.js",
+        "sha256": "4b22cd44c4d55e5e989eddf29d7ccae2b95b4159d472c9822ef1b48a243cad16"
+      },
+      {
+        "path": "web/assets/search-CKdDOdEP.js",
+        "sha256": "d758513eec2e948651b7b710cd60866ebc9fdd8360d6a342617f5181111d14da"
+      },
+      {
+        "path": "web/assets/setup-wI6MqaEA.js",
+        "sha256": "3dbc51990945abdb08a1abf53af73f9da246015c37e2d61a1b302f754735826d"
+      },
+      {
+        "path": "web/assets/shield-alert-BGsKdPHI.js",
+        "sha256": "52acc3285ec8dad74a2df40f37663c620dd219dd1460da940c6528e7164257e5"
+      },
+      {
+        "path": "web/assets/skeleton-CvwOniUm.js",
+        "sha256": "47a7f523597a0bcebda487243379304e103b7d292fd99be16f01105febfc2aee"
+      },
+      {
+        "path": "web/assets/sostieni-progetto-BlRw39mn.js",
+        "sha256": "d569c3bca460017cbf2cdf2fa31a8bbbd1025cafa4779b32ec93a6d6a07a3b3e"
+      },
+      {
+        "path": "web/assets/super-admin-audit-configurazioni-Ch6fwRTe.js",
+        "sha256": "41e37ec4bd7835bcaf17cf3d5b06af025c7291b3ce163952a70612c3ed006a74"
+      },
+      {
+        "path": "web/assets/super-admin-configurazione-ambiente-DswRJdTD.js",
+        "sha256": "2d58cc668be1c0e80b91d624515e7601801ddb4ac9eed7c15aeb8acaccafc03d"
+      },
+      {
+        "path": "web/assets/super-admin-log-sistema-Dv155Ydw.js",
+        "sha256": "9d6846d36c9fe603021d4d71975c63c150ebe3e53d1f0b6a38dcf4e16b2f53f5"
+      },
+      {
+        "path": "web/assets/super-admin-moduli-D_AuHMDB.js",
+        "sha256": "bf97f7d996efd9e43994c09e8e0670d290f0fa88a0455a97f3e1ef621bee0557"
+      },
+      {
+        "path": "web/assets/switch-D46Nilgo.js",
+        "sha256": "70eec5868200068fdee6e60839238756ce53c191d7d9dcbb7915966e179735b5"
+      },
+      {
+        "path": "web/assets/table-BHgRpEGs.js",
+        "sha256": "a5a47a27a27481f5f9eb0a846f41d871c57ebc70ea539f108df5274ca60120ed"
+      },
+      {
+        "path": "web/assets/tabs-l5bFWi1i.js",
+        "sha256": "a458d6d2c834b161dd94767a496fbea7ba811892d00e2d728c8e5eed4a0819fc"
+      },
+      {
+        "path": "web/assets/textarea-CV3cAyz3.js",
+        "sha256": "c0faef66d6f5d6201cff66a1a7fc4d8b6780880b8e632fd69f1a94e771c5a3b7"
+      },
+      {
+        "path": "web/assets/tipi-intervento-BiBDWifO.js",
+        "sha256": "5cba051c129e0149cbd718b73236d38d6045058d280148d508720b8d50da811d"
+      },
+      {
+        "path": "web/assets/tipologie-fornitore-CB_snZVP.js",
+        "sha256": "43eaf3c705289019badcf9f816a58195cd7f4805a6dc74e1ff09b9dd7a1eb865"
+      },
+      {
+        "path": "web/assets/trasferimento-pdf-CLT3BOup.js",
+        "sha256": "e98baef7b037dacf1bb390be068b3001c818d43d7a6a42dc12f6c40a1e8bd3a9"
+      },
+      {
+        "path": "web/assets/trash-2-CceEZKEU.js",
+        "sha256": "b7e159d1a6c71ce974a2882aaf7653a0abcd0e407ef28b9368aff5b7feb907f9"
+      },
+      {
+        "path": "web/assets/triangle-alert-DgeukOp9.js",
+        "sha256": "c128f447490963212e14811e4500d8ea8910e113e474a5e652dcb3ca394ad8b2"
+      },
+      {
+        "path": "web/assets/turni-GmpbvY9p.js",
+        "sha256": "dc30b2c7576f89e3055ddd90f5e14f72e81957cfbbec309be7053523e46c690d"
+      },
+      {
+        "path": "web/assets/types-Uc80xRoU.js",
+        "sha256": "5a49665c3922490f369e1de3eb7c2eccfeb5a783aad2f1f6a68d7d0785ee516a"
+      },
+      {
+        "path": "web/assets/uds-anagrafica-CKPq0QRJ.js",
+        "sha256": "45c2dbf30d703af8b84e60054c49ff39aeb5dbc418123d653efcbd45d3ff239b"
+      },
+      {
+        "path": "web/assets/uds-interventi-C-s6Ni9Y.js",
+        "sha256": "4bd7f2fe09713ba98d03c2bac86e9d769edf991c4e9da88d7c4ca6cb0b866572"
+      },
+      {
+        "path": "web/assets/uds-persona-sheet-nPux5efT.js",
+        "sha256": "6b90d7038cd78915ba2ef65ca6180f6f573465cdffe8b69f4b2b79588a629d10"
+      },
+      {
+        "path": "web/assets/uds-report-giornaliero-db0sXhMA.js",
+        "sha256": "fbbc5acd84dec4c375fd368a20f9d3ab9d56ed4981cb48a15d17759c8dce39a5"
+      },
+      {
+        "path": "web/assets/upload-JWkxEFHH.js",
+        "sha256": "bd57269c94f9d87436d891335d41f90177bf1da769054ff857d3d70582463f11"
+      },
+      {
+        "path": "web/assets/use-documento-access-DTfn983J.js",
+        "sha256": "c4fad42fac05260f0b1fdd8c6968b888de1f22d023ea918f9ddd90e4b6d65d1f"
+      },
+      {
+        "path": "web/assets/use-emporio-security-B0JXCWfm.js",
+        "sha256": "1a1294fb06a6628d95cba36bf2784c1cbeebb0571a1f5c70cea6d2c4b88e9e8c"
+      },
+      {
+        "path": "web/assets/use-unsaved-changes-guard-Cx7qIOQR.js",
+        "sha256": "87920043594aa93d44d7e1ec90f6b19d4701e1a2f28ac6926bc5143444c1f2b2"
+      },
+      {
+        "path": "web/assets/user-nPJhor1u.js",
+        "sha256": "dfebf8ff3c43ca1d44d8ba8cf69aba6f1f9dec38a47c2871115eeff563c945fd"
+      },
+      {
+        "path": "web/assets/user-plus-CTl2ZKyo.js",
+        "sha256": "f70b414ff7b4a9d99afa2b94fb217344cf7dd94010762268e3452c0b71e83bb0"
+      },
+      {
+        "path": "web/assets/utenti-DFqt7dVi.js",
+        "sha256": "f2aa9c106997f3a00cd6f8b1b4ef0f4d2f89c23a9fdd5034d8bc96c994450282"
+      },
+      {
+        "path": "web/assets/volontari-CVJq7N-e.js",
+        "sha256": "06472f080d288fc999b5b76cfa7a410a5e8e331309921d70a020c07d06557148"
+      },
+      {
+        "path": "web/assets/volontari-label-DF6GyoCL.js",
+        "sha256": "e58af393d5d3e4b307eff6ba3e35882314750cdcd3f4a986b29f5777d10605b4"
+      },
+      {
+        "path": "web/assets/zone-uds-CRekdDC3.js",
+        "sha256": "a9f7cfe740ef09be91b8b18af3887c3b9d1d4516c41d22ea7f9ed4af2c0926d2"
+      },
+      {
+        "path": "web/config.js",
+        "sha256": "db84faa549063184ee97c3c523a68c8d81a9242821e72b40019a7c3f9bc5efe7"
+      },
+      {
+        "path": "web/favicon.svg",
+        "sha256": "8ffbde9092b1fa4de97c9481b76f518b131268c82e7c555041925225b1dab6e0"
+      },
+      {
+        "path": "web/index.html",
+        "sha256": "831202db8ed1f89206e5a9ee1215c602c7d723175e96cc6a97a2d23fea434d29"
+      },
+      {
+        "path": "web/logo-aim.png",
+        "sha256": "0b639ba78a6c97f2bc82dba7c0244119c77e17e2c75d50bd6fc7a41521ef21d5"
+      },
+      {
+        "path": "web/opengraph.jpg",
+        "sha256": "d231922c9423ab133910a4c5fa92b7d6d6dd480fa6d6f14fb415c86c6b3ca40c"
+      },
+      {
+        "path": "web/robots.txt",
+        "sha256": "16ceb5ee3e0dc13aa9adf31a3ebbe45a1d965b8c2b9f72eaf84e5911e140ed95"
+      }
+    ]
+  },
+  "harness": {
+    "sha256": "3934b204ba524b91b4f00f6f687c59c634afc59b6b2943c46a664a8d3aba7725",
+    "files": [
+      {
+        "path": "browser-api.ts",
+        "sha256": "aedb353e3e410d27ffb9164e52d2c705f00bfe629e640dbdef90f043be9d71d6"
+      },
+      {
+        "path": "built-api.mjs",
+        "sha256": "836464cb48a339c3f3758eb5fbf8f1739cd27fac2e29589bc4923388f6e3fadb"
+      },
+      {
+        "path": "built-web.mjs",
+        "sha256": "dbb32c7acd97987c0135bd2f323cf132b4cf55f9c9ede21b65eddc4bfb52caf6"
+      },
+      {
+        "path": "campaign.mjs",
+        "sha256": "aff25ff1ce538120524e1f4d244450543006aacc6394d02645ad1a0546963119"
+      },
+      {
+        "path": "db-guard.mjs",
+        "sha256": "472cf6a89d273912b796d04f85fdc18e023c9e9e65075d91326bb8302629ae19"
+      },
+      {
+        "path": "domains.mjs",
+        "sha256": "be94697c1cb3ff42e8ef3dfa383054a8d8eef7634f2e276d17ab66a733071a2e"
+      },
+      {
+        "path": "identity.mjs",
+        "sha256": "b3fa83154d300184879f0eef5fc4deb4b7ec4d51d9c3c61cf4751f76b7aca497"
+      },
+      {
+        "path": "linux-build.mjs",
+        "sha256": "e411c627d1ec6c502d6486d50663801f75e72b545fc9363ea171023d1fae12f4"
+      },
+      {
+        "path": "playwright.config.ts",
+        "sha256": "dbee00a9e9ebfceeb8f499f1686ced6b0fc90fbcdcd02a46b4f6ff37ef478141"
+      },
+      {
+        "path": "run.mjs",
+        "sha256": "c8eac422865f7ac6f23eb89628e1d23994d5f67c705616784b20ce42c2431e26"
+      },
+      {
+        "path": "stage-build.mjs",
+        "sha256": "c1912b2480f0e7843517719b929829e9732179b89bb3fffb48004509c2eaf432"
+      },
+      {
+        "path": "verify-inputs.mjs",
+        "sha256": "34fb311cb1aa312759f139f9b21e10631556815016b70e89003952f2d68104d6"
+      },
+      {
+        "path": "vite.config.ts",
+        "sha256": "5ddc51b058a472d2d113867d34f64730b2e4372d5f37b920ed623615b2f06e56"
+      }
+    ]
+  },
+  "dbReuse": {
+    "checked": 143,
+    "delta": [],
+    "evidence": "/private/tmp/magazzino-m66-area-pfMCet/migration-integrity.log",
+    "sha256": "c3c8ed2c1f190f5b228a852bb4192d6fb793f634f65c80d5c386c943b917b734"
+  },
+  "codegen": {
+    "checked": 954,
+    "delta": [],
+    "logs": ["codegen-e1-native.log", "codegen-e1-repeat.log"]
+  },
+  "commands": [
+    {
+      "label": "e2-frontend",
+      "cmd": "pnpm",
+      "args": ["--filter", "@workspace/magazzino-solidale", "test"],
+      "environment": {},
+      "start": "2026-10-16T09:08:53.084Z",
+      "end": "2026-10-16T09:09:04.609Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    {
+      "label": "e2-typecheck",
+      "cmd": "pnpm",
+      "args": ["run", "typecheck"],
+      "environment": {},
+      "start": "2026-10-16T09:09:04.611Z",
+      "end": "2026-10-16T09:09:08.203Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    {
+      "label": "e2-runner",
+      "cmd": "pnpm",
+      "args": ["--filter", "@workspace/db", "run", "test:migrations"],
+      "environment": {},
+      "start": "2026-10-16T09:09:08.203Z",
+      "end": "2026-10-16T09:09:08.710Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    {
+      "label": "e2-diff",
+      "cmd": "git",
+      "args": ["diff", "--check"],
+      "environment": {},
+      "start": "2026-10-16T09:09:08.710Z",
+      "end": "2026-10-16T09:09:08.758Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    {
+      "label": "e2-api-core",
+      "cmd": "node",
+      "args": [
+        "/private/tmp/magazzino-m67e-mhURHw/run.mjs",
+        "test",
+        "e2-api-core",
+        "tests/m67a-authorization.test.ts",
+        "tests/m67a-mensa-access.test.ts",
+        "tests/m67b-movement-effect.test.ts",
+        "tests/m67b-paths.test.ts",
+        "tests/m67d-social-chain.test.ts",
+        "tests/m67d-verifications.test.ts",
+        "tests/m67e-movement-export.test.ts",
+        "tests/m67e-supply.test.ts",
+        "tests/mensa-magazzino-correttivo.test.ts",
+        "tests/transport-return-m4b2.test.ts",
+        "tests/carico-pratiche-m3a.test.ts",
+        "tests/fse-import-practice-m3b.test.ts",
+        "tests/fse-m64-regressions.test.ts",
+        "tests/fse-m64-administrative-source.test.ts",
+        "tests/fse-m64-representations.test.ts",
+        "tests/beneficiari-uds.test.ts",
+        "tests/uds-hardening.test.ts",
+        "tests/logistica-hardening.test.ts",
+        "tests/bug-05-approvvigionamenti-area.test.ts",
+        "tests/bug-05-logo-upload.test.ts"
+      ],
+      "environment": {},
+      "start": "2026-10-16T09:08:51.913Z",
+      "end": "2026-10-16T09:12:34.228Z",
+      "exitCode": 1,
+      "signal": null
+    },
+    {
+      "label": "e2-api-maps",
+      "cmd": "node",
+      "args": [
+        "/private/tmp/magazzino-m67e-mhURHw/run.mjs",
+        "test",
+        "e2-api-maps",
+        "tests/maps.test.ts"
+      ],
+      "environment": {
+        "M67D_DB": "m67d_maps"
+      },
+      "start": "2026-10-16T09:12:34.231Z",
+      "end": "2026-10-16T09:12:37.085Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    {
+      "label": "e2-api-handoff",
+      "cmd": "node",
+      "args": [
+        "/private/tmp/magazzino-m67e-mhURHw/run.mjs",
+        "test",
+        "e2-api-handoff",
+        "tests/m5c2a-handoff-bolla-pronta.test.ts"
+      ],
+      "environment": {
+        "M67D_DB": "m5c2a_r2_d"
+      },
+      "start": "2026-10-16T09:12:37.085Z",
+      "end": "2026-10-16T09:12:46.212Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    {
+      "label": "e2-api-mensa",
+      "cmd": "node",
+      "args": ["/private/tmp/magazzino-m67e-mhURHw/domains.mjs", "mensa"],
+      "environment": {},
+      "start": "2026-10-16T09:12:46.213Z",
+      "end": "2026-10-16T09:13:00.319Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    {
+      "label": "e2-api-emporio",
+      "cmd": "node",
+      "args": ["/private/tmp/magazzino-m67e-mhURHw/domains.mjs", "emporio"],
+      "environment": {},
+      "start": "2026-10-16T09:13:00.319Z",
+      "end": "2026-10-16T09:13:37.356Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    {
+      "label": "e2-api-reporting",
+      "cmd": "node",
+      "args": ["/private/tmp/magazzino-m67e-mhURHw/domains.mjs", "reporting"],
+      "environment": {},
+      "start": "2026-10-16T09:13:37.356Z",
+      "end": "2026-10-16T09:14:03.009Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    {
+      "label": "e2-browser-m67d-integrated",
+      "cmd": "node",
+      "args": [
+        "/private/tmp/magazzino-m67e-mhURHw/run.mjs",
+        "browser",
+        "e2-browser-m67d-integrated"
+      ],
+      "environment": {
+        "M67E_GROUP": "m67d-integrated"
+      },
+      "start": "2026-10-16T09:15:15.440Z",
+      "end": "2026-10-16T09:16:35.931Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    {
+      "label": "e2-browser-m67a-access",
+      "cmd": "node",
+      "args": [
+        "/private/tmp/magazzino-m67e-mhURHw/run.mjs",
+        "browser",
+        "e2-browser-m67a-access"
+      ],
+      "environment": {
+        "M67E_GROUP": "m67a-access"
+      },
+      "start": "2026-10-16T09:16:35.935Z",
+      "end": "2026-10-16T09:21:05.768Z",
+      "exitCode": 1,
+      "signal": null
+    },
+    {
+      "label": "e2-browser-mensa",
+      "cmd": "node",
+      "args": [
+        "/private/tmp/magazzino-m67e-mhURHw/domains.mjs",
+        "browser-mensa",
+        "e2-browser-mensa"
+      ],
+      "environment": {},
+      "start": "2026-10-16T09:21:05.832Z",
+      "end": "2026-10-16T09:21:06.110Z",
+      "exitCode": 1,
+      "signal": null
+    },
+    {
+      "label": "e2-browser-report",
+      "cmd": "node",
+      "args": [
+        "/private/tmp/magazzino-m67e-mhURHw/domains.mjs",
+        "browser-reporting",
+        "e2-browser-report",
+        "--project=rome-desktop",
+        "--project=la-tablet",
+        "--project=webkit-tablet"
+      ],
+      "environment": {},
+      "start": "2026-10-16T09:21:06.111Z",
+      "end": "2026-10-16T09:21:33.978Z",
+      "exitCode": 1,
+      "signal": null
+    }
+  ],
+  "cleanup": {
+    "time": "2026-10-16T09:48:37.000Z",
+    "checks": [
+      {
+        "cmd": "docker",
+        "args": [
+          "ps",
+          "-a",
+          "--filter",
+          "label=codex.task=m67e-mhurhw",
+          "--format",
+          "{{.Names}}"
+        ],
+        "code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "cmd": "docker",
+        "args": [
+          "network",
+          "ls",
+          "--filter",
+          "name=magazzino-m67e-mhurhw-net",
+          "--format",
+          "{{.Name}}"
+        ],
+        "code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "cmd": "docker",
+        "args": [
+          "volume",
+          "ls",
+          "--filter",
+          "label=codex.task=m67e-mhurhw",
+          "--format",
+          "{{.Name}}"
+        ],
+        "code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "cmd": "lsof",
+        "args": [
+          "-nP",
+          "-iTCP:19671",
+          "-iTCP:19672",
+          "-iTCP:59671",
+          "-iTCP:58621",
+          "-iTCP:58461",
+          "-iTCP:59666",
+          "-sTCP:LISTEN"
+        ],
+        "code": 1,
+        "stdout": "",
+        "stderr": ""
+      }
+    ],
+    "secretsRemoved": true
+  },
+  "documents": {
+    "operational": [
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-mobile/consegne-274.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-mobile/consegne-274.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "a4a436578b701d1c362179fd68c044794603b46af7247875bfe0558e19869336",
+        "xlsxSHA256": "092363f242a799f93a43b9a23d43e766cd77de75f57ad001ad3bd7d3bb0d7e9a",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-mobile/consegne-275.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-mobile/consegne-275.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "786e788fb78fc6d9f50971de8bc49b95b64f48411275c7a419bf737fbe379e28",
+        "xlsxSHA256": "ff6e16dbe789a0221a9338dadcb5821707e66ca40050a1de8dafcea75e805677",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-tablet/consegne-262.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-tablet/consegne-262.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "c6d8506cafd1441f64d3cdcd4a0b0e53ff2316d5da31c5aa7fa77609edd6d558",
+        "xlsxSHA256": "34dc3fafb5380d2f5682482885dd3a2bcb71c02a64b3c1b9f442a6290cd22d15",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-tablet/consegne-263.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-la-tablet/consegne-263.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "4ada395dffbf93a836c16c32b3cebdb9f721e30dea51f21a09c0f7692bd678a8",
+        "xlsxSHA256": "d29457dcd2d01e07e3ee7bd48e37d70700f362a167af13cc256c30466ab95e19",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-desktop/consegne-250.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-desktop/consegne-250.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "d449b369b0ec75b33045d0ee1e240ebf28ae717e95488ef4cdcef4b52dae4944",
+        "xlsxSHA256": "13272373e49ea06f6845279cc7074cc103ecbd802f9841b95f8f41b0617a74ac",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-desktop/consegne-251.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-desktop/consegne-251.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "0cf226afca8a9fdd6e922bf183022b40eea2cd90b61395a1af8f0c679debf91a",
+        "xlsxSHA256": "94fd58e8913a903dc9fefbc145ccc20dfc60fb7983d0ee83702714a582bd467e",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-landscape/consegne-268.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-landscape/consegne-268.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "7f1352d211b3d11eafa79c7733bf0e050d424f4b93a94d73d4670ccb05e45fb8",
+        "xlsxSHA256": "ba7e91121db8291160ace21ee050a37ae9977f248c6e865f7d7e8a9959058eaa",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-landscape/consegne-269.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-landscape/consegne-269.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "916329c77a3a5b457da28be2886ab904d7a17c5021aad0c7a6001778753d6a62",
+        "xlsxSHA256": "d2e74960a6dcad7c8491f2e85ad531dc59e373ac21df8f8e26f2b8d77ea8d6a4",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-laptop/consegne-256.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-laptop/consegne-256.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "4754310439af5f85ed96ac14ab6fcda101a38157072ac4b9eda88c7a718da043",
+        "xlsxSHA256": "f2bb50b8a27cf597dbd7419b90c0866dc543c714835727385972700398930bec",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-laptop/consegne-257.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-rome-laptop/consegne-257.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "c197d34827f5c3baab03bd464fd189d29f5cb7d67e270fbde74fce526780065c",
+        "xlsxSHA256": "c0af7643fbbd7436a68f07c3d16ed78de6c6e16a170480e9b7d2134881fe5389",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-webkit-tablet/consegne-280.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-webkit-tablet/consegne-280.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "62f18ef5bcef8aa19d3583be7213d0d7fd292f83e5e5b7c25a8709942f08ed65",
+        "xlsxSHA256": "3eecbabf54d6985f615ced7818175bee88f6f8b6d415ceec501e4b8f5879e48c",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-webkit-tablet/consegne-281.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-04-Are-d43fd-y-export-match-the-database-webkit-tablet/consegne-281.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 27,
+        "pdfSHA256": "84648a64576189fac0910675acb796565af4daa8f3077e438673dbfb7a11766d",
+        "xlsxSHA256": "f15ac10f78321438c8cbc575b99d400c077ea55753a696b2a05672af70e9a753",
+        "inspection": "27 unique codes and all civil dates equal SQL-verified XLSX"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-la-mobile/movimenti.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-la-mobile/movimenti.xlsx",
+        "pages": 1,
+        "rowsFirstSheet": 12,
+        "pdfSHA256": "1766fa024181a231f0cd07479a85afe8d3ab1398a0b2d428848799900fbeb8fa",
+        "xlsxSHA256": "22c61d1435b57138279fc27a9ce65696689546ff38a27dffc75e6099c4f981de",
+        "inspection": "real writer variants, precision, sign labels and civil date present; XLSX checked in E2"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-la-tablet/movimenti.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-la-tablet/movimenti.xlsx",
+        "pages": 1,
+        "rowsFirstSheet": 12,
+        "pdfSHA256": "18f31dcb4823105c2fd9c8b68268aa236dee602c9ab3cddaa95823bf43615db3",
+        "xlsxSHA256": "8475a9eb923e984762ab588f6303dbd6ed0e2de9efb3f5444809b57aea888d25",
+        "inspection": "real writer variants, precision, sign labels and civil date present; XLSX checked in E2"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-rome-desktop/movimenti.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-rome-desktop/movimenti.xlsx",
+        "pages": 1,
+        "rowsFirstSheet": 12,
+        "pdfSHA256": "1a3858b5531ff152705fad310ddba9580fe9d8a78c6b0f534fcba1ec4addde8d",
+        "xlsxSHA256": "233d4e9b5e5829c86ebd477b32c874858a259c0fbd8c5194740576ec8e3e3577",
+        "inspection": "real writer variants, precision, sign labels and civil date present; XLSX checked in E2"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-rome-landscape/movimenti.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-rome-landscape/movimenti.xlsx",
+        "pages": 1,
+        "rowsFirstSheet": 12,
+        "pdfSHA256": "26d0a6867934e148adce3c87fca8458e01e32633653e43ea5289e32d517e0166",
+        "xlsxSHA256": "6e8cb62b8bc700d13343c4ec4e621a89708b6a4ef89c60f81af4601c480ebb73",
+        "inspection": "real writer variants, precision, sign labels and civil date present; XLSX checked in E2"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-rome-laptop/movimenti.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-rome-laptop/movimenti.xlsx",
+        "pages": 1,
+        "rowsFirstSheet": 12,
+        "pdfSHA256": "ba73682de24b2c348abdcc4d1c8d5540ea33f298412b08c7bcede21b7751efe0",
+        "xlsxSHA256": "bd532f840f7f686dbe0986439c40879f02e6973e7d6f027941519bcda34f0be6",
+        "inspection": "real writer variants, precision, sign labels and civil date present; XLSX checked in E2"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-webkit-tablet/movimenti.pdf",
+        "xlsx": "/private/tmp/magazzino-m67e-mhURHw/e22-integrated-results/m67d-integrated-M67-08-rea-bb11c--reversal-in-binary-exports-webkit-tablet/movimenti.xlsx",
+        "pages": 1,
+        "rowsFirstSheet": 12,
+        "pdfSHA256": "d7c05951f36a3310b2a63c6f32612915e2beee71c4e8a9a2f6fa89419ecdd5e8",
+        "xlsxSHA256": "31be413bf17d0ca0a9579c089c0c2da66237d9fde7c20fffbc78fbb27234df97",
+        "inspection": "real writer variants, precision, sign labels and civil date present; XLSX checked in E2"
+      }
+    ],
+    "reporting": [
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/centro-ascolto.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/centro-ascolto.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 34,
+        "pdfSHA256": "2aa8ebb2d080abd730894e04654d8e9fb1721a66b9946f65901013828c01be07",
+        "xlsxSHA256": "d03498879f2fe2b89232542d07336a40851540f056957e284138333940b3bb6f",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/dashboard.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/dashboard.xlsx",
+        "pages": 5,
+        "rowsFirstSheet": 32,
+        "pdfSHA256": "ff63aaff9c9f95e78e2606f225eb25f0b24a2f882a3c42b6dc9b79b0a5fb8665",
+        "xlsxSHA256": "467990a617b23a5592be0d315442e6e0f07a3d4b2279589983ff32cbb9936812",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/emporio.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/emporio.xlsx",
+        "pages": 3,
+        "rowsFirstSheet": 34,
+        "pdfSHA256": "3095f81d99cfa78e0bca3bcd2e8a5bd4bc08e7ba4645cf6108d8d633dd45565d",
+        "xlsxSHA256": "ade9378257449b9ea403ac55089f347ce17c556b61469a5e1f4577884b639736",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/fse-plus.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/fse-plus.xlsx",
+        "pages": 8,
+        "rowsFirstSheet": 60,
+        "pdfSHA256": "9bc7f73c90ca29c3c8b9b5aa7c96090d0b1e7f4a36066a74ef69d43fc88d1964",
+        "xlsxSHA256": "369a0d9bf342f94a8667f04bb7f591968688908f320423b85979220557ef656c",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/magazzino-logistica.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/magazzino-logistica.xlsx",
+        "pages": 32,
+        "rowsFirstSheet": 58,
+        "pdfSHA256": "2e28c10a0f230e40d4f38ca8e33858c74374aa26c8871911efd50bbf0da0cfe4",
+        "xlsxSHA256": "8f3e6f7dae8a0feab57c561dd2bbbbe65c360a9d02a526db6b57efd08350080a",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/mensa.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/mensa.xlsx",
+        "pages": 5,
+        "rowsFirstSheet": 43,
+        "pdfSHA256": "63a08e4a863ba9d2543665cc70a7a3e19ad22bc537823f1c56c2df6239a4510f",
+        "xlsxSHA256": "70793217c56e1c7f1c51e9ad31a5f71d2e82fed88d841506d3068083093c4a50",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/pacchi.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/pacchi.xlsx",
+        "pages": 4,
+        "rowsFirstSheet": 30,
+        "pdfSHA256": "5b52ddd44dae73f77404b3ec3b6aaac4ce07ca6c8e4b3190c5d6fd82c73b3686",
+        "xlsxSHA256": "f0bce71cfdd24d3af67a309715a40996da3816dac5f05997a390c8a9f0470323",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/uds.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/uds.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 26,
+        "pdfSHA256": "dea46e64c2ec371c980cf709bd016bd293c8b4f004346695033ddc9f42572c3e",
+        "xlsxSHA256": "7f10215a8c4d0d9508dfcee8b2ffafd2277fc25048ca1ced840759d0306fc6f2",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/centro-ascolto.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/centro-ascolto.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 34,
+        "pdfSHA256": "1f2980c479ac1376e0182e478ad5ac3e9f8dd3feaa1882a97d18c300f3b20ecb",
+        "xlsxSHA256": "12a3977a627309febd8f0699c37c7642bafd02bc9ac265183f74e84ed28e2810",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/dashboard.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/dashboard.xlsx",
+        "pages": 5,
+        "rowsFirstSheet": 32,
+        "pdfSHA256": "e1c25ce38c0bd76168ce71b1f9e69ae6485ff685082911ea209b41a5e596fd19",
+        "xlsxSHA256": "3238efd85f67f0230dd73cb61672c445d99630aed92c446570fac0079c5c82b3",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/emporio.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/emporio.xlsx",
+        "pages": 3,
+        "rowsFirstSheet": 34,
+        "pdfSHA256": "ab11f30628996cbf1d8b5a7ea40f9eb0554f098bc4f504051955bfb566eb91d9",
+        "xlsxSHA256": "643ad0232c2ead4a34051c08c544aac02217467be6022581a1eea8014a0ec0a9",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/fse-plus.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/fse-plus.xlsx",
+        "pages": 8,
+        "rowsFirstSheet": 60,
+        "pdfSHA256": "e2da61cf551de07fd462d095fdf3758aad724ea060abc471972780c0bfbc8b3e",
+        "xlsxSHA256": "f198ee7a8be56030f7dce73ca3685c78efa32f0919da6fb08f02e822151c56fb",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/magazzino-logistica.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/magazzino-logistica.xlsx",
+        "pages": 32,
+        "rowsFirstSheet": 58,
+        "pdfSHA256": "f1d1928dab0c0cacc701149b26d19dce43a415cc0839a46cc8a7a20fa095f47e",
+        "xlsxSHA256": "efcbd4edddc605e2757c7d65d8dbbddd9e0558488b562443b656cbbdd3be9773",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/mensa.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/mensa.xlsx",
+        "pages": 5,
+        "rowsFirstSheet": 43,
+        "pdfSHA256": "57e6b4ee7730a6749c49a02dcf876f6653f58c5d46b2429ec2f260245969eb18",
+        "xlsxSHA256": "e56557bfb1e0f979960bbc11f52a027a22af6a162b0fd2c0070a555adb235967",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/pacchi.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/pacchi.xlsx",
+        "pages": 4,
+        "rowsFirstSheet": 30,
+        "pdfSHA256": "6fa20482c3132bc37a8ab74d728629441593c937e2e3e0d67b90729da62c4c95",
+        "xlsxSHA256": "a8888e2bde214fcb5c1414d87a7228db8d7fa922b92cea0768f28e827be35ac9",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/uds.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/uds.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 26,
+        "pdfSHA256": "c5a673b0d645a0e82780348d14b73ffda642267e913466aaec2ed85c40f0f23f",
+        "xlsxSHA256": "dbfa8e2f27675daeff077719762aa2bbe97893342fdf834acf69fb8c705d9a9c",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/centro-ascolto.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/centro-ascolto.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 34,
+        "pdfSHA256": "b58ee3197c418e56645b024a31080c2fe5c4877202280d3e64fb88c87c07fed1",
+        "xlsxSHA256": "27f778e4cd1c9dac220366e274ca6d2b810b6cda8c0b381ac0940bcc1b2c8366",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/dashboard.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/dashboard.xlsx",
+        "pages": 5,
+        "rowsFirstSheet": 32,
+        "pdfSHA256": "e353644dfc60e0cdd004bb342be3594d7532e2a4046a51b41476e7aa7fc6e833",
+        "xlsxSHA256": "bb39ba77601911ac135d9015a40c42d8861d195bd1f988d0a7336f2a299cbd7f",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/emporio.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/emporio.xlsx",
+        "pages": 3,
+        "rowsFirstSheet": 34,
+        "pdfSHA256": "f4fef3b94586366c0cf1af45d3ff6e5cac81cd4592118aed112bdd25a0cf3657",
+        "xlsxSHA256": "749a47fd3d52d4380fe68ad5bb6711ea56bcd9d5981ef294409f47069d7d2253",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/fse-plus.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/fse-plus.xlsx",
+        "pages": 8,
+        "rowsFirstSheet": 60,
+        "pdfSHA256": "417f2bbfc32e932579cf4dad97d5d24738103265ef586447b788245c52ed2d01",
+        "xlsxSHA256": "d32252d2f4f2a614dca023bb880bb602e76c4236324b558efab6c1ccbbad5f73",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/magazzino-logistica.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/magazzino-logistica.xlsx",
+        "pages": 32,
+        "rowsFirstSheet": 58,
+        "pdfSHA256": "5b985616ccefcf33ae0f9fdaec89f3bde8e007191bc154b7d8faaf95899f8f2c",
+        "xlsxSHA256": "594475b0242106bb8b405142a576a033cb17f718c1ceb391c177795d2d3c3168",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/mensa.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/mensa.xlsx",
+        "pages": 5,
+        "rowsFirstSheet": 43,
+        "pdfSHA256": "8c86225176a2641492d1a5bc9be07415d0a9cbf0ae54b5026c5a3c3e37e6cada",
+        "xlsxSHA256": "986b62f38d226b952e26fa45c57ae7217431b5423395a4d29f4209b4c437c26f",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/pacchi.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/pacchi.xlsx",
+        "pages": 4,
+        "rowsFirstSheet": 30,
+        "pdfSHA256": "8c7973ccf4b7d56ee1aea8080b5ac9de9ab4cdbc786e26ef1a76723a72ca9b49",
+        "xlsxSHA256": "991d63329caa0f642947a77e317163b36537a39bc4f2965f39e9ca2b6ee5671c",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/uds.pdf",
+        "xlsx": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/uds.xlsx",
+        "pages": 2,
+        "rowsFirstSheet": 26,
+        "pdfSHA256": "3bc78b93af2e88c29a73d521219d4e3b234579bfc7a302b99fc7529cf2e665b5",
+        "xlsxSHA256": "635c04dd0600cdfdaf1689d2cbfea19aeb7b64092052aadb12b1cc77788a7d8e",
+        "inspection": "readable PDF/XLSX; dataset parity asserted by reporting browser suite"
+      }
+    ],
+    "reportingContent": [
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/centro-ascolto.pdf",
+        "sha256": "2aa8ebb2d080abd730894e04654d8e9fb1721a66b9946f65901013828c01be07",
+        "pages": 2,
+        "checks": 64,
+        "datasetId": "172c7700-52ee-4b20-9429-b838e010c77c"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/dashboard.pdf",
+        "sha256": "ff63aaff9c9f95e78e2606f225eb25f0b24a2f882a3c42b6dc9b79b0a5fb8665",
+        "pages": 5,
+        "checks": 220,
+        "datasetId": "01c0de50-0177-4f22-9ad2-b1ac4cce33dd"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/emporio.pdf",
+        "sha256": "3095f81d99cfa78e0bca3bcd2e8a5bd4bc08e7ba4645cf6108d8d633dd45565d",
+        "pages": 3,
+        "checks": 90,
+        "datasetId": "892a39f9-7321-4862-a00e-4bd630b23bf5"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/fse-plus.pdf",
+        "sha256": "9bc7f73c90ca29c3c8b9b5aa7c96090d0b1e7f4a36066a74ef69d43fc88d1964",
+        "pages": 8,
+        "checks": 333,
+        "datasetId": "7b60c99a-7847-4c71-9eec-937906516f30"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/magazzino-logistica.pdf",
+        "sha256": "2e28c10a0f230e40d4f38ca8e33858c74374aa26c8871911efd50bbf0da0cfe4",
+        "pages": 32,
+        "checks": 2875,
+        "datasetId": "c13e33c0-86b5-42e9-a26b-5d53b6e026bc"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/mensa.pdf",
+        "sha256": "63a08e4a863ba9d2543665cc70a7a3e19ad22bc537823f1c56c2df6239a4510f",
+        "pages": 5,
+        "checks": 152,
+        "datasetId": "dea80dea-9923-4b19-a214-5abbcc8bf245"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/pacchi.pdf",
+        "sha256": "5b52ddd44dae73f77404b3ec3b6aaac4ce07ca6c8e4b3190c5d6fd82c73b3686",
+        "pages": 4,
+        "checks": 77,
+        "datasetId": "ead6ff42-4cb4-48e7-8eaa-f50f9258c81b"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/la-tablet/uds.pdf",
+        "sha256": "dea46e64c2ec371c980cf709bd016bd293c8b4f004346695033ddc9f42572c3e",
+        "pages": 2,
+        "checks": 52,
+        "datasetId": "055fddb6-f50a-4ef4-9e1a-50d11c1d1d7e"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/centro-ascolto.pdf",
+        "sha256": "1f2980c479ac1376e0182e478ad5ac3e9f8dd3feaa1882a97d18c300f3b20ecb",
+        "pages": 2,
+        "checks": 64,
+        "datasetId": "51bf8076-2b96-42d8-ae40-b4f803ee7416"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/dashboard.pdf",
+        "sha256": "e1c25ce38c0bd76168ce71b1f9e69ae6485ff685082911ea209b41a5e596fd19",
+        "pages": 5,
+        "checks": 214,
+        "datasetId": "d4b8fe3a-0971-4db9-b701-4b47a4dc0d40"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/emporio.pdf",
+        "sha256": "ab11f30628996cbf1d8b5a7ea40f9eb0554f098bc4f504051955bfb566eb91d9",
+        "pages": 3,
+        "checks": 90,
+        "datasetId": "d35a381b-3654-44a4-a011-1c82ade2a398"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/fse-plus.pdf",
+        "sha256": "e2da61cf551de07fd462d095fdf3758aad724ea060abc471972780c0bfbc8b3e",
+        "pages": 8,
+        "checks": 333,
+        "datasetId": "df635535-581c-4744-a8fa-fbfcc36ecf9b"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/magazzino-logistica.pdf",
+        "sha256": "f1d1928dab0c0cacc701149b26d19dce43a415cc0839a46cc8a7a20fa095f47e",
+        "pages": 32,
+        "checks": 2875,
+        "datasetId": "546ebce7-13f4-4f1a-ad8f-b8a237fa8576"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/mensa.pdf",
+        "sha256": "57e6b4ee7730a6749c49a02dcf876f6653f58c5d46b2429ec2f260245969eb18",
+        "pages": 5,
+        "checks": 152,
+        "datasetId": "3d697d82-602e-48e3-912c-04ab05cbc4e4"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/pacchi.pdf",
+        "sha256": "6fa20482c3132bc37a8ab74d728629441593c937e2e3e0d67b90729da62c4c95",
+        "pages": 4,
+        "checks": 77,
+        "datasetId": "42f4d9b5-0bdb-41f7-b06c-23db88f003a5"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/rome-desktop/uds.pdf",
+        "sha256": "c5a673b0d645a0e82780348d14b73ffda642267e913466aaec2ed85c40f0f23f",
+        "pages": 2,
+        "checks": 52,
+        "datasetId": "37c77e4e-24ff-41cf-bd90-1bd280656194"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/centro-ascolto.pdf",
+        "sha256": "b58ee3197c418e56645b024a31080c2fe5c4877202280d3e64fb88c87c07fed1",
+        "pages": 2,
+        "checks": 64,
+        "datasetId": "5431100a-1e51-4c50-a342-a3071acde1ba"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/dashboard.pdf",
+        "sha256": "e353644dfc60e0cdd004bb342be3594d7532e2a4046a51b41476e7aa7fc6e833",
+        "pages": 5,
+        "checks": 226,
+        "datasetId": "392dfbc0-6ec3-42c7-994f-d8030e2c2bd5"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/emporio.pdf",
+        "sha256": "f4fef3b94586366c0cf1af45d3ff6e5cac81cd4592118aed112bdd25a0cf3657",
+        "pages": 3,
+        "checks": 90,
+        "datasetId": "ecef4ee4-40b1-4dd6-96a1-d3ae8cfb8900"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/fse-plus.pdf",
+        "sha256": "417f2bbfc32e932579cf4dad97d5d24738103265ef586447b788245c52ed2d01",
+        "pages": 8,
+        "checks": 333,
+        "datasetId": "9f62bbb4-3858-4c86-a71a-d3d29e3d887a"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/magazzino-logistica.pdf",
+        "sha256": "5b985616ccefcf33ae0f9fdaec89f3bde8e007191bc154b7d8faaf95899f8f2c",
+        "pages": 32,
+        "checks": 2875,
+        "datasetId": "f7c3db3d-1a70-49ec-868c-b54d5c2c1ffb"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/mensa.pdf",
+        "sha256": "8c86225176a2641492d1a5bc9be07415d0a9cbf0ae54b5026c5a3c3e37e6cada",
+        "pages": 5,
+        "checks": 152,
+        "datasetId": "00283579-7acd-4437-a2d9-8a8c9294cafd"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/pacchi.pdf",
+        "sha256": "8c7973ccf4b7d56ee1aea8080b5ac9de9ab4cdbc786e26ef1a76723a72ca9b49",
+        "pages": 4,
+        "checks": 77,
+        "datasetId": "fe1dc999-6c3b-474d-9a34-edd3fee00beb"
+      },
+      {
+        "pdf": "/private/tmp/magazzino-m66-m67e-mhURHw/documents/e24-report/webkit-tablet/uds.pdf",
+        "sha256": "3bc78b93af2e88c29a73d521219d4e3b234579bfc7a302b99fc7529cf2e665b5",
+        "pages": 2,
+        "checks": 52,
+        "datasetId": "8f78ea65-4470-49f1-ac41-9a0e82b37d6c"
+      }
+    ]
+  },
+  "finalBrowser": {
+    "evidence": [
+      "e22-integrated.json",
+      "e22-access.json",
+      "e22-paths.json",
+      "e23-ux.json",
+      "e24-mensa.json",
+      "e24-report.json"
+    ],
+    "pass": 291,
+    "fail": 0,
+    "skip": 0,
+    "retries": 0
+  },
+  "supplementalCommands": [
+    {
+      "label": "e22-integrated",
+      "command": "M67E_BUILD=e22 M67E_GROUP=m67d-integrated node E/run.mjs browser e22-integrated",
+      "exitCode": 0
+    },
+    {
+      "label": "e22-access",
+      "command": "M67E_BUILD=e22 M67E_GROUP=m67a-access node E/run.mjs browser e22-access",
+      "exitCode": 0
+    },
+    {
+      "label": "e22-paths",
+      "command": "M67E_BUILD=e22 M67E_GROUP=m67b-paths node E/run.mjs browser e22-paths",
+      "exitCode": 0
+    },
+    {
+      "label": "e22-ux",
+      "command": "M67E_BUILD=e22 M67E_GROUP=m67c-ux node E/run.mjs browser e22-ux",
+      "exitCode": 1
+    },
+    {
+      "label": "e23-ux",
+      "command": "M67E_BUILD=e23 M67E_GROUP=m67c-ux node E/run.mjs browser e23-ux",
+      "exitCode": 0
+    },
+    {
+      "label": "e24-mensa",
+      "command": "M67E_BUILD=e24 node E/domains.mjs browser-mensa e24-mensa",
+      "exitCode": 0
+    },
+    {
+      "label": "e24-report",
+      "command": "M67E_BUILD=e24 node E/domains.mjs browser-reporting e24-report --project=rome-desktop --project=la-tablet --project=webkit-tablet",
+      "exitCode": 0
+    },
+    {
+      "label": "build-e2",
+      "command": "node E/linux-build.mjs e2 && node E/stage-build.mjs e2",
+      "exitCode": 0
+    },
+    {
+      "label": "build-e22",
+      "command": "node E/linux-build.mjs e22 && node E/stage-build.mjs e22",
+      "exitCode": 0
+    },
+    {
+      "label": "build-e23",
+      "command": "node E/linux-build.mjs e23 && node E/stage-build.mjs e23",
+      "exitCode": 0
+    },
+    {
+      "label": "build-e24",
+      "command": "node E/linux-build.mjs e24 && node E/stage-build.mjs e24",
+      "exitCode": 0
+    },
+    {
+      "label": "controller-e23",
+      "command": "Controller stopped after e23-ux exit0, before non-isolated legacy groups; SIGTERM specific PID76143",
+      "exitCode": 143
+    },
+    {
+      "label": "typecheck-final",
+      "command": "pnpm run typecheck",
+      "exitCode": 0,
+      "evidence": "e24-typecheck.log"
+    },
+    {
+      "label": "format-final-code",
+      "command": "pnpm exec prettier --check <23 paths from e24-identity.deltaFromD>",
+      "exitCode": 0,
+      "evidence": "e24-format.log"
+    },
+    {
+      "label": "runtime",
+      "command": "sh scripts/test-web-runtime-config.sh",
+      "exitCode": 0,
+      "evidence": "e22-runtime.log"
+    },
+    {
+      "label": "cleanup-domains",
+      "command": "node E/domains.mjs cleanup",
+      "exitCode": 0
+    },
+    {
+      "label": "cleanup-main-ephemeral",
+      "command": "node E/run.mjs cleanup",
+      "exitCode": 0
+    }
+  ]
+}

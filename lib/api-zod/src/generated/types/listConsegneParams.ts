@@ -8,6 +8,11 @@
 
 export type ListConsegneParams = {
   /**
+   * Intersezione con lo scope corrente; snapshot per le consegne effettuate.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
    * @minimum 1
    */
   page?: number;

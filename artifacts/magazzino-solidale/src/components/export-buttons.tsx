@@ -6,7 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { exportToXlsx, exportToPdf, type ExportColumn } from "@/lib/export";
@@ -26,6 +26,8 @@ type ExportButtonsProps<T> = {
   loadRows?: () => Promise<T[]>;
   beforeExport?: (format: "xlsx" | "pdf", exportRows: T[]) => Promise<void>;
   onError?: (error: unknown) => void;
+  contextKey?: string;
+  validateDownload?: () => Promise<void>;
 };
 
 export function ExportButtons<T>({
@@ -42,11 +44,36 @@ export function ExportButtons<T>({
   loadRows,
   beforeExport,
   onError,
+  contextKey,
+  validateDownload,
 }: ExportButtonsProps<T>) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [exportLoading, setExportLoading] = useState(false);
   const exportInFlight = useRef(false);
+  const identity = JSON.stringify([user, contextKey]);
+  const generation = useRef({ identity, version: 0, mounted: true });
+  if (generation.current.identity !== identity) {
+    generation.current.identity = identity;
+    generation.current.version++;
+  }
+  useEffect(() => {
+    generation.current.mounted = true;
+    return () => {
+      generation.current.mounted = false;
+      generation.current.version++;
+    };
+  }, []);
+  const downloadGuard = () => {
+    const version = generation.current.version;
+    return async () => {
+      const current = () =>
+        generation.current.mounted && generation.current.version === version;
+      if (!current()) throw new Error(t("common.readdenied"));
+      await validateDownload?.();
+      if (!current()) throw new Error(t("common.readdenied"));
+    };
+  };
   const generatedBy = user
     ? `${user.nome ?? ""} ${user.cognome ?? ""}`.trim() || user.username
     : undefined;
@@ -56,6 +83,7 @@ export function ExportButtons<T>({
     if (exportInFlight.current) return;
     exportInFlight.current = true;
     setExportLoading(true);
+    const validate = downloadGuard();
     try {
       const exportRows = await resolveRows();
       if (exportRows.length === 0) return;
@@ -70,6 +98,7 @@ export function ExportButtons<T>({
         orientation,
         generatedBy,
         branding: { ...branding, logoDataUrl },
+        beforeSave: validate,
       });
     } catch (error) {
       if (!onError) throw error;
@@ -84,10 +113,12 @@ export function ExportButtons<T>({
     if (exportInFlight.current) return;
     exportInFlight.current = true;
     setExportLoading(true);
+    const validate = downloadGuard();
     try {
       const exportRows = await resolveRows();
       if (exportRows.length === 0) return;
       await beforeExport?.("xlsx", exportRows);
+      await validate();
       exportToXlsx(filename, sheetName ?? title, exportRows, columns);
     } catch (error) {
       if (!onError) throw error;

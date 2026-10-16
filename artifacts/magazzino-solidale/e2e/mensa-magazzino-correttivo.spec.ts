@@ -25,9 +25,26 @@ test("Mensa → richiesta → Magazzino → fornitura 12/20 → ricezione; diret
     baseURL: testInfo.project.use.baseURL,
     viewport: testInfo.project.use.viewport,
     hasTouch: testInfo.project.use.hasTouch,
+    timezoneId: testInfo.project.use.timezoneId,
+    isMobile: testInfo.project.use.isMobile,
   };
   const mensaContext = await browser.newContext(options),
     warehouseContext = await browser.newContext(options);
+  const externalRequests: string[] = [];
+  for (const context of [mensaContext, warehouseContext]) {
+    await context.route("**/*", async (route) => {
+      const host = new URL(route.request().url()).hostname;
+      if (["127.0.0.1", "localhost"].includes(host)) return route.continue();
+      if (host === "fonts.googleapis.com")
+        return route.fulfill({
+          status: 200,
+          contentType: "text/css",
+          body: "/* offline font fixture */",
+        });
+      externalRequests.push(host);
+      return route.abort();
+    });
+  }
   const mensaPage = await mensaContext.newPage(),
     warehousePage = await warehouseContext.newPage();
   const errors: string[] = [];
@@ -375,6 +392,7 @@ test("Mensa → richiesta → Magazzino → fornitura 12/20 → ricezione; diret
       ),
     ).toBe(1);
     expect(errors).toEqual([]);
+    expect(externalRequests).toEqual([]);
   } finally {
     await mensaContext.close();
     await warehouseContext.close();

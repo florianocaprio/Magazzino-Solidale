@@ -1,0 +1,109 @@
+{
+  "phase": "M6.7-C development; not formal certification",
+  "date": "2026-10-15",
+  "branch": "codex/magazzino-workflow-unificato",
+  "head": "879d96ca04f6355b94c709e271482603db306bf6",
+  "technical": {
+    "files": 2139,
+    "sha256": "e49c61b7810a0777ef01f2dcbad8357a2c2a6e487cd028c6e212d2e85bce7028",
+    "fullManifest": "/private/tmp/magazzino-m67c-nBXBao/technical-full-manifest.json",
+    "algorithm": "SHA-256 of compact JSON of path-sorted {path,sha256}; docs, ignored files and env excluded; deleted paths null"
+  },
+  "previousB": "f9f5e6e772ebaa2228718aa0afd01b2b6ffa776cfb6278daf43c96b0b128dd04",
+  "components": {
+    "api": {
+      "files": 389,
+      "sha256": "34e07b28c6670717feda61b70b86ba94184550a6545805155fd2a459defec923"
+    },
+    "web": {
+      "files": 481,
+      "sha256": "13fc5dc91ca6c8c0528e31cd66a7f4609207d1dd182a27e51a77f3188737fb8a"
+    },
+    "db": {
+      "files": 140,
+      "sha256": "3cac8b191ff01a552d84486cd9bc99bac4dc3714002d4c527145ba9cc0754c9b"
+    },
+    "contracts": {
+      "files": 966,
+      "sha256": "8dda4872178d6d5a4115aed55841cccf6b890bec5606818c7d088eff15c359b1"
+    },
+    "dependencies": {
+      "files": 3,
+      "sha256": "7ec48ef044f1c21e948b4782893244916b180384e39f16eb699f36f55fdadb7b"
+    }
+  },
+  "cFiles": [
+    {
+      "path": "artifacts/magazzino-solidale/e2e/m67c-ux.spec.ts",
+      "sha256": "3f7f706b3db6e2b404bb40b11b46d0caf598c02da11b9f1b24f59c21b9b72b8b"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/App.tsx",
+      "sha256": "7af0f3eaeffbebec0f284917e34adbf2c888f34f8483976a4385b9aa49e3d564"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/layout.tsx",
+      "sha256": "7895fbaf40a4c81bbd98429e0b67ae318b3390bc692c70310f50bd813e7af33c"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/maps/maps-operativa.test.tsx",
+      "sha256": "7227f01691878ae8d989bd73400e77e0ba57b0992ced95d5da29f9993b76ab20"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/read-query-feedback.test.tsx",
+      "sha256": "30d63691e97e25cd351e61d0f59a725e883055cf14122ec89bba3ecd326adcb8"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/components/read-query-feedback.tsx",
+      "sha256": "7071d71fda99eba69824b27c1b2ee84ff49d9dfd3b7fee8fc2ad4f762f38b107"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/lib/i18n/namespaces/base.ts",
+      "sha256": "6731b7ede422b9bf19c881181b7c28b6f59568408638b52c461e16c71cfb7526"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/consegne.tsx",
+      "sha256": "48e851b2dbad31505a30b3efc82c3b104947e7e3d9dd4bcd8b88cd3f1e0c569c"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/maps.tsx",
+      "sha256": "800aa107bc75e769ec8c8e749b0924a1280b42dbc379a0cdba5810cbf1d300e4"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/movimenti.tsx",
+      "sha256": "a3ed3a1ff2972e4b5bf82b932373b6ff9cd7d0eac8a1dff1e21cdf8d9377aedf"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/richieste-magazzino.test.tsx",
+      "sha256": "c85f99d252d394068b432260812102bd5b2eaa4c7b3a573c228303c7012a3521"
+    },
+    {
+      "path": "artifacts/magazzino-solidale/src/pages/richieste-magazzino.tsx",
+      "sha256": "103aac9544ad90a21dc904766c13b5ad5e50a066b234ac2c39b0bc216955ebff"
+    }
+  ],
+  "build": {
+    "snapshot": "/private/tmp/magazzino-m67c-nBXBao/linux-source-candidate2",
+    "productAndConfigurationIdentity": "byte-identical to final working tree",
+    "testOnlyDifferences": [
+      "artifacts/magazzino-solidale/e2e/m67c-ux.spec.ts",
+      "artifacts/magazzino-solidale/src/components/maps/maps-operativa.test.tsx",
+      "artifacts/magazzino-solidale/src/pages/richieste-magazzino.test.tsx"
+    ],
+    "entry": "index-DjGuhmvi.js",
+    "entryGzipKiB": 399.2,
+    "limitKiB": 400
+  },
+  "evidenceManifest": "/private/tmp/magazzino-m67c-nBXBao/fingerprint.json",
+  "results": {
+    "unitUniquePass": 112,
+    "unitMandatorySubsetRerunPass": 9,
+    "chromiumPass": 35,
+    "finalExecutedFail": 0,
+    "finalExecutedSkip": 0,
+    "webkit": "NOT EXECUTED: 32 browser launch failures, executable absent",
+    "hardware": "NOT EXECUTED",
+    "M67-04": "PARTIAL from B; deferred D/E",
+    "M67-08": "PARTIAL from B; deferred D/E"
+  }
+}

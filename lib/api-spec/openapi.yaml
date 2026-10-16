@@ -2739,6 +2739,61 @@ paths:
                 items:
                   $ref: "#/components/schemas/Movimento"
 
+  /movimenti/export:
+    get:
+      operationId: exportMovimenti
+      tags: [movimenti]
+      summary: Export coerente del ledger filtrato
+      description: Un solo snapshot PostgreSQL, ordine dataCreazione DESC e id DESC. Massimo 10000 righe e 16 MiB; nessuna troncatura. Sessione e scope rivalidati prima della risposta. Non accetta page o limit.
+      parameters:
+        - name: tipo
+          in: query
+          schema:
+            type: string
+        - name: magazzinoId
+          in: query
+          schema:
+            type: integer
+        - name: prodottoId
+          in: query
+          schema:
+            type: integer
+        - name: centroAscoltoId
+          in: query
+          schema:
+            type: integer
+        - name: da
+          in: query
+          schema:
+            type: string
+        - name: a
+          in: query
+          schema:
+            type: string
+        - name: fondoOrigine
+          in: query
+          schema:
+            $ref: "#/components/schemas/FondoOrigine"
+        - name: naturaContabile
+          in: query
+          schema: { type: string }
+        - name: canaleOperativo
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Tutti i movimenti dello snapshot filtrato; X-Total-Count coincide con il numero di elementi.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Movimento"
+        "400": { description: Filtri non validi o paginazione non ammessa }
+        "401": { description: "Sessione assente, terminata o cambiata" }
+        "403": { description: Permesso o perimetro revocato }
+        "413": { description: "Export troppo ampio, restringere i filtri" }
+
   # ─── GIACENZE ────────────────────────────────────────────────────────────────
   /giacenze:
     get:
@@ -4944,6 +4999,12 @@ paths:
       operationId: listConsegne
       tags: [consegne]
       parameters:
+        - {
+            name: areaOperativaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+            description: Intersezione con lo scope corrente; snapshot per le consegne effettuate.,
+          }
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }
@@ -5009,6 +5070,11 @@ paths:
       tags: [consegne]
       summary: Restituisce tutte le consegne autorizzate per i filtri richiesti
       parameters:
+        - {
+            name: areaOperativaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
         - { name: q, in: query, schema: { type: string } }
         - { name: stato, in: query, schema: { type: string } }
         - { name: data, in: query, schema: { type: string } }
@@ -5028,6 +5094,17 @@ paths:
       operationId: listBollePronteDaPianificare
       tags: [consegne]
       summary: Coda derivata delle Bolle M5 pronte nel perimetro del Centro
+      parameters:
+        - {
+            name: areaOperativaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: centroAscoltoId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
       responses:
         "200":
           description: Bolle pronte non ancora pianificate
@@ -5037,6 +5114,49 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/BollaProntaDaPianificare" }
         "403": { description: Coda non autorizzata }
+
+  /consegne/beneficiario-da-codice:
+    get:
+      operationId: getConsegnaBeneficiarioDaCodice
+      tags: [consegne]
+      summary: Identità esatta da codice beneficiario legacy attivo entro scope; non risolve token tessera MS
+      parameters:
+        - {
+            name: codice,
+            in: query,
+            required: true,
+            schema: { type: string, minLength: 1, maxLength: 100 },
+          }
+        - {
+            name: areaOperativaId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+        - {
+            name: centroAscoltoId,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
+      responses:
+        "200":
+          description: Identità operativa minima, senza creazione di attività
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, codice, nome, cognome, centroAscoltoId]
+                properties:
+                  id: { type: integer }
+                  codice: { type: string }
+                  nome: { type: string }
+                  cognome: { type: string }
+                  centroAscoltoId: { type: [integer, "null"] }
+        "400": { description: Parametri non validi }
+        "403": { description: Grant o territorio non autorizzati }
+        "404":
+          {
+            description: "Codice non disponibile, non univoco, inattivo o fuori scope",
+          }
 
   /consegne/da-bolla/{bollaId}:
     post:
@@ -14258,8 +14378,14 @@ components:
           type: string
         tipoDettaglio:
           type: string
+        effettoFisico:
+          type: [integer, "null"]
+          enum: [-1, 0, 1, null]
+          description: Segno fisico canonico, inclusa inversione dello storno. Null se non determinabile da dati legacy; zero significa nessuna variazione fisica.
         dataMovimento:
           type: string
+          description: Data civile operativa YYYY-MM-DD, senza ora o fuso orario.
+          pattern: '^\d{4}-\d{2}-\d{2}$'
         magazzinoId:
           type: integer
         magazzinoNome:

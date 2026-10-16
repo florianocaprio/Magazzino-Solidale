@@ -182,6 +182,7 @@ import type {
   ExecuteCreditoSolidaleRicaricaMensile410,
   ExportConsegneParams,
   ExportDocumentiOperativiParams,
+  ExportMovimentiParams,
   ForgotPasswordInput,
   Fornitore,
   FornitoreInput,
@@ -215,6 +216,8 @@ import type {
   FseReportingPreview,
   FseResolutionInput,
   FseVersionInput,
+  GetConsegnaBeneficiarioDaCodice200,
+  GetConsegnaBeneficiarioDaCodiceParams,
   GetCreditoSolidaleRicaricaMensileStato200,
   GetDocumentoOperativoRichiesta200,
   GetEmporioAbilitazioniRiepilogoBeneficiariParams,
@@ -273,6 +276,7 @@ import type {
   ListApprovvigionamentiParams,
   ListBeneficiariParams,
   ListBolleParams,
+  ListBollePronteDaPianificareParams,
   ListCarichiParams,
   ListCaricoPraticheParams,
   ListConsegneParams,
@@ -10276,6 +10280,101 @@ export function useListMovimenti<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
+export const getExportMovimentiUrl = (params?: ExportMovimentiParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/movimenti/export?${stringifiedParams}`
+    : `/api/movimenti/export`;
+};
+
+/**
+ * Un solo snapshot PostgreSQL, ordine dataCreazione DESC e id DESC. Massimo 10000 righe e 16 MiB; nessuna troncatura. Sessione e scope rivalidati prima della risposta. Non accetta page o limit.
+ * @summary Export coerente del ledger filtrato
+ */
+export const exportMovimenti = async (
+  params?: ExportMovimentiParams,
+  options?: RequestInit,
+): Promise<Movimento[]> => {
+  return customFetch<Movimento[]>(getExportMovimentiUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportMovimentiQueryKey = (params?: ExportMovimentiParams) => {
+  return [`/api/movimenti/export`, ...(params ? [params] : [])] as const;
+};
+
+export const getExportMovimentiQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportMovimenti>>,
+  TError = ErrorType<void>,
+>(
+  params?: ExportMovimentiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportMovimenti>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getExportMovimentiQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof exportMovimenti>>> = ({
+    signal,
+  }) => exportMovimenti(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportMovimenti>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportMovimentiQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportMovimenti>>
+>;
+export type ExportMovimentiQueryError = ErrorType<void>;
+
+/**
+ * @summary Export coerente del ledger filtrato
+ */
+
+export function useExportMovimenti<
+  TData = Awaited<ReturnType<typeof exportMovimenti>>,
+  TError = ErrorType<void>,
+>(
+  params?: ExportMovimentiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportMovimenti>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportMovimentiQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
 export const getListGiacenzeUrl = (params: ListGiacenzeParams) => {
   const normalizedParams = new URLSearchParams();
 
@@ -18166,18 +18265,33 @@ export function useExportConsegne<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
-export const getListBollePronteDaPianificareUrl = () => {
-  return `/api/consegne/da-pianificare`;
+export const getListBollePronteDaPianificareUrl = (
+  params?: ListBollePronteDaPianificareParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/consegne/da-pianificare?${stringifiedParams}`
+    : `/api/consegne/da-pianificare`;
 };
 
 /**
  * @summary Coda derivata delle Bolle M5 pronte nel perimetro del Centro
  */
 export const listBollePronteDaPianificare = async (
+  params?: ListBollePronteDaPianificareParams,
   options?: RequestInit,
 ): Promise<BollaProntaDaPianificare[]> => {
   return customFetch<BollaProntaDaPianificare[]>(
-    getListBollePronteDaPianificareUrl(),
+    getListBollePronteDaPianificareUrl(params),
     {
       ...options,
       method: "GET",
@@ -18185,30 +18299,35 @@ export const listBollePronteDaPianificare = async (
   );
 };
 
-export const getListBollePronteDaPianificareQueryKey = () => {
-  return [`/api/consegne/da-pianificare`] as const;
+export const getListBollePronteDaPianificareQueryKey = (
+  params?: ListBollePronteDaPianificareParams,
+) => {
+  return [`/api/consegne/da-pianificare`, ...(params ? [params] : [])] as const;
 };
 
 export const getListBollePronteDaPianificareQueryOptions = <
   TData = Awaited<ReturnType<typeof listBollePronteDaPianificare>>,
   TError = ErrorType<void>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listBollePronteDaPianificare>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListBollePronteDaPianificareParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBollePronteDaPianificare>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getListBollePronteDaPianificareQueryKey();
+    queryOptions?.queryKey ?? getListBollePronteDaPianificareQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listBollePronteDaPianificare>>
   > = ({ signal }) =>
-    listBollePronteDaPianificare({ signal, ...requestOptions });
+    listBollePronteDaPianificare(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listBollePronteDaPianificare>>,
@@ -18229,15 +18348,131 @@ export type ListBollePronteDaPianificareQueryError = ErrorType<void>;
 export function useListBollePronteDaPianificare<
   TData = Awaited<ReturnType<typeof listBollePronteDaPianificare>>,
   TError = ErrorType<void>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listBollePronteDaPianificare>>,
+>(
+  params?: ListBollePronteDaPianificareParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBollePronteDaPianificare>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBollePronteDaPianificareQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetConsegnaBeneficiarioDaCodiceUrl = (
+  params: GetConsegnaBeneficiarioDaCodiceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/consegne/beneficiario-da-codice?${stringifiedParams}`
+    : `/api/consegne/beneficiario-da-codice`;
+};
+
+/**
+ * @summary Identità esatta da codice beneficiario legacy attivo entro scope; non risolve token tessera MS
+ */
+export const getConsegnaBeneficiarioDaCodice = async (
+  params: GetConsegnaBeneficiarioDaCodiceParams,
+  options?: RequestInit,
+): Promise<GetConsegnaBeneficiarioDaCodice200> => {
+  return customFetch<GetConsegnaBeneficiarioDaCodice200>(
+    getGetConsegnaBeneficiarioDaCodiceUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetConsegnaBeneficiarioDaCodiceQueryKey = (
+  params?: GetConsegnaBeneficiarioDaCodiceParams,
+) => {
+  return [
+    `/api/consegne/beneficiario-da-codice`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetConsegnaBeneficiarioDaCodiceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getConsegnaBeneficiarioDaCodice>>,
+  TError = ErrorType<void>,
+>(
+  params: GetConsegnaBeneficiarioDaCodiceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getConsegnaBeneficiarioDaCodice>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetConsegnaBeneficiarioDaCodiceQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getConsegnaBeneficiarioDaCodice>>
+  > = ({ signal }) =>
+    getConsegnaBeneficiarioDaCodice(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getConsegnaBeneficiarioDaCodice>>,
     TError,
     TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListBollePronteDaPianificareQueryOptions(options);
+  > & { queryKey: QueryKey };
+};
+
+export type GetConsegnaBeneficiarioDaCodiceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getConsegnaBeneficiarioDaCodice>>
+>;
+export type GetConsegnaBeneficiarioDaCodiceQueryError = ErrorType<void>;
+
+/**
+ * @summary Identità esatta da codice beneficiario legacy attivo entro scope; non risolve token tessera MS
+ */
+
+export function useGetConsegnaBeneficiarioDaCodice<
+  TData = Awaited<ReturnType<typeof getConsegnaBeneficiarioDaCodice>>,
+  TError = ErrorType<void>,
+>(
+  params: GetConsegnaBeneficiarioDaCodiceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getConsegnaBeneficiarioDaCodice>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetConsegnaBeneficiarioDaCodiceQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

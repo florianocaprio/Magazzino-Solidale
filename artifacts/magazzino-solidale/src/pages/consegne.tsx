@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useConsegnaScan } from "@/hooks/use-consegna-scan";
+import { ReadQueryFeedback } from "@/components/read-query-feedback";
 import {
   useListConsegne,
   useGetConsegna,
@@ -132,7 +134,11 @@ import { format, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { volontarioLabel } from "@/lib/volontari-label";
-import { civilDateEuropeRome, todayEuropeRome } from "@/lib/europe-rome";
+import {
+  civilDateEuropeRome,
+  formatDateEuropeRome,
+  todayEuropeRome,
+} from "@/lib/europe-rome";
 import {
   UnsavedChangesDialog,
   useUnsavedChangesGuard,
@@ -187,12 +193,20 @@ export default function Consegne() {
     [],
   );
   const linkedConsegnaId = Number(initialSearch.get("consegnaId"));
-  const linkedConsegna = useGetConsegna(linkedConsegnaId, {
+  const linkedConsegnaQuery = useGetConsegna(linkedConsegnaId, {
     query: {
-      queryKey: getGetConsegnaQueryKey(linkedConsegnaId),
+      queryKey: [...getGetConsegnaQueryKey(linkedConsegnaId), "actor", user],
       enabled: Number.isSafeInteger(linkedConsegnaId) && linkedConsegnaId > 0,
+      retry: false,
     },
   });
+  const linkedConsegna = {
+    ...linkedConsegnaQuery,
+    data:
+      linkedConsegnaQuery.isError || linkedConsegnaQuery.isFetching
+        ? undefined
+        : linkedConsegnaQuery.data,
+  };
   const [areaOperativaFilter, setAreaOperativaFilter] = useState(
     initialSearch.get("area") ?? "all",
   );
@@ -241,28 +255,75 @@ export default function Consegne() {
     page: number;
     pageSize: number;
     q?: string;
+    areaOperativaId?: number;
     centroAscoltoId?: number;
     stato?: string;
     dataInizio?: string;
     dataFine?: string;
   } = { page, pageSize };
+  if (areaOperativaFilter !== "all")
+    consegneParams.areaOperativaId = Number(areaOperativaFilter);
   if (search.trim()) consegneParams.q = search.trim();
   if (centroFilter !== "all")
     consegneParams.centroAscoltoId = parseInt(centroFilter);
   if (statoFilter !== "all") consegneParams.stato = statoFilter;
   if (dataInizio) consegneParams.dataInizio = dataInizio;
   if (dataFine) consegneParams.dataFine = dataFine;
-  const { data: consegnePage, isLoading } = useListConsegne(consegneParams);
+  const deliveriesQuery = useListConsegne(consegneParams, {
+    query: {
+      queryKey: [...getListConsegneQueryKey(consegneParams), "actor", user],
+      retry: false,
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: "always",
+    },
+  });
+  const isLoading = deliveriesQuery.isLoading || deliveriesQuery.isFetching;
+  const consegnePage =
+    deliveriesQuery.isError || isLoading ? undefined : deliveriesQuery.data;
   const consegne = consegnePage?.items ?? [];
   const canViewReady =
     hasPermission("richieste_magazzino.view") &&
     (user?.isAdmin || user?.aree?.includes("sociale"));
-  const readyQueue = useListBollePronteDaPianificare({
+  const readyParams = {
+    areaOperativaId:
+      areaOperativaFilter !== "all" ? Number(areaOperativaFilter) : undefined,
+    centroAscoltoId: centroFilter !== "all" ? Number(centroFilter) : undefined,
+  };
+  const readyQueue = useListBollePronteDaPianificare(readyParams, {
     query: {
-      queryKey: getListBollePronteDaPianificareQueryKey(),
+      queryKey: [
+        ...getListBollePronteDaPianificareQueryKey(readyParams),
+        "actor",
+        user,
+      ],
       enabled: Boolean(canViewReady),
+      retry: false,
     },
   });
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      setAreaOperativaFilter(params.get("area") ?? "all");
+      setCentroFilter(
+        isCentroLocked
+          ? String(lockedCentroId)
+          : (params.get("centro") ?? "all"),
+      );
+      setStatoFilter(params.get("stato") ?? "all");
+      setSearch(params.get("q") ?? "");
+      setDataInizio(params.get("dal") ?? lastMonthRange.inizio);
+      setDataFine(params.get("al") ?? lastMonthRange.fine);
+      setPage(Math.max(1, Number(params.get("page")) || 1));
+      setViewTab(
+        params.get("tab") === "da-pianificare" && canViewReady
+          ? "da-pianificare"
+          : "consegne",
+      );
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [canViewReady, isCentroLocked, lockedCentroId, lastMonthRange]);
   useEffect(() => {
     const params = new URLSearchParams();
     if (areaOperativaFilter !== "all") params.set("area", areaOperativaFilter);
@@ -323,11 +384,19 @@ export default function Consegne() {
   });
 
   const handleAreaOperativaFilterChange = (v: string) => {
+    window.history.pushState(null, "", window.location.href);
     setAreaOperativaFilter(v);
     setCentroFilter("all");
     setCreateCentroId("all");
     setPage(1);
   };
+  useEffect(() => {
+    if (!centri || isCentroLocked || centroFilter === "all") return;
+    if (!centriFiltrati.some((c) => String(c.id) === centroFilter)) {
+      setCentroFilter("all");
+      setPage(1);
+    }
+  }, [centri, areaOperativaFilter, centroFilter, isCentroLocked]);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -575,10 +644,17 @@ export default function Consegne() {
   );
   const beneficiarioSelezionato = useMemo(
     () =>
-      [...(beneficiari ?? []), ...(allBeneficiari ?? [])].find(
-        (b) => b.id === selectedBeneficiarioId,
-      ),
-    [allBeneficiari, beneficiari, selectedBeneficiarioId],
+      [
+        ...(beneficiari ?? []),
+        ...(allBeneficiari ?? []),
+        ...(beneficiarioDettaglio ? [beneficiarioDettaglio] : []),
+      ].find((b) => b.id === selectedBeneficiarioId),
+    [
+      allBeneficiari,
+      beneficiari,
+      beneficiarioDettaglio,
+      selectedBeneficiarioId,
+    ],
   );
   useEffect(() => {
     if (previousBeneficiarioId.current === selectedBeneficiarioId) return;
@@ -868,28 +944,43 @@ export default function Consegne() {
     );
   };
 
+  const resolveScan = useConsegnaScan({
+    context: JSON.stringify([
+      user?.id,
+      user?.permessi,
+      user?.areaOperativaId,
+      user?.centroAscoltoId,
+      areaOperativaFilter,
+      createCentroId,
+      isFormOpen,
+      planningBolla?.bollaId,
+    ]),
+    enabled: isFormOpen && !planningBolla && canManage,
+    areaOperativaId:
+      areaOperativaFilter !== "all"
+        ? Number(areaOperativaFilter)
+        : (user?.areaOperativaId ?? undefined),
+    centroAscoltoId:
+      createCentroId !== "all" ? Number(createCentroId) : undefined,
+    onError: () =>
+      toast({ title: t("consegne.scanNotFound"), variant: "destructive" }),
+    onFound: (b) => {
+      setCreateCentroId(
+        isCentroLocked && lockedCentroId != null
+          ? String(lockedCentroId)
+          : b.centroAscoltoId
+            ? String(b.centroAscoltoId)
+            : "all",
+      );
+      form.setValue("beneficiarioId", b.id);
+      setScanCode("");
+      toast({
+        title: t("consegne.scanFound", { name: `${b.cognome} ${b.nome}` }),
+      });
+    },
+  });
   const handleScan = (codeOverride?: string) => {
-    const code = (codeOverride ?? scanCode).trim();
-    if (!code) return;
-    const b = allBeneficiari?.find(
-      (x) => x.codice.toLowerCase() === code.toLowerCase(),
-    );
-    if (!b) {
-      toast({ title: t("consegne.scanNotFound"), variant: "destructive" });
-      return;
-    }
-    setCreateCentroId(
-      isCentroLocked && lockedCentroId != null
-        ? String(lockedCentroId)
-        : b.centroAscoltoId
-          ? String(b.centroAscoltoId)
-          : "all",
-    );
-    form.setValue("beneficiarioId", b.id);
-    setScanCode("");
-    toast({
-      title: t("consegne.scanFound", { name: `${b.cognome} ${b.nome}` }),
-    });
+    void resolveScan(codeOverride ?? scanCode);
   };
 
   const openRipianifica = (c: Consegna) => {
@@ -1024,6 +1115,9 @@ export default function Consegne() {
   };
 
   const exportParams = {
+    ...(areaOperativaFilter !== "all"
+      ? { areaOperativaId: Number(areaOperativaFilter) }
+      : {}),
     ...(search.trim() ? { q: search.trim() } : {}),
     ...(centroFilter !== "all"
       ? { centroAscoltoId: Number(centroFilter) }
@@ -1045,6 +1139,7 @@ export default function Consegne() {
         <div className="flex flex-wrap items-center gap-2">
           {canExport && (
             <ExportButtons
+              disabled={deliveriesQuery.isError || isLoading}
               rows={consegne}
               loadRows={async () => (await exportConsegne(exportParams)).items}
               columns={[
@@ -1052,9 +1147,7 @@ export default function Consegne() {
                 {
                   header: t("consegne.colDataPrevista"),
                   accessor: (c) =>
-                    c.dataPrevista
-                      ? new Date(c.dataPrevista).toLocaleDateString("it-IT")
-                      : "",
+                    c.dataPrevista ? formatDateEuropeRome(c.dataPrevista) : "",
                 },
                 {
                   header: t("consegne.colFasciaOraria"),
@@ -1125,7 +1218,9 @@ export default function Consegne() {
             onClick={() => setViewTab("da-pianificare")}
           >
             {t("consegne.readyToPlan")}{" "}
-            {readyQueue.data ? `(${readyQueue.data.length})` : ""}
+            {!readyQueue.isError && readyQueue.data
+              ? `(${readyQueue.data.length})`
+              : ""}
           </Button>
           <Button
             type="button"
@@ -1148,10 +1243,10 @@ export default function Consegne() {
             </p>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {readyQueue.isLoading ? (
+            {readyQueue.isLoading || readyQueue.isFetching ? (
               <Skeleton className="h-28 w-full" />
             ) : readyQueue.isError ? (
-              <p role="alert">{t("consegne.readyQueueError")}</p>
+              <ReadQueryFeedback query={readyQueue} />
             ) : readyQueue.data?.length ? (
               readyQueue.data.map((ready) => (
                 <article
@@ -1374,6 +1469,7 @@ export default function Consegne() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          <ReadQueryFeedback query={deliveriesQuery} />
           <div
             data-testid="consegne-mobile-list"
             className="grid gap-3 p-3 lg:hidden"
@@ -1382,7 +1478,7 @@ export default function Consegne() {
               Array.from({ length: 3 }, (_, index) => (
                 <Skeleton key={index} className="h-52 w-full rounded-lg" />
               ))
-            ) : consegne.length === 0 ? (
+            ) : deliveriesQuery.isError ? null : consegne.length === 0 ? (
               <p className="py-12 text-center text-sm text-muted-foreground">
                 {t("consegne.emptyState")}
               </p>
@@ -1405,11 +1501,7 @@ export default function Consegne() {
                         </p>
                         <h2 className="font-semibold">{c.beneficiarioNome}</h2>
                         <p className="text-sm text-muted-foreground">
-                          {format(
-                            new Date(`${c.dataPrevista.slice(0, 10)}T12:00:00`),
-                            "dd MMM yyyy",
-                            { locale: it },
-                          )}
+                          {formatDateEuropeRome(c.dataPrevista)}
                           {c.fasciaOraria ? ` · ${c.fasciaOraria}` : ""}
                         </p>
                       </div>
@@ -1587,7 +1679,7 @@ export default function Consegne() {
                       </TableCell>
                     </TableRow>
                   ))
-              ) : consegne?.length === 0 ? (
+              ) : deliveriesQuery.isError ? null : consegne?.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={isGlobal ? 8 : 7}
@@ -1604,9 +1696,7 @@ export default function Consegne() {
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">
-                        {format(new Date(c.dataPrevista), "dd MMM yyyy", {
-                          locale: it,
-                        })}
+                        {formatDateEuropeRome(c.dataPrevista)}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {c.fasciaOraria}
@@ -2261,9 +2351,12 @@ export default function Consegne() {
                         selectedLabelFallback={(() => {
                           if (planningBolla)
                             return planningBolla.beneficiarioNome;
-                          const sel = allBeneficiari?.find(
-                            (b) => b.id === field.value,
-                          );
+                          const sel =
+                            beneficiarioDettaglio?.id === field.value
+                              ? beneficiarioDettaglio
+                              : allBeneficiari?.find(
+                                  (b) => b.id === field.value,
+                                );
                           return sel ? `${sel.cognome} ${sel.nome}` : null;
                         })()}
                       />

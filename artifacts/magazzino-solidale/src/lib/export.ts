@@ -220,6 +220,7 @@ export async function exportToPdf<T>(opts: {
   orientation?: "portrait" | "landscape";
   generatedBy?: string;
   branding?: PdfExportBranding | null;
+  beforeSave?: () => Promise<void>;
   metadataLabels?: {
     generatedAt: string;
     rows: string;
@@ -277,6 +278,7 @@ export async function exportToPdf<T>(opts: {
   });
 
   drawBrandingFooters(doc, branding, marginX);
+  await opts.beforeSave?.();
   doc.save(`${filename}_${timestamp()}.pdf`);
 }
 

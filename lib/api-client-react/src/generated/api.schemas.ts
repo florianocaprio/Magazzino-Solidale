@@ -3147,10 +3147,33 @@ export interface RettificaLottoInput {
   note?: string;
 }
 
+/**
+ * Segno fisico canonico, inclusa inversione dello storno. Null se non determinabile da dati legacy; zero significa nessuna variazione fisica.
+ * @nullable
+ */
+export type MovimentoEffettoFisico =
+  | (typeof MovimentoEffettoFisico)[keyof typeof MovimentoEffettoFisico]
+  | null;
+
+export const MovimentoEffettoFisico = {
+  NUMBER_MINUS_1: -1,
+  NUMBER_0: 0,
+  NUMBER_1: 1,
+} as const;
+
 export interface Movimento {
   id: number;
   tipoMovimento: string;
   tipoDettaglio: string;
+  /**
+   * Segno fisico canonico, inclusa inversione dello storno. Null se non determinabile da dati legacy; zero significa nessuna variazione fisica.
+   * @nullable
+   */
+  effettoFisico?: MovimentoEffettoFisico;
+  /**
+   * Data civile operativa YYYY-MM-DD, senza ora o fuso orario.
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
   dataMovimento: string;
   magazzinoId: number;
   /** @nullable */
@@ -10995,6 +11018,18 @@ export type ListMovimentiParams = {
   limit?: number;
 };
 
+export type ExportMovimentiParams = {
+  tipo?: string;
+  magazzinoId?: number;
+  prodottoId?: number;
+  centroAscoltoId?: number;
+  da?: string;
+  a?: string;
+  fondoOrigine?: FondoOrigine;
+  naturaContabile?: string;
+  canaleOperativo?: string;
+};
+
 export type ListGiacenzeParams = {
   /**
    * Area Operativa che delimita sempre la consultazione delle giacenze.
@@ -11417,6 +11452,11 @@ export type ListUdsLinkCandidatesParams = {
 
 export type ListConsegneParams = {
   /**
+   * Intersezione con lo scope corrente; snapshot per le consegne effettuate.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
    * @minimum 1
    */
   page?: number;
@@ -11438,6 +11478,10 @@ export type ListConsegneParams = {
 };
 
 export type ExportConsegneParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   q?: string;
   stato?: string;
   data?: string;
@@ -11445,6 +11489,42 @@ export type ExportConsegneParams = {
   dataFine?: string;
   beneficiarioId?: number;
   centroAscoltoId?: number;
+};
+
+export type ListBollePronteDaPianificareParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+};
+
+export type GetConsegnaBeneficiarioDaCodiceParams = {
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  codice: string;
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId?: number;
+};
+
+export type GetConsegnaBeneficiarioDaCodice200 = {
+  id: number;
+  codice: string;
+  nome: string;
+  cognome: string;
+  /** @nullable */
+  centroAscoltoId: number | null;
 };
 
 export type ListAccessiEmporioParams = {

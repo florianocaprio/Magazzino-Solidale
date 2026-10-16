@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { Link, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   useCreateRichiestaMagazzino,
+  useGetRichiestaMagazzino,
+  getGetRichiestaMagazzinoQueryKey,
   useCancelRichiestaMagazzino,
   useListRichiesteMagazzino,
   useListTrasferimentiMensa,
@@ -76,16 +79,85 @@ function requestDisplayStatus(
 
 export function MensaRifornimenti() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const context = useMensaContext()!;
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const requestId = Number(params.get("richiestaId"));
+  const hasRequest = params.has("richiestaId");
+  const validId = Number.isSafeInteger(requestId) && requestId > 0;
+  const returnTo = params.get("returnTo");
+  const safeReturn =
+    returnTo && /^\/report\/[a-z-]+(?:\?|$)/.test(returnTo) ? returnTo : null;
+  const focused = useGetRichiestaMagazzino(requestId, {
+    query: {
+      queryKey: [
+        ...getGetRichiestaMagazzinoQueryKey(requestId),
+        "mensa-actor",
+        user?.id,
+        context.areaId,
+        user?.permessi,
+      ],
+      enabled: hasRequest && validId,
+      staleTime: 0,
+      retry: false,
+      refetchOnWindowFocus: "always",
+    },
+  });
+  // Never display retained query data after a denial or while revalidating the
+  // canonical request. Resolve the exact aggregate, not the first list page.
+  const selected =
+    hasRequest &&
+    !focused.isError &&
+    !focused.isFetching &&
+    focused.data?.id === requestId &&
+    context.mense.some((m) => m.id === focused.data?.mensaId)
+      ? focused.data
+      : undefined;
   const [mensaId, setMensaId] = useState<number | null>(null);
+  const effectiveMensa = hasRequest ? (selected?.mensaId ?? null) : mensaId;
   return (
     <div className="space-y-5 p-6">
-      <MensaSelect historical value={mensaId} onChange={setMensaId} />
-      {mensaId != null && <Rifornimenti key={mensaId} mensaId={mensaId} />}
+      {safeReturn && (
+        <Link
+          className="inline-flex min-h-11 items-center underline"
+          href={safeReturn}
+        >
+          {t("mensa.backToReport")}
+        </Link>
+      )}
+      {hasRequest ? (
+        focused.isFetching ? (
+          <p role="status">{t("common.loading")}</p>
+        ) : !selected ? (
+          <p role="alert">{t("mensa.requestUnavailable")}</p>
+        ) : (
+          <h2 className="font-semibold">
+            {context.mense.find((m) => m.id === selected.mensaId)?.nome} ·{" "}
+            {selected.codice}
+          </h2>
+        )
+      ) : (
+        <MensaSelect historical value={mensaId} onChange={setMensaId} />
+      )}
+      {effectiveMensa != null && (
+        <Rifornimenti
+          key={`${effectiveMensa}:${hasRequest ? requestId : "list"}`}
+          mensaId={effectiveMensa}
+          focusedRequest={selected}
+        />
+      )}
     </div>
   );
 }
 
-function Rifornimenti({ mensaId }: { mensaId: number }) {
+function Rifornimenti({
+  mensaId,
+  focusedRequest,
+}: {
+  mensaId: number;
+  focusedRequest?: RichiestaMagazzino;
+}) {
   const { t } = useTranslation();
   const { hasPermission, user } = useAuth();
   const context = useMensaContext()!;
@@ -343,7 +415,7 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
           </CardContent>
         </Card>
       )}
-      {canRequest && active && !sentRequest && (
+      {canRequest && active && !sentRequest && !focusedRequest && (
         <Card>
           <CardHeader>
             <CardTitle>{t("mensa.newRequest")}</CardTitle>
@@ -472,10 +544,13 @@ function Rifornimenti({ mensaId }: { mensaId: number }) {
             </p>
           ) : requests.isLoading ? (
             <p role="status">{t("common.loading")}</p>
-          ) : !requests.data?.items.length ? (
+          ) : !focusedRequest && !requests.data?.items.length ? (
             <p>{t("mensa.empty")}</p>
           ) : (
-            requests.data.items.map((row) => (
+            (focusedRequest
+              ? [focusedRequest]
+              : (requests.data?.items ?? [])
+            ).map((row) => (
               <article
                 className="rounded border p-3 space-y-2"
                 key={row.id}

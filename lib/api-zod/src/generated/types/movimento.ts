@@ -7,12 +7,22 @@
  */
 import type { FattoreContabile } from "./fattoreContabile";
 import type { FondoOrigine } from "./fondoOrigine";
+import type { MovimentoEffettoFisico } from "./movimentoEffettoFisico";
 import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface Movimento {
   id: number;
   tipoMovimento: string;
   tipoDettaglio: string;
+  /**
+   * Segno fisico canonico, inclusa inversione dello storno. Null se non determinabile da dati legacy; zero significa nessuna variazione fisica.
+   * @nullable
+   */
+  effettoFisico?: MovimentoEffettoFisico;
+  /**
+   * Data civile operativa YYYY-MM-DD, senza ora o fuso orario.
+   * @pattern ^\d{4}-\d{2}-\d{2}$
+   */
   dataMovimento: string;
   magazzinoId: number;
   /** @nullable */

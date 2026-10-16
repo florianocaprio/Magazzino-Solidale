@@ -1,4 +1,6 @@
 const it = {
+  backToReport: "Torna al report",
+  requestUnavailable: "Richiesta non disponibile nel contesto Mensa corrente.",
   requestSent: "Richiesta inviata",
   requestSentHint:
     "La richiesta è stata inviata al Magazzino. Puoi seguirne lo stato nel riepilogo qui sotto. Tocca questo riquadro o l’Area Operativa per tornare all’inserimento.",
@@ -112,6 +114,8 @@ const it = {
 
 const en = {
   ...it,
+  backToReport: "Back to report",
+  requestUnavailable: "Request unavailable in the current canteen context.",
   requestSent: "Request sent",
   requestSentHint:
     "Your request has been sent to the warehouse. Follow its status in the summary below. Tap this panel or the Operational Area to return to the form.",
