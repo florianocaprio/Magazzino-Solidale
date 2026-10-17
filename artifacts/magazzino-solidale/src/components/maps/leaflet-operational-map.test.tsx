@@ -252,6 +252,59 @@ describe("LeafletOperationalMap", () => {
     ).toBeNull();
   });
 
+  it("ripristina l'errore tile dopo un nuovo loading senza duplicare la notifica", async () => {
+    const onUnavailable = vi.fn();
+    const warning = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    await act(async () =>
+      root.render(
+        <LeafletOperationalMap
+          markers={[baseMarker]}
+          onMarkerSelect={vi.fn()}
+          onUnavailable={onUnavailable}
+        />,
+      ),
+    );
+    const emit = leafletState.tileLayers[0].emit as (event: string) => void;
+    const failTiles = () => {
+      emit("tileerror");
+      emit("tileerror");
+      emit("tileerror");
+      emit("load");
+    };
+    await act(async () => failTiles());
+    expect(
+      document.querySelector('[data-testid="maps-tile-error"]'),
+    ).toBeTruthy();
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+
+    // A viewport resize / pan can start another tile load on the same layer.
+    await act(async () => emit("loading"));
+    await act(async () => failTiles());
+    expect(
+      document.querySelector('[data-testid="maps-tile-error"]'),
+    ).toBeTruthy();
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+    expect(warning).toHaveBeenCalledTimes(1);
+    expect(leafletState.maps).toHaveLength(1);
+    expect(leafletState.markers).toHaveLength(1);
+
+    await act(async () => emit("tileload"));
+    expect(
+      document.querySelector('[data-tile-state="available"]'),
+    ).toBeTruthy();
+    await act(async () => emit("loading"));
+    await act(async () => {
+      emit("tileerror");
+      emit("load");
+    });
+    expect(
+      document.querySelector('[data-testid="maps-tile-error"]'),
+    ).toBeTruthy();
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+  });
+
   it("aggiorna marker e selezione senza ricreare la mappa", async () => {
     const onMarkerSelect = vi.fn();
     await act(async () =>

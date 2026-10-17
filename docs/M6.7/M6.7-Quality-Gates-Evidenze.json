@@ -4,7 +4,7 @@
   "verdict": "LOCAL_PASS_GITHUB_RUN_PENDING",
   "technicalFingerprint": {
     "algorithm": "SHA-256(JSON.stringify(sorted [{path,sha256}])); excludes documentation to avoid self-reference",
-    "value": "7d0121c13f70eb28970d0c3f8f6fbabcaf4d43313286f11b2f9710d349aebf69",
+    "value": "e9880f9e8f99989f848530cd63bcb80bbf66d0cf1b477cf5bd9c52d956d6f240",
     "files": [
       {
         "path": ".github/workflows/quality-gates.yml",
@@ -83,6 +83,14 @@
         "sha256": "8f3526dee8d0fc176e5a411ab48ec8d7baa4143626a0ac6bce211c975dbbb733"
       },
       {
+        "path": "artifacts/magazzino-solidale/src/components/maps/leaflet-operational-map.test.tsx",
+        "sha256": "df3b2c95c8f4372678c780df422b55c1887fd5873d240af1ecbba23de4760a18"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/src/components/maps/leaflet-operational-map.tsx",
+        "sha256": "4a892ad7086fef4c919342ff23e3cae5022bc621e41a1260773c8501f9320c7e"
+      },
+      {
         "path": "scripts/quality-gates-plan.mjs",
         "sha256": "5906c724aaaff1d13eca2a12fc133cafa1e3e4ee5760f51c7d67d994f41285a7"
       },
@@ -99,9 +107,16 @@
   "applicability": {
     "unchangedApiInputs": 177,
     "unchangedBuildInputs": 1835,
-    "buildManifestSha256": "04edc30f800bfc65f75c371a9a32b4c0bedf12aeea949f888b1c3f7d5300d99d",
+    "buildManifestSha256": "6010845d931444e0a8a773bb5ef71d0e49a1a8282998e680e83699954fada63a",
     "staticJobByteIdentical": true,
-    "noApplicationSchemaMigrationContractDependencyChanges": true
+    "noSchemaMigrationContractDependencyChanges": true,
+    "minimalApplicationFix": [
+      "artifacts/magazzino-solidale/src/components/maps/leaflet-operational-map.tsx"
+    ],
+    "newRegression": [
+      "artifacts/magazzino-solidale/src/components/maps/leaflet-operational-map.test.tsx"
+    ],
+    "currentBuildEvidence": "/private/tmp/magazzino-quality-maps-build-d84DbL"
   },
   "api": {
     "files": 162,
@@ -168,13 +183,13 @@
         "skip": 4
       }
     ],
-    "evidence": "api-full-4"
+    "evidence": "api-full-4; GitHub39062309668 API SUCCESS, unchanged backend/tests/schema/dependencies after frontend-only Maps fix"
   },
   "frontend": {
-    "pass": 723,
+    "pass": 724,
     "fail": 0,
     "skip": 0,
-    "evidence": "frontend.json"
+    "evidence": "frontend-maps-fixed.json"
   },
   "runner": {
     "pass": 24,
@@ -417,7 +432,7 @@
       {
         "file": "m67-p4-final-residuals.spec.ts",
         "sourceSha256": "a4f4a82d5a73583cfe17d43f125efd4d477f4469598813ffffb2e9af2d30c977",
-        "evidence": "browser-continuation-16/e2e-m67-p4-final-residuals.json",
+        "evidence": "browser-continuation-24/e2e-m67-p4-final-residuals.json",
         "pass": 10,
         "fail": 0,
         "skip": 0,
@@ -435,7 +450,7 @@
       {
         "file": "m67-p4-residuals.spec.ts",
         "sourceSha256": "ed40ca32b9bdd88f032675e2754ff58a1144cb67f500d038e2635dcdbc4c337a",
-        "evidence": "browser-continuation-16/e2e-m67-p4-residuals.json",
+        "evidence": "browser-continuation-24/e2e-m67-p4-residuals.json",
         "pass": 15,
         "fail": 0,
         "skip": 0,
@@ -489,7 +504,7 @@
       {
         "file": "m67c-ux.spec.ts",
         "sourceSha256": "e301044986b14d7445b9adb4db348d3e7581b11d9eb3426817407e23563adec9",
-        "evidence": "browser-continuation-17/e2e-m67c-ux.json",
+        "evidence": "browser-continuation-24/e2e-m67c-ux.json",
         "pass": 175,
         "fail": 0,
         "skip": 0,
@@ -516,7 +531,7 @@
       {
         "file": "maps-operational.spec.ts",
         "sourceSha256": "f0b0dd933f7bc0deeebc94b4ad7758bfb8dc7e37635960e6f9c7f846774fd378",
-        "evidence": "browser-continuation-18/e2e-maps-operational.json",
+        "evidence": "browser-continuation-24/e2e-maps-operational.json",
         "pass": 5,
         "fail": 0,
         "skip": 0,
@@ -728,6 +743,8 @@
     "artifacts/magazzino-solidale/e2e/sociale-workflows.spec.ts",
     "artifacts/magazzino-solidale/e2e/tablet-operational-layouts.spec.ts",
     "artifacts/magazzino-solidale/playwright.ci.config.ts",
+    "artifacts/magazzino-solidale/src/components/maps/leaflet-operational-map.test.tsx",
+    "artifacts/magazzino-solidale/src/components/maps/leaflet-operational-map.tsx",
     "docs/M6.7/M6.7-Quality-Gates-Diagnosi.json",
     "docs/M6.7/M6.7-Quality-Gates-Evidenze.json",
     "docs/M6.7/M6.7-Quality-Gates-Fix.md",
@@ -735,7 +752,7 @@
     "scripts/quality-gates-plan.test.mjs",
     "scripts/quality-gates-run.mjs"
   ],
-  "previousCommit": "95d1bb69df7771f734132bbbd2820146684d58bc",
+  "previousCommit": "e6651ed92ebe2a3b7be0b6e9ed91c12381f02948",
   "githubRuns": [
     {
       "run": 39058888700,
@@ -751,13 +768,27 @@
     {
       "run": 39060352578,
       "commit": "95d1bb69df7771f734132bbbd2820146684d58bc",
-      "status": "IN_PROGRESS_WITH_API_FAILURE",
+      "status": "CANCELLED_SUPERSEDED_WITH_API_FAILURE",
       "jobs": {
         "api": "FAIL",
         "static": "SUCCESS",
-        "browser": "IN_PROGRESS"
+        "browser": "CANCELLED_NOT_CERTIFIED"
       },
       "cause": "Unchanged 5,000-movement FSE acceptance exceeded unchanged 60s limit; first run passed in44.3s. Workload moved unchanged to own fresh DB; FULL eight-group local API campaign PASS. No timeout increase or application change."
+    },
+    {
+      "run": 39062309668,
+      "commit": "e6651ed92ebe2a3b7be0b6e9ed91c12381f02948",
+      "status": "IN_PROGRESS_WITH_MAPS_FAILURE",
+      "jobs": {
+        "api": "SUCCESS",
+        "static": "SUCCESS",
+        "browser0": "IN_PROGRESS",
+        "browser1": "SUCCESS",
+        "browser2": "SUCCESS",
+        "browser3": "FAIL"
+      },
+      "cause": "Real Maps tile-state latch reproduced by red unit regression. Minimal application fix keeps state transitions independent of deduplicated notifications; unchanged E2E 5/5 and correlated205/205 PASS."
     }
   ]
 }

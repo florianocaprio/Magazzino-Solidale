@@ -162,10 +162,13 @@ export function LeafletOperationalMap({
 
     const clearLoadTimeout = () => window.clearTimeout(timeout);
     const markUnavailable = (reason: "timeout" | "tile-errors") => {
-      if ((reason === "timeout" && loaded) || reported) return;
-      reported = true;
+      if (reason === "timeout" && loaded) return;
       clearLoadTimeout();
       setTileState("error");
+      // A resize/pan can start a new load on this same layer. Deduplicate the
+      // notification, not the error state after a subsequent failed load.
+      if (reported) return;
+      reported = true;
       console.warn("Cartografia MAPS non disponibile.", { reason });
       onUnavailableRef.current?.();
     };
