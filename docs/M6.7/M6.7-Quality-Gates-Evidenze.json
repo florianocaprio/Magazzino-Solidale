@@ -4,7 +4,7 @@
   "verdict": "LOCAL_PASS_GITHUB_RUN_PENDING",
   "technicalFingerprint": {
     "algorithm": "SHA-256(JSON.stringify(sorted [{path,sha256}])); excludes documentation to avoid self-reference",
-    "value": "c44b731f0508ea4025c44f9ff8bb0d0d67725c22ab56184d3a8171514f530d2d",
+    "value": "1b70162238c9ef96773605f9f688eea20ff83fba155a79976ae5398a561c3d92",
     "files": [
       {
         "path": ".github/workflows/quality-gates.yml",
@@ -24,7 +24,7 @@
       },
       {
         "path": "artifacts/magazzino-solidale/e2e/emporio-security-m62a.spec.ts",
-        "sha256": "d35db12013631be4f7dbf8c33367b1ea445ab34ed2ffbae70b7a3d475e63ff53"
+        "sha256": "9b06834415a0a1c8d73fb4acbf52480fde1aaf1d3282d9a4f677e993ccd8808c"
       },
       {
         "path": "artifacts/magazzino-solidale/e2e/emporio-uat-f1.spec.ts",
@@ -265,8 +265,8 @@
       },
       {
         "file": "emporio-security-m62a.spec.ts",
-        "sourceSha256": "d35db12013631be4f7dbf8c33367b1ea445ab34ed2ffbae70b7a3d475e63ff53",
-        "evidence": "browser-continuation-3/e2e-emporio-security-m62a.json",
+        "sourceSha256": "9b06834415a0a1c8d73fb4acbf52480fde1aaf1d3282d9a4f677e993ccd8808c",
+        "evidence": "browser-continuation-23/e2e-emporio-security-m62a.json",
         "pass": 10,
         "fail": 0,
         "skip": 0,
@@ -659,5 +659,19 @@
     "scripts/quality-gates-plan.mjs",
     "scripts/quality-gates-plan.test.mjs",
     "scripts/quality-gates-run.mjs"
+  ],
+  "previousCommit": "f52ce42975f731bff3343f7f48b6ad9f2d84f7b7",
+  "githubRuns": [
+    {
+      "run": 39058888700,
+      "commit": "f52ce42975f731bff3343f7f48b6ad9f2d84f7b7",
+      "status": "FAIL",
+      "jobs": {
+        "api": "SUCCESS",
+        "static": "SUCCESS",
+        "browser": "FAIL"
+      },
+      "cause": "Emporio strict selector matched persistent main cashier state and notification; test-only semantic scoping, complete spec rerun 10 PASS, no retries."
+    }
   ]
 }

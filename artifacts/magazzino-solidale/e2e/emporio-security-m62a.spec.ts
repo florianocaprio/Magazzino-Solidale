@@ -236,8 +236,10 @@ test("A01/A16–18/A24: Accessi, recupero, sospensione, annullamento e checkout 
   const access = await createAccess(page, f);
   const before = await quantities(f);
   const opened = await openFromAccess(page, f, access);
+  // The notification can legitimately repeat the same text. Verify the
+  // persistent cashier state in main, not a transient toast or its announcer.
   await expect(
-    page.getByText("Sessione aperta", { exact: true }),
+    page.getByRole("main").getByText("Sessione aperta", { exact: true }),
   ).toBeVisible();
   await safe(page, errors);
   expect(await quantities(f)).toEqual(before);
@@ -397,7 +399,7 @@ test("A13/A14/A24: errore azione mantiene draft; GET revocata nasconde cache e P
   await expect(sessionButton).toBeVisible();
   await sessionButton.click();
   await expect(
-    page.getByText("Sessione aperta", { exact: true }),
+    page.getByRole("main").getByText("Sessione aperta", { exact: true }),
   ).toBeVisible();
   await expect(draft).toHaveValue("");
   await expect(
