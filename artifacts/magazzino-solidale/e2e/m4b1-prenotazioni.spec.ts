@@ -226,9 +226,14 @@ test.describe("M4B.1 — azioni reali del dettaglio Trasferimento", () => {
         }
       });
       await detail.getByRole("button", { name: buttonName }).click();
+      // The shared document now displays the real network error, not the
+      // old generic fallback. Select the visual toast, not its live announcer.
       await expect(
-        page.getByText("Impossibile aggiornare il trasferimento").last(),
+        page
+          .locator('li[data-state="open"]')
+          .filter({ hasText: "Failed to fetch" }),
       ).toBeVisible();
+      expect(attempts).toBe(1);
       const replayResponse = page.waitForResponse(
         (response) =>
           response
@@ -390,11 +395,61 @@ test.describe("M4B.1 — azioni reali del dettaglio Trasferimento", () => {
           righe: [{ prodottoId: mensaProduct.rows[0].id, quantita: 1 }],
         },
       });
-      expect(created.status(), await created.text()).toBe(201);
-      const transfer = (await created.json()) as Transfer;
+      // The direct Mensa writer was intentionally retired. The Mensa expresses
+      // a need; only the warehouse prepares the canonical M4 transfer.
+      expect(created.status(), await created.text()).toBe(410);
+      expect((await created.json()).code).toBe(
+        "MENSA_TRANSFER_CREATION_RETIRED",
+      );
+      const sent = await mensaPage.request.post("/api/richieste-magazzino", {
+        data: {
+          idempotencyKey: key(),
+          tipoDestinatario: "magazzino",
+          sorgente: "operativa",
+          mensaId: mensa.rows[0].id,
+          areaOperativaId: mensa.rows[0].area_id,
+          magazzinoRichiestoId: data.originId,
+          bisogno: "Rifornimento sintetico M4B.1",
+        },
+      });
+      expect(sent.status(), await sent.text()).toBe(201);
+      const request = await sent.json();
+      const taken = await page.request.post(
+        `/api/richieste-magazzino/${request.id}/presa-in-carico`,
+        {
+          data: { idempotencyKey: key(), versione: request.versione },
+        },
+      );
+      expect(taken.status(), await taken.text()).toBe(200);
+      const preparedDocument = await page.request.post(
+        `/api/richieste-magazzino/${request.id}/documento`,
+        {
+          data: {
+            idempotencyKey: key(),
+            versione: (await taken.json()).versione,
+            magazzinoId: data.originId,
+            righe: [
+              {
+                prodottoId: mensaProduct.rows[0].id,
+                quantita: "1",
+                unitaMisura: "pz",
+              },
+            ],
+          },
+        },
+      );
+      expect(preparedDocument.status(), await preparedDocument.text()).toBe(
+        201,
+      );
+      const document = await preparedDocument.json();
+      const canonicalTransfer = await page.request.get(
+        `/api/trasferimenti/${document.documentoId}`,
+      );
+      expect(canonicalTransfer.status()).toBe(200);
+      const transfer = (await canonicalTransfer.json()) as Transfer;
       await mensaPage.goto("/mensa/trasferimenti");
-      const mensaRow = mensaPage.getByRole("row", {
-        name: new RegExp(transfer.codice),
+      const mensaRow = mensaPage.getByRole("article", {
+        name: request.codice,
       });
       await expect(mensaRow).toBeVisible();
       expect(
@@ -411,10 +466,19 @@ test.describe("M4B.1 — azioni reali del dettaglio Trasferimento", () => {
       const forbiddenBolle = await mensaPage.request.get("/api/bolle");
       expect(forbiddenBolle.status()).toBe(403);
 
-      await page.goto("/mensa/trasferimenti");
-      const originRow = page.getByRole("row", {
-        name: new RegExp(transfer.codice),
-      });
+      const carrier = await page.request.patch(
+        `/api/trasferimenti/${transfer.id}`,
+        {
+          data: {
+            idempotencyKey: key(),
+            versione: transfer.versione,
+            trasportatoreVolontarioId: null,
+            trasportatoreNome: "E2E M4B.1",
+          },
+        },
+      );
+      expect(carrier.status(), await carrier.text()).toBe(200);
+      const originRow = await openTransfer(page, transfer.id);
       await originRow.getByRole("button", { name: /segna pronto/i }).click();
       await expect(
         originRow.getByRole("button", { name: /^avvia$/i }),
@@ -422,13 +486,20 @@ test.describe("M4B.1 — azioni reali del dettaglio Trasferimento", () => {
       await originRow.getByRole("button", { name: /^avvia$/i }).click();
       await expect(originRow.getByText(/in transito/i)).toBeVisible();
       await mensaPage.reload();
-      const arrivedRow = mensaPage.getByRole("row", {
-        name: new RegExp(transfer.codice),
+      const arrivedRow = mensaPage.locator("article").filter({
+        has: mensaPage.getByRole("heading", {
+          name: new RegExp(transfer.codice),
+        }),
       });
       await expect(
-        arrivedRow.getByRole("button", { name: /^conferma$/i }),
+        arrivedRow.getByRole("button", {
+          name: "Conferma ricezione",
+          exact: true,
+        }),
       ).toBeVisible();
-      await arrivedRow.getByRole("button", { name: /^conferma$/i }).click();
+      await arrivedRow
+        .getByRole("button", { name: "Conferma ricezione", exact: true })
+        .click();
       await expect(arrivedRow.getByText(/completato/i)).toBeVisible();
       const final = await database.query<{ stato: string }>(
         "SELECT stato FROM trasferimenti WHERE id=$1",

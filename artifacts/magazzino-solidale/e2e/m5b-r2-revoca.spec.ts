@@ -109,20 +109,51 @@ test("R2-17: revoca durante pagina aperta, refresh e deep link non espongono ric
     const deniedDocument = await warehousePage.request.get(
       `/api/bolle/${document.documentoId}`,
     );
-    expect(deniedDocument.status()).toBe(404);
+    // M6.7 rejects an unassigned warehouse actor before the linked-document
+    // lookup. Require that specific territorial denial, not an arbitrary 403.
+    expect(deniedDocument.status()).toBe(403);
+    const deniedBody = await deniedDocument.json();
+    expect(deniedBody).toMatchObject({
+      code: `${document.documentoId}_FORBIDDEN`,
+      error:
+        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+    });
+    expect(Object.keys(deniedBody).sort()).toEqual([
+      "code",
+      "correlationId",
+      "details",
+      "error",
+      "message",
+    ]);
+    expect(JSON.stringify(deniedBody)).not.toContain(need);
+    expect(JSON.stringify(deniedBody)).not.toContain("TEST-M5B-B1");
 
-    await warehousePage.reload();
-    await expect(warehousePage.getByRole("alert")).toContainText(
-      /caricare|load/i,
+    const refreshedDenial = warehousePage.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname ===
+          `/api/richieste-magazzino/${request.id}` && r.status() === 404,
     );
+    await warehousePage.reload();
+    await refreshedDenial;
+    // The current Sheet closes and purges the inaccessible deep-link/cache.
+    // Verify the canonical denial and protected content, not the old inline panel.
+    await expect(warehousePage.getByTestId("richiesta-sheet")).toHaveCount(0);
+    await expect(warehousePage).not.toHaveURL(/richiestaId=/);
     await expect(warehousePage.getByText(need)).toHaveCount(0);
     await expect(warehousePage.getByText("Documento corrente")).toHaveCount(0);
     await warehousePage.goto("/richieste-magazzino");
     await expect(
       warehousePage.getByRole("button", { name: new RegExp(request.codice) }),
     ).toHaveCount(0);
+    const directDenial = warehousePage.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname ===
+          `/api/richieste-magazzino/${request.id}` && r.status() === 404,
+    );
     await warehousePage.goto(`/richieste-magazzino?richiestaId=${request.id}`);
-    await expect(warehousePage.getByRole("alert")).toBeVisible();
+    await directDenial;
+    await expect(warehousePage.getByTestId("richiesta-sheet")).toHaveCount(0);
+    await expect(warehousePage).not.toHaveURL(/richiestaId=/);
     await expect(warehousePage.getByText(need)).toHaveCount(0);
     await warehousePage.goto(`/bolle?bollaId=${document.documentoId}`);
     await expect(

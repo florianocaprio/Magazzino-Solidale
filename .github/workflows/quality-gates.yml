@@ -41,25 +41,6 @@ jobs:
 
   api-and-fresh-db:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: magazzino
-          POSTGRES_PASSWORD: magazzino_test_only
-          POSTGRES_DB: magazzino_ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U magazzino -d magazzino_ci"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgresql://magazzino:magazzino_test_only@127.0.0.1:5432/magazzino_ci
-      SESSION_SECRET: ci-test-session-secret-only
-      COOKIE_SECURE: "false"
-      COOKIE_SAMESITE: lax
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -70,34 +51,20 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:fresh-db
-        env:
-          FRESH_DB_INITIAL_PASSWORD: FreshDb-CI-Only-2026
-          FRESH_DB_FINAL_PASSWORD: FreshDb-CI-Only-2026-Changed
-      - run: pnpm --filter @workspace/db run test:migrations
-      - run: pnpm --filter @workspace/api-server test
+      - run: node --test scripts/quality-gates-plan.test.mjs scripts/m63-test-guards.test.mjs
+      - run: node scripts/quality-gates-run.mjs api
+      - run: git diff --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-quality-gates
+          path: |
+            test-results/quality-gates/api/**/*.log
+            test-results/quality-gates/api/**/*.json
+          retention-days: 7
 
   browser-critical-paths:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: magazzino
-          POSTGRES_PASSWORD: magazzino_e2e_only
-          POSTGRES_DB: magazzino_e2e
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U magazzino -d magazzino_e2e"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgresql://magazzino:magazzino_e2e_only@127.0.0.1:5432/magazzino_e2e
-      E2E_DATABASE_URL: postgresql://magazzino:magazzino_e2e_only@127.0.0.1:5432/magazzino_e2e
-      E2E_USERNAME: sadmin
-      E2E_PASSWORD: FreshDb-E2E-Only-2026-Changed
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -108,12 +75,19 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:fresh-db
-        env:
-          FRESH_DB_INITIAL_PASSWORD: FreshDb-E2E-Only-2026
-          FRESH_DB_FINAL_PASSWORD: FreshDb-E2E-Only-2026-Changed
-      - run: pnpm --filter @workspace/api-server environment:data seed-demo --super-admin=sadmin
-        env:
-          DEMO_USER_INITIAL_PASSWORD: Demo-E2E-Only-2026
       - run: pnpm --filter @workspace/magazzino-solidale exec playwright install --with-deps chromium
-      - run: pnpm --filter @workspace/magazzino-solidale test:e2e
+      # Historical document tests require this private temporary output prefix.
+      # It exists on macOS; prepare the equivalent ephemeral path on this runner.
+      - run: sudo install -d -m 0700 -o "$(id -un)" /private/tmp
+      - run: node scripts/quality-gates-run.mjs browser
+      - run: git diff --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-quality-gates
+          # Do not publish browser traces, screenshots, synthetic uploads or
+          # credentials captured while filling the temporary login forms.
+          path: |
+            test-results/quality-gates/browser/*/*.log
+            test-results/quality-gates/browser/*/*.json
+          retention-days: 7

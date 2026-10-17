@@ -78,8 +78,15 @@ test("M5B: richiesta Centro → presa Magazzino → Bolla → annullamento M4 �
     await prepare
       .locator("#rm-warehouse")
       .selectOption({ label: "TEST-M5B Deposito A1" });
-    await prepare.getByRole("button").last().click();
-    await expect(warehousePage).toHaveURL(/\/bolle\?bollaId=\d+/);
+    // Current M5C2 preparation stays inside the request Sheet; the command is
+    // in its persistent footer rather than the retired inline form panel.
+    await warehousePage
+      .getByTestId("richiesta-sheet")
+      .getByRole("button", { name: "Crea Bolla", exact: true })
+      .click();
+    await expect(warehousePage).toHaveURL(
+      /\/richieste-magazzino\?.*documento=bolla%3A\d+/,
+    );
 
     const firstDetail = await warehousePage.request.get(
       `/api/richieste-magazzino/${request.id}`,
@@ -124,7 +131,9 @@ test("M5B: richiesta Centro → presa Magazzino → Bolla → annullamento M4 �
       if (new URL(entry.url()).pathname.startsWith("/api/"))
         bollaRequests.push(entry.url());
     });
-    await expect(warehousePage).toHaveURL(new RegExp(`bollaId=${firstId}`));
+    await expect(warehousePage).toHaveURL(
+      new RegExp(`documento=bolla%3A${firstId}(?:&|$)`),
+    );
     await expect(
       warehousePage.getByText(first.documentoCorrente.codice).first(),
     ).toBeVisible();
@@ -162,7 +171,10 @@ test("M5B: richiesta Centro → presa Magazzino → Bolla → annullamento M4 �
       .getByRole("link", { name: new RegExp(request.codice) })
       .click();
     await expect(warehousePage).toHaveURL(/\/richieste-magazzino/);
-    await warehousePage.getByRole("link", { name: "Apri documento" }).click();
+    await warehousePage
+      .getByTestId("richiesta-sheet")
+      .getByRole("button", { name: "Apri documento", exact: true })
+      .click();
     await expect(warehousePage).toHaveURL(
       new RegExp(`documento=bolla%3A${firstId}`),
     );
@@ -208,8 +220,13 @@ test("M5B: richiesta Centro → presa Magazzino → Bolla → annullamento M4 �
     await replacement
       .locator("#rm-warehouse")
       .selectOption({ label: "TEST-M5B Deposito A1" });
-    await replacement.getByRole("button").last().click();
-    await expect(warehousePage).toHaveURL(/\/bolle\?bollaId=\d+/);
+    await warehousePage
+      .getByTestId("richiesta-sheet")
+      .getByRole("button", { name: "Crea Bolla", exact: true })
+      .click();
+    await expect(warehousePage).toHaveURL(
+      /\/richieste-magazzino\?.*documento=bolla%3A\d+/,
+    );
     const secondDetail = await warehousePage.request.get(
       `/api/richieste-magazzino/${request.id}`,
     );
@@ -357,14 +374,33 @@ test("M5B: richieste operative Ente e Magazzino creano documenti M4 distinti", a
       .getByRole("button", { name: new RegExp(request.codice) })
       .click();
     await expect(page.getByText("Documento corrente")).toBeVisible();
-    const directLink = await page
-      .getByRole("link", { name: "Apri documento" })
-      .getAttribute("href");
+    const currentResponse = await page.request.get(
+      `/api/richieste-magazzino/${request.id}`,
+    );
+    expect(currentResponse.status()).toBe(200);
+    const current = await currentResponse.json();
+    const directLink = current.documentoCorrente.percorsoDocumento as string;
     expect(directLink).toMatch(
       kind === "ente"
         ? /^\/bolle\?bollaId=/
         : /^\/trasferimenti\?trasferimentoId=/,
     );
+    await page
+      .getByTestId("richiesta-sheet")
+      .getByRole("button", { name: "Apri documento", exact: true })
+      .click();
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === "/richieste-magazzino" &&
+        url.searchParams.get("richiestaId") === String(request.id) &&
+        url.searchParams.get("documento") ===
+          `${createdDocument.tipoDocumento}:${createdDocument.documentoId}`,
+    );
+    await expect(
+      page
+        .getByTestId("richiesta-sheet")
+        .getByText(createdDocument.codiceDocumento, { exact: true }),
+    ).toBeVisible();
     if (kind === "magazzino") {
       const beforePdf = await page.request.get(
         `/api/trasferimenti/${createdDocument.documentoId}`,

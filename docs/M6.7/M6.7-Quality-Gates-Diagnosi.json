@@ -1,0 +1,843 @@
+{
+  "sourceRun": 39046094178,
+  "sourceCommit": "ff86c24ac7a8847c1fbc50044c1c97c5e7418979",
+  "observed": {
+    "apiPass": 1607,
+    "apiFail": 56,
+    "apiSkip": 322,
+    "failedFiles": 31,
+    "failedSetups": 22
+  },
+  "classification": [
+    {
+      "file": "tests/credito-automatico-f1.test.ts",
+      "scenario": "[ tests/credito-automatico-f1.test.ts ]",
+      "kind": "setup",
+      "error": "Error: F1 requires explicit disposable database",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/emporio-security.test.ts",
+      "scenario": "[ tests/emporio-security.test.ts ]",
+      "kind": "setup",
+      "error": "AssertionError: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/emporio-uat-f1.test.ts",
+      "scenario": "[ tests/emporio-uat-f1.test.ts ]",
+      "kind": "setup",
+      "error": "Error: F1 requires isolated disposable PostgreSQL",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m5b-r2-autorizzazioni.test.ts",
+      "scenario": "[ tests/m5b-r2-autorizzazioni.test.ts ]",
+      "kind": "setup",
+      "error": "Error: R2 requires verified disposable PostgreSQL",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m5b-r3-guardie-post-preparazione.test.ts",
+      "scenario": "[ tests/m5b-r3-guardie-post-preparazione.test.ts ]",
+      "kind": "setup",
+      "error": "Error: R3 requires verified disposable PostgreSQL",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m5c1-formal-session.test.ts",
+      "scenario": "[ tests/m5c1-formal-session.test.ts ]",
+      "kind": "setup",
+      "error": "Error: M5C1 richiede PostgreSQL effimero verificato",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m5c2a-handoff-bolla-pronta.test.ts",
+      "scenario": "[ tests/m5c2a-handoff-bolla-pronta.test.ts ]",
+      "kind": "setup",
+      "error": "Error: M5C2A requires verified disposable PostgreSQL",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m5c2a-r1-request-cancel.test.ts",
+      "scenario": "[ tests/m5c2a-r1-request-cancel.test.ts ]",
+      "kind": "setup",
+      "error": "Error: Requires disposable PostgreSQL",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m63-formal-certification.test.ts",
+      "scenario": "[ tests/m63-formal-certification.test.ts ]",
+      "kind": "setup",
+      "error": "AssertionError: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta DB incompatibile"],
+      "required": "M63; 127.0.0.1:58631",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m63-interventi.test.ts",
+      "scenario": "[ tests/m63-interventi.test.ts ]",
+      "kind": "setup",
+      "error": "AssertionError: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta DB incompatibile"],
+      "required": "M63; 127.0.0.1:58631",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67-review-supply.test.ts",
+      "scenario": "[ tests/m67-review-supply.test.ts ]",
+      "kind": "setup",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67a-authorization.test.ts",
+      "scenario": "[ tests/m67a-authorization.test.ts ]",
+      "kind": "setup",
+      "error": "Error: Dedicated disposable M67A DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67a-mensa-access.test.ts",
+      "scenario": "[ tests/m67a-mensa-access.test.ts ]",
+      "kind": "setup",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67b-paths.test.ts",
+      "scenario": "[ tests/m67b-paths.test.ts ]",
+      "kind": "setup",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67d-verifications.test.ts",
+      "scenario": "[ tests/m67d-verifications.test.ts ]",
+      "kind": "setup",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67e-movement-export.test.ts",
+      "scenario": "[ tests/m67e-movement-export.test.ts ]",
+      "kind": "setup",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/mensa-magazzino-correttivo.test.ts",
+      "scenario": "[ tests/mensa-magazzino-correttivo.test.ts ]",
+      "kind": "setup",
+      "error": "Error: Disposable database required",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-certification.test.ts",
+      "scenario": "[ tests/reporting-m66-certification.test.ts ]",
+      "kind": "setup",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-review.test.ts",
+      "scenario": "[ tests/reporting-m66-review.test.ts ]",
+      "kind": "setup",
+      "error": "Error: Dedicated disposable DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-security.test.ts",
+      "scenario": "[ tests/reporting-m66-security.test.ts ]",
+      "kind": "setup",
+      "error": "Error: Requires dedicated M6.6 disposable database",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a-session.test.ts",
+      "scenario": "[ tests/richieste-magazzino-m5a-session.test.ts ]",
+      "kind": "setup",
+      "error": "Error: M5A session test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5b.test.ts",
+      "scenario": "[ tests/richieste-magazzino-m5b.test.ts ]",
+      "kind": "setup",
+      "error": "Error: M5B API test requires verified disposable PostgreSQL with the M5B migration",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/cassa-emporio.test.ts",
+      "scenario": "> Cassa Emporio > C27 storico frazionario saldi leggibile ma non rettificabile, anche se la somma è intera",
+      "kind": "test",
+      "error": "AssertionError: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/cassa-emporio.test.ts",
+      "scenario": "> Cassa Emporio > C27 storico frazionario rimborsi leggibile ma non rettificabile, anche se la somma è intera",
+      "kind": "test",
+      "error": "AssertionError: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/cassa-emporio.test.ts",
+      "scenario": "> Cassa Emporio > C28 fault lotti: stock, credito, ricevuta e audit annullati insieme",
+      "kind": "test",
+      "error": "AssertionError: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/cassa-emporio.test.ts",
+      "scenario": "> Cassa Emporio > C28 fault credito_solidale_movimenti: stock, credito, ricevuta e audit annullati insieme",
+      "kind": "test",
+      "error": "AssertionError: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/cassa-emporio.test.ts",
+      "scenario": "> Cassa Emporio > C28 fault comandi_operativi: stock, credito, ricevuta e audit annullati insieme",
+      "kind": "test",
+      "error": "AssertionError: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/cassa-emporio.test.ts",
+      "scenario": "> Cassa Emporio > C28 fault audit_eventi: stock, credito, ricevuta e audit annullati insieme",
+      "kind": "test",
+      "error": "AssertionError: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/cassa-emporio.test.ts",
+      "scenario": "> Cassa Emporio > B27 fault injection PostgreSQL: rollback totale",
+      "kind": "test",
+      "error": "AssertionError: fault injection solo su DB effimero esplicito: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/cassa-emporio.test.ts",
+      "scenario": "> Cassa Emporio > B28 fault injection PostgreSQL: rollback totale",
+      "kind": "test",
+      "error": "AssertionError: fault injection solo su DB effimero esplicito: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/cassa-emporio.test.ts",
+      "scenario": "> Cassa Emporio > B29-credito fault injection PostgreSQL: rollback totale",
+      "kind": "test",
+      "error": "AssertionError: fault injection solo su DB effimero esplicito: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/cassa-emporio.test.ts",
+      "scenario": "> Cassa Emporio > B29-audit/B31 fault injection PostgreSQL: rollback totale",
+      "kind": "test",
+      "error": "AssertionError: fault injection solo su DB effimero esplicito: expected undefined to be 'verified' // Object.is equality",
+      "categories": ["verifica ambiente assente", "porta/nome DB dedicati"],
+      "required": "M62A/M62A_F1/M62B/M62C secondo il caso; 127.0.0.1:58621/m62a",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67-p4-download-boundaries.test.ts",
+      "scenario": "> M67-38 a real persisted register remains scoped after grant and territory revocation on the same cookie",
+      "kind": "test",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67-p4-download-boundaries.test.ts",
+      "scenario": "> M67-38 real authenticated session cannot download protected artifacts without source grants",
+      "kind": "test",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67-p4-download-boundaries.test.ts",
+      "scenario": "> M67-38 real-session logo upload rejects unauthorized actors, invalid MIME, empty and oversized bodies",
+      "kind": "test",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67-p4-uds-revocation.test.ts",
+      "scenario": "> F02 same real session, ordinary mixed=false: revoke Area, deny dossier/list/intervention/export/report and no mutation",
+      "kind": "test",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67-p4-uds-revocation.test.ts",
+      "scenario": "> F02 same real session, ordinary mixed=true: revoke Area, deny dossier/list/intervention/export/report and no mutation",
+      "kind": "test",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67-p4-uds-revocation.test.ts",
+      "scenario": "> F02 inactive Area denies ordinary UDS, while explicit administrative global access and scoped denial remain",
+      "kind": "test",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67d-social-chain.test.ts",
+      "scenario": "> M67-18/19 actual Social and Warehouse sessions: intervention to delivery, replay, no duplicate stock or intervention",
+      "kind": "test",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67e-supply.test.ts",
+      "scenario": "> M67-25 real scoped session receives 1.25 kg once under concurrent commands and replay; catalogue UOM and exact stock",
+      "kind": "test",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/m67e-supply.test.ts",
+      "scenario": "> M67-25 real scoped session receives 1.000001 kg once under concurrent commands and replay; catalogue UOM and exact stock",
+      "kind": "test",
+      "error": "AssertionError: Expected values to be strictly equal:",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "M67A; 127.0.0.1:59671/m67a_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/mensa.test.ts",
+      "scenario": "> Modulo Mensa > M61-F4 audit riapertura > F4-T6: errore PostgreSQL nell'audit annulla atomicamente la riapertura",
+      "kind": "test",
+      "error": "AssertionError: expected '5432' to be '58461' // Object.is equality",
+      "categories": ["porta DB incompatibile"],
+      "required": "127.0.0.1:58461/m61_*",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-grant-revocation.test.ts",
+      "scenario": "> SEC source area revocation also removes stock while preserving an authorized logistics source",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-grant-revocation.test.ts",
+      "scenario": "> SEC-01/07 revoking magazzino.view on the same session denies the source and prevents its movement count being exported",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-grant-revocation.test.ts",
+      "scenario": "> SEC-07 a grant revoked while PostgreSQL is preparing export prevents delivering the old dataset",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-grant-revocation.test.ts",
+      "scenario": "> SEC an explicit global admin retains source reads without synthetic grants",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-grant-revocation.test.ts",
+      "scenario": "> SEC mixed role retains logistica.mezzi.view after warehouse revocation, without stock/series/quality leakage",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-grant-revocation.test.ts",
+      "scenario": "> SEC mixed role retains approvvigionamenti.view after warehouse revocation, without stock/series/quality leakage",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-grant-revocation.test.ts",
+      "scenario": "> SEC disabled source modules cannot be bypassed by an unrelated enabled logistics module",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-grant-revocation.test.ts",
+      "scenario": "> SEC admin=false does not turn a current territory into global visibility",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-grant-revocation.test.ts",
+      "scenario": "> SEC admin=true does not turn a current territory into global visibility",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC-01/02/07 a mixed Social/Mensa role loses Pacchi data after bolle.view revocation, preserving authorized Mensa",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC Pacchi re-grant restores reads and prepared data on the same session",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC Pacchi grant alone never bypasses the source area or an absent territorial scope",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC Pacchi territorial scope remains enforced for admin=false",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC Pacchi territorial scope remains enforced for admin=true",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC explicit global admin keeps Pacchi without synthetic grants",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC removing BOLLE excludes only Pacchi from the mixed report and its warehouse options",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC/PDF-08 Pacchi preparation blocked in PostgreSQL rejects concurrent grant",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC/PDF-08 Pacchi preparation blocked in PostgreSQL rejects concurrent logout",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC/PDF-08 Pacchi preparation blocked in PostgreSQL rejects concurrent switch-user",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC/PDF-08 Pacchi preparation blocked in PostgreSQL rejects concurrent relogin-same-user",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/reporting-m66-residual-security.test.ts",
+      "scenario": "> SEC successful prepare keeps the authenticated session and normal rolling cookie",
+      "kind": "test",
+      "error": "Error: Dedicated disposable reporting DB required",
+      "categories": [
+        "verifica ambiente assente",
+        "porta/nome DB incompatibili"
+      ],
+      "required": "REPORTING_TEST; 127.0.0.1:59666/m66_dev",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > invia Beneficiario senza Intervento/prodotti e non scrive stock o documenti",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > usa Intervento sociale concluso, non lo muta e blocca due chiavi attive concorrenti",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > impone esclusività destinatario e dati sociali completi e coerenti",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > limita Ente/Magazzino ai profili operativi e non espone il dossier al Magazzino",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > filtra nello scope prima di conteggio e paginazione anche tra Centri della stessa Area",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > non allarga la cartella sociale fra Zone UDS dello stesso Centro",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > richiede i flag Magazzino/Centro pertinenti ma non BOLLE o CONSEGNE",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > verifica 401, permessi, Area e Centro anche per conteggi/storico",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > rifiuta mass assignment/versioni coercibili, blocca update dopo presa e serializza take",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > replay non duplica effetti/audit e rivalida scope e ruolo revocati",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > due invii con la stessa chiave producono una sola richiesta e un solo audit",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > dopo spostamento del Beneficiario blocca presa/modifica ma consente annullamento nello scope originario",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > modifica solo in inviata con versione corrente e non perde aggiornamenti concorrenti",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > modifica, presa e annullamento non cambiano documenti, stock o materiali legacy",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    },
+    {
+      "file": "tests/richieste-magazzino-m5a.test.ts",
+      "scenario": "> M5A — Richiesta Magazzino reale su PostgreSQL isolato > annulla il comando intero se l'audit non può registrare l'evento",
+      "kind": "test",
+      "error": "Error: M5A API test requires a verified disposable PostgreSQL database",
+      "categories": ["verifica ambiente assente"],
+      "required": "Flag dedicato M5A/M5B/M5C1/M5C2A/MENSA_FIX secondo il file",
+      "resolution": "Rerun isolato API completo: PASS; nessuna modifica applicativa o alle assertion API."
+    }
+  ],
+  "coverage": {
+    "apiFiles": 162,
+    "browserSpecs": 46,
+    "sourceFilesRead": 224
+  },
+  "newApiResult": {
+    "pass": 2016,
+    "fail": 0,
+    "skip": 4
+  },
+  "note": "Le 322 omissioni del run iniziale includono setup bloccati e non sono tutti skip intenzionali. I nuovi quattro skip sono i campioni esterni già documentati."
+}

@@ -49,7 +49,9 @@ test.beforeAll(async () => {
       })),
   );
   const result = await database.query(
-    "select filename, checksum_sha256 from app_meta.schema_migrations order by filename",
+    // Match JavaScript's bytewise filename order independently of the PostgreSQL
+    // locale. The assertion still compares every filename and exact checksum.
+    'select filename, checksum_sha256 from app_meta.schema_migrations order by filename COLLATE "C"',
   );
   expect(required.length).toBeGreaterThan(0);
   expect(result.rows).toEqual(required);

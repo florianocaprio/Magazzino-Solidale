@@ -14,6 +14,23 @@ test("Cassa Emporio forza un accesso tracciato, calcola credito e chiude la spes
   );
   await login(page);
 
+  // Demo credit is not an Emporio service assignment. Establish this scenario's
+  // eligibility explicitly through the real, audited API; never relax the gate.
+  const beneficiaries = await page.request.get(
+    "/api/beneficiari?search=DEMO-BEN-001",
+  );
+  expect(beneficiaries.status()).toBe(200);
+  const beneficiaryRecord = (await beneficiaries.json()).find(
+    (row: { codice: string }) => row.codice === "DEMO-BEN-001",
+  );
+  expect(beneficiaryRecord?.id).toBeTruthy();
+  const eligibility = await page.request.post(
+    `/api/emporio/beneficiari/${beneficiaryRecord.id}/abilitazione`,
+    { data: { stato: "attivo", motivo: "Fixture sintetica lifecycle CI" } },
+  );
+  expect(eligibility.status(), await eligibility.text()).toBe(200);
+  expect((await eligibility.json()).stato).toBe("attivo");
+
   const [warehousesResponse, productsResponse] = await Promise.all([
     page.request.get("/api/magazzini"),
     page.request.get("/api/prodotti"),

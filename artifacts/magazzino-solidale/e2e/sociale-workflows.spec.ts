@@ -20,7 +20,7 @@ test("Beneficiario → intervento pianificato → avvio → conclusione e storic
   await page.goto(`/interventi?areaOperativa=${area.id}&vista=oggi`);
   await page.getByRole("button", { name: /nuovo intervento/i }).click();
   await page
-    .getByRole("menuitem", { name: /nuovo intervento pianificato/i })
+    .getByRole("menuitem", { name: /pianifica nuovo intervento/i })
     .click();
   const form = page.getByRole("dialog", {
     name: /intervento pianificato/i,
@@ -38,6 +38,10 @@ test("Beneficiario → intervento pianificato → avvio → conclusione e storic
   await form
     .getByRole("textbox", { name: /descrizione/i })
     .fill(uniqueDescription);
+  await form
+    .getByLabel("Data pianificata")
+    .fill(`${new Date().getUTCFullYear() + 1}-10-15`);
+  await form.getByLabel("Ora pianificata").fill("10:30");
 
   const createResponsePromise = page.waitForResponse(
     (response) =>
@@ -49,13 +53,22 @@ test("Beneficiario → intervento pianificato → avvio → conclusione e storic
   expect(createResponse.status()).toBe(201);
   const created = (await createResponse.json()) as { id: number };
   await expect(form).toBeHidden();
+  const detail = page.getByRole("dialog", { name: /dettaglio intervento/i });
+  // M5C1-R1 keeps the new intervention open in the matching list. Verify the
+  // actual record by closing and reopening it, not just a tab counter.
+  await expect(detail).toBeVisible();
+  await expect(page).toHaveURL(
+    (url) =>
+      url.searchParams.get("vista") === "pianificati" &&
+      url.searchParams.get("interventoId") === String(created.id),
+  );
+  await detail.getByRole("button", { name: "Close", exact: true }).click();
 
   const result = page.locator(
     `[data-testid="interventi-desktop-list"] [data-intervento-id="${created.id}"]`,
   );
   await expect(result).toBeVisible();
   await result.click();
-  const detail = page.getByRole("dialog", { name: /dettaglio intervento/i });
   await expect(detail).toBeVisible();
   await expect(detail).toContainText(/pianificato/i);
 

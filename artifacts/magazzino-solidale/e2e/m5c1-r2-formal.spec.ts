@@ -443,8 +443,21 @@ test("R2-02: presa in carico, Bolla aperta, P1/P2 persistenti e volontario con e
       await page.evaluate(() =>
         window.dispatchEvent(new Event("visibilitychange")),
       );
-      // Il documento collegato fuori perimetro viene minimizzato come 404.
-      expect((await revoked).status()).toBe(404);
+      // M6.7 rejects missing territory before linked-document lookup. Require
+      // that exact denial and no protected payload, not an arbitrary 403.
+      const revokedRead = await revoked;
+      expect(revokedRead.status()).toBe(403);
+      const revokedBody = await revokedRead.json();
+      expect(revokedBody.error).toBe(
+        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+      );
+      expect(Object.keys(revokedBody).sort()).toEqual([
+        "code",
+        "correlationId",
+        "details",
+        "error",
+        "message",
+      ]);
       await expect(
         contextual.getByRole("row", { name: new RegExp(names[0]) }),
       ).toHaveCount(0);
@@ -457,7 +470,8 @@ test("R2-02: presa in carico, Bolla aperta, P1/P2 persistenti e volontario con e
       const deniedAgain = await page.request.get(
         `/api/documenti-operativi/bolla/${bollaId}`,
       );
-      expect(deniedAgain.status()).toBe(404);
+      expect(deniedAgain.status()).toBe(403);
+      expect((await deniedAgain.json()).error).toBe(revokedBody.error);
     } finally {
       await database.query(
         "UPDATE utenti SET area_operativa_id=$1,centro_ascolto_id=$2 WHERE username='m5c1-e2e-warehouse'",

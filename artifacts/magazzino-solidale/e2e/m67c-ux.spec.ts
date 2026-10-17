@@ -134,62 +134,70 @@ test("M67-17 baseline: failed capabilities are not an authorized empty map", asy
   ).toHaveCount(0);
 });
 
-for (const [width, height] of [
-  [390, 844],
-  [767, 1024],
-  [768, 1024],
-  [820, 1180],
-  [1024, 768],
-  [1440, 900],
-]) {
-  test(`M67-15 touch menu, dense form and rotation ${width}x${height}`, async ({
-    page,
-  }, info) => {
-    await syntheticApp(page);
-    await page.setViewportSize({ width, height });
-    await page.goto("/richieste-magazzino");
-    const trigger = page.locator('header [data-sidebar="trigger"]');
-    await expect(trigger).toBeVisible();
-    const box = await trigger.boundingBox();
-    expect(box!.width).toBeGreaterThanOrEqual(44);
-    expect(box!.height).toBeGreaterThanOrEqual(44);
-    await trigger.tap();
-    if (width < 768) {
-      const menu = page.getByRole("dialog");
-      await expect(menu).toBeVisible();
-      const groups = menu.locator('[data-slot="sidebar-group-label"]');
-      for (const group of await groups.all()) await group.click();
-      await menu.getByRole("button", { name: "Chiudi", exact: true }).tap();
-      await expect(menu).toBeHidden();
-    } else {
-      await expect(
-        page.locator('[data-state="collapsed"][data-collapsible="offcanvas"]'),
-      ).toBeVisible();
+test.describe("Explicit touch and rotation matrix", () => {
+  // Setting the viewport alone does not enable tap in the desktop project.
+  // Only these touch scenarios override its input device; other desktop tests
+  // retain their normal mouse context.
+  test.use({ hasTouch: true });
+  for (const [width, height] of [
+    [390, 844],
+    [767, 1024],
+    [768, 1024],
+    [820, 1180],
+    [1024, 768],
+    [1440, 900],
+  ]) {
+    test(`M67-15 touch menu, dense form and rotation ${width}x${height}`, async ({
+      page,
+    }, info) => {
+      await syntheticApp(page);
+      await page.setViewportSize({ width, height });
+      await page.goto("/richieste-magazzino");
+      const trigger = page.locator('header [data-sidebar="trigger"]');
+      await expect(trigger).toBeVisible();
+      const box = await trigger.boundingBox();
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.height).toBeGreaterThanOrEqual(44);
       await trigger.tap();
-      await expect(
-        page.locator('[data-state="expanded"][data-side]'),
-      ).toBeVisible();
-      await trigger.tap();
-    }
-    await page
-      .getByRole("button", { name: "Nuova richiesta", exact: true })
-      .click();
-    await page.locator("#rm-need").fill("Need synthetic");
-    await page.locator("#rm-notes").fill("Synthetic notes");
-    const cancel = page.getByRole("button", { name: "Annulla", exact: true });
-    await cancel.scrollIntoViewIfNeeded();
-    await expect(cancel).toBeInViewport();
-    await page.screenshot({ path: info.outputPath(`form-${width}.png`) });
-    await page.setViewportSize({ width: height, height: width });
-    await expect(page.locator("#rm-need")).toHaveValue("Need synthetic");
-    await cancel.scrollIntoViewIfNeeded();
-    await cancel.click();
-    await expect(page.getByRole("alertdialog")).toBeVisible();
-    await page
-      .getByRole("button", { name: "Scarta modifiche", exact: true })
-      .click();
-  });
-}
+      if (width < 768) {
+        const menu = page.getByRole("dialog");
+        await expect(menu).toBeVisible();
+        const groups = menu.locator('[data-slot="sidebar-group-label"]');
+        for (const group of await groups.all()) await group.click();
+        await menu.getByRole("button", { name: "Chiudi", exact: true }).tap();
+        await expect(menu).toBeHidden();
+      } else {
+        await expect(
+          page.locator(
+            '[data-state="collapsed"][data-collapsible="offcanvas"]',
+          ),
+        ).toBeVisible();
+        await trigger.tap();
+        await expect(
+          page.locator('[data-state="expanded"][data-side]'),
+        ).toBeVisible();
+        await trigger.tap();
+      }
+      await page
+        .getByRole("button", { name: "Nuova richiesta", exact: true })
+        .click();
+      await page.locator("#rm-need").fill("Need synthetic");
+      await page.locator("#rm-notes").fill("Synthetic notes");
+      const cancel = page.getByRole("button", { name: "Annulla", exact: true });
+      await cancel.scrollIntoViewIfNeeded();
+      await expect(cancel).toBeInViewport();
+      await page.screenshot({ path: info.outputPath(`form-${width}.png`) });
+      await page.setViewportSize({ width: height, height: width });
+      await expect(page.locator("#rm-need")).toHaveValue("Need synthetic");
+      await cancel.scrollIntoViewIfNeeded();
+      await cancel.click();
+      await expect(page.getByRole("alertdialog")).toBeVisible();
+      await page
+        .getByRole("button", { name: "Scarta modifiche", exact: true })
+        .click();
+    });
+  }
+});
 
 test("M67-13/14 mandatory fields, failed send preserved, successful send clean", async ({
   page,

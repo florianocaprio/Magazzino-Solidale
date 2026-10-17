@@ -44,6 +44,10 @@ test("Consegne, Sociale e UDS usano card sotto 1024px", async ({
   expect(socialFixture.status()).toBe(201);
 
   await page.goto("/consegne");
+  await page
+    .getByRole("navigation", { name: "Stato pianificazione consegne" })
+    .getByRole("button", { name: "Consegne pianificate", exact: true })
+    .click();
   if (compact) {
     await expect(page.getByTestId("consegne-mobile-list")).toBeVisible();
     await expect(page.getByTestId("consegne-desktop-list")).toBeHidden();

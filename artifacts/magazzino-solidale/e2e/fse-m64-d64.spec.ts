@@ -38,7 +38,7 @@ async function context(page: Page) {
   return { area, warehouse, lot, source };
 }
 function registry(
-  product: string,
+  product: string | ((index: number) => string),
   document: string,
   reference = "17/09/2026",
   count = 2,
@@ -72,7 +72,7 @@ function registry(
       h,
       ...Array.from({ length: count }, (_, i) => [
         funds[i % funds.length],
-        product,
+        typeof product === "function" ? product(i) : product,
         20,
         null,
         `${document}-${i}`,
@@ -879,20 +879,29 @@ test("D64: M3B partial → confirmed source → immutable run, resolution and mi
   await assertViewportSafe(page);
 });
 
-test("D64/F26: authorized original source is selectable in administrative reconciliation", async ({
+const originalRegistryPath = process.env.FSE_REGISTRY_ORIGINAL_PATH;
+test(`D64/F26: ${originalRegistryPath ? "authorized original acceptance" : "synthetic CI registry"} is selectable in administrative reconciliation`, async ({
   page,
-}) => {
-  expect(
-    process.env.FSE_REGISTRY_ORIGINAL_PATH,
-    "Required authorized original",
-  ).toBeTruthy();
+}, testInfo) => {
+  testInfo.annotations.push({
+    type: "data-source",
+    description: originalRegistryPath
+      ? "External authorized original: acceptance actually executed"
+      : "Synthetic CI regression: external-original acceptance NOT EXECUTED",
+  });
+  // The CI fixture has 250 distinct products, not 250 repetitions which could
+  // collapse into one observation. No operational document is copied into Git.
+  const input = originalRegistryPath
+    ? readFileSync(originalRegistryPath)
+    : registry(
+        (i) => `CI-F26-P-${String(i).padStart(3, "0")}`,
+        "CI-F26",
+        "17/09/2026",
+        250,
+      );
   await login(page);
   const c = await context(page);
-  const acquired = await upload(
-    page,
-    c,
-    readFileSync(process.env.FSE_REGISTRY_ORIGINAL_PATH!),
-  );
+  const acquired = await upload(page, c, input);
   await page.goto(
     `/report/fse-plus?magazzinoId=${c.warehouse.id}&da=2024-09-01&a=2026-09-17`,
   );
@@ -929,4 +938,5 @@ test("D64/F26: authorized original source is selectable in administrative reconc
   );
   expect(observations.total).toBeGreaterThan(201);
   expect(observations.rows).toHaveLength(20);
+  if (!originalRegistryPath) expect(observations.total).toBe(250);
 });

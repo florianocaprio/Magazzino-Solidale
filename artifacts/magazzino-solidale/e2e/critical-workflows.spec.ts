@@ -12,6 +12,10 @@ test("dashboard e navigazione operativa rispettano il viewport", async ({
   await assertViewportSafe(page);
 
   await page.goto("/consegne");
+  await page
+    .getByRole("navigation", { name: "Stato pianificazione consegne" })
+    .getByRole("button", { name: "Consegne pianificate", exact: true })
+    .click();
   await expect(page.locator("h1").first()).toBeVisible();
   await assertViewportSafe(page);
 
@@ -37,6 +41,10 @@ test("filtri Consegne sono utilizzabili da mobile e tablet portrait", async ({
     "Il filtro Sheet è il flusso portrait",
   );
   await page.goto("/consegne");
+  await page
+    .getByRole("navigation", { name: "Stato pianificazione consegne" })
+    .getByRole("button", { name: "Consegne pianificate", exact: true })
+    .click();
   await page.getByRole("button", { name: /filtri e ricerca/i }).click();
   await expect(
     page.getByRole("heading", { name: /filtri consegne/i }),

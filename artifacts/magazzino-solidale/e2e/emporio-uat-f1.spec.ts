@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { selectOption } from "./helpers";
 const require = createRequire(
   new URL("../../api-server/package.json", import.meta.url),
@@ -722,6 +722,46 @@ async function open(page: Page) {
     exact: true,
   });
 }
+// M6.7 deliberately lets the operator submit an incomplete form to expose
+// contextual required-field errors. The invariant is no command/no write,
+// rather than a disabled Save button (see the current component unit tests).
+async function expectIncompleteAccessBlocked(
+  page: Page,
+  dialog: Locator,
+  blockedReason?: string | RegExp,
+) {
+  const before = (await database.query("select count(*)::int n from consegne"))
+    .rows[0].n;
+  const writes: string[] = [];
+  const observe = (request: import("@playwright/test").Request) => {
+    if (
+      ["POST", "PATCH"].includes(request.method()) &&
+      new URL(request.url()).pathname.startsWith("/api/accessi-emporio")
+    )
+      writes.push(request.url());
+  };
+  page.on("request", observe);
+  try {
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    if (blockedReason)
+      await expect(
+        dialog.getByText(blockedReason, {
+          exact: typeof blockedReason === "string",
+        }),
+      ).toBeVisible();
+    else
+      await expect(
+        dialog.getByPlaceholder(/cerca beneficiario per nome/i),
+      ).toHaveAttribute("aria-invalid", "true");
+    await expect(dialog).toBeVisible();
+    expect(writes).toEqual([]);
+    expect(
+      (await database.query("select count(*)::int n from consegne")).rows[0].n,
+    ).toBe(before);
+  } finally {
+    page.off("request", observe);
+  }
+}
 for (const count of [0, 1, 2])
   test(`T01/T02/T03: ${count} Empori — selection before beneficiary`, async ({
     page,
@@ -746,9 +786,10 @@ for (const count of [0, 1, 2])
     } else {
       await expect(input).toBeDisabled();
       expect(queries).toEqual([]);
+      await expectIncompleteAccessBlocked(page, d);
       await expect(
-        d.getByRole("button", { name: "Salva", exact: true }),
-      ).toBeDisabled();
+        d.getByRole("combobox", { name: "Emporio", exact: true }),
+      ).toHaveAttribute("aria-invalid", "true");
       if (count === 0)
         await expect(
           d.getByText(/Nessun Emporio attivo accessibile/),
@@ -794,9 +835,7 @@ test("T04/T06/T11/T12/T13/T20: cross-Center name, card, context reset and explic
     d.getByRole("button", { name: "Salva", exact: true }),
   ).toBeEnabled();
   await selectOption(page, wh, f.warehouses[0].nome);
-  await expect(
-    d.getByRole("button", { name: "Salva", exact: true }),
-  ).toBeDisabled();
+  await expectIncompleteAccessBlocked(page, d);
   await expect(input).toHaveValue("");
   const legacyCard = `opaque-usb-${f.beneficiary}`;
   await database.query(
@@ -841,7 +880,22 @@ test("T08/T15: beneficiary service panel enables explicitly without credit incre
     name: "Abilita all'Emporio",
     exact: true,
   });
-  await expect(enable).toBeDisabled();
+  const commands: string[] = [];
+  page.on("request", (request) => {
+    if (
+      ["POST", "PATCH"].includes(request.method()) &&
+      new URL(request.url()).pathname.includes("emporio")
+    )
+      commands.push(request.url());
+  });
+  await enable.click();
+  await expect(
+    card.getByRole("textbox", {
+      name: "Motivo dell'abilitazione o della variazione",
+    }),
+  ).toHaveAttribute("aria-invalid", "true");
+  await expect(card.getByText("NON ABILITATO", { exact: true })).toBeVisible();
+  expect(commands).toEqual([]);
   await card
     .getByRole("textbox", {
       name: "Motivo dell'abilitazione o della variazione",
@@ -942,9 +996,11 @@ test("F2 B14/B15/B19/B24: service transitions update cached directory and deep-l
   await page
     .getByRole("button", { name: "Nuovo Accesso Emporio", exact: true })
     .click();
-  await expect(
-    dialog.getByRole("button", { name: "Salva", exact: true }),
-  ).toBeDisabled();
+  await expectIncompleteAccessBlocked(
+    page,
+    dialog,
+    "Abilitazione Emporio revocata.",
+  );
   await expect(
     dialog.getByRole("button").filter({ hasText: f.code }),
   ).toBeDisabled();
@@ -1013,9 +1069,7 @@ test("F3: luca is immediately selectable; empty, blocked and deep-link results a
   await expect(
     d.getByText(/Nessun beneficiario trovato nell'Area/),
   ).toBeVisible();
-  await expect(
-    d.getByRole("button", { name: "Salva", exact: true }),
-  ).toBeDisabled();
+  await expectIncompleteAccessBlocked(page, d);
   await database.query(
     "update beneficiari set credito_solidale_abilitato=false where id=$1",
     [f.beneficiary],
@@ -1023,18 +1077,18 @@ test("F3: luca is immediately selectable; empty, blocked and deep-link results a
   await input.fill("luca");
   await expect(choice).toBeDisabled();
   await expect(d.getByText(/Credito Solidale non abilitato:/)).toBeVisible();
-  await expect(
-    d.getByRole("button", { name: "Salva", exact: true }),
-  ).toBeDisabled();
+  await expectIncompleteAccessBlocked(page, d);
   await page.goto(`/emporio/accessi?beneficiarioId=${f.beneficiary}`);
   await page
     .getByRole("button", { name: "Nuovo Accesso Emporio", exact: true })
     .click();
   await expect(choice).toBeDisabled();
   await expect(d.getByText(/Credito Solidale non abilitato:/)).toBeVisible();
-  await expect(
-    d.getByRole("button", { name: "Salva", exact: true }),
-  ).toBeDisabled();
+  await expectIncompleteAccessBlocked(
+    page,
+    d,
+    /Credito Solidale non abilitato:/,
+  );
   expect(
     (
       await database.query(

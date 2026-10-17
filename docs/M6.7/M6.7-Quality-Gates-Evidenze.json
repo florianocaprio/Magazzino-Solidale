@@ -1,0 +1,663 @@
+{
+  "base": "ff86c24ac7a8847c1fbc50044c1c97c5e7418979",
+  "branch": "main",
+  "verdict": "LOCAL_PASS_GITHUB_RUN_PENDING",
+  "technicalFingerprint": {
+    "algorithm": "SHA-256(JSON.stringify(sorted [{path,sha256}])); excludes documentation to avoid self-reference",
+    "value": "c44b731f0508ea4025c44f9ff8bb0d0d67725c22ab56184d3a8171514f530d2d",
+    "files": [
+      {
+        "path": ".github/workflows/quality-gates.yml",
+        "sha256": "4e1e4776597a80dd2e23cdabb8e711a7ac9b875a93133360de10fc6e11fee5fb"
+      },
+      {
+        "path": "artifacts/api-server/tests/helpers/quality-ci-bootstrap.ts",
+        "sha256": "00813d1245560a03917729c0665c4c86a0f103b589ae7e1b7cd016eee376bf4f"
+      },
+      {
+        "path": "artifacts/api-server/tests/helpers/quality-m5b-browser-seed.ts",
+        "sha256": "152d4b1045a549c753c380da30766a1e42d1f932321c84569311ec5424484522"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/critical-workflows.spec.ts",
+        "sha256": "3632d09cb502f9cd08ed875c5b3b50833cfbba047f7db695f93b293f79b65f69"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/emporio-security-m62a.spec.ts",
+        "sha256": "d35db12013631be4f7dbf8c33367b1ea445ab34ed2ffbae70b7a3d475e63ff53"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/emporio-uat-f1.spec.ts",
+        "sha256": "69cbe8d0830f510c733a3aba82796408de001023732ae77ff17005c68a56aeb8"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/emporio-workflows.spec.ts",
+        "sha256": "7c5096e41b55cec3d95e38c86d0ef8dbadf1e5dbc092eb56fa8ea1ad9d04e9b1"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/fse-m64-d64.spec.ts",
+        "sha256": "f9b429dc9c49d8a1c5b4c4ddd0df88cc189964b74e6f01c392822693b8bdb311"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/m4b1-prenotazioni.spec.ts",
+        "sha256": "6fc6dc5630a7be65e85d05e37eb600538c24cd43a002caf0b0d9f28b1593f242"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/m5b-r2-revoca.spec.ts",
+        "sha256": "765bc0abb60ab2026d70274f2670526e054f1bf1d8f23011d4d7ed71201490c2"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/m5c1-centro-richiesta.spec.ts",
+        "sha256": "d03fcbf2d4baa6a0ccbe6b91d1b3221cecf94b2379babf6aec383748ae0b3107"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/m5c1-r2-formal.spec.ts",
+        "sha256": "4bef38da7d5b85aa364746cd252a026d1f6e7a6362a3af91e708882ea611bb99"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/m5c2a-r1-sheet-real.spec.ts",
+        "sha256": "867d190f3a12a78c18b51cb707cae37fd5fd979b79bdb24bf8446fdf48c93697"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/m67c-ux.spec.ts",
+        "sha256": "e301044986b14d7445b9adb4db348d3e7581b11d9eb3426817407e23563adec9"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/magazzino-workflows.spec.ts",
+        "sha256": "48db08852df0d10304cd595fc3d492c92b26e77d592ebe94c31ff8995b9e8a52"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/richieste-magazzino-m5b.spec.ts",
+        "sha256": "dc6ef39af3ac6590e6b045347688afcb772b14a0b6dc79cf8c4263cf86356369"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/sociale-workflows.spec.ts",
+        "sha256": "91a037672388e1e9a225ffd312879ca1c6c723db34b2f919cef7a0d35717c104"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/e2e/tablet-operational-layouts.spec.ts",
+        "sha256": "55eda5b2a42793c9553996a50327443f98a47999910d6d68829363b2e29ccc46"
+      },
+      {
+        "path": "artifacts/magazzino-solidale/playwright.ci.config.ts",
+        "sha256": "8f3526dee8d0fc176e5a411ab48ec8d7baa4143626a0ac6bce211c975dbbb733"
+      },
+      {
+        "path": "scripts/quality-gates-plan.mjs",
+        "sha256": "3c90717f19aa594e2f0c4ba73c22415ab28dfecf106ecbdbfed2c23fc962920b"
+      },
+      {
+        "path": "scripts/quality-gates-plan.test.mjs",
+        "sha256": "5b4c8f498d63eddc56d1a986cde2216f0ed1ae4489bb4381878b936c8e6f4b09"
+      },
+      {
+        "path": "scripts/quality-gates-run.mjs",
+        "sha256": "4962776295ed98eec7bc4e9aceeba6e520796aa7ce8495a6e8ca5c12100cb21a"
+      }
+    ]
+  },
+  "applicability": {
+    "unchangedApiInputs": 177,
+    "unchangedBuildInputs": 1835,
+    "buildManifestSha256": "04edc30f800bfc65f75c371a9a32b4c0bedf12aeea949f888b1c3f7d5300d99d",
+    "staticJobByteIdentical": true,
+    "noApplicationSchemaMigrationContractDependencyChanges": true
+  },
+  "api": {
+    "files": 162,
+    "totals": {
+      "pass": 2016,
+      "fail": 0,
+      "skip": 4
+    },
+    "groups": [
+      {
+        "group": "core",
+        "files": 11,
+        "pass": 76,
+        "fail": 0,
+        "skip": 0
+      },
+      {
+        "group": "reporting",
+        "files": 6,
+        "pass": 83,
+        "fail": 0,
+        "skip": 0
+      },
+      {
+        "group": "interventi",
+        "files": 2,
+        "pass": 21,
+        "fail": 0,
+        "skip": 0
+      },
+      {
+        "group": "mensa",
+        "files": 1,
+        "pass": 109,
+        "fail": 0,
+        "skip": 0
+      },
+      {
+        "group": "emporio",
+        "files": 4,
+        "pass": 230,
+        "fail": 0,
+        "skip": 0
+      },
+      {
+        "group": "maps",
+        "files": 1,
+        "pass": 18,
+        "fail": 0,
+        "skip": 0
+      },
+      {
+        "group": "general",
+        "files": 137,
+        "pass": 1479,
+        "fail": 0,
+        "skip": 4
+      }
+    ],
+    "evidence": "api-full-1"
+  },
+  "frontend": {
+    "pass": 723,
+    "fail": 0,
+    "skip": 0,
+    "evidence": "frontend.json"
+  },
+  "runner": {
+    "pass": 24,
+    "fail": 0,
+    "skip": 0,
+    "ledger": "58/58",
+    "replay": true,
+    "checksums": true
+  },
+  "launcherGuards": {
+    "pass": 26,
+    "fail": 0,
+    "skip": 0
+  },
+  "browser": {
+    "files": 46,
+    "totals": {
+      "pass": 712,
+      "fail": 0,
+      "skip": 148
+    },
+    "method": "Latest fully green execution of every disjoint spec; diagnostic failures are retained, not counted as final results; retries=0; five canonical projects",
+    "specs": [
+      {
+        "file": "carico-lotti-formal.spec.ts",
+        "sourceSha256": "cfc9d569709b513d9cfed23155b36c35f9efa6f3d7d8850075413eca851acc36",
+        "evidence": "browser-full-1/e2e-carico-lotti-formal.json",
+        "pass": 10,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "carico-merce-tabs.spec.ts",
+        "sourceSha256": "e6b34b7a38de80614cfd87c69c0d0c69bcb727933f9047a2cd2e6246082fefe1",
+        "evidence": "browser-full-1/e2e-carico-merce-tabs.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "carico-pratiche-m3a.spec.ts",
+        "sourceSha256": "f2366d9d62712ea09ba19049976bda1ce565fa6c8f12f6a2d02b74f6a0438252",
+        "evidence": "browser-full-1/e2e-carico-pratiche-m3a.json",
+        "pass": 2,
+        "fail": 0,
+        "skip": 8,
+        "flaky": 0
+      },
+      {
+        "file": "carico-ux-01.spec.ts",
+        "sourceSha256": "9d445ae7403ef7d27b0f29d2791b609a723eabf6eadcdfea6662389f8e467bed",
+        "evidence": "browser-full-1/e2e-carico-ux-01.json",
+        "pass": 3,
+        "fail": 0,
+        "skip": 2,
+        "flaky": 0
+      },
+      {
+        "file": "consegne-workflows.spec.ts",
+        "sourceSha256": "7f6233c8dfe3d1b1e0b2bab838c1a1d9a017d2eba5c6e1ae9a283512dd6bb337",
+        "evidence": "browser-full-1/e2e-consegne-workflows.json",
+        "pass": 2,
+        "fail": 0,
+        "skip": 8,
+        "flaky": 0
+      },
+      {
+        "file": "credito-automatico-f1.spec.ts",
+        "sourceSha256": "bd7ebd3037272b506471c8b6b558f89956f2047257a8c9126cae0d1032509ce1",
+        "evidence": "browser-full-1/e2e-credito-automatico-f1.json",
+        "pass": 35,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "critical-workflows.spec.ts",
+        "sourceSha256": "3632d09cb502f9cd08ed875c5b3b50833cfbba047f7db695f93b293f79b65f69",
+        "evidence": "browser-continuation-2/e2e-critical-workflows.json",
+        "pass": 8,
+        "fail": 0,
+        "skip": 2,
+        "flaky": 0
+      },
+      {
+        "file": "emporio-rettifiche-m62c.spec.ts",
+        "sourceSha256": "0fd200b984111275b32f1b1fa71ec7b6992aab2988d63effc70f8a156c539a9c",
+        "evidence": "browser-continuation-2/e2e-emporio-rettifiche-m62c.json",
+        "pass": 45,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "emporio-security-m62a.spec.ts",
+        "sourceSha256": "d35db12013631be4f7dbf8c33367b1ea445ab34ed2ffbae70b7a3d475e63ff53",
+        "evidence": "browser-continuation-3/e2e-emporio-security-m62a.json",
+        "pass": 10,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "emporio-uat-f1.spec.ts",
+        "sourceSha256": "69cbe8d0830f510c733a3aba82796408de001023732ae77ff17005c68a56aeb8",
+        "evidence": "browser-continuation-5/e2e-emporio-uat-f1.json",
+        "pass": 90,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "emporio-workflows.spec.ts",
+        "sourceSha256": "7c5096e41b55cec3d95e38c86d0ef8dbadf1e5dbc092eb56fa8ea1ad9d04e9b1",
+        "evidence": "browser-continuation-6/e2e-emporio-workflows.json",
+        "pass": 1,
+        "fail": 0,
+        "skip": 4,
+        "flaky": 0
+      },
+      {
+        "file": "fse-import-practice-m3b.spec.ts",
+        "sourceSha256": "c3f0b00e9554e80e6238ce880120b9d951736ca95eaa6d470de5ba6018f17d8a",
+        "evidence": "browser-continuation-6/e2e-fse-import-practice-m3b.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 20,
+        "flaky": 0
+      },
+      {
+        "file": "fse-m64-d64.spec.ts",
+        "sourceSha256": "f9b429dc9c49d8a1c5b4c4ddd0df88cc189964b74e6f01c392822693b8bdb311",
+        "evidence": "browser-continuation-7/e2e-fse-m64-d64.json",
+        "pass": 25,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "fse-m64.spec.ts",
+        "sourceSha256": "d476be83cd24626d020bff57eafecdcfb2687822f39a220c21288ed272532b07",
+        "evidence": "browser-continuation-7/e2e-fse-m64.json",
+        "pass": 10,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m4a-documenti-accessibilita.spec.ts",
+        "sourceSha256": "d6b9a94412ca39b1da533cdb7b7c2c0eb28ac6bf60fbf6762dbb285a114749db",
+        "evidence": "browser-continuation-7/e2e-m4a-documenti-accessibilita.json",
+        "pass": 3,
+        "fail": 0,
+        "skip": 2,
+        "flaky": 0
+      },
+      {
+        "file": "m4a-documenti-destinatari.spec.ts",
+        "sourceSha256": "8c15a1bcfe96b71a691089b5230ce9b77fbe48eb14cdc11b0fec3d533ffd5d72",
+        "evidence": "browser-continuation-7/e2e-m4a-documenti-destinatari.json",
+        "pass": 7,
+        "fail": 0,
+        "skip": 28,
+        "flaky": 0
+      },
+      {
+        "file": "m4b1-prenotazioni.spec.ts",
+        "sourceSha256": "6fc6dc5630a7be65e85d05e37eb600538c24cd43a002caf0b0d9f28b1593f242",
+        "evidence": "browser-continuation-10/e2e-m4b1-prenotazioni.json",
+        "pass": 10,
+        "fail": 0,
+        "skip": 10,
+        "flaky": 0
+      },
+      {
+        "file": "m4b2-transport-return.spec.ts",
+        "sourceSha256": "ae8f24df5893440b9d39785b497eac85dd052adac0a30de770fe3b234014e217",
+        "evidence": "browser-continuation-10/e2e-m4b2-transport-return.json",
+        "pass": 6,
+        "fail": 0,
+        "skip": 24,
+        "flaky": 0
+      },
+      {
+        "file": "m5b-r2-revoca.spec.ts",
+        "sourceSha256": "765bc0abb60ab2026d70274f2670526e054f1bf1d8f23011d4d7ed71201490c2",
+        "evidence": "browser-continuation-14/e2e-m5b-r2-revoca.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m5c1-centro-richiesta.spec.ts",
+        "sourceSha256": "d03fcbf2d4baa6a0ccbe6b91d1b3221cecf94b2379babf6aec383748ae0b3107",
+        "evidence": "browser-continuation-15/e2e-m5c1-centro-richiesta.json",
+        "pass": 20,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m5c1-r2-formal.spec.ts",
+        "sourceSha256": "4bef38da7d5b85aa364746cd252a026d1f6e7a6362a3af91e708882ea611bb99",
+        "evidence": "browser-continuation-16/e2e-m5c1-r2-formal.json",
+        "pass": 10,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m5c2a-r1-sheet-real.spec.ts",
+        "sourceSha256": "867d190f3a12a78c18b51cb707cae37fd5fd979b79bdb24bf8446fdf48c93697",
+        "evidence": "browser-continuation-16/e2e-m5c2a-r1-sheet-real.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m5c2a-r2-continuity-real.spec.ts",
+        "sourceSha256": "9c0943642cdacde0f1e360f7fc5c9b04e7fc9bfca39cd095b1f2ba26859b0020",
+        "evidence": "browser-continuation-16/e2e-m5c2a-r2-continuity-real.json",
+        "pass": 10,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m63-interventi.spec.ts",
+        "sourceSha256": "fd55aa7d03309575a4265278dd7735a011e5f2a5fc2dae669a5f24473807c4b7",
+        "evidence": "browser-continuation-16/e2e-m63-interventi.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m67-p4-final-residuals.spec.ts",
+        "sourceSha256": "a4f4a82d5a73583cfe17d43f125efd4d477f4469598813ffffb2e9af2d30c977",
+        "evidence": "browser-continuation-16/e2e-m67-p4-final-residuals.json",
+        "pass": 10,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m67-p4-mensa-context.spec.ts",
+        "sourceSha256": "03c4d2d7ed0820f48066d0b5f4fc71084c7759a39954d7a9161314a2b5e52490",
+        "evidence": "browser-continuation-16/e2e-m67-p4-mensa-context.json",
+        "pass": 15,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m67-p4-residuals.spec.ts",
+        "sourceSha256": "ed40ca32b9bdd88f032675e2754ff58a1144cb67f500d038e2635dcdbc4c337a",
+        "evidence": "browser-continuation-16/e2e-m67-p4-residuals.json",
+        "pass": 15,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m67-p4-social-chain.spec.ts",
+        "sourceSha256": "941be7669f221d7bee5d341d6c0e12e34d643fa8bbf668b606c56d91c5b5c80c",
+        "evidence": "browser-continuation-16/e2e-m67-p4-social-chain.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m67-p4-uds-session.spec.ts",
+        "sourceSha256": "458c1b7de8ca7a2425953322e421a13d9cafd10802dbdf883d129f2dbd03d60c",
+        "evidence": "browser-continuation-16/e2e-m67-p4-uds-session.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m67-review-supply.spec.ts",
+        "sourceSha256": "272fb9e24180024d9b2a2ae8b432f995551a97a99526f3e8aa4d473811175f62",
+        "evidence": "browser-continuation-16/e2e-m67-review-supply.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m67a-access.spec.ts",
+        "sourceSha256": "7aad0f0aa11143bdf21d3942d4d147dec41a7060e2f98ba61a3ff7a81ef8217a",
+        "evidence": "browser-continuation-16/e2e-m67a-access.json",
+        "pass": 30,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m67b-paths.spec.ts",
+        "sourceSha256": "4106f6d533ceb2e2f737579ab96a2edd6df18bb694a513f9a473c98d38f830b4",
+        "evidence": "browser-continuation-16/e2e-m67b-paths.json",
+        "pass": 10,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m67c-ux.spec.ts",
+        "sourceSha256": "e301044986b14d7445b9adb4db348d3e7581b11d9eb3426817407e23563adec9",
+        "evidence": "browser-continuation-17/e2e-m67c-ux.json",
+        "pass": 175,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "m67d-integrated.spec.ts",
+        "sourceSha256": "58d1456faf9203dbdb98dd19a53539c7fc0f03b1bb9ded82fdf8dee2399538ee",
+        "evidence": "browser-continuation-17/e2e-m67d-integrated.json",
+        "pass": 20,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "magazzino-workflows.spec.ts",
+        "sourceSha256": "48db08852df0d10304cd595fc3d492c92b26e77d592ebe94c31ff8995b9e8a52",
+        "evidence": "browser-continuation-18/e2e-magazzino-workflows.json",
+        "pass": 4,
+        "fail": 0,
+        "skip": 16,
+        "flaky": 0
+      },
+      {
+        "file": "maps-operational.spec.ts",
+        "sourceSha256": "f0b0dd933f7bc0deeebc94b4ad7758bfb8dc7e37635960e6f9c7f846774fd378",
+        "evidence": "browser-continuation-18/e2e-maps-operational.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "mensa-magazzino-correttivo.spec.ts",
+        "sourceSha256": "483c28a16ae454be7d4f7af1310c41c12c4dbd9843d44fb1268a4febb7ca21b5",
+        "evidence": "browser-continuation-18/e2e-mensa-magazzino-correttivo.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "mensa-workflows.spec.ts",
+        "sourceSha256": "de7ece564e18bbc0e0286a0a8f1be920e8708e6dec2868a47bb6c8df73d91d77",
+        "evidence": "browser-continuation-18/e2e-mensa-workflows.json",
+        "pass": 8,
+        "fail": 0,
+        "skip": 12,
+        "flaky": 0
+      },
+      {
+        "file": "reporting-m66.spec.ts",
+        "sourceSha256": "c1fb2cad579881b54f6188479beb2764981400130ee6388954238816a262ca58",
+        "evidence": "browser-continuation-18/e2e-reporting-m66.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "reporting-review.spec.ts",
+        "sourceSha256": "4de2286e4e55dc090b3c858387710652ffe8b5e8d2d5344e033387ac58a5a696",
+        "evidence": "browser-continuation-18/e2e-reporting-review.json",
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "richieste-magazzino-m5a.spec.ts",
+        "sourceSha256": "952ac4c44e11ec4c345ba3d6667f0eeebf29f1d66d7e8f556a22621ce4ef0fad",
+        "evidence": "browser-continuation-18/e2e-richieste-magazzino-m5a.json",
+        "pass": 10,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "richieste-magazzino-m5b.spec.ts",
+        "sourceSha256": "dc6ef39af3ac6590e6b045347688afcb772b14a0b6dc79cf8c4263cf86356369",
+        "evidence": "browser-continuation-19/e2e-richieste-magazzino-m5b.json",
+        "pass": 20,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "sociale-workflows.spec.ts",
+        "sourceSha256": "91a037672388e1e9a225ffd312879ca1c6c723db34b2f919cef7a0d35717c104",
+        "evidence": "browser-continuation-20/e2e-sociale-workflows.json",
+        "pass": 1,
+        "fail": 0,
+        "skip": 4,
+        "flaky": 0
+      },
+      {
+        "file": "tablet-operational-layouts.spec.ts",
+        "sourceSha256": "55eda5b2a42793c9553996a50327443f98a47999910d6d68829363b2e29ccc46",
+        "evidence": "browser-continuation-21/e2e-tablet-operational-layouts.json",
+        "pass": 10,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      },
+      {
+        "file": "uds-workflows.spec.ts",
+        "sourceSha256": "95db6363446af3600e792ec5e4904a7b8b44e40398416d87222d48dadda39d2c",
+        "evidence": "browser-continuation-21/e2e-uds-workflows.json",
+        "pass": 2,
+        "fail": 0,
+        "skip": 8,
+        "flaky": 0
+      },
+      {
+        "file": "volontari-workflows.spec.ts",
+        "sourceSha256": "4a81df0031fa303ff0f28f597db12c049e6ce8ce936a302cfa1234c3e4a5f2e8",
+        "evidence": "browser-continuation-21/e2e-volontari-workflows.json",
+        "pass": 15,
+        "fail": 0,
+        "skip": 0,
+        "flaky": 0
+      }
+    ]
+  },
+  "fseF26": {
+    "ci": "25 PASS across complete D64 spec; 250 distinct synthetic product observations; source FSE_M3B and pagination assertions preserved",
+    "originalAcceptance": "NOT EXECUTED in this CI campaign; requires FSE_REGISTRY_ORIGINAL_PATH"
+  },
+  "exclusions": [
+    {
+      "path": "docs/M6.2-A-Rilascio-Ufficiale-20261009.md",
+      "sha256": "ce9a35b7743dcfab0086671a14dcb93656cb57d89c4fdb80d4ba20243848e08f",
+      "preserved": true
+    },
+    {
+      "path": "docs/M6.2-C-Pubblicazione-Preview.md",
+      "sha256": "4047c5efd4acad1bebd5a670a369e3389e6c473bd352a71dfb20bf74a8a1816b",
+      "preserved": true
+    },
+    {
+      "path": "docs/M6.6-BC-Rilascio-Ufficiale-Chiusura.md",
+      "sha256": "c9a920d6ca3a283b0f285d9790fee37f7bb1c658934e830a9caf82e00b39d640",
+      "preserved": true
+    },
+    {
+      "path": "docs/M6.7/M6.7-Merge-Finale.md",
+      "sha256": "6d347936e1f1c0c628b00738f921884a5006c99f58a4afa96c3242aad5afba79",
+      "preserved": true
+    }
+  ],
+  "inventory": [
+    ".github/workflows/quality-gates.yml",
+    "artifacts/api-server/tests/helpers/quality-ci-bootstrap.ts",
+    "artifacts/api-server/tests/helpers/quality-m5b-browser-seed.ts",
+    "artifacts/magazzino-solidale/e2e/critical-workflows.spec.ts",
+    "artifacts/magazzino-solidale/e2e/emporio-security-m62a.spec.ts",
+    "artifacts/magazzino-solidale/e2e/emporio-uat-f1.spec.ts",
+    "artifacts/magazzino-solidale/e2e/emporio-workflows.spec.ts",
+    "artifacts/magazzino-solidale/e2e/fse-m64-d64.spec.ts",
+    "artifacts/magazzino-solidale/e2e/m4b1-prenotazioni.spec.ts",
+    "artifacts/magazzino-solidale/e2e/m5b-r2-revoca.spec.ts",
+    "artifacts/magazzino-solidale/e2e/m5c1-centro-richiesta.spec.ts",
+    "artifacts/magazzino-solidale/e2e/m5c1-r2-formal.spec.ts",
+    "artifacts/magazzino-solidale/e2e/m5c2a-r1-sheet-real.spec.ts",
+    "artifacts/magazzino-solidale/e2e/m67c-ux.spec.ts",
+    "artifacts/magazzino-solidale/e2e/magazzino-workflows.spec.ts",
+    "artifacts/magazzino-solidale/e2e/richieste-magazzino-m5b.spec.ts",
+    "artifacts/magazzino-solidale/e2e/sociale-workflows.spec.ts",
+    "artifacts/magazzino-solidale/e2e/tablet-operational-layouts.spec.ts",
+    "artifacts/magazzino-solidale/playwright.ci.config.ts",
+    "docs/M6.7/M6.7-Quality-Gates-Diagnosi.json",
+    "docs/M6.7/M6.7-Quality-Gates-Evidenze.json",
+    "docs/M6.7/M6.7-Quality-Gates-Fix.md",
+    "scripts/quality-gates-plan.mjs",
+    "scripts/quality-gates-plan.test.mjs",
+    "scripts/quality-gates-run.mjs"
+  ]
+}

@@ -77,60 +77,120 @@ test.describe("workflow Magazzino reali", () => {
   }) => {
     const suffix = Date.now();
     const lotCode = `LOT-E2E-CARICO-${suffix}`;
-    await page.goto("/lotti");
-    await page.getByRole("button", { name: /nuovo carico/i }).click();
-    const sheet = page.getByRole("dialog", {
-      name: /nuovo carico multi-riga/i,
+    const warehouses = await page.request.get("/api/magazzini");
+    expect(warehouses.status()).toBe(200);
+    const warehouse = (await warehouses.json()).find(
+      (w: { nome: string }) => w.nome === "Magazzino Demo Principale",
+    );
+    const areas = await page.request.get("/api/aree-operative");
+    expect(areas.status()).toBe(200);
+    const area = (await areas.json()).find(
+      (a: { id: number }) => a.id === warehouse.areaOperativaId,
+    );
+    const createdProduct = await page.request.post("/api/prodotti", {
+      data: {
+        nome: `Carico con tracciabilità ${suffix}`,
+        tipoProdotto: "alimentare",
+        unitaMisura: "pz",
+        quantitaFrazionabile: false,
+        lottoFisicoObbligatorio: true,
+        gestioneScadenza: true,
+      },
     });
-    await expect(sheet).toBeVisible();
-
-    await page.getByLabel("Descrizione carico").fill("draft E2E da preservare");
-    await sheet.getByRole("button", { name: /annulla/i }).click();
+    expect(createdProduct.status()).toBe(201);
+    const product = await createdProduct.json();
+    await page.goto("/carico-merce");
+    await page
+      .getByRole("button", { name: "Nuova pratica", exact: true })
+      .click();
+    await page
+      .getByLabel("Descrizione", { exact: true })
+      .fill("draft E2E da preservare");
+    await page
+      .getByRole("button", { name: "Torna all'elenco", exact: true })
+      .click();
     await expect(
       page.getByRole("alertdialog", { name: /modifiche non salvate/i }),
     ).toBeVisible();
     await page.getByRole("button", { name: /resta e continua/i }).click();
-    await expect(page.getByLabel("Descrizione carico")).toHaveValue(
+    await expect(page.getByLabel("Descrizione", { exact: true })).toHaveValue(
       "draft E2E da preservare",
     );
-    await page.getByLabel("Descrizione carico").fill(`Carico E2E ${suffix}`);
+    await page
+      .getByLabel("Descrizione", { exact: true })
+      .fill(`Carico E2E ${suffix}`);
 
     await selectOption(
       page,
-      page.getByRole("combobox", { name: "Magazzino carico" }),
+      page.getByRole("combobox", { name: "Area Operativa", exact: true }),
+      area.nome,
+    );
+    await selectOption(
+      page,
+      page.getByRole("combobox", {
+        name: "Magazzino destinazione",
+        exact: true,
+      }),
       "Magazzino Demo Principale",
     );
-    await selectOption(
-      page,
-      page.getByRole("combobox", { name: "Prodotto riga 1" }),
-      /Pasta Demo 500g/,
-    );
-    await page.getByLabel("Quantità operativa riga 1").fill("0");
-    await sheet.getByRole("button", { name: /conferma carico/i }).click();
-    await expect(sheet.getByRole("alert")).toContainText(/quantità positiva/i);
+    await page
+      .getByRole("button", { name: "Salva bozza", exact: true })
+      .click();
+    await page.getByLabel("Cerca per nome o codice").fill(product.codice);
+    await page
+      .getByRole("button", { name: new RegExp(product.codice) })
+      .click();
+    const row = page
+      .locator('[data-testid^="carico-row-"]')
+      .filter({ hasText: product.nome });
+    const register = page.getByRole("button", {
+      name: "Conferma carico a magazzino",
+      exact: true,
+    });
+    await row.getByLabel(/Quantità/).fill("0");
+    await row.getByRole("button", { name: "Salva bozza", exact: true }).click();
+    await expect(
+      row.getByText("La quantità deve essere maggiore di zero.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(register).toBeDisabled();
 
-    await page.getByLabel("Quantità operativa riga 1").fill("3");
-    await sheet.getByRole("button", { name: /conferma carico/i }).click();
-    await expect(sheet.getByRole("alert")).toContainText(
-      /codice lotto obbligatorio/i,
-    );
-    await expect(sheet.getByRole("alert")).toContainText(
-      /scadenza obbligatoria/i,
-    );
+    await row.getByLabel(/Quantità/).fill("3");
+    await row.getByRole("button", { name: "Salva bozza", exact: true }).click();
+    await expect(
+      row.getByText("Per questo prodotto è obbligatorio il codice lotto.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      row.getByText("Inserisci la scadenza.", { exact: true }),
+    ).toBeVisible();
+    await expect(register).toBeDisabled();
 
-    await page.getByLabel("Codice lotto riga 1").fill(lotCode);
-    await page.getByLabel("Scadenza riga 1").fill("2028-12-31");
+    await row
+      .getByRole("textbox", { name: "Codice lotto produttore", exact: true })
+      .fill(lotCode);
+    await row
+      .getByLabel("Scadenza effettiva")
+      .fill(`${new Date().getUTCFullYear() + 2}-12-31`);
+    await row.getByRole("button", { name: "Salva bozza", exact: true }).click();
+    await expect(row.getByRole("checkbox")).toBeChecked();
+    await register.click();
     const createResponse = page.waitForResponse(
       (response) =>
-        response.url().endsWith("/api/carichi") &&
+        /\/api\/carico-pratiche\/\d+\/registra$/.test(response.url()) &&
         response.request().method() === "POST",
     );
-    await sheet.getByRole("button", { name: /conferma carico/i }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Conferma carico", exact: true })
+      .click();
     expect((await createResponse).status()).toBe(201);
     await expect(
-      page.getByText("Carico contabilizzato", { exact: true }),
+      page.getByText("Carico registrato a magazzino", { exact: true }),
     ).toBeVisible();
-    await expect(sheet).toBeHidden();
+    await expect(page.getByRole("alertdialog")).toBeHidden();
 
     const lottiResponse = await page.request.get("/api/lotti");
     expect(lottiResponse.ok()).toBe(true);
