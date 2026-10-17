@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const password = process.env.E2E_PASSWORD;
 const planningYear = new Date().getUTCFullYear() + 1;
@@ -18,6 +18,51 @@ async function login(page: Page, username: string) {
     areaOperativaId: number;
     centroAscoltoId: number;
   }>;
+}
+
+async function selectSocialBeneficiary(page: Page, form: Locator) {
+  // The Sheet and its portal both animate. Wait for their observed completion,
+  // and for the real typeahead response, rather than clicking a moving initial
+  // option which can be replaced while Playwright checks its stability.
+  await form.evaluate(async (element) => {
+    await Promise.all(
+      element.getAnimations().map((animation) => animation.finished),
+    );
+  });
+  const picker = form.getByRole("combobox", {
+    name: "Beneficiario",
+    exact: true,
+  });
+  await picker.click();
+  const search = page.getByPlaceholder("Cerca per nome o codice...", {
+    exact: true,
+  });
+  await expect(search).toBeFocused();
+  const matchingResponse = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      url.pathname === "/api/beneficiari" &&
+      url.searchParams.get("search") === "M5C1-E2E-B1" &&
+      response.request().method() === "GET"
+    );
+  });
+  await search.fill("M5C1-E2E-B1");
+  const response = await matchingResponse;
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ codice: "M5C1-E2E-B1" }),
+    ]),
+  );
+  const popover = page.getByRole("dialog").filter({ has: search });
+  await popover.evaluate(async (element) => {
+    await Promise.all(
+      element.getAnimations().map((animation) => animation.finished),
+    );
+  });
+  await popover.getByRole("option", { name: /M5C1-E2E-B1/ }).click();
+  await expect(picker).toHaveAttribute("aria-expanded", "false");
+  await expect(picker).toContainText("Sintetica Ada");
 }
 
 test("M5C1 Centro: Intervento pianificato, prefill, invio esplicito, nessuna Bolla", async ({
@@ -184,8 +229,7 @@ test("M5C1-R1: creazione da vista Annullati, dettaglio e pianificazione continui
     .click();
   const form = page.getByRole("dialog", { name: /Intervento da pianificare/i });
   await expect(form).toBeVisible();
-  await form.getByRole("combobox", { name: "Beneficiario" }).click();
-  await page.getByRole("option", { name: /M5C1-E2E-B1/ }).click();
+  await selectSocialBeneficiary(page, form);
   const createdResponse = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/interventi") &&
@@ -398,8 +442,7 @@ test("M5C1-R1: creazione direttamente pianificata da vista incompatibile", async
     .click();
   const form = page.getByRole("dialog", { name: /Intervento pianificato/i });
   await expect(form).toBeVisible();
-  await form.getByRole("combobox", { name: "Beneficiario" }).click();
-  await page.getByRole("option", { name: /M5C1-E2E-B1/ }).click();
+  await selectSocialBeneficiary(page, form);
   await form.getByLabel("Data pianificata").fill("");
   await form.getByLabel("Ora pianificata").fill("");
   await form.getByRole("button", { name: "Salva" }).click();
