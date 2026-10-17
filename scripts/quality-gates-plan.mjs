@@ -18,6 +18,9 @@ export const apiTargets = {
   mensa: target(58461, "m61_final"),
   emporio: target(58621, "m62a", ["M62A", "M62A_F1", "M62B", "M62C"]),
   maps: target(59671, "m67_final_maps"),
+  // Keep the 5,000-movement snapshot workload independent of planner/table
+  // statistics and dead tuples left by the general API fixture lifecycle.
+  fse: target(59673, "quality_fse_snapshot"),
   general: target(58621, "m5c2a_r2_final", [
     "M5A_TEST",
     "M5B_TEST",
@@ -29,6 +32,7 @@ export const apiTargets = {
 };
 
 export function apiGroup(filename) {
+  if (filename === "fse-r2-acceptance.test.ts") return "fse";
   if (filename.startsWith("m67")) return "core";
   if (filename.startsWith("reporting-m66-")) return "reporting";
   if (filename.startsWith("m63-")) return "interventi";
@@ -85,6 +89,13 @@ export function browserTarget(filename) {
       seed: "m5b",
     });
   return target(58621, "m62c_r2_m4", [], { demo: true });
+}
+
+export function partitionBrowser(files, index, count) {
+  assert.ok(Number.isInteger(count) && count > 0 && count <= files.length);
+  assert.ok(Number.isInteger(index) && index >= 0 && index < count);
+  assert.equal(new Set(files).size, files.length);
+  return files.filter((_, position) => position % count === index);
 }
 
 function discover(directory, suffix) {

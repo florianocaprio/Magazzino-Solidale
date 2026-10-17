@@ -21,6 +21,7 @@ import {
   browserTarget,
   assertDisposableIdentity,
   assertLocalDockerEndpoint,
+  partitionBrowser,
 } from "./quality-gates-plan.mjs";
 import { withExclusiveTestEnvironment } from "./m63-test-guards.mjs";
 
@@ -35,7 +36,17 @@ assert.ok(
   ["plan", "api", "browser"].includes(mode),
   "Use plan, api or browser",
 );
-const only = process.argv.slice(3);
+let only = process.argv.slice(3);
+let partition;
+if (mode === "browser" && only.some((arg) => arg.startsWith("--partition"))) {
+  assert.equal(only.length, 1, "Partition cannot be mixed with spec filters");
+  const match = /^--partition=(\d+)\/(\d+)$/.exec(only[0]);
+  assert.ok(match, "Use --partition=index/count (zero-based index)");
+  partition = { index: Number(match[1]), count: Number(match[2]) };
+  only = partitionBrowser(plan.browser, partition.index, partition.count).map(
+    (file) => path.basename(file),
+  );
+}
 const inventory = {
   api: Object.fromEntries(
     Object.entries(plan.groups).map(([g, fs]) => [
@@ -69,6 +80,14 @@ mkdirSync(output, { recursive: true, mode: 0o700 });
 writeFileSync(
   path.join(output, "inventory.json"),
   JSON.stringify(inventory, null, 2),
+);
+writeFileSync(
+  path.join(output, "selection.json"),
+  JSON.stringify(
+    { mode, partition, selected: only, full: !only.length },
+    null,
+    2,
+  ),
 );
 const redactions = [];
 const redact = (text) =>
@@ -526,5 +545,5 @@ await withExclusiveTestEnvironment(
   },
 );
 console.log(
-  `${mode}: complete ${only.length ? "TARGETED" : "FULL"} campaign PASS; evidence: ${output}`,
+  `${mode}: complete ${partition ? `PARTITION ${partition.index + 1}/${partition.count}` : only.length ? "TARGETED" : "FULL"} campaign PASS; evidence: ${output}`,
 );

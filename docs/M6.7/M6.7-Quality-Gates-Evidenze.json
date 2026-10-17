@@ -4,11 +4,11 @@
   "verdict": "LOCAL_PASS_GITHUB_RUN_PENDING",
   "technicalFingerprint": {
     "algorithm": "SHA-256(JSON.stringify(sorted [{path,sha256}])); excludes documentation to avoid self-reference",
-    "value": "1b70162238c9ef96773605f9f688eea20ff83fba155a79976ae5398a561c3d92",
+    "value": "7d0121c13f70eb28970d0c3f8f6fbabcaf4d43313286f11b2f9710d349aebf69",
     "files": [
       {
         "path": ".github/workflows/quality-gates.yml",
-        "sha256": "4e1e4776597a80dd2e23cdabb8e711a7ac9b875a93133360de10fc6e11fee5fb"
+        "sha256": "fd450b553050cd553aed5b710666f8b5016b5f6823e9a38ba203f245ab90a9f7"
       },
       {
         "path": "artifacts/api-server/tests/helpers/quality-ci-bootstrap.ts",
@@ -84,15 +84,15 @@
       },
       {
         "path": "scripts/quality-gates-plan.mjs",
-        "sha256": "3c90717f19aa594e2f0c4ba73c22415ab28dfecf106ecbdbfed2c23fc962920b"
+        "sha256": "5906c724aaaff1d13eca2a12fc133cafa1e3e4ee5760f51c7d67d994f41285a7"
       },
       {
         "path": "scripts/quality-gates-plan.test.mjs",
-        "sha256": "5b4c8f498d63eddc56d1a986cde2216f0ed1ae4489bb4381878b936c8e6f4b09"
+        "sha256": "30b374aee6c8971597065b878441931679ce42a61452196b04b2273120a64f09"
       },
       {
         "path": "scripts/quality-gates-run.mjs",
-        "sha256": "4962776295ed98eec7bc4e9aceeba6e520796aa7ce8495a6e8ca5c12100cb21a"
+        "sha256": "d62804e2b050df1cd4ca3b054c02d32e8eb87865a920caab6532b34c77b67b68"
       }
     ]
   },
@@ -154,14 +154,21 @@
         "skip": 0
       },
       {
+        "group": "fse",
+        "files": 1,
+        "pass": 2,
+        "fail": 0,
+        "skip": 0
+      },
+      {
         "group": "general",
-        "files": 137,
-        "pass": 1479,
+        "files": 136,
+        "pass": 1477,
         "fail": 0,
         "skip": 4
       }
     ],
-    "evidence": "api-full-1"
+    "evidence": "api-full-4"
   },
   "frontend": {
     "pass": 723,
@@ -178,7 +185,7 @@
     "checksums": true
   },
   "launcherGuards": {
-    "pass": 26,
+    "pass": 29,
     "fail": 0,
     "skip": 0
   },
@@ -605,6 +612,74 @@
         "skip": 0,
         "flaky": 0
       }
+    ],
+    "ciPartitions": [
+      {
+        "index": 0,
+        "files": [
+          "carico-lotti-formal.spec.ts",
+          "consegne-workflows.spec.ts",
+          "emporio-security-m62a.spec.ts",
+          "fse-m64-d64.spec.ts",
+          "m4b1-prenotazioni.spec.ts",
+          "m5c1-r2-formal.spec.ts",
+          "m67-p4-final-residuals.spec.ts",
+          "m67-p4-uds-session.spec.ts",
+          "m67c-ux.spec.ts",
+          "mensa-magazzino-correttivo.spec.ts",
+          "richieste-magazzino-m5a.spec.ts",
+          "uds-workflows.spec.ts"
+        ]
+      },
+      {
+        "index": 1,
+        "files": [
+          "carico-merce-tabs.spec.ts",
+          "credito-automatico-f1.spec.ts",
+          "emporio-uat-f1.spec.ts",
+          "fse-m64.spec.ts",
+          "m4b2-transport-return.spec.ts",
+          "m5c2a-r1-sheet-real.spec.ts",
+          "m67-p4-mensa-context.spec.ts",
+          "m67-review-supply.spec.ts",
+          "m67d-integrated.spec.ts",
+          "mensa-workflows.spec.ts",
+          "richieste-magazzino-m5b.spec.ts",
+          "volontari-workflows.spec.ts"
+        ]
+      },
+      {
+        "index": 2,
+        "files": [
+          "carico-pratiche-m3a.spec.ts",
+          "critical-workflows.spec.ts",
+          "emporio-workflows.spec.ts",
+          "m4a-documenti-accessibilita.spec.ts",
+          "m5b-r2-revoca.spec.ts",
+          "m5c2a-r2-continuity-real.spec.ts",
+          "m67-p4-residuals.spec.ts",
+          "m67a-access.spec.ts",
+          "magazzino-workflows.spec.ts",
+          "reporting-m66.spec.ts",
+          "sociale-workflows.spec.ts"
+        ]
+      },
+      {
+        "index": 3,
+        "files": [
+          "carico-ux-01.spec.ts",
+          "emporio-rettifiche-m62c.spec.ts",
+          "fse-import-practice-m3b.spec.ts",
+          "m4a-documenti-destinatari.spec.ts",
+          "m5c1-centro-richiesta.spec.ts",
+          "m63-interventi.spec.ts",
+          "m67-p4-social-chain.spec.ts",
+          "m67b-paths.spec.ts",
+          "maps-operational.spec.ts",
+          "reporting-review.spec.ts",
+          "tablet-operational-layouts.spec.ts"
+        ]
+      }
     ]
   },
   "fseF26": {
@@ -660,7 +735,7 @@
     "scripts/quality-gates-plan.test.mjs",
     "scripts/quality-gates-run.mjs"
   ],
-  "previousCommit": "f52ce42975f731bff3343f7f48b6ad9f2d84f7b7",
+  "previousCommit": "95d1bb69df7771f734132bbbd2820146684d58bc",
   "githubRuns": [
     {
       "run": 39058888700,
@@ -671,7 +746,18 @@
         "static": "SUCCESS",
         "browser": "FAIL"
       },
-      "cause": "Emporio strict selector matched persistent main cashier state and notification; test-only semantic scoping, complete spec rerun 10 PASS, no retries."
+      "cause": "Emporio ambiguous state/toast selector; semantically scoped to main; complete affected spec 10 PASS."
+    },
+    {
+      "run": 39060352578,
+      "commit": "95d1bb69df7771f734132bbbd2820146684d58bc",
+      "status": "IN_PROGRESS_WITH_API_FAILURE",
+      "jobs": {
+        "api": "FAIL",
+        "static": "SUCCESS",
+        "browser": "IN_PROGRESS"
+      },
+      "cause": "Unchanged 5,000-movement FSE acceptance exceeded unchanged 60s limit; first run passed in44.3s. Workload moved unchanged to own fresh DB; FULL eight-group local API campaign PASS. No timeout increase or application change."
     }
   ]
 }

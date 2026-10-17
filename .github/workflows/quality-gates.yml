@@ -65,6 +65,11 @@ jobs:
 
   browser-critical-paths:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        partition: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -79,12 +84,12 @@ jobs:
       # Historical document tests require this private temporary output prefix.
       # It exists on macOS; prepare the equivalent ephemeral path on this runner.
       - run: sudo install -d -m 0700 -o "$(id -un)" /private/tmp
-      - run: node scripts/quality-gates-run.mjs browser
+      - run: node scripts/quality-gates-run.mjs browser --partition=${{ matrix.partition }}/4
       - run: git diff --check
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: browser-quality-gates
+          name: browser-quality-gates-${{ matrix.partition }}
           # Do not publish browser traces, screenshots, synthetic uploads or
           # credentials captured while filling the temporary login forms.
           path: |

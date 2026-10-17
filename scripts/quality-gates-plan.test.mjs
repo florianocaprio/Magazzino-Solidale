@@ -5,8 +5,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   testPlan,
+  apiGroup,
   apiTargets,
   browserTarget,
+  partitionBrowser,
   assertDisposableIdentity,
   assertLocalDockerEndpoint,
 } from "./quality-gates-plan.mjs";
@@ -29,6 +31,8 @@ test("every API and browser file has one environment and its direct guards are a
     plan.api.length,
   );
   assert.equal(new Set(plan.browser).size, plan.browser.length);
+  for (const group of Object.keys(apiTargets))
+    assert.match(group, /^[a-z0-9-]+$/, "Group must be a safe container label");
   assert.deepEqual(apiTargets.core, {
     port: 59671,
     database: "m67a_dev",
@@ -37,6 +41,43 @@ test("every API and browser file has one environment and its direct guards are a
   assert.equal(browserTarget("m5c1-r2-formal.spec.ts").database, "m5c1_r2_e2e");
   assert.equal(browserTarget("mensa-workflows.spec.ts").port, 58461);
   assert.equal(browserTarget("fse-m64-d64.spec.ts").port, 58641);
+});
+
+test("FSE snapshot acceptance keeps its full workload on a separate fresh database", () => {
+  const plan = testPlan();
+  assert.equal(apiGroup("fse-r2-acceptance.test.ts"), "fse");
+  assert.equal(plan.groups.fse.length, 1);
+  assert.equal(path.basename(plan.groups.fse[0]), "fse-r2-acceptance.test.ts");
+  assert.ok(
+    !plan.groups.general.some((f) => f.endsWith("/fse-r2-acceptance.test.ts")),
+  );
+  assert.deepEqual(apiTargets.fse, {
+    port: 59673,
+    database: "quality_fse_snapshot",
+    flags: [],
+  });
+});
+
+test("the four CI browser partitions cover every spec exactly once", () => {
+  const files = testPlan().browser;
+  const partitions = Array.from({ length: 4 }, (_, i) =>
+    partitionBrowser(files, i, 4),
+  );
+  assert.ok(partitions.every((files) => files.length > 0));
+  assert.equal(new Set(partitions.flat()).size, files.length);
+  assert.deepEqual(partitions.flat().sort(), [...files].sort());
+});
+
+test("invalid or duplicate browser partition inputs fail instead of dropping tests", () => {
+  for (const [files, index, count] of [
+    [[], 0, 4],
+    [["a", "b"], -1, 2],
+    [["a", "b"], 2, 2],
+    [["a", "b"], 0, 0],
+    [["a", "b"], 0, 3],
+    [["a", "a"], 0, 2],
+  ])
+    assert.throws(() => partitionBrowser(files, index, count));
 });
 
 test("a new unassigned disposable guard fails inventory instead of silently skipping or attesting it", () => {
