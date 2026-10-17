@@ -54,7 +54,7 @@ afterAll(async () => {
   await pool.end();
 });
 
-it("V67-02 characterizes independent Maps grant after same-session Consegne revocation (not policy approval)", async () => {
+it("V67-02 approved policy: Maps inherits Consegne permission and same-session revocation", async () => {
   const centre = await createCentroRec(scope, { areaOperativaId: f.area });
   const person = await createBeneficiario(scope, centre.id, {
     areaOperativaId: f.area,
@@ -84,7 +84,7 @@ it("V67-02 characterizes independent Maps grant after same-session Consegne revo
       lastAttemptAt: new Date(),
       updatedAt: new Date(),
     });
-  async function observe() {
+  async function observe(allowed: boolean) {
     const capability = await actor.get("/api/maps/capabilities");
     const layer = await actor.get(
       "/api/maps/layers/pacchi/consegne?da=2026-10-16&a=2026-10-16",
@@ -96,18 +96,35 @@ it("V67-02 characterizes independent Maps grant after same-session Consegne revo
       capability.body.layers.some(
         (l: { code: string }) => l.code === "pacchi.consegne",
       ),
-    ).toBe(true);
-    expect(layer.status, layer.text).toBe(200);
-    expect(JSON.stringify(layer.body)).toContain(String(id));
-    expect(route.status, route.text).toBe(200);
+    ).toBe(allowed);
+    expect(layer.status, layer.text).toBe(allowed ? 200 : 403);
+    expect(route.status, route.text).toBe(allowed ? 200 : 403);
+    if (allowed)
+      expect(
+        layer.body.some((row: { entityId: number }) => row.entityId === id),
+      ).toBe(true);
+    else {
+      expect(JSON.stringify(layer.body)).not.toContain(destination);
+      expect(JSON.stringify(route.body)).not.toContain(destination);
+    }
     return detail.status;
   }
-  expect(await observe()).toBe(200);
+  expect(await observe(true)).toBe(200);
   await pool.query("update ruoli set permessi=$1 where id=$2", [
     JSON.stringify(["maps.operational", "maps.route", "magazzino.view"]),
     f.users.requester.roleId,
   ]);
-  expect(await observe()).toBe(403);
+  expect(await observe(false)).toBe(403);
+  await pool.query("update ruoli set permessi=$1 where id=$2", [
+    JSON.stringify([
+      "maps.operational",
+      "maps.route",
+      "magazzino.view",
+      "consegne.view",
+    ]),
+    f.users.requester.roleId,
+  ]);
+  expect(await observe(true)).toBe(200);
 });
 
 it("V67-03 characterizes offset export drift under an actual intervening writer, then same-session revocation", async () => {
@@ -169,7 +186,7 @@ it("V67-03 characterizes offset export drift under an actual intervening writer,
   ).toBe(403);
 });
 
-it("D67-01 controlled Rome day 1/day 2: no new late run, existing run resumes idempotently", async () => {
+it("D67-01 approved Rome calendar: late current-month run is created once", async () => {
   const year = 2100 + f.area;
   const period = `${year}-02`;
   const first = new Date(`${year}-01-31T23:05:00Z`),
@@ -190,7 +207,7 @@ it("D67-01 controlled Rome day 1/day 2: no new late run, existing run resumes id
         [period],
       )
     ).rows,
-  ).toHaveLength(0);
+  ).toHaveLength(1);
   await preparaRicaricaMensile(first);
   await eseguiRicaricaMensile(second);
   const before = (

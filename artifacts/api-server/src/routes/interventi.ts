@@ -88,7 +88,10 @@ import {
   creaScaricoInventariale,
   InventoryError,
 } from "../lib/scaricoInventory";
-import { canAccessUdsInterventoTerritory } from "../lib/udsInterventoPolicy";
+import {
+  canAccessUdsInterventoTerritory,
+  requireCurrentUdsScope,
+} from "../lib/udsInterventoPolicy";
 import {
   BeneficiaryReportingScopeError,
   isReportingSnapshotConcurrencyError,
@@ -122,6 +125,7 @@ import {
 const router: IRouter = Router();
 
 router.use("/interventi", requireAnyModulo(["CENTRO_ASCOLTO", "UDS"]));
+router.use("/interventi", requireCurrentUdsScope);
 
 const socialActors = new WeakMap<Request, SocialActor>();
 router.use("/interventi", async (req, _res, next) => {

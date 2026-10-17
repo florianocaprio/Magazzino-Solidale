@@ -1311,7 +1311,7 @@ router.get(
   "/credito-solidale/ricariche-mensili/stato",
   requirePermission("credito.view"),
   async (req, res) => {
-    const { periodo, primoDelMese } = calendarioCredito(new Date());
+    const { periodo } = calendarioCredito(new Date());
     const [job] = await db
       .select()
       .from(creditoRicaricheMensiliTable)
@@ -1350,7 +1350,8 @@ router.get(
       );
     res.json({
       periodo,
-      calendario: "Primo del mese — Europe/Rome",
+      calendario:
+        "Primo del mese — Europe/Rome; recupero automatico della sola mensilità corrente",
       stato: job
         ? job.completataAt
           ? "completata"
@@ -1358,7 +1359,8 @@ router.get(
         : "non_avviata",
       avviataAt: job?.avviataAt?.toISOString() ?? null,
       completataAt: job?.completataAt?.toISOString() ?? null,
-      recuperoDaDecidere: !job && !primoDelMese,
+      // Campo conservato per compatibilità: il recupero corrente è approvato.
+      recuperoDaDecidere: false,
       esiti: righe,
     });
   },

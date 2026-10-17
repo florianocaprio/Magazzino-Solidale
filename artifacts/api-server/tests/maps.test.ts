@@ -202,12 +202,12 @@ describe("MAPS — capability, scope e routing", () => {
   });
 
   it("dichiara routeSupported solo con layer Consegne visibile e maps.route", async () => {
-    const withoutRoute = await request(await app({ permessi: ["maps.operational"] }))
+    const withoutRoute = await request(await app({ permessi: ["maps.operational", "consegne.view"] }))
       .get("/maps/capabilities");
     expect(withoutRoute.body.layers).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: "pacchi.consegne", routeSupported: false }),
     ]));
-    const withRoute = await request(await app({ permessi: ["maps.operational", "maps.route"] }))
+    const withRoute = await request(await app({ permessi: ["maps.operational", "maps.route", "consegne.view"] }))
       .get("/maps/capabilities");
     expect(withRoute.body.layers).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: "pacchi.consegne", routeSupported: true }),
@@ -284,7 +284,7 @@ describe("MAPS — capability, scope e routing", () => {
       .toEqual(sorted([deliveryIds[0], deliveryIds[1]]));
     expect(await visibleIds({
       aree: ["sociale"],
-      permessi: ["maps.operational"],
+      permessi: ["maps.operational", "consegne.view"],
       areaOperativaId: areaOperativaA,
     })).toEqual(sorted([deliveryIds[0], deliveryIds[1]]));
 
@@ -327,7 +327,7 @@ describe("MAPS — capability, scope e routing", () => {
       .get(`/maps/routes/consegne/${deliveryB}`)).status).toBe(200);
     expect((await request(await app({
       aree: ["sociale"],
-      permessi: ["maps.route"],
+      permessi: ["maps.route", "consegne.view"],
       areaOperativaId: areaOperativaA,
     })).get(`/maps/routes/consegne/${deliveryB}`)).status).toBe(403);
   });
@@ -349,7 +349,7 @@ describe("MAPS — capability, scope e routing", () => {
     await db.update(consegneTable).set({ indirizzoConsegna: "Via Destinazione 10" }).where(eq(consegneTable.id, deliveryA));
     await db.update(consegneTable).set({ indirizzoConsegna: "Via Segreta 20" }).where(eq(consegneTable.beneficiarioId, beneficiaryB));
 
-    const response = await request(await app({ areaOperativaId: areaOperativaA, centroId: centreA, permessi: ["maps.operational", "maps.route"] }))
+    const response = await request(await app({ areaOperativaId: areaOperativaA, centroId: centreA, permessi: ["maps.operational", "maps.route", "consegne.view"] }))
       .get(`/maps/layers/pacchi/consegne?da=${today}&a=${today}`);
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
@@ -375,7 +375,7 @@ describe("MAPS — capability, scope e routing", () => {
     await db.update(bolleTable).set({ ritiroNonEffettuatoAt: new Date() }).where(eq(bolleTable.id, bollaA));
     await db.update(bolleTable).set({ ritiroNonEffettuatoAt: new Date() }).where(eq(bolleTable.id, bollaB));
 
-    const scoped = await app({ centroId: centreA, permessi: ["maps.operational", "bolle.view"] });
+    const scoped = await app({ centroId: centreA, permessi: ["maps.operational", "bolle.view", "consegne.view"] });
     const deliveries = await request(scoped).get(`/maps/layers/pacchi/consegne?da=${today}&a=${today}`);
     expect(deliveries.body.map((item: { entityId: number }) => item.entityId)).toEqual([deliveryA]);
     expect(JSON.stringify(deliveries.body)).not.toContain("Via Fuori Scope");
@@ -394,11 +394,11 @@ describe("MAPS — capability, scope e routing", () => {
     await db.update(consegneTable).set({ indirizzoConsegna: "Via Pianificata 1" }).where(eq(consegneTable.id, planned));
     await db.update(consegneTable).set({ indirizzoConsegna: "Via Effettuata 2" }).where(eq(consegneTable.id, completed));
 
-    const layer = await request(await app({ centroId: centre, permessi: ["maps.operational", "maps.route"] }))
+    const layer = await request(await app({ centroId: centre, permessi: ["maps.operational", "maps.route", "consegne.view"] }))
       .get(`/maps/layers/pacchi/consegne?da=${today}&a=${today}`);
     expect(layer.status).toBe(200);
     expect(layer.body.map((marker: { entityId: number }) => marker.entityId)).toEqual([planned]);
-    const route = await request(await app({ centroId: centre, permessi: ["maps.route"] }))
+    const route = await request(await app({ centroId: centre, permessi: ["maps.route", "consegne.view"] }))
       .get(`/maps/routes/consegne/${completed}`);
     expect(route.status).toBe(409);
     expect(route.body.error).toContain("non è più una pianificazione attiva");
@@ -421,7 +421,7 @@ describe("MAPS — capability, scope e routing", () => {
     }))).returning({ id: consegneTable.id });
     scope.consegnaIds.push(...inserted.map((row) => row.id));
 
-    const response = await request(await app({ centroId: centre, permessi: ["maps.operational"] }))
+    const response = await request(await app({ centroId: centre, permessi: ["maps.operational", "consegne.view"] }))
       .get(`/maps/layers/pacchi/consegne?da=${today}&a=${today}`);
     expect(response.status).toBe(422);
     expect(response.body.error).toContain("limite operativo");
@@ -465,7 +465,7 @@ describe("MAPS — capability, scope e routing", () => {
 
     await db.update(beneficiariTable).set({ domicilio: "Via B" }).where(eq(beneficiariTable.id, beneficiary));
     await cacheResolvedMapsAddresses(["Via Magazzino 1", "Via A"]);
-    const route = await request(await app({ centroId: centre, permessi: ["maps.route"] }))
+    const route = await request(await app({ centroId: centre, permessi: ["maps.route", "consegne.view"] }))
       .get(`/maps/routes/consegne/${created.body.id}`);
     expect(route.status).toBe(200);
     expect(route.body.destination).toBe("Via A");
@@ -482,7 +482,7 @@ describe("MAPS — capability, scope e routing", () => {
     await db.update(consegneTable).set({ indirizzoConsegna: "Via A & B 2" }).where(eq(consegneTable.id, delivery));
     await cacheResolvedMapsAddresses(["Via dell'Origine 1, Roma", "Via A & B 2"]);
 
-    const allowed = await request(await app({ areaOperativaId: areaOperativaA, centroId: centre, permessi: ["maps.route"] })).get(`/maps/routes/consegne/${delivery}`);
+    const allowed = await request(await app({ areaOperativaId: areaOperativaA, centroId: centre, permessi: ["maps.route", "consegne.view"] })).get(`/maps/routes/consegne/${delivery}`);
     expect(allowed.status).toBe(200);
     const url = new URL(allowed.body.url);
     expect(url.origin).toBe("https://www.openstreetmap.org");
@@ -497,7 +497,7 @@ describe("MAPS — capability, scope e routing", () => {
     });
     expect(Object.keys(allowed.body).sort()).toEqual(["destination", "origin", "provider", "url"]);
 
-    const denied = await request(await app({ areaOperativaId: areaOperativaB, permessi: ["maps.route"] })).get(`/maps/routes/consegne/${delivery}`);
+    const denied = await request(await app({ areaOperativaId: areaOperativaB, permessi: ["maps.route", "consegne.view"] })).get(`/maps/routes/consegne/${delivery}`);
     expect(denied.status).toBe(403);
   });
 
@@ -508,7 +508,7 @@ describe("MAPS — capability, scope e routing", () => {
     const beneficiary = await createBeneficiario(scope, centre);
     const delivery = await insertConsegna(scope, { beneficiarioId: beneficiary, magazzinoId: warehouse });
     await db.update(consegneTable).set({ tipoConsegna: "in_sede", indirizzoConsegna: null }).where(eq(consegneTable.id, delivery));
-    const scoped = await app({ centroId: centre, permessi: ["maps.route", "maps.operational"] });
+    const scoped = await app({ centroId: centre, permessi: ["maps.route", "maps.operational", "consegne.view"] });
     expect((await request(scoped).get(`/maps/routes/consegne/${delivery}`)).status).toBe(422);
     expect((await request(scoped).get("/maps/layers/pacchi/consegne?da=2026-01-01&a=2026-03-01")).status).toBe(400);
   });
@@ -519,7 +519,7 @@ describe("MAPS — capability, scope e routing", () => {
     const beneficiary = await createBeneficiario(scope, centre);
     const delivery = await insertConsegna(scope, { beneficiarioId: beneficiary, magazzinoId: warehouse });
     await db.update(consegneTable).set({ indirizzoConsegna: "Via Destinazione 1" }).where(eq(consegneTable.id, delivery));
-    const scoped = await app({ centroId: centre, permessi: ["maps.route"] });
+    const scoped = await app({ centroId: centre, permessi: ["maps.route", "consegne.view"] });
 
     expect((await request(scoped).get(`/maps/routes/consegne/${delivery}`)).status).toBe(422);
     await db.update(magazziniTable).set({ indirizzo: "Via Origine 1" }).where(eq(magazziniTable.id, warehouse));

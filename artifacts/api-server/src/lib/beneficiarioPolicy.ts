@@ -17,6 +17,7 @@ import {
   canAccessZonaUds,
 } from "./centroScope";
 import type { PermissionKey } from "./permissions";
+import { hasUdsOperationalArea } from "./udsInterventoPolicy";
 
 export function hasPermission(req: Request, permission: PermissionKey): boolean {
   return Boolean(req.user?.isAdmin || req.user?.permessi?.includes(permission));
@@ -56,6 +57,7 @@ export function canAccessBeneficiarioRecord(
   beneficiario: BeneficiarioScopeRecord,
   req: Request,
 ): boolean {
+  if (req.user?.aree.includes("uds") && !hasUdsOperationalArea(req)) return false;
   return canAccessBeneficiarioScope(
     beneficiario,
     beneficiarioAccessScopeFromRequest(req),
@@ -72,6 +74,7 @@ export function canViewBeneficiarioRecord(
   beneficiario: Pick<typeof beneficiariTable.$inferSelect, "areaOperativaId" | "centroAscoltoId" | "zonaUdsId">,
   req: Request,
 ): boolean {
+  if (req.user?.aree.includes("uds") && !hasUdsOperationalArea(req)) return false;
   if (req.user?.aree?.includes("uds") && !req.user?.aree?.includes("sociale")) {
     return canAccessAreaOperativa(beneficiario.areaOperativaId, callerAreaOperativaId(req));
   }

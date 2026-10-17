@@ -621,6 +621,13 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
       quantita: 100,
       fsePlus: true,
     });
+    // This case also runs after the 100k movement fixture. Refresh the joined
+    // fixture tables before reporting: fresh/stale estimates can select an
+    // expensive JIT plan. Keep every row, the global scope and planner defaults.
+    await db.execute(sql`ANALYZE movimenti, prodotti, magazzini, lotti,
+      bolle, beneficiari, spese_emporio, operazioni_distribuzione_magazzino,
+      carichi_magazzino_righe, esportazioni_fse, esportazioni_fse_eventi,
+      esportazioni_fse_righe, rilevazioni_monitoraggio_fse`);
     const before = await buildFsePlusReport(reportingFilters);
     const id = await readyBolla(20, "kg");
     const entrusted = await request(bollaApp())
@@ -649,7 +656,7 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
         kpiValue(before, "distribuzioniFseNetteKgLt"),
     ).toBe(20);
     expect(await lotAmount()).toBe(80);
-  });
+  }, 80_000);
 
   it("REPORT-M4-C: rientro 18 idonei, 1 deteriorato e 1 mancante lascia 98 fisici e zero distribuiti", async () => {
     lotId = await createLotto(scope, {

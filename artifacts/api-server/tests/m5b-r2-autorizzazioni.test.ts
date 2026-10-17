@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
-import * as XLSX from "xlsx";
 import { eq } from "drizzle-orm";
 import {
   areeOperativeTable,
@@ -293,27 +292,31 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
         .query({ ricerca: row.codice });
       expect(search.body.total).toBe(0);
       const bollaList = await agent.get("/api/bolle");
-      expect(bollaList.status, bollaList.text).toBe(200);
-      expect(bollaList.body).not.toEqual(
-        expect.arrayContaining([expect.objectContaining({ id: documentId })]),
+      expect(bollaList.status, bollaList.text).toBe(403);
+      expect(bollaList.body.error).toBe(
+        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
       );
+      expect(bollaList.body).not.toHaveProperty("items");
+      expect(bollaList.text).not.toContain(created.body.codiceDocumento);
       const documentsList = await agent.get("/api/documenti-operativi");
-      expect(documentsList.status, documentsList.text).toBe(200);
-      expect(documentsList.body.items).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ documentoId: `bolla:${documentId}` }),
-        ]),
+      expect(documentsList.status, documentsList.text).toBe(403);
+      expect(documentsList.body.error).toBe(
+        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
       );
+      expect(documentsList.body).not.toHaveProperty("items");
+      expect(documentsList.text).not.toContain(created.body.codiceDocumento);
       const exportResponse = await agent.get(
         "/api/documenti-operativi/export.xlsx",
       );
-      expect(exportResponse.status).toBe(200);
-      const workbook = XLSX.read(exportResponse.body, { type: "buffer" });
-      const cells = XLSX.utils.sheet_to_json<string[]>(
-        workbook.Sheets[workbook.SheetNames[0]],
-        { header: 1 },
+      expect(exportResponse.status).toBe(403);
+      expect(exportResponse.body.error).toBe(
+        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
       );
-      expect(JSON.stringify(cells)).not.toContain(created.body.codiceDocumento);
+      expect(exportResponse.headers["content-type"]).toContain(
+        "application/json",
+      );
+      expect(exportResponse.headers["content-disposition"]).toBeUndefined();
+      expect(exportResponse.text).not.toContain(created.body.codiceDocumento);
       const replay = await agent
         .post(`/api/richieste-magazzino/${row.id}/documento`)
         .send(payload);
@@ -463,11 +466,13 @@ describe("M5B-R2 — autorizzazione territoriale con sessione reale", () => {
         );
       }
       const transferList = await agent.get("/api/trasferimenti");
-      expect(transferList.status, transferList.text).toBe(200);
-      expect(transferList.body).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ id: transferDocument.body.documentoId }),
-        ]),
+      expect(transferList.status, transferList.text).toBe(403);
+      expect(transferList.body.error).toBe(
+        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+      );
+      expect(transferList.body).not.toHaveProperty("items");
+      expect(transferList.text).not.toContain(
+        transferDocument.body.codiceDocumento,
       );
       const direct = await agent
         .post(`/api/trasferimenti/${transferDocument.body.documentoId}/annulla`)

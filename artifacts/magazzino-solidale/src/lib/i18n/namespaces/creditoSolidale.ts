@@ -20,8 +20,8 @@ const it = {
   ricaricaAutomatica: "Ricarica mensile automatica",
   ricaricaCalendario:
     "La quota assegnata viene aggiunta al saldo il primo giorno di ogni mese (Europe/Rome). Nessun comando manuale.",
-  recuperoNonDeciso:
-    "Le lavorazioni già avviate vengono riprese. Se il sistema era spento alla scadenza, il recupero della mensilità non avviata è una decisione ancora da definire: nessun accredito retroattivo automatico.",
+  recuperoCorrente:
+    "Al primo avvio utile viene recuperata automaticamente solo la mensilità corrente, senza duplicare accrediti già eseguiti. I mesi precedenti non vengono recuperati.",
   statoNonDisponibile: "Stato dell’elaborazione non disponibile.",
   job: {
     non_avviata: "Non avviata",

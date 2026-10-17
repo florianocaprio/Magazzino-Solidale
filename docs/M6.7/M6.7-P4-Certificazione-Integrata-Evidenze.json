@@ -1,0 +1,455 @@
+{
+  "head": "027fb6b569af2807a91b5c6aeef16f43ccdda325",
+  "candidate": "caaf71394f1d5dbb115003bc1f832ab9e281c9c0cb13f27a76d028b569a48f25",
+  "technicalFiles": 2126,
+  "api": [
+    {
+      "group": "core",
+      "files": 11,
+      "pass": 76,
+      "fail": 0,
+      "skip": 0
+    },
+    {
+      "group": "reporting",
+      "files": 6,
+      "pass": 83,
+      "fail": 0,
+      "skip": 0
+    },
+    {
+      "group": "m63",
+      "files": 2,
+      "pass": 21,
+      "fail": 0,
+      "skip": 0
+    },
+    {
+      "group": "mensa",
+      "files": 1,
+      "pass": 109,
+      "fail": 0,
+      "skip": 0
+    },
+    {
+      "group": "emporio",
+      "files": 4,
+      "pass": 230,
+      "fail": 0,
+      "skip": 0
+    },
+    {
+      "group": "maps",
+      "files": 1,
+      "pass": 18,
+      "fail": 0,
+      "skip": 0
+    },
+    {
+      "group": "general",
+      "files": 137,
+      "pass": 1479,
+      "fail": 0,
+      "skip": 4
+    }
+  ],
+  "apiFiles": 162,
+  "apiPass": 2016,
+  "apiSkip": 4,
+  "skips": [
+    {
+      "file": "artifacts/api-server/tests/agea-import.test.ts",
+      "title": "Import AGEA/SIFEAD 2.0B esegue il bootstrap del registro reale come un Carico con sette righe e nessun movimento negativo",
+      "status": "skipped"
+    },
+    {
+      "file": "artifacts/api-server/tests/agea-sifead-parser.test.ts",
+      "title": "acceptance sul registro AGEA reale (file esterno al repository) riproduce gli aggregati osservati senza includere il file nei fixture",
+      "status": "skipped"
+    },
+    {
+      "file": "artifacts/api-server/tests/fse-import-parser-m3b.test.ts",
+      "title": "parser FSE+/AGEA M3B T01/T04/T06 legge i due originali e ricalcola profili, movimenti e sette saldi",
+      "status": "skipped"
+    },
+    {
+      "file": "artifacts/api-server/tests/fse-import-practice-m3b.test.ts",
+      "title": "M3B — import FSE+ nella pratica Carico Merce T25 registra i sette saldi originali per 1177 pezzi e copre gli 80 carichi storici senza duplicarli",
+      "status": "skipped"
+    }
+  ],
+  "browser": [
+    {
+      "group": "m67a-access",
+      "pass": 30,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "m67b-paths",
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "m67c-ux",
+      "pass": 175,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "m67d-integrated",
+      "pass": 20,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "m67-review-supply",
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "m67-p4-residuals-canonical",
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "m67-p4-mensa-context-contract",
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "m67-p4-uds-report",
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "emporio-recovery",
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "m67-p4-final-residuals-cert",
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "fse-residual-final",
+      "pass": 20,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "social-chain-detail-fixed",
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "emporio-returns-source",
+      "pass": 20,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "emporio-pdf-context-fixed",
+      "pass": 25,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    },
+    {
+      "group": "mensa-magazzino-correttivo-ready",
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "flaky": 0
+    }
+  ],
+  "browserPass": 365,
+  "frontend": {
+    "pass": 723,
+    "fail": 0,
+    "skip": 0,
+    "unchangedInputs": 436
+  },
+  "migrations": {
+    "applied": 58,
+    "pending": 0,
+    "mismatch": 0,
+    "freshReplayDatabases": 8,
+    "runnerPass": 24,
+    "launcherPass": 13,
+    "parityComparatorPass": 14
+  },
+  "reuse": {
+    "priorEvidenceVerified": 86,
+    "invariantFiles": 1122,
+    "buildInputs": 1898,
+    "changesSinceV3": [
+      "artifacts/api-server/tests/bisogni-pianificati.test.ts",
+      "artifacts/api-server/tests/cerca-simili.test.ts",
+      "artifacts/api-server/tests/interventi-workflow.test.ts",
+      "artifacts/api-server/tests/m5b-r2-autorizzazioni.test.ts",
+      "artifacts/api-server/tests/m5b-r3-guardie-post-preparazione.test.ts",
+      "artifacts/api-server/tests/scoping-direct.test.ts"
+    ]
+  },
+  "evidence": [
+    {
+      "name": "final-api-core-cert.json",
+      "sha256": "0130fdef583542ac386f8181988a18b9adcbd253cb6ab895bd1daff83773878b"
+    },
+    {
+      "name": "final-api-reporting-cert.json",
+      "sha256": "0db223b9e42adef41be7e6dd3623b87ae5fe6e92cf387ae6eefb1c3452fc23a9"
+    },
+    {
+      "name": "final-api-m63-cert.json",
+      "sha256": "36a44355b3537e5f8e70529e6df1c7b5266bd6bb6941932d551b6923b356c993"
+    },
+    {
+      "name": "final-api-mensa-cert.json",
+      "sha256": "80a33ed23269d648c70ccc4fafdd5df542f9f7bd44d50a349e25ebcdfbae2b2d"
+    },
+    {
+      "name": "final-api-emporio-cert.json",
+      "sha256": "476636c2f1dd0a8353a64a2d179ad6ce43a2628318dba54d2cb8b91aebc919b0"
+    },
+    {
+      "name": "final-api-maps-cert.json",
+      "sha256": "38f79fb8e46fbc68091498d92c44a9b2b5eea2e71b2dd8c4b93862a98013a35d"
+    },
+    {
+      "name": "final-api-general-cert-r4.json",
+      "sha256": "e2fb9417c1ca96bed2c19bfcf9fcf99fa85022f73b708255c8962ede225095ed"
+    },
+    {
+      "name": "m67a-access.json",
+      "sha256": "cbb4a9de6dd6a4bbca2b9d4ea4a30bc86723c6d02ff1333a7386988ea018eab1"
+    },
+    {
+      "name": "m67b-paths.json",
+      "sha256": "f1aa1643972a898a38a0f41d6fa804e61fe2993dc9edb7f91b562db9a68ced89"
+    },
+    {
+      "name": "m67c-ux.json",
+      "sha256": "fd102ae99584c8dc085facd5ede65e787acbd08c4c1b98c9e8c0662b82044888"
+    },
+    {
+      "name": "m67d-integrated.json",
+      "sha256": "90e40110aa29a7caf34203bd442787631bc7c230391fbe2a5d8b249fd27f2091"
+    },
+    {
+      "name": "m67-review-supply.json",
+      "sha256": "edc1c9aa55defa14f9d96900e0e16e6e99dda67863a7437e040e65de158ab788"
+    },
+    {
+      "name": "m67-p4-residuals-canonical.json",
+      "sha256": "86422b9ff329f9e01a48514c67f4228863b925f40f5a425e0981e1e407861643"
+    },
+    {
+      "name": "m67-p4-mensa-context-contract.json",
+      "sha256": "b2e68259164a66a91d39b74de1002f2d9106a70c1e2d06a19fe79d13ce3f78fb"
+    },
+    {
+      "name": "m67-p4-uds-report.json",
+      "sha256": "fe10a731ddd6c3b59675b385d7c9f8e698dfb3c2d2f783de00a9511299649eda"
+    },
+    {
+      "name": "emporio-recovery.json",
+      "sha256": "d97bd39b5766b02fd5724e34b2bd8e896709584b24bdd16c6857cf0a2cf12b40"
+    },
+    {
+      "name": "m67-p4-final-residuals-cert.json",
+      "sha256": "d143243fbfeb322523bfc3ec1d327780bf6160a18ecc86c82c02c8e4f6107ec7"
+    },
+    {
+      "name": "fse-residual-final.json",
+      "sha256": "90c6a1eb0dda7d0d1a472733e93063a5e6f37e6f14db2a5c0bf8e2246beb6f02"
+    },
+    {
+      "name": "social-chain-detail-fixed.json",
+      "sha256": "24f3e359ad1f828065ab674a0ed9a35038b64d26230ae76d7d7b37e5bc6218cc"
+    },
+    {
+      "name": "emporio-returns-source.json",
+      "sha256": "705592c22551e2d98471788dcabad1254d2373f5f82f623d090610770993e1c2"
+    },
+    {
+      "name": "emporio-pdf-context-fixed.json",
+      "sha256": "af0d94767e9c0de8a9fd5307036d62d233968d41742ca89ae56ff01711ede0a7"
+    },
+    {
+      "name": "mensa-magazzino-correttivo-ready.json",
+      "sha256": "50639c79585c44e9b0fa517fceb9045f2178e7cff29ddb2c805eb785aba0b9c3"
+    },
+    {
+      "name": "cert-candidate-v5.json",
+      "sha256": "4f94fe0270e60af8a0476223b8b889a368783219b717379e18e7d8a4e6bc2fbc"
+    },
+    {
+      "name": "final-frontend.json",
+      "sha256": "a0eb60927f2e0b2414cdab78837f2e1abc2ca801858005eba8e8ff8ac44fbed1"
+    },
+    {
+      "name": "fse100k-final.json",
+      "sha256": "fa98e67a09094e5fbae236778d40baae493ecb41f938a7629c9abae3830934c6"
+    },
+    {
+      "name": "cert-typecheck.log",
+      "sha256": "21f71ed3a7fe9e750e6ec5fcfc4872a9cc9c9da3d645211005d1fc0942ebe67b"
+    },
+    {
+      "name": "cert-runtime.log",
+      "sha256": "5751bb49b0e7edee967c8a3b7eab4554977de47d563d0fc46347ef76b4f74637"
+    },
+    {
+      "name": "linux-cert-build.log",
+      "sha256": "f710ddf604ed0799fac5318e1472d6eedbdb9f2d68d9ed9b273b7a67245d49d7"
+    },
+    {
+      "name": "linux-cert-input.json",
+      "sha256": "507d078dba3da8f52175ce9b0bbfc7ae3bcccc32091e6f401bd72e2cb80e9e84"
+    },
+    {
+      "name": "codegen-result.json",
+      "sha256": "b5013328ec004a6b2b262971b471615b3371bd49e5f334cd5e3b1e15109256a3"
+    },
+    {
+      "name": "final-runner-guards.log",
+      "sha256": "00132fe7309cbceb011ca7b193a99abe774078e8e406d1b271b7f603de1188a5"
+    },
+    {
+      "name": "final-parity-comparator.log",
+      "sha256": "862569c1660c189435c6624cb4e897eb7cd71d79faf8260ea8d22474559c57cc"
+    },
+    {
+      "name": "cert-runner-postgresql.log",
+      "sha256": "8950f688edd247fd1c40b5e793258adce1a7987ce8f2bd4105672ff9a0483756"
+    },
+    {
+      "name": "cert-runner-cleanup.log",
+      "sha256": "b2baa47a46358b2a8d38a7d190642072c724c6b59a1046b4c7c24e7b6406be70"
+    },
+    {
+      "name": "cert-cleanup.json",
+      "sha256": "70c3855a71f3b02bf41ff8ef208785bc77c89f81666d7593ad474671917b5789"
+    },
+    {
+      "name": "cert-ledger-core-migrations-verify.log",
+      "sha256": "66ddaa71c8bf269d5b924eb21302439f47748f483f8760d4aee400fc48f7cd7b"
+    },
+    {
+      "name": "cert-ledger-core-migrations-status.log",
+      "sha256": "29ad305fc2950ba98c3364e040372e52fe7f9163eba5d424174a584fc1e21bc9"
+    },
+    {
+      "name": "cert-ledger-core-update.log",
+      "sha256": "b7bcf5582192096094c83e6967e93e16a961957a7237852a192a904a16d7bc40"
+    },
+    {
+      "name": "cert-ledger-reporting-migrations-verify.log",
+      "sha256": "66ddaa71c8bf269d5b924eb21302439f47748f483f8760d4aee400fc48f7cd7b"
+    },
+    {
+      "name": "cert-ledger-reporting-migrations-status.log",
+      "sha256": "3f51648fca26ac21e7b0afb28303231ecf662b6403c9007487b27b20b545f671"
+    },
+    {
+      "name": "cert-ledger-reporting-update.log",
+      "sha256": "9ea75dbc4cce8eaf47943bf697297e4f828258e45f494d0779e8ee389cfa0421"
+    },
+    {
+      "name": "cert-ledger-m63-migrations-verify.log",
+      "sha256": "66ddaa71c8bf269d5b924eb21302439f47748f483f8760d4aee400fc48f7cd7b"
+    },
+    {
+      "name": "cert-ledger-m63-migrations-status.log",
+      "sha256": "8b803f955700c881802aa39ab1bd30a5c665251a1403ddd84e0cbc7dbde58028"
+    },
+    {
+      "name": "cert-ledger-m63-update.log",
+      "sha256": "9ea75dbc4cce8eaf47943bf697297e4f828258e45f494d0779e8ee389cfa0421"
+    },
+    {
+      "name": "cert-ledger-mensa-migrations-verify.log",
+      "sha256": "66ddaa71c8bf269d5b924eb21302439f47748f483f8760d4aee400fc48f7cd7b"
+    },
+    {
+      "name": "cert-ledger-mensa-migrations-status.log",
+      "sha256": "f1cd5d8cc110160d208d22fd3c4ddc59022dd4a7ea72571aa2540eb4489d6ec2"
+    },
+    {
+      "name": "cert-ledger-mensa-update.log",
+      "sha256": "9ea75dbc4cce8eaf47943bf697297e4f828258e45f494d0779e8ee389cfa0421"
+    },
+    {
+      "name": "cert-ledger-emporio-migrations-verify.log",
+      "sha256": "66ddaa71c8bf269d5b924eb21302439f47748f483f8760d4aee400fc48f7cd7b"
+    },
+    {
+      "name": "cert-ledger-emporio-migrations-status.log",
+      "sha256": "9285a130e36ebab277e08d1f64421fcd21680c8d253a0e1562bfc727321934d7"
+    },
+    {
+      "name": "cert-ledger-emporio-update.log",
+      "sha256": "b7bcf5582192096094c83e6967e93e16a961957a7237852a192a904a16d7bc40"
+    },
+    {
+      "name": "cert-ledger-maps-migrations-verify.log",
+      "sha256": "66ddaa71c8bf269d5b924eb21302439f47748f483f8760d4aee400fc48f7cd7b"
+    },
+    {
+      "name": "cert-ledger-maps-migrations-status.log",
+      "sha256": "65d390520eabec59e51ee6d3f523fc688bc414b638e889d371f4c89329547f61"
+    },
+    {
+      "name": "cert-ledger-maps-update.log",
+      "sha256": "9ea75dbc4cce8eaf47943bf697297e4f828258e45f494d0779e8ee389cfa0421"
+    },
+    {
+      "name": "cert-ledger-general-migrations-verify.log",
+      "sha256": "66ddaa71c8bf269d5b924eb21302439f47748f483f8760d4aee400fc48f7cd7b"
+    },
+    {
+      "name": "cert-ledger-general-migrations-status.log",
+      "sha256": "950c961e35b72cd67bcf7604ef83625d7acce06d59c8430378c30a2406f4abe1"
+    },
+    {
+      "name": "cert-ledger-general-update.log",
+      "sha256": "a56aae4e9ed7112831aa72f18eed9b8a81a413e273dacd178100672c8c274096"
+    },
+    {
+      "name": "cert-ledger-mensaBrowser-migrations-verify.log",
+      "sha256": "66ddaa71c8bf269d5b924eb21302439f47748f483f8760d4aee400fc48f7cd7b"
+    },
+    {
+      "name": "cert-ledger-mensaBrowser-migrations-status.log",
+      "sha256": "d683323ff8fd627b5fb8ea67d7ed82f2ff35736356c7312723a2c57f122abef9"
+    },
+    {
+      "name": "cert-ledger-mensaBrowser-update.log",
+      "sha256": "94e194da9e014921ebc97a8d4f593c73eb89389beb58c403d315c32c887bebb7"
+    }
+  ]
+}

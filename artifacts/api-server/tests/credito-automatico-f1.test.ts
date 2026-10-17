@@ -505,18 +505,91 @@ describe("F1 scheduler backend", () => {
       expect(await effects(b.id)).toEqual(before);
     },
   );
-  it("M10/M11 letture e primo avvio a mese iniziato non accreditano", async () => {
+  it("M10/M11 letture non accreditano; recupero corrente al primo avvio tardivo una sola volta", async () => {
     const b = await beneficiary();
     clock.setUTCDate(10);
-    await eseguiRicaricaMensile(clock);
     for (const url of [
       `/credito-solidale/beneficiari/${b.id}/saldo`,
       "/credito-solidale/ricariche-mensili/stato",
-    ])
-      expect((await request(await app()).get(url)).status).toBe(200);
+    ]) {
+      const response = await request(await app()).get(url);
+      expect(response.status).toBe(200);
+      if (url.endsWith("/stato")) {
+        expect(response.body.recuperoDaDecidere).toBe(false);
+        expect(response.body.calendario).toContain(
+          "recupero automatico della sola mensilità corrente",
+        );
+      }
+    }
     expect(await balance(b.id)).toBe(210);
     expect(
       await db.select().from(jobs).where(eq(jobs.periodo, period())),
     ).toHaveLength(0);
+    await Promise.all([
+      eseguiRicaricaMensile(clock),
+      eseguiRicaricaMensile(clock),
+    ]);
+    expect(await balance(b.id)).toBe(222);
+    expect(
+      await db.select().from(jobs).where(eq(jobs.periodo, period())),
+    ).toHaveLength(1);
+    expect(
+      (await effects(b.id)).movements.filter(
+        (m) => m.tipoMovimento === "ricarica_mensile",
+      ),
+    ).toHaveLength(1);
+    await eseguiRicaricaMensile(clock);
+    expect(await balance(b.id)).toBe(222);
+  });
+
+  it("D67-01 non recupera mesi precedenti neppure con un gruppo pendente", async () => {
+    const b = await beneficiary();
+    const previous = new Date(clock);
+    previous.setUTCMonth(previous.getUTCMonth() - 1);
+    const previousPeriod = calendarioCredito(previous).periodo;
+    try {
+      await preparaRicaricaMensile(previous);
+      clock.setUTCDate(15);
+      await eseguiRicaricaMensile(clock);
+      expect(await balance(b.id)).toBe(222);
+      const credits = (await effects(b.id)).movements.filter(
+        (m) => m.tipoMovimento === "ricarica_mensile",
+      );
+      expect(credits).toHaveLength(1);
+      expect(credits[0].periodoRiferimento).toBe(period());
+      const old = await db
+        .select()
+        .from(jobs)
+        .where(eq(jobs.periodo, previousPeriod));
+      expect(old[0].completataAt).toBeNull();
+      const oldItems = await db
+        .select()
+        .from(items)
+        .where(eq(items.periodo, previousPeriod));
+      expect(oldItems.find((i) => i.beneficiarioId === b.id)?.stato).toBe(
+        "pendente",
+      );
+    } finally {
+      await db.delete(items).where(eq(items.periodo, previousPeriod));
+      await db.delete(jobs).where(eq(jobs.periodo, previousPeriod));
+    }
+  });
+
+  it("D67-01 recupero tardivo verifica diritto corrente e non amplia il gruppo ai tick successivi", async () => {
+    clock.setUTCDate(12);
+    const eligible = await beneficiary();
+    const revoked = await beneficiary();
+    await db
+      .update(emporioAbilitazioniTable)
+      .set({ stato: "revocato" })
+      .where(eq(emporioAbilitazioniTable.beneficiarioId, revoked.id));
+    await preparaRicaricaMensile(clock);
+    const later = await beneficiary();
+    await eseguiRicaricaMensile(clock);
+    expect(await balance(eligible.id)).toBe(222);
+    expect(await balance(revoked.id)).toBe(210);
+    expect(await balance(later.id)).toBe(210);
+    await eseguiRicaricaMensile(clock);
+    expect(await balance(later.id)).toBe(210);
   });
 });

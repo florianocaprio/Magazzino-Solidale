@@ -1,4 +1,5 @@
 import {
+  getCurrentUser,
   getBollaStampaSpesaEmporio,
   type BollaDettaglio,
   type BollaEmporioStampa,
@@ -47,8 +48,23 @@ export function adattaBollaEmporioPerPdf(
 
 export async function downloadBollaEmporioPdf(
   spesa: SpesaEmporio,
-  options: { footer?: string | null; template?: BollaTemplate } = {},
+  options: {
+    footer?: string | null;
+    template?: BollaTemplate;
+    expectedActor?: unknown;
+    isCurrent?: () => boolean;
+  } = {},
 ): Promise<void> {
+  const actor = JSON.stringify(await getCurrentUser());
+  const assertLocalContext = () => {
+    if (
+      options.isCurrent?.() === false ||
+      (options.expectedActor !== undefined &&
+        JSON.stringify(options.expectedActor) !== actor)
+    )
+      throw new Error("Export context changed");
+  };
+  assertLocalContext();
   const stampa = await getBollaStampaSpesaEmporio(spesa.id);
   const { branding, logoDataUrl } = await loadDocumentBrandingForPdf();
   await generateBollaPdf({
@@ -58,5 +74,16 @@ export async function downloadBollaEmporioPdf(
     template: options.template ?? "standard",
     associationLogoDataUrl: logoDataUrl,
     branding,
+    beforeSave: async () => {
+      assertLocalContext();
+      if (JSON.stringify(await getCurrentUser()) !== actor)
+        throw new Error("Export actor changed");
+      // Revalidate the canonical document after asynchronous rendering. A
+      // previously authorized response is not authorization to download later.
+      await getBollaStampaSpesaEmporio(spesa.id);
+      if (JSON.stringify(await getCurrentUser()) !== actor)
+        throw new Error("Export actor changed");
+      assertLocalContext();
+    },
   });
 }

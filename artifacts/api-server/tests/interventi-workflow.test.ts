@@ -951,12 +951,23 @@ describe("visibilità territoriale del workflow", () => {
   });
 
   it("obbliga il globale a scegliere la area operativa negli elenchi UDS", async () => {
-    const missingAreaOperativa = await request(makeApp(null, null, null))
+    const unscoped = await request(makeApp(null, null, null))
+      .get("/interventi")
+      .query({ ambito: "uds", areaOperativaId: areaOperativaRoma });
+    expect(unscoped.status).toBe(403);
+    expect(unscoped.body.error).toBe(
+      "Assegnazione territoriale UDS non disponibile",
+    );
+    const missingAreaOperativa = await request(
+      makeApp(null, null, null, ["sociale", "uds"], true),
+    )
       .get("/interventi")
       .query({ ambito: "uds" });
     expect(missingAreaOperativa.status).toBe(400);
 
-    const scoped = await request(makeApp(null, null, null))
+    const scoped = await request(
+      makeApp(null, null, null, ["sociale", "uds"], true),
+    )
       .get("/interventi")
       .query({ ambito: "uds", areaOperativaId: areaOperativaRoma });
     expect(scoped.status).toBe(200);
@@ -970,7 +981,7 @@ describe("visibilità territoriale del workflow", () => {
   it("protegge dettaglio, storico e transizioni da un'altra area operativa", async () => {
     const milano = await createWorkflow(
       { beneficiarioId: udsMilano, ambito: "uds" },
-      makeApp(null, null, null),
+      makeApp(areaOperativaMilano, centroMilano, zonaMilano),
     );
     expect(milano.status).toBe(201);
 

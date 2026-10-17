@@ -472,12 +472,24 @@ describe("Beneficiari — scoping per centro", () => {
   it("lista: il caller globale vede tutti", async () => {
     const bA = await createBeneficiario(scope, centroA);
     const bB = await createBeneficiario(scope, centroB);
-    const res = await request(
+    const unscoped = await request(
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
         centroAscoltoId: null,
       }),
     ).get("/beneficiari");
+    expect(unscoped.status).toBe(403);
+    expect(unscoped.body.error).toBe(
+      "Assegnazione territoriale UDS non disponibile",
+    );
+    const res = await request(
+      makeScopedApp(beneficiariRouter, {
+        id: operatoreId,
+        centroAscoltoId: null,
+        isAdmin: true,
+      }),
+    ).get("/beneficiari");
+    expect(res.status).toBe(200);
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([bA, bB]));
   });
 

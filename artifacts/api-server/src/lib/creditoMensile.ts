@@ -35,8 +35,9 @@ export function calendarioCredito(now: Date) {
 /** Invocazione interna, mai esposta via HTTP. Il clock è iniettabile nei soli test.
  * Congelamento del gruppo e lavorazione per beneficiario sono durevoli e distinti. */
 export async function preparaRicaricaMensile(now = new Date()) {
-  const { periodo, primoDelMese } = calendarioCredito(now);
-  if (!primoDelMese) return;
+  // Recupero al primo avvio utile della sola mensilità corrente (Europe/Rome).
+  // Il gruppo resta congelato: i successivi tick non aggiungono destinatari.
+  const { periodo } = calendarioCredito(now);
   await db.transaction(async (tx) => {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`credito-mensile:${periodo}`},0))`,
@@ -64,7 +65,13 @@ export async function eseguiRicaricaMensile(now = new Date()) {
   const jobs = await db
     .select()
     .from(runs)
-    .where(isNull(runs.completataAt))
+    // Non recuperare automaticamente mensilità precedenti, neppure incompiute.
+    .where(
+      and(
+        eq(runs.periodo, calendarioCredito(now).periodo),
+        isNull(runs.completataAt),
+      ),
+    )
     .orderBy(runs.periodo);
   for (const job of jobs) {
     const candidates = await db

@@ -1,5 +1,26 @@
-import type { Request } from "express";
+import type { Request, RequestHandler } from "express";
 import { callerAreaOperativaId } from "./centroScope";
+
+/** NULL non concede globalità a un operatore UDS ordinario, anche con ruolo misto. */
+export function hasUdsOperationalArea(req: Request): boolean {
+  return Boolean(
+    req.user &&
+    (req.user.isAdmin ||
+      req.user.isSuperAdmin ||
+      (callerAreaOperativaId(req) != null &&
+        req.user.areaOperativaAttiva !== false)),
+  );
+}
+
+export const requireCurrentUdsScope: RequestHandler = (req, res, next) => {
+  if (req.user?.aree.includes("uds") && !hasUdsOperationalArea(req)) {
+    res
+      .status(403)
+      .json({ error: "Assegnazione territoriale UDS non disponibile" });
+    return;
+  }
+  next();
+};
 
 interface UdsTerritorySnapshot {
   areaOperativaIdSnapshot: number | null;
@@ -15,6 +36,7 @@ export function canAccessUdsInterventoTerritory(
   intervento: UdsTerritorySnapshot,
   currentBeneficiarioAreaId: number | null,
 ): boolean {
+  if (!hasUdsOperationalArea(req)) return false;
   const callerArea = callerAreaOperativaId(req);
   if (intervento.areaOperativaIdSnapshot != null) {
     return (

@@ -30,6 +30,7 @@ import {
 import { searchBeneficiariDuplicates } from "../lib/beneficiarioDuplicates";
 import { formatTesseraBeneficiario, issueTesseraBeneficiario, TesseraBeneficiarioError } from "../lib/tesseraBeneficiarioService";
 import { requirePermission } from "../middlewares/auth";
+import { requireCurrentUdsScope } from "../lib/udsInterventoPolicy";
 import {
   canAccessBeneficiarioRecord,
   hasPermission,
@@ -49,6 +50,7 @@ import {
 } from "../lib/beneficiarioValidation";
 
 const router: IRouter = Router();
+router.use("/beneficiari", requireCurrentUdsScope);
 
 const SOCIAL_SENSITIVE_FIELDS = new Set([
   "restrizioniAlimentari",

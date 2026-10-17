@@ -36,6 +36,7 @@ function makeApp(
   areaOperativaId: number | null = areaOperativaRoma,
   centroAscoltoId: number | null = centroRoma,
   zonaUdsId: number | null = zonaRoma,
+  isAdmin = false,
 ): Express {
   const app = express();
   app.use(express.json());
@@ -44,6 +45,7 @@ function makeApp(
       req as unknown as {
         user: {
           id: number;
+          isAdmin: boolean;
           areaOperativaId: number | null;
           centroAscoltoId: number | null;
           zonaUdsId: number | null;
@@ -53,6 +55,7 @@ function makeApp(
       }
     ).user = {
       id: operatorUserId,
+      isAdmin,
       areaOperativaId,
       centroAscoltoId,
       zonaUdsId,
@@ -507,10 +510,17 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
     },
   );
 
-  it("permette a un utente globale di gestire una area operativa valorizzata ma non un legacy NULL", async () => {
-    const globalApp = makeApp(null, null, null);
+  it("nega la globalità implicita e il legacy NULL all'ordinario, preservando l'admin esplicito", async () => {
+    const globalApp = makeApp(null, null, null, true);
     const beneficiarioMilano = await createBeneficiario(areaOperativaMilano);
     const interventoMilano = await createIntervento(beneficiarioMilano);
+    const unscoped = await request(makeApp(null, null, null))
+      .post(`/interventi/${interventoMilano}/bisogni-pianificati`)
+      .send({ tipo: "azione", descrizione: "Non autorizzato" });
+    expect(unscoped.status).toBe(403);
+    expect(unscoped.body.error).toBe(
+      "Assegnazione territoriale UDS non disponibile",
+    );
     const allowed = await request(globalApp)
       .post(`/interventi/${interventoMilano}/bisogni-pianificati`)
       .send({ tipo: "azione", descrizione: "Globale" });
@@ -519,7 +529,7 @@ describe("Bisogni Pianificati negli Interventi UDS", () => {
 
     const beneficiarioLegacy = await createBeneficiario(null);
     const interventoLegacy = await createIntervento(beneficiarioLegacy);
-    const denied = await request(globalApp).get(
+    const denied = await request(makeApp(null, null, null)).get(
       `/interventi/${interventoLegacy}/bisogni-pianificati`,
     );
     expect(denied.status).toBe(403);

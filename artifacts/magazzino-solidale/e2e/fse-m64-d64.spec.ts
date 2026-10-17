@@ -42,6 +42,7 @@ function registry(
   document: string,
   reference = "17/09/2026",
   count = 2,
+  funds: string[] = ["FSE+"],
 ) {
   const h = [
     "Fondo",
@@ -70,7 +71,7 @@ function registry(
     XLSX.utils.aoa_to_sheet([
       h,
       ...Array.from({ length: count }, (_, i) => [
-        "FSE+",
+        funds[i % funds.length],
         product,
         20,
         null,
@@ -124,6 +125,174 @@ async function upload(
 }
 const panel = (page: Page) =>
   page.getByRole("region", { name: "Rendicontazione FSE+", exact: true });
+
+test("M67-24: mixed funds keep import identity, physical stock and reconciliation source in the same browser chain", async ({
+  page,
+}) => {
+  await login(page);
+  const c = await context(page),
+    doc = randomUUID();
+  const product = await json(
+    await page.request.post("/api/prodotti", {
+      data: {
+        nome: `M67 mixed ${doc}`,
+        tipoProdotto: "alimentare",
+        unitaMisura: "pz",
+        quantitaFrazionabile: false,
+        lottoFisicoObbligatorio: false,
+        gestioneScadenza: false,
+      },
+    }),
+    201,
+  );
+  const acquired = await upload(
+    page,
+    c,
+    registry(product.nome, doc, "17/09/2026", 2, ["FSE+", "Fondo Nazionale"]),
+  );
+  await json(
+    await page.request.post(
+      `/api/fse-importazioni/sessioni/${acquired.sessionId}/associa-prodotto`,
+      {
+        data: {
+          versione: acquired.versione,
+          descrizioneEsterna: product.nome,
+          prodottoId: product.id,
+          motivo: "Mapping sintetico fondi misti",
+          accettaFallbackData: false,
+        },
+      },
+    ),
+    200,
+  );
+  const session = await json(
+    await page.request.get(
+      `/api/fse-importazioni/sessioni/${acquired.sessionId}`,
+    ),
+    200,
+  );
+  const attached = await json(
+    await page.request.post(
+      `/api/fse-importazioni/sessioni/${session.id}/aggiungi-pratica`,
+      {
+        data: {
+          versione: session.versione,
+          rigaIds: session.rows.map((r: { id: number }) => r.id),
+          idempotencyKey: randomUUID(),
+        },
+      },
+    ),
+    201,
+  );
+  const practice = await json(
+    await page.request.get(`/api/carico-pratiche/${attached.practiceId}`),
+    200,
+  );
+  const command = {
+    versione: practice.versione,
+    rigaIds: practice.righe.map((r: { id: number }) => r.id),
+    idempotencyKey: randomUUID(),
+  };
+  await json(
+    await page.request.post(`/api/carico-pratiche/${practice.id}/registra`, {
+      data: command,
+    }),
+    201,
+  );
+  await json(
+    await page.request.post(`/api/carico-pratiche/${practice.id}/registra`, {
+      data: command,
+    }),
+    200,
+  );
+  const lots = await json(
+    await page.request.get(
+      `/api/lotti?magazzinoId=${c.warehouse.id}&prodottoId=${product.id}`,
+    ),
+    200,
+  );
+  expect(lots).toHaveLength(2);
+  expect(
+    lots.map((l: { fondoOrigine: string }) => l.fondoOrigine).sort(),
+  ).toEqual(["FONDO_NAZIONALE", "FSE_PLUS"]);
+  expect(
+    lots.map((l: { quantitaResidua: number }) => Number(l.quantitaResidua)),
+  ).toEqual([10, 10]);
+  const stock = await json(
+    await page.request.get(
+      `/api/giacenze?areaOperativaId=${c.area.id}&magazzinoId=${c.warehouse.id}`,
+    ),
+    200,
+  );
+  expect(
+    stock.find((r: { prodottoId: number }) => r.prodottoId === product.id)
+      .giacenzaFisica,
+  ).toBe(20);
+  const current = await json(
+    await page.request.get(`/api/fse-importazioni/sessioni/${session.id}`),
+    200,
+  );
+  await page.goto(
+    `/report/fse-plus?magazzinoId=${c.warehouse.id}&da=2026-09-01&a=2026-09-17`,
+  );
+  const region = panel(page);
+  await region
+    .getByRole("tab", { name: "Riconciliazioni", exact: true })
+    .click();
+  await region
+    .getByLabel("Tipo fonte amministrativa", { exact: true })
+    .selectOption("FSE_M3B");
+  await region
+    .getByLabel("Procedura FSE+ e versione", { exact: true })
+    .selectOption(String(current.id));
+  await region
+    .getByRole("checkbox", {
+      name: /Confermo fonte, versione, data e baseline/,
+    })
+    .check();
+  const calculated = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/fse/riconciliazioni") &&
+      r.request().method() === "POST",
+  );
+  await region
+    .getByRole("button", { name: "Calcola riconciliazione", exact: true })
+    .click();
+  const header = await json(await calculated, 201);
+  const source = await json(
+    await page.request.get(`/api/fse/riconciliazioni/${header.id}/fonte`),
+    200,
+  );
+  expect(source.runs).toHaveLength(1);
+  expect(source.source.sessionId).toBe(session.id);
+  expect(source.source.sessionVersion).toBe(current.versione);
+  const reconciled = await json(
+    await page.request.get(`/api/fse/riconciliazioni/${header.id}/righe`),
+    200,
+  );
+  expect(JSON.stringify(reconciled.rows)).toContain("FSE_PLUS");
+  expect(JSON.stringify(reconciled.rows)).toContain("FONDO_NAZIONALE");
+  expect(
+    await json(
+      await page.request.get(
+        `/api/lotti?magazzinoId=${c.warehouse.id}&prodottoId=${product.id}`,
+      ),
+      200,
+    ),
+  ).toEqual(lots);
+  await region
+    .getByText("Fonte congelata e storico dei calcoli", { exact: true })
+    .click();
+  const registered = region.getByText('"claimState": "REGISTRATA"', {
+    exact: false,
+  });
+  await expect(registered).toHaveCount(2);
+  for (const fund of ["FSE_PLUS", "FONDO_NAZIONALE"]) {
+    await expect(
+      registered.filter({ hasText: `"fund": "${fund}"` }),
+    ).toBeVisible();
+  }
+});
 
 async function acceptExternalRow(page: Page, headerId: number) {
   const response = await json(

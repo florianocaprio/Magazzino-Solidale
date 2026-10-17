@@ -767,6 +767,11 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
       .update(bolleTable)
       .set({ consegnaId: consegna.id })
       .where(eq(bolleTable.id, bolla.id));
+    const visible = await agent.get("/api/consegne");
+    expect(visible.status, visible.text).toBe(200);
+    expect(
+      visible.body.items.find((row: { id: number }) => row.id === consegna.id),
+    ).toMatchObject({ bollaId: bolla.id });
     const before = await digest(bolla.richiestaId, lotId);
     await assignment(null, null);
     try {
@@ -781,11 +786,18 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
           .send(command(bolla.versione)),
       );
       const list = await agent.get("/api/consegne");
-      expect(list.status, list.text).toBe(200);
-      const item = list.body.items.find(
-        (row: { id: number }) => row.id === consegna.id,
+      // M6.7 rejects the whole warehouse read after total territorial revocation,
+      // before the older R3 linked-Bolla redaction can run. Never restore a
+      // global list merely because Area/Centro are now NULL.
+      expect(list.status, list.text).toBe(403);
+      expect(list.body.error).toBe(
+        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
       );
-      expect(item).toMatchObject({ bollaId: null, bollaNumero: null });
+      expect(list.body).not.toHaveProperty("items");
+      await denied(list);
+      const detail = await agent.get(`/api/consegne/${consegna.id}`);
+      expect(detail.status, detail.text).toBe(403);
+      await denied(detail);
       expect(await digest(bolla.richiestaId, lotId)).toBe(before);
     } finally {
       await assignment(areaId, centreId);

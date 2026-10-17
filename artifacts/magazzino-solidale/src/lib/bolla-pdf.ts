@@ -47,6 +47,7 @@ export interface BollaPdfOptions {
   template: BollaTemplate;
   associationLogoDataUrl?: string | null;
   branding?: BrandingAmbiente | null;
+  beforeSave?: () => Promise<void>;
 }
 
 /** Carica il logo AIM statico di fallback come data URL per jsPDF. */
@@ -479,5 +480,6 @@ export async function generateBollaPdf(opts: BollaPdfOptions): Promise<void> {
     doc.text(lines, footerTextX, footerY + 1);
   }
 
+  await opts.beforeSave?.();
   doc.save(`${bolla.numeroBolla}.pdf`);
 }

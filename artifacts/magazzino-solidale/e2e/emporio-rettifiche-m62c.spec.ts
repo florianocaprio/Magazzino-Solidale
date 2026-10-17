@@ -143,7 +143,16 @@ async function fixture(
   await expect(
     page.getByRole("button", { name: "Rettifica spesa", exact: true }),
   ).toBeVisible();
-  return { spesa: closed.spesa, beneficiary, product, user, role, grants };
+  return {
+    spesa: closed.spesa,
+    beneficiary,
+    product,
+    user,
+    role,
+    grants,
+    area,
+    center,
+  };
 }
 
 async function economicForm(page: Page) {
@@ -257,6 +266,7 @@ for (const kind of [
   "Reso fisico idoneo",
   "Reso fisico non distribuibile",
   "Errore amministrativo — solo credito",
+  "Reso fisico idoneo parziale",
 ]) {
   test(`C16/C17/C29 ${kind}: effetti dichiarati e scritture reali`, async ({
     page,
@@ -273,9 +283,15 @@ for (const kind of [
       "Addebitato: 6 · Già restituito: 0 · Rimborsabile: 6",
     );
     await dialog.getByRole("combobox", { name: "Tipologia rettifica" }).click();
-    await page.getByRole("option", { name: kind, exact: true }).click();
+    const partial = kind === "Reso fisico idoneo parziale";
+    await page
+      .getByRole("option", {
+        name: partial ? "Reso fisico idoneo" : kind,
+        exact: true,
+      })
+      .click();
     const admin = kind.startsWith("Errore"),
-      idoneo = kind === "Reso fisico idoneo";
+      idoneo = kind.startsWith("Reso fisico idoneo");
     if (admin) {
       await expect(dialog).toContainText(
         "stock e quantità distribuite non cambiano",
@@ -294,6 +310,7 @@ for (const kind of [
           : "nessun aumento della disponibilità",
       );
     }
+    if (partial) await dialog.getByRole("spinbutton").fill("1");
     await dialog
       .getByPlaceholder("Motivo obbligatorio dello storno")
       .fill(`Prova causale ${kind}`);
@@ -320,8 +337,8 @@ for (const kind of [
       )
     ).rows[0];
     expect(facts).toEqual({
-      stock: idoneo ? 10 : 8,
-      saldo: admin ? 16 : 20,
+      stock: idoneo ? (partial ? 9 : 10) : 8,
+      saldo: admin ? 16 : partial ? 17 : 20,
       rettifiche: 1,
       scarti: kind === "Reso fisico non distribuibile" ? 1 : 0,
     });
@@ -338,6 +355,106 @@ for (const kind of [
           Number(r.saldo_dopo),
       ),
     ).toBe(true);
+    // M67-29: the very same checkout and reversal, not an unrelated report seed.
+    await db.query("UPDATE ruoli SET aree=$1 WHERE id=$2", [
+      JSON.stringify(["emporio", "analisi"]),
+      f.role,
+    ]);
+    const day = (
+      await db.query(
+        "SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Rome')::date::text AS day",
+      )
+    ).rows[0].day;
+    const params = new URLSearchParams({
+      da: day,
+      a: day,
+      areaOperativaId: String(f.area),
+      centroAscoltoId: String(f.center),
+    });
+    const reportResponse = page.waitForResponse(
+      (r) => r.url().includes("/api/report/emporio?") && r.status() === 200,
+    );
+    await page.goto(`/report/emporio?${params}`);
+    const rr = await reportResponse;
+    const report = await rr.json();
+    await test.info().attach("synthetic-report", {
+      body: JSON.stringify({
+        url: rr.url(),
+        params: Object.fromEntries(params),
+        report,
+      }),
+      contentType: "application/json",
+    });
+    const table = (key: string) =>
+      report.tables.find((t: { key: string }) => t.key === key).rows;
+    const flows = table("flussiDistribuzionePeriodo");
+    expect(flows).toHaveLength(1);
+    expect(flows[0]).toMatchObject({
+      prodotto: "Prodotto sintetico C",
+      unita: "pz",
+    });
+    expect(
+      [flows[0].lordo, flows[0].compensazioni, flows[0].netto].map(Number),
+    ).toEqual([2, admin ? 0 : partial ? -1 : -2, admin ? 2 : partial ? 1 : 0]);
+    const products = table("prodotti");
+    expect(products).toHaveLength(admin ? 1 : 0);
+    if (admin)
+      expect(products[0]).toMatchObject({
+        prodottoId: f.product,
+        quantita: "2.00",
+      });
+    const creditOracle = (
+      await db.query(
+        `SELECT tipo_movimento tipo,COUNT(*)::text eventi,SUM(variazione_credito)::text variazione,COUNT(*) FILTER (WHERE variazione_credito<>trunc(variazione_credito))::text frazionari FROM credito_solidale_movimenti WHERE beneficiario_id=$1 AND (data_movimento AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Rome')::date=$2 GROUP BY tipo_movimento ORDER BY tipo_movimento`,
+        [f.beneficiary, day],
+      )
+    ).rows;
+    expect(table("creditoFlussiPeriodo")).toEqual(creditOracle);
+    const flowTable = page.getByRole("table").filter({
+      has: page.getByRole("columnheader", {
+        name: "Compensazioni",
+        exact: true,
+      }),
+    });
+    await expect(flowTable).toContainText("Prodotto sintetico C");
+    await expect(
+      flowTable
+        .getByRole("row")
+        .filter({ hasText: "Prodotto sintetico C" })
+        .getByRole("cell"),
+    ).toHaveText([
+      "Prodotto sintetico C",
+      "pz",
+      flows[0].lordo,
+      flows[0].compensazioni,
+      flows[0].netto,
+    ]);
+    expect(
+      (
+        await db.query(
+          "SELECT count(*)::int n FROM spese_emporio_storni WHERE spesa_emporio_id=$1",
+          [f.spesa.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    await db.query("UPDATE ruoli SET aree=$1 WHERE id=$2", [
+      JSON.stringify(["sociale", "analisi"]),
+      f.role,
+    ]);
+    expect(
+      (await page.request.get(`/api/report/pacchi?${params}`)).status(),
+    ).toBe(403);
+    await db.query("UPDATE ruoli SET permessi=$1 WHERE id=$2", [
+      JSON.stringify([...f.grants, "bolle.view"]),
+      f.role,
+    ]);
+    const pacchi = await page.request.get(`/api/report/pacchi?${params}`);
+    expect(pacchi.status(), await pacchi.text()).toBe(200);
+    expect(
+      (await pacchi.json()).tables.find(
+        (t: { key: string }) => t.key === "flussiDistribuzionePeriodo",
+      ).rows,
+    ).toEqual([]);
   });
 }
 

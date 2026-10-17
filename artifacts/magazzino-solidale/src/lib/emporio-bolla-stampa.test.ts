@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  getCurrentUser: vi.fn(),
   getBollaStampaSpesaEmporio: vi.fn(),
   getBolla: vi.fn(),
   generateBollaPdf: vi.fn(),
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
+  getCurrentUser: mocks.getCurrentUser,
   getBollaStampaSpesaEmporio: mocks.getBollaStampaSpesaEmporio,
   getBolla: mocks.getBolla,
 }));
@@ -24,7 +26,14 @@ import { downloadBollaEmporioPdf } from "./emporio-bolla-stampa";
 
 describe("stampa Bolla dal dominio Emporio", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    mocks.getCurrentUser.mockResolvedValue({
+      id: 7,
+      permessi: ["emporio.sales.view"],
+    });
+    mocks.generateBollaPdf.mockImplementation(async (options) => {
+      await options.beforeSave();
+    });
     mocks.getBollaStampaSpesaEmporio.mockResolvedValue({
       intestazione: "Magazzino Solidale",
       numeroBolla: "B-1",
@@ -113,5 +122,37 @@ describe("stampa Bolla dal dominio Emporio", () => {
         }),
       }),
     );
+  });
+
+  it.each(["logout", "different-user", "revoked-document", "local-context"])(
+    "blocks a late PDF after %s without saving",
+    async (change) => {
+      let current = true;
+      mocks.generateBollaPdf.mockImplementation(async (options) => {
+        if (change === "logout")
+          mocks.getCurrentUser.mockRejectedValue(new Error("401"));
+        if (change === "different-user")
+          mocks.getCurrentUser.mockResolvedValue({ id: 8 });
+        if (change === "revoked-document")
+          mocks.getBollaStampaSpesaEmporio.mockRejectedValue(new Error("403"));
+        if (change === "local-context") current = false;
+        await options.beforeSave();
+        throw new Error("UNSAFE_SAVE_REACHED");
+      });
+      await expect(
+        downloadBollaEmporioPdf({ id: 10 } as never, {
+          isCurrent: () => current,
+        }),
+      ).rejects.toThrow(/401|403|Export/);
+    },
+  );
+
+  it("rejects an already different UI actor before reading the document", async () => {
+    await expect(
+      downloadBollaEmporioPdf({ id: 10 } as never, {
+        expectedActor: { id: 8 },
+      }),
+    ).rejects.toThrow("Export context changed");
+    expect(mocks.getBollaStampaSpesaEmporio).not.toHaveBeenCalled();
   });
 });

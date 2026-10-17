@@ -2220,7 +2220,9 @@ describe("M5B — documento unico e transazione PostgreSQL", () => {
       .values({
         magazzinoId: originId,
         dataDistribuzione: "2026-09-28",
-        canaleOperativo: "sociale",
+        // The channel is not the source domain. Keep the historical SOCIALE
+        // identity below; use a valid unclassified channel on the current DB.
+        canaleOperativo: "ALTRO",
         dominioOrigine: "SOCIALE",
         entitaOrigineTipo: `intervento_materiali_${originId}`,
         entitaOrigineId: intervention.id,

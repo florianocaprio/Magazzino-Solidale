@@ -82,7 +82,7 @@ const MAPS_LAYER_POLICIES: Record<MapsLayerCode, MapsLayerPolicy> = {
   "pacchi.consegne": {
     areas: ["sociale"],
     modules: ["CENTRO_ASCOLTO", "CONSEGNE"],
-    sourcePermissions: [],
+    sourcePermissions: ["consegne.view"],
   },
   "pacchi.ritiri_non_effettuati": {
     areas: ["sociale", "magazzino"],

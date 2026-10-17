@@ -186,6 +186,145 @@ async function checkoutFixture(page: Page) {
   return { ...f, product, code, barcode: `BC-${suffix}`, input, session };
 }
 
+for (const outcome of [
+  "pdf-error",
+  "success",
+  "logout",
+  "different-user",
+  "revoked-document",
+] as const) {
+  test(`M67-28/37: Cassa receipt survives PDF failure, no stale download after ${outcome}`, async ({
+    page,
+    context,
+  }) => {
+    const f = await checkoutFixture(page);
+    await f.input.fill(f.barcode);
+    await f.input.press("Enter");
+    await expect(
+      page.getByRole("spinbutton", { name: "Quantità", exact: true }),
+    ).toHaveValue("1");
+    await page
+      .getByRole("button", { name: "Prepara chiusura", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Chiudi spesa Emporio", exact: true })
+      .click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Chiudi spesa Emporio", exact: true })
+      .click();
+    await expect(
+      page.getByText(/Spesa Emporio chiusa correttamente.*Numero Spesa/),
+    ).toBeVisible();
+    const expense = (
+      await database.query(
+        "select id,numero_spesa from spese_emporio where sessione_cassa_id=$1",
+        [f.session],
+      )
+    ).rows[0];
+    // Printing is a distinct, explicit sales grant, not implied by operating
+    // the till. Keep the existing minimal checkout fixtures unchanged.
+    const role = (
+      await database.query(
+        "select r.id,r.permessi from ruoli r join utenti u on u.ruolo_id=r.id where u.id=$1",
+        [f.user],
+      )
+    ).rows[0];
+    await database.query("update ruoli set permessi=$1 where id=$2", [
+      JSON.stringify([...role.permessi, "emporio.sales.view"]),
+      role.id,
+    ]);
+    await page.reload();
+    let release!: () => void, reached!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const captured = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    const downloads: string[] = [];
+    page.on("download", (d) => downloads.push(d.suggestedFilename()));
+    const unexpectedDownload = new Promise<string>((resolve) =>
+      page.once("download", () => resolve("download")),
+    );
+    await page.route(
+      `**/api/spese-emporio/${expense.id}/bolla-stampa`,
+      async (route) => {
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        reached();
+        await barrier;
+        if (outcome === "pdf-error")
+          await route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            body: JSON.stringify({
+              error: "Synthetic PDF preparation failure",
+            }),
+          });
+        else await route.fulfill({ response });
+      },
+    );
+    const other = await context.newPage();
+    try {
+      await page
+        .getByRole("button", { name: "Scarica Bolla PDF", exact: true })
+        .click();
+      await captured;
+      if (outcome === "logout" || outcome === "different-user") {
+        expect((await other.request.post("/api/auth/logout")).status()).toBe(
+          204,
+        );
+        if (outcome === "different-user") await login(other, await fixture(1));
+      }
+      if (outcome === "revoked-document")
+        await database.query("update ruoli set permessi=$1 where id=$2", [
+          JSON.stringify(role.permessi),
+          role.id,
+        ]);
+      release();
+      // A visible terminal error is the completion barrier, not a sleep.
+      const errorShown = expect(
+        page.getByRole("region", { name: "Notifications (F8)", exact: true }),
+      )
+        .toContainText("Esportazione non completata")
+        .then(() => "error");
+      expect(await Promise.race([errorShown, unexpectedDownload])).toBe(
+        outcome === "success" ? "download" : "error",
+      );
+      if (outcome === "success") {
+        expect(downloads).toHaveLength(1);
+        expect(downloads[0]).toMatch(/\.pdf$/);
+      } else expect(downloads).toEqual([]);
+      if (outcome === "pdf-error")
+        await expect(
+          page.getByRole("button", { name: "Scarica Bolla PDF", exact: true }),
+        ).toBeVisible();
+      expect(
+        (
+          await database.query(
+            "select count(*)::int n from spese_emporio where sessione_cassa_id=$1",
+            [f.session],
+          )
+        ).rows[0].n,
+      ).toBe(1);
+      expect(
+        Number(
+          (
+            await database.query(
+              "select quantita_residua from lotti where prodotto_id=$1",
+              [f.product],
+            )
+          ).rows[0].quantita_residua,
+        ),
+      ).toBe(9);
+    } finally {
+      release();
+      await other.close();
+    }
+  });
+}
+
 test("M62B B19/B20/B21: scanner esatto, ambiguo e doppio Enter senza inserimenti silenziosi", async ({
   page,
 }) => {

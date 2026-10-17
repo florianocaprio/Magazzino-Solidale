@@ -183,6 +183,14 @@ it("M67-18/19 actual Social and Warehouse sessions: intervention to delivery, re
     201,
   );
   expect((await snapshot()).stock).toBe(before.stock);
+  const plannedDetail = await social.get(`/api/consegne/${planned.id}`);
+  expect(plannedDetail.status, plannedDetail.text).toBe(200);
+  expect(plannedDetail.body).toMatchObject({
+    id: planned.id,
+    bollaId: linked.id,
+    bollaVersione: await version(),
+    stato: "pianificata",
+  });
   const payload = { versione: await version(), idempotencyKey: randomUUID() };
   await post(social, `/consegne/${planned.id}/completa`, payload, 200);
   const after = await snapshot();

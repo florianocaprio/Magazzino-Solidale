@@ -17,11 +17,15 @@ import { requireModulo } from "../lib/featureFlags";
 import { callerAreaOperativaId } from "../lib/centroScope";
 import { canAccessBeneficiarioRecord } from "../lib/beneficiarioPolicy";
 import { dataCivileEuropeRome, isDateOnly } from "../lib/interventiWorkflow";
-import { canAccessUdsInterventoTerritory } from "../lib/udsInterventoPolicy";
+import {
+  canAccessUdsInterventoTerritory,
+  requireCurrentUdsScope,
+} from "../lib/udsInterventoPolicy";
 
 const router: IRouter = Router();
 
 router.use("/uds", requireModulo("UDS"));
+router.use("/uds", requireCurrentUdsScope);
 
 function positiveInteger(value: unknown): number | null {
   const parsed = typeof value === "number" ? value : Number(value);

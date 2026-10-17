@@ -48,7 +48,7 @@ vi.mock("@workspace/api-client-react", () => ({
       periodo: "2026-10",
       stato: "non_avviata",
       esiti: [],
-      recuperoDaDecidere: true,
+      recuperoDaDecidere: false,
     },
     isError: false,
   }),
@@ -167,6 +167,13 @@ describe("parità permessi UI Credito e Accessi Emporio", () => {
 
   it("Credito view-only non espone mutazioni e non esegue ricariche all'apertura", async () => {
     await act(async () => root.render(<EmporioCreditiSaldo />));
+
+    expect(document.body.textContent).toContain(
+      "creditoSolidale.recuperoCorrente",
+    );
+    expect(document.body.textContent).not.toContain(
+      "creditoSolidale.recuperoNonDeciso",
+    );
 
     expect(document.body.textContent).not.toContain(
       "creditoSolidale.ricaricaCreditoSolidale",

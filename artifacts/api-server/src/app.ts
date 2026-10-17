@@ -207,6 +207,13 @@ app.use("/api", (req, res, next) => {
 app.use("/api", router);
 
 const unhandledError: ErrorRequestHandler = (error, req, res, _next) => {
+  // Preserve the body parser's size rejection instead of turning a client
+  // error into an internal failure. Do not expose parser internals or bodies.
+  if (error?.type === "entity.too.large" && error?.status === 413) {
+    if (!res.headersSent)
+      res.status(413).json({ error: "Dimensione della richiesta eccessiva" });
+    return;
+  }
   let current: unknown = error;
   let databaseError: { code?: string; constraint?: string } = {};
   for (let depth = 0; current != null && depth < 5; depth += 1) {

@@ -335,7 +335,7 @@ function EmporioCassa() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { emporioAbilitato } = useModuloFlags();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const { canOperate, canForce, canAdjustCredito } =
     cassaEmporioCapabilities(hasPermission);
   const { data: impostazioniStampa } = useGetImpostazioniStampa();
@@ -1064,12 +1064,14 @@ function EmporioCassa() {
   const downloadBolla = async (spesa: SpesaEmporio) => {
     try {
       await downloadBollaEmporioPdf(spesa, {
+        expectedActor: user,
+        isCurrent: security.isCurrent,
         footer: impostazioniStampa?.footerBolla ?? null,
         template:
           (impostazioniStampa?.templateBolla as BollaTemplate) ?? "standard",
       });
     } catch {
-      toast({ title: t("common.error"), variant: "destructive" });
+      toast({ title: t("movimenti.exportError"), variant: "destructive" });
     }
   };
 

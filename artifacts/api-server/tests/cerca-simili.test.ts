@@ -19,9 +19,12 @@ function makeApp(user: { id: number; centroAscoltoId: number | null; areaOperati
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    (req as unknown as { user: typeof user & { isAdmin: boolean; permessi: string[] } }).user = {
+    (req as unknown as { user: typeof user & { isAdmin: boolean; aree: string[]; permessi: string[] } }).user = {
       ...user,
       isAdmin: false,
+      // Il middleware reale valorizza sempre le aree del ruolo; questa suite
+      // esercita la ricerca Sociale completa, non la directory UDS minimizzata.
+      aree: ["sociale"],
       permessi: ["beneficiari.duplicates.search"],
     };
     next();

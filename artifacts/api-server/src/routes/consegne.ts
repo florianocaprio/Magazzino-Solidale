@@ -1160,7 +1160,11 @@ router.get(
         .json({ error: "Risorsa non accessibile per il tuo centro" });
       return;
     }
-    res.json({ ...row, dataCreazione: row.dataCreazione.toISOString() });
+    res.json({
+      ...row,
+      ...(await dettaglioConsegna(row.id, req.user!)),
+      dataCreazione: row.dataCreazione.toISOString(),
+    });
   },
 );
 

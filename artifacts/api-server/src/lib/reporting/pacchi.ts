@@ -16,7 +16,7 @@ function pacchiConditions(filters: ReportFilters): SQL[] {
     sql`b.stato = 'consegnato'`,
     sql`NOT EXISTS (
       SELECT 1 FROM spese_emporio pacchi_se
-      WHERE pacchi_se.bolla_id = b.id AND pacchi_se.stato_spesa = 'chiusa'
+      WHERE pacchi_se.bolla_id = b.id AND pacchi_se.stato_spesa IN ('chiusa', 'stornata', 'stornata_parzialmente')
     )`,
     sql`b.data_bolla::date BETWEEN ${filters.da} AND ${filters.a}`,
     ...reportScope(filters, {

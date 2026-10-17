@@ -430,12 +430,14 @@ function EmporioSpese() {
   const printBolla = async (spesa: SpesaEmporio) => {
     try {
       await downloadBollaEmporioPdf(spesa, {
+        expectedActor: user,
+        isCurrent: security.isCurrent,
         footer: impostazioniStampa?.footerBolla ?? null,
         template:
           (impostazioniStampa?.templateBolla as BollaTemplate) ?? "standard",
       });
     } catch {
-      toast({ title: t("common.error"), variant: "destructive" });
+      toast({ title: t("movimenti.exportError"), variant: "destructive" });
     }
   };
 

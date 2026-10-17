@@ -37,7 +37,7 @@ export function fseAuthorizedMovementCondition(
   // Even administrative oversight does not reactivate a disabled source.
   const allowedChannels = channels;
   const legacyEmporio = sql`EXISTS (SELECT 1 FROM spese_emporio source_se
-    WHERE source_se.bolla_id=b.id AND source_se.stato_spesa='chiusa')`;
+    WHERE source_se.bolla_id=b.id AND source_se.stato_spesa IN ('chiusa', 'stornata', 'stornata_parzialmente'))`;
   const legacySource = sql`((${channels.includes("EMPORIO")} AND ${legacyEmporio})
     OR (${channels.includes("PACCHI")} AND NOT ${legacyEmporio}))`;
   const bollaScope = fseScope(filters);
@@ -144,13 +144,13 @@ export function fseBollaSourceCondition(filters: ReportFilters): SQL {
   if (emporio) {
     return sql`EXISTS (
       SELECT 1 FROM spese_emporio source_se
-      WHERE source_se.bolla_id = b.id AND source_se.stato_spesa = 'chiusa'
+      WHERE source_se.bolla_id = b.id AND source_se.stato_spesa IN ('chiusa', 'stornata', 'stornata_parzialmente')
     )`;
   }
   if (pacchi) {
     return sql`NOT EXISTS (
       SELECT 1 FROM spese_emporio source_se
-      WHERE source_se.bolla_id = b.id AND source_se.stato_spesa = 'chiusa'
+      WHERE source_se.bolla_id = b.id AND source_se.stato_spesa IN ('chiusa', 'stornata', 'stornata_parzialmente')
     )`;
   }
   return sql`false`;

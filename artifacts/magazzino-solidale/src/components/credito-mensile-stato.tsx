@@ -39,7 +39,7 @@ export function CreditoMensileStato() {
           {item.causa ? ` (${t(`creditoSolidale.cause.${item.causa}`)})` : ""}
         </p>
       ))}
-      <p>{t("creditoSolidale.recuperoNonDeciso")}</p>
+      <p>{t("creditoSolidale.recuperoCorrente")}</p>
       {query.isError && (
         <p role="alert">{t("creditoSolidale.statoNonDisponibile")}</p>
       )}

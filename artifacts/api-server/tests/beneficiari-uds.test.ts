@@ -42,6 +42,7 @@ function makeApp(user: {
   centroAscoltoId: number | null;
   areaOperativaId: number | null;
   zonaUdsId?: number | null;
+  isAdmin?: boolean;
 }): Express {
   const app = express();
   // Ogni app mantiene un attore persistito distinto: nessuna mutazione di un
@@ -51,7 +52,7 @@ function makeApp(user: {
   app.use(async (req, _res, next) => {
     actor ??= emporioActorFixture({
       ...user,
-      isAdmin: false,
+      isAdmin: user.isAdmin ?? false,
       aree: ["sociale", "uds"],
       permessi: [
         "beneficiari.view",
@@ -147,6 +148,10 @@ const appAsCentro = (
   areaOperativaId: number | null,
   zonaUdsId: number | null = null,
 ) => makeApp({ centroAscoltoId, areaOperativaId, zonaUdsId });
+// Globalità amministrativa esplicita: un operatore ordinario senza Area
+// non è un caller globale (regressione con sessione reale nel test P4).
+const appAsGlobalAdmin = () =>
+  makeApp({ centroAscoltoId: null, areaOperativaId: null, isAdmin: true });
 const idsOf = (body: unknown) =>
   (body as Array<{ id: number }>).map((r) => r.id);
 const sessoObbligatorioMsg = "Il campo Sesso è obbligatorio.";
@@ -222,7 +227,7 @@ afterAll(async () => {
 
 describe("POST /beneficiari (uds)", () => {
   it("crea una persona UDS con la area operativa e ritorna uds=true", async () => {
-    const res = await request(appAs(null))
+    const res = await request(appAs(areaOperativaA))
       .post("/beneficiari")
       .send({
         ...newUdsRequiredFields,
@@ -240,7 +245,7 @@ describe("POST /beneficiari (uds)", () => {
 
   it("continua a creare persone UDS quando il servizio Centro di Ascolto è disabilitato", async () => {
     await setCentroAscoltoEnabled(false);
-    const res = await request(appAs(null))
+    const res = await request(appAs(areaOperativaA))
       .post("/beneficiari")
       .send({
         nome: "Persona",
@@ -288,7 +293,7 @@ describe("POST /beneficiari (uds)", () => {
   });
 
   it("rifiuta una persona UDS senza area operativa per un caller globale (400)", async () => {
-    const res = await request(appAs(null))
+    const res = await request(appAsGlobalAdmin())
       .post("/beneficiari")
       .send({
         ...newUdsRequiredFields,
@@ -302,7 +307,7 @@ describe("POST /beneficiari (uds)", () => {
   });
 
   it('rifiuta uds passato come stringa "true" senza area operativa (no type-confusion bypass)', async () => {
-    const res = await request(appAs(null)).post("/beneficiari").send({
+    const res = await request(appAsGlobalAdmin()).post("/beneficiari").send({
       nome: "Coerce",
       cognome: "AreaOperativa",
       sesso: "M",
@@ -946,7 +951,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
-    const res = await request(appAs(null))
+    const res = await request(appAsGlobalAdmin())
       .patch(`/beneficiari/${b.id}`)
       .send({ uds: true, ...udsEnableRequiredFields });
     expect(res.status).toBe(400);
@@ -964,7 +969,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
-    const res = await request(appAs(null))
+    const res = await request(appAsGlobalAdmin())
       .patch(`/beneficiari/${b.id}`)
       .send({ uds: true, ...udsEnableRequiredFields });
     expect(res.status).toBe(200);
@@ -983,7 +988,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
-    const res = await request(appAs(null))
+    const res = await request(appAsGlobalAdmin())
       .patch(`/beneficiari/${b.id}`)
       .send({ uds: "true" });
     expect(res.status).toBe(400);
@@ -1021,7 +1026,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
-    const res = await request(appAs(null))
+    const res = await request(appAsGlobalAdmin())
       .patch(`/beneficiari/${b.id}`)
       .send({
         uds: true,
@@ -1065,7 +1070,7 @@ describe("PATCH /beneficiari/:id (uds boundary)", () => {
       })
       .returning({ id: beneficiariTable.id });
     beneficiarioIds.push(b.id);
-    const res = await request(appAs(null))
+    const res = await request(appAs(areaOperativaA))
       .patch(`/beneficiari/${b.id}`)
       .send({ uds: true, areaOperativaId: areaOperativaA });
     expect(res.status).toBe(200);
@@ -1137,7 +1142,7 @@ describe("GET /beneficiari?uds", () => {
         sesso: "M",
         uds: true,
       });
-    const mariaB = await request(appAs(null))
+    const mariaB = await request(appAs(areaOperativaB))
       .post("/beneficiari")
       .send({
         ...newUdsRequiredFields,
