@@ -616,3 +616,48 @@ File modificati: `artifacts/magazzino-solidale/src/pages/utenti.tsx` e
 esclusi. Prova manuale: ricaricare Utenti sulla 8082 e verificare il badge
 Disattivato rosso tenue; UAT visiva di Floriano ancora attesa. Prompt 02 non
 avviato.
+
+## Rifinitura UAT: mostra/nascondi password iniziale
+
+Su richiesta di Floriano è aggiunta l’icona dell’occhio nel campo Password
+iniziale di Nuovo utente. Il controllo segue lo stile già presente nel login:
+un clic mostra il testo, il successivo lo nasconde. Il pulsante è di tipo
+button, ha etichetta accessibile tradotta, aria-controls e aria-pressed.
+Il testo digitato rimane invariato; ogni apertura del form ripristina la
+password nascosta. Nessuna modifica al flusso di salvataggio o alle policy
+della password.
+
+File modificati:
+
+- `artifacts/magazzino-solidale/src/pages/utenti.tsx`.
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/utentiActions.ts`:
+  etichette Mostra/Nascondi nelle sei lingue esistenti, caricate con la pagina.
+- `artifacts/magazzino-solidale/src/pages/utenti.test.tsx`:
+  prova di mostra/nascondi, valore preservato, nessun submit del pulsante e
+  ripristino del campo nascosto e vuoto alla nuova apertura.
+- `docs/campagna-bug-2026-10.md`: questo registro.
+
+Verifiche effettive: installazione con frozen lockfile PASS,
+`pnpm run typecheck` PASS, **737 test UI PASS** in 115 file e gruppo canonico
+API core **76 PASS** in 11 file (zero FAIL/SKIP). Gli altri gruppi API non
+sono stati ripetuti per questo intervento sul solo frontend. Nessuna modifica
+a schema, OpenAPI, generated o dipendenze. Evidenze private:
+`/private/tmp/utenti-password-eye-ui.log`,
+`/private/tmp/utenti-password-eye-typecheck.log`,
+`/private/tmp/utenti-password-eye-api-core`.
+
+Build Docker WEB PASS, entry **399,1/400 KiB gzip**, budget invariato.
+Installato solo WEB sulla **8082**, candidato `7d70906bdc130073a49ebc8760cc1c38fda8cbc6`:
+`magazzino-bugfix-uat-web:sha-7d70906bdc13`,
+image ID `sha256:b3eeacf8afbe0b969b64024a72ae8d78e311a208b17e6f0ed8e20f1873970677`.
+API e PostgreSQL conservano container e data di avvio, verificati contro il
+preflight. Ledger **58/58** senza discrepanze. HTTP `/`, `/config.js`,
+`/api/healthz`, `/api/readyz`: 200; `/api/utenti` senza sessione: 401.
+Configurazione Compose confrontata: cambia soltanto immagine/revisione WEB.
+Ricevuta e rollback privati: `/Users/florianocaprio/Backups/Magazzino-Solidale/UTENTI-PASSWORD-EYE-WEB-7d70906bdc13-2026-10-19T13-25-42-063Z`.
+
+I quattro documenti locali preesistenti sono invariati per SHA-256 ed esclusi
+dai commit; nessun log, screenshot, credenziale o file locale aggiunto a Git.
+Prova manuale: ricaricare la 8082, aprire Nuovo utente, digitare la password
+iniziale e usare l’occhio per mostrarla/nasconderla. UAT visiva di Floriano
+ancora attesa; prompt 02 non avviato.
