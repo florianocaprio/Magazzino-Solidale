@@ -179,9 +179,12 @@ test("il form volontario espone tipologia e giornata temporanea", async ({
   const centres = await (await page.request.get("/api/centri-ascolto")).json() as Center[];
   const centre = centres.find((c) => c.attivo && c.areaOperativaId != null)!;
   const area = areas.find((a) => a.id === centre.areaOperativaId)!;
-  const other = await page.request.post("/api/aree-operative", { data: { nome: `Area alternativa ${Date.now()}`, sigla: "VA", codiceMatricola: "VA", attivo: true } });
-  expect(other.status()).toBe(201);
-  const otherArea = await other.json() as Area;
+  let otherArea = areas.find((a) => a.attivo && a.id !== area.id);
+  if (!otherArea) {
+    const other = await page.request.post("/api/aree-operative", { data: { nome: "Area alternativa Volontari", sigla: "VA", codiceMatricola: "VA", attivo: true } });
+    expect(other.status()).toBe(201);
+    otherArea = await other.json() as Area;
+  }
   await page.goto("/volontari");
   await page.getByRole("button", { name: /nuovo volontario/i }).click();
   const form = page.getByRole("dialog");
@@ -198,7 +201,7 @@ test("il form volontario espone tipologia e giornata temporanea", async ({
   await page.getByRole("option", { name: centre.nome, exact: true }).click();
   await expect(reference).toContainText(centre.nome);
   await areaSelect.click();
-  await page.getByRole("option", { name: otherArea.nome, exact: true }).click();
+  await page.getByRole("option", { name: otherArea!.nome, exact: true }).click();
   await expect(reference).toContainText("Nessun Centro di riferimento");
   await reference.click();
   await expect(page.getByRole("option", { name: centre.nome, exact: true })).toHaveCount(0);
