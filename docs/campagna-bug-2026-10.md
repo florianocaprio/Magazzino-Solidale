@@ -101,7 +101,7 @@ Nessuna decisione residua blocca l'avvio del prompt 01.
 
 ## Registro dei BUG
 
-Il BUG 01 è **CHIUSO CON OK UAT DI FLORIANO**; BUG 02/03/15 sono CHIUSI con OK UAT di Floriano; BUG 17 in sviluppo nel prompt 03. Le UAT successive sono **DA ESEGUIRE** e non derivano
+Il BUG 01 è **CHIUSO CON OK UAT DI FLORIANO**; BUG 02/03/15 sono CHIUSI con OK UAT di Floriano; BUG 17 ha un checkpoint tecnico pronto per ##test, con UAT integrata dopo il prompt 04. Le UAT successive sono **DA ESEGUIRE** e non derivano
 dai test automatici. Il candidato iniziale non è un candidato verificato della
 campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 
@@ -123,7 +123,7 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 14  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 15  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 16  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 17  | C      | 03, 04 | DA SVILUPPARE             | Nessuno; D04 approvata; UAT dopo 04                            | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
+| 17 | C | 03, 04 | CHECKPOINT 03 PRONTO PER ##test | Nessuno; D04 approvata; UAT dopo 04 | e8dbbfd65ff79b630b3f18ad2dea703d073b8b27 | PASS mirati; skip dichiarati nella ricevuta | DA ESEGUIRE dopo 04 | e8dbbfd65ff79b630b3f18ad2dea703d073b8b27 |
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 19  | E      | 07     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 20  | F      | 08     | DA SVILUPPARE             | Nessuno; conservare UX20-01–14                                 | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -139,7 +139,7 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | -------- | ----------------------------- | --------------- | ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------- |
 | 01 | A: 01 | Funzionale | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 | PASS; ultimi controlli 737 UI e 76 API core | Installata e verificata | CHIUSA; OK UAT Floriano 19/10 |
 | 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | CHIUSA; OK UAT Floriano 19/10 |
-| 03       | C: 17, prima parte            | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
+| 03 | C: 17, prima parte | Tecnica | e8dbbfd65ff79b630b3f18ad2dea703d073b8b27 | PASS: 1.596 API + 4 skip; 756 UI; 11 browser + 34 skip di matrice; build/budget | Installata su richiesta esplicita; ledger 60/60 | Checkpoint pronto per ##test; UAT integrata dopo 04 |
 | 04       | C: 05–09 e regressione 17     | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 05       | D: 04, 10–14, 16              | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 06       | E: 18, modello e integrazioni | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
@@ -1201,3 +1201,83 @@ File modificati per BUG 17 (inclusi contratti generati):
 - `artifacts/magazzino-solidale/src/pages/enti-esterni.test.tsx`
 - `lib/api-zod/src/generated/types/listEntiDestinatariAmbito.ts`
 - `lib/db/updates/20261019_z_enti_destinatari_globali.sql`
+
+
+### Ricevuta finale 03 — checkpoint tecnico pronto per ##test
+
+Checkpoint applicativo `baecd89c4b5c079a5e43c9526c2aae77c441eedc`;
+checkpoint finale **`e8dbbfd65ff79b630b3f18ad2dea703d073b8b27`**, che aggiunge soltanto la correzione di un selettore
+nel test browser. API, schema, UI applicativa e migration identici fra i due:
+riusate le evidenze pertinenti; typecheck e build ripetuti anche sulla SHA finale.
+**D04 approvata, nessuna parte sospesa. BUG 17 non chiuso**: UAT del blocco C
+integrato dopo prompt 04; nessun prompt 04 avviato automaticamente.
+
+Verifiche realmente eseguite con Node 24 e pnpm del workspace:
+
+- `pnpm install --frozen-lockfile`: PASS (CI=true), lockfile invariato.
+- `pnpm --filter @workspace/api-spec run codegen`: PASS, eseguito tramite
+  comando ufficiale; schema/client/Zod aggiornati. Seconda generazione coerente.
+- `pnpm run typecheck`: PASS, anche sul checkpoint finale.
+- `pnpm --filter @workspace/magazzino-solidale run test`: **756 PASS**, 119 file,
+  incluse le nuove verifiche di filtro/pagina e amministrazione degli Enti.
+- `node scripts/quality-gates-run.mjs api general reporting`: prima esecuzione
+  PASS. Esecuzione finale `api general` dopo il completamento delle nuove prove:
+  **1.513 PASS + 4 SKIP**, 139 file; reporting **83 PASS**, 6 file, sul medesimo
+  codice applicativo. Totale selezionato **1.596 API PASS**, quattro acceptance
+  di originali esterni non eseguite. Runner PostgreSQL **24 PASS**, fresh/replay
+  e ledger temporanei **60/60**, zero differenze. Evidenze
+  `/private/tmp/enti03-api-final` e `/private/tmp/enti03-api` (reporting).
+- Browser via runner canonico, API terminate e lock condiviso rispettato:
+  `m4a-documenti-destinatari.spec.ts` **8 PASS**, **32 SKIP** previsti sulle
+  quattro repliche non desktop dei lifecycle mutativi;
+  `m4a-documenti-accessibilita.spec.ts` **3 PASS**, **2 SKIP** previsti dalla
+  matrice desktop/tablet, sei lingue e RTL. Totale **11 PASS + 34 SKIP**.
+  Prima prova: nuovo selettore filtro Area ambiguo col selettore Lingua;
+  corretto soltanto il locator, nessuna asserzione o policy ridotta. Ripetuta
+  integralmente la suite documentale, incluse creazione globale da UI, scelta
+  Ente che preserva magazzino/Area, replay, PDF, snapshot e Trasferimento.
+  Evidenze `/private/tmp/enti03-browser-r2` e `/private/tmp/enti03-browser`
+  (accessibilità). NODE_PATH ai moduli nativi macOS temporanei già predisposti;
+  invariati dipendenze, isolamento, attestazioni e runner.
+- Tutte le prove funzionali su dati sintetici/PostgreSQL temporanei attestati;
+  nessuna suite funzionale sui dati della 8082.
+- Build API/WEB da archivio Git della SHA finale: PASS. Budget entry
+  **399,4/400 KiB gzip**, `index-Lc3iSvcQ.js`, soglia invariata.
+
+Preflight personale separato dai test funzionali: backup completo DB
+(`pg_dump -Fc`) e uploads, SHA-256 e indici archivi verificati. Ripristino su
+PostgreSQL temporaneo senza porte esposte e senza avvio dell’applicazione;
+runner update canonico **59→60 PASS**, ledger senza pending/checksum difformi,
+mancanti o fuori ordine. Confrontate impronte integrali di Enti, Bolle,
+Richieste, lotti, movimenti, prenotazioni e audit: **tutte invariate**.
+I **2 Enti preesistenti rimangono territoriali**, nessun globale creato dalla
+migrazione. Copia e rete temporanee rimosse, nessun volume temporaneo creato.
+La prova è stata ripetuta con backup e immagini della SHA finale.
+
+Backup e ricevute private:
+`/Users/florianocaprio/Backups/Magazzino-Solidale/ENTI-GLOBALI-e8dbbfd65ff7-2026-10-19T15-52-12-785Z`.
+`restoreTested=true`, `integrityUnchanged=true`; nessun dato personale,
+credenziale o connection string riportato in Git o in chat.
+
+Installazione 8082 autorizzata dalla richiesta diretta successiva al file 03:
+ricreati soltanto API e WEB dopo confronto Compose (sole immagini, revisione
+Git e versione sorgente migration). Database non ricreato, stesso avvio del
+06/10 e stessi volumi DB/uploads; update canonico applicato dall’entrypoint.
+
+- API `magazzino-bugfix-uat-api:sha-e8dbbfd65ff7`, image ID `sha256:d9e32b119ffa725d06ee8ff3761a2320c0ba0cb50ecd78837a893c80926afc88`.
+- WEB `magazzino-bugfix-uat-web:sha-e8dbbfd65ff7`, image ID `sha256:5b9e59a55bc0be3d0429185db7ad5094a9c7f0719616cf375ac7028608298942`.
+- Revisione immagini e container uguale alla SHA finale; API **healthy**.
+- Ledger personale **60/60**, zero pending/checksum difformi/mancanti/fuori ordine.
+- HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: **200**;
+  `/api/utenti` senza sessione: **401**.
+- Impronte dei dati dopo installazione uguali al backup; **2 Enti territoriali,
+  0 globali**, senza conversioni automatiche o alterazioni contabili.
+
+Prove disponibili sulla 8082, ricaricando la pagina: amministratore globale
+crea un Ente scegliendo Area oppure Globale prima dell’anagrafica; il filtro
+Area comprende i locali più i globali e Solo globali esclude i territoriali.
+Un profilo di Area vede/usa i globali ma non li può amministrare. Nella Bolla
+un globale mantiene magazzino e Area scelti; i documenti restano territoriali.
+Nessuna modifica manuale ai dati richiesta per completare questa migrazione.
+Il BUG 17 resta aperto per la UAT integrata dopo 04. Nessun merge/main/produzione.
+I quattro documenti locali preesistenti conservati ed esclusi dai commit.
