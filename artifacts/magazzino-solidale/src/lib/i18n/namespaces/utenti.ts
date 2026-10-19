@@ -1,22 +1,5 @@
 export const utenti = {
   it: {
-    actions: "Azioni",
-    actionsFor: "Azioni per {{username}}",
-    temporaryAction: "Assegna password temporanea",
-    temporaryHelp:
-      "Le sessioni e i link precedenti saranno revocati. L’utente dovrà cambiare questa password prima di utilizzare il servizio.",
-    temporaryPolicy: "Almeno 8 caratteri, una lettera e un numero.",
-    confirmPassword: "Conferma password temporanea",
-    passwordMismatch: "Le password non coincidono.",
-    temporarySuccess:
-      "Password temporanea assegnata. Cambio obbligatorio al prossimo accesso.",
-    reactivate: "Riattiva",
-    remove: "Elimina",
-    removeTitle: "Elimina utente?",
-    removeHelp:
-      "sarà eliminato definitivamente solo se mai utilizzato e senza dipendenze. Negli altri casi verrà disattivato conservando lo storico.",
-    toastRemoved:
-      "Rimozione completata; l’eventuale storico è stato conservato.",
     title: "Utenti",
     subtitle: "Gestisci gli account e i ruoli del personale",
     newUser: "Nuovo utente",
@@ -33,8 +16,7 @@ export const utenti = {
     nuovoUtente: "Nuovo utente",
     nomeCompleto: "Nome completo",
     matricolaPlaceholder: "Codice operatore (facoltativo)",
-    matricolaHint:
-      "Stampata sulle bolle come codice operatore. Se vuota, viene generata dalle iniziali di nome e cognome + giorno e anno (es. MR2426).",
+    matricolaHint: "Stampata sulle bolle come codice operatore. Se vuota, viene generata dalle iniziali di nome e cognome + giorno e anno (es. MR2426).",
     passwordIniziale: "Password iniziale",
     passwordHint: "L'utente dovrà cambiarla al primo accesso.",
     selezionaRuolo: "Seleziona ruolo",
@@ -49,18 +31,15 @@ export const utenti = {
     saveChanges: "Salva modifiche",
     createUser: "Crea utente",
     resetTitle: "Invia link reset password",
-    resetConfirm:
-      "Vuoi inviare un link di reset password all'indirizzo email dell'utente?",
+    resetConfirm: "Vuoi inviare un link di reset password all'indirizzo email dell'utente?",
     resetDescBefore: "Invierai un link per scegliere una nuova password a",
     resetDescAfter: ".",
     nuovaPassword: "Nuova password",
     resetButton: "Invia link reset password",
-    emailInvalidForReset:
-      "L'utente non ha un indirizzo email valido. Aggiorna prima il profilo.",
+    emailInvalidForReset: "L'utente non ha un indirizzo email valido. Aggiorna prima il profilo.",
     deleteTitle: "Disattiva utente?",
     deleteDescBefore: "L'account",
-    deleteDescAfter:
-      "verrà disattivato senza eliminare lo storico e potrà essere riattivato dalla modifica.",
+    deleteDescAfter: "verrà disattivato senza eliminare lo storico e potrà essere riattivato dalla modifica.",
     toastUpdated: "Utente aggiornato",
     toastCreated: "Utente creato",
     toastCreatedDesc: "Dovrà cambiare la password al primo accesso.",
@@ -75,23 +54,6 @@ export const utenti = {
     operationFailed: "Operazione non riuscita.",
   },
   es: {
-    actions: "Acciones",
-    actionsFor: "Acciones para {{username}}",
-    temporaryAction: "Asignar contraseña temporal",
-    temporaryHelp:
-      "Se revocarán las sesiones y los enlaces anteriores. El usuario deberá cambiar esta contraseña antes de usar el servicio.",
-    temporaryPolicy: "Al menos 8 caracteres, una letra y un número.",
-    confirmPassword: "Confirmar contraseña temporal",
-    passwordMismatch: "Las contraseñas no coinciden.",
-    temporarySuccess:
-      "Contraseña temporal asignada. Cambio obligatorio en el próximo acceso.",
-    reactivate: "Reactivar",
-    remove: "Eliminar",
-    removeTitle: "¿Eliminar usuario?",
-    removeHelp:
-      "se eliminará definitivamente solo si nunca se ha utilizado y no tiene dependencias. En los demás casos se desactivará conservando el historial.",
-    toastRemoved:
-      "Eliminación completada; se ha conservado el historial existente.",
     title: "Usuarios",
     subtitle: "Gestiona las cuentas y los roles del personal",
     newUser: "Nuevo usuario",
@@ -108,8 +70,7 @@ export const utenti = {
     nuovoUtente: "Nuevo usuario",
     nomeCompleto: "Nombre completo",
     matricolaPlaceholder: "Código de operador (opcional)",
-    matricolaHint:
-      "Impresa en los albaranes como código de operador. Si está vacía, se genera con las iniciales de nombre y apellido + día y año (p. ej. MR2426).",
+    matricolaHint: "Impresa en los albaranes como código de operador. Si está vacía, se genera con las iniciales de nombre y apellido + día y año (p. ej. MR2426).",
     passwordIniziale: "Contraseña inicial",
     passwordHint: "El usuario deberá cambiarla en el primer acceso.",
     selezionaRuolo: "Seleccionar rol",
@@ -124,18 +85,15 @@ export const utenti = {
     saveChanges: "Guardar cambios",
     createUser: "Crear usuario",
     resetTitle: "Enviar enlace de restablecimiento",
-    resetConfirm:
-      "¿Quieres enviar un enlace de restablecimiento de contraseña al email del usuario?",
+    resetConfirm: "¿Quieres enviar un enlace de restablecimiento de contraseña al email del usuario?",
     resetDescBefore: "Enviarás un enlace para elegir una nueva contraseña a",
     resetDescAfter: ".",
     nuovaPassword: "Nueva contraseña",
     resetButton: "Enviar enlace de restablecimiento",
-    emailInvalidForReset:
-      "El usuario no tiene una dirección de email válida. Actualiza primero el perfil.",
+    emailInvalidForReset: "El usuario no tiene una dirección de email válida. Actualiza primero el perfil.",
     deleteTitle: "¿Desactivar el usuario?",
     deleteDescBefore: "La cuenta",
-    deleteDescAfter:
-      "se desactivará sin eliminar el historial y podrá reactivarse desde la edición.",
+    deleteDescAfter: "se desactivará sin eliminar el historial y podrá reactivarse desde la edición.",
     toastUpdated: "Usuario actualizado",
     toastCreated: "Usuario creado",
     toastCreatedDesc: "Deberá cambiar la contraseña en el primer acceso.",
@@ -150,22 +108,6 @@ export const utenti = {
     operationFailed: "La operación no se pudo completar.",
   },
   en: {
-    actions: "Actions",
-    actionsFor: "Actions for {{username}}",
-    temporaryAction: "Assign temporary password",
-    temporaryHelp:
-      "Previous sessions and reset links will be revoked. The user must change this password before using the service.",
-    temporaryPolicy: "At least 8 characters, a letter and a number.",
-    confirmPassword: "Confirm temporary password",
-    passwordMismatch: "Passwords do not match.",
-    temporarySuccess:
-      "Temporary password assigned. A password change is required at next login.",
-    reactivate: "Reactivate",
-    remove: "Delete",
-    removeTitle: "Delete user?",
-    removeHelp:
-      "will be permanently deleted only if never used and without dependencies. Otherwise it will be deactivated with history preserved.",
-    toastRemoved: "Removal completed; any history has been preserved.",
     title: "Users",
     subtitle: "Manage staff accounts and roles",
     newUser: "New user",
@@ -182,8 +124,7 @@ export const utenti = {
     nuovoUtente: "New user",
     nomeCompleto: "Full name",
     matricolaPlaceholder: "Operator code (optional)",
-    matricolaHint:
-      "Printed on delivery notes as operator code. If empty, it is generated from the initials of first and last name + day and year (e.g. MR2426).",
+    matricolaHint: "Printed on delivery notes as operator code. If empty, it is generated from the initials of first and last name + day and year (e.g. MR2426).",
     passwordIniziale: "Initial password",
     passwordHint: "The user will have to change it at first access.",
     selezionaRuolo: "Select role",
@@ -198,18 +139,15 @@ export const utenti = {
     saveChanges: "Save changes",
     createUser: "Create user",
     resetTitle: "Send password reset link",
-    resetConfirm:
-      "Do you want to send a password reset link to the user's email address?",
+    resetConfirm: "Do you want to send a password reset link to the user's email address?",
     resetDescBefore: "You will send a link to choose a new password to",
     resetDescAfter: ".",
     nuovaPassword: "New password",
     resetButton: "Send password reset link",
-    emailInvalidForReset:
-      "The user does not have a valid email address. Update the profile first.",
+    emailInvalidForReset: "The user does not have a valid email address. Update the profile first.",
     deleteTitle: "Deactivate the user?",
     deleteDescBefore: "The account",
-    deleteDescAfter:
-      "will be deactivated without deleting history and can be reactivated from edit.",
+    deleteDescAfter: "will be deactivated without deleting history and can be reactivated from edit.",
     toastUpdated: "User updated",
     toastCreated: "User created",
     toastCreatedDesc: "They will have to change the password at first access.",
@@ -224,22 +162,6 @@ export const utenti = {
     operationFailed: "The operation failed.",
   },
   fr: {
-    actions: "Actions",
-    actionsFor: "Actions pour {{username}}",
-    temporaryAction: "Attribuer un mot de passe temporaire",
-    temporaryHelp:
-      "Les sessions et liens précédents seront révoqués. L’utilisateur devra changer ce mot de passe avant d’utiliser le service.",
-    temporaryPolicy: "Au moins 8 caractères, une lettre et un chiffre.",
-    confirmPassword: "Confirmer le mot de passe temporaire",
-    passwordMismatch: "Les mots de passe ne correspondent pas.",
-    temporarySuccess:
-      "Mot de passe temporaire attribué. Changement obligatoire à la prochaine connexion.",
-    reactivate: "Réactiver",
-    remove: "Supprimer",
-    removeTitle: "Supprimer l’utilisateur ?",
-    removeHelp:
-      "sera supprimé définitivement uniquement s’il n’a jamais été utilisé et n’a aucune dépendance. Sinon, il sera désactivé en conservant l’historique.",
-    toastRemoved: "Suppression terminée ; l’historique existant est conservé.",
     title: "Utilisateurs",
     subtitle: "Gérez les comptes et les rôles du personnel",
     newUser: "Nouvel utilisateur",
@@ -256,8 +178,7 @@ export const utenti = {
     nuovoUtente: "Nouvel utilisateur",
     nomeCompleto: "Nom complet",
     matricolaPlaceholder: "Code opérateur (facultatif)",
-    matricolaHint:
-      "Imprimé sur les bons comme code opérateur. Si vide, il est généré à partir des initiales du prénom et du nom + jour et année (ex. MR2426).",
+    matricolaHint: "Imprimé sur les bons comme code opérateur. Si vide, il est généré à partir des initiales du prénom et du nom + jour et année (ex. MR2426).",
     passwordIniziale: "Mot de passe initial",
     passwordHint: "L'utilisateur devra le changer à la première connexion.",
     selezionaRuolo: "Sélectionner un rôle",
@@ -272,23 +193,18 @@ export const utenti = {
     saveChanges: "Enregistrer les modifications",
     createUser: "Créer l'utilisateur",
     resetTitle: "Envoyer le lien de réinitialisation",
-    resetConfirm:
-      "Voulez-vous envoyer un lien de réinitialisation du mot de passe à l'adresse email de l'utilisateur ?",
-    resetDescBefore:
-      "Vous enverrez un lien pour choisir un nouveau mot de passe à",
+    resetConfirm: "Voulez-vous envoyer un lien de réinitialisation du mot de passe à l'adresse email de l'utilisateur ?",
+    resetDescBefore: "Vous enverrez un lien pour choisir un nouveau mot de passe à",
     resetDescAfter: ".",
     nuovaPassword: "Nouveau mot de passe",
     resetButton: "Envoyer le lien de réinitialisation",
-    emailInvalidForReset:
-      "L'utilisateur n'a pas d'adresse email valide. Mettez d'abord le profil à jour.",
+    emailInvalidForReset: "L'utilisateur n'a pas d'adresse email valide. Mettez d'abord le profil à jour.",
     deleteTitle: "Désactiver l'utilisateur ?",
     deleteDescBefore: "Le compte",
-    deleteDescAfter:
-      "sera désactivé sans supprimer l'historique et pourra être réactivé depuis la modification.",
+    deleteDescAfter: "sera désactivé sans supprimer l'historique et pourra être réactivé depuis la modification.",
     toastUpdated: "Utilisateur mis à jour",
     toastCreated: "Utilisateur créé",
-    toastCreatedDesc:
-      "Il devra changer le mot de passe à la première connexion.",
+    toastCreatedDesc: "Il devra changer le mot de passe à la première connexion.",
     toastDeleted: "Utilisateur désactivé",
     cannotDelete: "Impossible de désactiver",
     pwdShort: "Le mot de passe doit comporter au moins 8 caractères.",
@@ -300,23 +216,6 @@ export const utenti = {
     operationFailed: "L'opération a échoué.",
   },
   de: {
-    actions: "Aktionen",
-    actionsFor: "Aktionen für {{username}}",
-    temporaryAction: "Temporäres Passwort zuweisen",
-    temporaryHelp:
-      "Bisherige Sitzungen und Links werden widerrufen. Das Passwort muss vor der Nutzung des Dienstes geändert werden.",
-    temporaryPolicy: "Mindestens 8 Zeichen, ein Buchstabe und eine Zahl.",
-    confirmPassword: "Temporäres Passwort bestätigen",
-    passwordMismatch: "Die Passwörter stimmen nicht überein.",
-    temporarySuccess:
-      "Temporäres Passwort zugewiesen. Änderung bei der nächsten Anmeldung erforderlich.",
-    reactivate: "Reaktivieren",
-    remove: "Löschen",
-    removeTitle: "Benutzer löschen?",
-    removeHelp:
-      "wird nur endgültig gelöscht, wenn das Konto nie verwendet wurde und keine Abhängigkeiten bestehen. Andernfalls wird es mit erhaltenem Verlauf deaktiviert.",
-    toastRemoved:
-      "Entfernung abgeschlossen; vorhandener Verlauf wurde erhalten.",
     title: "Benutzer",
     subtitle: "Verwalten Sie Konten und Rollen des Personals",
     newUser: "Neuer Benutzer",
@@ -333,8 +232,7 @@ export const utenti = {
     nuovoUtente: "Neuer Benutzer",
     nomeCompleto: "Vollständiger Name",
     matricolaPlaceholder: "Bedienercode (optional)",
-    matricolaHint:
-      "Wird auf Lieferscheinen als Bedienercode gedruckt. Wenn leer, wird er aus den Initialen von Vor- und Nachname + Tag und Jahr erzeugt (z. B. MR2426).",
+    matricolaHint: "Wird auf Lieferscheinen als Bedienercode gedruckt. Wenn leer, wird er aus den Initialen von Vor- und Nachname + Tag und Jahr erzeugt (z. B. MR2426).",
     passwordIniziale: "Initiales Passwort",
     passwordHint: "Der Benutzer muss es beim ersten Zugriff ändern.",
     selezionaRuolo: "Rolle auswählen",
@@ -349,19 +247,15 @@ export const utenti = {
     saveChanges: "Änderungen speichern",
     createUser: "Benutzer erstellen",
     resetTitle: "Link zum Zurücksetzen senden",
-    resetConfirm:
-      "Möchten Sie einen Link zum Zurücksetzen des Passworts an die E-Mail-Adresse des Benutzers senden?",
-    resetDescBefore:
-      "Sie senden einen Link zur Auswahl eines neuen Passworts an",
+    resetConfirm: "Möchten Sie einen Link zum Zurücksetzen des Passworts an die E-Mail-Adresse des Benutzers senden?",
+    resetDescBefore: "Sie senden einen Link zur Auswahl eines neuen Passworts an",
     resetDescAfter: ".",
     nuovaPassword: "Neues Passwort",
     resetButton: "Link zum Zurücksetzen senden",
-    emailInvalidForReset:
-      "Der Benutzer hat keine gültige E-Mail-Adresse. Aktualisieren Sie zuerst das Profil.",
+    emailInvalidForReset: "Der Benutzer hat keine gültige E-Mail-Adresse. Aktualisieren Sie zuerst das Profil.",
     deleteTitle: "Benutzer deaktivieren?",
     deleteDescBefore: "Das Konto",
-    deleteDescAfter:
-      "wird deaktiviert, ohne den Verlauf zu löschen, und kann über Bearbeiten reaktiviert werden.",
+    deleteDescAfter: "wird deaktiviert, ohne den Verlauf zu löschen, und kann über Bearbeiten reaktiviert werden.",
     toastUpdated: "Benutzer aktualisiert",
     toastCreated: "Benutzer erstellt",
     toastCreatedDesc: "Das Passwort muss beim ersten Zugriff geändert werden.",
@@ -376,22 +270,6 @@ export const utenti = {
     operationFailed: "Der Vorgang ist fehlgeschlagen.",
   },
   ar: {
-    actions: "الإجراءات",
-    actionsFor: "إجراءات {{username}}",
-    temporaryAction: "تعيين كلمة مرور مؤقتة",
-    temporaryHelp:
-      "سيتم إلغاء الجلسات وروابط الاستعادة السابقة. يجب على المستخدم تغيير كلمة المرور قبل استخدام الخدمة.",
-    temporaryPolicy: "8 أحرف على الأقل مع حرف لاتيني ورقم.",
-    confirmPassword: "تأكيد كلمة المرور المؤقتة",
-    passwordMismatch: "كلمتا المرور غير متطابقتين.",
-    temporarySuccess:
-      "تم تعيين كلمة مرور مؤقتة. يجب تغييرها عند الدخول التالي.",
-    reactivate: "إعادة التفعيل",
-    remove: "حذف",
-    removeTitle: "حذف المستخدم؟",
-    removeHelp:
-      "سيُحذف نهائيًا فقط إذا لم يُستخدم مطلقًا ولا توجد ارتباطات به. وإلا فسيتم تعطيله مع الاحتفاظ بالسجل.",
-    toastRemoved: "اكتملت الإزالة مع الاحتفاظ بالسجل إن وجد.",
     title: "المستخدمون",
     subtitle: "إدارة حسابات الموظفين وأدوارهم",
     newUser: "مستخدم جديد",
@@ -408,8 +286,7 @@ export const utenti = {
     nuovoUtente: "مستخدم جديد",
     nomeCompleto: "الاسم الكامل",
     matricolaPlaceholder: "رمز المشغّل (اختياري)",
-    matricolaHint:
-      "يُطبع على الإشعارات كرمز المشغّل. إذا كان فارغًا، يُولَّد من الأحرف الأولى للاسم واللقب + اليوم والسنة (مثل MR2426).",
+    matricolaHint: "يُطبع على الإشعارات كرمز المشغّل. إذا كان فارغًا، يُولَّد من الأحرف الأولى للاسم واللقب + اليوم والسنة (مثل MR2426).",
     passwordIniziale: "كلمة المرور الأولية",
     passwordHint: "يجب على المستخدم تغييرها عند أول دخول.",
     selezionaRuolo: "اختر الدور",
@@ -424,18 +301,15 @@ export const utenti = {
     saveChanges: "حفظ التغييرات",
     createUser: "إنشاء المستخدم",
     resetTitle: "إرسال رابط إعادة تعيين كلمة المرور",
-    resetConfirm:
-      "هل تريد إرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني للمستخدم؟",
+    resetConfirm: "هل تريد إرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني للمستخدم؟",
     resetDescBefore: "سيتم إرسال رابط لاختيار كلمة مرور جديدة إلى",
     resetDescAfter: ".",
     nuovaPassword: "كلمة مرور جديدة",
     resetButton: "إرسال رابط إعادة التعيين",
-    emailInvalidForReset:
-      "لا يملك المستخدم بريدًا إلكترونيًا صالحًا. حدّث الملف أولًا.",
+    emailInvalidForReset: "لا يملك المستخدم بريدًا إلكترونيًا صالحًا. حدّث الملف أولًا.",
     deleteTitle: "إلغاء تفعيل المستخدم؟",
     deleteDescBefore: "الحساب",
-    deleteDescAfter:
-      "سيتم إلغاء تفعيله دون حذف السجل ويمكن إعادة تفعيله من شاشة التعديل.",
+    deleteDescAfter: "سيتم إلغاء تفعيله دون حذف السجل ويمكن إعادة تفعيله من شاشة التعديل.",
     toastUpdated: "تم تحديث المستخدم",
     toastCreated: "تم إنشاء المستخدم",
     toastCreatedDesc: "سيتعين عليه تغيير كلمة المرور عند أول دخول.",

@@ -212,3 +212,36 @@ D01 applicata senza eccezioni implicite: ultimo accesso, sessioni, token e ogni 
 Le sessioni precedenti prive della versione delle credenziali richiedono un nuovo login dopo l’aggiornamento. I segreti non sono restituiti o registrati in audit; anche gli errori dei nuovi writer delle credenziali non espongono i parametri SQL.
 
 Candidato locale congelato per i controlli finali API/UI e build API/WEB con budget 400 KiB invariato. Aggiornamento 8082 e pubblicazione solo dopo esito positivo; backup e metadati operativi resteranno fuori repository. La UAT non è ancora eseguita.
+
+Controlli sul backend congelato `50d55b2426f590d1afc3a91c44b8f476bc663259`: gruppi API core/general, 148 file, **1.564 PASS, 0 FAIL, 4 SKIP** sugli originali esterni; **24 test migration PASS**, ledger effimeri 58/58 e cleanup completato. Evidenze nuove `/private/tmp/magazzino-bug01-certified-api-AqF5ne`; gli 11 casi BUG 01 sono inclusi, senza conteggiare i giri precedenti.
+
+Installazione con lockfile invariato, codegen ufficiale e typecheck Node 24 PASS. Il primo giro UI aveva rilevato una conferma Elimina etichettata come disattivazione: corretta e verificata. Il primo build API/WEB era riuscito, ma il budget WEB era **KO, 400,5/400 KiB gzip**: quel candidato non è stato installato. Le sole nuove traduzioni delle azioni Utenti sono ora caricate con la pagina, già lazy, tramite `utentiActions.ts`; caricamento delle altre pagine e soglia invariati. Typecheck e frontend completa dopo questo adeguamento: **730 PASS, 0 FAIL, 0 SKIP**. Il backend, i contratti e gli input delle sue suite restano invariati rispetto a `50d55b2`, quindi le evidenze API sopra restano applicabili. Nuovo build e budget ancora da concludere prima della 8082.
+
+File del BUG 01 (sorgenti, test, contratto, generati ufficiali e registro):
+
+- `artifacts/api-server/src/lib/removeUser.ts`
+- `artifacts/api-server/src/lib/systemLog.ts`
+- `artifacts/api-server/src/lib/userAccess.ts`
+- `artifacts/api-server/src/middlewares/auth.ts`
+- `artifacts/api-server/src/routes/auth.ts`
+- `artifacts/api-server/src/routes/utenti.ts`
+- `artifacts/api-server/tests/change-password.test.ts`
+- `artifacts/api-server/tests/fase5-super-admin.test.ts`
+- `artifacts/api-server/tests/helpers/session-stub.ts`
+- `artifacts/api-server/tests/password-recovery.test.ts`
+- `artifacts/api-server/tests/scope-helpers.ts`
+- `artifacts/api-server/tests/utenti-bug01.test.ts`
+- `artifacts/api-server/tests/utenti-matricola.test.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/utentiActions.ts`
+- `artifacts/magazzino-solidale/src/pages/utenti.test.tsx`
+- `artifacts/magazzino-solidale/src/pages/utenti.tsx`
+- `docs/campagna-bug-2026-10.md`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-client-react/src/generated/api.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/deleteUtenteParams.ts`
+- `lib/api-zod/src/generated/types/index.ts`
+- `lib/api-zod/src/generated/types/systemLogEventType.ts`
+- `lib/api-zod/src/generated/types/temporaryPasswordInput.ts`
+- `lib/api-zod/src/index.ts`

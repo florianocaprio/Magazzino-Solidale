@@ -1,6 +1,8 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createInstance } from "i18next";
+import { registerUtentiActions } from "@/lib/i18n/namespaces/utentiActions";
 
 const mocks = vi.hoisted(() => ({
   users: [
@@ -57,7 +59,9 @@ vi.mock("react-i18next", () => ({
       params?.username ? `${key} ${params.username}` : key,
   }),
 }));
-vi.mock("@/lib/i18n", () => ({ default: { t: (key: string) => key } }));
+vi.mock("@/lib/i18n", () => ({
+  default: { t: (key: string) => key, addResourceBundle: vi.fn() },
+}));
 import Utenti from "./utenti";
 
 let container: HTMLDivElement, root: Root;
@@ -112,6 +116,24 @@ afterEach(async () => {
 });
 
 describe("BUG 01 — azioni Utenti", () => {
+  it("carica le nuove traduzioni con la pagina e conserva quelle esistenti al cambio lingua", async () => {
+    const instance = createInstance();
+    await instance.init({
+      lng: "it",
+      resources: { it: { translation: { utenti: { title: "Utenti" } } } },
+    });
+    registerUtentiActions(instance);
+    expect(instance.t("utenti.title")).toBe("Utenti");
+    expect(instance.t("utenti.temporaryAction")).toBe(
+      "Assegna password temporanea",
+    );
+    await instance.changeLanguage("en");
+    expect(instance.t("utenti.temporaryAction")).toBe(
+      "Assign temporary password",
+    );
+    await instance.changeLanguage("ar");
+    expect(instance.t("utenti.actions")).toBe("الإجراءات");
+  });
   it("espone il controllo etichettato nella prima cella e permette l'apertura da tastiera", async () => {
     const first = document.querySelector("tbody tr td")!;
     expect(first.querySelector("button")?.getAttribute("aria-label")).toContain(

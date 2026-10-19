@@ -78,7 +78,10 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
+import { registerUtentiActions } from "@/lib/i18n/namespaces/utentiActions";
 import { ruoliNelPerimetro } from "@/lib/admin-scope";
+
+registerUtentiActions(i18n);
 
 const NO_ROLE = "none";
 const NO_CENTRO = "__none__";
