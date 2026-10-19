@@ -24,11 +24,19 @@ export interface UtenteInput {
   matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoId?: number | null;
   /** @nullable */
   areaOperativaId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsId?: number | null;
   attivo?: boolean;
 }

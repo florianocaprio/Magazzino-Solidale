@@ -10165,17 +10165,33 @@ export interface AuthUser {
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoNome?: string | null;
   /** @nullable */
   areaOperativaId?: number | null;
   /** @nullable */
   areaOperativaNome?: string | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsNome?: string | null;
   isSuperAdmin: boolean;
   isAdmin: boolean;
@@ -10231,17 +10247,33 @@ export interface Utente {
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoNome?: string | null;
   /** @nullable */
   areaOperativaId?: number | null;
   /** @nullable */
   areaOperativaNome?: string | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsNome?: string | null;
   isSuperAdmin: boolean;
   attivo: boolean;
@@ -10279,11 +10311,19 @@ export interface UtenteInput {
   matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoId?: number | null;
   /** @nullable */
   areaOperativaId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsId?: number | null;
   attivo?: boolean;
 }
@@ -10299,11 +10339,19 @@ export interface UtenteUpdate {
   matricola?: string | null;
   /** @nullable */
   ruoloId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoId?: number | null;
   /** @nullable */
   areaOperativaId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsId?: number | null;
   attivo?: boolean;
 }

@@ -21477,12 +21477,32 @@ export const LoginUserResponse = zod.object({
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
   ruoloNome: zod.string().nullish(),
-  centroAscoltoId: zod.number().nullish(),
-  centroAscoltoNome: zod.string().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  centroAscoltoNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
   areaOperativaNome: zod.string().nullish(),
-  zonaUdsId: zod.number().nullish(),
-  zonaUdsNome: zod.string().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  zonaUdsNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   isSuperAdmin: zod.boolean(),
   isAdmin: zod.boolean(),
   aree: zod.array(zod.string()),
@@ -21500,12 +21520,32 @@ export const GetCurrentUserResponse = zod.object({
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
   ruoloNome: zod.string().nullish(),
-  centroAscoltoId: zod.number().nullish(),
-  centroAscoltoNome: zod.string().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  centroAscoltoNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
   areaOperativaNome: zod.string().nullish(),
-  zonaUdsId: zod.number().nullish(),
-  zonaUdsNome: zod.string().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  zonaUdsNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   isSuperAdmin: zod.boolean(),
   isAdmin: zod.boolean(),
   aree: zod.array(zod.string()),
@@ -23150,12 +23190,32 @@ export const ListUtentiResponseItem = zod.object({
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
   ruoloNome: zod.string().nullish(),
-  centroAscoltoId: zod.number().nullish(),
-  centroAscoltoNome: zod.string().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  centroAscoltoNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
   areaOperativaNome: zod.string().nullish(),
-  zonaUdsId: zod.number().nullish(),
-  zonaUdsNome: zod.string().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  zonaUdsNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   isSuperAdmin: zod.boolean(),
   attivo: zod.boolean(),
   mustChangePassword: zod.boolean(),
@@ -23180,9 +23240,19 @@ export const CreateUtenteBody = zod.object({
   cognome: zod.string().min(1),
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
-  centroAscoltoId: zod.number().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
-  zonaUdsId: zod.number().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.",
+    ),
   attivo: zod.boolean().optional(),
 });
 
@@ -23199,12 +23269,32 @@ export const GetUtenteResponse = zod.object({
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
   ruoloNome: zod.string().nullish(),
-  centroAscoltoId: zod.number().nullish(),
-  centroAscoltoNome: zod.string().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  centroAscoltoNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
   areaOperativaNome: zod.string().nullish(),
-  zonaUdsId: zod.number().nullish(),
-  zonaUdsNome: zod.string().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  zonaUdsNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   isSuperAdmin: zod.boolean(),
   attivo: zod.boolean(),
   mustChangePassword: zod.boolean(),
@@ -23225,9 +23315,19 @@ export const UpdateUtenteBody = zod.object({
   cognome: zod.string().nullish(),
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
-  centroAscoltoId: zod.number().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
-  zonaUdsId: zod.number().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.",
+    ),
   attivo: zod.boolean().optional(),
 });
 
@@ -23240,12 +23340,32 @@ export const UpdateUtenteResponse = zod.object({
   matricola: zod.string().nullish(),
   ruoloId: zod.number().nullish(),
   ruoloNome: zod.string().nullish(),
-  centroAscoltoId: zod.number().nullish(),
-  centroAscoltoNome: zod.string().nullish(),
+  centroAscoltoId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  centroAscoltoNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   areaOperativaId: zod.number().nullish(),
   areaOperativaNome: zod.string().nullish(),
-  zonaUdsId: zod.number().nullish(),
-  zonaUdsNome: zod.string().nullish(),
+  zonaUdsId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
+  zonaUdsNome: zod
+    .string()
+    .nullish()
+    .describe(
+      "Campo legacy restituito come null; perimetro utente definito dall'Area.",
+    ),
   isSuperAdmin: zod.boolean(),
   attivo: zod.boolean(),
   mustChangePassword: zod.boolean(),

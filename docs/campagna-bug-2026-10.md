@@ -431,3 +431,90 @@ continuano a essere respinti.
 
 **Correzione pronta su 8082; UAT di Floriano ancora attesa. Non avviare prompt 02
 prima del suo OK.**
+
+
+## Chiarimento successivo: account autorizzato soltanto per Area
+
+Richiesta di Floriano del 19 ottobre 2026: «Un utente è abilitato per AREA non
+per centro di ascolto», con rimozione di Centro di Ascolto e Zona UDS. Questa
+istruzione sostituisce la precedente distinzione che conservava i vincoli
+Centro/Zona per UDS e logistica: l’account usa ora **ruolo, permessi e Area**
+in tutti i moduli. Prompt 02 resta in attesa dell’OK UAT.
+
+Intervento incrementale:
+
+- Rimossi Centro e Zona da creazione, modifica e tabella Utenti; rimangono
+  Ruolo e Area Operativa. Gli operatori senza Area sono indicati come
+  «Area non assegnata», senza suggerire un’autorizzazione globale.
+- La sessione e gli attori riletti nei comandi restituiscono Centro/Zona null,
+  anche per account con riferimenti legacy inattivi o differenti. Le restrizioni
+  fra Aree, i ruoli correnti, i moduli abilitati e le revoche restano applicati.
+- Le API di creazione ignorano i parametri legacy Centro/Zona. In modifica non
+  si assegnano questi campi; un cambio di Area li azzera sul singolo account
+  modificato, evitando conflitti con la FK composta Zona/Area. Nessuna modifica
+  massiva ai dati personali esistenti.
+- Gli operatori senza Area non accedono alle funzioni operative. Identità e
+  cambio password restano disponibili; un vecchio vincolo senza Area non viene
+  trasformato automaticamente in privilegio globale. L’accesso amministrativo
+  globale esplicito rimane previsto.
+- I Centri/Zona delle strutture, dei beneficiari e delle attività rimangono
+  dati operativi utilizzabili nei filtri. Non sono più assegnazioni dell’account.
+
+Impatto API: proprietà legacy deprecate in OpenAPI, conservate nullable per
+compatibilità; in output valgono null e in input sono ignorate. Generated
+rigenerati con il comando ufficiale. **Nessuna modifica schema o migration**:
+le colonne legacy restano presenti; lo storico operativo è conservato.
+
+I test che imponevano restrizioni per Centro/Zona all’account sono aggiornati
+alla regola Area; restano prove negative per altre Aree, privilegi insufficienti,
+account disattivati, revoca Area e concorrenza. Le fixture di sessioni valide
+assegnano esplicitamente l’Area; le prove di scope non configurato continuano
+a verificarne il diniego.
+
+Rilievo aggregato in sola lettura sulla 8082: due account attivi senza Area
+richiedono configurazione da parte dell’amministratore prima dell’uso operativo.
+Nessuna Area scelta o assegnata automaticamente.
+
+File modificati in questo chiarimento (oltre al presente registro):
+
+- `artifacts/api-server/src/lib/currentCommandActor.ts`
+- `artifacts/api-server/src/lib/m5bRequestAccess.ts`
+- `artifacts/api-server/src/lib/mensaScope.ts`
+- `artifacts/api-server/src/lib/userAccess.ts`
+- `artifacts/api-server/src/middlewares/auth.ts`
+- `artifacts/api-server/src/routes/interventi.ts`
+- `artifacts/api-server/src/routes/utenti.ts`
+- `artifacts/api-server/tests/audit-admin-hardening.test.ts`
+- `artifacts/api-server/tests/beneficiari-uds.test.ts`
+- `artifacts/api-server/tests/bolle-prenotazioni.test.ts`
+- `artifacts/api-server/tests/credito-solidale.test.ts`
+- `artifacts/api-server/tests/emporio-security.test.ts`
+- `artifacts/api-server/tests/fse-api-2-0c.test.ts`
+- `artifacts/api-server/tests/m5b-r2-autorizzazioni.test.ts`
+- `artifacts/api-server/tests/m5b-r3-guardie-post-preparazione.test.ts`
+- `artifacts/api-server/tests/m5c2a-handoff-bolla-pronta.test.ts`
+- `artifacts/api-server/tests/m5c2a-r1-request-cancel.test.ts`
+- `artifacts/api-server/tests/m63-formal-certification.test.ts`
+- `artifacts/api-server/tests/m63-interventi.test.ts`
+- `artifacts/api-server/tests/m67a-authorization.test.ts`
+- `artifacts/api-server/tests/reporting-m66-security.test.ts`
+- `artifacts/api-server/tests/richieste-magazzino-m5a-session.test.ts`
+- `artifacts/api-server/tests/richieste-magazzino-m5a.test.ts`
+- `artifacts/api-server/tests/scope-helpers.ts`
+- `artifacts/api-server/tests/scoping-beneficiario.test.ts`
+- `artifacts/api-server/tests/scoping-direct.test.ts`
+- `artifacts/api-server/tests/transport-return-m4b2.test.ts`
+- `artifacts/api-server/tests/utenti-bug01.test.ts`
+- `artifacts/api-server/tests/utenti-matricola.test.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/utentiActions.ts`
+- `artifacts/magazzino-solidale/src/pages/utenti.test.tsx`
+- `artifacts/magazzino-solidale/src/pages/utenti.tsx`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/authUser.ts`
+- `lib/api-zod/src/generated/types/utente.ts`
+- `lib/api-zod/src/generated/types/utenteInput.ts`
+- `lib/api-zod/src/generated/types/utenteUpdate.ts`
+
+Verifiche automatiche e ricevuta 8082: in completamento.

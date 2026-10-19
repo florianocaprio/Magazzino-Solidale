@@ -101,7 +101,7 @@ export function m5bTerritory(actor: M5bRequestActor) {
     return actor.centroAscoltoId == null && actor.isAdmin ? "global" : "none";
   }
   if (actor.centroAscoltoId != null) return "centro";
-  return actor.isAdmin || hasM5bArea(actor, "magazzino") ? "area" : "none";
+  return actor.isAdmin || hasM5bArea(actor, "magazzino") || hasM5bArea(actor, "sociale") ? "area" : "none";
 }
 
 export function canReadM5bRequest(

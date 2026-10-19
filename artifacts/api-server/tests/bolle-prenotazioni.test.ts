@@ -680,9 +680,9 @@ describe("Bolle — prenotazione merce su conferma", () => {
   });
 
   it("registra la catena audit A crea, B conferma e C consegna", async () => {
-    const actorA = await createUtente(scope, { centroId: centroA });
-    const actorB = await createUtente(scope, { centroId: centroA });
-    const actorC = await createUtente(scope, { centroId: centroA });
+    const actorA = await createUtente(scope);
+    const actorB = await createUtente(scope);
+    const actorC = await createUtente(scope);
     const appFor = (id: number, matricola: string) =>
       makeScopedApp(bolleRouter, {
         id,

@@ -497,28 +497,29 @@ describe("M5A — Richiesta Magazzino reale su PostgreSQL isolato", () => {
       .get("/richieste-magazzino")
       .query({ page: 1, limit: 1, sorgente: "beneficiario" });
     expect(own.status).toBe(200);
-    expect(own.body.total).toBe(1);
+    expect(own.body.total).toBe(2);
     expect(own.body.items.map((item: { id: number }) => item.id)).toEqual([
-      first.body.id,
+      second.body.id,
     ]);
     const excluded = await request(app(socialA))
       .get("/richieste-magazzino")
       .query({ centroAscoltoId: otherCentre });
-    expect(excluded.body).toMatchObject({ total: 0, items: [] });
+    expect(excluded.body.total).toBe(1);
+    expect(excluded.body.items[0].id).toBe(second.body.id);
     expect(
       (
         await request(app(socialA)).get(
           `/richieste-magazzino/${second.body.id}`,
         )
       ).status,
-    ).toBe(404);
+    ).toBe(200);
     expect(
       (
         await request(app(socialA)).get(
           `/richieste-magazzino/${second.body.id}/storico`,
         )
       ).status,
-    ).toBe(404);
+    ).toBe(200);
     const warehouse = await request(app(warehouseA))
       .get("/richieste-magazzino")
       .query({ sorgente: "beneficiario", tipoDestinatario: "beneficiario" });
@@ -539,7 +540,7 @@ describe("M5A — Richiesta Magazzino reale su PostgreSQL isolato", () => {
     ).toBe(0);
   });
 
-  it("non allarga la cartella sociale fra Zone UDS dello stesso Centro", async () => {
+  it("consente le cartelle sociali fra Zone UDS della stessa Area", async () => {
     const zoneA = (await createZona(scope, areaA)).id;
     const zoneB = (await createZona(scope, areaA)).id;
     await db
@@ -575,14 +576,15 @@ describe("M5A — Richiesta Magazzino reale su PostgreSQL isolato", () => {
     const deniedList = await request(app(zoneUserB)).get(
       "/richieste-magazzino",
     );
-    expect(deniedList.body).toMatchObject({ total: 0, items: [] });
+    expect(deniedList.body.total).toBe(1);
+    expect(deniedList.body.items[0].id).toBe(created.body.id);
     expect(
       (
         await request(app(zoneUserB)).get(
           `/richieste-magazzino/${created.body.id}`,
         )
       ).status,
-    ).toBe(404);
+    ).toBe(200);
     expect(
       (
         await request(app(warehouseA)).get(

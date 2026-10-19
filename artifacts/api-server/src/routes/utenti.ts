@@ -54,12 +54,12 @@ const fmt = (r: UtenteRow) => ({
   matricola: r.matricola ?? null,
   ruoloId: r.ruoloId ?? null,
   ruoloNome: r.ruoloNome ?? null,
-  centroAscoltoId: r.centroAscoltoId ?? null,
-  centroAscoltoNome: r.centroAscoltoNome ?? null,
+  centroAscoltoId: null,
+  centroAscoltoNome: null,
   areaOperativaId: r.areaOperativaId ?? null,
   areaOperativaNome: r.areaOperativaNome ?? null,
-  zonaUdsId: r.zonaUdsId ?? null,
-  zonaUdsNome: r.zonaUdsNome ?? null,
+  zonaUdsId: null,
+  zonaUdsNome: null,
   isSuperAdmin: r.isSuperAdmin || r.ruoloNome === SUPER_ADMIN_ROLE_NAME,
   attivo: r.attivo,
   mustChangePassword: r.mustChangePassword,
@@ -223,31 +223,6 @@ async function validateUserTerritorialAssignment(params: { areaOperativaId: numb
   if (!(await areaIsAvailable(params.areaOperativaId))) {
     return "L'Area Operativa selezionata non è disponibile";
   }
-  if (params.centroAscoltoId != null) {
-    const [centro] = await db
-      .select({
-        areaOperativaId: centriAscoltoTable.areaOperativaId,
-        attivo: centriAscoltoTable.attivo,
-      })
-      .from(centriAscoltoTable)
-      .where(eq(centriAscoltoTable.id, params.centroAscoltoId));
-    if (!centro || !centro.attivo) {
-      return "Il Centro di Ascolto selezionato non è disponibile";
-    }
-    if (centro.areaOperativaId !== params.areaOperativaId) {
-      return "Il Centro di Ascolto deve appartenere alla stessa Area Operativa dell'utente";
-    }
-  }
-
-  if (params.zonaUdsId != null) {
-    const [zona] = await db.select({ areaOperativaId: zoneUdsTable.areaOperativaId, attivo: zoneUdsTable.attivo }).from(zoneUdsTable).where(eq(zoneUdsTable.id, params.zonaUdsId));
-    if (!zona || !zona.attivo) {
-      return "La Zona UDS selezionata non è disponibile";
-    }
-    if (zona.areaOperativaId !== params.areaOperativaId) {
-      return "La Zona UDS deve appartenere alla stessa Area Operativa dell'utente";
-    }
-  }
 
   return null;
 }
@@ -325,14 +300,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
     }
   }
 
-  // A centro-bound admin can only create users inside their own centro; the
-  // caller's centro is auto-assigned and locked (any body value is ignored).
-  const caller = callerCentroId(req);
-  if (caller != null && centroAscoltoId != null && centroAscoltoId !== caller) {
-    res.status(403).json({ error: "Centro non accessibile per il tuo profilo" });
-    return;
-  }
-  const finalCentroId = bootstrap || finalIsSuperAdmin ? null : caller != null ? caller : (centroAscoltoId ?? null);
+  const finalCentroId = null; // Campo legacy non più assegnabile.
   // Likewise a area operativa-bound admin can only create users inside their own area operativa;
   // the caller's area operativa is auto-assigned and locked (any body value is ignored).
   const areaOperativaCaller = callerAreaOperativaId(req);
@@ -341,8 +309,7 @@ router.post("/utenti", async (req, res): Promise<void> => {
     return;
   }
   const finalAreaOperativaId = bootstrap || finalIsSuperAdmin ? null : areaOperativaCaller != null ? areaOperativaCaller : (areaOperativaId ?? null);
-  const zonaCaller = callerZonaUdsId(req);
-  const finalZonaUdsId = bootstrap || finalIsSuperAdmin ? null : zonaCaller != null ? zonaCaller : finalAreaOperativaId == null ? null : (zonaUdsId ?? null);
+  const finalZonaUdsId = null; // Campo legacy non più assegnabile.
   if (!(await areaIsAvailable(finalAreaOperativaId))) {
     res.status(400).json({ error: "L'Area Operativa selezionata non è disponibile" });
     return;
@@ -483,18 +450,6 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Utente non accessibile per la tua zona" });
     return;
   }
-  if (zonaCaller != null && body.zonaUdsId !== undefined && body.zonaUdsId !== target.zonaUdsId) {
-    res.status(403).json({
-      error: "Non sei autorizzato a modificare la zona assegnata al tuo profilo.",
-    });
-    return;
-  }
-  if (caller != null && body.centroAscoltoId !== undefined && body.centroAscoltoId !== target.centroAscoltoId) {
-    res.status(403).json({
-      error: "Non sei autorizzato a modificare il centro assegnato al tuo profilo.",
-    });
-    return;
-  }
 
   const wasActiveAdmin = target.attivo && (await roleIsAdmin(target.ruoloId));
   if (wasActiveAdmin) {
@@ -554,27 +509,15 @@ router.patch("/utenti/:id", async (req, res): Promise<void> => {
   if (body.matricola !== undefined) updates.matricola = normalizeMatricola(body.matricola);
   if (body.ruoloId !== undefined) updates.ruoloId = body.ruoloId;
   if (body.attivo !== undefined) updates.attivo = body.attivo;
-  // A centro-bound admin cannot move users to another centro; only a global
-  // admin may (re)assign the centro.
-  if (caller == null && body.centroAscoltoId !== undefined && updates.isSuperAdmin !== true) {
-    updates.centroAscoltoId = body.centroAscoltoId;
-  }
   // A area operativa-bound admin cannot move users to another area operativa; only a area operativa-global
   // admin may (re)assign the area operativa.
   if (areaOperativaCaller == null && body.areaOperativaId !== undefined && updates.isSuperAdmin !== true) {
     updates.areaOperativaId = body.areaOperativaId;
-  }
-  // A zona-bound admin cannot move users to another zona; only a zona-global
-  // admin may (re)assign the UDS zona. A user without area operativa cannot keep a zona.
-  if (zonaCaller == null && body.zonaUdsId !== undefined && updates.isSuperAdmin !== true) {
-    const effectiveAreaOperativaId = updates.areaOperativaId !== undefined ? (updates.areaOperativaId ?? null) : target.areaOperativaId;
-    updates.zonaUdsId = effectiveAreaOperativaId == null ? null : body.zonaUdsId;
-  }
-  if (zonaCaller != null) {
-    updates.zonaUdsId = zonaCaller;
-  }
-  if (updates.areaOperativaId === null) {
-    updates.zonaUdsId = null;
+    // Retire legacy bindings on an Area change, including the composite Zona/Area FK.
+    if (body.areaOperativaId !== target.areaOperativaId) {
+      updates.centroAscoltoId = null;
+      updates.zonaUdsId = null;
+    }
   }
   const effectiveIsSuperAdmin = updates.isSuperAdmin ?? target.isSuperAdmin;
   if (effectiveIsSuperAdmin) {

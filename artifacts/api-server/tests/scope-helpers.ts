@@ -523,6 +523,13 @@ export async function createUtente(
     opts.ruoloId === undefined
       ? await createRuolo(scope, { isAdmin: true })
       : opts.ruoloId;
+  // Valid account fixtures carry an Area; Centre is retained as legacy metadata.
+  const [center] = opts.centroId == null
+    ? []
+    : await db
+        .select({ areaOperativaId: centriAscoltoTable.areaOperativaId })
+        .from(centriAscoltoTable)
+        .where(eq(centriAscoltoTable.id, opts.centroId));
   const [u] = await db
     .insert(utentiTable)
     .values({
@@ -531,6 +538,7 @@ export async function createUtente(
       nome: "Test",
       cognome: "Utente",
       centroAscoltoId: opts.centroId ?? null,
+      areaOperativaId: center?.areaOperativaId ?? null,
       ruoloId: roleId,
     })
     .returning({ id: utentiTable.id });

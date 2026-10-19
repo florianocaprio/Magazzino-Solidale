@@ -827,7 +827,7 @@ describe("audit hardening Amministrazione/Core", () => {
     }
   });
 
-  it("ADM-09 rifiuta assegnazioni utente tra Aree e combinazioni Centro/Area incoerenti", async () => {
+  it("ADM-09 rifiuta assegnazioni utente tra Aree e ignora il Centro legacy", async () => {
     const appA = appAs(adminA, utentiRouter);
     const crossArea = await request(appA)
       .post("/utenti")
@@ -854,7 +854,9 @@ describe("audit hardening Amministrazione/Core", () => {
         areaOperativaId: areaA,
         centroAscoltoId: centroB,
       });
-    expect(incoherent.status).toBe(400);
+    expect(incoherent.status).toBe(201);
+    ids.utenti.push(incoherent.body.id);
+    expect(incoherent.body).toMatchObject({ areaOperativaId: areaA, centroAscoltoId: null });
   });
 
   it("ADM-10/11 applica la policy unica e forza il cambio password al primo accesso", async () => {

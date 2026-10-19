@@ -7,9 +7,7 @@ import {
   useResetUtentePassword,
   useSetUtenteTemporaryPassword,
   useListRuoli,
-  useListCentriAscolto,
   useListAreeOperative,
-  useListZoneUds,
   getListUtentiQueryKey,
   type Utente,
 } from "@workspace/api-client-react";
@@ -83,20 +81,15 @@ import { ruoliNelPerimetro } from "@/lib/admin-scope";
 registerUtentiActions(i18n);
 
 const NO_ROLE = "none";
-const NO_CENTRO = "__none__";
 const NO_AREA_OPERATIVA = "__noareaOperativa__";
-const ALL_ZONE = "__allzone__";
 const SUPER_ADMIN_ROLE_NAME = "SuperAdmin";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Utenti() {
   const { t } = useTranslation();
   const { user: currentUser, refresh } = useAuth();
-  const lockedCentroId = currentUser?.centroAscoltoId ?? null;
-  const isCentroLocked = lockedCentroId != null;
   const lockedAreaOperativaId = currentUser?.areaOperativaId ?? null;
   const isAreaOperativaLocked = lockedAreaOperativaId != null;
-  const isZonaLocked = currentUser?.zonaUdsId != null;
   const canFilterAreaGeografica = currentUser?.isAdmin ?? false;
   const [areaOperativaFilter, setAreaOperativaFilter] = useState("all");
   const [matricolaFilter, setMatricolaFilter] = useState("");
@@ -118,7 +111,6 @@ export default function Utenti() {
     query: { queryKey: getListUtentiQueryKey(listUtentiParams) },
   });
   const { data: ruoli } = useListRuoli();
-  const { data: centri } = useListCentriAscolto();
   const { data: areaOperativa } = useListAreeOperative();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -152,34 +144,19 @@ export default function Utenti() {
   const [matricola, setMatricola] = useState("");
   const [password, setPassword] = useState("");
   const [ruoloId, setRuoloId] = useState<string>(NO_ROLE);
-  const [centroId, setCentroId] = useState<string>(NO_CENTRO);
   const [areaOperativaId, setAreaOperativaId] =
     useState<string>(NO_AREA_OPERATIVA);
-  const [zonaUdsId, setZonaUdsId] = useState<string>(ALL_ZONE);
   const [attivo, setAttivo] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const resettingHasValidEmail = hasValidResetEmail(resetting);
 
-  const selectedAreaOperativaNum =
-    areaOperativaId === NO_AREA_OPERATIVA
-      ? undefined
-      : parseInt(areaOperativaId, 10);
   const visibleRoles = ruoliNelPerimetro(
     ruoli ?? [],
     currentUser?.aree ?? [],
     currentUser?.isSuperAdmin ?? false,
   );
   const editingSelf = editing?.id === currentUser?.id;
-  const { data: zoneUds } = useListZoneUds(
-    { areaOperativaId: selectedAreaOperativaNum },
-    {
-      query: {
-        enabled: selectedAreaOperativaNum != null,
-        queryKey: ["zoneUds", selectedAreaOperativaNum],
-      },
-    },
-  );
-
+  const selectedRoleIsAdmin = ruoli?.find((role) => String(role.id) === ruoloId)?.isAdmin ?? false;
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: getListUtentiQueryKey() });
     await refresh();
@@ -209,11 +186,9 @@ export default function Utenti() {
     setMatricola("");
     setPassword("");
     setRuoloId(NO_ROLE);
-    setCentroId(isCentroLocked ? String(lockedCentroId) : NO_CENTRO);
     setAreaOperativaId(
       isAreaOperativaLocked ? String(lockedAreaOperativaId) : NO_AREA_OPERATIVA,
     );
-    setZonaUdsId(ALL_ZONE);
     setAttivo(true);
     setFormError(null);
     setIsFormOpen(true);
@@ -229,13 +204,9 @@ export default function Utenti() {
     setMatricola(u.matricola ?? "");
     setPassword("");
     setRuoloId(u.ruoloId != null ? String(u.ruoloId) : NO_ROLE);
-    setCentroId(
-      u.centroAscoltoId != null ? String(u.centroAscoltoId) : NO_CENTRO,
-    );
     setAreaOperativaId(
       u.areaOperativaId != null ? String(u.areaOperativaId) : NO_AREA_OPERATIVA,
     );
-    setZonaUdsId(u.zonaUdsId != null ? String(u.zonaUdsId) : ALL_ZONE);
     setAttivo(u.attivo);
     setFormError(null);
     setIsFormOpen(true);
@@ -246,21 +217,11 @@ export default function Utenti() {
     if (pending) return;
     setFormError(null);
     const ruoloIdValue = ruoloId === NO_ROLE ? null : parseInt(ruoloId, 10);
-    const centroIdValue = isCentroLocked
-      ? lockedCentroId
-      : centroId === NO_CENTRO
-        ? null
-        : parseInt(centroId, 10);
     const areaOperativaIdValue = isAreaOperativaLocked
       ? lockedAreaOperativaId
       : areaOperativaId === NO_AREA_OPERATIVA
         ? null
         : parseInt(areaOperativaId, 10);
-    const zonaUdsIdValue =
-      areaOperativaIdValue == null || zonaUdsId === ALL_ZONE
-        ? null
-        : parseInt(zonaUdsId, 10);
-
     if (editing) {
       updateUtente.mutate(
         {
@@ -271,9 +232,7 @@ export default function Utenti() {
             cognome: cognome.trim() || null,
             matricola: matricola.trim() || null,
             ruoloId: ruoloIdValue,
-            centroAscoltoId: centroIdValue,
             areaOperativaId: areaOperativaIdValue,
-            zonaUdsId: zonaUdsIdValue,
             attivo,
           },
         },
@@ -301,9 +260,7 @@ export default function Utenti() {
             matricola: matricola.trim() || null,
             password,
             ruoloId: ruoloIdValue,
-            centroAscoltoId: centroIdValue,
             areaOperativaId: areaOperativaIdValue,
-            zonaUdsId: zonaUdsIdValue,
             attivo,
           },
         },
@@ -505,9 +462,7 @@ export default function Utenti() {
                   <TableHead>{t("common.name")}</TableHead>
                   <TableHead>{t("utenti.colMatricola")}</TableHead>
                   <TableHead>{t("utenti.colRuolo")}</TableHead>
-                  <TableHead>{t("common.centro")}</TableHead>
                   <TableHead>{t("utenti.colAreaOperativa")}</TableHead>
-                  <TableHead>{t("utenti.colZona")}</TableHead>
                   <TableHead>{t("common.status")}</TableHead>
                   <TableHead>{t("utenti.colUltimoAccesso")}</TableHead>
                 </TableRow>
@@ -655,13 +610,7 @@ export default function Utenti() {
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {u.centroAscoltoNome ?? t("common.centroComune")}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.areaOperativaNome ?? t("utenti.areaOperativaGlobale")}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.zonaUdsNome ?? t("utenti.tutteLeZone")}
+                      {u.areaOperativaNome ?? t(u.isSuperAdmin || ruoli?.find((role) => role.id === u.ruoloId)?.isAdmin ? "utenti.areaOperativaGlobale" : "utenti.areaUnassigned")}
                     </TableCell>
                     <TableCell>
                       {u.attivo ? (
@@ -684,7 +633,7 @@ export default function Utenti() {
                 {utenti?.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={11}
+                      colSpan={9}
                       className="text-center text-muted-foreground py-8"
                     >
                       {t("utenti.emptyUsers")}
@@ -805,40 +754,10 @@ export default function Utenti() {
               )}
             </div>
             <div className="space-y-2">
-              <Label>{t("common.centro")}</Label>
-              <Select
-                value={centroId}
-                onValueChange={setCentroId}
-                disabled={isCentroLocked}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_CENTRO}>
-                    {t("common.centroComune")}
-                  </SelectItem>
-                  {centri?.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {isCentroLocked && (
-                <p className="text-xs text-muted-foreground">
-                  {t("common.centroLocked")}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
               <Label>{t("utenti.colAreaOperativa")}</Label>
               <Select
                 value={areaOperativaId}
-                onValueChange={(v) => {
-                  setAreaOperativaId(v);
-                  setZonaUdsId(ALL_ZONE);
-                }}
+                onValueChange={setAreaOperativaId}
                 disabled={isAreaOperativaLocked}
               >
                 <SelectTrigger>
@@ -849,7 +768,7 @@ export default function Utenti() {
                 <SelectContent>
                   {!isAreaOperativaLocked && (
                     <SelectItem value={NO_AREA_OPERATIVA}>
-                      {t("utenti.areaOperativaGlobale")}
+                      {t(selectedRoleIsAdmin ? "utenti.areaOperativaGlobale" : "utenti.areaUnassigned")}
                     </SelectItem>
                   )}
                   {(isAreaOperativaLocked
@@ -860,28 +779,6 @@ export default function Utenti() {
                   )?.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       {c.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>{t("utenti.colZona")}</Label>
-              <Select
-                value={zonaUdsId}
-                onValueChange={setZonaUdsId}
-                disabled={areaOperativaId === NO_AREA_OPERATIVA || isZonaLocked}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("utenti.selezionaZona")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_ZONE}>
-                    {t("utenti.tutteLeZone")}
-                  </SelectItem>
-                  {zoneUds?.map((z) => (
-                    <SelectItem key={z.id} value={String(z.id)}>
-                      {z.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>

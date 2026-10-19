@@ -25,3 +25,8 @@ export async function revokeUserAccess(
       ),
     );
 }
+
+/** Gli account operano per Area: Centro e Zona legacy non restringono il profilo. */
+export function areaOnlyUserScope<T extends { centroAscoltoId: number | null; zonaUdsId: number | null }>(user: T): T {
+  return { ...user, centroAscoltoId: null, zonaUdsId: null };
+}

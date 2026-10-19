@@ -67,7 +67,7 @@ async function makeApp(user: {
       expect(actor).toMatchObject({
         isAdmin: options.isAdmin,
         isSuperAdmin: false,
-        centroAscoltoId: options.centroAscoltoId,
+        centroAscoltoId: null,
         areaOperativaId: options.areaOperativaId,
         aree: options.aree,
         permessi: options.permessi,

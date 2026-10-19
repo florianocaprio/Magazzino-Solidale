@@ -168,7 +168,7 @@ describe("POST /utenti — accesso immediato", () => {
     expect(row.mustChangePassword).toBe(true);
   });
 
-  it("persiste e restituisce area operativa e zona UDS", async () => {
+  it("persiste l’Area e ignora il parametro legacy Zona UDS", async () => {
     const res = await request(app)
       .post("/utenti")
       .send({
@@ -185,8 +185,8 @@ describe("POST /utenti — accesso immediato", () => {
     createdUserIds.push(res.body.id);
     expect(res.body.areaOperativaId).toBe(areaOperativaId);
     expect(res.body.areaOperativaNome).toContain("Milano Test");
-    expect(res.body.zonaUdsId).toBe(zonaUdsId);
-    expect(res.body.zonaUdsNome).toContain("Zona Test");
+    expect(res.body.zonaUdsId).toBeNull();
+    expect(res.body.zonaUdsNome).toBeNull();
 
     const [row] = await db
       .select({
@@ -196,7 +196,7 @@ describe("POST /utenti — accesso immediato", () => {
       .from(utentiTable)
       .where(eq(utentiTable.id, res.body.id));
     expect(row.areaOperativaId).toBe(areaOperativaId);
-    expect(row.zonaUdsId).toBe(zonaUdsId);
+    expect(row.zonaUdsId).toBeNull();
   });
 });
 

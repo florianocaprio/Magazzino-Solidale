@@ -359,7 +359,7 @@ describe("Mezzi — scoping per centro", () => {
   });
 });
 
-describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
+describe("Utenti — scoping per Area (niente globali/NULL)", () => {
   // The utenti router bakes in requireAuth+requireAdmin, so the caller must be a
   // real admin utente loaded via the session; its centro drives the scoping.
   let adminA: number;
@@ -377,7 +377,7 @@ describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
     });
   });
 
-  it("lista: A vede SOLO gli utenti del proprio centro (non B, non globali/NULL)", async () => {
+  it("lista: A vede SOLO gli utenti della propria Area (non B, non globali/NULL)", async () => {
     const uA = await createUtente(scope, { centroId: centroA });
     const uB = await createUtente(scope, { centroId: centroB });
     const uNull = await createUtente(scope, { centroId: null });
@@ -409,7 +409,7 @@ describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
     expect((await request(appA).get(`/utenti/${uNull}`)).status).toBe(403);
   });
 
-  it("POST auto-assegna e blocca il centro del caller", async () => {
+  it("POST ignora il Centro legacy e assegna l’Area del caller", async () => {
     const ruoloId = await createRuolo(scope, {});
     const res = await request(makeSessionApp(utentiRouter, adminA))
       .post("/utenti")
@@ -422,7 +422,9 @@ describe("Utenti — scoping STRETTO per centro (niente comuni/NULL)", () => {
         ruoloId,
         centroAscoltoId: centroB,
       });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
+    scope.utenteIds.push(res.body.id);
+    expect(res.body).toMatchObject({ areaOperativaId: areaOperativaA, centroAscoltoId: null });
   });
 
   it("PATCH /:id fuori centro → 403", async () => {
@@ -722,7 +724,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
     const ids = idsOf(res.body);
     expect(ids).toContain(aA);
     expect(ids).toContain(aNull);
-    expect(ids).not.toContain(aB);
+    expect(ids).toContain(aB);
   });
 
   it("lista: il caller globale vede tutti", async () => {
@@ -741,7 +743,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([aA, aB]));
   });
 
-  it("GET /:id fuori centro → 403", async () => {
+  it("GET /:id dello stesso magazzino resta leggibile fra Centri", async () => {
     const mag = await createMagazzino(scope, null, {
       areaOperativaId: areaOperativaA,
     });
@@ -752,10 +754,10 @@ describe("Approvvigionamenti — scoping per centro", () => {
     const res = await request(await supplyApp(centroA)).get(
       `/approvvigionamenti/${aB}`,
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
-  it("POST auto-assegna il centro del caller", async () => {
+  it("POST non assegna il Centro storico dell’utente", async () => {
     const mag = await createMagazzino(scope, null, {
       areaOperativaId: areaOperativaA,
     });
@@ -772,7 +774,7 @@ describe("Approvvigionamenti — scoping per centro", () => {
       });
     expect(res.status, JSON.stringify(res.body)).toBe(201);
     scope.approvvigionamentoIds.push(res.body.id);
-    expect(res.body.centroAscoltoId).toBe(centroA);
+    expect(res.body.centroAscoltoId).toBeNull();
   });
 
   it("PATCH IDOR: spostare l'ordine su un magazzino di un altro centro → 403", async () => {

@@ -14,6 +14,8 @@ import {
   passwordResetTokensTable,
   systemLogsTable,
   areeOperativeTable,
+  centriAscoltoTable,
+  zoneUdsTable,
 } from "@workspace/db";
 import authRouter from "../src/routes/auth";
 import utentiRouter from "../src/routes/utenti";
@@ -24,6 +26,7 @@ import {
   loadSessionUser,
 } from "../src/middlewares/auth";
 import { createPasswordResetLinkForUser } from "../src/lib/passwordReset";
+import { requireCurrentCommandActor } from "../src/lib/currentCommandActor";
 import { logger } from "../src/lib/logger";
 
 const PgSession = connectPgSimple(session);
@@ -60,7 +63,9 @@ app.get("/admin-only", requireAdmin, (_req, res) => res.sendStatus(204));
 
 const ids: number[] = [],
   roles: number[] = [],
-  areas: number[] = [];
+  areas: number[] = [],
+  centers: number[] = [],
+  zones: number[] = [];
 const initial = "SyntheticInitial42";
 const temporary = "SyntheticTemporary43";
 const final = "SyntheticFinal44";
@@ -69,6 +74,14 @@ async function user(
   admin = false,
 ) {
   const suffix = crypto.randomUUID().slice(0, 8);
+  if (!admin && !("areaOperativaId" in options)) {
+    const [area] = await db
+      .insert(areeOperativeTable)
+      .values({ nome: `BUG01-${suffix}` })
+      .returning();
+    areas.push(area.id);
+    options = { ...options, areaOperativaId: area.id };
+  }
   const [role] = await db
     .insert(ruoliTable)
     .values({ nome: `BUG01-${suffix}`, isAdmin: admin, aree: ["magazzino"] })
@@ -123,6 +136,13 @@ afterEach(async () => {
   }
   if (roles.length)
     await db.delete(ruoliTable).where(inArray(ruoliTable.id, roles.splice(0)));
+  if (zones.length)
+    await db.delete(zoneUdsTable).where(inArray(zoneUdsTable.id, zones));
+  if (centers.length)
+    await db
+      .delete(centriAscoltoTable)
+      .where(inArray(centriAscoltoTable.id, centers));
+  zones.length = centers.length = 0;
   if (areas.length)
     await db
       .delete(areeOperativeTable)
@@ -349,7 +369,123 @@ describe("BUG 01 — sessioni reali e azioni amministrative", () => {
     expect(unchanged.passwordHash).toBe(target.passwordHash);
   });
 
-  it("applica Area, Centro e Zona al reset e alla rimozione", async () => {
+  it("account per Area: ignora Centro e Zona legacy anche nelle autorizzazioni correnti", async () => {
+    const target = await user();
+    const [other] = await db
+      .insert(areeOperativeTable)
+      .values({ nome: `Altra-${crypto.randomUUID()}` })
+      .returning();
+    areas.push(other.id);
+    const [center] = await db
+      .insert(centriAscoltoTable)
+      .values({
+        nome: "Centro legacy",
+        areaOperativaId: other.id,
+        attivo: false,
+      })
+      .returning();
+    const [zone] = await db
+      .insert(zoneUdsTable)
+      .values({
+        nome: "Zona legacy",
+        areaOperativaId: target.areaOperativaId,
+        attivo: false,
+      })
+      .returning();
+    centers.push(center.id);
+    zones.push(zone.id);
+    await db
+      .update(utentiTable)
+      .set({ centroAscoltoId: center.id, zonaUdsId: zone.id })
+      .where(eq(utentiTable.id, target.id));
+    await db
+      .update(ruoliTable)
+      .set({ permessi: ["magazzino.view"] })
+      .where(eq(ruoliTable.id, target.ruoloId!));
+    const session = await login(target);
+    expect((await session.get("/protected")).status).toBe(204);
+    const identity = await session.get("/auth/me");
+    expect(identity.status, identity.text).toBe(200);
+    expect(identity.body).toMatchObject({
+      areaOperativaId: target.areaOperativaId,
+      centroAscoltoId: null,
+      zonaUdsId: null,
+    });
+    const actor = await db.transaction((tx) =>
+      requireCurrentCommandActor(tx, target.id, "magazzino.view"),
+    );
+    expect(actor).toMatchObject({
+      areaOperativaId: target.areaOperativaId,
+      centroAscoltoId: null,
+      zonaUdsId: null,
+    });
+    const admin = await user(
+      {
+        areaOperativaId: target.areaOperativaId,
+        centroAscoltoId: center.id,
+        zonaUdsId: zone.id,
+      },
+      true,
+    );
+    const manager = await login(admin);
+    const edit = await manager
+      .patch(`/utenti/${target.id}`)
+      .send({
+        nome: "Area valida",
+        centroAscoltoId: center.id,
+        zonaUdsId: zone.id,
+      });
+    expect(edit.status, edit.text).toBe(200);
+    expect(edit.body).toMatchObject({
+      areaOperativaId: target.areaOperativaId,
+      centroAscoltoId: null,
+      zonaUdsId: null,
+    });
+    expect((await session.get("/protected")).status).toBe(204);
+    const global = await login(await user({}, true));
+    const moved = await global
+      .patch(`/utenti/${target.id}`)
+      .send({ areaOperativaId: other.id });
+    expect(moved.status, moved.text).toBe(200);
+    expect(moved.body).toMatchObject({
+      areaOperativaId: other.id,
+      centroAscoltoId: null,
+      zonaUdsId: null,
+    });
+    const [stored] = await db
+      .select()
+      .from(utentiTable)
+      .where(eq(utentiTable.id, target.id));
+    expect(stored).toMatchObject({
+      areaOperativaId: other.id,
+      centroAscoltoId: null,
+      zonaUdsId: null,
+    });
+  });
+
+  it("un riferimento legacy senza Area non diventa accesso globale", async () => {
+    const normal = await user({ areaOperativaId: null });
+    expect((await (await login(normal)).get("/protected")).status).toBe(403);
+    const [area] = await db
+      .insert(areeOperativeTable)
+      .values({ nome: `Legacy-${crypto.randomUUID()}` })
+      .returning();
+    areas.push(area.id);
+    const [center] = await db
+      .insert(centriAscoltoTable)
+      .values({ nome: "Vecchio vincolo", areaOperativaId: area.id })
+      .returning();
+    centers.push(center.id);
+    const admin = await user(
+      { areaOperativaId: null, centroAscoltoId: center.id },
+      true,
+    );
+    expect((await (await login(admin)).get("/protected")).status).toBe(403);
+    const global = await user({}, true);
+    expect((await (await login(global)).get("/protected")).status).toBe(204);
+  });
+
+  it("applica il confine Area al reset e alla rimozione", async () => {
     const [area] = await db
       .insert(areeOperativeTable)
       .values({ nome: `BUG01-${crypto.randomUUID()}` })
@@ -375,7 +511,9 @@ describe("BUG 01 — sessioni reali e azioni amministrative", () => {
     const admin = await user({}, true),
       operator = await login(admin);
     const suffix = crypto.randomUUID().slice(0, 8);
+    const scopeUser = await user();
     const response = await operator.post("/utenti").send({
+      areaOperativaId: scopeUser.areaOperativaId,
       username: `new-${suffix}`,
       email: `new-${suffix}@example.org`,
       nome: "Synthetic",

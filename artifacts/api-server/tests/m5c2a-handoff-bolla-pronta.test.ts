@@ -916,7 +916,7 @@ describe("M5C2-A — handoff Bolla pronta", () => {
       const denied = await request(app)
         .post(`/consegne/da-bolla/${ready.bollaId}`)
         .send(payload);
-      expect(denied.status).toBe(404);
+      expect(denied.status).toBe(403);
     } finally {
       await db
         .update(utentiTable)

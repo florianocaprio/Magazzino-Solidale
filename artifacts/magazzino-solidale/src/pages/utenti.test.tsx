@@ -152,7 +152,7 @@ describe("BUG 01 — azioni Utenti", () => {
       ]),
     );
   });
-  it("in modifica consente il ruolo e non richiede assegnazioni Mensa", async () => {
+  it("in modifica offre solo ruolo e Area senza Centro, Zona o assegnazioni Mensa", async () => {
     await openActions();
     await select("common.edit");
     const role = document.querySelector<HTMLButtonElement>('[role="combobox"]');
@@ -163,6 +163,17 @@ describe("BUG 01 — azioni Utenti", () => {
       "mensa.operatorAssignments",
     );
     expect(document.body.textContent).not.toContain("mensa.assignmentHint");
+    expect(document.body.textContent).not.toContain("common.centro");
+    expect(document.body.textContent).not.toContain("utenti.colZona");
+    expect(button("utenti.saveChanges").closest("form")!.querySelectorAll('[role="combobox"]')).toHaveLength(2);
+    const form = button("utenti.saveChanges").closest("form")!;
+    await act(async () => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(mocks.update).toHaveBeenCalled();
+    const data = mocks.update.mock.calls[0][0].data;
+    expect(data).toHaveProperty("ruoloId");
+    expect(data).toHaveProperty("areaOperativaId");
+    expect(data).not.toHaveProperty("centroAscoltoId");
+    expect(data).not.toHaveProperty("zonaUdsId");
   });
   it("convalida e invia la password temporanea attraverso l'azione distinta dall'email", async () => {
     await openActions();

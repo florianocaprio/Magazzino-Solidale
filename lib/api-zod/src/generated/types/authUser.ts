@@ -20,17 +20,33 @@ export interface AuthUser {
   ruoloId?: number | null;
   /** @nullable */
   ruoloNome?: string | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   centroAscoltoNome?: string | null;
   /** @nullable */
   areaOperativaId?: number | null;
   /** @nullable */
   areaOperativaNome?: string | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsId?: number | null;
-  /** @nullable */
+  /**
+   * Campo legacy restituito come null; perimetro utente definito dall'Area.
+   * @deprecated
+   * @nullable
+   */
   zonaUdsNome?: string | null;
   isSuperAdmin: boolean;
   isAdmin: boolean;

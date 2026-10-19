@@ -1,3 +1,4 @@
+import { areaOnlyUserScope } from "./userAccess";
 import { ruoliTable, utentiTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import type { InventoryTransaction } from "./scaricoInventory";
@@ -16,6 +17,7 @@ export async function requireCurrentCommandActor(
     .select({
       id: utentiTable.id,
       attivo: utentiTable.attivo,
+      isSuperAdmin: utentiTable.isSuperAdmin,
       areaOperativaId: utentiTable.areaOperativaId,
       centroAscoltoId: utentiTable.centroAscoltoId,
       zonaUdsId: utentiTable.zonaUdsId,
@@ -38,6 +40,9 @@ export async function requireCurrentCommandActor(
           .for("share");
   if (
     !actor?.attivo ||
+    (actor.areaOperativaId == null &&
+      ((!role?.isAdmin && !actor.isSuperAdmin) ||
+        actor.centroAscoltoId != null || actor.zonaUdsId != null)) ||
     !(role?.isAdmin || (role?.permessi ?? []).includes(permission))
   ) {
     throw new CurrentCommandActorError(
@@ -45,7 +50,7 @@ export async function requireCurrentCommandActor(
     );
   }
   return {
-    ...actor,
+    ...areaOnlyUserScope(actor),
     isAdmin: role.isAdmin,
     permessi: role.permessi,
     aree: role.aree,

@@ -256,9 +256,7 @@ describe("Magazzino 2.0C — API FSE+", () => {
       expect(
         (await session.post("/api/fse/resi-opc").send(payload)).status,
       ).toBe(403);
-      expect((await session.get("/api/fse/exportazioni")).body.rows).toEqual(
-        [],
-      );
+      expect((await session.get("/api/fse/exportazioni")).status).toBe(403);
       expect(
         Number(
           (

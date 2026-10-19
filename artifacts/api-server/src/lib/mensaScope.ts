@@ -1,3 +1,4 @@
+import { areaOnlyUserScope } from "./userAccess";
 import type { Request, RequestHandler } from "express";
 import {
   db,
@@ -5,7 +6,6 @@ import {
   ruoliTable,
   menseTable,
   areeOperativeTable,
-  centriAscoltoTable,
 } from "@workspace/db";
 import { eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { InventoryTransaction } from "./scaricoInventory";
@@ -20,11 +20,12 @@ export async function currentMensaIds(
   tx: InventoryTransaction,
   userId: number,
 ) {
-  const [user] = await tx
+  const [storedUser] = await tx
     .select()
     .from(utentiTable)
     .where(eq(utentiTable.id, userId))
     .for("share");
+  const user = storedUser && areaOnlyUserScope(storedUser);
   const [role] =
     user?.ruoloId == null
       ? []
@@ -35,6 +36,11 @@ export async function currentMensaIds(
           .for("share");
   if (!user?.attivo || !role)
     throw new MensaScopeError("Operatore non più autorizzato");
+  if (
+    storedUser.areaOperativaId == null &&
+    (storedUser.centroAscoltoId != null || storedUser.zonaUdsId != null)
+  )
+    throw new MensaScopeError("Area Operativa dell'utente non assegnata");
   if (role.isAdmin) return { ids: null, user, role };
   if (!role.aree.includes("mensa") || user.areaOperativaId == null)
     throw new MensaScopeError("Scope Mensa non assegnato");
@@ -43,19 +49,7 @@ export async function currentMensaIds(
     .from(areeOperativeTable)
     .where(eq(areeOperativeTable.id, user.areaOperativaId))
     .for("share");
-  const [center] =
-    user.centroAscoltoId == null
-      ? []
-      : await tx
-          .select()
-          .from(centriAscoltoTable)
-          .where(eq(centriAscoltoTable.id, user.centroAscoltoId))
-          .for("share");
-  if (
-    !area?.attivo ||
-    (user.centroAscoltoId != null &&
-      (!center?.attivo || center.areaOperativaId !== area.id))
-  )
+  if (!area?.attivo)
     throw new MensaScopeError("Scope territoriale Mensa non valido");
   const candidates = await tx
     .select({ id: menseTable.id })

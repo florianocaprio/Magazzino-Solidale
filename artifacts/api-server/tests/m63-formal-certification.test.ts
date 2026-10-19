@@ -85,7 +85,7 @@ afterAll(async () => {
   await pool.end();
 });
 
-it("S05 Zona inattiva o incoerente nega lettura e comando con sessione già aperta", async () => {
+it("S05 la Zona storica non limita lettura e comando nell’Area corrente", async () => {
   const id = await intervention();
   const zone = await insert(
     "insert into zone_uds(nome,area_operativa_id,attivo)values($1,$2,false)returning id",
@@ -116,14 +116,14 @@ it("S05 Zona inattiva o incoerente nega lettura e comando con sessione già aper
           constraint: "utenti_zona_area_fk",
         });
       }
-      expect((await session.get(`/api/interventi/${id}`)).status).toBe(403);
+      expect((await session.get(`/api/interventi/${id}`)).status).toBe(200);
       expect(
         (
           await session
             .post(`/api/interventi/${id}/salva-operativita`)
-            .send({ versione: await version(id), note: "non salvare" })
+            .send({ versione: await version(id), note: "operazione consentita nell’Area" })
         ).status,
-      ).toBe(403);
+      ).toBe(200);
     }
   } finally {
     await pool.query("update utenti set zona_uds_id=null where id=$1", [actor]);

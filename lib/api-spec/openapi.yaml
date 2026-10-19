@@ -22592,16 +22592,24 @@ components:
         ruoloNome:
           type: ["string", "null"]
         centroAscoltoId:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["integer", "null"]
         centroAscoltoNome:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["string", "null"]
         areaOperativaId:
           type: ["integer", "null"]
         areaOperativaNome:
           type: ["string", "null"]
         zonaUdsId:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["integer", "null"]
         zonaUdsNome:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["string", "null"]
         isSuperAdmin:
           type: boolean
@@ -22695,16 +22703,24 @@ components:
         ruoloNome:
           type: ["string", "null"]
         centroAscoltoId:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["integer", "null"]
         centroAscoltoNome:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["string", "null"]
         areaOperativaId:
           type: ["integer", "null"]
         areaOperativaNome:
           type: ["string", "null"]
         zonaUdsId:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["integer", "null"]
         zonaUdsNome:
+          deprecated: true
+          description: Campo legacy restituito come null; perimetro utente definito dall'Area.
           type: ["string", "null"]
         isSuperAdmin:
           type: boolean
@@ -22767,10 +22783,14 @@ components:
         ruoloId:
           type: ["integer", "null"]
         centroAscoltoId:
+          deprecated: true
+          description: Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
           type: ["integer", "null"]
         areaOperativaId:
           type: ["integer", "null"]
         zonaUdsId:
+          deprecated: true
+          description: Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
           type: ["integer", "null"]
         attivo:
           type: boolean
@@ -22792,10 +22812,14 @@ components:
         ruoloId:
           type: ["integer", "null"]
         centroAscoltoId:
+          deprecated: true
+          description: Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
           type: ["integer", "null"]
         areaOperativaId:
           type: ["integer", "null"]
         zonaUdsId:
+          deprecated: true
+          description: Campo legacy ignorato; gli utenti sono abilitati per ruolo e Area.
           type: ["integer", "null"]
         attivo:
           type: boolean

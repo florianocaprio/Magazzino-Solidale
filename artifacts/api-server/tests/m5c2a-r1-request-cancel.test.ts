@@ -279,11 +279,11 @@ describe("M5C2-A-R1 annullamento orchestrato", () => {
       const replay = await request(caller.app)
         .post(`/richieste-magazzino/${f.rm.id}/annulla`)
         .send(body);
-      expect(replay.status, replay.text).toBe(404);
+      expect(replay.status, replay.text).toBe(403);
     },
   );
-  it("nega altro Centro e revoca corrente del grant con sessione precedente", async () => {
-    const f = await fixture("bozza");
+  it("consente altro Centro nell’Area e nega la revoca corrente del grant", async () => {
+    let f = await fixture("bozza");
     const otherCentre = (
       await createCentroRec(scope, { areaOperativaId: area })
     ).id;
@@ -294,7 +294,8 @@ describe("M5C2-A-R1 annullamento orchestrato", () => {
           .post(`/richieste-magazzino/${f.rm.id}/annulla`)
           .send(command())
       ).status,
-    ).toBe(404);
+    ).toBe(200);
+    f = await fixture("bozza");
     const revoked = await cancellationActor(["sociale"]);
     await db
       .update(ruoliTable)

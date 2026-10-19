@@ -282,7 +282,7 @@ async function startedTransfer(quantity: number) {
 beforeEach(async () => {
   scope = newScope();
   centreId = await createCentro(scope);
-  actorId = await createUtente(scope, { centroId: centreId });
+  actorId = await createUtente(scope);
   warehouseId = await createMagazzino(scope, centreId);
   beneficiaryId = await createBeneficiario(scope, centreId);
   productId = await createProdotto(scope, { unitaMisura: "pz" });
@@ -1426,7 +1426,7 @@ describe("M4B.2 — effetto fisico e Bolla affidata", () => {
   it("CONC-RET-04: due operatori sulla stessa uscita non duplicano il rientro", async () => {
     const id = await entrustedBolla(2);
     await missingDelivery(id);
-    const secondActorId = await createUtente(scope, { centroId: centreId });
+    const secondActorId = await createUtente(scope);
     const secondApp = await scopedServer(bolleRouter, {
       id: secondActorId,
       centroAscoltoId: centreId,

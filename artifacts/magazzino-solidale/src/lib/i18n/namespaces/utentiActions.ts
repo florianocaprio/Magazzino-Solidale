@@ -2,6 +2,7 @@ import type { i18n } from "i18next";
 
 const utentiActions = {
   it: {
+    areaUnassigned: "Area non assegnata",
     actions: "Azioni",
     actionsFor: "Azioni per {{username}}",
     temporaryAction: "Assegna password temporanea",
@@ -21,6 +22,7 @@ const utentiActions = {
       "Rimozione completata; l’eventuale storico è stato conservato.",
   },
   es: {
+    areaUnassigned: "Área no asignada",
     actions: "Acciones",
     actionsFor: "Acciones para {{username}}",
     temporaryAction: "Asignar contraseña temporal",
@@ -40,6 +42,7 @@ const utentiActions = {
       "Eliminación completada; se ha conservado el historial existente.",
   },
   en: {
+    areaUnassigned: "Area not assigned",
     actions: "Actions",
     actionsFor: "Actions for {{username}}",
     temporaryAction: "Assign temporary password",
@@ -58,6 +61,7 @@ const utentiActions = {
     toastRemoved: "Removal completed; any history has been preserved.",
   },
   fr: {
+    areaUnassigned: "Zone opérationnelle non attribuée",
     actions: "Actions",
     actionsFor: "Actions pour {{username}}",
     temporaryAction: "Attribuer un mot de passe temporaire",
@@ -76,6 +80,7 @@ const utentiActions = {
     toastRemoved: "Suppression terminée ; l’historique existant est conservé.",
   },
   de: {
+    areaUnassigned: "Einsatzgebiet nicht zugewiesen",
     actions: "Aktionen",
     actionsFor: "Aktionen für {{username}}",
     temporaryAction: "Temporäres Passwort zuweisen",
@@ -95,6 +100,7 @@ const utentiActions = {
       "Entfernung abgeschlossen; vorhandener Verlauf wurde erhalten.",
   },
   ar: {
+    areaUnassigned: "لم يتم تعيين منطقة العمل",
     actions: "الإجراءات",
     actionsFor: "إجراءات {{username}}",
     temporaryAction: "تعيين كلمة مرور مؤقتة",

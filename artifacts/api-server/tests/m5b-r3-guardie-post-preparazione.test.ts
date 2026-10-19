@@ -579,7 +579,7 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
     }
   }, 60_000);
 
-  it("R3-G: Area e Centro incoerenti/inattivi e revoca view o grant M4 negano; prepare non è richiesto dopo Pronta", async () => {
+  it("R3-G: Area assente/estranea/inattiva e revoca view o grant M4 negano; prepare non è richiesto dopo Pronta", async () => {
     const agent = await login();
     const bolla = await readyBolla(agent, "ente");
     const transfer = await readyTransfer(agent);
@@ -612,15 +612,8 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
         .update(areeOperativeTable)
         .set({ attivo: true })
         .where(eq(areeOperativeTable.id, areaId));
-      await db
-        .update(centriAscoltoTable)
-        .set({ attivo: false })
-        .where(eq(centriAscoltoTable.id, centreId));
-      await deniedBoth();
-      await db
-        .update(centriAscoltoTable)
-        .set({ attivo: true })
-        .where(eq(centriAscoltoTable.id, centreId));
+      // The actor's historical Centre no longer controls permissions. Its Area,
+      // role and current grants remain mandatory throughout this scenario.
       await db
         .update(ruoliTable)
         .set({
@@ -791,7 +784,7 @@ describe("M5B-R3 — guardie post-preparazione con sessione reale", () => {
       // global list merely because Area/Centro are now NULL.
       expect(list.status, list.text).toBe(403);
       expect(list.body.error).toBe(
-        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+        "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
       );
       expect(list.body).not.toHaveProperty("items");
       await denied(list);

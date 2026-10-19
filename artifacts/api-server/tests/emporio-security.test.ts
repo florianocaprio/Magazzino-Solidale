@@ -525,7 +525,7 @@ describe("M6.2-A — confini, replay e transazioni", () => {
     expect(replay.body.error).toContain("già chiusa");
     expect(await deniedFacts()).toEqual(before);
   });
-  it.each(["utente", "area", "zona"])(
+  it.each(["utente", "area"])(
     "A02/A06/A07: revoca corrente %s non usa il cookie come autorità",
     async (kind) => {
       const f = await fixture(),
@@ -540,16 +540,6 @@ describe("M6.2-A — confini, replay e transazioni", () => {
           .update(areeOperativeTable)
           .set({ attivo: false })
           .where(eq(areeOperativeTable.id, f.area.id));
-      if (kind === "zona") {
-        await db
-          .update(utentiTable)
-          .set({ zonaUdsId: f.zone.id })
-          .where(eq(utentiTable.id, f.user.id));
-        await db
-          .update(zoneUdsTable)
-          .set({ attivo: false })
-          .where(eq(zoneUdsTable.id, f.zone.id));
-      }
       const before = await deniedFacts(),
         response = await f.agent
           .post(`/api/cassa-emporio/sessioni/${s.id}/sospendi`)
@@ -558,6 +548,13 @@ describe("M6.2-A — confini, replay e transazioni", () => {
       expect(await deniedFacts()).toEqual(before);
     },
   );
+  it("A06: la Zona storica inattiva non revoca l’operatività nell’Area", async () => {
+    const f = await fixture(), { session: s } = await open(f);
+    await db.update(utentiTable).set({ zonaUdsId: f.zone.id }).where(eq(utentiTable.id, f.user.id));
+    await db.update(zoneUdsTable).set({ attivo: false }).where(eq(zoneUdsTable.id, f.zone.id));
+    const response = await f.agent.post(`/api/cassa-emporio/sessioni/${s.id}/sospendi`).send({ versione: s.versione });
+    expect(response.status, response.text).toBe(200);
+  });
   it("A07/A12/A29: batch Zona non ricarica altri beneficiari e replay dopo revoca è negato", async () => {
     const f = await fixture();
     const [other] = await db
@@ -668,7 +665,7 @@ describe("M6.2-A — confini, replay e transazioni", () => {
     expect(wh.status).toBe(403);
   });
   it.each(["inattivo", "incoerente", "senza_area"])(
-    "A06: Centro %s nega senza ampliamento",
+    "A06: Centro storico %s non limita l’Area; senza Area si nega",
     async (variant) => {
       const f = await fixture();
       if (variant === "inattivo")
@@ -688,7 +685,7 @@ describe("M6.2-A — confini, replay e transazioni", () => {
           .update(utentiTable)
           .set({ areaOperativaId: null })
           .where(eq(utentiTable.id, f.user.id));
-      expect((await f.agent.get("/api/accessi-emporio")).status).toBe(403);
+      expect((await f.agent.get("/api/accessi-emporio")).status).toBe(variant === "senza_area" ? 403 : 200);
     },
   );
   it("A07/A12/F1: Emporio usa Area, non Zona; storico leggibile ma batch richiede diritto esplicito", async () => {
