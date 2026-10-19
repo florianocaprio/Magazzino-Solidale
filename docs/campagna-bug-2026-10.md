@@ -1,6 +1,6 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-19 ottobre 2026, Europe/Rome. **Consegna 01 chiusa con OK UAT di Floriano; consegna 02 sviluppata, UAT personale da eseguire.**
+19 ottobre 2026, Europe/Rome. **Consegne 01 e 02 chiuse con OK UAT di Floriano; checkpoint 03 aggiornato sulla 8082, UAT integrata dopo 04.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
@@ -123,7 +123,7 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 14  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 15  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 16  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 17 | C | 03, 04 | CHECKPOINT 03 PRONTO PER ##test | Nessuno; D04 approvata; UAT dopo 04 | fa96bc4fa8c900c72e8ed5451526e9e8cf2a72c9 | PASS mirati; skip dichiarati nella ricevuta | DA ESEGUIRE dopo 04 | fa96bc4fa8c900c72e8ed5451526e9e8cf2a72c9 |
+| 17 | C | 03, 04 | CHECKPOINT 03 PRONTO PER ##test | Nessuno; Enti destinatari globali, Fornitori invariati; UAT dopo 04 | 451a21b86ca2b67e0ea8b61a6fc14a78dd093ced | PASS mirati; skip dichiarati nella ricevuta | DA ESEGUIRE dopo 04 | 451a21b86ca2b67e0ea8b61a6fc14a78dd093ced |
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 19  | E      | 07     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 20  | F      | 08     | DA SVILUPPARE             | Nessuno; conservare UX20-01–14                                 | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -139,7 +139,7 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | -------- | ----------------------------- | --------------- | ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------- |
 | 01 | A: 01 | Funzionale | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 | PASS; ultimi controlli 737 UI e 76 API core | Installata e verificata | CHIUSA; OK UAT Floriano 19/10 |
 | 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | CHIUSA; OK UAT Floriano 19/10 |
-| 03 | C: 17, prima parte | Tecnica | fa96bc4fa8c900c72e8ed5451526e9e8cf2a72c9 | PASS: 1.513 API + 4 skip; 756 UI; 8 browser + 32 skip di matrice; build/budget | Installata su richiesta esplicita; ledger 60/60 | Checkpoint pronto per ##test; UAT integrata dopo 04 |
+| 03 | C: 17, prima parte | Tecnica | 451a21b86ca2b67e0ea8b61a6fc14a78dd093ced | PASS: 1.513 API + 4 skip; 756 UI; 8 browser + 32 skip di matrice; build/budget | Installata, asset HTTP verificati; ledger 60/60 | Checkpoint pronto per ##test; UAT integrata dopo 04 |
 | 04       | C: 05–09 e regressione 17     | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 05       | D: 04, 10–14, 16              | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 06       | E: 18, modello e integrazioni | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
@@ -1470,3 +1470,59 @@ il controllo Globale e la sua assenza per il profilo territoriale, senza
 dipendere dall’essere il primo elemento DOM del form. Nessuna modifica al database, alle API, a OpenAPI o ai generati.
 Le verifiche e la ricompilazione API/WEB 8082 effettive sono riportate nella
 ricevuta successiva. Nessun avvio della fase 04.
+
+
+### Ricevuta — Enti destinatari globali, 8082 aggiornata dopo il chiarimento
+
+Checkpoint applicativo **`451a21b86ca2b67e0ea8b61a6fc14a78dd093ced`**. Il form Ente espone il controllo Globale;
+il tag resta dopo modifica e salvataggio. Filtri anagrafici tutti / globali /
+Area incl. globali. Nessun pulsante Solo globali nelle Bolle: il selettore
+propone automaticamente Enti dell'Area e globali. Il codice dell'anagrafica Fornitori
+e i suoi tipi/client/API/OpenAPI sono invariati rispetto
+al checkpoint precedente `4b94c12d9f625d7ac637858ad2e67b5dc043887b`.
+
+- `pnpm install --frozen-lockfile` con `CI=true`: PASS, lockfile invariato.
+- `pnpm run typecheck`: PASS. Suite UI finale **756 PASS / 119 file**;
+  aggiornato il test che assumeva l'etichetta Area come primo nodo del form,
+  ora verifica l'ordine rispetto alla denominazione e il nuovo controllo.
+- Runner canonico sullo stato finale `api general`: **1.513 PASS + 4 SKIP**,
+  139 file; PostgreSQL runner **24 PASS**, fresh/replay/finale **60/60**.
+  Evidenze `/private/tmp/enti03-definitivo-api`. Questa esecuzione segue il
+  ripristino completo dei file Fornitori e la fine del browser precedente.
+- Runner canonico `browser m4a-documenti-destinatari.spec.ts`: **8 PASS +
+  32 SKIP** intenzionali delle repliche non desktop dei lifecycle mutativi.
+  Nuova prova reale: controllo Globale, persistenza NULL, tag, modifica senza
+  perdere l'ambito, solo globali esclude i locali, Area e tutti includono
+  l'Ente globale, Bolla senza pulsante, scelta prima locale poi globale e
+  magazzino/snapshot territoriale preservati. Regressioni Beneficiario,
+  idempotenza, prenotazioni, PDF, snapshot e Trasferimenti eseguite.
+  Evidenze `/private/tmp/enti03-definitivo-browser`. Il checkpoint browser
+  `c5c172fc322f0f1ecc9d154b6d8adb368371074a` contiene gli stessi file applicativi
+  del candidato installato; il successivo commit aggiunge solo test UI/registro.
+- API/browser eseguiti in sequenza con lock e database temporanei attestati,
+  soli dati sintetici, cleanup completato. Nessun test funzionale sui dati 8082.
+- API e WEB ricostruite da `git archive` del checkpoint installato, label SHA
+  complete controllate; budget entry **399,6/400 KiB gzip**, soglia invariata.
+
+Backup DB completo/uploads, SHA-256 e indici degli archivi verificati:
+`/Users/florianocaprio/Backups/Magazzino-Solidale/ENTI-DESTINATARI-GLOBALI-451a21b86ca2-2026-10-19T17-24-19-670Z`.
+Nessuna nuova migrazione: ledger personale prima/dopo **60/60**, zero pending,
+checksum difformi, file mancanti o fuori ordine. `restoreTested=false` per questo
+backup; non viene dichiarato un nuovo ripristino. PostgreSQL stesso container,
+stesso avvio e stessi volumi DB/uploads. Ricreati solo API e WEB dopo confronto
+Compose delle sole immagini/revisioni. Impronte identiche al backup per
+Fornitori, Enti, Bolle, Richieste, lotti, movimenti, prenotazioni e audit.
+
+- API `magazzino-bugfix-uat-api:sha-451a21b86ca2`, image ID `sha256:5539ca8c194ba9c5ccb38d23e3721f2277ff90d4b2fbcce766a7b569b22d685e`.
+- WEB `magazzino-bugfix-uat-web:sha-451a21b86ca2`, image ID `sha256:9d6490f8f59f70aa7f0ec79855fd76f96a3375ff3d41a66dbec3eada5e2765df`.
+- Revisioni container e immagini uguali al checkpoint; API healthy.
+- HTTP root/config/healthz/readyz **200**, Utenti senza sessione **401**.
+- Entry `/assets/index-BC1oj0d6.js`. SHA-256 HTTP uguali ai file della nuova
+  immagine per `enti-esterni-BtVaBoN7.js` e `documento-operativo-CEHMz4vX.js`; nel primo verificati
+  `ente-global` e la spiegazione, nel secondo assenza del riferimento al
+  pulsante `entiEsterni.onlyGlobal`.
+
+Percorso di prova: `http://localhost:8082/enti-esterni`, ricaricare con ⌘⇧R.
+Admin globale → Nuovo Ente → Globale; verificare tag, filtri e disponibilità
+in Nuova Bolla dell'Area. Consegna 02 resta chiusa. Nessuna fase 04, merge,
+main o produzione avviata; quattro documenti locali preesistenti esclusi.
