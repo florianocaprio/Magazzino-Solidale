@@ -14147,6 +14147,9 @@ components:
           oneOf:
             - $ref: "#/components/schemas/QuantitaContabile"
             - type: "null"
+        quantitaRettificata:
+          description: Quantità già stornata dalla riga, senza alterare il dato originario.
+          $ref: "#/components/schemas/QuantitaContabile"
         unitaMisura: { type: string }
         quantitaFrazionabile: { type: boolean }
         lottoFisicoObbligatorio: { type: boolean }
@@ -14355,6 +14358,9 @@ components:
           $ref: "#/components/schemas/QuantitaContabile"
         motivo: { type: string, minLength: 1, maxLength: 1000 }
         idempotencyKey: { type: string, minLength: 1, maxLength: 100 }
+        ripristinaBozza:
+          type: boolean
+          description: Storna tutta la quantità residua della riga e crea atomicamente una copia modificabile non contabilizzata. Solo pratiche manuali aperte, con permesso di carico.
       required: [versione, quantita, motivo, idempotencyKey]
 
     CaricoPraticaRettificaResult:
@@ -14363,6 +14369,7 @@ components:
         praticaId: { type: integer }
         rigaId: { type: integer }
         rettificaId: { type: integer }
+        rigaSostitutivaId: { type: integer }
         lottoId: { type: integer }
         movimentoId: { type: integer }
         quantita:

@@ -11,6 +11,7 @@ export interface CaricoPraticaRettificaResult {
   praticaId: number;
   rigaId: number;
   rettificaId?: number;
+  rigaSostitutivaId?: number;
   lottoId: number;
   movimentoId: number;
   quantita: QuantitaContabile;

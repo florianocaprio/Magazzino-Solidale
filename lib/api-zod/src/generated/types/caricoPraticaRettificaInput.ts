@@ -21,4 +21,6 @@ export interface CaricoPraticaRettificaInput {
    * @maxLength 100
    */
   idempotencyKey: string;
+  /** Storna tutta la quantità residua della riga e crea atomicamente una copia modificabile non contabilizzata. Solo pratiche manuali aperte, con permesso di carico. */
+  ripristinaBozza?: boolean;
 }

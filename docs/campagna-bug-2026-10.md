@@ -2193,3 +2193,118 @@ limite invariato. Ricevuta privata `/private/tmp/blocco05-release-result.json`.
 La ricevuta è un successivo commit solo documentale: non cambia il codice
 installato. La consegna 05 resta aperta alla UAT di Floriano; prompt 06 non
 avviato.
+
+## Correttivo UAT 05 — azioni, apertura pratica e righe contabilizzate, 20 ottobre 2026
+
+Floriano segnala pulsanti di riga fuori dal riquadro, salvataggio poco chiaro,
+assenza di correzioni sulle righe già caricate e permanenza nel dettaglio dopo
+Chiudi/Sospendi. La richiesta diretta aggiorna il vincolo del prompt 05 sulle
+righe registrate: devono essere correggibili senza cancellare movimenti e storico.
+La consegna 05 rimane **APERTA ALLA UAT**; nessun avvio del prompt 06.
+
+- Azioni delle righe pendenti su una riga dedicata adattiva, con Rimuovi visibile
+  e bordo rosso tenue. Dopo il salvataggio esplicito, o su una riga completa già
+  salvata, **Prodotto salvato** grigio disabilitato; modificando un campo torna
+  **Inserisci Prodotto**. Rimuovi resta abilitato secondo i permessi esistenti.
+  Le bozze incomplete restano salvabili, accompagnate dai campi da completare.
+- Prima creazione: **Apertura Pratica**. Dopo la risposta positiva la testata
+  viene nascosta, lasciando il contesto Area/Magazzino e **Da caricare a magazzino**.
+  **Dati pratica** permette di rivederla; il comando successivo è **Salva modifiche**.
+  La sezione delle righe registrate compare solo quando contiene righe.
+- **Inserimento prodotti** con icona + e verde tenue; **Annulla Pratica**.
+- **Chiudi Carico**, dopo il successo, e **Sospendi Carico** riportano all'elenco
+  con Area e Magazzino della pratica, ripulendo ricerca/date/stato che potrebbero
+  nasconderla. La chiusura resta bloccata con righe pendenti o modifiche locali.
+  Sospendi conserva la protezione esplicita delle modifiche non salvate (D03),
+  non contabilizza né cambia lo stato. Un errore resta nel dettaglio.
+- Nelle pratiche manuali Aperte, con permessi receive+adjust, le righe registrate
+  espongono **Modifica prodotto** e **Rimuovi Prodotto**. Entrambi richiedono una
+  motivazione e spiegano lo storno. Rimuovi storna la quantità non ancora stornata;
+  Modifica storna e crea **nella stessa transazione** una copia modificabile tra
+  le righe pendenti. I nuovi dati vanno salvati e confermati per ricontabilizzarli.
+  L'originale resta nello storico con quantità netta e quantità stornata visibili.
+  Una pratica Chiusa va prima riaperta con motivo. Nessuna modifica diretta ai
+  movimenti, né PATCH/DELETE delle righe registrate.
+- Restano i blocchi dell'endpoint esistente: merce già distribuita/prenotata,
+  quantità eccedenti e lotti con più provenienze non attribuibili. Le pratiche
+  FSE+/saldo iniziale restano nella procedura dedicata.
+
+**Contratto API:** estensione additiva dell'endpoint rettifica esistente:
+`ripristinaBozza?: boolean`, risposta `rigaSostitutivaId?: integer` e dettaglio
+riga `quantitaRettificata`. Quantità/precisione, idempotenza, versioni, transazione,
+audit e controllo disponibilità conservati. Il flag richiede anche receive e
+pratica manuale in stato modificabile; il replay restituisce lo stesso ID della
+copia. Nessuna migration o modifica allo schema DB. Client e Zod rigenerati
+con il comando ufficiale; seconda generazione identica byte per byte.
+
+### Prove manuali aggiornate del correttivo 05
+
+1. **Nuova pratica → Apertura Pratica**: dopo il salvataggio deve comparire la
+   sezione Da caricare, senza il form della testata e senza storico vuoto.
+   Dati pratica riapre il form senza perdere i prodotti digitati.
+2. **+ Inserimento prodotti**: aggiungere due prodotti, salvare il primo. Il
+   suo pulsante diventa grigio Prodotto salvato, Rimuovi resta attivo e dentro
+   il riquadro anche su tablet. Modificare la quantità riattiva Inserisci Prodotto.
+3. Confermare 80, sospendere e verificare l'elenco filtrato sul Magazzino/Area
+   corretti. Riprendere, aggiungere 20 e confermare: stock 100, nessun duplicato.
+   Chiudi torna allo stesso elenco filtrato e conserva stock 100.
+4. Riaprire con motivo, **Modifica prodotto** sulla riga 20 e indicare il motivo:
+   stock 80, copia pendente 20. Correggerla a 15, salvare (stock sempre 80), poi
+   confermare: stock 95. L'originale 20 rimane nello storico come stornato.
+5. Provare **Rimuovi Prodotto** su una riga di prova già contabilizzata: dopo
+   motivazione viene stornata, conservando lo storico. Provare una quantità già
+   impegnata: messaggio di blocco e nessuna modifica parziale.
+6. Confermare la permanenza sul form con valori preservati se un salvataggio
+   fallisce e il dialogo sulle modifiche locali quando si sospende senza salvarle.
+
+### File del correttivo 05
+
+- `artifacts/magazzino-solidale/src/pages/carico-merce.tsx`
+- `artifacts/magazzino-solidale/src/lib/carico-merce.ts`
+- `artifacts/magazzino-solidale/src/lib/carico-merce.test.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/blocco05.ts` (sei lingue)
+- `artifacts/magazzino-solidale/e2e/carico-pratiche-m3a.spec.ts`
+- `artifacts/magazzino-solidale/e2e/carico-ux-01.spec.ts`
+- `artifacts/api-server/src/routes/carico-pratiche.ts`
+- `artifacts/api-server/tests/carico-pratiche-m3a.test.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/caricoPraticaRiga.ts`
+- `lib/api-zod/src/generated/types/caricoPraticaRettificaInput.ts`
+- `lib/api-zod/src/generated/types/caricoPraticaRettificaResult.ts`
+- questo registro.
+
+### Verifiche del correttivo 05
+
+- `pnpm install --frozen-lockfile`: PASS, lockfile invariato.
+- `pnpm run typecheck`: PASS (log finale `blocco05fix-typecheck-final.log`).
+- `pnpm --filter @workspace/magazzino-solidale run test --maxWorkers=2`:
+  **782 PASS, 121 file**, esecuzione finale dopo le modifiche.
+- API, runner canonico `node scripts/quality-gates-run.mjs api general`:
+  **1.529 PASS + 4 SKIP, 140 file**, evidenza privata
+  `/private/tmp/blocco05fix-api-2`. Le 12 prove di carico passano, inclusi copia
+  atomica, permessi, versione concorrente, replay con stesso ID, modifica e nuova
+  conferma, storno finale, rollback in caso di audit fallito. Quattro skip per i
+  file originali AGEA/FSE+ esterni non disponibili, come nella consegna precedente.
+- Browser, runner canonico con le quattro spec già previste: **22 PASS + 13 SKIP**.
+  Evidenze valide: `/private/tmp/blocco05fix-browser-1` per Lotti (10 PASS) e
+  navigazione tab (5 PASS), `blocco05fix-browser-2` per M3A (2 PASS + 8 SKIP),
+  `blocco05fix-browser-3` per UX (5 PASS + 5 SKIP). Skip dei viewport estranei alla
+  matrice già prevista, invariati. Verificati bounds e clic Rimuovi, stato salvato,
+  draft conservati, errori di salvataggio, testata nascosta/riapribile, filtri al
+  ritorno e scenario 80+20=100 seguito da storno 20 → 80 e nuova riga 15 → 95.
+- Un primo test API aveva atteso `10.000000` invece della rappresentazione originale
+  `10.00`: corretto per confrontare il dato originale letto dall'API, senza
+  modificarne precisione o contratto. Due selettori E2E avevano confuso menu e
+  campo Approvvigionamenti “Magazzino” con il filtro “Magazzino destinazione”:
+  ripristinati i nomi corretti e rieseguite le suite interessate. Nessun aumento
+  dei timeout, retry aggiunto o indebolimento dei controlli contabili.
+- Build di produzione e budget: **386,6/400 KiB gzip**, entry locale
+  `index-DKsxEa49.js`. Contratti rigenerati due volte con impronte identiche.
+- `git diff --check`: PASS. I quattro documenti locali preesistenti restano
+  inalterati e fuori dai commit. Nessun file `.env`, segreto, log o screenshot
+  aggiunto. Test API/browser esclusivamente su DB temporanei, rimossi dal runner.
+
+Installazione sulla 8082 da completare con immagini del checkpoint e ricevuta
+separata. Nessuna UAT umana attestata automaticamente.

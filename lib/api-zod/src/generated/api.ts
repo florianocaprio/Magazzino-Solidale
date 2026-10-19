@@ -1744,6 +1744,8 @@ export const GetCaricoPraticaParams = zod.object({
 export const getCaricoPraticaResponseTwoRigheItemQuantitaOneRegExp = new RegExp(
   "^[0-9]+(?:\\.[0-9]{1,6})?$",
 );
+export const getCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const getCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
 
@@ -1813,6 +1815,15 @@ export const GetCaricoPraticaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              getCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -1892,6 +1903,8 @@ export const UpdateCaricoPraticaBody = zod.object({
 
 export const updateCaricoPraticaResponseTwoRigheItemQuantitaOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const updateCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const updateCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
 
@@ -1961,6 +1974,15 @@ export const UpdateCaricoPraticaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              updateCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -2132,6 +2154,8 @@ export const UpdateCaricoPraticaRigaBody = zod
 
 export const updateCaricoPraticaRigaResponseTwoRigheItemQuantitaOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const updateCaricoPraticaRigaResponseTwoRigheItemQuantitaRettificataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const updateCaricoPraticaRigaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
 
@@ -2203,6 +2227,15 @@ export const UpdateCaricoPraticaRigaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              updateCaricoPraticaRigaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -2256,6 +2289,8 @@ export const DeleteCaricoPraticaRigaBody = zod.object({
 });
 
 export const deleteCaricoPraticaRigaResponseTwoRigheItemQuantitaOneRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const deleteCaricoPraticaRigaResponseTwoRigheItemQuantitaRettificataRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const deleteCaricoPraticaRigaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
@@ -2328,6 +2363,15 @@ export const DeleteCaricoPraticaRigaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              deleteCaricoPraticaRigaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -2424,6 +2468,12 @@ export const RectifyCaricoPraticaRigaBody = zod.object({
     .string()
     .min(1)
     .max(rectifyCaricoPraticaRigaBodyIdempotencyKeyMax),
+  ripristinaBozza: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Storna tutta la quantità residua della riga e crea atomicamente una copia modificabile non contabilizzata. Solo pratiche manuali aperte, con permesso di carico.",
+    ),
 });
 
 export const rectifyCaricoPraticaRigaResponseQuantitaRegExp = new RegExp(
@@ -2434,6 +2484,7 @@ export const RectifyCaricoPraticaRigaResponse = zod.object({
   praticaId: zod.number(),
   rigaId: zod.number(),
   rettificaId: zod.number().optional(),
+  rigaSostitutivaId: zod.number().optional(),
   lottoId: zod.number(),
   movimentoId: zod.number(),
   quantita: zod
@@ -2455,6 +2506,8 @@ export const CloseCaricoPraticaBody = zod.object({
 });
 
 export const closeCaricoPraticaResponseTwoRigheItemQuantitaOneRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const closeCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const closeCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
@@ -2525,6 +2578,15 @@ export const CloseCaricoPraticaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              closeCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -2580,6 +2642,8 @@ export const ReopenCaricoPraticaBody = zod.object({
 });
 
 export const reopenCaricoPraticaResponseTwoRigheItemQuantitaOneRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const reopenCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const reopenCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
@@ -2650,6 +2714,15 @@ export const ReopenCaricoPraticaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              reopenCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),
@@ -2705,6 +2778,8 @@ export const CancelCaricoPraticaBody = zod.object({
 });
 
 export const cancelCaricoPraticaResponseTwoRigheItemQuantitaOneRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const cancelCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
 export const cancelCaricoPraticaResponseTwoRigheItemFattoreKgLtPezzoOneRegExp =
   new RegExp("^[0-9]+(?:\\.[0-9]{1,9})?$");
@@ -2775,6 +2850,15 @@ export const CancelCaricoPraticaResponse = zod
               zod.null(),
             ])
             .optional(),
+          quantitaRettificata: zod
+            .string()
+            .regex(
+              cancelCaricoPraticaResponseTwoRigheItemQuantitaRettificataRegExp,
+            )
+            .optional()
+            .describe(
+              "Quantità già stornata dalla riga, senza alterare il dato originario.",
+            ),
           unitaMisura: zod.string(),
           quantitaFrazionabile: zod.boolean(),
           lottoFisicoObbligatorio: zod.boolean(),

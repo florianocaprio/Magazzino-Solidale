@@ -32,6 +32,19 @@ export type CaricoRowIssue =
   | "required";
 export type CaricoRowErrors = Partial<Record<CaricoRowField, CaricoRowIssue>>;
 
+/** API quantities have at most six decimals; never subtract formatted values. */
+export function remainingCaricoQuantity(
+  row: Pick<CaricoPraticaRiga, "quantita" | "quantitaRettificata">,
+): string {
+  const scaled = (value: string) => {
+    const [whole, fraction = ""] = value.split(".");
+    return BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, "0"));
+  };
+  const remaining =
+    scaled(row.quantita ?? "0") - scaled(row.quantitaRettificata ?? "0");
+  return `${remaining / 1_000_000n}.${(remaining % 1_000_000n).toString().padStart(6, "0")}`;
+}
+
 function validDateOnly(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);

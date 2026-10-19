@@ -487,6 +487,7 @@ async function detail(id: number) {
       gestioneScadenza: prodottiTable.gestioneScadenza,
       integrazioneId: caricoIntegrazioneRigheTable.caricoIntegrazioneId,
       caricoMagazzinoRigaId: caricoIntegrazioneRigheTable.caricoMagazzinoRigaId,
+      quantitaRettificata: sql<string>`(select coalesce(sum(r.quantita), 0)::text from ${caricoPraticaRettificheTable} r where r.carico_pratica_riga_id = ${caricoPraticaRigheTable.id})`,
     })
     .from(caricoPraticaRigheTable)
     .innerJoin(
@@ -525,6 +526,7 @@ async function detail(id: number) {
     righe: rows.map((row) => ({
       ...row.riga,
       quantita: row.riga.quantita,
+      quantitaRettificata: row.quantitaRettificata,
       prodottoNome: row.prodottoNome,
       prodottoCodice: row.prodottoCodice,
       unitaMisura: row.riga.unitaMisuraSnapshot ?? row.unitaMisura,
@@ -1419,6 +1421,24 @@ router.post(
       const requestedVersion = version(req.body?.versione);
       const key = requiredText(req.body?.idempotencyKey, "idempotencyKey", 100);
       const motivo = requiredText(req.body?.motivo, "motivo", 1000);
+      if (
+        req.body?.ripristinaBozza != null &&
+        typeof req.body.ripristinaBozza !== "boolean"
+      )
+        throw new CaricoPraticaError(
+          400,
+          "ripristinaBozza deve essere booleano",
+        );
+      const ripristinaBozza = req.body?.ripristinaBozza === true;
+      if (
+        ripristinaBozza &&
+        !req.user!.isAdmin &&
+        !(req.user!.permessi ?? []).includes("magazzino.stock.receive")
+      )
+        throw new CaricoPraticaError(
+          403,
+          "Permesso di carico richiesto per creare la riga sostitutiva",
+        );
       let quantita: InventoryDecimal;
       try {
         quantita = InventoryDecimal.parse(req.body?.quantita);
@@ -1438,6 +1458,7 @@ router.post(
         versione: requestedVersion,
         quantita: quantita.toCanonical(),
         motivo,
+        ...(ripristinaBozza ? { ripristinaBozza: true } : {}),
       });
       const command = auditContextFromRequest(req, {
         operationKey: `m3a-rettifica:${key}`,
@@ -1476,6 +1497,10 @@ router.post(
         }
 
         requireVersion(practice, requestedVersion);
+        if (ripristinaBozza) {
+          requireWorkingState(practice);
+          requireManualPracticeEdit(practice);
+        }
         const [source] = await tx
           .select({
             riga: caricoPraticaRigheTable,
@@ -1566,6 +1591,11 @@ router.post(
         const remainingSource = InventoryDecimal.parse(
           source.quantitaOriginale,
         ).subtract(InventoryDecimal.parse(prior?.total ?? "0"));
+        if (ripristinaBozza && quantita.compare(remainingSource) !== 0)
+          throw new CaricoPraticaError(
+            409,
+            "Per modificare la riga occorre stornare tutta la quantità ancora rettificabile",
+          );
         if (quantita.compare(remainingSource) > 0)
           throw new CaricoPraticaError(
             409,
@@ -1612,6 +1642,25 @@ router.post(
             "Audit obbligatorio della rettifica non registrato",
           );
         const nextVersion = practice.versione + 1;
+        let rigaSostitutivaId: number | undefined;
+        if (ripristinaBozza) {
+          const [replacement] = await tx
+            .insert(caricoPraticaRigheTable)
+            .values({
+              caricoPraticaId: id,
+              prodottoId: source.riga.prodottoId,
+              fondoOrigine: source.riga.fondoOrigine,
+              quantita: remainingSource.toDb(),
+              codiceLottoProduttore: source.riga.codiceLottoProduttore,
+              dataScadenza: source.riga.dataScadenza,
+              fattoreKgLtPezzo: source.riga.fattoreKgLtPezzo,
+              note: source.riga.note,
+              creatoDa: req.user!.id,
+              aggiornatoDa: req.user!.id,
+            })
+            .returning({ id: caricoPraticaRigheTable.id });
+          rigaSostitutivaId = replacement.id;
+        }
         const snapshot = {
           praticaId: id,
           rigaId,
@@ -1620,6 +1669,7 @@ router.post(
           quantita: quantita.toDb(),
           versione: nextVersion,
           replay: false,
+          ...(rigaSostitutivaId == null ? {} : { rigaSostitutivaId }),
         };
         const [rectification] = await tx
           .insert(caricoPraticaRettificheTable)

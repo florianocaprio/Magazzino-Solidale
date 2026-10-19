@@ -19,6 +19,8 @@ export interface CaricoPraticaRiga {
   prodottoCodice: string;
   fondoOrigine: FondoOrigine;
   quantita?: QuantitaContabile | null;
+  /** Quantità già stornata dalla riga, senza alterare il dato originario. */
+  quantitaRettificata?: QuantitaContabile;
   unitaMisura: string;
   quantitaFrazionabile: boolean;
   lottoFisicoObbligatorio: boolean;

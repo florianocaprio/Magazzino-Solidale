@@ -15,6 +15,7 @@ import {
   operationalWarehousesForArea,
   productForBarcode,
   reconcileCaricoDrafts,
+  remainingCaricoQuantity,
   shouldAcceptBarcodeScan,
   validateCaricoRow,
   type CaricoRowDraft,
@@ -292,4 +293,22 @@ it("carica tutte le traduzioni della pagina quando viene aperto Carico Merce", a
       blocco05[lng].insertProduct,
     );
   }
+});
+
+describe("quantità rettificabile", () => {
+  it("sottrae gli storni senza perdere la precisione del magazzino", () => {
+    expect(
+      remainingCaricoQuantity({
+        quantita: "99999999.999999",
+        quantitaRettificata: "99999999.999998",
+      }),
+    ).toBe("0.000001");
+    expect(
+      remainingCaricoQuantity({
+        quantita: "5.123456",
+        quantitaRettificata: "5.123456",
+      }),
+    ).toBe("0.000000");
+    expect(remainingCaricoQuantity({ quantita: "10.00" })).toBe("10.000000");
+  });
 });

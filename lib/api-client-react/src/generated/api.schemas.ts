@@ -2757,6 +2757,8 @@ export interface CaricoPraticaRiga {
   prodottoCodice: string;
   fondoOrigine: FondoOrigine;
   quantita?: QuantitaContabile | null;
+  /** Quantità già stornata dalla riga, senza alterare il dato originario. */
+  quantitaRettificata?: QuantitaContabile;
   unitaMisura: string;
   quantitaFrazionabile: boolean;
   lottoFisicoObbligatorio: boolean;
@@ -2941,12 +2943,15 @@ export interface CaricoPraticaRettificaInput {
    * @maxLength 100
    */
   idempotencyKey: string;
+  /** Storna tutta la quantità residua della riga e crea atomicamente una copia modificabile non contabilizzata. Solo pratiche manuali aperte, con permesso di carico. */
+  ripristinaBozza?: boolean;
 }
 
 export interface CaricoPraticaRettificaResult {
   praticaId: number;
   rigaId: number;
   rettificaId?: number;
+  rigaSostitutivaId?: number;
   lottoId: number;
   movimentoId: number;
   quantita: QuantitaContabile;

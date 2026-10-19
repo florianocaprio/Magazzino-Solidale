@@ -140,7 +140,7 @@ test.describe("M3A — pratica di carico persistente", () => {
         response.url().endsWith("/api/carico-pratiche") &&
         response.request().method() === "POST",
     );
-    await page.getByRole("button", { name: /salva bozza/i }).click();
+    await page.getByRole("button", { name: /apertura pratica/i }).click();
     expect((await createResponse).status()).toBe(201);
     expect(await readStock(page)).toBe(before);
 
@@ -156,7 +156,7 @@ test.describe("M3A — pratica di carico persistente", () => {
     await resumedPage.goto("/carico-merce");
     await openPracticeFromList(resumedPage, area, description);
     await resumedPage
-      .getByRole("button", { name: "Inserire altri prodotti" })
+      .getByRole("button", { name: "Inserimento prodotti" })
       .click();
     await resumedPage
       .getByLabel(/cerca per nome, codice o barcode/i)
@@ -211,6 +211,18 @@ test.describe("M3A — pratica di carico persistente", () => {
     await expect(
       resumedPage.getByRole("button", { name: /nuova pratica/i }),
     ).toBeVisible();
+    await expect(
+      resumedPage.getByRole("combobox", {
+        name: "Area Operativa",
+        exact: true,
+      }),
+    ).toContainText(area.nome);
+    await expect(
+      resumedPage.getByRole("combobox", {
+        name: "Magazzino destinazione",
+        exact: true,
+      }),
+    ).toContainText(warehouse.nome);
     resumedPage.off("request", recordSuspend);
     expect(suspendWrites).toEqual([]);
     expect(await readStock(resumedPage)).toBe(before + 80);
@@ -218,7 +230,7 @@ test.describe("M3A — pratica di carico persistente", () => {
     await resumedPage.reload();
     await openPracticeFromList(resumedPage, area, description);
     await resumedPage
-      .getByRole("button", { name: "Inserire altri prodotti" })
+      .getByRole("button", { name: "Inserimento prodotti" })
       .click();
     await resumedPage
       .getByLabel(/cerca per nome, codice o barcode/i)
@@ -348,12 +360,67 @@ test.describe("M3A — pratica di carico persistente", () => {
     await expect(close).toHaveClass(/bg-emerald-700/);
     await close.click();
     await expect(
-      resumedPage.getByRole("button", { name: /^riapri$/i }),
+      resumedPage.getByRole("button", { name: "Nuova pratica" }),
     ).toBeVisible();
     await expect(
-      resumedPage.getByRole("button", { name: "Inserire altri prodotti" }),
+      resumedPage.getByRole("combobox", { name: "Area Operativa" }),
+    ).toContainText(area.nome);
+    await expect(
+      resumedPage.getByRole("combobox", {
+        name: "Magazzino destinazione",
+        exact: true,
+      }),
+    ).toContainText(warehouse.nome);
+    await expect(
+      resumedPage.getByRole("button", { name: "Inserimento prodotti" }),
     ).toHaveCount(0);
     expect(await readStock(resumedPage)).toBe(before + 100);
+    await openPracticeFromList(resumedPage, area, description);
+    resumedPage.once("dialog", (dialog) =>
+      dialog.accept("Correzione di una riga caricata"),
+    );
+    await resumedPage.getByRole("button", { name: /^riapri$/i }).click();
+    const loadedRow = resumedPage
+      .getByText(`20,00 ${product.unitaMisura}`, { exact: true })
+      .locator("..");
+    await loadedRow
+      .getByRole("button", { name: "Modifica prodotto", exact: true })
+      .click();
+    const correctionDialog = resumedPage.getByRole("alertdialog");
+    await correctionDialog
+      .getByRole("textbox")
+      .fill("Quantità corretta da 20 a 15");
+    await correctionDialog
+      .getByRole("button", { name: "Conferma rettifica" })
+      .click();
+    await expect(correctionDialog).toHaveCount(0);
+    expect(await readStock(resumedPage)).toBe(before + 80);
+    const replacementQuantity = resumedPage.getByLabel(/quantità/i);
+    await expect(replacementQuantity).toBeFocused();
+    await replacementQuantity.fill("15");
+    await resumedPage
+      .getByRole("button", { name: "Inserisci Prodotto", exact: true })
+      .click();
+    await expect(
+      resumedPage.getByRole("button", {
+        name: "Prodotto salvato",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await expect(
+      resumedPage
+        .getByTestId(/^carico-row-/)
+        .getByRole("button", { name: "Rimuovi Prodotto" }),
+    ).toBeEnabled();
+    await resumedPage
+      .getByRole("button", { name: /conferma carico a magazzino/i })
+      .click();
+    await resumedPage
+      .getByRole("alertdialog")
+      .getByRole("button", { name: /conferma/i })
+      .click();
+    await expect(replacementQuantity).toHaveCount(0);
+    expect(await readStock(resumedPage)).toBe(before + 95);
     await concurrentContext.close();
     await resumedContext.close();
   });
@@ -464,7 +531,9 @@ test.describe("M3A — pratica di carico persistente", () => {
       ),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Magazzino", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Magazzino", exact: true })
+      .click();
     await page.getByRole("link", { name: "Giacenze", exact: true }).click();
     const unsavedDialog = page.getByRole("alertdialog", {
       name: /modifiche non salvate/i,

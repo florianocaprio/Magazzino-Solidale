@@ -55,6 +55,7 @@ function appFor(
     areaOperativaId?: number | null;
     matricola?: string;
     adjust?: boolean;
+    receive?: boolean;
   } = {},
 ): Express {
   const app = express();
@@ -69,7 +70,7 @@ function appFor(
       aree: ["magazzino"],
       permessi: [
         "magazzino.view",
-        "magazzino.stock.receive",
+        ...(options.receive === false ? [] : ["magazzino.stock.receive"]),
         ...(options.adjust === false ? [] : ["magazzino.stock.adjust"]),
       ],
       centroAscoltoId: null,
@@ -659,7 +660,8 @@ describe("M3A — pratica persistente e registrazioni incrementali", () => {
         )
         .send({
           versione: corrected.body.versione,
-          quantita: "1",
+          quantita: "7",
+          ripristinaBozza: true,
           motivo: "Deve fare rollback",
           idempotencyKey: `m3a-rect-audit-${suffix}`,
         });
@@ -677,6 +679,11 @@ describe("M3A — pratica persistente e registrazioni incrementali", () => {
       .from(lottiTable)
       .where(eq(lottiTable.id, accountingLine.lottoId));
     expect(afterAuditFailure.quantita).toBe(beforeAuditFailure.quantita);
+    const afterRollback = await request(app).get(
+      `/carico-pratiche/${created.body.id}`,
+    );
+    expect(afterRollback.body.righe).toHaveLength(1);
+    expect(afterRollback.body.versione).toBe(corrected.body.versione);
     expect(
       await db
         .select()
@@ -688,6 +695,106 @@ describe("M3A — pratica persistente e registrazioni incrementali", () => {
           ),
         ),
     ).toHaveLength(0);
+  });
+
+  it("storna la riga e crea una sola copia modificabile, senza contabilizzarla, con replay e versioni concorrenti", async () => {
+    const app = appFor(operatorAId);
+    const created = await createPractice(app, [row("10")]);
+    const id = created.body.id;
+    const sourceId = created.body.righe[0].id;
+    const registered = await request(app)
+      .post(`/carico-pratiche/${id}/registra`)
+      .send({
+        versione: created.body.versione,
+        rigaIds: [sourceId],
+        idempotencyKey: `replace-load-${suffix}`,
+      });
+    expect(registered.status).toBe(201);
+    const beforeCorrection = await request(app).get(`/carico-pratiche/${id}`);
+    const originalQuantity = beforeCorrection.body.righe[0].quantita;
+    const payload = {
+      versione: registered.body.versione,
+      quantita: "10",
+      motivo: "Correzione dei dati della riga",
+      idempotencyKey: `replace-${suffix}`,
+      ripristinaBozza: true,
+    };
+    const url = `/carico-pratiche/${id}/righe/${sourceId}/rettifica`;
+    const partial = await request(app)
+      .post(url)
+      .send({ ...payload, quantita: "2" });
+    expect(partial.status).toBe(409);
+    const invalidFlag = await request(app)
+      .post(url)
+      .send({ ...payload, ripristinaBozza: "yes" });
+    expect(invalidFlag.status).toBe(400);
+    const withoutReceive = appFor(operatorAId, { receive: false });
+    expect((await request(withoutReceive).post(url).send(payload)).status).toBe(
+      403,
+    );
+    const replaced = await request(app).post(url).send(payload);
+    expect(replaced.status).toBe(201);
+    expect(replaced.body.rigaSostitutivaId).toBeTypeOf("number");
+    const replay = await request(app).post(url).send(payload);
+    expect(replay.status).toBe(200);
+    expect(replay.body.rigaSostitutivaId).toBe(replaced.body.rigaSostitutivaId);
+    const stale = await request(app)
+      .post(url)
+      .send({ ...payload, idempotencyKey: `replace-stale-${suffix}` });
+    expect(stale.status).toBe(409);
+    const detail = await request(app).get(`/carico-pratiche/${id}`);
+    expect(detail.body.righe).toHaveLength(2);
+    expect(detail.body.righe[0]).toMatchObject({
+      id: sourceId,
+      registrata: true,
+      quantita: originalQuantity,
+      quantitaRettificata: "10.000000",
+    });
+    const replacement = detail.body.righe[1];
+    expect(replacement).toMatchObject({
+      id: replaced.body.rigaSostitutivaId,
+      registrata: false,
+      quantita: originalQuantity,
+      fondoOrigine: "NESSUN_FONDO",
+    });
+    const [lot] = await db
+      .select()
+      .from(lottiTable)
+      .where(eq(lottiTable.id, replaced.body.lottoId));
+    expect(Number(lot.quantitaResidua)).toBe(0);
+    const edited = await request(app)
+      .patch(`/carico-pratiche/${id}/righe/${replacement.id}`)
+      .send({
+        versione: detail.body.versione,
+        prodottoId: replacement.prodottoId,
+        fondoOrigine: replacement.fondoOrigine,
+        quantita: "8",
+        codiceLottoProduttore: "CORRETTO",
+      });
+    expect(edited.status).toBe(200);
+    const confirmed = await request(app)
+      .post(`/carico-pratiche/${id}/registra`)
+      .send({
+        versione: edited.body.versione,
+        rigaIds: [replacement.id],
+        idempotencyKey: `replace-confirm-${suffix}`,
+      });
+    expect(confirmed.status).toBe(201);
+    const removed = await request(app)
+      .post(`/carico-pratiche/${id}/righe/${replacement.id}/rettifica`)
+      .send({
+        versione: confirmed.body.versione,
+        quantita: "8",
+        motivo: "Rimozione definitiva dal carico operativo",
+        idempotencyKey: `replace-remove-${suffix}`,
+      });
+    expect(removed.status).toBe(201);
+    const final = await request(app).get(`/carico-pratiche/${id}`);
+    expect(final.body.righe).toHaveLength(2);
+    expect(
+      final.body.righe.every((r: { registrata: boolean }) => r.registrata),
+    ).toBe(true);
+    expect(Number(final.body.righe[1].quantitaRettificata)).toBe(8);
   });
 
   it("gestisce chiusura, replay dopo chiusura e annullamento motivato di una bozza", async () => {
