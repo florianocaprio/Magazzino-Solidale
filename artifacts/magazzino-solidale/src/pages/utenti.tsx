@@ -618,7 +618,7 @@ export default function Utenti() {
                           {t("common.active")}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary">
+                        <Badge variant="secondary" className="bg-red-500/10 text-red-700">
                           {t("utenti.disattivato")}
                         </Badge>
                       )}
