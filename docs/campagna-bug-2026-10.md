@@ -1,6 +1,6 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-19 ottobre 2026, Europe/Rome. **Consegne 01 e 02 chiuse con OK UAT di Floriano; checkpoint 03 aggiornato sulla 8082, UAT integrata dopo 04.**
+19 ottobre 2026, Europe/Rome. **Consegne 01, 02 e checkpoint 03 chiusi con OK di Floriano; consegna 04 e addendum BUG 21 verificati tecnicamente, installazione 8082 in preparazione e UAT del blocco C da eseguire.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
@@ -101,7 +101,7 @@ Nessuna decisione residua blocca l'avvio del prompt 01.
 
 ## Registro dei BUG
 
-Il BUG 01 è **CHIUSO CON OK UAT DI FLORIANO**; BUG 02/03/15 sono CHIUSI con OK UAT di Floriano; BUG 17 ha un checkpoint tecnico pronto per ##test, con UAT integrata dopo il prompt 04. Le UAT successive sono **DA ESEGUIRE** e non derivano
+Il BUG 01 è **CHIUSO CON OK UAT DI FLORIANO**; BUG 02/03/15 sono CHIUSI con OK UAT di Floriano; il checkpoint 03 è approvato da Floriano e la regressione integrata del BUG 17 resta nella UAT 04. Le UAT successive sono **DA ESEGUIRE** e non derivano
 dai test automatici. Il candidato iniziale non è un candidato verificato della
 campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 
@@ -111,11 +111,11 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 02  | B      | 02     | CHIUSO; UAT OK | Nessuno; D01 approvata                                         | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 03  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 04  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 05  | C      | 04     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 06  | C      | 04     | DA SVILUPPARE             | Nessuno; requisito sostitutivo Area/Centro prima della ricerca | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 07  | C      | 04     | DA SVILUPPARE             | Nessuno; D02 approvata                                         | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 08  | C      | 04     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 09  | C      | 04     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
+| 05 | C | 04 | PRONTO PER UAT; DA INSTALLARE | Nessuno; D02 confermata per BUG 07 | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
+| 06 | C | 04 | PRONTO PER UAT; DA INSTALLARE | Nessuno; D02 confermata per BUG 07 | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
+| 07 | C | 04 | PRONTO PER UAT; DA INSTALLARE | Nessuno; D02 confermata per BUG 07 | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
+| 08 | C | 04 | PRONTO PER UAT; DA INSTALLARE | Nessuno; D02 confermata per BUG 07 | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
+| 09 | C | 04 | PRONTO PER UAT; DA INSTALLARE | Nessuno; D02 confermata per BUG 07 | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
 | 10  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 11  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 12  | D      | 05     | DA SVILUPPARE             | Raccordo D03 con le attuali pratiche Aperte                    | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -123,10 +123,11 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 14  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 15  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 16  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 17 | C | 03, 04 | CHECKPOINT 03 PRONTO PER ##test | Nessuno; Enti e Fornitori locali/globali; UAT dopo 04 | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 | PASS mirati; skip dichiarati nella ricevuta | DA ESEGUIRE dopo 04 | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 |
+| 17 | C | 03, 04 | CHECKPOINT 03 APPROVATO; REGRESSIONE 04 | Nessuno; Enti e Fornitori locali/globali; UAT dopo 04 | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 | PASS mirati; skip dichiarati nella ricevuta | DA ESEGUIRE dopo 04 | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 |
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 19  | E      | 07     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 20  | F      | 08     | DA SVILUPPARE             | Nessuno; conservare UX20-01–14                                 | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
+| 21 | C | 04 + addendum 2.2 | PRONTO PER UAT; DA INSTALLARE | Un solo ID con stati, territorio, tessera e Zona UDS | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
 
 ## Otto consegne
 
@@ -139,8 +140,8 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | -------- | ----------------------------- | --------------- | ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------- |
 | 01 | A: 01 | Funzionale | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 | PASS; ultimi controlli 737 UI e 76 API core | Installata e verificata | CHIUSA; OK UAT Floriano 19/10 |
 | 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | CHIUSA; OK UAT Floriano 19/10 |
-| 03 | C: 17, prima parte | Tecnica | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 | PASS: 1.521 API + 4 skip; 756 UI; 9 browser + 36 skip di matrice; build/budget | Installata, asset HTTP verificati; ledger 60/60 | Checkpoint pronto per ##test; UAT integrata dopo 04 |
-| 04       | C: 05–09 e regressione 17     | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
+| 03 | C: 17, prima parte | Tecnica | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 | PASS: 1.521 API + 4 skip; 756 UI; 9 browser + 36 skip di matrice; build/budget | Installata, asset HTTP verificati; ledger 60/60 | CHIUSO; OK Floriano; regressione integrata nel 04 |
+| 04 | C: 05–09, 21 e regressione 17 | Funzionale | Candidato di questo commit | PASS mirati; evidenze sotto | Da ricompilare prima della consegna | UAT DA ESEGUIRE |
 | 05       | D: 04, 10–14, 16              | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 06       | E: 18, modello e integrazioni | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
 | 07       | E: 18 UI, 19                  | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
@@ -1643,3 +1644,177 @@ Admin globale → Nuovo Fornitore → scegliere Area locale oppure Globale.
 Verificare tag, modifica, tre filtri e disponibilità nei carichi. Nessuna fase
 04, merge, main o produzione avviata. Consegna 02 resta chiusa; quattro
 file documentali locali preesistenti esclusi dai commit.
+
+
+### Avvio prompt 04 e addendum BUG 21
+
+Floriano ha provato la 8082, approvato il punto 03 e incaricato lo sviluppo
+del prompt 04 con addendum BUG 21, chiedendo espressamente ricompilazione
+della 8082 per le prove. D02 e D04 sono già approvate; nessuna richiesta di
+conferma ripetuta. Perimetro: BUG 05–09 e 21, regressione 17, conservazione
+dei controlli sulle date del 02 e dei Fornitori locali/globali del 03.
+Nessun avvio 05, merge/main/produzione. Esito UAT 04 ancora da eseguire.
+
+### Implementazione del blocco 04 — BUG 05–09 e 21
+
+- BUG 05: Area prima del Centro e scelte attive coerenti; reset dei dati
+  dipendenti e dei suggerimenti al cambio Area. Abilitazione Emporio con motivo
+  e permessi esistenti, indipendente da credito, preferenza e tessera. Esiti
+  parziali Mensa/Emporio recuperabili sullo stesso ID, invio protetto dal doppio
+  click; lettura del diritto prima del retry per recuperare una risposta persa.
+- BUG 06: Area/Centro prima della ricerca o scansione. Nuovo lookup minimo
+  riservato al comando Bolla, paginato sul server, usabile da Magazzino senza
+  accesso al dossier. Tessera trasversale registrata, esatta e valida, senza
+  fallback al codice anagrafico. Selezionato conservato fuori pagina, query
+  contestualizzate, reset e rifiuto delle risposte tardive. Consegna già
+  contestualizzata conservata. Contesto atteso ricontrollato in transazione;
+  hash dei vecchi comandi invariato se il campo opzionale non è presente.
+- BUG 07: D02 applicata alla lista Richieste, sia dal documento integrato sia
+  dal collegamento diretto. Filtri e guardia sulle modifiche conservati;
+  nessun annullamento o altra scrittura dal comando Ritorna.
+- BUG 08: Pronta riusa il badge blu del documento confermato. Gli avanzamenti
+  non vengono confusi con gli stati della richiesta; valore sconosciuto o
+  non disponibile non viene tradotto come Bozza.
+- BUG 09: scarico manuale Area → Magazzino attivo della stessa Area. Nessuna
+  lettura stock prima del contesto e reset di magazzino/righe al cambio Area.
+  Rimosso soltanto il Centro manuale e il campo inviato; derivazione server,
+  storico, FEFO e controlli sulle quantità conservati.
+- BUG 21: route esplicita `/uds/anagrafica/:id` con ritorno filtrato persistente.
+  Stati Emporio/Mensa compatti, senza comandi o query delle Richieste/accessi
+  nella vista UDS e nella Modifica, anche per profili amministrativi/misti.
+  La vista ordinaria CdA conserva le funzioni autorizzate della stessa persona.
+  Centro/Zona modificabili con PATCH minime e versione, valori imposti dal
+  profilo rispettati, Zona corrente inattiva conservata e directory invalidate.
+  Sezione Tessera sempre riconoscibile: prima emissione soltanto su comando
+  esplicito, anche per provvisori senza Centro; recupero serializzato sulla
+  persona, token/data/ID stabili, nessuna riattivazione o sostituzione implicita.
+  PDF CR80 con token reale e giorno di emissione registrato in Europe/Rome.
+
+Impatto del contratto: cinque endpoint circoscritti e un campo opzionale
+`contestoBeneficiarioAtteso` in BollaInput. OpenAPI e client/Zod rigenerati con
+`pnpm --filter @workspace/api-spec run codegen`; rimozione della collisione
+tra tipo query e validatore nel postprocessore ufficiale. Nessuna nuova
+colonna, migration o modifica ai dati preesistenti prevista. Le capacità UDS
+non conferiscono la gestione generale Mensa o sostituzione/revoca tessere.
+
+Verifiche automatiche e ricevuta 8082 vengono completate sotto dopo l'esito
+reale. Un timeout del browser e quattro timeout di avvio worker UI durante
+un'esecuzione concorrente sono esclusi dagli esiti validi; le suite vengono
+ripetute separate. Nessuna modifica ai tempi limite o ai gate per nasconderli.
+
+Prova personale prevista sulla nuova 8082:
+
+1. Beneficiari → Nuovo: Area prima del Centro; cambiando Area si svuotano le
+   scelte dipendenti. Provare abilitazione Emporio con motivo, anche insieme
+   a Mensa se autorizzata; l'esito parziale deve mantenere la stessa persona.
+2. Bolle → Nuovo documento → Beneficiario: selezionare Area e Centro, poi
+   ricercare una persona o scansionarne la tessera. Una tessera di altro
+   Centro, scaduta/sospesa/revocata o un semplice codice anagrafico non registrato
+   come tessera viene rifiutato senza cambiare i selettori.
+3. Richieste → documento: verificare Pronta blu e Ritorna alle Richieste,
+   mantenimento dei filtri e nessun annullamento della pratica.
+4. Scarico manuale: Area → Magazzino, senza Centro manuale. Cambiando Area
+   magazzino e righe si azzerano; conferma e quantità restano protette.
+5. UDS → Anagrafica → Nuova persona provvisoria: aprire la scheda UDS,
+   scaricare e ristampare la tessera, assegnare Centro e poi Zona; cambiare o
+   rimuovere Zona. Controllare nome/tag nell'elenco e dopo riapertura/refresh.
+6. Nella scheda UDS e Modifica vedere soltanto gli stati dei servizi e nessun
+   comando Emporio/Mensa/Richieste. Entrando dalla scheda CdA della stessa
+   persona, verificare le normali funzioni autorizzate.
+7. Regressione 17: Enti locali/globali nei documenti e filtro/tag nell'anagrafica;
+   Fornitori locali/globali disponibili soltanto nei carichi pertinenti.
+
+Queste prove sono parte della consegna funzionale 04; non aggiungono una nona
+consegna né una settima UAT. Nessun avvio del prompt 05 prima dell'OK di Floriano.
+
+### Controlli del candidato 04
+
+- `pnpm install --frozen-lockfile`: PASS; lockfile invariato.
+- `pnpm --filter @workspace/api-spec run codegen`: PASS, postprocessore incluso.
+- `pnpm run typecheck`: PASS.
+- `pnpm --filter @workspace/magazzino-solidale run test --maxWorkers=2`:
+  **764 PASS, 119 file**, compresi recupero del PDF, vista UDS anche in Modifica,
+  Zona storica inattiva e PATCH minima, invio doppio/esiti parziali dei servizi,
+  ritorno alla lista e badge Pronta/stato sconosciuto.
+- API, runner canonico `scripts/quality-gates-run.mjs api`: **1.938 PASS +
+  4 SKIP esterni**, gruppi core 79, general 1.521, mensa 108, emporio 230.
+  Evidenze: `/private/tmp/blocco04-api-core-final` e
+  `/private/tmp/blocco04-api-4`. Core ricreato e rieseguito dopo l'aggiunta del
+  caso fuori Area. I quattro skip riguardano originali AGEA/SIFEAD/FSE+
+  esterni al repository; nessun caso del blocco aggiunto è saltato.
+- Browser canonici: 9 PASS Bolle/destinatari e regressione 17, 4 PASS Magazzino,
+  10 PASS Richieste su cinque viewport, 2 PASS Sociale (compreso Emporio con
+  risposta persa e doppio invio), 3 PASS UDS (compresa scheda provvisoria,
+  doppio PDF, PATCH, refresh/ritorno ed esame della larghezza mobile).
+  **28 PASS + 72 SKIP intenzionali della matrice**, senza retry passato come
+  esito pulito. Evidenze in `/private/tmp/blocco04-browser-4` per Bolle e
+  Magazzino, `/private/tmp/blocco04-browser-6` per Sociale e
+  `/private/tmp/blocco04-browser-final` per Richieste/UDS dopo il controllo bundle.
+- Build WEB locale PASS; budget di ingresso **399,9/400 KiB gzip**. Budget
+  invariato: testi degli avanzamenti spostati nel registro caricato con il
+  modulo documentale. I percorsi e i permessi distinti UDS restano espliciti.
+- `git diff --check`: PASS. Nessuna modifica a package/lockfile, migrazioni,
+  configurazione ambienti, credenziali o asset temporanei tracciata.
+
+Le verifiche DB/browser usano soltanto stack temporanei attestati con lock,
+checksum delle migrazioni e rimozione finale. Le suite non vengono eseguite
+sulla 8082 personale. La ricevuta di installazione riporterà SHA delle immagini,
+backup, ledger, stato dei container e confronto degli asset serviti via HTTP.
+
+### File del blocco 04
+
+Elenco completo dei sorgenti, test, contratto, derivati rigenerati e registro
+inclusi nel candidato; esclusi i quattro documenti locali preesistenti.
+
+- `artifacts/api-server/src/lib/bollaBeneficiariLookup.ts`
+- `artifacts/api-server/src/lib/mensaEligibilitySummary.ts`
+- `artifacts/api-server/src/lib/tesseraBeneficiarioService.ts`
+- `artifacts/api-server/src/routes/beneficiari.ts`
+- `artifacts/api-server/src/routes/bolle.ts`
+- `artifacts/api-server/src/routes/mensa.ts`
+- `artifacts/api-server/tests/m67-p4-uds-revocation.test.ts`
+- `artifacts/api-server/tests/mensa.test.ts`
+- `artifacts/magazzino-solidale/e2e/m4a-documenti-destinatari.spec.ts`
+- `artifacts/magazzino-solidale/e2e/magazzino-workflows.spec.ts`
+- `artifacts/magazzino-solidale/e2e/sociale-workflows.spec.ts`
+- `artifacts/magazzino-solidale/e2e/uds-workflows.spec.ts`
+- `artifacts/magazzino-solidale/src/App.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiari-provvisori.test.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiario-combobox.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiario-emporio-card.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiario-tessera.test.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiario-uds-tools.tsx`
+- `artifacts/magazzino-solidale/src/components/documento-operativo-access.test.tsx`
+- `artifacts/magazzino-solidale/src/components/documento-operativo.tsx`
+- `artifacts/magazzino-solidale/src/components/uds-anagrafica-pagination.test.tsx`
+- `artifacts/magazzino-solidale/src/components/uds-persona-sheet.test.tsx`
+- `artifacts/magazzino-solidale/src/components/uds-persona-sheet.tsx`
+- `artifacts/magazzino-solidale/src/lib/beneficiario-mensa-workflow.test.ts`
+- `artifacts/magazzino-solidale/src/lib/beneficiario-mensa-workflow.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/blocco04.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/richiesteMagazzino.ts`
+- `artifacts/magazzino-solidale/src/lib/m5c2a-r2-navigation.test.ts`
+- `artifacts/magazzino-solidale/src/lib/richiesta-documento-navigation.ts`
+- `artifacts/magazzino-solidale/src/lib/tessera-pdf.ts`
+- `artifacts/magazzino-solidale/src/lib/uds-persona-context.ts`
+- `artifacts/magazzino-solidale/src/pages/beneficiari.tsx`
+- `artifacts/magazzino-solidale/src/pages/beneficiario-dettaglio.tsx`
+- `artifacts/magazzino-solidale/src/pages/richieste-magazzino.test.tsx`
+- `artifacts/magazzino-solidale/src/pages/richieste-magazzino.tsx`
+- `artifacts/magazzino-solidale/src/pages/scarichi.tsx`
+- `artifacts/magazzino-solidale/src/pages/uds-anagrafica.tsx`
+- `docs/campagna-bug-2026-10.md`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-client-react/src/generated/api.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-spec/scripts/fix-binary-upload.mjs`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/beneficiarioServizioStatoUds.ts`
+- `lib/api-zod/src/generated/types/beneficiarioStatiServiziUds.ts`
+- `lib/api-zod/src/generated/types/bollaBeneficiarioCandidato.ts`
+- `lib/api-zod/src/generated/types/bollaBeneficiarioContestoAtteso.ts`
+- `lib/api-zod/src/generated/types/bollaInput.ts`
+- `lib/api-zod/src/generated/types/bollaTesseraLookupInput.ts`
+- `lib/api-zod/src/generated/types/getBollaBeneficiarioConsegnaParams.ts`
+- `lib/api-zod/src/generated/types/index.ts`
+- `lib/api-zod/src/generated/types/listBollaBeneficiariCandidatiParams.ts`

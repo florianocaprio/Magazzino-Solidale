@@ -1,8 +1,8 @@
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import JsBarcode from "jsbarcode";
-import { format, type Locale } from "date-fns";
-import { it } from "date-fns/locale";
+import type { Locale } from "date-fns";
+import { formatDateEuropeRome } from "@/lib/europe-rome";
 import type { BrandingAmbiente } from "@/lib/branding-ambiente";
 
 export interface TesseraBeneficiario {
@@ -97,6 +97,7 @@ export interface TesseraPdfOptions {
   associationLogoDataUrl?: string | null;
   branding?: BrandingAmbiente | null;
   locale?: Locale;
+  dataEmissione?: string;
 }
 
 function drawCenteredFitText(
@@ -120,7 +121,6 @@ function drawCenteredFitText(
 /** Genera una tessera beneficiario formato CR80 (85.6 x 54 mm) con QR e codice a barre. */
 export async function generateTesseraPdf(opts: TesseraPdfOptions): Promise<void> {
   const { beneficiario: b, labels, associationLogoDataUrl, branding } = opts;
-  const locale = opts.locale ?? it;
   const W = 85.6;
   const H = 54;
   const doc = new jsPDF({ unit: "mm", format: [W, H], orientation: "landscape" });
@@ -189,7 +189,7 @@ export async function generateTesseraPdf(opts: TesseraPdfOptions): Promise<void>
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.5);
   doc.setTextColor(110, 110, 110);
-  const issued = `${labels.issuedLabel}: ${format(new Date(), "dd/MM/yyyy", { locale })}`;
+  const issued = `${labels.issuedLabel}: ${formatDateEuropeRome(opts.dataEmissione ?? new Date())}`;
   doc.text(issued, W - 4, 29, { align: "right" });
 
   // Association logo (bottom-right, below the issue date)

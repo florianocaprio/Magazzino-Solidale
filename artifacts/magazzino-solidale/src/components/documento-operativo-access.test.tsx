@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { DocumentoOperativoDettaglioComune } from "./documento-operativo";
+import { DocumentoOperativoDettaglioComune, documentProgressBadge, statoBadge } from "./documento-operativo";
 
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
@@ -152,7 +152,7 @@ it.each([403, 404, 401])(
   },
 );
 it("secondary request denial drops cached link, not the readable document", async () => {
-  expect(host.textContent).toContain("LINK-PROTETTO");
+  expect(host.textContent).toContain("blocco04.backToRequests");
   secondaryCode = 403;
   await act(async () => {
     await client.refetchQueries({
@@ -161,8 +161,29 @@ it("secondary request denial drops cached link, not the readable document", asyn
   });
   await act(async () => {
     await vi.waitFor(() =>
-      expect(host.textContent).not.toContain("LINK-PROTETTO"),
+      expect(host.textContent).not.toContain("blocco04.backToRequests"),
     );
   });
   expect(host.textContent).toContain("F7-PROTETTA");
+});
+
+
+it("BUG08: Pronta usa lo stile confermato, conserva la propria etichetta e non inventa Bozza per stati ignoti", async () => {
+  await act(async () => root.render(<div>{documentProgressBadge("pronta")}{statoBadge("confermato")}{documentProgressBadge("nuovo_stato")}</div>));
+  const badges = host.firstElementChild!.children;
+  expect(badges).toHaveLength(3);
+  expect(badges[0].textContent).toBe("Pronta");
+  expect(badges[1].textContent).toBe("Pronta");
+  expect(badges[0].className).toBe(badges[1].className);
+  expect(badges[2].textContent).toBe("nuovo_stato");
+  expect(badges[2].textContent).not.toBe("Bozza");
+});
+
+it("BUG07: Ritorna apre la coda, senza mutazioni del documento o della richiesta", async () => {
+  const back = Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "blocco04.backToRequests")!;
+  expect(back).toBeDefined();
+  await act(async () => back.click());
+  expect(window.location.pathname).toBe("/richieste-magazzino");
+  expect(window.location.search).not.toContain("richiestaId");
+  for (const call of vi.mocked(fetch).mock.calls) expect(call[1]?.method ?? "GET").toBe("GET");
 });

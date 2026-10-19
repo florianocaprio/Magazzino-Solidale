@@ -1,7 +1,8 @@
 import { operationalCentroId } from "@/lib/service-scope";
 import i18n from "@/lib/i18n";
+import { registerBlocco04 } from "@/lib/i18n/namespaces/blocco04";
 import { registerLogisticaCampaign } from "@/lib/i18n/namespaces/logisticaCampaign";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useListBeneficiari, useCreateBeneficiario, useDeleteBeneficiario, useUpdateBeneficiarioStato, useAuthorizeBeneficiariExport, useBulkBeneficiari, useListCentriAscolto, useListMagazzini, useGetBeneficiario, useCercaBeneficiariSimili, useListAreeOperative, useListZoneUds, useCreateMensaAbilitazione, useGetMensaAbilitazioniRiepilogoBeneficiari, getListBeneficiariQueryKey, getGetBeneficiarioQueryKey, getCercaBeneficiariSimiliQueryKey, getListAreeOperativeQueryKey, getListMensaAbilitazioniQueryKey, getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey, type BeneficiarioDirectory, type MensaAbilitazioneRiepilogoBeneficiario, type ListBeneficiariParams } from "@workspace/api-client-react";
@@ -35,16 +36,17 @@ import * as z from "zod";
 import { isNotFutureDateOnly, todayDateOnly } from "@/lib/date-only";
 import { todayEuropeRome } from "@/lib/europe-rome";
 import { MensaStatusBadge, NuovaAbilitazioneMensaFields } from "@/components/beneficiario-mensa-card";
-import { useGetEmporioAbilitazioniRiepilogoBeneficiari, getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey } from "@workspace/api-client-react";
+import { getEmporioAbilitazione, useUpdateEmporioAbilitazione, listMensaAbilitazioni, getGetEmporioAbilitazioneQueryKey, useGetEmporioAbilitazioniRiepilogoBeneficiari, getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey } from "@workspace/api-client-react";
 import { EmporioStatusBadge } from "@/components/beneficiario-emporio-card";
 import { emporioReadableData, useEmporioSecurity } from "@/hooks/use-emporio-security";
-import { createBeneficiarioWithOptionalMensa } from "@/lib/beneficiario-mensa-workflow";
+import { createBeneficiarioWithOptionalServices, type BeneficiarioServicesResult } from "@/lib/beneficiario-mensa-workflow";
 import { BENEFICIARI_PAGE_SIZE, fetchBeneficiariExportRows, type BeneficiarioExportRow } from "@/lib/beneficiari-pagination";
 import { buildBeneficiarioDuplicateParams, canSearchBeneficiarioDuplicates, requireGlobalBeneficiarioArea } from "@/lib/beneficiario-create-ui";
 import { FseBeneficiariActions } from "@/components/fse-beneficiari-actions";
 import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 
 registerLogisticaCampaign(i18n);
+registerBlocco04(i18n);
 
 const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.object({
   cognome: z.string().trim().min(2),
@@ -65,6 +67,8 @@ const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.ob
   priorita: z.string().default("media"),
   centroAscoltoId: z.string().optional(),
   abilitaMensa: z.boolean().default(false),
+  abilitaEmporio: z.boolean().default(false),
+  emporioMotivo: z.string().optional(),
   mensaId: z.string().optional(),
   mensaDataInizio: z.string().optional(),
   mensaDataFine: z.string().optional(),
@@ -153,11 +157,12 @@ export default function Beneficiari() {
     () => (magazzini ?? []).filter((m) => m.tipoMagazzino === "emporio" || m.tipoMagazzino === "misto"),
     [magazzini],
   );
-  const { data: areaOperativaList } = useListAreeOperative({ query: { queryKey: getListAreeOperativeQueryKey(), enabled: isAreaOperativaGlobal } });
+  const { data: areaOperativaList } = useListAreeOperative({ query: { queryKey: getListAreeOperativeQueryKey() } });
   const { emporioAbilitato, unitaStradaAbilitata, mensaAbilitato } = useModuloFlags();
   const canViewMensa = mensaAbilitato && hasArea("mensa") && hasPermission("mensa.view");
   const canViewEmporio = emporioAbilitato && hasPermission("beneficiari.view");
   const emporioSecurity = useEmporioSecurity();
+  const canManageEmporio = emporioAbilitato && isModuloAttivo("EMPORIO_SOLIDALE") && hasPermission("emporio.eligibility.manage") && (user?.isAdmin || hasArea("sociale"));
   const canManageMensa = canViewMensa && hasPermission("mensa.eligibility.manage");
   const canManage = hasPermission("beneficiari.manage");
   const canDeactivate = hasPermission("beneficiari.deactivate");
@@ -203,6 +208,10 @@ export default function Beneficiari() {
 
   const createBeneficiario = useCreateBeneficiario();
   const createMensaAbilitazione = useCreateMensaAbilitazione();
+  const updateEmporio = useUpdateEmporioAbilitazione();
+  const saving = useRef(false);
+  const [savingServices, setSavingServices] = useState(false);
+  const [postCreate, setPostCreate] = useState<BeneficiarioServicesResult<Awaited<ReturnType<typeof createBeneficiario.mutateAsync>>> | null>(null);
   const deleteBeneficiario = useDeleteBeneficiario();
   const updateBeneficiarioStato = useUpdateBeneficiarioStato();
   const authorizeExport = useAuthorizeBeneficiariExport();
@@ -226,7 +235,7 @@ export default function Beneficiari() {
       cognome: "", nome: "", soprannome: "", codiceFiscale: "", dataNascita: "", sesso: "",
       cittadinanza: "", areaProvenienza: "", residenza: "", domicilio: "", comune: "", zonaMunicipio: "",
       telefono: "", email: "", numComponenti: 1, priorita: "media", centroAscoltoId: "",
-      abilitaMensa: false, mensaId: "", mensaDataInizio: todayEuropeRome(), mensaDataFine: "",
+      abilitaEmporio: false, emporioMotivo: "", abilitaMensa: false, mensaId: "", mensaDataInizio: todayEuropeRome(), mensaDataFine: "",
       creditoSolidaleAbilitato: false, creditoSolidaleStato: "non_abilitato", creditoSolidaleNote: "",
       magazzinoEmporioPreferitoId: NO_EMPORIO,
       consegnaDomicilio: false, motivoConsegnaDomicilio: "", restrizioniAlimentari: "",
@@ -241,13 +250,14 @@ export default function Beneficiari() {
   });
   const creditoSolidaleAbilitato = form.watch("creditoSolidaleAbilitato");
   const abilitaMensa = form.watch("abilitaMensa");
+  const abilitaEmporio = form.watch("abilitaEmporio");
 
   const watchUds = form.watch("uds");
   const formAreaOperativa = isAreaOperativaGlobal
     ? (form.watch("areaOperativaId") ? parseInt(form.watch("areaOperativaId")!) : undefined)
     : (user?.areaOperativaId ?? undefined);
   const formCentriDisponibili = useMemo(
-    () => (centri ?? []).filter((centro) => formAreaOperativa != null && centro.areaOperativaId === formAreaOperativa),
+    () => (centri ?? []).filter((centro) => centro.attivo && formAreaOperativa != null && centro.areaOperativaId === formAreaOperativa),
     [centri, formAreaOperativa],
   );
   const { data: udsZone } = useListZoneUds(
@@ -283,11 +293,12 @@ export default function Beneficiari() {
       }),
     },
   });
-  const suggestions = dupMatches ?? [];
+  const suggestions = dupParams.areaOperativaId === (isAreaOperativaGlobal ? formAreaOperativa : undefined) ? dupMatches ?? [] : [];
 
   const resetDup = () => { setDupDismissed(false); setDupParams({}); };
 
   const onSubmit = async (data: FormValues) => {
+    if (saving.current) return;
     const {
       centroAscoltoId,
       codiceFiscale,
@@ -299,6 +310,8 @@ export default function Beneficiari() {
       creditoSolidaleStato: _creditoSolidaleStato,
       creditoSolidaleNote: _creditoSolidaleNote,
       abilitaMensa: shouldEnableMensa,
+      abilitaEmporio: shouldEnableEmporio,
+      emporioMotivo,
       mensaId,
       mensaDataInizio,
       mensaDataFine,
@@ -313,6 +326,10 @@ export default function Beneficiari() {
       return;
     }
     const centroId = centroAscoltoId ? parseInt(centroAscoltoId) : (isCentroLocked && lockedCentroId != null ? lockedCentroId : null);
+    if (shouldEnableEmporio && (!canManageEmporio || centroId == null || !emporioMotivo?.trim())) {
+      form.setError(centroId == null ? "centroAscoltoId" : "emporioMotivo", { type: "manual", message: t("common.requiredField") });
+      return;
+    }
     if (shouldEnableMensa) {
       if (!formAreaOperativa) {
         form.setError("areaOperativaId", { type: "manual", message: "Seleziona l'Area" });
@@ -346,11 +363,18 @@ export default function Beneficiari() {
     if (uds) {
       if (zonaUdsId && zonaUdsId !== NO_ZONE) payload.zonaUdsId = parseInt(zonaUdsId);
     }
+    saving.current = true;
+    setSavingServices(true);
+    let savedResult = postCreate;
     try {
-      const result = await createBeneficiarioWithOptionalMensa({
+      const result = await createBeneficiarioWithOptionalServices({
+        previous: postCreate,
         createBeneficiario: () => createBeneficiario.mutateAsync({ data: payload as never }),
         createMensaAbilitazione: shouldEnableMensa
-          ? (beneficiarioId) => createMensaAbilitazione.mutateAsync({
+          ? async (beneficiarioId) => {
+            const existing = await listMensaAbilitazioni({ beneficiarioId });
+            if (existing.some((right) => right.mensaId === Number(mensaId) && right.mensaPrincipale && right.stato === "attiva" && right.dataInizio === mensaDataInizio && (right.dataFine ?? null) === (mensaDataFine || null))) return;
+            return createMensaAbilitazione.mutateAsync({
               data: {
                 beneficiarioId,
                 mensaId: Number(mensaId),
@@ -358,32 +382,48 @@ export default function Beneficiari() {
                 dataFine: mensaDataFine || null,
                 mensaPrincipale: true,
               },
-            })
+            });
+          }
           : undefined,
+        createEmporioAbilitazione: shouldEnableEmporio ? async (beneficiarioId) => {
+          const existing = await getEmporioAbilitazione(beneficiarioId);
+          if (existing.statoEffettivo === "attivo") return;
+          return updateEmporio.mutateAsync({ beneficiarioId, data: { stato: "attivo", motivo: emporioMotivo!.trim() } });
+        } : undefined,
       });
+      savedResult = result;
+      setPostCreate(result);
+      await queryClient.invalidateQueries({ queryKey: getGetBeneficiarioQueryKey(result.beneficiario.id) });
+      await queryClient.invalidateQueries({ queryKey: getGetEmporioAbilitazioneQueryKey(result.beneficiario.id) });
+      await queryClient.invalidateQueries({ queryKey: getGetEmporioAbilitazioniRiepilogoBeneficiariQueryKey() });
       await queryClient.invalidateQueries({ queryKey: getListBeneficiariQueryKey() });
       if (shouldEnableMensa) {
         await queryClient.invalidateQueries({ queryKey: getListMensaAbilitazioniQueryKey() });
         await queryClient.invalidateQueries({ queryKey: getGetMensaAbilitazioniRiepilogoBeneficiariQueryKey() });
       }
-      if (result.mensaError) {
+      if (result.mensaError || result.emporioError) {
         toast({
-          title: "Beneficiario creato, abilitazione Mensa non completata",
-          description: apiErrorMessage(result.mensaError, "Apri il beneficiario e riprova l'abilitazione Mensa."),
+          title: t("blocco04.partial"),
+          description: apiErrorMessage(result.emporioError ?? result.mensaError, "Riprova le abilitazioni per la persona già creata."),
           variant: "destructive",
         });
+        return;
       } else {
-        toast({ title: shouldEnableMensa ? "Beneficiario creato e abilitato alla Mensa" : t("beneficiari.toastAdded") });
+        toast({ title: shouldEnableMensa || shouldEnableEmporio ? t("blocco04.servicesDone") : t("beneficiari.toastAdded") });
       }
       setIsFormOpen(false);
+      setPostCreate(null);
       resetDup();
       form.reset();
     } catch (err) {
       toast({
-        title: "Beneficiario non creato",
+        title: savedResult ? "Persona già creata: riprendi dallo stesso ID" : "Beneficiario non creato",
         description: apiErrorMessage(err, t("beneficiari.creditoSolidaleCentroAscoltoRichiesto")),
         variant: "destructive",
       });
+    } finally {
+      saving.current = false;
+      setSavingServices(false);
     }
   };
 
@@ -436,6 +476,9 @@ export default function Beneficiari() {
           </Button>}
           {canManage && <Button onClick={() => {
             form.setValue("centroAscoltoId", isCentroLocked && lockedCentroId != null ? String(lockedCentroId) : "");
+            setPostCreate(null);
+            form.setValue("abilitaEmporio", false);
+            form.setValue("emporioMotivo", "");
             form.setValue("abilitaMensa", false);
             form.setValue("mensaId", "");
             form.setValue("mensaDataInizio", todayEuropeRome());
@@ -711,6 +754,7 @@ export default function Beneficiari() {
           <div className="mt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <fieldset disabled={savingServices || postCreate != null} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="nome" render={({ field }) => (
                     <FormItem><FormLabel>{t("common.name")}</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
@@ -845,20 +889,7 @@ export default function Beneficiari() {
                   )} />
                 </div>
 
-                <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("beneficiari.centroRiferimento")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined} disabled={isCentroLocked || formAreaOperativa == null}>
-                      <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {formCentriDisponibili.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                {isAreaOperativaGlobal && (
+                {isAreaOperativaGlobal ? (
                   <FormField control={form.control} name="areaOperativaId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Area *</FormLabel>
@@ -868,18 +899,46 @@ export default function Beneficiari() {
                         form.setValue("zonaUdsId", NO_ZONE);
                         form.setValue("magazzinoEmporioPreferitoId", NO_EMPORIO);
                         form.setValue("mensaId", "");
+                        form.setValue("abilitaMensa", false);
+                        form.setValue("abilitaEmporio", false);
+                        form.setValue("emporioMotivo", "");
                         resetDup();
                       }}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Seleziona un'Area" /></SelectTrigger></FormControl>
                         <SelectContent>
-                          {areaOperativaList?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                          {areaOperativaList?.filter((area) => area.attivo).map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )} />
-                )}
+                ) : <div className="space-y-1"><span className="text-sm font-medium">Area</span><p>{areaOperativaList?.find((area) => area.id === user?.areaOperativaId)?.nome ?? user?.areaOperativaId}</p></div>}
 
+                <FormField control={form.control} name="centroAscoltoId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("beneficiari.centroRiferimento")}</FormLabel>
+                    <Select onValueChange={(value) => field.onChange(value === "none" ? "" : value)} value={field.value || "none"} disabled={isCentroLocked || formAreaOperativa == null}>
+                      <FormControl><SelectTrigger><SelectValue placeholder={t("common.none")} /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">{t("common.none")}</SelectItem>
+                        {formCentriDisponibili.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+
+                {canManageEmporio && (
+                  <div className="rounded-md border p-3 space-y-3">
+                    <FormField control={form.control} name="abilitaEmporio" render={({ field }) => (
+                      <FormItem className="flex items-center justify-between"><FormLabel>{t("emporioServizio.abilita")}</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>
+                    )} />
+                    {abilitaEmporio && <FormField control={form.control} name="emporioMotivo" render={({ field }) => (
+                      <FormItem><FormLabel>{t("emporioServizio.motivo")} *</FormLabel><FormControl><Input {...field} maxLength={1000} /></FormControl><FormMessage /></FormItem>
+                    )} />}
+                  </div>
+                )}
                 {canManageMensa && (
                   <NuovaAbilitazioneMensaFields
                     enabled={abilitaMensa}
@@ -944,9 +1003,11 @@ export default function Beneficiari() {
                   )}
                 </div>
 
+                </fieldset>
+                {postCreate && <div role="alert" className="rounded-md border p-3 space-y-2"><p>{t("blocco04.samePerson", { codice: postCreate.beneficiario.codice })}</p><Button asChild type="button" variant="outline"><Link href={`/beneficiari/${postCreate.beneficiario.id}`}>{t("blocco04.openPerson")}</Link></Button></div>}
                 <div className="pt-6 flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={closeCreateForm}>{t("common.cancel")}</Button>
-                  <Button type="submit" disabled={createBeneficiario.isPending || createMensaAbilitazione.isPending}>{t("common.save")}</Button>
+                  <Button type="submit" disabled={savingServices}>{postCreate ? t("common.retry", { defaultValue: "Riprova" }) : t("common.save")}</Button>
                 </div>
               </form>
             </Form>

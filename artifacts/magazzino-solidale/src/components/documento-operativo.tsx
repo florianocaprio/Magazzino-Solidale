@@ -1,12 +1,20 @@
-import { useState, useEffect } from "react";
+import { cloneElement, useCallback, useState, useEffect, useRef } from "react";
 import { authUserCanOperateBolle, useAuth } from "@/lib/auth";
 import {
   documentAuthContext,
   useDocumentoAccess,
 } from "@/hooks/use-documento-access";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { registerBlocco04 } from "@/lib/i18n/namespaces/blocco04";
+import { requestListReturnUrl } from "@/lib/richiesta-documento-navigation";
 import {
   useListBolle,
+  useListBollaBeneficiariCandidati,
+  getListBollaBeneficiariCandidatiQueryKey,
+  lookupBollaTessera,
+  useGetBollaBeneficiarioConsegna,
+  getGetBollaBeneficiarioConsegnaQueryKey,
+  type BollaBeneficiarioCandidato,
   useCreateBolla,
   useGetBolla,
   useAddBollaRiga,
@@ -210,7 +218,7 @@ export function statoBadge(stato: string) {
     );
   if (stato === "confermato")
     return (
-      <Badge className="border-blue-300 text-blue-700 bg-blue-50">
+      <Badge className="border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-950 dark:border-blue-700 dark:text-blue-200">
         {i18n.t("transportReturn.ready")}
       </Badge>
     );
@@ -219,6 +227,17 @@ export function statoBadge(stato: string) {
       <Badge variant="destructive">{i18n.t("bolle.statoAnnullato")}</Badge>
     );
   return <Badge variant="secondary">{i18n.t("bolle.statoBozza")}</Badge>;
+}
+
+/** L'avanzamento della richiesta non è uno stato della richiesta stessa. */
+export function documentProgressBadge(progress: string) {
+  const states: Record<string, string> = {
+    in_preparazione: "bozza", pronta: "confermato", in_viaggio: "in_trasporto",
+    rientro_atteso: "rientro_atteso", esito_registrato: "consegnato",
+    rientrato: "rientrato", annullato: "annullato",
+  };
+  const label = i18n.t(`richiesteMagazzino.progress.${progress}`, { defaultValue: progress });
+  return states[progress] ? cloneElement(statoBadge(states[progress]), {}, label) : <Badge variant="outline">{label}</Badge>;
 }
 
 // ─── Helper download PDF bolla (riusabile da bolle + consegne) ───────────────
@@ -230,6 +249,8 @@ type CentroLite = {
   comune?: string | null;
   logoUrl?: string | null;
 };
+registerBlocco04(i18n);
+
 export type BeneficiarioLite = { id: number; centroAscoltoId?: number | null };
 type BollaPdfOptions = {
   beneficiari?: BeneficiarioLite[];
@@ -313,6 +334,13 @@ export function CreaiBollaDialog({
   const [debouncedEnteSearch, setDebouncedEnteSearch] = useState("");
   const [createError, setCreateError] = useState("");
   const [magazzinoId, setMagazzinoId] = useState("");
+  const [recipientAreaId, setRecipientAreaId] = useState(String(user?.areaOperativaId ?? ""));
+  const [selectedBeneficiario, setSelectedBeneficiario] = useState<BollaBeneficiarioCandidato | null>(null);
+  const [benefSearch, setBenefSearch] = useState("");
+  const [debouncedBenefSearch, setDebouncedBenefSearch] = useState("");
+  const [benefPage, setBenefPage] = useState(1);
+  const [scanLoading, setScanLoading] = useState(false);
+  const lookupVersion = useRef(0);
   const [centroId, setCentroId] = useState("all");
   const [trasportatore, setTrasportatore] = useState("");
   const [trasportatoreAltro, setTrasportatoreAltro] = useState("");
@@ -323,9 +351,10 @@ export function CreaiBollaDialog({
     if (open) {
       if (initialMagazzinoId && initialMagazzinoId !== "all")
         setMagazzinoId(initialMagazzinoId);
-      if (!isCentroLocked && contextCentroId) setCentroId(contextCentroId);
+      setRecipientAreaId(String(user?.areaOperativaId ?? (initialAreaId && initialAreaId !== "all" ? initialAreaId : "")));
+      if (!isCentroLocked) setCentroId(contextCentroId && contextCentroId !== "all" ? contextCentroId : "all");
     }
-  }, [open, initialMagazzinoId, contextCentroId, isCentroLocked]);
+  }, [open, initialMagazzinoId, contextCentroId, isCentroLocked, initialAreaId, user?.areaOperativaId]);
   useEffect(() => {
     if (isCentroLocked && lockedCentroId != null) {
       setCentroId(String(lockedCentroId));
@@ -359,29 +388,38 @@ export function CreaiBollaDialog({
     return () => window.clearTimeout(timeout);
   }, [enteSearch]);
   const { data: centri } = useListCentriAscolto();
-  const canSearchBeneficiari = open && hasPermission("beneficiari.view");
-  const beneficiariParams = {
-    attivo: true,
-    ...(centroId !== "all" ? { centroAscoltoId: parseInt(centroId) } : {}),
-  };
-  const { data: beneficiari } = useListBeneficiari(beneficiariParams, {
-    query: {
-      enabled: canSearchBeneficiari,
-      queryKey: getListBeneficiariQueryKey(beneficiariParams),
-    },
+  const authLookupContext = documentAuthContext(user);
+  const contextReady = recipientAreaId !== "" && centroId !== "all" && Boolean(centri?.some((centre) => String(centre.id) === centroId && centre.attivo && centre.areaOperativaId === Number(recipientAreaId)));
+  const recipientContext = `${open}:${tipoDestinatario}:${recipientAreaId}:${centroId}:${authLookupContext}`;
+  const currentContext = useRef(recipientContext);
+  currentContext.current = recipientContext;
+  useEffect(() => {
+    if (lockedBeneficiario) return;
+    lookupVersion.current++;
+    setBeneficiarioId(""); setSelectedBeneficiario(null); setScanCode(""); setScanLoading(false);
+    setBenefSearch(""); setDebouncedBenefSearch(""); setBenefPage(1); setCreateError("");
+    setTrasportatore(""); setTrasportatoreAltro(""); setMezzo("");
+  }, [recipientContext, lockedBeneficiario]);
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedBenefSearch(benefSearch.trim()), 275);
+    return () => clearTimeout(timeout);
+  }, [benefSearch]);
+  useEffect(() => {
+    if (!recipientAreaId && centroId !== "all") {
+      const area = centri?.find((centre) => String(centre.id) === centroId)?.areaOperativaId;
+      if (area != null) setRecipientAreaId(String(area));
+    }
+  }, [centri, centroId, recipientAreaId]);
+  const benefSearchReady = benefSearch.trim().length === 0 || (benefSearch.trim().length >= 2 && debouncedBenefSearch === benefSearch.trim());
+  const beneficiariParams = { areaOperativaId: Number(recipientAreaId), centroAscoltoId: Number(centroId), page: benefPage, limit: 50, ...(debouncedBenefSearch.length >= 2 ? { search: debouncedBenefSearch } : {}) };
+  const candidates = useListBollaBeneficiariCandidati(beneficiariParams, {
+    query: { enabled: open && tipoDestinatario === "beneficiario" && !lockedBeneficiario && contextReady && benefSearchReady && hasPermission("bolle.manage"), queryKey: [...getListBollaBeneficiariCandidatiQueryKey(beneficiariParams), authLookupContext] },
   });
-  const { data: allBeneficiari } = useListBeneficiari(
-    { attivo: true },
-    {
-      query: {
-        enabled: canSearchBeneficiari,
-        queryKey: getListBeneficiariQueryKey({ attivo: true }),
-      },
-    },
-  );
-  const selectedBenef = allBeneficiari?.find(
-    (b) => String(b.id) === beneficiarioId,
-  );
+  const lockedParams = { consegnaId: consegnaId ?? 0 };
+  const lockedCandidate = useGetBollaBeneficiarioConsegna(lockedBeneficiario?.id ?? 0, lockedParams, {
+    query: { enabled: open && !!lockedBeneficiario && consegnaId != null, queryKey: [...getGetBollaBeneficiarioConsegnaQueryKey(lockedBeneficiario?.id ?? 0, lockedParams), authLookupContext], retry: false },
+  });
+  const selectedBenef = lockedBeneficiario ? lockedCandidate.data : selectedBeneficiario;
   const volontariParams =
     selectedBenef?.centroAscoltoId != null
       ? { centroAscoltoId: selectedBenef.centroAscoltoId }
@@ -431,26 +469,21 @@ export function CreaiBollaDialog({
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  const handleScan = () => {
-    const code = scanCode.trim();
-    if (!code) return;
-    const b = allBeneficiari?.find(
-      (x) => x.codice.toLowerCase() === code.toLowerCase(),
-    );
-    if (!b) {
-      toast({ title: t("bolle.scanNotFound"), variant: "destructive" });
-      return;
+  const handleScan = async () => {
+    if (!contextReady || !scanCode.length || scanLoading) return;
+    const version = ++lookupVersion.current;
+    const context = currentContext.current;
+    setScanLoading(true); setCreateError(""); setSelectedBeneficiario(null); setBeneficiarioId("");
+    try {
+      const person = await lookupBollaTessera({ areaOperativaId: Number(recipientAreaId), centroAscoltoId: Number(centroId), codiceTessera: scanCode });
+      if (version !== lookupVersion.current || context !== currentContext.current) return;
+      setSelectedBeneficiario(person); setBeneficiarioId(String(person.id)); setScanCode("");
+      toast({ title: t("bolle.scanFound", { name: `${person.cognome} ${person.nome}` }) });
+    } catch (error) {
+      if (version === lookupVersion.current && context === currentContext.current) setCreateError(bollaErrorMessage(error, t("bolle.scanNotFound")));
+    } finally {
+      if (version === lookupVersion.current && context === currentContext.current) setScanLoading(false);
     }
-    setCentroId(
-      isCentroLocked && lockedCentroId != null
-        ? String(lockedCentroId)
-        : b.centroAscoltoId
-          ? String(b.centroAscoltoId)
-          : "all",
-    );
-    setBeneficiarioId(String(b.id));
-    setScanCode("");
-    toast({ title: t("bolle.scanFound", { name: `${b.cognome} ${b.nome}` }) });
   };
 
   useEffect(() => {
@@ -501,6 +534,8 @@ export function CreaiBollaDialog({
         !!enteId ||
         !!magazzinoId ||
         centroId !== initialCentroId ||
+        !!benefSearch ||
+        (!!recipientAreaId && recipientAreaId !== String(user?.areaOperativaId ?? "")) ||
         !!scanCode ||
         trasportatore !== initialTrasportatore ||
         trasportatoreAltro !== initialTrasportatoreAltro ||
@@ -513,7 +548,7 @@ export function CreaiBollaDialog({
 
   const onSubmit = () => {
     setCreateError("");
-    if (tipoDestinatario === "beneficiario" && !beneficiarioId) {
+    if (tipoDestinatario === "beneficiario" && (!beneficiarioId || !selectedBenef || (!lockedBeneficiario && (!contextReady || selectedBenef.areaOperativaId !== Number(recipientAreaId) || selectedBenef.centroAscoltoId !== Number(centroId))))) {
       setCreateError(t("bolle.beneficiarioPlaceholder"));
       return;
     }
@@ -547,6 +582,7 @@ export function CreaiBollaDialog({
     const data: {
       tipoDestinatario: "beneficiario" | "ente";
       beneficiarioId?: number;
+      contestoBeneficiarioAtteso?: { areaOperativaId: number; centroAscoltoId: number };
       enteDestinatarioId?: number;
       magazzinoId: number;
       consegnaId?: number;
@@ -555,9 +591,10 @@ export function CreaiBollaDialog({
       mezzoAltro?: boolean;
       trasportatoreNome?: string;
     } = { tipoDestinatario, magazzinoId: parseInt(magazzinoId) };
-    if (tipoDestinatario === "beneficiario")
+    if (tipoDestinatario === "beneficiario") {
       data.beneficiarioId = parseInt(beneficiarioId);
-    else data.enteDestinatarioId = parseInt(enteId);
+      if (selectedBenef?.areaOperativaId != null && selectedBenef.centroAscoltoId != null) data.contestoBeneficiarioAtteso = { areaOperativaId: selectedBenef.areaOperativaId, centroAscoltoId: selectedBenef.centroAscoltoId };
+    } else data.enteDestinatarioId = parseInt(enteId);
     if (tipoDestinatario === "beneficiario" && consegnaId != null)
       data.consegnaId = consegnaId;
     if (requiresTrasportatore && trasportatore) {
@@ -629,9 +666,7 @@ export function CreaiBollaDialog({
               </Label>
               <Select
                 value={tipoDestinatario}
-                onValueChange={(value) =>
-                  setTipoDestinatario(value as "beneficiario" | "ente")
-                }
+                onValueChange={(value) => setTipoDestinatario(value as "beneficiario" | "ente")}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -658,76 +693,50 @@ export function CreaiBollaDialog({
                 <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
                   {lockedBeneficiario.nome}
                 </div>
+                {lockedCandidate.isLoading && <p>{t("common.loading")}</p>}
+                {lockedCandidate.isError && <p role="alert">{t("common.error")}</p>}
               </div>
             ) : (
               <>
                 <div className="space-y-2">
-                  <Label>{t("bolle.scanLabel")}</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      autoFocus
-                      placeholder={t("bolle.scanPlaceholder")}
-                      value={scanCode}
-                      onChange={(e) => setScanCode(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleScan();
-                        }
-                      }}
-                      className="font-mono"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleScan}
-                      disabled={!scanCode.trim()}
-                    >
-                      <ScanLine className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Label>Area</Label>
+                  <Select value={recipientAreaId} disabled={user?.areaOperativaId != null} onValueChange={(value) => { setRecipientAreaId(value); setCentroId(isCentroLocked ? String(lockedCentroId) : "all"); }}>
+                    <SelectTrigger aria-label="Area destinatario"><SelectValue placeholder="Area" /></SelectTrigger>
+                    <SelectContent>{areeEnti?.filter((area) => area.attivo && (user?.areaOperativaId == null || user.areaOperativaId === area.id)).map((area) => <SelectItem key={area.id} value={String(area.id)}>{area.nome}</SelectItem>)}</SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>{t("bolle.centroFilterLabel")}</Label>
-                  <Select
-                    value={centroId}
-                    onValueChange={(v) => {
-                      setCentroId(v);
-                      setBeneficiarioId("");
-                    }}
-                    disabled={isCentroLocked}
-                  >
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={t("bolle.allCentriPlaceholder")}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">
-                        {t("bolle.allBeneficiari")}
-                      </SelectItem>
-                      {centri?.map((c) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          {c.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
+                  <Select value={centroId === "all" ? "" : centroId} onValueChange={setCentroId} disabled={isCentroLocked || !recipientAreaId}>
+                    <SelectTrigger aria-label={t("bolle.centroFilterLabel")}><SelectValue placeholder={t("beneficiari.centroRiferimento")} /></SelectTrigger>
+                    <SelectContent>{centri?.filter((centre) => centre.attivo && centre.areaOperativaId === Number(recipientAreaId) && (!isCentroLocked || centre.id === lockedCentroId)).map((centre) => <SelectItem key={centre.id} value={String(centre.id)}>{centre.nome}</SelectItem>)}</SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("bolle.scanLabel")}</Label>
+                  <div className="flex gap-2">
+                    <Input placeholder={t("bolle.scanPlaceholder")} disabled={!contextReady || scanLoading} value={scanCode} onChange={(event) => setScanCode(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleScan(); } }} className="font-mono" />
+                    <Button type="button" variant="outline" aria-label={t("bolle.scanLabel")} onClick={() => void handleScan()} disabled={!contextReady || !scanCode.length || scanLoading}><ScanLine className="h-4 w-4" /></Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>{t("bolle.beneficiarioLabel")}</Label>
                   <BeneficiarioCombobox
-                    items={(beneficiari ?? []).map((b) => ({
-                      id: b.id,
-                      nome: b.nome,
-                      cognome: b.cognome,
-                      codice: b.codice,
-                    }))}
+                    key={recipientContext}
+                    items={contextReady && benefSearchReady && !candidates.isError ? candidates.data ?? [] : []}
                     value={beneficiarioId}
-                    onChange={setBeneficiarioId}
+                    onChange={(id) => { const person = candidates.data?.find((candidate) => String(candidate.id) === id); if (person) { lookupVersion.current++; setSelectedBeneficiario(person); setBeneficiarioId(id); setScanLoading(false); setCreateError(""); } }}
+                    disabled={!contextReady}
+                    filterLocally={false}
+                    selectedLabelFallback={selectedBenef ? `${selectedBenef.cognome} ${selectedBenef.nome}` : null}
+                    searchValue={benefSearch}
+                    onSearchChange={(value) => { setBenefSearch(value); setBenefPage(1); }}
                     placeholder={t("bolle.beneficiarioPlaceholder")}
-                    emptyText={t("bolle.noBeneficiarioForCentro")}
+                    emptyText={candidates.isFetching ? t("common.loading") : candidates.isError ? t("common.error") : !benefSearchReady ? t("blocco04.searchMinimum") : t("bolle.noBeneficiarioForCentro")}
+                    footer={<div className="flex justify-between gap-2 p-2"><Button type="button" variant="outline" disabled={benefPage === 1 || candidates.isFetching} onClick={() => setBenefPage((page) => page - 1)}>{t("richiesteMagazzino.previous")}</Button><Button type="button" variant="outline" disabled={candidates.isFetching || (candidates.data?.length ?? 0) < 50} onClick={() => setBenefPage((page) => page + 1)}>{t("richiesteMagazzino.next")}</Button></div>}
                   />
+                  {!contextReady && <p className="text-sm text-muted-foreground">{t("logisticaCampaign.selectContext")}</p>}
+                  {candidates.isError && <p role="alert">{t("common.error")}</p>}
                 </div>
               </>
             ))}
@@ -856,9 +865,7 @@ export function CreaiBollaDialog({
                             return false;
                           if (m.effectiveCentroId == null) return true;
                           const benefCentro =
-                            allBeneficiari?.find(
-                              (b) => String(b.id) === beneficiarioId,
-                            )?.centroAscoltoId ?? null;
+                            selectedBenef?.centroAscoltoId ?? null;
                           return (
                             benefCentro != null &&
                             m.effectiveCentroId === benefCentro
@@ -3571,6 +3578,12 @@ export function DocumentoOperativoDettaglioComune({
   onDraftDirtyChange: (dirty: boolean) => void;
   onBackToRequest?: () => void;
 }) {
+  const [, navigate] = useLocation();
+  const [returnDirty, setReturnDirty] = useState(false);
+  const returnGuard = useUnsavedChangesGuard(returnDirty);
+  const dirtyCallback = useRef(onDraftDirtyChange);
+  dirtyCallback.current = onDraftDirtyChange;
+  const reportDirty = useCallback((dirty: boolean) => { setReturnDirty(dirty); dirtyCallback.current(dirty); }, []);
   const { user, hasPermission } = useAuth();
   const { t } = useTranslation();
   const authContext = documentAuthContext(user);
@@ -3597,6 +3610,8 @@ export function DocumentoOperativoDettaglioComune({
     sourceRequestQuery.isError || !hasPermission("richieste_magazzino.view")
       ? undefined
       : sourceRequestQuery.data;
+
+  const backToRequests = onBackToRequest ?? (sourceRequest?.richiesta ? () => returnGuard.requestClose(() => navigate(requestListReturnUrl(sourceRequest.richiesta!.percorso))) : undefined);
 
   if (read.denied)
     return (
@@ -3634,20 +3649,8 @@ export function DocumentoOperativoDettaglioComune({
   return (
     <div className="space-y-3">
       {technicalError}
-      {onBackToRequest ? (
-        <Button variant="outline" onClick={onBackToRequest}>
-          {t("richiesteMagazzino.backToRequest")}
-        </Button>
-      ) : (
-        sourceRequest?.richiesta && (
-          <p className="text-sm">
-            <Link className="underline" href={sourceRequest.richiesta.percorso}>
-              {t("richiesteMagazzino.sourceRequest")}:{" "}
-              {sourceRequest.richiesta.codice}
-            </Link>
-          </p>
-        )
-      )}
+      {backToRequests && <Button variant="outline" onClick={backToRequests}>{t("blocco04.backToRequests")}</Button>}
+      <UnsavedChangesDialog guard={returnGuard} />
       <div
         key={read.context}
         inert={read.blocked || undefined}
@@ -3681,10 +3684,10 @@ export function DocumentoOperativoDettaglioComune({
           <BollaDettaglio
             bollaId={selection.id}
             bollaData={data.dettaglio as BollaDettaglioDto}
-            onClose={onClose}
+            onClose={backToRequests ?? onClose}
             onCloseLabel={
-              onBackToRequest
-                ? t("richiesteMagazzino.backToRequest")
+              backToRequests
+                ? t("blocco04.backToRequests")
                 : undefined
             }
             linkedRequest={
@@ -3693,14 +3696,14 @@ export function DocumentoOperativoDettaglioComune({
                 : sourceRequest.richiesta != null
             }
             linkedRequestId={sourceRequest?.richiesta?.id}
-            onDraftDirtyChange={onDraftDirtyChange}
+            onDraftDirtyChange={reportDirty}
           />
         ) : (
           <TrasferimentoDettaglioComune
             trasferimentoId={selection.id}
             trasferimentoData={data.dettaglio as Trasferimento}
-            onClose={onClose}
-            onDraftDirtyChange={onDraftDirtyChange}
+            onClose={backToRequests ?? onClose}
+            onDraftDirtyChange={reportDirty}
           />
         )}
       </div>

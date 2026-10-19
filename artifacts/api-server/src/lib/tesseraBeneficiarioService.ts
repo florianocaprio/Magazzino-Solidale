@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
 import {
   auditConfigurazioniTable,
+  beneficiariTable,
   db,
   tessereBeneficiariTable,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, desc, sql } from "drizzle-orm";
 
 export class TesseraBeneficiarioError extends Error {
   constructor(
@@ -40,8 +41,20 @@ export async function issueTesseraBeneficiario(input: {
   operatoreId: number;
   ip: string | null;
   areaAudit: "mensa" | "beneficiari";
+  recoverExisting?: boolean;
+  authorize?: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0], beneficiary: typeof beneficiariTable.$inferSelect) => Promise<void>;
 }) {
   return db.transaction(async (tx) => {
+    // Blocca anche il caso senza tessere: due prime emissioni non possono gareggiare.
+    const [beneficiary] = await tx.select().from(beneficiariTable).where(eq(beneficiariTable.id, input.beneficiarioId)).for("update");
+    if (!beneficiary) throw new TesseraBeneficiarioError(404, "Beneficiario non trovato");
+    if (!beneficiary.attivo) throw new TesseraBeneficiarioError(409, "Il beneficiario non è attivo");
+    await input.authorize?.(tx, beneficiary);
+    if (input.recoverExisting) {
+      const [existing] = await tx.select().from(tessereBeneficiariTable).where(eq(tessereBeneficiariTable.beneficiarioId, input.beneficiarioId))
+        .orderBy(sql`case when ${tessereBeneficiariTable.stato} = 'attiva' then 0 else 1 end`, desc(tessereBeneficiariTable.createdAt), desc(tessereBeneficiariTable.id)).limit(1);
+      if (existing) return existing;
+    }
     const [active] = await tx
       .select()
       .from(tessereBeneficiariTable)

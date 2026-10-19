@@ -7,6 +7,7 @@ import {
   writeDocumentiOperativiUrl,
 } from "./documenti-operativi-url";
 import {
+  requestListReturnUrl,
   linkedDocumentSelection,
   requestAllowsDocument,
 } from "./richiesta-documento-navigation";
@@ -91,4 +92,10 @@ describe("M5C2-A-R2 — stati, inserimento e contesto", () => {
       false,
     );
   });
+});
+
+
+it("BUG07: ritorno alla lista conserva filtri e pagina, senza selezionare o annullare la richiesta", () => {
+  expect(requestListReturnUrl("/richieste-magazzino?search=Pane&page=3&richiestaId=4&documento=bolla%3A9")).toBe("/richieste-magazzino?search=Pane&page=3");
+  for (const path of ["https://other/richieste-magazzino", "//other/richieste-magazzino", "http://[", "/bolle?documento=bolla%3A9"]) expect(requestListReturnUrl(path)).toBe("/richieste-magazzino");
 });

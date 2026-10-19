@@ -146,3 +146,61 @@ test("tablet 820: crea e rettifica un intervento UDS dalla card", async ({
   );
   await runUdsLifecycle(page, "uds-interventi-mobile", true);
 });
+
+test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno filtrato", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop-1440x900", "Lifecycle mutante desktop una volta");
+  await login(page);
+  const areas = await (await page.request.get("/api/aree-operative")).json();
+  const area = areas.find((item: { nome: string }) => item.nome === "Area Demo");
+  expect(area).toBeTruthy();
+  const centres = await (await page.request.get("/api/centri-ascolto")).json();
+  const centre = centres.find((item: { areaOperativaId: number; attivo: boolean }) => item.areaOperativaId === area.id && item.attivo);
+  expect(centre).toBeTruthy();
+  const zoneResponse = await page.request.post("/api/zone-uds", { data: { nome: `BUG21Zona${Date.now()}`, areaOperativaId: area.id } });
+  expect(zoneResponse.status(), await zoneResponse.text()).toBe(201);
+  const zone = await zoneResponse.json();
+  const created = await page.request.post("/api/beneficiari", { data: { nome: "Persona", cognome: `BUG21Browser${Date.now()}`, sesso: "M", fasciaEtaPresunta: "30_64", areaProvenienza: "UE", uds: true, statoAnagrafica: "provvisoria", areaOperativaId: area.id, centroAscoltoId: null } });
+  expect(created.status(), await created.text()).toBe(201);
+  const person = await created.json();
+  const directoryPath = `/uds/anagrafica?search=${person.cognome}`;
+  await page.goto(directoryPath);
+  await page.getByRole("link", { name: person.cognome, exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/uds/anagrafica/${person.id}\\?ritorno=`));
+  // Il riepilogo ha solo stati, senza azioni per i servizi o richieste.
+  await expect(page.getByLabel("Stati dei servizi")).toBeVisible();
+  await expect(page.getByRole("button", { name: /abilita all.emporio|abilita alla mensa|nuova richiesta/i })).toHaveCount(0);
+  await expect(page.getByTestId("beneficiario-mensa-card")).toHaveCount(0);
+  const download = page.getByRole("button", { name: /scarica tessera pdf/i });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const downloaded = page.waitForEvent("download");
+    await download.click();
+    expect((await downloaded).suggestedFilename()).toMatch(/\.pdf$/i);
+  }
+  const cards = await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json();
+  expect(cards).toHaveLength(1);
+  // I pulsanti sono nel contenitore immediato del rispettivo selettore.
+  const centrePicker = page.getByRole("combobox", { name: /centro di ascolto di riferimento/i });
+  await selectOption(page, centrePicker, centre.nome);
+  const centrePatch = page.waitForRequest((request) => request.method() === "PATCH" && new URL(request.url()).pathname === `/api/beneficiari/${person.id}`);
+  await centrePicker.locator("..").getByRole("button", { name: /^salva$/i }).click();
+  expect(Object.keys((await centrePatch).postDataJSON()).sort()).toEqual(["centroAscoltoId", "versione"]);
+  const zonePicker = page.getByRole("combobox", { name: /^zona uds$/i });
+  await selectOption(page, zonePicker, zone.nome);
+  const zonePatch = page.waitForResponse((response) => response.request().method() === "PATCH" && new URL(response.url()).pathname === `/api/beneficiari/${person.id}`);
+  await zonePicker.locator("..").getByRole("button", { name: /^salva$/i }).click();
+  const response = await zonePatch;
+  expect(response.status(), await response.text()).toBe(200);
+  expect(Object.keys(response.request().postDataJSON()).sort()).toEqual(["versione", "zonaUdsId"]);
+  await page.reload();
+  await expect(zonePicker).toContainText(zone.nome);
+  await expect(centrePicker).toContainText(centre.nome);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await assertViewportSafe(page);
+  await page.getByRole("link", { name: /indietro/i }).click();
+  await expect(page).toHaveURL(new RegExp(`/uds/anagrafica\\?search=${person.cognome}$`));
+  await expect(page.getByRole("link", { name: person.cognome, exact: true })).toBeVisible();
+  const row = page.getByRole("row").filter({ hasText: person.cognome });
+  await expect(row).toContainText(zone.nome);
+  await page.goto(`/beneficiari/${person.id}`);
+  await expect(page.getByTestId("beneficiario-mensa-card")).toBeVisible();
+});

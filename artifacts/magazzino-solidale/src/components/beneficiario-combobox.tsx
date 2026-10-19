@@ -37,6 +37,8 @@ export function BeneficiarioCombobox({
   selectedLabelFallback,
   searchValue,
   onSearchChange,
+  filterLocally = true,
+  footer,
 }: {
   items: BeneficiarioOption[];
   value: string;
@@ -48,6 +50,8 @@ export function BeneficiarioCombobox({
   selectedLabelFallback?: string | null;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
+  filterLocally?: boolean;
+  footer?: import("react").ReactNode;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -73,7 +77,7 @@ export function BeneficiarioCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <Command>
+        <Command shouldFilter={filterLocally}>
           <CommandInput
             placeholder={t("common.searchByNameOrCode")}
             value={searchValue}
@@ -100,6 +104,7 @@ export function BeneficiarioCombobox({
               ))}
             </CommandGroup>
           </CommandList>
+          {footer}
         </Command>
       </PopoverContent>
     </Popover>

@@ -1,9 +1,12 @@
+import { UdsServiceStates, UdsTerritoryFields, TesseraDocumentoSection, invalidateBeneficiarioTerritory } from "@/components/beneficiario-uds-tools";
+import { todayEuropeRome } from "@/lib/europe-rome";
+import { udsDirectoryReturnPath } from "@/lib/uds-persona-context";
 import { operationalCentroId } from "@/lib/service-scope";
 import i18n from "@/lib/i18n";
 import { registerLogisticaCampaign } from "@/lib/i18n/namespaces/logisticaCampaign";
 import { CreditoRettificaDialog } from "@/components/credito-rettifica-dialog";
 import { useEffect, useState, useMemo } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useParams, useLocation, useSearch } from "wouter";
 import {
   useGetBeneficiario,
   getGetBeneficiarioQueryKey,
@@ -163,7 +166,11 @@ export default function BeneficiarioDettaglio() {
   const { t } = useTranslation();
   const { id } = useParams();
   const numId = Number(id);
-  const emporioEligibility = emporioReadableData(useBeneficiarioEmporio(numId));
+  const [location] = useLocation();
+  const udsContext = location.startsWith("/uds/anagrafica/");
+  const params = useSearch();
+  const udsReturn = udsDirectoryReturnPath(new URLSearchParams(params).get("ritorno"));
+  const emporioEligibility = emporioReadableData(useBeneficiarioEmporio(numId, !udsContext));
   const { data: b, isLoading } = useGetBeneficiario(numId, {
     query: { enabled: !!id, queryKey: getGetBeneficiarioQueryKey(numId) },
   });
@@ -175,7 +182,7 @@ export default function BeneficiarioDettaglio() {
   const canManage = hasPermission("beneficiari.manage");
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
   const canViewRequests =
-    hasArea("sociale") &&
+    !udsContext && hasArea("sociale") &&
     hasPermission("richieste_magazzino.view") &&
     isModuloAttivo("MAGAZZINO_SOLIDALE") &&
     isModuloAttivo("CENTRO_ASCOLTO");
@@ -196,8 +203,8 @@ export default function BeneficiarioDettaglio() {
   const canExport = hasPermission("beneficiari.export");
   const canViewFse = hasPermission("beneficiari.fse.view");
   const canManageFse = hasPermission("beneficiari.fse.manage");
-  const canViewEmporioAccess = hasPermission("emporio.access.view");
-  const canManageEmporioAccess = hasPermission("emporio.access.manage");
+  const canViewEmporioAccess = !udsContext && hasPermission("emporio.access.view");
+  const canManageEmporioAccess = !udsContext && hasPermission("emporio.access.manage");
   const authorizeExport = useAuthorizeBeneficiariExport();
   const createTessera = useCreateTesseraBeneficiarioDaAnagrafica();
   const { emporioAbilitato, unitaStradaAbilitata } = useModuloFlags();
@@ -213,7 +220,7 @@ export default function BeneficiarioDettaglio() {
         enabled:
           Number.isInteger(numId) &&
           numId > 0 &&
-          hasPermission("beneficiari.cards.manage"),
+          !udsContext && hasPermission("beneficiari.cards.manage"),
       },
     });
   const activeTessera = useMemo(
@@ -340,6 +347,7 @@ export default function BeneficiarioDettaglio() {
         cognome: b.cognome,
         codiceFiscale: b.codiceFiscale,
       },
+      dataEmissione: card.dataEmissione,
       labels: buildTesseraLabels(t),
       associationLogoDataUrl: logoDataUrl,
       branding,
@@ -385,6 +393,7 @@ export default function BeneficiarioDettaglio() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {udsContext && <div className="flex items-center gap-3"><Button asChild variant="outline"><Link href={udsReturn}>{t("common.back", { defaultValue: "Ritorna" })}</Link></Button><h2>{t("blocco04.udsPerson")}</h2></div>}
       <div className="flex flex-col md:flex-row gap-6">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
@@ -400,7 +409,7 @@ export default function BeneficiarioDettaglio() {
             {b.statoAnagrafica === "provvisoria" && (
               <Badge variant="secondary">Anagrafica provvisoria</Badge>
             )}
-            {activeTessera && (
+            {!udsContext && activeTessera && !activeTessera.dataRevoca && (!activeTessera.dataScadenza || activeTessera.dataScadenza >= todayEuropeRome()) && (
               <Badge variant="outline">
                 Tessera attiva{" "}
                 {activeTessera.codice.startsWith("MS-") ? "MS" : "legacy"}
@@ -432,39 +441,7 @@ export default function BeneficiarioDettaglio() {
               Completa anagrafica
             </Button>
           )}
-          {hasPermission("beneficiari.cards.manage") &&
-            b.statoAnagrafica === "completa" &&
-            (tessereLoading ? (
-              <Button variant="outline" disabled>
-                Verifica tessera…
-              </Button>
-            ) : activeTessera ? (
-              <>
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => void printTessera(activeTessera)}
-                >
-                  <CreditCard className="w-4 h-4" /> Stampa tessera attiva
-                </Button>
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => setReplaceCardOpen(true)}
-                >
-                  <RefreshCw className="w-4 h-4" /> Sostituisci tessera
-                </Button>
-              </>
-            ) : (
-              <Button
-                variant="outline"
-                className="gap-2"
-                disabled={createTessera.isPending}
-                onClick={() => emitTessera()}
-              >
-                <CreditCard className="w-4 h-4" /> {t("tessera.generate")}
-              </Button>
-            ))}
+          {!udsContext && hasPermission("beneficiari.cards.manage") && activeTessera && <Button variant="outline" onClick={() => setReplaceCardOpen(true)}><RefreshCw className="w-4 h-4" /> Sostituisci tessera</Button>}
           {canExport && <SchedaExportButtons b={b} size="default" />}
           {canManage && (
             <Button
@@ -593,6 +570,7 @@ export default function BeneficiarioDettaglio() {
       {editing && (
         <EditBeneficiarioSheet
           b={b}
+          udsContext={udsContext}
           onClose={() => setEditing(false)}
           onSaved={() => {
             queryClient.invalidateQueries({
@@ -601,18 +579,19 @@ export default function BeneficiarioDettaglio() {
             queryClient.invalidateQueries({
               queryKey: getListBeneficiariQueryKey(),
             });
+            void invalidateBeneficiarioTerritory(queryClient);
             toast({ title: t("beneficiarioDettaglio.toastUpdated") });
             setEditing(false);
           }}
         />
       )}
 
-      {hasPermission("credito.view") && (
+      {!udsContext && hasPermission("credito.view") && (
         <CreditoSolidaleSaldoPanel b={b} emporioAbilitato={emporioAbilitato} />
       )}
 
-      <BeneficiarioEmporioSection key={b.id} beneficiario={b} />
-      <BeneficiarioMensaSection beneficiario={b} />
+      {udsContext ? <><UdsServiceStates id={b.id} /><UdsTerritoryFields b={b} /></> : <><BeneficiarioEmporioSection key={b.id} beneficiario={b} /><BeneficiarioMensaSection beneficiario={b} /></>}
+      <TesseraDocumentoSection b={b} udsContext={udsContext} />
 
       {canViewRequests && (
         <Card>
@@ -1551,10 +1530,12 @@ function CreditoSolidaleSaldoPanel({
 
 export function EditBeneficiarioSheet({
   b,
+  udsContext = false,
   onClose,
   onSaved,
 }: {
   b: BeneficiarioDettaglioType;
+  udsContext?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1564,9 +1545,9 @@ export function EditBeneficiarioSheet({
   const { toast } = useToast();
   const editSchema = useMemo(() => makeEditSchema(t), [t]);
   const { user, hasPermission } = useAuth();
-  const servizio = emporioReadableData(useBeneficiarioEmporio(b.id));
+  const servizio = emporioReadableData(useBeneficiarioEmporio(b.id, !udsContext));
   const canManageCredito =
-    hasPermission("credito.quota.manage") && servizio?.stato === "attivo";
+    !udsContext && hasPermission("credito.quota.manage") && servizio?.stato === "attivo";
   const isAreaOperativaGlobal = user?.areaOperativaId == null;
   const lockedCentroId = operationalCentroId(user);
   const isCentroLocked = lockedCentroId != null;
@@ -1712,6 +1693,10 @@ export function EditBeneficiarioSheet({
         zonaUdsId && zonaUdsId !== NONE_VALUE ? parseInt(zonaUdsId) : null;
     }
     try {
+      if (udsContext) {
+        delete payload.centroAscoltoId; delete payload.zonaUdsId; delete payload.areaOperativaId;
+        delete payload.magazzinoEmporioPreferitoId; delete payload.uds;
+      }
       await updateBeneficiario.mutateAsync({
         id: b.id,
         data: payload as never,
@@ -2037,8 +2022,8 @@ export function EditBeneficiarioSheet({
                         field.onChange(value);
                         form.clearErrors("centroAscoltoId");
                       }}
-                      value={field.value || NONE_VALUE}
-                      disabled={isCentroLocked}
+                      value={udsContext ? String(b.centroAscoltoId ?? NONE_VALUE) : field.value || NONE_VALUE}
+                      disabled={udsContext || isCentroLocked}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -2279,10 +2264,9 @@ export function EditBeneficiarioSheet({
                 </div>
               )}
 
-              <BeneficiarioEmporioSection key={b.id} beneficiario={b} />
-              <BeneficiarioMensaSection beneficiario={b} compact />
+              {!udsContext && <><BeneficiarioEmporioSection key={b.id} beneficiario={b} /><BeneficiarioMensaSection beneficiario={b} compact /></>}
 
-              <div className="rounded-md border p-3 space-y-3">
+              {udsContext ? <UdsTerritoryFields b={b} /> : <div className="rounded-md border p-3 space-y-3">
                 {!unitaStradaAbilitata && (
                   <p className="text-xs text-muted-foreground">
                     {UNITA_STRADA_DISABLED_MESSAGE}
@@ -2386,7 +2370,7 @@ export function EditBeneficiarioSheet({
                     />
                   </>
                 )}
-              </div>
+              </div>}
 
               <div className="pt-6 flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onClose}>

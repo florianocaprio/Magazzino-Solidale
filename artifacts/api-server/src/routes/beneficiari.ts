@@ -1,3 +1,9 @@
+import { isModuloAttivo } from "../lib/featureFlags";
+import { requireCurrentCommandActor, CurrentCommandActorError } from "../lib/currentCommandActor";
+import { beneficiarioAccessScopeFromRequest, canAccessBeneficiarioScope } from "../lib/beneficiarioPolicy";
+import { emporioAbilitazioniTable, mensaAbilitazioniTable } from "@workspace/db";
+import { emporioEligibilityState } from "../lib/emporioScope";
+import { riepilogoAbilitazioneMensa, type MensaRiepilogoHistoryRow } from "../lib/mensaEligibilitySummary";
 import { randomInt } from "node:crypto";
 import { creditoIntero, CreditoInteroError } from "../lib/creditoIntero";
 import { Router, type IRouter, type Request } from "express";
@@ -835,6 +841,54 @@ router.post("/beneficiari/export/authorize", requirePermission("beneficiari.expo
   res.json({ autorizzato: true, auditId: audit.id });
 });
 
+// Le capacità UDS aggiungono solo stati minimizzati e prima tessera/recupero.
+router.get("/beneficiari/:id/stati-servizi-uds", requirePermission("beneficiari.view"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido" }); return; }
+  if (!(await isModuloAttivo("UDS"))) { res.status(403).json({ error: "Modulo UDS disabilitato" }); return; }
+  const [emporioEnabled, mensaEnabled] = await Promise.all([isModuloAttivo("EMPORIO_SOLIDALE"), isModuloAttivo("MENSA")]);
+  try {
+    const result = await db.transaction(async (tx) => {
+      const actor = await requireCurrentCommandActor(tx, req.user!.id, "beneficiari.view");
+      const [person] = await tx.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
+      if (!actor.isAdmin && !actor.aree.includes("uds")) throw new TesseraBeneficiarioError(403, "Contesto UDS non autorizzato");
+      if (!person || !person.uds || !canAccessBeneficiarioRecord(person, req, callerCentroId(req)) || !canAccessBeneficiarioScope(person, actor)) throw new TesseraBeneficiarioError(403, "Persona UDS non accessibile");
+      const [right] = emporioEnabled ? await tx.select({ stato: emporioEligibilityState() }).from(emporioAbilitazioniTable).where(and(eq(emporioAbilitazioniTable.beneficiarioId, id), eq(emporioAbilitazioniTable.areaOperativaId, person.areaOperativaId ?? -1))) : [];
+      const history = mensaEnabled ? await tx.select({ id: mensaAbilitazioniTable.id, stato: mensaAbilitazioniTable.stato, dataInizio: mensaAbilitazioniTable.dataInizio, dataFine: mensaAbilitazioniTable.dataFine, mensaPrincipale: mensaAbilitazioniTable.mensaPrincipale }).from(mensaAbilitazioniTable).where(eq(mensaAbilitazioniTable.beneficiarioId, id)).orderBy(desc(mensaAbilitazioniTable.createdAt), desc(mensaAbilitazioniTable.id)) : [];
+      return {
+        emporio: { disponibile: emporioEnabled, stato: emporioEnabled ? right?.stato ?? "non_abilitato" : null },
+        mensa: { disponibile: mensaEnabled, stato: mensaEnabled ? riepilogoAbilitazioneMensa(history as MensaRiepilogoHistoryRow[], dataCivileEuropeRome(new Date())).stato : null },
+      };
+    });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof TesseraBeneficiarioError || error instanceof CurrentCommandActorError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
+});
+
+router.post("/beneficiari/:id/tessera-documento", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0 || Object.keys(req.body ?? {}).length) { res.status(400).json({ error: "Richiesta tessera non valida" }); return; }
+  const fullManager = hasPermission(req, "beneficiari.cards.manage");
+  if (!fullManager && (!hasPermission(req, "beneficiari.manage") || !hasPermission(req, "beneficiari.view") || !req.user?.aree.includes("uds") || !(await isModuloAttivo("UDS")))) { res.status(403).json({ error: "Tessera non autorizzata" }); return; }
+  try {
+    const card = await issueTesseraBeneficiario({
+      beneficiarioId: id, dataScadenza: null, motivoSostituzione: null,
+      operatoreId: req.user!.id, ip: req.ip ?? null, areaAudit: "beneficiari", recoverExisting: true,
+      authorize: async (tx, person) => {
+        const actor = await requireCurrentCommandActor(tx, req.user!.id, fullManager ? "beneficiari.cards.manage" : "beneficiari.manage");
+        if (!fullManager && (!person.uds || (!actor.isAdmin && (!actor.aree.includes("uds") || !actor.permessi.includes("beneficiari.view"))))) throw new TesseraBeneficiarioError(403, "Gestione persona UDS non autorizzata");
+        if (!canAccessBeneficiarioRecord(person, req, callerCentroId(req)) || !canAccessBeneficiarioScope(person, actor)) throw new TesseraBeneficiarioError(403, "Beneficiario non accessibile");
+      },
+    });
+    res.json(formatTesseraBeneficiario(card));
+  } catch (error) {
+    if (error instanceof TesseraBeneficiarioError || error instanceof CurrentCommandActorError) { res.status(error.status).json({ error: error.message }); return; }
+    throw error;
+  }
+});
+
 router.get("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.manage"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id <= 0) { res.status(400).json({ error: "Beneficiario non valido" }); return; }
@@ -862,9 +916,6 @@ router.post("/beneficiari/:id/tessere", requirePermission("beneficiari.cards.man
     res.status(403).json({ error: "Beneficiario non accessibile" }); return;
   }
   if (!beneficiario.attivo) { res.status(409).json({ error: "Il beneficiario non è attivo" }); return; }
-  if (beneficiario.statoAnagrafica !== "completa" || beneficiario.centroAscoltoId == null) {
-    res.status(409).json({ error: "Completa l'anagrafica prima di emettere la tessera" }); return;
-  }
   const dataScadenza = req.body?.dataScadenza;
   if (dataScadenza != null && dataScadenza !== "" && (typeof dataScadenza !== "string" || !isDateOnly(dataScadenza))) {
     res.status(400).json({ error: "La scadenza non è valida" }); return;

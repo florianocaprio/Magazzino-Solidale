@@ -5,6 +5,7 @@
  * Magazzino Solidale AIM API
  * OpenAPI spec version: 0.1.0
  */
+import type { BollaBeneficiarioContestoAtteso } from "./bollaBeneficiarioContestoAtteso";
 import type { BollaInputTipoDestinatario } from "./bollaInputTipoDestinatario";
 
 export interface BollaInput {
@@ -14,6 +15,7 @@ export interface BollaInput {
    */
   idempotencyKey: string;
   tipoDestinatario: BollaInputTipoDestinatario;
+  contestoBeneficiarioAtteso?: BollaBeneficiarioContestoAtteso;
   /** @nullable */
   beneficiarioId?: number | null;
   /** @nullable */

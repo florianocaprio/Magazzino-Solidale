@@ -612,6 +612,9 @@ function AppRoutes() {
             )}
           </Route>
 
+          <Route path="/uds/anagrafica/:id">
+            {() => <Guard area="uds"><RequireModulo codice="UDS"><RequirePermission permission="beneficiari.view"><BeneficiarioDettaglio /></RequirePermission></RequireModulo></Guard>}
+          </Route>
           <Route path="/uds/anagrafica">
             {() => (
               <Guard area="uds">

@@ -34,7 +34,7 @@ export function EmporioStatusBadge({
   );
 }
 
-export function useBeneficiarioEmporio(beneficiarioId: number) {
+export function useBeneficiarioEmporio(beneficiarioId: number, enabled = true) {
   const security = useEmporioSecurity();
   const { emporioAbilitato } = useModuloFlags();
   return useGetEmporioAbilitazione(beneficiarioId, {
@@ -42,7 +42,7 @@ export function useBeneficiarioEmporio(beneficiarioId: number) {
       ...security.readOptions(
         getGetEmporioAbilitazioneQueryKey(beneficiarioId),
       ),
-      enabled: emporioAbilitato,
+      enabled: emporioAbilitato && enabled,
     },
   });
 }

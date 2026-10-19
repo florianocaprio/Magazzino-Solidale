@@ -4292,7 +4292,7 @@ describe("Modulo Mensa", () => {
     );
   });
 
-  it("emette dal Sociale solo tessere opache e soltanto dopo il completamento dell'anagrafica", async () => {
+  it("emette dal Sociale tessere opache anche per provvisori, mantenendo il vincolo autonomo Mensa", async () => {
     const fixture = await createFixture();
     const permissions = [
       ...MENSA_PERMISSIONS.map((item) => item.key),
@@ -4308,7 +4308,8 @@ describe("Modulo Mensa", () => {
     const provisional = await request(app)
       .post(`/beneficiari/${fixture.beneficiaryId}/tessere`)
       .send({ motivoSostituzione: "Test anagrafica provvisoria" });
-    expect(provisional.status).toBe(409);
+    expect(provisional.status).toBe(201);
+    expect(provisional.body.codice).toMatch(/^MS-/);
     expect(
       (
         await request(app).post("/mensa/tessere").send({
@@ -4392,7 +4393,7 @@ describe("Modulo Mensa", () => {
       expect.arrayContaining([
         expect.objectContaining({ id: issued.body.id, stato: "attiva" }),
         expect.objectContaining({
-          id: fixture.cardId,
+          id: provisional.body.id,
           stato: "revocata",
           motivoRevoca: "Sostituzione tessera legacy",
         }),

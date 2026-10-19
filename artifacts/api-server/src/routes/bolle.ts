@@ -1,3 +1,4 @@
+import { bollaBeneficiariLookup } from "../lib/bollaBeneficiariLookup";
 import { enteMatchesArea } from "../lib/entiScope";
 import { volunteerMatchesCentre, volunteerAreaFilter, volunteerContextFilter } from "../lib/volontariArea";
 import { Router, type IRouter } from "express";
@@ -13,6 +14,7 @@ import {
   consegneTable,
   utentiTable,
   centriAscoltoTable,
+  areeOperativeTable,
   prenotazioniMagazzinoTable,
   speseEmporioRigheTable,
   speseEmporioTable,
@@ -1017,6 +1019,11 @@ router.get("/bolle", requirePermission("bolle.view"), async (req, res) => {
   );
 });
 
+// Proiezione circoscritta ai destinatari del comando, senza beneficiari.view.
+router.get("/bolle/beneficiari-candidati", requirePermission("bolle.manage"), (req, res) => bollaBeneficiariLookup(req, res, "search"));
+router.post("/bolle/beneficiari-candidati/tessera", requirePermission("bolle.manage"), (req, res) => bollaBeneficiariLookup(req, res, "card"));
+router.get("/bolle/beneficiari-candidati/:id", requirePermission("bolle.manage"), (req, res) => bollaBeneficiariLookup(req, res, "locked"));
+
 // ─── CREATE ──────────────────────────────────────────────────────────────────
 
 router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
@@ -1038,6 +1045,7 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
     "idempotencyKey",
     "tipoDestinatario",
     "beneficiarioId",
+    "contestoBeneficiarioAtteso",
     "enteDestinatarioId",
     "consegnaId",
     "magazzinoId",
@@ -1096,8 +1104,13 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
       .json({ error: "Destinatario tipizzato e Magazzino non validi" });
     return;
   }
+  const expectedContext = body.contestoBeneficiarioAtteso;
+  if (expectedContext !== undefined && (!isBeneficiario || !expectedContext || typeof expectedContext !== "object" || Array.isArray(expectedContext) || Object.keys(expectedContext).some((key) => !["areaOperativaId", "centroAscoltoId"].includes(key)) || !Number.isSafeInteger(expectedContext.areaOperativaId) || expectedContext.areaOperativaId <= 0 || !Number.isSafeInteger(expectedContext.centroAscoltoId) || expectedContext.centroAscoltoId <= 0)) {
+    res.status(400).json({ error: "Contesto del beneficiario non valido" }); return;
+  }
   const requestHash = commandRequestHash({
     tipoDestinatario,
+    ...(expectedContext !== undefined ? { contestoBeneficiarioAtteso: expectedContext } : {}),
     beneficiarioId: isBeneficiario ? body.beneficiarioId : null,
     enteDestinatarioId: isEnte ? body.enteDestinatarioId : null,
     consegnaId: body.consegnaId ?? null,
@@ -1413,6 +1426,15 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
             "Il Beneficiario non è più attivo o accessibile",
           );
         }
+      }
+      if (expectedContext && lockedBeneficiario && (lockedBeneficiario.areaOperativaId !== expectedContext.areaOperativaId || lockedBeneficiario.centroAscoltoId !== expectedContext.centroAscoltoId)) {
+        throw new BollaActionError(409, "Il beneficiario ha cambiato Area o Centro: ripeti la ricerca");
+      }
+      if (expectedContext) {
+        const [context] = await tx.select({ centroAttivo: centriAscoltoTable.attivo, areaAttiva: areeOperativeTable.attivo })
+          .from(centriAscoltoTable).innerJoin(areeOperativeTable, eq(centriAscoltoTable.areaOperativaId, areeOperativeTable.id))
+          .where(and(eq(centriAscoltoTable.id, expectedContext.centroAscoltoId), eq(areeOperativeTable.id, expectedContext.areaOperativaId))).for("share", { of: [centriAscoltoTable, areeOperativeTable] });
+        if (!context?.centroAttivo || !context.areaAttiva) throw new BollaActionError(409, "Area o Centro non più attivi: ripeti la ricerca");
       }
       const [lockedMagazzino] = await tx
         .select()

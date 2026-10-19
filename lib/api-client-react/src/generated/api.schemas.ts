@@ -8034,6 +8034,13 @@ export const BollaInputTipoDestinatario = {
   ente: "ente",
 } as const;
 
+export interface BollaBeneficiarioContestoAtteso {
+  /** @minimum 1 */
+  areaOperativaId: number;
+  /** @minimum 1 */
+  centroAscoltoId: number;
+}
+
 export interface BollaInput {
   /**
    * @minLength 1
@@ -8041,6 +8048,7 @@ export interface BollaInput {
    */
   idempotencyKey: string;
   tipoDestinatario: BollaInputTipoDestinatario;
+  contestoBeneficiarioAtteso?: BollaBeneficiarioContestoAtteso;
   /** @nullable */
   beneficiarioId?: number | null;
   /** @nullable */
@@ -10411,6 +10419,42 @@ export interface RuoloUpdate {
   isAdmin?: boolean;
 }
 
+export interface BollaTesseraLookupInput {
+  /** @minimum 1 */
+  areaOperativaId: number;
+  /** @minimum 1 */
+  centroAscoltoId: number;
+  /**
+   * @minLength 1
+   * @maxLength 256
+   */
+  codiceTessera: string;
+}
+
+export interface BollaBeneficiarioCandidato {
+  /** @minimum 1 */
+  id: number;
+  nome: string;
+  cognome: string;
+  codice: string;
+  /** @nullable */
+  areaOperativaId: number | null;
+  /** @nullable */
+  centroAscoltoId: number | null;
+  consegnaDomicilio: boolean;
+}
+
+export interface BeneficiarioServizioStatoUds {
+  disponibile: boolean;
+  /** @nullable */
+  stato: string | null;
+}
+
+export interface BeneficiarioStatiServiziUds {
+  emporio: BeneficiarioServizioStatoUds;
+  mensa: BeneficiarioServizioStatoUds;
+}
+
 /**
  * Input non valido
  */
@@ -11901,6 +11945,38 @@ export const ExportDocumentiOperativiSortDirection = {
   asc: "asc",
   desc: "desc",
 } as const;
+
+export type ListBollaBeneficiariCandidatiParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId: number;
+  /**
+   * @minimum 1
+   */
+  centroAscoltoId: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * @minLength 2
+   * @maxLength 200
+   */
+  search?: string;
+};
+
+export type GetBollaBeneficiarioConsegnaParams = {
+  /**
+   * @minimum 1
+   */
+  consegnaId: number;
+};
 
 export type ListBolleParams = {
   stato?: string;

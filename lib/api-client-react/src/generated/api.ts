@@ -88,6 +88,7 @@ import type {
   BeneficiarioFseUpdate,
   BeneficiarioInput,
   BeneficiarioSimile,
+  BeneficiarioStatiServiziUds,
   BeneficiarioStatoInput,
   BeneficiarioUpdate,
   BisognoPianificato,
@@ -96,6 +97,7 @@ import type {
   BisognoPianificatoUpdate,
   Bolla,
   BollaAnnullamentoInput,
+  BollaBeneficiarioCandidato,
   BollaDettaglio,
   BollaEmporioEmailResult,
   BollaEmporioInvioManualeInput,
@@ -105,6 +107,7 @@ import type {
   BollaRiga,
   BollaRigaInput,
   BollaStornoAmministrativoInput,
+  BollaTesseraLookupInput,
   BollaUpdate,
   BootstrapStatus,
   BulkImportResult,
@@ -217,6 +220,7 @@ import type {
   FseReportingPreview,
   FseResolutionInput,
   FseVersionInput,
+  GetBollaBeneficiarioConsegnaParams,
   GetConsegnaBeneficiarioDaCodice200,
   GetConsegnaBeneficiarioDaCodiceParams,
   GetCreditoSolidaleRicaricaMensileStato200,
@@ -276,6 +280,7 @@ import type {
   ListAgeaImportazioneRigheParams,
   ListApprovvigionamentiParams,
   ListBeneficiariParams,
+  ListBollaBeneficiariCandidatiParams,
   ListBolleParams,
   ListBollePronteDaPianificareParams,
   ListCarichiParams,
@@ -22568,6 +22573,480 @@ export function useGetDocumentoOperativo<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+export const getListBollaBeneficiariCandidatiUrl = (
+  params: ListBollaBeneficiariCandidatiParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/bolle/beneficiari-candidati?${stringifiedParams}`
+    : `/api/bolle/beneficiari-candidati`;
+};
+
+export const listBollaBeneficiariCandidati = async (
+  params: ListBollaBeneficiariCandidatiParams,
+  options?: RequestInit,
+): Promise<BollaBeneficiarioCandidato[]> => {
+  return customFetch<BollaBeneficiarioCandidato[]>(
+    getListBollaBeneficiariCandidatiUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListBollaBeneficiariCandidatiQueryKey = (
+  params?: ListBollaBeneficiariCandidatiParams,
+) => {
+  return [
+    `/api/bolle/beneficiari-candidati`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListBollaBeneficiariCandidatiQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBollaBeneficiariCandidati>>,
+  TError = ErrorType<void>,
+>(
+  params: ListBollaBeneficiariCandidatiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBollaBeneficiariCandidati>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListBollaBeneficiariCandidatiQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listBollaBeneficiariCandidati>>
+  > = ({ signal }) =>
+    listBollaBeneficiariCandidati(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listBollaBeneficiariCandidati>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListBollaBeneficiariCandidatiQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBollaBeneficiariCandidati>>
+>;
+export type ListBollaBeneficiariCandidatiQueryError = ErrorType<void>;
+
+export function useListBollaBeneficiariCandidati<
+  TData = Awaited<ReturnType<typeof listBollaBeneficiariCandidati>>,
+  TError = ErrorType<void>,
+>(
+  params: ListBollaBeneficiariCandidatiParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBollaBeneficiariCandidati>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBollaBeneficiariCandidatiQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getLookupBollaTesseraUrl = () => {
+  return `/api/bolle/beneficiari-candidati/tessera`;
+};
+
+/**
+ * Lettura esatta e senza effetti operativi della tessera trasversale nel contesto selezionato.
+ */
+export const lookupBollaTessera = async (
+  bollaTesseraLookupInput: BollaTesseraLookupInput,
+  options?: RequestInit,
+): Promise<BollaBeneficiarioCandidato> => {
+  return customFetch<BollaBeneficiarioCandidato>(getLookupBollaTesseraUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(bollaTesseraLookupInput),
+  });
+};
+
+export const getLookupBollaTesseraMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof lookupBollaTessera>>,
+    TError,
+    { data: BodyType<BollaTesseraLookupInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof lookupBollaTessera>>,
+  TError,
+  { data: BodyType<BollaTesseraLookupInput> },
+  TContext
+> => {
+  const mutationKey = ["lookupBollaTessera"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof lookupBollaTessera>>,
+    { data: BodyType<BollaTesseraLookupInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return lookupBollaTessera(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LookupBollaTesseraMutationResult = NonNullable<
+  Awaited<ReturnType<typeof lookupBollaTessera>>
+>;
+export type LookupBollaTesseraMutationBody = BodyType<BollaTesseraLookupInput>;
+export type LookupBollaTesseraMutationError = ErrorType<void>;
+
+export const useLookupBollaTessera = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof lookupBollaTessera>>,
+    TError,
+    { data: BodyType<BollaTesseraLookupInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof lookupBollaTessera>>,
+  TError,
+  { data: BodyType<BollaTesseraLookupInput> },
+  TContext
+> => {
+  return useMutation(getLookupBollaTesseraMutationOptions(options));
+};
+
+export const getGetBollaBeneficiarioConsegnaUrl = (
+  id: number,
+  params: GetBollaBeneficiarioConsegnaParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/bolle/beneficiari-candidati/${id}?${stringifiedParams}`
+    : `/api/bolle/beneficiari-candidati/${id}`;
+};
+
+export const getBollaBeneficiarioConsegna = async (
+  id: number,
+  params: GetBollaBeneficiarioConsegnaParams,
+  options?: RequestInit,
+): Promise<BollaBeneficiarioCandidato> => {
+  return customFetch<BollaBeneficiarioCandidato>(
+    getGetBollaBeneficiarioConsegnaUrl(id, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetBollaBeneficiarioConsegnaQueryKey = (
+  id: number,
+  params?: GetBollaBeneficiarioConsegnaParams,
+) => {
+  return [
+    `/api/bolle/beneficiari-candidati/${id}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetBollaBeneficiarioConsegnaQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBollaBeneficiarioConsegna>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  params: GetBollaBeneficiarioConsegnaParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBollaBeneficiarioConsegna>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetBollaBeneficiarioConsegnaQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBollaBeneficiarioConsegna>>
+  > = ({ signal }) =>
+    getBollaBeneficiarioConsegna(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBollaBeneficiarioConsegna>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBollaBeneficiarioConsegnaQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBollaBeneficiarioConsegna>>
+>;
+export type GetBollaBeneficiarioConsegnaQueryError = ErrorType<void>;
+
+export function useGetBollaBeneficiarioConsegna<
+  TData = Awaited<ReturnType<typeof getBollaBeneficiarioConsegna>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  params: GetBollaBeneficiarioConsegnaParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBollaBeneficiarioConsegna>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBollaBeneficiarioConsegnaQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetBeneficiarioStatiServiziUdsUrl = (id: number) => {
+  return `/api/beneficiari/${id}/stati-servizi-uds`;
+};
+
+export const getBeneficiarioStatiServiziUds = async (
+  id: number,
+  options?: RequestInit,
+): Promise<BeneficiarioStatiServiziUds> => {
+  return customFetch<BeneficiarioStatiServiziUds>(
+    getGetBeneficiarioStatiServiziUdsUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetBeneficiarioStatiServiziUdsQueryKey = (id: number) => {
+  return [`/api/beneficiari/${id}/stati-servizi-uds`] as const;
+};
+
+export const getGetBeneficiarioStatiServiziUdsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBeneficiarioStatiServiziUds>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBeneficiarioStatiServiziUds>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetBeneficiarioStatiServiziUdsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBeneficiarioStatiServiziUds>>
+  > = ({ signal }) =>
+    getBeneficiarioStatiServiziUds(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBeneficiarioStatiServiziUds>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBeneficiarioStatiServiziUdsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBeneficiarioStatiServiziUds>>
+>;
+export type GetBeneficiarioStatiServiziUdsQueryError = ErrorType<void>;
+
+export function useGetBeneficiarioStatiServiziUds<
+  TData = Awaited<ReturnType<typeof getBeneficiarioStatiServiziUds>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBeneficiarioStatiServiziUds>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBeneficiarioStatiServiziUdsQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetOrCreateBeneficiarioTesseraDocumentoUrl = (id: number) => {
+  return `/api/beneficiari/${id}/tessera-documento`;
+};
+
+/**
+ * Prima emissione o recupero idempotente della tessera. Non sostituisce e non riattiva tessere esistenti.
+ */
+export const getOrCreateBeneficiarioTesseraDocumento = async (
+  id: number,
+  options?: RequestInit,
+): Promise<TesseraBeneficiario> => {
+  return customFetch<TesseraBeneficiario>(
+    getGetOrCreateBeneficiarioTesseraDocumentoUrl(id),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getGetOrCreateBeneficiarioTesseraDocumentoMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof getOrCreateBeneficiarioTesseraDocumento>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof getOrCreateBeneficiarioTesseraDocumento>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["getOrCreateBeneficiarioTesseraDocumento"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof getOrCreateBeneficiarioTesseraDocumento>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return getOrCreateBeneficiarioTesseraDocumento(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GetOrCreateBeneficiarioTesseraDocumentoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof getOrCreateBeneficiarioTesseraDocumento>>
+>;
+
+export type GetOrCreateBeneficiarioTesseraDocumentoMutationError =
+  ErrorType<void>;
+
+export const useGetOrCreateBeneficiarioTesseraDocumento = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof getOrCreateBeneficiarioTesseraDocumento>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof getOrCreateBeneficiarioTesseraDocumento>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(
+    getGetOrCreateBeneficiarioTesseraDocumentoMutationOptions(options),
+  );
+};
 
 export const getListBolleUrl = (params?: ListBolleParams) => {
   const normalizedParams = new URLSearchParams();

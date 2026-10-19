@@ -15064,6 +15064,120 @@ export const GetDocumentoOperativoResponse = zod.object({
   ]),
 });
 
+export const listBollaBeneficiariCandidatiQueryLimitMax = 100;
+
+export const listBollaBeneficiariCandidatiQuerySearchMin = 2;
+export const listBollaBeneficiariCandidatiQuerySearchMax = 200;
+
+export const ListBollaBeneficiariCandidatiQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1),
+  centroAscoltoId: zod.coerce.number().min(1),
+  page: zod.coerce.number().min(1).optional(),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listBollaBeneficiariCandidatiQueryLimitMax)
+    .optional(),
+  search: zod.coerce
+    .string()
+    .min(listBollaBeneficiariCandidatiQuerySearchMin)
+    .max(listBollaBeneficiariCandidatiQuerySearchMax)
+    .optional(),
+});
+
+export const ListBollaBeneficiariCandidatiResponseItem = zod.object({
+  id: zod.number().min(1),
+  nome: zod.string(),
+  cognome: zod.string(),
+  codice: zod.string(),
+  areaOperativaId: zod.number().nullable(),
+  centroAscoltoId: zod.number().nullable(),
+  consegnaDomicilio: zod.boolean(),
+});
+export const ListBollaBeneficiariCandidatiResponse = zod.array(
+  ListBollaBeneficiariCandidatiResponseItem,
+);
+
+/**
+ * Lettura esatta e senza effetti operativi della tessera trasversale nel contesto selezionato.
+ */
+
+export const lookupBollaTesseraBodyCodiceTesseraMax = 256;
+
+export const LookupBollaTesseraBody = zod.object({
+  areaOperativaId: zod.number().min(1),
+  centroAscoltoId: zod.number().min(1),
+  codiceTessera: zod
+    .string()
+    .min(1)
+    .max(lookupBollaTesseraBodyCodiceTesseraMax),
+});
+
+export const LookupBollaTesseraResponse = zod.object({
+  id: zod.number().min(1),
+  nome: zod.string(),
+  cognome: zod.string(),
+  codice: zod.string(),
+  areaOperativaId: zod.number().nullable(),
+  centroAscoltoId: zod.number().nullable(),
+  consegnaDomicilio: zod.boolean(),
+});
+
+export const GetBollaBeneficiarioConsegnaParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const GetBollaBeneficiarioConsegnaQueryParams = zod.object({
+  consegnaId: zod.coerce.number().min(1),
+});
+
+export const GetBollaBeneficiarioConsegnaResponse = zod.object({
+  id: zod.number().min(1),
+  nome: zod.string(),
+  cognome: zod.string(),
+  codice: zod.string(),
+  areaOperativaId: zod.number().nullable(),
+  centroAscoltoId: zod.number().nullable(),
+  consegnaDomicilio: zod.boolean(),
+});
+
+export const GetBeneficiarioStatiServiziUdsParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const GetBeneficiarioStatiServiziUdsResponse = zod.object({
+  emporio: zod.object({
+    disponibile: zod.boolean(),
+    stato: zod.string().nullable(),
+  }),
+  mensa: zod.object({
+    disponibile: zod.boolean(),
+    stato: zod.string().nullable(),
+  }),
+});
+
+/**
+ * Prima emissione o recupero idempotente della tessera. Non sostituisce e non riattiva tessere esistenti.
+ */
+
+export const GetOrCreateBeneficiarioTesseraDocumentoParams = zod.object({
+  id: zod.coerce.number().min(1),
+});
+
+export const GetOrCreateBeneficiarioTesseraDocumentoResponse = zod.object({
+  id: zod.number(),
+  beneficiarioId: zod.number(),
+  codice: zod.string(),
+  stato: zod.enum(["attiva", "sospesa", "revocata", "scaduta"]),
+  dataEmissione: zod.coerce.date(),
+  dataScadenza: zod.coerce.date().nullish(),
+  dataRevoca: zod.coerce.date().nullish(),
+  motivoRevoca: zod.string().nullish(),
+  createdBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  versione: zod.coerce.date(),
+});
+
 export const listBolleQueryPageDefault = 1;
 
 export const listBolleQueryLimitDefault = 50;
@@ -15130,6 +15244,12 @@ export const createBollaBodyIdempotencyKeyMax = 120;
 export const CreateBollaBody = zod.object({
   idempotencyKey: zod.string().min(1).max(createBollaBodyIdempotencyKeyMax),
   tipoDestinatario: zod.enum(["beneficiario", "ente"]),
+  contestoBeneficiarioAtteso: zod
+    .object({
+      areaOperativaId: zod.number().min(1),
+      centroAscoltoId: zod.number().min(1),
+    })
+    .optional(),
   beneficiarioId: zod.number().nullish(),
   enteDestinatarioId: zod.number().nullish(),
   consegnaId: zod.number().optional(),

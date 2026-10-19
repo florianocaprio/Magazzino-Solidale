@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
+  useUpdateEmporioAbilitazione: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useGetEmporioAbilitazioniRiepilogoBeneficiari: (
     params: unknown,
     options: unknown,

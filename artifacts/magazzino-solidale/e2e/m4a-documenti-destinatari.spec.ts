@@ -373,7 +373,13 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     const fixtures = await loadDemoFixtures(page);
     const dialog = await openCreateBollaDialog(page);
     const scan = dialog.getByPlaceholder(/scansiona o digita il codice/i);
-    await scan.fill(fixtures.beneficiary.codice);
+    const detail = await expectJson<{ areaOperativaId: number; centroAscoltoId: number }> (await page.request.get(`/api/beneficiari/${fixtures.beneficiary.id}`), 200);
+    const areas = await (await page.request.get("/api/aree-operative")).json();
+    const centres = await (await page.request.get("/api/centri-ascolto")).json();
+    await selectOption(page, dialog.getByRole("combobox", { name: "Area destinatario" }), areas.find((area: { id: number }) => area.id === detail.areaOperativaId).nome);
+    await selectOption(page, dialog.getByRole("combobox", { name: /centro di ascolto/i }), centres.find((centre: { id: number }) => centre.id === detail.centroAscoltoId).nome);
+    const card = await expectJson<{ codice: string }>(await page.request.post(`/api/beneficiari/${fixtures.beneficiary.id}/tessera-documento`, { data: {} }), 200);
+    await scan.fill(card.codice);
     await scan.press("Enter");
     await expect(dialog).toContainText(
       `${fixtures.beneficiary.cognome} ${fixtures.beneficiary.nome}`,

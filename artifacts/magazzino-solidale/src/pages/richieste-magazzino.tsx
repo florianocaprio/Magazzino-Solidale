@@ -26,7 +26,7 @@ import {
 } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { invalidateRequestWorkflowViews } from "@/lib/bolla-query-invalidation";
-import { DocumentoOperativoDettaglioComune } from "@/components/documento-operativo";
+import { DocumentoOperativoDettaglioComune, documentProgressBadge } from "@/components/documento-operativo";
 import {
   parseDocumentoSelection,
   documentoSelectionValue,
@@ -1027,9 +1027,7 @@ export default function RichiesteMagazzino() {
                   {request.documentoCorrente && (
                     <span className="ml-2 text-xs">
                       {request.documentoCorrente.codice} ·{" "}
-                      {t(
-                        `richiesteMagazzino.progress.${request.documentoCorrente.avanzamento}`,
-                      )}
+                      {documentProgressBadge(request.documentoCorrente.avanzamento)}
                     </span>
                   )}
                   <p className="text-xs text-muted-foreground">
@@ -1105,8 +1103,8 @@ export default function RichiesteMagazzino() {
                   <DocumentoOperativoDettaglioComune
                     key={documentoSelectionValue(documentSelection)}
                     selection={documentSelection}
-                    onClose={() => openDocument(null)}
-                    onBackToRequest={() => openDocument(null)}
+                    onClose={() => requestClose(() => { setDocumentDirty(false); selectRequest(null); })}
+                    onBackToRequest={() => requestClose(() => { setDocumentDirty(false); selectRequest(null); })}
                     onDraftDirtyChange={setDocumentDirty}
                   />
                 ) : (
@@ -1154,9 +1152,7 @@ export default function RichiesteMagazzino() {
                       </h2>
                       <p>
                         {row.documentoCorrente.codice} ·{" "}
-                        {t(
-                          `richiesteMagazzino.progress.${row.documentoCorrente.avanzamento}`,
-                        )}
+                        {documentProgressBadge(row.documentoCorrente.avanzamento)}
                       </p>
                       {row.documentoCorrente.percorsoDocumento && (
                         <Button
@@ -1247,9 +1243,7 @@ export default function RichiesteMagazzino() {
                       {row.documentiPrecedenti.map((document) => (
                         <p key={document.relazioneId} className="text-sm">
                           {document.codice} ·{" "}
-                          {t(
-                            `richiesteMagazzino.progress.${document.avanzamento}`,
-                          )}{" "}
+                          {documentProgressBadge(document.avanzamento)}{" "}
                           {document.percorsoDocumento && (
                             <Button
                               variant="link"

@@ -249,6 +249,9 @@ test.describe("workflow Magazzino reali", () => {
     await page.goto("/scarichi");
     await page.getByRole("button", { name: /^nuovo$/i }).click();
     const sheet = page.getByRole("dialog", { name: /nuovo scarico/i });
+    await expect(sheet.getByRole("combobox", { name: /magazzino/i })).toBeDisabled();
+    await selectOption(page, sheet.getByRole("combobox", { name: "Area", exact: true }), "Area Demo");
+    await expect(sheet.getByRole("combobox", { name: /centro/i })).toHaveCount(0);
     await selectOption(
       page,
       sheet.getByRole("combobox", { name: /magazzino/i }),
@@ -282,6 +285,7 @@ test.describe("workflow Magazzino reali", () => {
       .click();
     const created = await createResponse;
     expect(created.status()).toBe(201);
+    expect(created.request().postDataJSON()).not.toHaveProperty("centroAscoltoId");
     await expect(
       page.getByRole("dialog", { name: /bolla creata/i }),
     ).toBeVisible();
