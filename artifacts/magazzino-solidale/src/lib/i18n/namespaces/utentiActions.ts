@@ -2,6 +2,8 @@ import type { i18n } from "i18next";
 
 const utentiActions = {
   it: {
+    showPassword: "Mostra password",
+    hidePassword: "Nascondi password",
     areaUnassigned: "Area non assegnata",
     actions: "Azioni",
     actionsFor: "Azioni per {{username}}",
@@ -22,6 +24,8 @@ const utentiActions = {
       "Rimozione completata; l’eventuale storico è stato conservato.",
   },
   es: {
+    showPassword: "Mostrar contraseña",
+    hidePassword: "Ocultar contraseña",
     areaUnassigned: "Área no asignada",
     actions: "Acciones",
     actionsFor: "Acciones para {{username}}",
@@ -42,6 +46,8 @@ const utentiActions = {
       "Eliminación completada; se ha conservado el historial existente.",
   },
   en: {
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     areaUnassigned: "Area not assigned",
     actions: "Actions",
     actionsFor: "Actions for {{username}}",
@@ -61,6 +67,8 @@ const utentiActions = {
     toastRemoved: "Removal completed; any history has been preserved.",
   },
   fr: {
+    showPassword: "Afficher le mot de passe",
+    hidePassword: "Masquer le mot de passe",
     areaUnassigned: "Zone opérationnelle non attribuée",
     actions: "Actions",
     actionsFor: "Actions pour {{username}}",
@@ -80,6 +88,8 @@ const utentiActions = {
     toastRemoved: "Suppression terminée ; l’historique existant est conservé.",
   },
   de: {
+    showPassword: "Passwort anzeigen",
+    hidePassword: "Passwort verbergen",
     areaUnassigned: "Einsatzgebiet nicht zugewiesen",
     actions: "Aktionen",
     actionsFor: "Aktionen für {{username}}",
@@ -100,6 +110,8 @@ const utentiActions = {
       "Entfernung abgeschlossen; vorhandener Verlauf wurde erhalten.",
   },
   ar: {
+    showPassword: "إظهار كلمة المرور",
+    hidePassword: "إخفاء كلمة المرور",
     areaUnassigned: "لم يتم تعيين منطقة العمل",
     actions: "الإجراءات",
     actionsFor: "إجراءات {{username}}",

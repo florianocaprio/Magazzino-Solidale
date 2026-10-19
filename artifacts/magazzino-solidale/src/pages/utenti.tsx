@@ -72,6 +72,8 @@ import {
   Power,
   KeyRound,
   Trash2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
@@ -143,6 +145,7 @@ export default function Utenti() {
   const [cognome, setCognome] = useState("");
   const [matricola, setMatricola] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [ruoloId, setRuoloId] = useState<string>(NO_ROLE);
   const [areaOperativaId, setAreaOperativaId] =
     useState<string>(NO_AREA_OPERATIVA);
@@ -185,6 +188,7 @@ export default function Utenti() {
     setCognome("");
     setMatricola("");
     setPassword("");
+    setPasswordVisible(false);
     setRuoloId(NO_ROLE);
     setAreaOperativaId(
       isAreaOperativaLocked ? String(lockedAreaOperativaId) : NO_AREA_OPERATIVA,
@@ -203,6 +207,7 @@ export default function Utenti() {
     setCognome(u.cognome ?? "");
     setMatricola(u.matricola ?? "");
     setPassword("");
+    setPasswordVisible(false);
     setRuoloId(u.ruoloId != null ? String(u.ruoloId) : NO_ROLE);
     setAreaOperativaId(
       u.areaOperativaId != null ? String(u.areaOperativaId) : NO_AREA_OPERATIVA,
@@ -712,14 +717,33 @@ export default function Utenti() {
                 <Label htmlFor="u-password">
                   {t("utenti.passwordIniziale")}
                 </Label>
-                <Input
-                  id="u-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="u-password"
+                    type={passwordVisible ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-12"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-11 w-11 text-muted-foreground"
+                    aria-controls="u-password"
+                    aria-label={t(passwordVisible ? "utenti.hidePassword" : "utenti.showPassword")}
+                    aria-pressed={passwordVisible}
+                    onClick={() => setPasswordVisible((visible) => !visible)}
+                  >
+                    {passwordVisible ? (
+                      <EyeOff aria-hidden="true" />
+                    ) : (
+                      <Eye aria-hidden="true" />
+                    )}
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {t("utenti.passwordHint")}
                 </p>

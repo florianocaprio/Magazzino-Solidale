@@ -115,6 +115,31 @@ afterEach(async () => {
 });
 
 describe("BUG 01 — azioni Utenti", () => {
+  it("mostra e nasconde la password iniziale senza modificarla o inviare il form", async () => {
+    await act(async () => button("utenti.newUser").click());
+    const field = document.getElementById("u-password") as HTMLInputElement;
+    expect(field.type).toBe("password");
+    await input("u-password", "SyntheticInitial42");
+    const submitted = vi.fn();
+    field.closest("form")!.addEventListener("submit", submitted);
+    const toggle = () => document.querySelector<HTMLButtonElement>('button[aria-controls="u-password"]')!;
+    expect(toggle().getAttribute("aria-label")).toBe("utenti.showPassword");
+    await act(async () => toggle().click());
+    expect(field.type).toBe("text");
+    expect(field.value).toBe("SyntheticInitial42");
+    expect(toggle().getAttribute("aria-label")).toBe("utenti.hidePassword");
+    expect(toggle().getAttribute("aria-pressed")).toBe("true");
+    await act(async () => toggle().click());
+    expect(field.type).toBe("password");
+    expect(field.value).toBe("SyntheticInitial42");
+    expect(submitted).not.toHaveBeenCalled();
+    await act(async () => toggle().click());
+    await act(async () => button("Close").click());
+    await act(async () => button("utenti.newUser").click());
+    const reopened = document.getElementById("u-password") as HTMLInputElement;
+    expect(reopened.type).toBe("password");
+    expect(reopened.value).toBe("");
+  });
   it("carica le nuove traduzioni con la pagina e conserva quelle esistenti al cambio lingua", async () => {
     const instance = createInstance();
     await instance.init({
