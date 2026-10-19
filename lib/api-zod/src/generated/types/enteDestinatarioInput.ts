@@ -32,6 +32,10 @@ export interface EnteDestinatarioInput {
    * @nullable
    */
   email?: string | null;
-  /** @minimum 1 */
-  areaOperativaId: number;
+  /**
+   * Area richiesta per i territoriali; NULL esplicito per un globale, riservato all’amministratore globale.
+   * @minimum 1
+   * @nullable
+   */
+  areaOperativaId: number | null;
 }

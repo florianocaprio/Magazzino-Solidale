@@ -8,6 +8,7 @@ import {
   it,
 } from "vitest";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import request from "supertest";
 import express from "express";
 import { and, eq } from "drizzle-orm";
@@ -115,6 +116,85 @@ afterAll(async () => {
 });
 
 describe("M4A — destinatario Ente e facciata documentale", () => {
+  it("BUG17: CRUD globale riservato, replay/CAS e filtri Area prima della paginazione", async () => {
+    const otherArea = await createAreaOperativa(scope);
+    const globalApp = makeScopedApp(entiRouter, { id: operatoreId, centroAscoltoId: null, isAdmin: true });
+    const localAdmin = makeScopedApp(entiRouter, { id: operatoreId, centroAscoltoId: null, areaOperativaId: areaId, isAdmin: true });
+    const key = commandKey("bug17-global");
+    const payload = { idempotencyKey: key, denominazione: "BUG17 B globale", indirizzo: "Via test", areaOperativaId: null };
+    expect((await request(localAdmin).post("/enti-destinatari").send(payload)).status).toBe(403);
+    const global = await request(globalApp).post("/enti-destinatari").send(payload);
+    expect(global.status, global.text).toBe(201);
+    scope.enteDestinatarioIds.push(global.body.id);
+    expect(global.body.areaOperativaId).toBeNull();
+    expect((await request(globalApp).post("/enti-destinatari").send(payload)).status).toBe(200);
+    expect((await request(globalApp).post("/enti-destinatari").send({ ...payload, areaOperativaId: areaId })).status).toBe(409);
+    // Losing global administration also revokes access to replaying the receipt.
+    expect((await request(localAdmin).post("/enti-destinatari").send(payload)).status).toBe(403);
+    const [foreign, local] = await db.insert(entiDestinatariTable).values([
+      { denominazione: "BUG17 A fuori Area", indirizzo: "Via test", areaOperativaId: otherArea },
+      { denominazione: "BUG17 C locale", indirizzo: "Via test", areaOperativaId: areaId },
+    ]).returning();
+    scope.enteDestinatarioIds.push(foreign.id, local.id);
+    for (const client of [globalApp, localAdmin]) {
+      const list = await request(client).get("/enti-destinatari").query({ areaOperativaId: areaId, search: "BUG17", limit: 1, offset: 1 });
+      expect(list.status).toBe(200);
+      expect(list.body.map((e: { id: number }) => e.id)).toEqual([local.id]);
+    }
+    expect((await request(localAdmin).get("/enti-destinatari").query({ areaOperativaId: otherArea })).status).toBe(403);
+    expect((await request(globalApp).get("/enti-destinatari").query({ areaOperativaId: -1 })).status).toBe(400);
+    const onlyGlobal = await request(localAdmin).get("/enti-destinatari").query({ ambito: "globali", search: "BUG17" });
+    expect(onlyGlobal.body.map((e: { id: number }) => e.id)).toEqual([global.body.id]);
+    const update = { idempotencyKey: commandKey("bug17-update"), versione: 1, attivo: false };
+    expect((await request(localAdmin).patch(`/enti-destinatari/${global.body.id}`).send(update)).status).toBe(403);
+    const readOnly = makeScopedApp(entiRouter, { id: operatoreId, centroAscoltoId: null, areaOperativaId: areaId, aree: ["sociale"], permessi: ["enti-destinatari.view"] });
+    expect((await request(readOnly).get("/enti-destinatari").query({ ambito: "globali", search: "BUG17" })).body.map((e: { id: number }) => e.id)).toContain(global.body.id);
+    expect((await request(readOnly).patch(`/enti-destinatari/${global.body.id}`).send(update)).status).toBe(403);
+    expect((await request(globalApp).patch(`/enti-destinatari/${global.body.id}`).send({ ...update, areaOperativaId: areaId })).status).toBe(400);
+    const changed = await request(globalApp).patch(`/enti-destinatari/${global.body.id}`).send(update);
+    expect(changed.status, changed.text).toBe(200);
+    expect(changed.body).toMatchObject({ versione: 2, attivo: false });
+    expect((await request(globalApp).patch(`/enti-destinatari/${global.body.id}`).send(update)).body.versione).toBe(2);
+    expect((await request(globalApp).patch(`/enti-destinatari/${global.body.id}`).send({ ...update, idempotencyKey: commandKey("bug17-stale") })).status).toBe(409);
+    expect((await request(localAdmin).get("/enti-destinatari").query({ ambito: "globali", search: "BUG17" })).body).toEqual([]);
+    const audit = await pool.query("SELECT azione, area_operativa_id_snapshot FROM audit_eventi WHERE entita_tipo='ente_destinatario' AND entita_id=$1 ORDER BY id", [global.body.id]);
+    expect(audit.rows).toEqual([
+      { azione: "ENTE_DESTINATARIO_CREATO", area_operativa_id_snapshot: null },
+      { azione: "ENTE_DESTINATARIO_MODIFICATO", area_operativa_id_snapshot: null },
+    ]);
+  });
+
+  it("BUG17: lo stesso Ente globale non condivide Bolle o magazzini tra Aree", async () => {
+    const otherArea = await createAreaOperativa(scope);
+    const otherCentre = await createCentroRec(scope, { areaOperativaId: otherArea });
+    const otherWarehouse = await createMagazzino(scope, otherCentre.id, { areaOperativaId: otherArea });
+    const [entity] = await db.insert(entiDestinatariTable).values({ denominazione: "Globale due Aree", indirizzo: "Via test", areaOperativaId: null }).returning();
+    scope.enteDestinatarioIds.push(entity.id);
+    const client = (area: number) => makeScopedApp(bolleRouter, { id: operatoreId, centroAscoltoId: null, areaOperativaId: area });
+    const documents: number[] = [];
+    for (const [area, warehouse] of [[areaId, magazzinoId], [otherArea, otherWarehouse]]) {
+      const created = await request(client(area)).post("/bolle").send({ idempotencyKey: commandKey("bug17-bolla"), tipoDestinatario: "ente", enteDestinatarioId: entity.id, magazzinoId: warehouse });
+      expect(created.status, created.text).toBe(201);
+      scope.bollaIds.push(created.body.id); documents.push(created.body.id);
+      expect(created.body.areaOperativaIdSnapshot).toBe(area);
+    }
+    expect((await request(client(areaId)).get(`/bolle/${documents[1]}`)).status).toBe(403);
+    expect((await request(client(otherArea)).get(`/bolle/${documents[0]}`)).status).toBe(403);
+    expect((await request(client(areaId)).post("/bolle").send({ idempotencyKey: commandKey("bug17-foreign-warehouse"), tipoDestinatario: "ente", enteDestinatarioId: entity.id, magazzinoId: otherWarehouse })).status).toBe(403);
+    await db.update(entiDestinatariTable).set({ attivo: false }).where(eq(entiDestinatariTable.id, entity.id));
+    expect((await request(client(areaId)).get(`/bolle/${documents[0]}`)).status).toBe(200);
+    expect((await request(client(areaId)).post("/bolle").send({ idempotencyKey: commandKey("bug17-inactive"), tipoDestinatario: "ente", enteDestinatarioId: entity.id, magazzinoId })).status).toBe(400);
+  });
+
+  it("BUG17: migrazione conserva tutti gli Enti legacy territoriali e permette NULL solo sui nuovi", async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN; CREATE SCHEMA bug17_migration; SET LOCAL search_path TO bug17_migration, public; CREATE TABLE enti_destinatari(id integer PRIMARY KEY, area_operativa_id integer NOT NULL, storico text); INSERT INTO enti_destinatari VALUES (1,10,'immutato')");
+      await client.query(readFileSync(new URL("../../../lib/db/updates/20261019_z_enti_destinatari_globali.sql", import.meta.url), "utf8"));
+      expect((await client.query("SELECT * FROM enti_destinatari")).rows).toEqual([{ id: 1, area_operativa_id: 10, storico: "immutato" }]);
+      await client.query("INSERT INTO enti_destinatari VALUES (2,NULL,'nuovo globale')");
+    } finally { await client.query("ROLLBACK"); client.release(); }
+  });
   it("LOT-EX-03: il lotto prenotato non è disponibile né selezionabile per il Trasferimento", async () => {
     const earlyLot = await createLotto(scope, {
       prodottoId,

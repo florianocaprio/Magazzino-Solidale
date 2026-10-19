@@ -101,15 +101,15 @@ Nessuna decisione residua blocca l'avvio del prompt 01.
 
 ## Registro dei BUG
 
-Il BUG 01 è **CHIUSO CON OK UAT DI FLORIANO**; BUG 02/03/15 sono sviluppati e gli altri BUG restano da sviluppare. Le UAT successive sono **DA ESEGUIRE** e non derivano
+Il BUG 01 è **CHIUSO CON OK UAT DI FLORIANO**; BUG 02/03/15 sono CHIUSI con OK UAT di Floriano; BUG 17 in sviluppo nel prompt 03. Le UAT successive sono **DA ESEGUIRE** e non derivano
 dai test automatici. Il candidato iniziale non è un candidato verificato della
 campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 
 | BUG | Blocco | Prompt | Stato                     | Requisiti sospesi                                              | Commit           | Automatico                      | UAT         | Ultimo candidato verificato              |
 | --- | ------ | ------ | ------------------------- | -------------------------------------------------------------- | ---------------- | ------------------------------- | ----------- | ---------------------------------------- |
 | 01 | A | 01 | CHIUSO; UAT OK | Nessuno; D01 approvata | 7d70906 | PASS; 4 skip esterni dichiarati nel blocco precedente | OK Floriano 19/10 | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 |
-| 02  | B      | 02     | SVILUPPATO; Area/Centro facoltativo recepiti | Nessuno; D01 approvata                                         | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | DA ESEGUIRE | 3c882b610be185ef5f62867ac562e8e7b322b08d |
-| 03  | B      | 02     | SVILUPPATO; Area/Centro facoltativo recepiti | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | DA ESEGUIRE | 3c882b610be185ef5f62867ac562e8e7b322b08d |
+| 02  | B      | 02     | CHIUSO; UAT OK | Nessuno; D01 approvata                                         | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
+| 03  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 04  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 05  | C      | 04     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 06  | C      | 04     | DA SVILUPPARE             | Nessuno; requisito sostitutivo Area/Centro prima della ricerca | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -121,7 +121,7 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 12  | D      | 05     | DA SVILUPPARE             | Raccordo D03 con le attuali pratiche Aperte                    | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 13  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 14  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 15  | B      | 02     | SVILUPPATO; Area/Centro facoltativo recepiti | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | DA ESEGUIRE | 3c882b610be185ef5f62867ac562e8e7b322b08d |
+| 15  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 16  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 17  | C      | 03, 04 | DA SVILUPPARE             | Nessuno; D04 approvata; UAT dopo 04                            | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -138,7 +138,7 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | Consegna | Blocco e BUG                  | Tipo            | SHA                                      | Controlli e risultato reale                                                   | Versione 8082                 | Esito                                       |
 | -------- | ----------------------------- | --------------- | ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------- |
 | 01 | A: 01 | Funzionale | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 | PASS; ultimi controlli 737 UI e 76 API core | Installata e verificata | CHIUSA; OK UAT Floriano 19/10 |
-| 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | UAT DA ESEGUIRE; prossimo ##test |
+| 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | CHIUSA; OK UAT Floriano 19/10 |
 | 03       | C: 17, prima parte            | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
 | 04       | C: 05–09 e regressione 17     | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 05       | D: 04, 10–14, 16              | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
@@ -1129,3 +1129,75 @@ Restano i due legacy senza Area da completare manualmente con profilo globale,
 senza attribuzioni arbitrarie; nuovi salvataggi richiedono un’Area valida.
 **UAT DA ESEGUIRE**, consegna 01 chiusa, nessuna fase successiva avviata.
 I quattro documenti locali preesistenti restano invariati ed esclusi dai commit.
+
+
+## Avvio prompt 03 — BUG 17 Enti territoriali e globali
+
+Il 19/10 Floriano conferma «Ho provato sulla 8082, ora funziona tutto. Il punto
+02 è chiuso», attiva espressamente il prompt 03 e ribadisce «ricompila sempre
+la 8082 per le prove». Conseguentemente consegna 02 e BUG 02/03/15 sono chiusi
+con OK UAT; per il checkpoint 03 la richiesta diretta più recente prevale sul
+divieto di installazione intermedia del file: preparare anche la 8082 dopo
+verifiche e preflight. Non è attivato il prompt 04 né il distinto ##test/##merge.
+D04 è già APPROVATA, nessuna nuova conferma necessaria.
+
+Rappresentazione unica: `enti_destinatari.area_operativa_id` nullable:
+ID reale = territoriale; NULL esplicito = globale. Campo obbligatorio nel payload
+di creazione, nullable solo per amministrazione globale. Area e ambito restano
+immutabili in modifica; nessun trasferimento o conversione degli Enti esistenti.
+Migration incrementale `20261019_z_enti_destinatari_globali.sql`, dopo la 59:
+rimuove soltanto NOT NULL. Nessun UPDATE dei dati, nessuna modifica degli ID/FK,
+dei documenti o dei grant. Schema, OpenAPI e client/Zod rigenerati con codegen
+ufficiale. L’API deve essere distribuita con la nuova migration prima del nuovo
+form globale; rollback con vecchie immagini richiede runner compatibile col
+ledger aggiornato, senza conversioni o cancellazioni dei globali creati.
+
+Policy specifica `entiScope.ts`, senza cambiare `centroScope`: l’amministratore
+locale non può amministrare globali anche se isAdmin=true. Lettura/uso conservano
+grant e moduli esistenti. Filtro Area include territoriali dell’Area + globali,
+con intersezione dello scope prima di ricerca/ordinamento/paginazione;
+`ambito=globali` seleziona soltanto globali. Area estranea al profilo rifiutata.
+
+Le operazioni richiedono sempre un’Area concreta. La stessa coerenza
+territoriale/globale è verificata nelle transazioni di creazione/modifica e
+conferma Bolla, richiesta/preparazione e prova di chiusura M5. Le Bolle mantengono
+snapshot Area del magazzino, mai quello NULL dell’Ente. Storico leggibile anche
+con Ente inattivo; nuova selezione/operazione richiede Ente attivo. Restano
+idempotenza, versioni, lock, scoping dei documenti e contabilità esistenti.
+
+Raccordo per il prompt 04: in `documento-operativo.tsx` preservare il tipo Area
+nullable del selezionato, la query Enti filtrata dall’Area del contesto/magazzino,
+il reset di un territoriale incompatibile e l’esenzione dei globali dai soli
+confronti Ente/Area. Un globale non cancella il magazzino scelto e non rimuove
+filtri territoriali del profilo/contesto. Preservare etichette di ambito nel
+combobox, policy server e regressioni del ciclo M5.
+
+Verifiche e checkpoint finale saranno registrati dopo l’esecuzione effettiva.
+
+File modificati per BUG 17 (inclusi contratti generati):
+
+- `artifacts/api-server/src/lib/m5RequestClosure.ts`
+- `artifacts/api-server/src/routes/bolle.ts`
+- `artifacts/api-server/src/routes/enti-destinatari.ts`
+- `artifacts/api-server/src/routes/richieste-magazzino.ts`
+- `artifacts/api-server/tests/documenti-operativi-m4a.test.ts`
+- `artifacts/api-server/tests/richieste-magazzino-m5a.test.ts`
+- `artifacts/api-server/tests/richieste-magazzino-m5b.test.ts`
+- `artifacts/magazzino-solidale/e2e/m4a-documenti-destinatari.spec.ts`
+- `artifacts/magazzino-solidale/src/components/documento-operativo.tsx`
+- `artifacts/magazzino-solidale/src/components/ente-destinatario-combobox.tsx`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/entiEsterni.ts`
+- `artifacts/magazzino-solidale/src/pages/enti-esterni.tsx`
+- `docs/campagna-bug-2026-10.md`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/enteDestinatario.ts`
+- `lib/api-zod/src/generated/types/enteDestinatarioInput.ts`
+- `lib/api-zod/src/generated/types/index.ts`
+- `lib/api-zod/src/generated/types/listEntiDestinatariParams.ts`
+- `lib/db/src/schema/entiDestinatari.ts`
+- `artifacts/api-server/src/lib/entiScope.ts`
+- `artifacts/magazzino-solidale/src/pages/enti-esterni.test.tsx`
+- `lib/api-zod/src/generated/types/listEntiDestinatariAmbito.ts`
+- `lib/db/updates/20261019_z_enti_destinatari_globali.sql`

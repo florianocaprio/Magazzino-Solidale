@@ -307,7 +307,7 @@ export function CreaiBollaDialog({
   const [enteId, setEnteId] = useState("");
   const [selectedEnte, setSelectedEnte] = useState<{
     denominazione: string;
-    areaOperativaId: number;
+    areaOperativaId: number | null;
   } | null>(null);
   const [enteSearch, setEnteSearch] = useState("");
   const [debouncedEnteSearch, setDebouncedEnteSearch] = useState("");
@@ -387,8 +387,16 @@ export function CreaiBollaDialog({
       ? { centroAscoltoId: selectedBenef.centroAscoltoId }
       : undefined;
   const { data: magazzini } = useListMagazzini();
+  const enteContextArea = magazzini?.find((m) => String(m.id) === magazzinoId)?.areaOperativaId ??
+    (initialAreaId && initialAreaId !== "all" ? Number(initialAreaId) : user?.areaOperativaId);
+  useEffect(() => {
+    if (selectedEnte?.areaOperativaId != null && enteContextArea != null && selectedEnte.areaOperativaId !== enteContextArea) {
+      setEnteId(""); setSelectedEnte(null);
+    }
+  }, [enteContextArea, selectedEnte]);
   const enteParams = {
     limit: 50,
+    ...(enteContextArea != null ? { areaOperativaId: enteContextArea } : {}),
     ...(debouncedEnteSearch.length >= 2 ? { search: debouncedEnteSearch } : {}),
   };
   const enteSearchReady =
@@ -526,7 +534,7 @@ export function CreaiBollaDialog({
     }
     if (
       tipoDestinatario === "ente" &&
-      selectedEnte &&
+      selectedEnte?.areaOperativaId != null &&
       chosenWarehouse?.areaOperativaId !== selectedEnte.areaOperativaId
     ) {
       setCreateError(t("entiEsterni.areaMismatch"));
@@ -736,7 +744,7 @@ export function CreaiBollaDialog({
                   setSelectedEnte(ente);
                   setCreateError("");
                   if (
-                    magazzinoId &&
+                    ente.areaOperativaId != null && magazzinoId &&
                     magazzini?.find((item) => String(item.id) === magazzinoId)
                       ?.areaOperativaId !== ente.areaOperativaId
                   )
@@ -745,7 +753,7 @@ export function CreaiBollaDialog({
                 searchValue={enteSearch}
                 onSearchChange={setEnteSearch}
                 areaNames={enteAreaNames}
-                selectedLabel={selectedEnte?.denominazione}
+                selectedLabel={selectedEnte ? `${selectedEnte.denominazione} · ${selectedEnte.areaOperativaId == null ? t("entiEsterni.global") : enteAreaNames.get(selectedEnte.areaOperativaId) ?? selectedEnte.areaOperativaId}` : undefined}
               />
             </div>
           )}
@@ -765,7 +773,7 @@ export function CreaiBollaDialog({
                         initialAreaId === "all" ||
                         String(m.areaOperativaId) === initialAreaId) &&
                       (tipoDestinatario !== "ente" ||
-                        !selectedEnte ||
+                        selectedEnte?.areaOperativaId == null ||
                         m.areaOperativaId === selectedEnte.areaOperativaId),
                   )
                   .map((m) => (

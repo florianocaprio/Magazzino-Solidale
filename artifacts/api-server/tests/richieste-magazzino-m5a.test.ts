@@ -390,13 +390,13 @@ describe("M5A — Richiesta Magazzino reale su PostgreSQL isolato", () => {
     ).rejects.toThrow();
   });
 
-  it("limita Ente/Magazzino ai profili operativi e non espone il dossier al Magazzino", async () => {
+  it.each([false, true])("limita Ente/Magazzino ai profili operativi (globale=%s) senza esporre il dossier", async (globalEntity) => {
     const [entity] = await db
       .insert(entiDestinatariTable)
       .values({
         denominazione: "Ente test",
         indirizzo: "Sede",
-        areaOperativaId: areaA,
+        areaOperativaId: globalEntity ? null : areaA,
       })
       .returning({ id: entiDestinatariTable.id });
     scope.enteDestinatarioIds.push(entity.id);
@@ -443,6 +443,13 @@ describe("M5A — Richiesta Magazzino reale su PostgreSQL isolato", () => {
     expect(detail.body).not.toHaveProperty("codiceFiscale");
     expect(detail.body).not.toHaveProperty("noteInterne");
     expect(detail.body).not.toHaveProperty("materiali");
+    if (globalEntity) {
+      const warehouseB = await user(areaB, null, ["magazzino"], ["richieste_magazzino.view", "richieste_magazzino.create", "enti-destinatari.view"]);
+      const other = await request(app(warehouseB)).post("/richieste-magazzino").send({ ...payload, idempotencyKey: key(), areaOperativaId: areaB });
+      expect(other.status, other.text).toBe(201);
+      expect((await request(app(warehouseA)).get(`/richieste-magazzino/${other.body.id}`)).status).toBe(404);
+      expect((await request(app(warehouseB)).get(`/richieste-magazzino/${created.body.id}`)).status).toBe(404);
+    }
     const warehouseId = await createMagazzino(scope, null, {
       areaOperativaId: areaA,
     });

@@ -6154,6 +6154,13 @@ paths:
       operationId: listEntiDestinatari
       tags: [bolle]
       parameters:
+        - name: areaOperativaId
+          in: query
+          description: Enti dell’Area e globali; intersecato con l’Area del profilo.
+          schema: { type: integer, minimum: 1 }
+        - name: ambito
+          in: query
+          schema: { type: string, enum: [tutti, globali], default: tutti }
         - { name: attivo, in: query, schema: { type: boolean, default: true } }
         - {
             name: search,
@@ -19910,7 +19917,7 @@ components:
         indirizzo: { type: string, maxLength: 250 }
         telefono: { type: ["string", "null"], maxLength: 50 }
         email: { type: ["string", "null"], maxLength: 200 }
-        areaOperativaId: { type: integer }
+        areaOperativaId: { type: ["integer", "null"], description: "NULL per gli Enti globali; ID Area per i territoriali. Ambito immutabile dopo la creazione." }
         attivo: { type: boolean }
         versione: { type: integer, minimum: 1 }
         dataCreazione: { type: string, format: date-time }
@@ -19925,7 +19932,7 @@ components:
         indirizzo: { type: string, minLength: 1, maxLength: 250 }
         telefono: { type: ["string", "null"], maxLength: 50 }
         email: { type: ["string", "null"], maxLength: 200 }
-        areaOperativaId: { type: integer, minimum: 1 }
+        areaOperativaId: { type: ["integer", "null"], minimum: 1, description: "Area richiesta per i territoriali; NULL esplicito per un globale, riservato all’amministratore globale." }
 
     EnteDestinatarioUpdate:
       type: object

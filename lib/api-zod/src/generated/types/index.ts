@@ -479,6 +479,7 @@ export * from "./listDocumentiOperativiSortBy";
 export * from "./listDocumentiOperativiSortDirection";
 export * from "./listDocumentiOperativiTipoAggregato";
 export * from "./listEccezioniMensaParams";
+export * from "./listEntiDestinatariAmbito";
 export * from "./listEntiDestinatariParams";
 export * from "./listFornitoriParams";
 export * from "./listFseAdministrativeSourcesParams";

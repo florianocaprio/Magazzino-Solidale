@@ -14628,6 +14628,7 @@ export const GetEsitoRettificaSpesaEmporioResponse = zod.object({
   }),
 });
 
+export const listEntiDestinatariQueryAmbitoDefault = `tutti`;
 export const listEntiDestinatariQueryAttivoDefault = true;
 export const listEntiDestinatariQuerySearchMin = 2;
 export const listEntiDestinatariQuerySearchMax = 100;
@@ -14639,6 +14640,14 @@ export const listEntiDestinatariQueryOffsetDefault = 0;
 export const listEntiDestinatariQueryOffsetMin = 0;
 
 export const ListEntiDestinatariQueryParams = zod.object({
+  areaOperativaId: zod.coerce
+    .number()
+    .min(1)
+    .optional()
+    .describe("Enti dell’Area e globali; intersecato con l’Area del profilo."),
+  ambito: zod
+    .enum(["tutti", "globali"])
+    .default(listEntiDestinatariQueryAmbitoDefault),
   attivo: zod.coerce.boolean().default(listEntiDestinatariQueryAttivoDefault),
   search: zod.coerce
     .string()
@@ -14673,7 +14682,12 @@ export const ListEntiDestinatariResponseItem = zod.object({
   indirizzo: zod.string().max(listEntiDestinatariResponseIndirizzoMax),
   telefono: zod.string().max(listEntiDestinatariResponseTelefonoMax).nullish(),
   email: zod.string().max(listEntiDestinatariResponseEmailMax).nullish(),
-  areaOperativaId: zod.number(),
+  areaOperativaId: zod
+    .number()
+    .nullable()
+    .describe(
+      "NULL per gli Enti globali; ID Area per i territoriali. Ambito immutabile dopo la creazione.",
+    ),
   attivo: zod.boolean(),
   versione: zod.number().min(1),
   dataCreazione: zod.coerce.date(),
@@ -14705,7 +14719,13 @@ export const CreateEnteDestinatarioBody = zod.object({
   indirizzo: zod.string().min(1).max(createEnteDestinatarioBodyIndirizzoMax),
   telefono: zod.string().max(createEnteDestinatarioBodyTelefonoMax).nullish(),
   email: zod.string().max(createEnteDestinatarioBodyEmailMax).nullish(),
-  areaOperativaId: zod.number().min(1),
+  areaOperativaId: zod
+    .number()
+    .min(1)
+    .nullable()
+    .describe(
+      "Area richiesta per i territoriali; NULL esplicito per un globale, riservato all’amministratore globale.",
+    ),
 });
 
 export const UpdateEnteDestinatarioParams = zod.object({
@@ -14762,7 +14782,12 @@ export const UpdateEnteDestinatarioResponse = zod.object({
     .max(updateEnteDestinatarioResponseTelefonoMax)
     .nullish(),
   email: zod.string().max(updateEnteDestinatarioResponseEmailMax).nullish(),
-  areaOperativaId: zod.number(),
+  areaOperativaId: zod
+    .number()
+    .nullable()
+    .describe(
+      "NULL per gli Enti globali; ID Area per i territoriali. Ambito immutabile dopo la creazione.",
+    ),
   attivo: zod.boolean(),
   versione: zod.number().min(1),
   dataCreazione: zod.coerce.date(),

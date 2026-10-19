@@ -38,7 +38,9 @@ export function EnteDestinatarioCombobox({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const selected = items.find((item) => String(item.id) === value);
-  const label = selected?.denominazione ?? selectedLabel;
+  const scopeLabel = (item: EnteDestinatario) => item.areaOperativaId == null
+    ? t("entiEsterni.global") : areaNames.get(item.areaOperativaId) ?? item.areaOperativaId;
+  const label = selected ? `${selected.denominazione} · ${scopeLabel(selected)}` : selectedLabel;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -90,8 +92,7 @@ export function EnteDestinatarioCombobox({
                   />
                   <span className="truncate">
                     {item.denominazione} · {item.indirizzo} ·{" "}
-                    {areaNames.get(item.areaOperativaId) ??
-                      item.areaOperativaId}
+                    {scopeLabel(item)}
                   </span>
                 </CommandItem>
               ))}

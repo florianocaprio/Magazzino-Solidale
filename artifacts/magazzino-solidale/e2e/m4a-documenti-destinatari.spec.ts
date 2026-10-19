@@ -224,6 +224,35 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     await login(page);
   });
 
+  test("BUG17: crea un Ente globale dalla UI, filtra e mantiene territoriale la Bolla", async ({ page }) => {
+    const fixtures = await loadDemoFixtures(page);
+    const name = `Globale BUG17 ${runSuffix}`;
+    await page.goto("/enti-esterni");
+    await page.getByRole("button", { name: "Nuovo Ente", exact: true }).click();
+    const form = page.getByRole("dialog");
+    await selectOption(page, form.getByRole("combobox"), "Globale");
+    await form.getByLabel("Denominazione", { exact: true }).fill(name);
+    await form.getByLabel("Indirizzo", { exact: true }).fill("Via sintetica globale 1");
+    const saved = page.waitForResponse((r) => r.url().endsWith("/api/enti-destinatari") && r.request().method() === "POST");
+    await form.getByRole("button", { name: /salva/i }).click();
+    const entity = await expectJson<Ente & { areaOperativaId: null }>(await saved, 201);
+    expect(entity.areaOperativaId).toBeNull();
+    await expect(form).toBeHidden();
+    await selectOption(page, page.getByRole("combobox"), "Solo globali");
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+    const dialog = await openCreateBollaDialog(page);
+    await selectOption(page, dialog.getByRole("combobox").first(), "Ente esterno");
+    await selectOption(page, dialog.getByRole("combobox", { name: /magazzino di uscita/i }), fixtures.origin.nome);
+    await dialog.getByRole("combobox").filter({ hasText: /seleziona ente/i }).click();
+    await page.getByPlaceholder(/cerca per denominazione/i).fill(name);
+    await page.getByRole("option", { name: new RegExp(`${name}.*Globale`) }).click();
+    await expect(dialog.getByRole("combobox", { name: /magazzino di uscita/i })).toContainText(fixtures.origin.nome);
+    const created = page.waitForResponse((r) => r.url().endsWith("/api/bolle") && r.request().method() === "POST");
+    await dialog.getByRole("button", { name: /crea bolla/i }).click();
+    const document = await expectJson<{ areaOperativaIdSnapshot: number }>(await created, 201);
+    expect(document.areaOperativaIdSnapshot).toBe(fixtures.origin.areaOperativaId);
+  });
+
   test("Beneficiario: una risposta persa conserva payload/key, crea una sola bozza e la riprende dopo login", async ({
     page,
   }) => {

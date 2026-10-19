@@ -21,7 +21,6 @@ export const entiDestinatariTable = pgTable(
     telefono: varchar("telefono", { length: 50 }),
     email: varchar("email", { length: 200 }),
     areaOperativaId: integer("area_operativa_id")
-      .notNull()
       .references(() => areeOperativeTable.id, { onDelete: "restrict" }),
     attivo: boolean("attivo").notNull().default(true),
     versione: integer("versione").notNull().default(1),

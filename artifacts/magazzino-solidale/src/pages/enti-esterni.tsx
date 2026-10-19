@@ -54,6 +54,10 @@ export default function EntiEsterni() {
   const intents = useCommandIntentRegistry();
   const create = useCreateEnteDestinatario();
   const update = useUpdateEnteDestinatario();
+  const globalAdmin = Boolean(user?.isAdmin && user.areaOperativaId == null);
+  const [areaFilter, setAreaFilter] = useState(
+    String(user?.areaOperativaId ?? "all"),
+  );
   const canManage =
     hasPermission("enti-destinatari.manage") &&
     (user?.isAdmin ||
@@ -78,6 +82,11 @@ export default function EntiEsterni() {
     attivo: false,
     limit: 50,
     offset,
+    ...(areaFilter === "global"
+      ? { ambito: "globali" as const }
+      : areaFilter !== "all"
+        ? { areaOperativaId: Number(areaFilter) }
+        : {}),
     ...(debouncedSearch.length >= 2 ? { search: debouncedSearch } : {}),
   };
   const searchReady =
@@ -106,26 +115,31 @@ export default function EntiEsterni() {
       indirizzo: item.indirizzo,
       telefono: item.telefono ?? "",
       email: item.email ?? "",
-      areaOperativaId: String(item.areaOperativaId),
+      areaOperativaId:
+        item.areaOperativaId == null ? "global" : String(item.areaOperativaId),
     });
     setError("");
     setOpen(true);
   };
-  const invalidate = () =>
-    queryClient.invalidateQueries({
+  const invalidate = () => {
+    setOffset(0);
+    return queryClient.invalidateQueries({
       queryKey: getListEntiDestinatariQueryKey(),
     });
+  };
   const save = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
-    const areaOperativaId = user?.isAdmin
-      ? Number(form.areaOperativaId)
+    const areaOperativaId = globalAdmin
+      ? form.areaOperativaId === "global"
+        ? null
+        : Number(form.areaOperativaId)
       : user?.areaOperativaId;
     if (
       !form.denominazione.trim() ||
       !form.indirizzo.trim() ||
-      !areaOperativaId ||
-      !Number.isSafeInteger(areaOperativaId)
+      (areaOperativaId !== null &&
+        (!areaOperativaId || !Number.isSafeInteger(areaOperativaId)))
     ) {
       setError(t("entiEsterni.required"));
       return;
@@ -188,6 +202,39 @@ export default function EntiEsterni() {
           <Button onClick={beginCreate}>{t("entiEsterni.new")}</Button>
         )}
       </header>
+      <div className="space-y-1">
+        <Label htmlFor="enti-area-filter">{t("entiEsterni.areaFilter")}</Label>
+        <Select
+          value={areaFilter}
+          onValueChange={(value) => {
+            setAreaFilter(value);
+            setOffset(0);
+          }}
+        >
+          <SelectTrigger id="enti-area-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {user?.areaOperativaId == null && (
+              <SelectItem value="all">{t("entiEsterni.allAreas")}</SelectItem>
+            )}
+            <SelectItem value="global">
+              {t("entiEsterni.onlyGlobal")}
+            </SelectItem>
+            {areas
+              ?.filter(
+                (area) =>
+                  user?.areaOperativaId == null ||
+                  area.id === user.areaOperativaId,
+              )
+              .map((area) => (
+                <SelectItem key={area.id} value={String(area.id)}>
+                  {area.nome} · {t("entiEsterni.withGlobal")}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+      </div>
       <Label htmlFor="enti-search">{t("entiEsterni.search")}</Label>
       <Input
         id="enti-search"
@@ -217,7 +264,10 @@ export default function EntiEsterni() {
                 <p className="font-medium">{item.denominazione}</p>
                 <p className="text-sm text-muted-foreground">
                   {item.indirizzo} ·{" "}
-                  {areaNames.get(item.areaOperativaId) ?? item.areaOperativaId}
+                  {item.areaOperativaId == null
+                    ? t("entiEsterni.global")
+                    : (areaNames.get(item.areaOperativaId) ??
+                      item.areaOperativaId)}
                   {item.telefono ? ` · ${item.telefono}` : ""}
                   {item.email ? ` · ${item.email}` : ""}
                 </p>
@@ -227,7 +277,7 @@ export default function EntiEsterni() {
                     : t("entiEsterni.inactive")}
                 </p>
               </div>
-              {canManage && (
+              {canManage && (item.areaOperativaId != null || globalAdmin) && (
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => beginEdit(item)}>
                     {t("entiEsterni.edit")}
@@ -272,6 +322,37 @@ export default function EntiEsterni() {
             </DialogTitle>
           </DialogHeader>
           <form className="space-y-3" onSubmit={save}>
+            <Label>{t("entiEsterni.area")}</Label>
+            {globalAdmin && !editing ? (
+              <Select
+                value={form.areaOperativaId}
+                onValueChange={(value) => setField("areaOperativaId", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("entiEsterni.chooseArea")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="global">
+                    {t("entiEsterni.global")}
+                  </SelectItem>
+                  {areas
+                    ?.filter((area) => area.attivo)
+                    .map((area) => (
+                      <SelectItem key={area.id} value={String(area.id)}>
+                        {area.nome}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="text-sm">
+                {form.areaOperativaId === "global"
+                  ? t("entiEsterni.global")
+                  : (areaNames.get(Number(form.areaOperativaId)) ??
+                    form.areaOperativaId)}
+              </p>
+            )}
+
             <Label htmlFor="ente-name">{t("entiEsterni.name")}</Label>
             <Input
               id="ente-name"
@@ -305,29 +386,6 @@ export default function EntiEsterni() {
               onChange={(event) => setField("email", event.target.value)}
               maxLength={200}
             />
-            <Label>{t("entiEsterni.area")}</Label>
-            {user?.isAdmin && !editing ? (
-              <Select
-                value={form.areaOperativaId}
-                onValueChange={(value) => setField("areaOperativaId", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("entiEsterni.chooseArea")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {areas?.map((area) => (
-                    <SelectItem key={area.id} value={String(area.id)}>
-                      {area.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <p className="text-sm">
-                {areaNames.get(Number(form.areaOperativaId)) ??
-                  form.areaOperativaId}
-              </p>
-            )}
             {error && (
               <p role="alert" className="text-sm text-destructive">
                 {error}

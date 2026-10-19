@@ -7532,7 +7532,11 @@ export interface EnteDestinatario {
    * @nullable
    */
   email?: string | null;
-  areaOperativaId: number;
+  /**
+   * NULL per gli Enti globali; ID Area per i territoriali. Ambito immutabile dopo la creazione.
+   * @nullable
+   */
+  areaOperativaId: number | null;
   attivo: boolean;
   /** @minimum 1 */
   versione: number;
@@ -7566,8 +7570,12 @@ export interface EnteDestinatarioInput {
    * @nullable
    */
   email?: string | null;
-  /** @minimum 1 */
-  areaOperativaId: number;
+  /**
+   * Area richiesta per i territoriali; NULL esplicito per un globale, riservato all’amministratore globale.
+   * @minimum 1
+   * @nullable
+   */
+  areaOperativaId: number | null;
 }
 
 export interface EnteDestinatarioUpdate {
@@ -11715,6 +11723,12 @@ export type ListSpeseEmporioParams = {
 };
 
 export type ListEntiDestinatariParams = {
+  /**
+   * Enti dell’Area e globali; intersecato con l’Area del profilo.
+   * @minimum 1
+   */
+  areaOperativaId?: number;
+  ambito?: ListEntiDestinatariAmbito;
   attivo?: boolean;
   /**
    * Ricerca case-insensitive su denominazione, indirizzo, telefono ed email
@@ -11732,6 +11746,14 @@ export type ListEntiDestinatariParams = {
    */
   offset?: number;
 };
+
+export type ListEntiDestinatariAmbito =
+  (typeof ListEntiDestinatariAmbito)[keyof typeof ListEntiDestinatariAmbito];
+
+export const ListEntiDestinatariAmbito = {
+  tutti: "tutti",
+  globali: "globali",
+} as const;
 
 export type ListDocumentiOperativiParams = {
   tipoAggregato?: ListDocumentiOperativiTipoAggregato;

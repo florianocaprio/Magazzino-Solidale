@@ -1,3 +1,4 @@
+import { enteMatchesArea } from "../lib/entiScope";
 import { volunteerMatchesCentre, volunteerAreaFilter, volunteerContextFilter } from "../lib/volontariArea";
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
@@ -1152,7 +1153,7 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
     res.status(400).json({ error: "Ente destinatario non trovato" });
     return;
   }
-  if (ente && ente.areaOperativaId !== magazzino.areaOperativaId) {
+  if (ente && !enteMatchesArea(ente, magazzino.areaOperativaId)) {
     res.status(400).json({
       error: "Ente e Magazzino devono appartenere alla stessa Area Operativa",
     });
@@ -1433,7 +1434,7 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
         if (
           !lockedEnte ||
           !lockedEnte.attivo ||
-          lockedEnte.areaOperativaId !== lockedMagazzino.areaOperativaId
+          !enteMatchesArea(lockedEnte, lockedMagazzino.areaOperativaId)
         ) {
           throw new BollaActionError(
             409,
@@ -2063,14 +2064,14 @@ router.patch(
           if (
             !lockedEnte ||
             !lockedEnte.attivo ||
-            lockedEnte.areaOperativaId !== lockedMagazzino.areaOperativaId
+            !enteMatchesArea(lockedEnte, lockedMagazzino.areaOperativaId)
           ) {
             throw new BollaActionError(
               409,
               "L'Ente destinatario non è più attivo o coerente con il Magazzino",
             );
           }
-          areaOperativaIdSnapshot = lockedEnte.areaOperativaId;
+          areaOperativaIdSnapshot = lockedMagazzino.areaOperativaId;
         } else {
           if (nextVolontarioId != null) {
             const [lockedVolontario] = await tx
@@ -2816,7 +2817,7 @@ router.post(
           current.tipoDestinatario === "ente" &&
           (!enteDaCongelare ||
             !enteDaCongelare.attivo ||
-            enteDaCongelare.areaOperativaId !== current.areaOperativaIdSnapshot)
+            !enteMatchesArea(enteDaCongelare, current.areaOperativaIdSnapshot))
         ) {
           throw new BollaActionError(
             409,

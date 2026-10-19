@@ -1,3 +1,4 @@
+import { enteMatchesArea } from "../lib/entiScope";
 import { operationalCentroId } from "../lib/serviceScope";
 import {
   Router,
@@ -359,7 +360,7 @@ export async function requireLiveSubject(
       .from(entiDestinatariTable)
       .where(eq(entiDestinatariTable.id, row.enteDestinatarioId!))
       .for("share");
-    if (!entity?.attivo || entity.areaOperativaId !== row.areaOperativaId)
+    if (!entity?.attivo || !enteMatchesArea(entity, row.areaOperativaId))
       throw conflict("Ente destinatario non più operativo nell'Area");
   } else {
     const [warehouse] = await tx
@@ -655,7 +656,7 @@ async function buildCreate(
       .from(entiDestinatariTable)
       .where(eq(entiDestinatariTable.id, input.enteDestinatarioId))
       .for("share");
-    if (!entity?.attivo || entity.areaOperativaId !== input.areaOperativaId)
+    if (!entity?.attivo || !enteMatchesArea(entity, input.areaOperativaId))
       throw missing();
     const [area] = await tx
       .select({
