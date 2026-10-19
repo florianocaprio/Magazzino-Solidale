@@ -123,7 +123,7 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 14  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 15  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 16  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 17 | C | 03, 04 | CHECKPOINT 03 PRONTO PER ##test | Nessuno; Enti destinatari globali, Fornitori invariati; UAT dopo 04 | 451a21b86ca2b67e0ea8b61a6fc14a78dd093ced | PASS mirati; skip dichiarati nella ricevuta | DA ESEGUIRE dopo 04 | 451a21b86ca2b67e0ea8b61a6fc14a78dd093ced |
+| 17 | C | 03, 04 | CHECKPOINT 03 PRONTO PER ##test | Nessuno; Enti e Fornitori locali/globali; UAT dopo 04 | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 | PASS mirati; skip dichiarati nella ricevuta | DA ESEGUIRE dopo 04 | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 |
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 19  | E      | 07     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 20  | F      | 08     | DA SVILUPPARE             | Nessuno; conservare UX20-01–14                                 | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -139,7 +139,7 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | -------- | ----------------------------- | --------------- | ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------- |
 | 01 | A: 01 | Funzionale | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 | PASS; ultimi controlli 737 UI e 76 API core | Installata e verificata | CHIUSA; OK UAT Floriano 19/10 |
 | 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | CHIUSA; OK UAT Floriano 19/10 |
-| 03 | C: 17, prima parte | Tecnica | 451a21b86ca2b67e0ea8b61a6fc14a78dd093ced | PASS: 1.513 API + 4 skip; 756 UI; 8 browser + 32 skip di matrice; build/budget | Installata, asset HTTP verificati; ledger 60/60 | Checkpoint pronto per ##test; UAT integrata dopo 04 |
+| 03 | C: 17, prima parte | Tecnica | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 | PASS: 1.521 API + 4 skip; 756 UI; 9 browser + 36 skip di matrice; build/budget | Installata, asset HTTP verificati; ledger 60/60 | Checkpoint pronto per ##test; UAT integrata dopo 04 |
 | 04       | C: 05–09 e regressione 17     | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 05       | D: 04, 10–14, 16              | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 06       | E: 18, modello e integrazioni | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
@@ -1579,3 +1579,67 @@ progetto. Le prime due esecuzioni si sono fermate sulla preparazione della
 seconda Area assente nel demo e sull'aspettativa di un messaggio diverso dal
 validatore comune; corrette le precondizioni e l'asserzione, senza rimuovere
 le verifiche di isolamento. Lo stato finale è verificato dalla nuova esecuzione.
+
+
+### Ricevuta — Fornitori locali/globali ripristinati e 8082 ricompilata
+
+Checkpoint installato **`ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084`**. Fornitori e Donatori ora espongono una scelta
+Globale esplicita nel form; in alternativa occorre un'Area locale. Il tag
+Globale rimane in modifica e salvataggio. Stessi filtri degli Enti: tutti /
+solo globali / Area inclusi globali. Nei carichi sono disponibili automaticamente
+fornitori attivi dell'Area e globali, con indicazione Globale nel selettore.
+Il Fornitore resta distinto dall'Ente destinatario; nessun intervento al form
+Bolla né all'anagrafica Enti Esterni di questo checkpoint.
+
+- Installazione `CI=true pnpm install --frozen-lockfile`: PASS, lockfile invariato.
+- Codegen ufficiale `pnpm --filter @workspace/api-spec run codegen`: PASS.
+  Nuovo parametro facoltativo `ambito` per GET `/fornitori`; payload di
+  scrittura invariati, nessuna nuova migrazione.
+- `pnpm run typecheck`: PASS sullo stato finale.
+- Suite UI **756 PASS / 119 file**, ripetuta dopo l'ultimo riuso della validazione
+  comune. Evidenze `/private/tmp/fornitori04-typecheck.log` e
+  `/private/tmp/fornitori04-ui.log`.
+- Runner canonico `api general`: **1.521 PASS + 4 SKIP**, 139 file; otto nuove
+  prove su filtri, scoping, query malformate, lettura/gestione globale e creazione
+  territoriale. Runner PostgreSQL **24 PASS**, fresh/replay/finale **60/60**.
+  Evidenze `/private/tmp/fornitori04-api`. I file API, OpenAPI e generati non
+  cambiano dopo questa esecuzione; le ultime modifiche sono soltanto UI/test.
+- Runner canonico `browser m4a-documenti-destinatari.spec.ts`: **9 PASS +
+  36 SKIP** intenzionali delle repliche non desktop dei lifecycle mutativi.
+  Evidenze finali `/private/tmp/fornitori04-browser-r3`. Primo caso: due Aree
+  sintetiche, validazione Area, creazione UI locale e globale, persistenza NULL,
+  tag mantenuto dopo modifica, filtro globali senza locali, Area con globali,
+  tutti con locali di entrambe le Aree, selezione globale nei carichi di due
+  Aree con esclusione dei locali dell'altra. Altri otto casi: Enti globali e
+  Bolle, Beneficiario, retry/idempotenza, prenotazioni, PDF, snapshot,
+  Trasferimenti e scelta lotto fisico. Nessuna asserzione di isolamento saltata.
+- API/browser eseguiti in sequenza con lock su DB temporanei attestati e soli
+  dati sintetici; cleanup completato. I suffissi temporanei `fornitori04-*`
+  identificano queste evidenze e non un avvio del prompt 04.
+- API e WEB ricostruite dall'archivio Git della SHA installata. Budget entry
+  **399,8/400 KiB gzip**, soglia invariata; `index-BLMZBofc.js`.
+
+Backup DB completo/uploads con SHA-256 e indici degli archivi verificati:
+`/Users/florianocaprio/Backups/Magazzino-Solidale/FORNITORI-GLOBALI-ef65e5e4b5a2-2026-10-19T17-40-38-213Z`.
+`restoreTested=false` per questo backup senza modifiche di schema; nessun nuovo
+ripristino dichiarato. Ledger personale prima/dopo **60/60**, zero pending,
+checksum difformi, file mancanti o fuori ordine. Ricreati solo API e WEB dopo
+confronto Compose; PostgreSQL mantiene container, avvio e volumi DB/uploads.
+Impronte identiche al backup per Fornitori, Enti, Bolle, Richieste, lotti,
+movimenti, prenotazioni e audit. Nessuna verifica funzionale sui dati personali.
+
+- API `magazzino-bugfix-uat-api:sha-ef65e5e4b5a2`, image ID `sha256:0913fafd43ec12f622e797eb01a73dd8e6ca88dbec5a4697ff1dbd30cc28a5b2`.
+- WEB `magazzino-bugfix-uat-web:sha-ef65e5e4b5a2`, image ID `sha256:77e878b40a08148503706952ba30940372eecb88d6defc1b39f99ede757a3a73`.
+- Revisioni immagini/container uguali al checkpoint; API healthy.
+- HTTP root/config/healthz/readyz **200**, Utenti senza sessione **401**.
+- SHA-256 dei contenuti HTTP uguali ai file della build per:
+  `fornitori-0ADIYtwT.js`, `carico-merce-D2M4wRY5.js`,
+  `enti-esterni-Bea6E33H.js` e `documento-operativo-C9JzQpMC.js`. Nei Fornitori verificati anche
+  controllo `fornitore-global` e filtro `fornitori.onlyGlobal`; nei carichi
+  etichetta Globale; nel documento operativo assenza del pulsante Solo globali.
+
+Prova personale: `http://localhost:8082/fornitori`, ricaricare con ⌘⇧R.
+Admin globale → Nuovo Fornitore → scegliere Area locale oppure Globale.
+Verificare tag, modifica, tre filtri e disponibilità nei carichi. Nessuna fase
+04, merge, main o produzione avviata. Consegna 02 resta chiusa; quattro
+file documentali locali preesistenti esclusi dai commit.
