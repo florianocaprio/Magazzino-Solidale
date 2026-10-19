@@ -1,4 +1,5 @@
-import { createHash, randomInt } from "node:crypto";
+import { allocateBeneficiaryCode } from "../lib/beneficiariCodice";
+import { createHash } from "node:crypto";
 import express, { Router, type IRouter, type Request } from "express";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
@@ -300,17 +301,6 @@ function parseResolutions(value: unknown): {
     map.set(numeroRiga, { numeroRiga, azione, beneficiarioId });
   }
   return { map };
-}
-
-async function uniqueBeneficiarioCode() {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    const codice = `BEN-${String(randomInt(0, 10_000_000_000_000)).padStart(13, "0")}`;
-    const [hit] = await db.select({ id: beneficiariTable.id })
-      .from(beneficiariTable)
-      .where(eq(beneficiariTable.codice, codice));
-    if (!hit) return codice;
-  }
-  throw new Error("Impossibile generare un codice beneficiario univoco");
 }
 
 function snapshotValues(row: FseBeneficiariRow, batchId: number) {
@@ -924,7 +914,7 @@ router.post(
           } else {
             const mono = row.numeroComponenti === 1;
             const [created] = await tx.insert(beneficiariTable).values({
-              codice: await uniqueBeneficiarioCode(),
+              codice: await allocateBeneficiaryCode(tx, scoped.centro.areaOperativaId),
               nome: row.nome,
               cognome: row.cognome,
               statoAnagrafica: "provvisoria",

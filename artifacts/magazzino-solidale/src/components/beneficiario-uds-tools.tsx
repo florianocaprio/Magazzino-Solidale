@@ -151,7 +151,8 @@ export function TesseraDocumentoSection({
       const { branding, logoDataUrl } = await loadTesseraBrandingForPdf();
       await generateTesseraPdf({
         beneficiario: {
-          codice: stored.codice,
+          codice: b.codice,
+          codiceTessera: stored.codice,
           nome: b.nome,
           cognome: b.cognome,
           codiceFiscale: b.codiceFiscale,

@@ -335,7 +335,7 @@ describe("Tessera trasversale dal dettaglio beneficiario", () => {
     await act(async () => buttonByText("blocco04.cardDownload")?.click());
     expect(recoverCard).toHaveBeenCalledTimes(2);
     expect(recoverCard).toHaveBeenLastCalledWith({ id: 42 });
-    expect(pdf).toHaveBeenLastCalledWith(expect.objectContaining({ beneficiario: expect.objectContaining({ codice: card.codice }), dataEmissione: card.dataEmissione }));
+    expect(pdf).toHaveBeenLastCalledWith(expect.objectContaining({ beneficiario: expect.objectContaining({ codice: "BEN-42", codiceTessera: card.codice }), dataEmissione: card.dataEmissione }));
     expect(createCardMutate).not.toHaveBeenCalled();
     await act(async () => buttonByText("beneficiarioDettaglio.editAnagrafica")?.click());
     expect(document.body.textContent).not.toContain("Abilita alla Mensa");

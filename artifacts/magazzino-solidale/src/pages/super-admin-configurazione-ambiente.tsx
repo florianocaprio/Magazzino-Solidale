@@ -1,3 +1,4 @@
+import { ConfigurazioneCodiciBeneficiari } from "@/components/configurazione-codici-beneficiari";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -470,6 +471,8 @@ export default function SuperAdminConfigurazioneAmbiente() {
           </div>
         </CardContent>
       </Card>
+
+      <ConfigurazioneCodiciBeneficiari />
 
       <Card>
         <CardHeader>

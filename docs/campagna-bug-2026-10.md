@@ -1864,3 +1864,117 @@ Esito tecnico della consegna 04: **PASS mirati e INSTALLATA sulla 8082**.
 **UAT personale ancora DA ESEGUIRE**: ricaricare `http://localhost:8082` con
 ⌘⇧R e svolgere la checklist sopra. Nessuna chiusura automatica dei BUG 05–09/21
 e nessun trasferimento dell'OK del punto 03 alla nuova UAT integrata.
+
+## Correttivo 04 — tessera e codici beneficiari configurabili, 19 ottobre 2026
+
+Richiesta diretta di Floriano dopo la stampa delle 23:16: separare la data dagli
+altri dati e configurare il codice automatico del beneficiario in Super Admin
+con la stessa interfaccia delle matricole volontari. Il blocco 04 rimane in UAT;
+nessuna attivazione del prompt 05.
+
+- **Stampa:** codice anagrafico leggibile al posto del token casuale nella riga
+  Codice. La data originale della tessera è a Y=36 mm, sotto a codice/CF; il logo
+  occupa al massimo gli ultimi 10 mm verticali. Adattamento del testo allo spazio.
+  QR e barcode continuano a contenere esattamente il token registrato, anche
+  legacy: nessuna riemissione o sostituzione implicita. Il barcode non ripete più
+  il token casuale come testo. Nome file derivato dal codice anagrafico.
+- **Super Admin → Configurazione ambiente → Codici automatici beneficiari:**
+  pannello accanto alle matricole permanenti, stessi controlli per prefisso,
+  codice Area (con fallback alla sigla), segmento, separatore, cifre, partenza e
+  ambito globale/per Area; anteprima durante la modifica e versione salvata.
+  Stato di caricamento/errore e salvataggio disabilitato finché la regola non è
+  disponibile. Accesso GET/PUT riservato ai Super Admin.
+- **Generazione:** applicata ai nuovi beneficiari senza codice manuale, compresi
+  creazione condivisa Sociale/UDS, bulk e import FSE. Default `BEN-000001`,
+  progressivo globale a sei cifre. Contatore e persona sono nella stessa
+  transazione; lock condiviso con il cambio regola, collisioni saltate e rollback
+  senza consumo del numero. Esaurimento gestito come conflitto esplicito.
+  Codici preesistenti, tessere e matricole volontari non vengono riscritti.
+- **Schema:** migration append-only `20261019_zz_codici_beneficiari.sql`, due
+  tabelle nuove (`configurazioni_codici_beneficiari` e
+  `progressivi_codici_beneficiari`), una configurazione iniziale e nessun nuovo
+  contatore fino alla prima creazione. Nessuna modifica alle colonne esistenti:
+  il codice resta entro 20 caratteri, validazione preventiva che riserva fino a
+  otto caratteri al codice Area. Upgrade ledger atteso 60→61.
+- **Contratto:** GET/PUT `/super-admin/configurazione-codici-beneficiari`, DTO
+  dedicati OpenAPI e client/Zod rigenerati soltanto dal comando ufficiale.
+  Nessuna modifica ai contratti di scansione, ai token o alle autorizzazioni Bolle.
+
+Verifiche eseguite:
+
+- `pnpm install --frozen-lockfile`, codegen ufficiale e `pnpm run typecheck`: PASS.
+- Runner API canonico, database Docker temporanei attestati e rimossi, gruppi
+  core/general/mensa/emporio: **1.945 PASS**, quattro SKIP preesistenti per file
+  originali AGEA/FSE non disponibili. Inclusi sette test nuovi per RBAC,
+  versioni/audit, indipendenza volontari, concorrenza, perimetro Area, collisioni,
+  lunghezza, rollback e progressivo esaurito. Evidenze private
+  `/private/tmp/tessera-api-1`.
+- UI: **768 PASS in 121 file**. Dopo il collegamento accessibile delle etichette,
+  ripetuti i tre file coinvolti: **9 PASS**. Verificati codice umano/token
+  distinti, data originale più in basso, compatibilità legacy, anteprima,
+  payload della configurazione e gestione del caricamento fallito.
+- Nessuna suite funzionale eseguita sul database personale 8082. Quattro file
+  documentali locali preesistenti conservati, esclusi dai commit e confrontati
+  per SHA-256.
+
+Prova manuale sulla 8082:
+
+1. In Super Admin → Configurazione ambiente, aprire **Codici automatici
+   beneficiari**, configurare ad esempio prefisso `AIM`, codice Area attivo,
+   segmento `B`, cinque cifre e progressivo per Area. Salvare la nuova versione.
+2. Creare un nuovo beneficiario senza codice manuale: verificare la regola scelta
+   e il progressivo successivo sulla seconda persona. I codici precedenti non
+   cambiano quando si salva una regola.
+3. Scaricare la tessera: verificare codice leggibile e data sotto ai dati, senza
+   sovrapposizioni; ristampare e verificare stessa data e stessa tessera. Provare
+   la scansione della tessera precedente: la regola anagrafica non la invalida.
+
+### File del correttivo
+
+- `artifacts/api-server/src/lib/beneficiariCodice.ts`
+- `artifacts/api-server/src/routes/beneficiari-fse.ts`
+- `artifacts/api-server/src/routes/beneficiari.ts`
+- `artifacts/api-server/src/routes/super-admin.ts`
+- `artifacts/api-server/tests/beneficiari-codici.test.ts`
+- `artifacts/magazzino-solidale/e2e/uds-workflows.spec.ts`
+- `artifacts/magazzino-solidale/src/components/beneficiario-tessera.test.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiario-uds-tools.tsx`
+- `artifacts/magazzino-solidale/src/components/configurazione-codici-beneficiari.test.tsx`
+- `artifacts/magazzino-solidale/src/components/configurazione-codici-beneficiari.tsx`
+- `artifacts/magazzino-solidale/src/lib/tessera-pdf.test.ts`
+- `artifacts/magazzino-solidale/src/lib/tessera-pdf.ts`
+- `artifacts/magazzino-solidale/src/pages/beneficiario-dettaglio.tsx`
+- `artifacts/magazzino-solidale/src/pages/super-admin-configurazione-ambiente.tsx`
+- `docs/campagna-bug-2026-10.md`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-client-react/src/generated/api.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/configurazioneCodiciBeneficiari.ts`
+- `lib/api-zod/src/generated/types/configurazioneCodiciBeneficiariAmbitoProgressivo.ts`
+- `lib/api-zod/src/generated/types/configurazioneCodiciBeneficiariInput.ts`
+- `lib/api-zod/src/generated/types/configurazioneCodiciBeneficiariInputAmbitoProgressivo.ts`
+- `lib/api-zod/src/generated/types/configurazioneCodiciBeneficiariInputSeparatore.ts`
+- `lib/api-zod/src/generated/types/configurazioneCodiciBeneficiariResponse.ts`
+- `lib/api-zod/src/generated/types/configurazioneCodiciBeneficiariScopeTipo.ts`
+- `lib/api-zod/src/generated/types/configurazioneCodiciBeneficiariSeparatore.ts`
+- `lib/api-zod/src/generated/types/index.ts`
+- `lib/db/src/schema/codiciBeneficiari.ts`
+- `lib/db/src/schema/index.ts`
+- `lib/db/updates/20261019_zz_codici_beneficiari.sql`
+
+Browser canonico completato su stack sintetici temporanei: M4A destinatari
+**9 PASS + 36 SKIP** e UDS **4 PASS + 16 SKIP** (repliche non previste dei
+lifecycle mutanti). Verificati salvataggio e ricaricamento della regola da UI,
+creazione `UAT-B-0042`, download reale e ristampa senza cambiare token/data o
+configurazione volontari. PDF CR80 renderizzato con Poppler e ispezionato:
+data, codice, barcode e logo separati. Caso CF coperto anche nel test del
+layout, con codice a Y=32,5 e data a Y=36. Evidenze private
+`/private/tmp/tessera-browser-3`; nessun PDF o screenshot di prova in Git.
+
+Una prima invocazione browser ha rispettato il lock ancora posseduto dalle
+API, senza avviare operazioni; una seconda prova è stata interrotta da un
+reload Vite dopo una modifica al file E2E. Traccia: nuova connessione Vite
+immediatamente dopo la risoluzione del controllo. Ripetute integralmente le
+due suite a sorgenti fermi, nessun retry, timeout o asserzione indebolita.
+Codegen ripetuto e confrontato per SHA-256: output byte per byte identico.

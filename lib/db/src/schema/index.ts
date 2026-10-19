@@ -58,3 +58,5 @@ export * from "./utentiMense";
 export * from "./emporioAbilitazioni";
 export * from "./mapsGeocodeCache";
 export * from "./creditoRicaricheMensili";
+
+export * from "./codiciBeneficiari";

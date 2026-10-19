@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import {
   configurazioniMatricoleVolontariTable,
+  configurazioniCodiciBeneficiariTable,
   db,
   systemLogsTable,
 } from "@workspace/db";
@@ -18,6 +19,8 @@ import {
   formatPermanentVolunteerIdentifier,
   validatePermanentIdentifierConfiguration,
 } from "../lib/volontariMatricola";
+
+import { validateBeneficiaryCodeConfiguration } from "../lib/beneficiariCodice";
 
 const router: IRouter = Router();
 
@@ -365,6 +368,85 @@ router.put(
     });
     await logConfigurazioneAudit({
       area: "matricole_volontari",
+      chiave: "GLOBALE",
+      azione: "nuova_versione",
+      valorePrecedente: result.before ? { ...result.before } : null,
+      valoreNuovo: { ...result.after },
+      ...auditMetaFromRequest(req),
+    });
+    res.json({
+      configurazione: result.after,
+      esempio: formatPermanentVolunteerIdentifier(
+        result.after,
+        "RM",
+        result.after.numeroIniziale,
+      ),
+    });
+  },
+);
+
+router.get("/super-admin/configurazione-codici-beneficiari", async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(configurazioniCodiciBeneficiariTable)
+    .orderBy(desc(configurazioniCodiciBeneficiariTable.versione));
+  const active = rows.find((row) => row.attiva) ?? null;
+  res.json({
+    configurazione: active,
+    esempio: active
+      ? formatPermanentVolunteerIdentifier(active, "RM", active.numeroIniziale)
+      : null,
+    storico: rows,
+  });
+});
+
+router.put(
+  "/super-admin/configurazione-codici-beneficiari",
+  async (req, res): Promise<void> => {
+    let parsed: ReturnType<typeof validateBeneficiaryCodeConfiguration>;
+    try {
+      parsed = validateBeneficiaryCodeConfiguration(req.body ?? {});
+    } catch (error) {
+      res.status(400).json({
+        error: error instanceof Error ? error.message : "Configurazione non valida",
+      });
+      return;
+    }
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('beneficiari-codici'))`,
+      );
+      const [before] = await tx
+        .select()
+        .from(configurazioniCodiciBeneficiariTable)
+        .where(eq(configurazioniCodiciBeneficiariTable.attiva, true))
+        .orderBy(desc(configurazioniCodiciBeneficiariTable.versione))
+        .limit(1)
+        .for("update");
+      const [latest] = await tx
+        .select({ versione: configurazioniCodiciBeneficiariTable.versione })
+        .from(configurazioniCodiciBeneficiariTable)
+        .orderBy(desc(configurazioniCodiciBeneficiariTable.versione))
+        .limit(1);
+      if (before)
+        await tx
+          .update(configurazioniCodiciBeneficiariTable)
+          .set({ attiva: false, dataAggiornamento: new Date() })
+          .where(eq(configurazioniCodiciBeneficiariTable.id, before.id));
+      const [after] = await tx
+        .insert(configurazioniCodiciBeneficiariTable)
+        .values({
+          scopeTipo: "GLOBALE",
+          versione: (latest?.versione ?? 0) + 1,
+          ...parsed,
+          attiva: true,
+          aggiornataDa: req.user?.id ?? null,
+        })
+        .returning();
+      return { before: before ?? null, after };
+    });
+    await logConfigurazioneAudit({
+      area: "codici_beneficiari",
       chiave: "GLOBALE",
       azione: "nuova_versione",
       valorePrecedente: result.before ? { ...result.before } : null,

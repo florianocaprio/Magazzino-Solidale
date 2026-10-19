@@ -8190,6 +8190,111 @@ export interface ConfigurazioneMatricoleVolontariResponse {
   storico?: ConfigurazioneMatricoleVolontari[];
 }
 
+export type ConfigurazioneCodiciBeneficiariScopeTipo =
+  (typeof ConfigurazioneCodiciBeneficiariScopeTipo)[keyof typeof ConfigurazioneCodiciBeneficiariScopeTipo];
+
+export const ConfigurazioneCodiciBeneficiariScopeTipo = {
+  GLOBALE: "GLOBALE",
+} as const;
+
+export type ConfigurazioneCodiciBeneficiariSeparatore =
+  (typeof ConfigurazioneCodiciBeneficiariSeparatore)[keyof typeof ConfigurazioneCodiciBeneficiariSeparatore];
+
+export const ConfigurazioneCodiciBeneficiariSeparatore = {
+  "": "",
+  "-": "-",
+  "/": "/",
+} as const;
+
+export type ConfigurazioneCodiciBeneficiariAmbitoProgressivo =
+  (typeof ConfigurazioneCodiciBeneficiariAmbitoProgressivo)[keyof typeof ConfigurazioneCodiciBeneficiariAmbitoProgressivo];
+
+export const ConfigurazioneCodiciBeneficiariAmbitoProgressivo = {
+  GLOBALE: "GLOBALE",
+  PER_AREA: "PER_AREA",
+} as const;
+
+export interface ConfigurazioneCodiciBeneficiari {
+  id: number;
+  scopeTipo: ConfigurazioneCodiciBeneficiariScopeTipo;
+  /** @minimum 1 */
+  versione: number;
+  /**
+   * @maxLength 12
+   * @nullable
+   */
+  prefissoAssociazione?: string | null;
+  includiCodiceArea: boolean;
+  /**
+   * @maxLength 8
+   * @nullable
+   */
+  segmentoFisso?: string | null;
+  separatore: ConfigurazioneCodiciBeneficiariSeparatore;
+  /**
+   * @minimum 2
+   * @maximum 8
+   */
+  cifreProgressivo: number;
+  /** @minimum 1 */
+  numeroIniziale: number;
+  ambitoProgressivo: ConfigurazioneCodiciBeneficiariAmbitoProgressivo;
+  attiva: boolean;
+  /** @nullable */
+  aggiornataDa?: number | null;
+  dataCreazione: string;
+  dataAggiornamento: string;
+}
+
+export type ConfigurazioneCodiciBeneficiariInputSeparatore =
+  (typeof ConfigurazioneCodiciBeneficiariInputSeparatore)[keyof typeof ConfigurazioneCodiciBeneficiariInputSeparatore];
+
+export const ConfigurazioneCodiciBeneficiariInputSeparatore = {
+  "": "",
+  "-": "-",
+  "/": "/",
+} as const;
+
+export type ConfigurazioneCodiciBeneficiariInputAmbitoProgressivo =
+  (typeof ConfigurazioneCodiciBeneficiariInputAmbitoProgressivo)[keyof typeof ConfigurazioneCodiciBeneficiariInputAmbitoProgressivo];
+
+export const ConfigurazioneCodiciBeneficiariInputAmbitoProgressivo = {
+  GLOBALE: "GLOBALE",
+  PER_AREA: "PER_AREA",
+} as const;
+
+export interface ConfigurazioneCodiciBeneficiariInput {
+  /**
+   * @maxLength 12
+   * @nullable
+   * @pattern ^[A-Za-z0-9]*$
+   */
+  prefissoAssociazione?: string | null;
+  includiCodiceArea: boolean;
+  /**
+   * @maxLength 8
+   * @nullable
+   * @pattern ^[A-Za-z0-9]*$
+   */
+  segmentoFisso?: string | null;
+  separatore: ConfigurazioneCodiciBeneficiariInputSeparatore;
+  /**
+   * @minimum 2
+   * @maximum 8
+   */
+  cifreProgressivo: number;
+  /** @minimum 1 */
+  numeroIniziale: number;
+  ambitoProgressivo: ConfigurazioneCodiciBeneficiariInputAmbitoProgressivo;
+}
+
+export interface ConfigurazioneCodiciBeneficiariResponse {
+  configurazione: ConfigurazioneCodiciBeneficiari | null;
+  /** @nullable */
+  esempio: string | null;
+  storico?: ConfigurazioneCodiciBeneficiari[];
+}
+
 export type VolontarioTipoVolontario =
   (typeof VolontarioTipoVolontario)[keyof typeof VolontarioTipoVolontario];
 

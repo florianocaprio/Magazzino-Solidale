@@ -7731,6 +7731,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConfigurazioneMatricoleVolontariResponse"
+  /super-admin/configurazione-codici-beneficiari:
+    get:
+      operationId: getSuperAdminConfigurazioneCodiciBeneficiari
+      tags: [super-admin, beneficiari]
+      responses:
+        "200":
+          description: Configurazione attiva e storico versioni delle codici beneficiari
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurazioneCodiciBeneficiariResponse"
+    put:
+      operationId: updateSuperAdminConfigurazioneCodiciBeneficiari
+      tags: [super-admin, beneficiari]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigurazioneCodiciBeneficiariInput"
+      responses:
+        "200":
+          description: Nuova versione della configurazione attivata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurazioneCodiciBeneficiariResponse"
   /super-admin/moduli:
     get:
       operationId: listSuperAdminModuli
@@ -20685,6 +20712,74 @@ components:
           type: array
           items:
             { $ref: "#/components/schemas/ConfigurazioneMatricoleVolontari" }
+      required: [configurazione, esempio]
+
+    ConfigurazioneCodiciBeneficiari:
+      type: object
+      properties:
+        id: { type: integer }
+        scopeTipo: { type: string, enum: [GLOBALE] }
+        versione: { type: integer, minimum: 1 }
+        prefissoAssociazione: { type: ["string", "null"], maxLength: 12 }
+        includiCodiceArea: { type: boolean }
+        segmentoFisso: { type: ["string", "null"], maxLength: 8 }
+        separatore: { type: string, enum: ["", "-", "/"] }
+        cifreProgressivo: { type: integer, minimum: 2, maximum: 8 }
+        numeroIniziale: { type: integer, minimum: 1 }
+        ambitoProgressivo: { type: string, enum: [GLOBALE, PER_AREA] }
+        attiva: { type: boolean }
+        aggiornataDa: { type: ["integer", "null"] }
+        dataCreazione: { type: string, format: date-time }
+        dataAggiornamento: { type: string, format: date-time }
+      required:
+        [
+          id,
+          scopeTipo,
+          versione,
+          includiCodiceArea,
+          separatore,
+          cifreProgressivo,
+          numeroIniziale,
+          ambitoProgressivo,
+          attiva,
+          dataCreazione,
+          dataAggiornamento,
+        ]
+
+    ConfigurazioneCodiciBeneficiariInput:
+      type: object
+      additionalProperties: false
+      properties:
+        prefissoAssociazione:
+          { type: ["string", "null"], maxLength: 12, pattern: "^[A-Za-z0-9]*$" }
+        includiCodiceArea: { type: boolean }
+        segmentoFisso:
+          { type: ["string", "null"], maxLength: 8, pattern: "^[A-Za-z0-9]*$" }
+        separatore: { type: string, enum: ["", "-", "/"] }
+        cifreProgressivo: { type: integer, minimum: 2, maximum: 8 }
+        numeroIniziale: { type: integer, minimum: 1 }
+        ambitoProgressivo: { type: string, enum: [GLOBALE, PER_AREA] }
+      required:
+        [
+          includiCodiceArea,
+          separatore,
+          cifreProgressivo,
+          numeroIniziale,
+          ambitoProgressivo,
+        ]
+
+    ConfigurazioneCodiciBeneficiariResponse:
+      type: object
+      properties:
+        configurazione:
+          anyOf:
+            - { $ref: "#/components/schemas/ConfigurazioneCodiciBeneficiari" }
+            - { type: "null" }
+        esempio: { type: ["string", "null"] }
+        storico:
+          type: array
+          items:
+            { $ref: "#/components/schemas/ConfigurazioneCodiciBeneficiari" }
       required: [configurazione, esempio]
 
     # ── Volontari ─────────────────────────────────────────────────────────

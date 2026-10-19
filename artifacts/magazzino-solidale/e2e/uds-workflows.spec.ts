@@ -204,3 +204,50 @@ test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno fi
   await page.goto(`/beneficiari/${person.id}`);
   await expect(page.getByTestId("beneficiario-mensa-card")).toBeVisible();
 });
+
+test("codici beneficiari: configurazione Super Admin, progressivo e stampa senza sostituire la tessera", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop-1440x900", "Configurazione mutante una sola volta");
+  await login(page);
+  const endpoint = "/api/super-admin/configurazione-codici-beneficiari";
+  const original = (await (await page.request.get(endpoint)).json()).configurazione;
+  const volunteerConfig = await (await page.request.get("/api/super-admin/configurazione-matricole-volontari")).json();
+  try {
+    await page.goto("/super-admin/configurazione-ambiente");
+    await expect(page.getByRole("button", { name: "Salva nuova versione", exact: true }).nth(1)).toBeEnabled();
+    // La sezione usa gli stessi controlli della configurazione matricole.
+    await page.getByLabel("Prefisso associazione", { exact: true }).fill("UAT");
+    await page.getByLabel("Segmento fisso", { exact: true }).fill("B");
+    await page.getByLabel("Cifre progressivo", { exact: true }).fill("4");
+    await page.getByLabel("Numero iniziale", { exact: true }).fill("42");
+    await expect(page.getByText("UAT-B-0042", { exact: true })).toBeVisible();
+    const saved = page.waitForResponse(r => r.request().method() === "PUT" && r.url().endsWith(endpoint));
+    // Il secondo pulsante salva la nuova sezione, il primo è delle matricole.
+    await page.getByRole("button", { name: "Salva nuova versione", exact: true }).nth(1).click();
+    expect((await saved).status()).toBe(200);
+    const areas = await (await page.request.get("/api/aree-operative")).json();
+    const area = areas.find((a: { nome: string }) => a.nome === "Area Demo");
+    const response = await page.request.post("/api/beneficiari", { data: { nome: "Mario", cognome: "Prova Tessera", sesso: "M", statoAnagrafica: "provvisoria", areaOperativaId: area.id } });
+    expect(response.status(), await response.text()).toBe(201);
+    const person = await response.json();
+    expect(person.codice).toBe("UAT-B-0042");
+    await page.goto(`/beneficiari/${person.id}`);
+    const downloading = page.waitForEvent("download");
+    await page.getByRole("button", { name: /scarica tessera pdf/i }).click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toBe("tessera-UAT-B-0042.pdf");
+    await download.saveAs(info.outputPath("tessera-configurata.pdf"));
+    const first = await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json();
+    expect(first).toHaveLength(1);
+    expect(first[0].codice).toMatch(/^MS-/);
+    const downloadingAgain = page.waitForEvent("download");
+    await page.getByRole("button", { name: /scarica tessera pdf/i }).click();
+    await downloadingAgain;
+    expect(await (await page.request.get(`/api/beneficiari/${person.id}/tessere`)).json()).toEqual(first);
+    await page.goto("/super-admin/configurazione-ambiente");
+    await expect(page.getByLabel("Prefisso associazione", { exact: true })).toHaveValue("UAT");
+    expect(await (await page.request.get("/api/super-admin/configurazione-matricole-volontari")).json()).toEqual(volunteerConfig);
+  } finally {
+    const { prefissoAssociazione, includiCodiceArea, segmentoFisso, separatore, cifreProgressivo, numeroIniziale, ambitoProgressivo } = original;
+    expect((await page.request.put(endpoint, { data: { prefissoAssociazione, includiCodiceArea, segmentoFisso, separatore, cifreProgressivo, numeroIniziale, ambitoProgressivo } })).status()).toBe(200);
+  }
+});

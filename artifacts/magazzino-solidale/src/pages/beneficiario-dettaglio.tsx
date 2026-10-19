@@ -342,7 +342,8 @@ export default function BeneficiarioDettaglio() {
     const { branding, logoDataUrl } = await loadTesseraBrandingForPdf();
     await generateTesseraPdf({
       beneficiario: {
-        codice: card.codice,
+        codice: b.codice,
+        codiceTessera: card.codice,
         nome: b.nome,
         cognome: b.cognome,
         codiceFiscale: b.codiceFiscale,

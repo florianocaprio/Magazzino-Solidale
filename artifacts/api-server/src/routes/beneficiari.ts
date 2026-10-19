@@ -4,7 +4,7 @@ import { beneficiarioAccessScopeFromRequest, canAccessBeneficiarioScope } from "
 import { emporioAbilitazioniTable, mensaAbilitazioniTable } from "@workspace/db";
 import { emporioEligibilityState } from "../lib/emporioScope";
 import { riepilogoAbilitazioneMensa, type MensaRiepilogoHistoryRow } from "../lib/mensaEligibilitySummary";
-import { randomInt } from "node:crypto";
+import { allocateBeneficiaryCode, BeneficiaryCodeError } from "../lib/beneficiariCodice";
 import { creditoIntero, CreditoInteroError } from "../lib/creditoIntero";
 import { Router, type IRouter, type Request } from "express";
 import { auditConfigurazioniTable, beneficiariTable, nucleoFamiliareTable, interventiTable, bisogniPianificatiTable, consegneTable, centriAscoltoTable, areeOperativeTable, magazziniTable, tessereBeneficiariTable, zoneUdsTable } from "@workspace/db";
@@ -242,14 +242,6 @@ async function codiceBeneficiarioEsiste(codice: string, excludeId?: number): Pro
     : eq(beneficiariTable.codice, codice);
   const [hit] = await db.select({ id: beneficiariTable.id }).from(beneficiariTable).where(where).limit(1);
   return hit != null;
-}
-
-async function generaCodiceBeneficiario(): Promise<string> {
-  for (let i = 0; i < 100; i++) {
-    const codice = `BEN-${String(randomInt(0, 10_000_000_000_000)).padStart(13, "0")}`;
-    if (!(await codiceBeneficiarioEsiste(codice))) return codice;
-  }
-  throw new Error("Impossibile generare un codice beneficiario univoco");
 }
 
 function isCodiceBeneficiarioUniqueViolation(error: unknown): boolean {
@@ -589,7 +581,7 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
 
 type BeneficiarioTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 interface BeneficiarioCreationOptions {
-  executor?: typeof db | BeneficiarioTx;
+  executor?: BeneficiarioTx;
   areaOperativaId?: number;
   centroAscoltoId?: number | null;
   zonaUdsId?: number | null;
@@ -612,8 +604,8 @@ export async function createBeneficiarioOne(
   const caller = callerCentroId(req);
   const cid = callerAreaOperativaId(req);
   const zid = callerZonaUdsId(req);
-  const codice = trimOrUndefined(b.codice) ?? await generaCodiceBeneficiario();
-  if (await codiceBeneficiarioEsiste(codice)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
+  const codice = trimOrUndefined(b.codice);
+  if (codice && await codiceBeneficiarioEsiste(codice)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
   const sesso = normalizzaSesso(b.sesso);
   if (!sesso) return { error: SESSO_OBBLIGATORIO_MSG, status: 400 };
   const values: Record<string, any> = {
@@ -686,7 +678,8 @@ export async function createBeneficiarioOne(
   });
   if (completeError) return { error: completeError, status: 400 };
 
-  const persist = async (executor: typeof db | BeneficiarioTx) => {
+  const persist = async (executor: BeneficiarioTx) => {
+    if (!codice) values.codice = await allocateBeneficiaryCode(executor, values.areaOperativaId ?? null);
     const [row] = await executor.insert(beneficiariTable)
       .values(values as typeof beneficiariTable.$inferInsert).returning();
     await executor.insert(auditConfigurazioniTable).values({
@@ -711,6 +704,7 @@ export async function createBeneficiarioOne(
       : await db.transaction((tx) => persist(tx));
     return { row };
   } catch (e) {
+    if (e instanceof BeneficiaryCodeError) return { error: e.message, status: 409 };
     if (isCodiceBeneficiarioUniqueViolation(e)) return { error: CODICE_BENEFICIARIO_DUPLICATO_MSG, status: 409 };
     throw e;
   }

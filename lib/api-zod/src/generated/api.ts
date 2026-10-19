@@ -17640,6 +17640,229 @@ export const UpdateSuperAdminConfigurazioneMatricoleVolontariResponse =
       .optional(),
   });
 
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOnePrefissoAssociazioneMax = 12;
+
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneSegmentoFissoMax = 8;
+
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMin = 2;
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMax = 8;
+
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemPrefissoAssociazioneMax = 12;
+
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemSegmentoFissoMax = 8;
+
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMin = 2;
+export const getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMax = 8;
+
+export const GetSuperAdminConfigurazioneCodiciBeneficiariResponse = zod.object({
+  configurazione: zod.union([
+    zod.object({
+      id: zod.number(),
+      scopeTipo: zod.enum(["GLOBALE"]),
+      versione: zod.number().min(1),
+      prefissoAssociazione: zod
+        .string()
+        .max(
+          getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOnePrefissoAssociazioneMax,
+        )
+        .nullish(),
+      includiCodiceArea: zod.boolean(),
+      segmentoFisso: zod
+        .string()
+        .max(
+          getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneSegmentoFissoMax,
+        )
+        .nullish(),
+      separatore: zod.enum(["", "-", "/"]),
+      cifreProgressivo: zod
+        .number()
+        .min(
+          getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMin,
+        )
+        .max(
+          getSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMax,
+        ),
+      numeroIniziale: zod.number().min(1),
+      ambitoProgressivo: zod.enum(["GLOBALE", "PER_AREA"]),
+      attiva: zod.boolean(),
+      aggiornataDa: zod.number().nullish(),
+      dataCreazione: zod.coerce.date(),
+      dataAggiornamento: zod.coerce.date(),
+    }),
+    zod.null(),
+  ]),
+  esempio: zod.string().nullable(),
+  storico: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        scopeTipo: zod.enum(["GLOBALE"]),
+        versione: zod.number().min(1),
+        prefissoAssociazione: zod
+          .string()
+          .max(
+            getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemPrefissoAssociazioneMax,
+          )
+          .nullish(),
+        includiCodiceArea: zod.boolean(),
+        segmentoFisso: zod
+          .string()
+          .max(
+            getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemSegmentoFissoMax,
+          )
+          .nullish(),
+        separatore: zod.enum(["", "-", "/"]),
+        cifreProgressivo: zod
+          .number()
+          .min(
+            getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMin,
+          )
+          .max(
+            getSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMax,
+          ),
+        numeroIniziale: zod.number().min(1),
+        ambitoProgressivo: zod.enum(["GLOBALE", "PER_AREA"]),
+        attiva: zod.boolean(),
+        aggiornataDa: zod.number().nullish(),
+        dataCreazione: zod.coerce.date(),
+        dataAggiornamento: zod.coerce.date(),
+      }),
+    )
+    .optional(),
+});
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodyPrefissoAssociazioneMax = 12;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodyPrefissoAssociazioneRegExp =
+  new RegExp("^[A-Za-z0-9]\*$");
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodySegmentoFissoMax = 8;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodySegmentoFissoRegExp =
+  new RegExp("^[A-Za-z0-9]\*$");
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodyCifreProgressivoMin = 2;
+export const updateSuperAdminConfigurazioneCodiciBeneficiariBodyCifreProgressivoMax = 8;
+
+export const UpdateSuperAdminConfigurazioneCodiciBeneficiariBody = zod.object({
+  prefissoAssociazione: zod
+    .string()
+    .max(
+      updateSuperAdminConfigurazioneCodiciBeneficiariBodyPrefissoAssociazioneMax,
+    )
+    .regex(
+      updateSuperAdminConfigurazioneCodiciBeneficiariBodyPrefissoAssociazioneRegExp,
+    )
+    .nullish(),
+  includiCodiceArea: zod.boolean(),
+  segmentoFisso: zod
+    .string()
+    .max(updateSuperAdminConfigurazioneCodiciBeneficiariBodySegmentoFissoMax)
+    .regex(
+      updateSuperAdminConfigurazioneCodiciBeneficiariBodySegmentoFissoRegExp,
+    )
+    .nullish(),
+  separatore: zod.enum(["", "-", "/"]),
+  cifreProgressivo: zod
+    .number()
+    .min(updateSuperAdminConfigurazioneCodiciBeneficiariBodyCifreProgressivoMin)
+    .max(
+      updateSuperAdminConfigurazioneCodiciBeneficiariBodyCifreProgressivoMax,
+    ),
+  numeroIniziale: zod.number().min(1),
+  ambitoProgressivo: zod.enum(["GLOBALE", "PER_AREA"]),
+});
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOnePrefissoAssociazioneMax = 12;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneSegmentoFissoMax = 8;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMin = 2;
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMax = 8;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemPrefissoAssociazioneMax = 12;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemSegmentoFissoMax = 8;
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMin = 2;
+export const updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMax = 8;
+
+export const UpdateSuperAdminConfigurazioneCodiciBeneficiariResponse =
+  zod.object({
+    configurazione: zod.union([
+      zod.object({
+        id: zod.number(),
+        scopeTipo: zod.enum(["GLOBALE"]),
+        versione: zod.number().min(1),
+        prefissoAssociazione: zod
+          .string()
+          .max(
+            updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOnePrefissoAssociazioneMax,
+          )
+          .nullish(),
+        includiCodiceArea: zod.boolean(),
+        segmentoFisso: zod
+          .string()
+          .max(
+            updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneSegmentoFissoMax,
+          )
+          .nullish(),
+        separatore: zod.enum(["", "-", "/"]),
+        cifreProgressivo: zod
+          .number()
+          .min(
+            updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMin,
+          )
+          .max(
+            updateSuperAdminConfigurazioneCodiciBeneficiariResponseConfigurazioneOneCifreProgressivoMax,
+          ),
+        numeroIniziale: zod.number().min(1),
+        ambitoProgressivo: zod.enum(["GLOBALE", "PER_AREA"]),
+        attiva: zod.boolean(),
+        aggiornataDa: zod.number().nullish(),
+        dataCreazione: zod.coerce.date(),
+        dataAggiornamento: zod.coerce.date(),
+      }),
+      zod.null(),
+    ]),
+    esempio: zod.string().nullable(),
+    storico: zod
+      .array(
+        zod.object({
+          id: zod.number(),
+          scopeTipo: zod.enum(["GLOBALE"]),
+          versione: zod.number().min(1),
+          prefissoAssociazione: zod
+            .string()
+            .max(
+              updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemPrefissoAssociazioneMax,
+            )
+            .nullish(),
+          includiCodiceArea: zod.boolean(),
+          segmentoFisso: zod
+            .string()
+            .max(
+              updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemSegmentoFissoMax,
+            )
+            .nullish(),
+          separatore: zod.enum(["", "-", "/"]),
+          cifreProgressivo: zod
+            .number()
+            .min(
+              updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMin,
+            )
+            .max(
+              updateSuperAdminConfigurazioneCodiciBeneficiariResponseStoricoItemCifreProgressivoMax,
+            ),
+          numeroIniziale: zod.number().min(1),
+          ambitoProgressivo: zod.enum(["GLOBALE", "PER_AREA"]),
+          attiva: zod.boolean(),
+          aggiornataDa: zod.number().nullish(),
+          dataCreazione: zod.coerce.date(),
+          dataAggiornamento: zod.coerce.date(),
+        }),
+      )
+      .optional(),
+  });
+
 export const ListSuperAdminModuliResponseItem = zod.object({
   id: zod.number(),
   codice: zod.string(),

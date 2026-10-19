@@ -138,6 +138,8 @@ import type {
   ConfigurazioneAmbiente,
   ConfigurazioneAmbientePubblica,
   ConfigurazioneAmbienteUpdate,
+  ConfigurazioneCodiciBeneficiariInput,
+  ConfigurazioneCodiciBeneficiariResponse,
   ConfigurazioneMatricoleVolontariInput,
   ConfigurazioneMatricoleVolontariResponse,
   ConfirmVolontariImport200,
@@ -28170,6 +28172,180 @@ export const useUpdateSuperAdminConfigurazioneMatricoleVolontari = <
 > => {
   return useMutation(
     getUpdateSuperAdminConfigurazioneMatricoleVolontariMutationOptions(options),
+  );
+};
+
+export const getGetSuperAdminConfigurazioneCodiciBeneficiariUrl = () => {
+  return `/api/super-admin/configurazione-codici-beneficiari`;
+};
+
+export const getSuperAdminConfigurazioneCodiciBeneficiari = async (
+  options?: RequestInit,
+): Promise<ConfigurazioneCodiciBeneficiariResponse> => {
+  return customFetch<ConfigurazioneCodiciBeneficiariResponse>(
+    getGetSuperAdminConfigurazioneCodiciBeneficiariUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetSuperAdminConfigurazioneCodiciBeneficiariQueryKey = () => {
+  return [`/api/super-admin/configurazione-codici-beneficiari`] as const;
+};
+
+export const getGetSuperAdminConfigurazioneCodiciBeneficiariQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof getSuperAdminConfigurazioneCodiciBeneficiari>
+  >,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSuperAdminConfigurazioneCodiciBeneficiari>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetSuperAdminConfigurazioneCodiciBeneficiariQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSuperAdminConfigurazioneCodiciBeneficiari>>
+  > = ({ signal }) =>
+    getSuperAdminConfigurazioneCodiciBeneficiari({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSuperAdminConfigurazioneCodiciBeneficiari>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSuperAdminConfigurazioneCodiciBeneficiariQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof getSuperAdminConfigurazioneCodiciBeneficiari>>
+  >;
+export type GetSuperAdminConfigurazioneCodiciBeneficiariQueryError =
+  ErrorType<unknown>;
+
+export function useGetSuperAdminConfigurazioneCodiciBeneficiari<
+  TData = Awaited<
+    ReturnType<typeof getSuperAdminConfigurazioneCodiciBeneficiari>
+  >,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSuperAdminConfigurazioneCodiciBeneficiari>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions =
+    getGetSuperAdminConfigurazioneCodiciBeneficiariQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getUpdateSuperAdminConfigurazioneCodiciBeneficiariUrl = () => {
+  return `/api/super-admin/configurazione-codici-beneficiari`;
+};
+
+export const updateSuperAdminConfigurazioneCodiciBeneficiari = async (
+  configurazioneCodiciBeneficiariInput: ConfigurazioneCodiciBeneficiariInput,
+  options?: RequestInit,
+): Promise<ConfigurazioneCodiciBeneficiariResponse> => {
+  return customFetch<ConfigurazioneCodiciBeneficiariResponse>(
+    getUpdateSuperAdminConfigurazioneCodiciBeneficiariUrl(),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(configurazioneCodiciBeneficiariInput),
+    },
+  );
+};
+
+export const getUpdateSuperAdminConfigurazioneCodiciBeneficiariMutationOptions =
+  <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof updateSuperAdminConfigurazioneCodiciBeneficiari>
+      >,
+      TError,
+      { data: BodyType<ConfigurazioneCodiciBeneficiariInput> },
+      TContext
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  }): UseMutationOptions<
+    Awaited<ReturnType<typeof updateSuperAdminConfigurazioneCodiciBeneficiari>>,
+    TError,
+    { data: BodyType<ConfigurazioneCodiciBeneficiariInput> },
+    TContext
+  > => {
+    const mutationKey = ["updateSuperAdminConfigurazioneCodiciBeneficiari"];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        "mutationKey" in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof updateSuperAdminConfigurazioneCodiciBeneficiari>
+      >,
+      { data: BodyType<ConfigurazioneCodiciBeneficiariInput> }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return updateSuperAdminConfigurazioneCodiciBeneficiari(
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type UpdateSuperAdminConfigurazioneCodiciBeneficiariMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof updateSuperAdminConfigurazioneCodiciBeneficiari>>
+  >;
+export type UpdateSuperAdminConfigurazioneCodiciBeneficiariMutationBody =
+  BodyType<ConfigurazioneCodiciBeneficiariInput>;
+export type UpdateSuperAdminConfigurazioneCodiciBeneficiariMutationError =
+  ErrorType<unknown>;
+
+export const useUpdateSuperAdminConfigurazioneCodiciBeneficiari = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateSuperAdminConfigurazioneCodiciBeneficiari>>,
+    TError,
+    { data: BodyType<ConfigurazioneCodiciBeneficiariInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateSuperAdminConfigurazioneCodiciBeneficiari>>,
+  TError,
+  { data: BodyType<ConfigurazioneCodiciBeneficiariInput> },
+  TContext
+> => {
+  return useMutation(
+    getUpdateSuperAdminConfigurazioneCodiciBeneficiariMutationOptions(options),
   );
 };
 
