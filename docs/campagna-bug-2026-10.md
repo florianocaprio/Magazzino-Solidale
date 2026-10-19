@@ -108,8 +108,8 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | BUG | Blocco | Prompt | Stato                     | Requisiti sospesi                                              | Commit           | Automatico                      | UAT         | Ultimo candidato verificato              |
 | --- | ------ | ------ | ------------------------- | -------------------------------------------------------------- | ---------------- | ------------------------------- | ----------- | ---------------------------------------- |
 | 01 | A | 01 | CHIUSO; UAT OK | Nessuno; D01 approvata | 7d70906 | PASS; 4 skip esterni dichiarati nel blocco precedente | OK Floriano 19/10 | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 |
-| 02  | B      | 02     | SVILUPPATO | Nessuno; D01 approvata                                         | checkpoint prompt 02 | PASS mirati; 4 skip esterni | DA ESEGUIRE | checkpoint prompt 02 |
-| 03  | B      | 02     | SVILUPPATO | Nessuno                                                        | checkpoint prompt 02 | PASS mirati; 4 skip esterni | DA ESEGUIRE | checkpoint prompt 02 |
+| 02  | B      | 02     | SVILUPPATO | Nessuno; D01 approvata                                         | 7adf403d8361d35a68de523a10c575f75ecbb03b | PASS mirati; 4 skip esterni | DA ESEGUIRE | 7adf403d8361d35a68de523a10c575f75ecbb03b |
+| 03  | B      | 02     | SVILUPPATO | Nessuno                                                        | 7adf403d8361d35a68de523a10c575f75ecbb03b | PASS mirati; 4 skip esterni | DA ESEGUIRE | 7adf403d8361d35a68de523a10c575f75ecbb03b |
 | 04  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 05  | C      | 04     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 06  | C      | 04     | DA SVILUPPARE             | Nessuno; requisito sostitutivo Area/Centro prima della ricerca | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -121,7 +121,7 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 12  | D      | 05     | DA SVILUPPARE             | Raccordo D03 con le attuali pratiche Aperte                    | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 13  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 14  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 15  | B      | 02     | SVILUPPATO | Nessuno                                                        | checkpoint prompt 02 | PASS mirati; 4 skip esterni | DA ESEGUIRE | checkpoint prompt 02 |
+| 15  | B      | 02     | SVILUPPATO | Nessuno                                                        | 7adf403d8361d35a68de523a10c575f75ecbb03b | PASS mirati; 4 skip esterni | DA ESEGUIRE | 7adf403d8361d35a68de523a10c575f75ecbb03b |
 | 16  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 17  | C      | 03, 04 | DA SVILUPPARE             | Nessuno; D04 approvata; UAT dopo 04                            | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -138,7 +138,7 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | Consegna | Blocco e BUG                  | Tipo            | SHA                                      | Controlli e risultato reale                                                   | Versione 8082                 | Esito                                       |
 | -------- | ----------------------------- | --------------- | ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------- |
 | 01 | A: 01 | Funzionale | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 | PASS; ultimi controlli 737 UI e 76 API core | Installata e verificata | CHIUSA; OK UAT Floriano 19/10 |
-| 02       | B: 02, 03, 15                 | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
+| 02 | B: 02, 03, 15 | Funzionale | 7adf403d8361d35a68de523a10c575f75ecbb03b | PASS: 1.585 API + 4 skip esterni; 751 UI; 15 browser; build/budget | Installata e verificata | UAT DA ESEGUIRE; prossimo ##test |
 | 03       | C: 17, prima parte            | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
 | 04       | C: 05–09 e regressione 17     | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 05       | D: 04, 10–14, 16              | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
@@ -740,7 +740,7 @@ Nuove etichette in italiano, inglese, spagnolo, francese, tedesco e arabo.
   nessun volume creato. Quattro documenti preesistenti invariati per SHA-256.
 
 Evidenze fuori Git: `/private/tmp/prompt02-install.log`,
-`/private/tmp/prompt02-typecheck-r4.log`, `/private/tmp/prompt02-ui-r6.log`,
+`/private/tmp/prompt02-typecheck-final.log`, `/private/tmp/prompt02-ui-r6.log`,
 `/private/tmp/prompt02-r2-api-general`, `/private/tmp/prompt02-r1-api-reporting`,
 `/private/tmp/prompt02-browser-volontari-r2`.
 Un primo test D01 leggeva come colonna un campo amministrativo derivato:
@@ -752,7 +752,7 @@ allineati alla registrazione lazy delle nuove traduzioni.
 OpenAPI introduce `VolontarioRemoveInput`, con `removeIfUnused` boolean opzionale
 (default false); generated rigenerati dal comando ufficiale.
 **Nessuna migrazione o modifica dello schema DB.** Build/budget e ricevuta 8082
-nel checkpoint di installazione. Nessuna decisione funzionale pendente.
+riportati sotto. Nessuna decisione funzionale pendente.
 UAT personale **DA ESEGUIRE**, ##test non attivato dalla sola lettura del file.
 
 ### File modificati nel checkpoint 02
@@ -811,3 +811,46 @@ storico leggibile e annullabile secondo le policy.
 Al 19/10/2026: 12/10 incluso, 11/10 escluso dalla pianificazione.
 Fermarsi: prossimo incarico **##test della consegna 02**; nessun avvio automatico
 del prompt 03, nessuna chiusura UAT ricavata dai test automatici.
+
+### Installazione personale 8082 — consegna 02
+
+Checkpoint applicativo **`7adf403d8361d35a68de523a10c575f75ecbb03b`**, pubblicato e verificato
+su `origin/codex/bugfix-uat-ottobre-2026`. La presente ricevuta è documentale:
+API e WEB eseguono esattamente il checkpoint applicativo, senza codice successivo.
+
+- Codegen ufficiale ripetuto: PASS, manifest SHA-256 dei generated identico
+  prima/dopo, nessuna deriva (`/private/tmp/prompt02-codegen-final.log`).
+- Typecheck finale sul checkpoint: PASS
+  (`/private/tmp/prompt02-typecheck-final.log`).
+- Build Docker API e WEB: PASS da archivio Git della SHA completa.
+- Budget WEB: **399,2/400 KiB gzip**, entry `index-D0903Ymh.js`;
+  soglia invariata. Verificato il bundle estratto dall’immagine installata.
+- API `magazzino-bugfix-uat-api:sha-7adf403d8361`,
+  image ID `sha256:28bd33fe97fde57f78b5b3e780db879a3a4d97e4df5d5d3273585ae66998395a`.
+- WEB `magazzino-bugfix-uat-web:sha-7adf403d8361`,
+  image ID `sha256:f79ec0e4dcd2e3534e0647547cc58d07a7ebe4e2431beb3c63e1d4008ca95e53`.
+  Label Git di entrambe le immagini e dei container uguali alla SHA candidata.
+- Backup database `pg_dump -Fc` e archivio uploads con SHA-256 e indici leggibili.
+  **Non è stata eseguita una prova di restore**; nessuna migrazione presente.
+  Directory privata backup/ricevute/override/rollback:
+  `/Users/florianocaprio/Backups/Magazzino-Solidale/PROMPT02-7adf403d8361-2026-10-19T14-18-31-296Z`.
+- Configurazione Compose effettiva confrontata: cambiano soltanto immagini,
+  label di revisione e versione sorgente del runner migration. Catena presa
+  dal WEB corrente, comprese le ultime rifiniture Utenti.
+- Ricreati soltanto API e WEB con `up -d --no-deps --no-build api web`.
+  Container PostgreSQL `af6bd975d17d0fb187820b50a860a51075ac8c64656356e59c1c12b7ea402797`
+  e avvio `2026-10-06T14:06:51.181962875Z` invariati;
+  volumi DB/uploads preservati. Nessuna cancellazione o ripristino dati.
+- API healthy, PostgreSQL healthy; WEB senza healthcheck Docker.
+  Ledger **58/58**, zero pending/checksum difformi/file mancanti/fuori ordine.
+  HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: **200**;
+  `/api/utenti` senza sessione: **401**.
+- Evidenze: `/private/tmp/prompt02-build-result.json` e
+  `/private/tmp/prompt02-release-result.json`, più ricevute nella directory
+  privata indicata sopra. Nessun dato personale, backup, log o screenshot in Git.
+
+Nessuna decisione pendente. BUG 02/03/15 **sviluppati e verificati automaticamente**,
+**UAT DA ESEGUIRE** personalmente da Floriano. La 8082 è stata aggiornata per
+l’autorizzazione persistente «ricompila sempre 8082». La fase distinta ##test
+resta il prossimo incarico; nessun altro prompt avviato. Main e produzione
+non modificati. Quattro documenti locali preesistenti preservati ed esclusi.
