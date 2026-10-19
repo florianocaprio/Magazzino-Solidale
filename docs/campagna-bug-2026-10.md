@@ -517,4 +517,72 @@ File modificati in questo chiarimento (oltre al presente registro):
 - `lib/api-zod/src/generated/types/utenteInput.ts`
 - `lib/api-zod/src/generated/types/utenteUpdate.ts`
 
-Verifiche automatiche e ricevuta 8082: in completamento.
+### Verifica conclusiva e ricevuta 8082 — account per Area
+
+Candidato codice `508dacfb6f0a9d428239e84de0a697af05b971c2`, branch
+`codex/bugfix-uat-ottobre-2026`. Nessuna modifica a main o alla produzione.
+
+| Controllo | Esito effettivo |
+| --- | --- |
+| `pnpm install --frozen-lockfile`, Node 24 | PASS; lockfile invariato. |
+| `pnpm run typecheck` | PASS, ripetuto al termine della rigenerazione finale. |
+| `pnpm --filter @workspace/api-spec run codegen` | PASS; esecuzione finale senza differenze nei generated rispetto al candidato. |
+| API, otto gruppi canonici isolati | **2.032 PASS, 0 FAIL, 4 SKIP**, 163 file. |
+| Runner PostgreSQL | 24 PASS; bootstrap fresh/replay e ledger 58/58 senza discrepanze. |
+| `pnpm --filter @workspace/magazzino-solidale run test` | **736 PASS**, 115 file, zero FAIL/SKIP. |
+| Docker API e WEB dal candidato | PASS; entry WEB **399,1/400 KiB gzip**, budget invariato. |
+| Diff, generated e documenti locali | PASS; quattro documenti preesistenti invariati per SHA-256 ed esclusi dai commit. |
+
+Comando canonico, eseguito per ciascun gruppo con il relativo
+`CI_RESULTS_DIR` privato: `node scripts/quality-gates-run.mjs api <gruppo>`.
+I gruppi core/interventi/mensa/fse/maps sono PASS nella seconda esecuzione;
+reporting/emporio/general sono stati rieseguiti dopo le ultime correzioni alle
+fixture e agli oracoli del nuovo perimetro Area. Non si sommano le riesecuzioni.
+Dopo la seconda esecuzione non sono cambiate le regole autorizzative del codice;
+le ulteriori modifiche ai sorgenti API erano soltanto di formattazione.
+
+Evidenze conclusive:
+
+- `core`: 76 PASS, 0 SKIP, 11 file; `/private/tmp/utenti-area-only-r2-api-core`.
+- `reporting`: 83 PASS, 0 SKIP, 6 file; `/private/tmp/utenti-area-only-r3-api-reporting`.
+- `interventi`: 21 PASS, 0 SKIP, 2 file; `/private/tmp/utenti-area-only-r2-api-interventi`.
+- `mensa`: 108 PASS, 0 SKIP, 1 file; `/private/tmp/utenti-area-only-r2-api-mensa`.
+- `emporio`: 230 PASS, 0 SKIP, 4 file; `/private/tmp/utenti-area-only-r3-api-emporio`.
+- `general`: 1494 PASS, 4 SKIP, 137 file; `/private/tmp/utenti-area-only-r3-api-general`.
+- `fse`: 2 PASS, 0 SKIP, 1 file; `/private/tmp/utenti-area-only-r2-api-fse`.
+- `maps`: 18 PASS, 0 SKIP, 1 file; `/private/tmp/utenti-area-only-r2-api-maps`.
+
+I quattro SKIP sono le acceptance sugli originali esterni già non disponibili
+(agea-import, agea-sifead-parser, fse-import-parser-m3b, fse-import-practice-m3b).
+Nessun nuovo skip. Browser UAT non automatizzata: la prova di Floriano resta
+da eseguire. I test API usano esclusivamente database Docker temporanei
+verificati dal runner; nessun test mutativo sul database personale della 8082.
+
+Installati soltanto API e WEB su `http://127.0.0.1:8082/`:
+
+- `/magazzino-api`: `magazzino-bugfix-uat-api:sha-508dacfb6f0a`, image ID `sha256:ca20041515eed85615570c0389d679cf0cde99afffcbc28e308ec4cf1c3591ce`, revisione `508dacfb6f0a9d428239e84de0a697af05b971c2`, health `healthy`.
+- `/magazzino-web`: `magazzino-bugfix-uat-web:sha-508dacfb6f0a`, image ID `sha256:69859192e00a1f3f4d7e19c8f2db8ddc23cf8e35a06ffa17ea1b9e9db69c2485`, revisione `508dacfb6f0a9d428239e84de0a697af05b971c2`, health `not-defined`.
+
+PostgreSQL conserva container `af6bd975d17d0fb187820b50a860a51075ac8c64656356e59c1c12b7ea402797` e avvio
+`2026-10-06T14:06:51.181962875Z`. Ledger **58/58**, zero pending/checksum
+difformi/file mancanti/fuori ordine. Il confronto Compose consente soltanto
+immagini, label revisione e DB_MIGRATION_SOURCE_VERSION; porte, rete, volumi e
+configurazione applicativa restano invariati. `/`, `/config.js`, `/api/healthz`,
+`/api/readyz` restituiscono 200; `/api/utenti` senza sessione restituisce 401.
+
+Backup privato precedente al recreate: `/Users/florianocaprio/Backups/Magazzino-Solidale/UTENTI-AREA-508dacfb6f0a-2026-10-19T13-10-14-868Z`.
+Dump e uploads verificati tramite indice archivio e SHA-256, con permessi
+privati; restore non eseguito. Ricevuta tecnica e rollback immagini sono nella
+stessa directory privata, fuori Git. Nessun file `.env`, credenziale, log o
+screenshot incluso nei commit.
+
+Prova UAT: ricaricare Utenti; in creazione/modifica deve comparire soltanto
+Ruolo e Area come assegnazioni di accesso, e la tabella non deve mostrare
+Centro/Zona. Un operatore abilitato deve operare sulle strutture della propria
+Area, compresi Centri/Zone diversi da quelli eventualmente presenti nei vecchi
+dati dell’account, con diniego sulle altre Aree. I due account attivi senza
+Area richiedono ancora configurazione amministrativa; non è stata assegnata
+un’Area automaticamente.
+
+**8082 aggiornata e pronta per la nuova UAT. Prompt 02 non avviato: si attende
+l’OK di Floriano.**
