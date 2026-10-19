@@ -20,7 +20,7 @@ import {
   beneficiarioCentroId,
   beneficiarioAreaOperativaId,
   beneficiarioZonaUdsId,
-  serviceCentroScopeFilter,
+  serviceAreaCentroScopeFilter,
 } from "../lib/serviceScope";
 import {
   EMPORIO_DISABLED_MSG,
@@ -54,8 +54,8 @@ const router: IRouter = Router();
 router.use("/beneficiari", requireCurrentUdsScope);
 router.use("/beneficiari/:id", async (req, res, next) => {
   const id = Number(req.params.id);
-  const boundary = serviceCentroScopeFilter(
-    beneficiariTable.centroAscoltoId, callerAreaOperativaId(req),
+  const boundary = serviceAreaCentroScopeFilter(
+    beneficiariTable.centroAscoltoId, req,
   );
   if (Number.isSafeInteger(id) && id > 0 && boundary) {
     const [outside] = await db.select({ id: beneficiariTable.id })
@@ -548,7 +548,7 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   }
   const areaOperativaFilter = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
   if (areaOperativaFilter) conditions.push(areaOperativaFilter);
-  const centreAreaFilter = serviceCentroScopeFilter(beneficiariTable.centroAscoltoId, callerAreaOperativaId(req));
+  const centreAreaFilter = serviceAreaCentroScopeFilter(beneficiariTable.centroAscoltoId, req);
   if (centreAreaFilter) conditions.push(centreAreaFilter);
   const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);

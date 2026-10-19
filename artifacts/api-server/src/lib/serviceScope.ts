@@ -28,11 +28,28 @@ export function operationalCentroId(
 }
 
 /** Anche con Area legacy NULL, un Centro di un'altra Area non è condiviso. */
-export function serviceCentroScopeFilter(column: Column, areaId: number | null) {
+export function serviceCentroScopeFilter(
+  column: Column,
+  areaId: number | null,
+) {
   if (areaId == null) return undefined;
-  return or(isNull(column), sql`exists (
+  return or(
+    isNull(column),
+    sql`exists (
     select 1 from centri_di_ascolto service_centro
     where service_centro.id = ${column}
       and service_centro.area_operativa_id = ${areaId}
-  )`);
+  )`,
+  );
+}
+
+/** Il nuovo confine dei servizi non modifica la directory UDS dedicata. */
+export function serviceAreaCentroScopeFilter(column: Column, req: Request) {
+  if (
+    !req.user?.aree.some((area) =>
+      ["sociale", "mensa", "emporio"].includes(area),
+    )
+  )
+    return undefined;
+  return serviceCentroScopeFilter(column, req.user.areaOperativaId);
 }
