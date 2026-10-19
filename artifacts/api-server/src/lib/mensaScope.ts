@@ -3,13 +3,11 @@ import {
   db,
   utentiTable,
   ruoliTable,
-  utentiMenseTable,
   menseTable,
-  magazziniTable,
   areeOperativeTable,
   centriAscoltoTable,
 } from "@workspace/db";
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { InventoryTransaction } from "./scaricoInventory";
 
 export class MensaScopeError extends Error {
@@ -17,7 +15,7 @@ export class MensaScopeError extends Error {
 }
 const scopes = new WeakMap<Request, number[] | null>();
 
-/** Nessuna globalità da Area/Centro nulli o dal semplice grant Mensa. */
+/** Il ruolo abilita Mensa; l'Area corrente delimita tutte le strutture utilizzabili. */
 export async function currentMensaIds(
   tx: InventoryTransaction,
   userId: number,
@@ -59,45 +57,13 @@ export async function currentMensaIds(
       (!center?.attivo || center.areaOperativaId !== area.id))
   )
     throw new MensaScopeError("Scope territoriale Mensa non valido");
-  const assignments = await tx
-    .select()
-    .from(utentiMenseTable)
-    .where(
-      and(
-        eq(utentiMenseTable.utenteId, user.id),
-        eq(utentiMenseTable.attiva, true),
-      ),
-    )
-    .orderBy(utentiMenseTable.id)
-    .for("share");
-  const candidates = assignments.length
-    ? await tx
-        .select({
-          id: menseTable.id,
-          areaId: menseTable.areaOperativaId,
-          centroId: magazziniTable.centroAscoltoId,
-        })
-        .from(menseTable)
-        .innerJoin(
-          magazziniTable,
-          eq(menseTable.magazzinoId, magazziniTable.id),
-        )
-        .where(
-          inArray(
-            menseTable.id,
-            assignments.map((item) => item.mensaId),
-          ),
-        )
-        .orderBy(menseTable.id)
-    : [];
+  const candidates = await tx
+    .select({ id: menseTable.id })
+    .from(menseTable)
+    .where(eq(menseTable.areaOperativaId, area.id))
+    .orderBy(menseTable.id);
   return {
-    ids: candidates
-      .filter(
-        (item) =>
-          item.areaId === area.id &&
-          (item.centroId == null || item.centroId === user.centroAscoltoId),
-      )
-      .map((item) => item.id),
+    ids: candidates.map((item) => item.id),
     user,
     role,
   };
@@ -133,7 +99,7 @@ export const currentMensaScope: RequestHandler = async (req, res, next) => {
         req.baseUrl.endsWith("/mensa") &&
         !(req.method === "GET" && req.path === "/mense")
       )
-        throw new MensaScopeError("Nessuna assegnazione Mensa attiva");
+        throw new MensaScopeError("Nessuna Mensa disponibile nell'Area");
       next();
       await responseCompleted;
     });
@@ -160,9 +126,7 @@ export function mensaScopeCondition(
 export function assertAssignedMensa(req: Request, mensaId: number) {
   const ids = scopes.get(req);
   if (ids !== null && !ids?.includes(mensaId))
-    throw new MensaScopeError(
-      "Mensa non assegnata o scope territoriale revocato",
-    );
+    throw new MensaScopeError("Mensa fuori dall'Area autorizzata");
 }
 
 export async function assertCurrentMensaAssignment(
@@ -172,7 +136,5 @@ export async function assertCurrentMensaAssignment(
 ) {
   const current = await currentMensaIds(tx, req.user!.id);
   if (current.ids !== null && !current.ids.includes(mensaId))
-    throw new MensaScopeError(
-      "Mensa non assegnata o scope territoriale revocato",
-    );
+    throw new MensaScopeError("Mensa fuori dall'Area autorizzata");
 }

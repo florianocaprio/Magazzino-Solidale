@@ -1,3 +1,4 @@
+import { operationalCentroId } from "@/lib/service-scope";
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -114,7 +115,7 @@ export default function Beneficiari() {
   const { t } = useTranslation();
   const { user, hasArea, hasPermission } = useAuth();
   const { isModuloAttivo } = useConfigurazioneAmbienteFlags();
-  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const lockedCentroId = operationalCentroId(user);
   const isCentroLocked = lockedCentroId != null;
   const isGlobal = !isCentroLocked;
   const [search, setSearch] = useState("");

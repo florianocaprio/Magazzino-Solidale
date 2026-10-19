@@ -87,7 +87,7 @@ function reportHandler(
       const filters = parseReportFilters(req);
       await assertReportFilterScope(req, filters);
       if (req.path === "/report/mensa" && filters.callerMensaIds?.length === 0)
-        throw new ReportingError(403, "Nessuna assegnazione Mensa attiva");
+        throw new ReportingError(403, "Nessuna Mensa disponibile nell'Area");
       res.json(await builder(filters));
     } catch (error) {
       if (sendError(error, res)) return;

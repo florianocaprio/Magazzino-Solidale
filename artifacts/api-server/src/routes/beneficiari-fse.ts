@@ -18,7 +18,8 @@ import {
   callerAreaOperativaId,
   callerCentroId,
   callerZonaUdsId,
-} from "../lib/centroScope";
+  serviceCentroScopeFilter,
+} from "../lib/serviceScope";
 import { canAccessBeneficiarioRecord } from "../lib/beneficiarioPolicy";
 import { searchBeneficiariDuplicates } from "../lib/beneficiarioDuplicates";
 import { isDateOnly } from "../lib/interventiWorkflow";
@@ -195,6 +196,15 @@ function authoritativeWorkbookBody(
       dataRiferimento: upload.fields.dataRiferimento,
     },
   };
+}
+
+async function canAccessFseBeneficiario(beneficiario: typeof beneficiariTable.$inferSelect, req: Request) {
+  if (!canAccessBeneficiarioRecord(beneficiario, req, callerCentroId(req))) return false;
+  const boundary = serviceCentroScopeFilter(beneficiariTable.centroAscoltoId, callerAreaOperativaId(req));
+  if (!boundary) return true;
+  const [allowed] = await db.select({ id: beneficiariTable.id }).from(beneficiariTable)
+    .where(and(eq(beneficiariTable.id, beneficiario.id), boundary));
+  return Boolean(allowed);
 }
 
 async function selectedCentro(body: RawBody, req: Request) {
@@ -1351,7 +1361,7 @@ router.get(
       )
       .where(eq(beneficiariTable.id, id));
     if (!row) { res.status(404).json({ error: "Beneficiario non trovato." }); return; }
-    if (!canAccessBeneficiarioRecord(row.beneficiario, req)) {
+    if (!(await canAccessFseBeneficiario(row.beneficiario, req))) {
       res.status(403).json({ error: "Beneficiario non accessibile." });
       return;
     }
@@ -1383,7 +1393,7 @@ router.patch(
     const [beneficiario] = await db.select().from(beneficiariTable)
       .where(eq(beneficiariTable.id, id));
     if (!beneficiario) { res.status(404).json({ error: "Beneficiario non trovato." }); return; }
-    if (!canAccessBeneficiarioRecord(beneficiario, req)) {
+    if (!(await canAccessFseBeneficiario(beneficiario, req))) {
       res.status(403).json({ error: "Beneficiario non accessibile." });
       return;
     }

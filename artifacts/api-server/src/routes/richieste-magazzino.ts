@@ -1,3 +1,4 @@
+import { operationalCentroId } from "../lib/serviceScope";
 import {
   Router,
   type IRouter,
@@ -463,7 +464,7 @@ async function buildCreate(
       supplier.stato !== "attivo" ||
       supplier.id === mensa.magazzinoId ||
       supplier.areaOperativaId !== mensa.areaOperativaId ||
-      !canAccessCentro(supplier.centroAscoltoId, actor.centroAscoltoId)
+      !canAccessCentro(supplier.centroAscoltoId, operationalCentroId(actor))
     )
       throw invalid(
         "Magazzino richiesto non disponibile nel contesto della Mensa",

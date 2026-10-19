@@ -174,7 +174,7 @@ export interface RichiestaMagazzinoCreate {
    */
   magazzinoRichiestoId?: number;
   /**
-   * Mensa assegnata; destinazione derivata dal server.
+   * Mensa della propria Area autorizzata dal ruolo; destinazione derivata dal server.
    * @minimum 1
    */
   mensaId?: number;
@@ -12563,6 +12563,10 @@ export type ListMagazziniMensaParams = {
 
 export type ListGiacenzeMensaParams = {
   magazzinoId: number;
+};
+
+export type SetUtenteMensa410 = {
+  error: string;
 };
 
 export type ListLottiMensaParams = {

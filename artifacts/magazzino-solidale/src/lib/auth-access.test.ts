@@ -1,3 +1,4 @@
+import { operationalCentroId } from "./service-scope";
 import { describe, expect, it } from "vitest";
 import {
   authUserCanOperateBolle,
@@ -56,4 +57,34 @@ describe("controlli accesso auth", () => {
       true,
     );
   });
+});
+
+it.each(["sociale", "mensa", "emporio"])(
+  "profilo %s: il Centro non limita l’Area",
+  (area) => {
+    expect(
+      operationalCentroId({
+        areaOperativaId: 5,
+        centroAscoltoId: 8,
+        aree: [area],
+      }),
+    ).toBeNull();
+    expect(
+      operationalCentroId({
+        areaOperativaId: null,
+        centroAscoltoId: 8,
+        aree: [area],
+      }),
+    ).toBe(8);
+  },
+);
+it("preserva il confine Centro dei moduli logistici e UDS", () => {
+  for (const area of ["magazzino", "logistica", "uds"])
+    expect(
+      operationalCentroId({
+        areaOperativaId: 5,
+        centroAscoltoId: 8,
+        aree: [area],
+      }),
+    ).toBe(8);
 });

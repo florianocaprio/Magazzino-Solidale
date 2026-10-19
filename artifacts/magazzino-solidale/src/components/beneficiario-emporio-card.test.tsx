@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   state: "non_abilitato",
   error: undefined as unknown,
   grant: true,
+  center: 2,
   mutate: vi.fn().mockResolvedValue({}),
 }));
 vi.mock("@workspace/api-client-react", () => ({
@@ -23,7 +24,13 @@ vi.mock("@workspace/api-client-react", () => ({
 }));
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
-    user: { id: 1, isAdmin: false, centroAscoltoId: 2 },
+    user: {
+      id: 1,
+      isAdmin: false,
+      centroAscoltoId: mocks.center,
+      areaOperativaId: 1,
+      aree: ["sociale"],
+    },
     hasArea: (a: string) => a === "sociale",
     hasPermission: () => mocks.grant,
   }),
@@ -41,6 +48,7 @@ beforeEach(() => {
   mocks.state = "non_abilitato";
   mocks.error = undefined;
   mocks.grant = true;
+  mocks.center = 2;
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -108,4 +116,11 @@ it("canonical denial hides cached eligibility", async () => {
   await mount();
   expect(host.textContent).not.toContain("emporioServizio.attivo");
   expect(host.querySelectorAll("button")).toHaveLength(0);
+});
+
+it("profilo sociale autorizzato: gestisce l’abilitazione anche per un altro Centro dell’Area", async () => {
+  mocks.center = 3;
+  await mount();
+  expect(host.querySelector<HTMLButtonElement>("button")?.disabled).toBe(false);
+  expect(host.textContent).toContain("emporioServizio.abilita");
 });

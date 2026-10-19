@@ -1,3 +1,4 @@
+import { operationalCentroId } from "../lib/serviceScope";
 import { Router, type RequestHandler } from "express";
 import {
   db,
@@ -128,7 +129,7 @@ router.get(
               : eq(beneficiariTable.areaOperativaId, actor.areaOperativaId),
             centroScopeFilter(
               beneficiariTable.centroAscoltoId,
-              actor.centroAscoltoId,
+              operationalCentroId(actor),
             ),
             zonaUdsScopeFilter(beneficiariTable.zonaUdsId, actor.zonaUdsId),
           ),
@@ -192,8 +193,8 @@ router.get(
           actor.isAdmin ||
           (actor.permessi.includes("emporio.eligibility.manage") &&
             actor.aree.includes("sociale") &&
-            (actor.centroAscoltoId == null ||
-              actor.centroAscoltoId === beneficiary.centroAscoltoId))
+            (operationalCentroId(actor) == null ||
+              operationalCentroId(actor) === beneficiary.centroAscoltoId))
             ? (right?.right.motivo ?? null)
             : null,
       };
@@ -234,8 +235,8 @@ router.post(
       if (
         !actor.isAdmin &&
         (!actor.aree.includes("sociale") ||
-          (actor.centroAscoltoId != null &&
-            actor.centroAscoltoId !== b.centroAscoltoId))
+          (operationalCentroId(actor) != null &&
+            operationalCentroId(actor) !== b.centroAscoltoId))
       )
         throw new EmporioScopeError(
           403,

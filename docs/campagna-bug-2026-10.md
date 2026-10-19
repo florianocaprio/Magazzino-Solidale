@@ -267,3 +267,88 @@ Entry point canonico eseguito: ledger initialized=true, 58/58, zero pending, mis
 4. Distinguere Assegna password temporanea da Invia link reset password. Provare Elimina su un record di prova collegato: lo storico deve restare e l’account risultare disattivato; solo record mai usati e privi di qualsiasi dipendenza sono cancellabili fisicamente.
 
 **UAT DA ESEGUIRE: BUG 01 non chiuso.** Attendere l’OK/KO reale di Floriano prima del prompt 02.
+
+
+## Chiarimento UAT 01 — accesso ai servizi per ruolo e Area
+
+Il 19 ottobre Floriano ha confermato positivamente la prova Utenti e chiarito:
+«Un operatore deve poter operare su tutte le mense dell'area, o i centri dell'area se abilitato, o empori dell'area se abilitato dal profilo».
+Questa istruzione sostituisce il precedente requisito di assegnazione individuale
+Utente–Mensa. Il prompt 02 resta in attesa dell'OK dopo la nuova prova su 8082.
+
+Intervento incrementale sullo stesso branch di campagna, da
+`d015622c29cfad2bd84869cb430564a794b27e9f`:
+
+- Eliminato il pannello di assegnazione Mensa dalla modifica Utenti e il relativo
+  componente. Il ruolo resta modificabile, con le protezioni già presenti.
+- Le autorizzazioni Mensa correnti sono derivate dal ruolo e da tutte le mense
+  dell'Area; valgono anche per richieste, rifornimenti, report e preparazione PDF.
+  Le vecchie assegnazioni attive/revocate non influenzano più gli accessi.
+- Nei servizi dei Centri, nelle anagrafiche e nelle abilitazioni Emporio, il Centro
+  anagrafico dell'operatore non limita più l'accesso agli altri Centri della stessa
+  Area. Interfaccia e report usano lo stesso confine. Conservati i permessi,
+  la validità territoriale e i controlli separati UDS e logistici.
+- Emporio operativo già delimitato per Area; adeguati anche il riepilogo della
+  directory Sociale e la gestione dell'abilitazione del beneficiario.
+- Nessuna migration o cancellazione dati: le tabelle di assegnazione e gli audit
+  restano conservati. Non cambiano le abilitazioni **dei beneficiari** ai servizi.
+- Impatto OpenAPI: GET delle assegnazioni marcato deprecato e mantenuto per lo
+  storico; PUT di assegnazione/revoca deprecato e dismesso con HTTP 410, senza
+  scritture. Client/Zod aggiornati esclusivamente con il codegen ufficiale.
+
+Verifiche e nuova installazione 8082: in corso; nessun esito UAT presunto sulla
+correzione. Gli eventuali errori dei primi giri di test sono conservati nelle
+evidenze private; i risultati finali saranno registrati separatamente.
+
+### File coinvolti nel chiarimento
+
+- `artifacts/api-server/src/lib/beneficiarioPolicy.ts`
+- `artifacts/api-server/src/lib/interventiSocialAccess.ts`
+- `artifacts/api-server/src/lib/mensaScope.ts`
+- `artifacts/api-server/src/lib/reporting/filterOptions.ts`
+- `artifacts/api-server/src/lib/reporting/filters.ts`
+- `artifacts/api-server/src/lib/reporting/prepare.ts`
+- `artifacts/api-server/src/lib/serviceScope.ts`
+- `artifacts/api-server/src/routes/beneficiari-fse.ts`
+- `artifacts/api-server/src/routes/beneficiari.ts`
+- `artifacts/api-server/src/routes/emporio-servizio.ts`
+- `artifacts/api-server/src/routes/interventi.ts`
+- `artifacts/api-server/src/routes/mensa.ts`
+- `artifacts/api-server/src/routes/report-integrato.ts`
+- `artifacts/api-server/src/routes/richieste-magazzino.ts`
+- `artifacts/api-server/src/routes/utenti-mense.ts`
+- `artifacts/api-server/tests/beneficiari-fse-api.test.ts`
+- `artifacts/api-server/tests/emporio-uat-f1.test.ts`
+- `artifacts/api-server/tests/helpers/m67a-mensa-fixture.ts`
+- `artifacts/api-server/tests/interventi-operativita-sociale.test.ts`
+- `artifacts/api-server/tests/interventi-viste-sociali.test.ts`
+- `artifacts/api-server/tests/interventi-workflow.test.ts`
+- `artifacts/api-server/tests/m67a-mensa-access.test.ts`
+- `artifacts/api-server/tests/mensa-magazzino-correttivo.test.ts`
+- `artifacts/api-server/tests/mensa.test.ts`
+- `artifacts/api-server/tests/reporting-m66-security.test.ts`
+- `artifacts/api-server/tests/scoping-beneficiario.test.ts`
+- `artifacts/api-server/tests/scoping-direct.test.ts`
+- `artifacts/magazzino-solidale/src/components/beneficiario-emporio-card.test.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiario-emporio-card.tsx`
+- `artifacts/magazzino-solidale/src/components/reporting/report-filters.tsx`
+- `artifacts/magazzino-solidale/src/components/utente-mense.tsx`
+- `artifacts/magazzino-solidale/src/lib/auth-access.test.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/mensa.ts`
+- `artifacts/magazzino-solidale/src/lib/service-scope.ts`
+- `artifacts/magazzino-solidale/src/pages/beneficiari.tsx`
+- `artifacts/magazzino-solidale/src/pages/beneficiario-dettaglio.tsx`
+- `artifacts/magazzino-solidale/src/pages/interventi.tsx`
+- `artifacts/magazzino-solidale/src/pages/reporting-dashboard.tsx`
+- `artifacts/magazzino-solidale/src/pages/utenti.test.tsx`
+- `artifacts/magazzino-solidale/src/pages/utenti.tsx`
+- `docs/campagna-bug-2026-10.md`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-client-react/src/generated/api.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/index.ts`
+- `lib/api-zod/src/generated/types/richiestaMagazzinoCreate.ts`
+- `lib/api-zod/src/generated/types/setUtenteMensa410.ts`
+
+I file generated derivano dal comando ufficiale `pnpm --filter @workspace/api-spec run codegen`. Il componente `utente-mense.tsx` è rimosso. I quattro documenti locali preesistenti sono esclusi e verificati per SHA-256.

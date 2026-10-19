@@ -43,10 +43,14 @@ it.each(["receiver", "requester", "manager", "mixed", "admin"])(
   async (name) => {
     const context = await agents[name].get("/api/mensa/mense");
     expect(context.status, context.text).toBe(200);
-    expect(context.body.map((m: { id: number }) => m.id)).toEqual(
+    expect(
+      context.body
+        .map((m: { id: number }) => m.id)
+        .sort((a: number, b: number) => a - b),
+    ).toEqual(
       name === "admin"
         ? expect.arrayContaining(f.canteens.map((m) => m.id))
-        : [f.canteens[0].id],
+        : f.canteens.map((m) => m.id).sort((a, b) => a - b),
     );
     const detail = await agents[name].get(
       `/api/richieste-magazzino/${requestId}`,
@@ -65,27 +69,27 @@ it.each(["receiver", "requester", "manager", "mixed", "admin"])(
   },
 );
 it.each(["receiver", "requester", "manager"])(
-  "M67-11 %s cannot read unassigned M2 in the same Area",
+  "M67-11 %s can read M2 in the same Area without assignment",
   async (name) => {
     expect(
       (await agents[name].get(`/api/richieste-magazzino/${otherId}`)).status,
-    ).toBe(404);
+    ).toBe(200);
     expect(
       (await agents[name].get(`/api/richieste-magazzino/${otherId}/storico`))
         .status,
-    ).toBe(404);
+    ).toBe(200);
     const list = await agents[name].get("/api/richieste-magazzino");
     expect(list.status, list.text).toBe(200);
-    expect(list.body.items.map((r: { id: number }) => r.id)).toEqual([
-      requestId,
-    ]);
+    expect(list.body.items.map((r: { id: number }) => r.id)).toEqual(
+      expect.arrayContaining([requestId, otherId]),
+    );
     expect(
       (
         await agents[name]
           .get("/api/mensa/trasferimenti")
           .query({ mensaId: f.canteens[1].id })
       ).status,
-    ).toBe(403);
+    ).toBe(200);
   },
 );
 it("M67-11 reports-only does not acquire request or supply access", async () => {
@@ -206,14 +210,14 @@ it("M67-10 receive-only receives the real M4 supply exactly once, without reques
     ).rows[0].n,
   ).toBe(1);
 });
-it("M67-03/11 revoking Mensa assignment and then read grant affects the same session", async () => {
+it("Area: vecchia API di assegnazione non modifica gli accessi; revoca ruolo efficace nella stessa sessione", async () => {
   const revoked = await agents.admin
     .put(`/api/utenti/${f.users.receiver.id}/mense/${f.canteens[0].id}`)
-    .send({ attiva: false, motivo: "Revoca sintetica M67-03" });
-  expect(revoked.status, revoked.text).toBe(200);
+    .send({ attiva: false, motivo: "Vecchia interfaccia" });
+  expect(revoked.status, revoked.text).toBe(410);
   expect(
     (await agents.receiver.get(`/api/richieste-magazzino/${requestId}`)).status,
-  ).toBe(404);
+  ).toBe(200);
   await db
     .update(ruoliTable)
     .set({ permessi: ["mensa.reports.view"] })

@@ -397,8 +397,7 @@ async function createFixture() {
     .update(utentiTable)
     .set({ ruoloId: role.id, areaOperativaId: rome.id })
     .where(eq(utentiTable.id, user.id));
-  // Le due Mense Roma sono assegnate esplicitamente: nessuna autorizzazione
-  // implicita dall'Area della fixture storica.
+  // Storico preesistente, conservato ma non più usato per autorizzare.
   await db.insert(utentiMenseTable).values(
     canteens.slice(0, 2).map((canteen) => ({
       utenteId: user.id,
@@ -860,7 +859,7 @@ describe("Modulo Mensa", () => {
       expect(await inventorySnapshot()).toEqual(before);
     });
 
-    it.each(["grant", "scope", "assegnazione"])(
+    it.each(["grant", "scope", "ruolo"])(
       "F4-T5: revoca %s nella sessione aperta nega riapertura e audit",
       async (kind) => {
         const { fixture, session, path, day } = await closedDay();
@@ -883,19 +882,14 @@ describe("Modulo Mensa", () => {
             .set({ areaOperativaId: fixture.milanId })
             .where(eq(utentiTable.id, fixture.userId));
         } else {
+          const [user] = await db
+            .select()
+            .from(utentiTable)
+            .where(eq(utentiTable.id, fixture.userId));
           await db
-            .update(utentiMenseTable)
-            .set({
-              attiva: false,
-              revocataDa: fixture.userId,
-              revocataAt: new Date(),
-            })
-            .where(
-              and(
-                eq(utentiMenseTable.utenteId, fixture.userId),
-                eq(utentiMenseTable.mensaId, fixture.mensaA),
-              ),
-            );
+            .update(ruoliTable)
+            .set({ aree: ["sociale"] })
+            .where(eq(ruoliTable.id, user.ruoloId!));
         }
         const before = await inventorySnapshot();
         const response = await session
@@ -1129,7 +1123,7 @@ describe("Modulo Mensa", () => {
     });
   });
 
-  it("M61-D1: revoca concorrente prevale prima del lock autorizzativo corrente", async () => {
+  it("Area: revoca concorrente del territorio prevale prima del lock autorizzativo corrente", async () => {
     const fixture = await createFixture(),
       session = await realMensaSession(fixture);
     const access = await session.post("/api/mensa/accessi/verifica").send({
@@ -1145,10 +1139,9 @@ describe("Modulo Mensa", () => {
       await blocker.query("BEGIN");
       const pid = (await blocker.query("select pg_backend_pid() as pid"))
         .rows[0].pid;
-      await blocker.query(
-        "select id from utenti_mense where utente_id=$1 for update",
-        [fixture.userId],
-      );
+      await blocker.query("select id from utenti where id=$1 for update", [
+        fixture.userId,
+      ]);
       pending = session
         .post("/api/mensa/pasti")
         .send({
@@ -1171,7 +1164,7 @@ describe("Modulo Mensa", () => {
       }
       expect(observed).toBe(true);
       await blocker.query(
-        "update utenti_mense set attiva=false,revocata_da=$1,revocata_at=now() where utente_id=$1",
+        "update utenti set area_operativa_id=null where id=$1",
         [fixture.userId],
       );
       await blocker.query("COMMIT");
@@ -1278,7 +1271,7 @@ describe("Modulo Mensa", () => {
   );
 
   it.each(["attiva", "revocata", "temporanea"])(
-    "M61-11: nessuna PII di altra Mensa nella stessa Area, affiliation %s",
+    "Area: nessuna PII di altra Area, abilitazione beneficiario %s",
     async (kind) => {
       const fixture = await createFixture();
       await db
@@ -1294,7 +1287,16 @@ describe("Modulo Mensa", () => {
             eq(utentiMenseTable.mensaId, fixture.mensaA),
           ),
         );
-      // Operatore assegnato soltanto a B; Mario appartiene ad A.
+      // Mario e la sua Mensa passano a un’altra Area: lo storico operatore
+      // non deve dare alcun accesso fuori dal territorio corrente.
+      await db
+        .update(menseTable)
+        .set({ areaOperativaId: fixture.milanId })
+        .where(eq(menseTable.id, fixture.mensaA));
+      await db
+        .update(beneficiariTable)
+        .set({ areaOperativaId: fixture.milanId })
+        .where(eq(beneficiariTable.id, fixture.beneficiaryId));
       if (kind === "revocata")
         await db
           .update(mensaAbilitazioniTable)
@@ -1343,7 +1345,7 @@ describe("Modulo Mensa", () => {
             dataInizio: dataServizioMensa(),
           })
         ).status,
-      ).toBe(403);
+      ).toBe(400);
     },
   );
 
@@ -1632,7 +1634,7 @@ describe("Modulo Mensa", () => {
     },
   );
 
-  it.each(["Area", "Centro", "grant"])(
+  it.each(["Area", "grant"])(
     "M61-08: revoca %s efficace nella stessa sessione reale",
     async (kind) => {
       const fixture = await createFixture();
@@ -1704,32 +1706,11 @@ describe("Modulo Mensa", () => {
     },
   );
 
-  it("M61-D1: Admin assegna e revoca esplicitamente con audit; Centro non concede altra Mensa", async () => {
+  it("Area: tutte le mense senza assegnazioni, Centro non limita, vecchia API dismessa", async () => {
     const fixture = await createFixture();
-    const [role] = await db
-      .insert(ruoliTable)
-      .values({
-        nome: `M61-admin-${rnd()}`,
-        isAdmin: true,
-        aree: ["mensa", "amministrazione"],
-        permessi: [],
-      })
-      .returning();
-    ids.roles.push(role.id);
-    const [admin] = await db
-      .insert(utentiTable)
-      .values({
-        username: `m61_admin_${rnd()}`,
-        passwordHash: "x",
-        nome: "Admin sintetico",
-        ruoloId: role.id,
-      })
-      .returning();
-    ids.users.push(admin.id);
-    const session = await realMensaSession({ ...fixture, userId: admin.id });
     const [center] = await db
       .insert(centriAscoltoTable)
-      .values({ nome: `D1 Centro ${rnd()}`, areaOperativaId: fixture.romeId })
+      .values({ nome: `Area Centro ${rnd()}`, areaOperativaId: fixture.romeId })
       .returning();
     ids.centers.push(center.id);
     await db
@@ -1737,54 +1718,40 @@ describe("Modulo Mensa", () => {
       .set({ centroAscoltoId: center.id })
       .where(eq(utentiTable.id, fixture.userId));
     await db
-      .update(magazziniTable)
-      .set({ centroAscoltoId: center.id })
-      .where(inArray(magazziniTable.id, fixture.warehouseIds.slice(0, 2)));
-    const url = `/api/utenti/${fixture.userId}/mense/${fixture.mensaB}`;
-    const revoke = await session
-      .put(url)
-      .send({ attiva: false, motivo: "Cambio incarico" });
-    expect(revoke.status, revoke.text).toBe(200);
-    expect(revoke.body).toMatchObject({ attiva: false, revocataDa: admin.id });
-    expect(
-      (
-        await session
-          .put(url)
-          .send({ attiva: false, motivo: "Cambio incarico" })
-      ).body.id,
-    ).toBe(revoke.body.id);
+      .delete(utentiMenseTable)
+      .where(eq(utentiMenseTable.utenteId, fixture.userId));
     const operator = await realMensaSession(fixture);
-    expect(
-      (await operator.get("/api/mensa/mense")).body.map(
-        (item: { id: number }) => item.id,
-      ),
-    ).toEqual([fixture.mensaA]);
+    const list = await operator.get("/api/mensa/mense");
+    expect(list.status, list.text).toBe(200);
+    expect(list.body.map((item: { id: number }) => item.id).sort()).toEqual(
+      [fixture.mensaA, fixture.mensaB].sort(),
+    );
+    for (const id of [fixture.mensaA, fixture.mensaB])
+      expect((await operator.get(`/api/mensa/mense/${id}`)).status).toBe(200);
     expect(
       (await operator.get(`/api/mensa/mense/${fixture.mensaMilan}`)).status,
     ).toBe(403);
-    expect(
-      (
-        await session
-          .put(url)
-          .send({ attiva: true, motivo: "Nuovo incarico esplicito" })
-      ).status,
-    ).toBe(200);
+    // Un nuovo Centro associato a B nella stessa Area non la nasconde.
+    await db
+      .update(magazziniTable)
+      .set({ centroAscoltoId: center.id })
+      .where(eq(magazziniTable.id, fixture.warehouseIds[1]));
+    await db
+      .update(utentiTable)
+      .set({ centroAscoltoId: null })
+      .where(eq(utentiTable.id, fixture.userId));
     expect((await operator.get("/api/mensa/mense")).body).toHaveLength(2);
-    const audit = await db
-      .select()
-      .from(auditEventiTable)
-      .where(
-        and(
-          eq(auditEventiTable.entitaTipo, "utente_mensa"),
-          eq(auditEventiTable.entitaId, revoke.body.id),
-        ),
-      )
-      .orderBy(auditEventiTable.id);
-    expect(audit.map((item) => item.azione)).toEqual([
-      "MENSA_OPERATORE_REVOCATO",
-      "MENSA_OPERATORE_ASSEGNATO",
-    ]);
-    expect(audit.every((item) => item.actorUserId === admin.id)).toBe(true);
+    const admin = await realAdminSession(fixture);
+    const retired = await admin
+      .put(`/api/utenti/${fixture.userId}/mense/${fixture.mensaB}`)
+      .send({ attiva: true, motivo: "Vecchia interfaccia" });
+    expect(retired.status, retired.text).toBe(410);
+    expect(
+      await db
+        .select()
+        .from(utentiMenseTable)
+        .where(eq(utentiMenseTable.utenteId, fixture.userId)),
+    ).toEqual([]);
   });
 
   it("M61-06: risposta persa post-commit e retry concorrenti hanno un solo scarico/ledger/audit", async () => {
@@ -1937,7 +1904,7 @@ describe("Modulo Mensa", () => {
       ),
     ).toBe(10);
   });
-  it("M61-D1: assegnazione esplicita, multi-Mensa e revoca nella stessa sessione reale", async () => {
+  it("Area: revoche storiche ignorate, cambio Area efficace nella stessa sessione reale", async () => {
     const fixture = await createFixture();
     const session = await realMensaSession(fixture);
     await db
@@ -1957,10 +1924,10 @@ describe("Modulo Mensa", () => {
       (await session.get("/api/mensa/mense")).body.map(
         (item: { id: number }) => item.id,
       ),
-    ).toEqual([fixture.mensaA]);
+    ).toEqual(expect.arrayContaining([fixture.mensaA, fixture.mensaB]));
     expect(
       (await session.get(`/api/mensa/mense/${fixture.mensaB}`)).status,
-    ).toBe(403);
+    ).toBe(200);
     const access = await session.post("/api/mensa/accessi/verifica").send({
       mensaId: fixture.mensaA,
       codiceTessera: fixture.cardCode,
@@ -1984,9 +1951,15 @@ describe("Modulo Mensa", () => {
           idempotencyKey: `m61-meal-${rnd()}`,
         })
       ).status,
-    ).toBe(403);
+    ).toBe(201);
+    expect((await session.get("/api/mensa/accessi")).status).toBe(200);
+    expect((await session.get("/api/mensa/mense")).body).toHaveLength(2);
+    await db
+      .update(utentiTable)
+      .set({ areaOperativaId: null })
+      .where(eq(utentiTable.id, fixture.userId));
     expect((await session.get("/api/mensa/accessi")).status).toBe(403);
-    expect((await session.get("/api/mensa/mense")).body).toEqual([]);
+    expect((await session.get("/api/mensa/mense")).status).toBe(403);
   });
 
   it.each(["beneficiario", "tessera", "abilitazione"])(
@@ -2274,7 +2247,7 @@ describe("Modulo Mensa", () => {
     ).toBe(400);
   });
 
-  it("applica al riepilogo gli scope area operativa, Centro di Ascolto e zona UDS", async () => {
+  it("riepilogo: tutta l’Area anche con Centro associato, filtro Zona UDS conservato", async () => {
     const fixture = await createFixture();
     const [centroA, centroB] = await db
       .insert(centriAscoltoTable)
@@ -2342,7 +2315,10 @@ describe("Modulo Mensa", () => {
       makeApp(fixture, ["mensa.view"], { centroAscoltoId: centroA.id }),
     ).get(path);
     expect(centerScoped.status).toBe(200);
-    expect(centerScoped.body).toEqual(expected);
+    expect(centerScoped.body).toEqual([
+      ...expected,
+      { beneficiarioId: scoped[1].id, stato: "non_abilitato" },
+    ]);
     const zoneScoped = await request(
       makeApp(fixture, ["mensa.view"], { zonaUdsId: zonaA.id }),
     ).get(path);

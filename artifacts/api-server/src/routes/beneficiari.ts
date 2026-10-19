@@ -20,7 +20,8 @@ import {
   beneficiarioCentroId,
   beneficiarioAreaOperativaId,
   beneficiarioZonaUdsId,
-} from "../lib/centroScope";
+  serviceCentroScopeFilter,
+} from "../lib/serviceScope";
 import {
   EMPORIO_DISABLED_MSG,
   UNITA_STRADA_DISABLED_MSG,
@@ -51,6 +52,22 @@ import {
 
 const router: IRouter = Router();
 router.use("/beneficiari", requireCurrentUdsScope);
+router.use("/beneficiari/:id", async (req, res, next) => {
+  const id = Number(req.params.id);
+  const boundary = serviceCentroScopeFilter(
+    beneficiariTable.centroAscoltoId, callerAreaOperativaId(req),
+  );
+  if (Number.isSafeInteger(id) && id > 0 && boundary) {
+    const [outside] = await db.select({ id: beneficiariTable.id })
+      .from(beneficiariTable)
+      .where(and(eq(beneficiariTable.id, id), sql`not (${boundary})`));
+    if (outside) {
+      res.status(403).json({ error: "Beneficiario fuori dall'Area autorizzata" });
+      return;
+    }
+  }
+  next();
+});
 
 const SOCIAL_SENSITIVE_FIELDS = new Set([
   "restrizioniAlimentari",
@@ -531,6 +548,8 @@ router.get("/beneficiari", requirePermission("beneficiari.view"), async (req, re
   }
   const areaOperativaFilter = areaOperativaScopeFilter(beneficiariTable.areaOperativaId, callerAreaOperativaId(req));
   if (areaOperativaFilter) conditions.push(areaOperativaFilter);
+  const centreAreaFilter = serviceCentroScopeFilter(beneficiariTable.centroAscoltoId, callerAreaOperativaId(req));
+  if (centreAreaFilter) conditions.push(centreAreaFilter);
   const zonaFilter = zonaUdsScopeFilter(beneficiariTable.zonaUdsId, callerZonaUdsId(req));
   if (zonaFilter) conditions.push(zonaFilter);
   if (attivo === "true") conditions.push(eq(beneficiariTable.attivo, true));
@@ -871,7 +890,7 @@ router.get("/beneficiari/:id", requirePermission("beneficiari.view"), async (req
   const id = Number(req.params.id);
   const [row] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  if (!canAccessBeneficiarioRecord(row, req)) {
+  if (!canAccessBeneficiarioRecord(row, req, callerCentroId(req))) {
     res.status(403).json({ error: "Beneficiario non accessibile per il tuo profilo" });
     return;
   }
@@ -1065,6 +1084,13 @@ router.patch("/beneficiari/:id", requirePermission("beneficiari.manage"), async 
     }
   }
   if (cid != null) delete updates.areaOperativaId;
+  if (cid != null && updates.centroAscoltoId != null) {
+    const [targetCentre] = await db.select({ area: centriAscoltoTable.areaOperativaId })
+      .from(centriAscoltoTable).where(eq(centriAscoltoTable.id, Number(updates.centroAscoltoId)));
+    if (!targetCentre || targetCentre.area !== cid) {
+      res.status(403).json({ error: "Centro fuori dall'Area autorizzata" }); return;
+    }
+  }
   if (zid != null) updates.zonaUdsId = zid;
 
   if ("statoAnagrafica" in updates) {
@@ -1271,7 +1297,7 @@ router.patch("/beneficiari/:id/stato", requirePermission("beneficiari.deactivate
   }
   const [existing] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!existing) { res.status(404).json({ error: "Beneficiario non trovato." }); return; }
-  if (!canAccessBeneficiarioRecord(existing, req)) { res.status(403).json({ error: "Beneficiario non accessibile." }); return; }
+  if (!canAccessBeneficiarioRecord(existing, req, callerCentroId(req))) { res.status(403).json({ error: "Beneficiario non accessibile." }); return; }
   const updated = await db.transaction(async (tx) => {
     const [row] = await tx.update(beneficiariTable).set({
       attivo: parsed.data.attivo,
@@ -1342,7 +1368,7 @@ async function scopedBeneficiario(
 > {
   const [beneficiario] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, id));
   if (!beneficiario) return { status: 404, error: "Beneficiario non trovato." } as const;
-  if (!canAccessBeneficiarioRecord(beneficiario, req)) return { status: 403, error: "Beneficiario non accessibile." } as const;
+  if (!canAccessBeneficiarioRecord(beneficiario, req, callerCentroId(req))) return { status: 403, error: "Beneficiario non accessibile." } as const;
   return { beneficiario } as const;
 }
 

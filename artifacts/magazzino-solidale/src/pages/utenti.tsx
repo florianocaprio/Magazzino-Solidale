@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { UtenteMense } from "@/components/utente-mense";
 import {
   useListUtenti,
   useCreateUtente,
@@ -899,13 +898,6 @@ export default function Utenti() {
             </div>
             {formError && (
               <p className="text-sm text-destructive">{formError}</p>
-            )}
-            {editing && (
-              <UtenteMense
-                key={editing.id}
-                utenteId={editing.id}
-                areaId={editing.areaOperativaId ?? null}
-              />
             )}
             <Button
               type="submit"

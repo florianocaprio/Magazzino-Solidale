@@ -145,20 +145,12 @@ async function directoryActor(f: Fixture) {
     .where(eq(utentiTable.id, f.user.id));
 }
 async function enable(f: Fixture, stato = "attivo") {
-  // Il diritto è concesso dal Sociale nel suo Centro; poi il cassiere torna
-  // al Centro 1, distinto sia dal beneficiario (2) sia dall'Emporio (3).
-  await db
-    .update(utentiTable)
-    .set({ centroAscoltoId: f.centers[1].id })
-    .where(eq(utentiTable.id, f.user.id));
+  // Il Sociale abilita il servizio anche dal Centro 1 per il beneficiario
+  // del Centro 2 nella stessa Area; il Centro del profilo non va cambiato.
   const r = await f.agent
     .post(`/api/emporio/beneficiari/${f.beneficiary.id}/abilitazione`)
     .send({ stato, motivo: `Decisione esplicita ${stato}` });
   expect(r.status, r.text).toBe(200);
-  await db
-    .update(utentiTable)
-    .set({ centroAscoltoId: f.centers[0].id })
-    .where(eq(utentiTable.id, f.user.id));
   return r;
 }
 const search = (f: Fixture, search: string, extra = {}) =>
@@ -415,7 +407,7 @@ describe("M6.2-A-F1 UAT", () => {
           .get(endpoint)
           .query({ beneficiarioIds: String(f.beneficiary.id) })
       ).body,
-    ).toEqual([]);
+    ).toEqual(result.body);
     expect(
       (await f.agent.get(endpoint).query({ beneficiarioIds: "1,bad" })).status,
     ).toBe(400);

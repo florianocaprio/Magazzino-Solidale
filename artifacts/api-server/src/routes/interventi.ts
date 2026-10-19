@@ -54,7 +54,7 @@ import {
   canAccessCentro,
   canAccessAreaOperativa,
   canAccessZonaUds,
-} from "../lib/centroScope";
+} from "../lib/serviceScope";
 import {
   isModuloAttivo,
   requireAnyModulo,

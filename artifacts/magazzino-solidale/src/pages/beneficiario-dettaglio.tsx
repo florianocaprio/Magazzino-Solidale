@@ -1,3 +1,4 @@
+import { operationalCentroId } from "@/lib/service-scope";
 import { CreditoRettificaDialog } from "@/components/credito-rettifica-dialog";
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "wouter";
@@ -1563,7 +1564,7 @@ export function EditBeneficiarioSheet({
   const canManageCredito =
     hasPermission("credito.quota.manage") && servizio?.stato === "attivo";
   const isAreaOperativaGlobal = user?.areaOperativaId == null;
-  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const lockedCentroId = operationalCentroId(user);
   const isCentroLocked = lockedCentroId != null;
   const { data: areaOperativaList } = useListAreeOperative({
     query: {

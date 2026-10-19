@@ -505,7 +505,7 @@ describe("Beneficiari — scoping per centro", () => {
     expect(res.status).toBe(403);
   });
 
-  it("POST auto-assegna e blocca il centro del caller", async () => {
+  it("POST rifiuta un Centro di un’altra Area senza assegnazioni implicite", async () => {
     const res = await request(
       makeScopedApp(beneficiariRouter, {
         id: operatoreId,
@@ -520,9 +520,31 @@ describe("Beneficiari — scoping per centro", () => {
         sesso: "M",
         centroAscoltoId: centroB,
       });
-    expect(res.status).toBe(201);
-    scope.beneficiarioIds.push(res.body.id);
-    expect(res.body.centroAscoltoId).toBe(centroA);
+    expect(res.status).toBe(400);
+  });
+
+  it("profilo sociale: crea, legge e modifica in un altro Centro della stessa Area", async () => {
+    const other = await createCentroRec(scope, { areaOperativaId: areaOperativaA });
+    const app = makeScopedApp(beneficiariRouter, {
+      id: operatoreId, centroAscoltoId: centroA, areaOperativaId: areaOperativaA,
+      aree: ["sociale"],
+    });
+    const created = await request(app).post("/beneficiari").send({
+      nome: "Area", cognome: "Condivisa", sesso: "M", centroAscoltoId: other.id,
+    });
+    expect(created.status, created.text).toBe(201);
+    scope.beneficiarioIds.push(created.body.id);
+    expect(created.body.centroAscoltoId).toBe(other.id);
+    const path = `/beneficiari/${created.body.id}`;
+    expect((await request(app).get(path)).status).toBe(200);
+    const updated = await request(app).patch(path).send({ nome: "Aggiornato", versione: created.body.versione });
+    expect(updated.status, updated.text).toBe(200);
+    const foreign = await request(app).patch(path).send({
+      centroAscoltoId: centroB, versione: updated.body.versione,
+    });
+    expect(foreign.status, foreign.text).toBe(403);
+    expect((await request(app).get(path)).body.centroAscoltoId).toBe(other.id);
+    expect((await request(app).delete(path)).status).toBe(204);
   });
 
   it("PATCH /:id fuori centro → 403", async () => {

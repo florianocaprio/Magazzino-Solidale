@@ -759,6 +759,16 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     });
   });
 
+  it("Area: scheda FSE leggibile da un altro Centro, mai da altra Area o Centro legacy esterno", async () => {
+    const own = await insertBeneficiary({ centroAscoltoId: centerRemote });
+    const local = app({ centroAscoltoId: centerA });
+    expect((await request(local).get(`/beneficiari/${own.id}/fse`)).status).toBe(200);
+    expect((await request(app({ areaOperativaId: areaB, centroAscoltoId: centerB }))
+      .get(`/beneficiari/${own.id}/fse`)).status).toBe(403);
+    const legacy = await insertBeneficiary({ areaOperativaId: null, centroAscoltoId: centerB });
+    expect((await request(local).get(`/beneficiari/${legacy.id}/fse`)).status).toBe(403);
+  });
+
   it("espone e aggiorna la scheda FSE applicando scope e validazione", async () => {
     const [profile] = await db
       .select()

@@ -462,6 +462,7 @@ import type {
   SessioneCassaEmporioRiga,
   SessioneCassaEmporioUpdate,
   SessioneCassaEmporioVersioneInput,
+  SetUtenteMensa410,
   SpesaEmporio,
   SpesaEmporioChiusuraInput,
   SpesaEmporioChiusuraResult,
@@ -38238,7 +38239,8 @@ export const getListUtenteMenseUrl = (utenteId: number) => {
 };
 
 /**
- * Solo amministratori; include revoche conservate. Nessuna assegnazione implicita.
+ * Solo amministratori; storico delle precedenti assegnazioni, senza effetto sugli accessi. Il ruolo abilita tutte le mense dell'Area dell'operatore.
+ * @deprecated
  */
 export const listUtenteMense = async (
   utenteId: number,
@@ -38294,6 +38296,10 @@ export type ListUtenteMenseQueryResult = NonNullable<
 >;
 export type ListUtenteMenseQueryError = ErrorType<unknown>;
 
+/**
+ * @deprecated
+ */
+
 export function useListUtenteMense<
   TData = Awaited<ReturnType<typeof listUtenteMense>>,
   TError = ErrorType<unknown>,
@@ -38322,15 +38328,16 @@ export const getSetUtenteMensaUrl = (utenteId: number, mensaId: number) => {
 };
 
 /**
- * Assegnazione/revoca esplicita con audit, senza hard delete; Area coerente obbligatoria all'assegnazione.
+ * Operazione dismessa; restituisce 410. Gli accessi Mensa dipendono dal ruolo e dall'Area, senza assegnazioni individuali.
+ * @deprecated
  */
 export const setUtenteMensa = async (
   utenteId: number,
   mensaId: number,
   assegnazioneMensaInput: AssegnazioneMensaInput,
   options?: RequestInit,
-): Promise<UtenteMensa> => {
-  return customFetch<UtenteMensa>(getSetUtenteMensaUrl(utenteId, mensaId), {
+): Promise<unknown> => {
+  return customFetch<unknown>(getSetUtenteMensaUrl(utenteId, mensaId), {
     ...options,
     method: "PUT",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -38339,7 +38346,7 @@ export const setUtenteMensa = async (
 };
 
 export const getSetUtenteMensaMutationOptions = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | SetUtenteMensa410>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -38388,10 +38395,13 @@ export type SetUtenteMensaMutationResult = NonNullable<
   Awaited<ReturnType<typeof setUtenteMensa>>
 >;
 export type SetUtenteMensaMutationBody = BodyType<AssegnazioneMensaInput>;
-export type SetUtenteMensaMutationError = ErrorType<void>;
+export type SetUtenteMensaMutationError = ErrorType<void | SetUtenteMensa410>;
 
+/**
+ * @deprecated
+ */
 export const useSetUtenteMensa = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | SetUtenteMensa410>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<

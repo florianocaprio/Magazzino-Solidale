@@ -60,7 +60,7 @@ import {
   areaOperativaScopeFilter,
   visibleMagazzinoIds,
   zonaUdsScopeFilter,
-} from "../lib/centroScope";
+} from "../lib/serviceScope";
 import { isDateOnly } from "../lib/interventiWorkflow";
 import { intervalloGiornoEuropeRome } from "../lib/interventiViste";
 import {

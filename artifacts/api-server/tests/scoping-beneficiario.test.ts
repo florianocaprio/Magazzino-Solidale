@@ -422,7 +422,7 @@ describe("Interventi — scoping via beneficiario", () => {
       ).status,
     ).toBe(403);
   });
-  it("lista: A vede gli interventi di benA, non quelli di benB o senza Centro", async () => {
+  it("lista: vede entrambi i Centri della propria Area, senza cartelle prive di Centro", async () => {
     const iA = await insertIntervento(scope, { beneficiarioId: benA });
     const iB = await insertIntervento(scope, { beneficiarioId: benB });
     const iNull = await insertIntervento(scope, { beneficiarioId: benNull });
@@ -433,7 +433,7 @@ describe("Interventi — scoping via beneficiario", () => {
     const ids = idsOf(res.body);
     expect(ids).toContain(iA);
     expect(ids).not.toContain(iNull);
-    expect(ids).not.toContain(iB);
+    expect(ids).toContain(iB);
   });
 
   it("lista: il caller globale vede tutto", async () => {
@@ -443,15 +443,15 @@ describe("Interventi — scoping via beneficiario", () => {
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([iA, iB]));
   });
 
-  it("GET /:id fuori centro → 403", async () => {
+  it("GET /:id altro Centro della stessa Area → 200", async () => {
     const iB = await insertIntervento(scope, { beneficiarioId: benB });
     const res = await request(appAs(interventiRouter, centroA)).get(
       `/interventi/${iB}`,
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
-  it("POST: non può creare per un beneficiario di un altro centro → 403", async () => {
+  it("POST: crea per un beneficiario di un altro Centro della stessa Area", async () => {
     const res = await request(appAs(interventiRouter, centroA))
       .post("/interventi")
       .send({
@@ -459,7 +459,8 @@ describe("Interventi — scoping via beneficiario", () => {
         dataIntervento: "2026-06-01",
         tipoIntervento: "pacco_alimentare",
       });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
+    scope.interventoIds.push(res.body.id);
   });
 
   it("POST: crea per un beneficiario del proprio centro", async () => {
@@ -474,11 +475,11 @@ describe("Interventi — scoping via beneficiario", () => {
     scope.interventoIds.push(res.body.id);
   });
 
-  it("PATCH IDOR: spostare l'intervento su un beneficiario di un altro centro → 403", async () => {
+  it("PATCH: il beneficiario dell’intervento resta immutabile anche nella stessa Area", async () => {
     const iA = await insertIntervento(scope, { beneficiarioId: benA });
     const res = await request(appAs(interventiRouter, centroA))
       .patch(`/interventi/${iA}`)
       .send({ beneficiarioId: benB });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(400);
   });
 });

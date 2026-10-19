@@ -52,7 +52,6 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: mocks.invalidate }),
 }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
-vi.mock("@/components/utente-mense", () => ({ UtenteMense: () => null }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, params?: { username?: string }) =>
@@ -152,6 +151,18 @@ describe("BUG 01 — azioni Utenti", () => {
         "utenti.remove",
       ]),
     );
+  });
+  it("in modifica consente il ruolo e non richiede assegnazioni Mensa", async () => {
+    await openActions();
+    await select("common.edit");
+    const role = document.querySelector<HTMLButtonElement>('[role="combobox"]');
+    expect(role).toBeTruthy();
+    expect(role!.disabled).toBe(false);
+    expect(button("utenti.saveChanges")).toBeTruthy();
+    expect(document.body.textContent).not.toContain(
+      "mensa.operatorAssignments",
+    );
+    expect(document.body.textContent).not.toContain("mensa.assignmentHint");
   });
   it("convalida e invia la password temporanea attraverso l'azione distinta dall'email", async () => {
     await openActions();

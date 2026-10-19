@@ -1,3 +1,4 @@
+import { operationalCentroId } from "@/lib/service-scope";
 import {
   useGetReportFilterOptions,
   type GetReportFilterOptionsSection,
@@ -81,12 +82,13 @@ export function getReportingFilterLocks(
   user: {
     areaOperativaId?: number | null;
     centroAscoltoId?: number | null;
+    aree?: string[];
     zonaUdsId?: number | null;
   } | null,
 ) {
   return {
     areaOperativaLocked: user?.areaOperativaId != null,
-    centreLocked: user?.centroAscoltoId != null,
+    centreLocked: operationalCentroId(user) != null,
     zoneLocked: user?.zonaUdsId != null,
   };
 }

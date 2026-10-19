@@ -17,7 +17,7 @@ export interface RichiestaMagazzinoCreate {
    */
   magazzinoRichiestoId?: number;
   /**
-   * Mensa assegnata; destinazione derivata dal server.
+   * Mensa della propria Area autorizzata dal ruolo; destinazione derivata dal server.
    * @minimum 1
    */
   mensaId?: number;

@@ -1,3 +1,4 @@
+import { operationalCentroId } from "@/lib/service-scope";
 import {
   getCurrentUser,
   listInterventiOperatori,
@@ -155,7 +156,7 @@ function InterventiSession({ identity }: { identity: string }) {
       hasPermission("sociale.interventi.view") &&
       (isGlobal || user.areaOperativaId != null),
     ) && !access.blocked;
-  const lockedCentroId = user?.centroAscoltoId ?? null;
+  const lockedCentroId = operationalCentroId(user);
   const isCentroLocked = lockedCentroId != null;
   const areaOperativaRequired = isGlobal && !filters.areaOperativaId;
   const effectiveAreaOperativaId = isGlobal

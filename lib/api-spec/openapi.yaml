@@ -10258,7 +10258,8 @@ paths:
     get:
       operationId: listUtenteMense
       tags: [utenti]
-      description: Solo amministratori; include revoche conservate. Nessuna assegnazione implicita.
+      deprecated: true
+      description: Solo amministratori; storico delle precedenti assegnazioni, senza effetto sugli accessi. Il ruolo abilita tutte le mense dell'Area dell'operatore.
       parameters:
         - {
             name: utenteId,
@@ -10280,7 +10281,8 @@ paths:
     put:
       operationId: setUtenteMensa
       tags: [utenti]
-      description: Assegnazione/revoca esplicita con audit, senza hard delete; Area coerente obbligatoria all'assegnazione.
+      deprecated: true
+      description: Operazione dismessa; restituisce 410. Gli accessi Mensa dipendono dal ruolo e dall'Area, senza assegnazioni individuali.
       parameters:
         - {
             name: utenteId,
@@ -10300,13 +10302,12 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/AssegnazioneMensaInput" }
       responses:
-        "200":
-          description: Assegnazione corrente
+        "410":
+          description: Assegnazioni individuali dismesse
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/UtenteMensa" }
+              schema: { type: object, required: [error], properties: { error: { type: string } } }
         "403": { description: Non amministratore }
-        "409": { description: Scope incompatibile }
 
   /mensa/logistica/lotti:
     get:
@@ -11286,7 +11287,7 @@ components:
           {
             type: integer,
             minimum: 1,
-            description: Mensa assegnata; destinazione derivata dal server.,
+            description: Mensa della propria Area autorizzata dal ruolo; destinazione derivata dal server.,
           }
         idempotencyKey: { type: string, minLength: 1, maxLength: 120 }
         tipoDestinatario:

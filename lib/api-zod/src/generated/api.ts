@@ -221,7 +221,9 @@ export const CreateRichiestaMagazzinoBody = zod.object({
     .number()
     .min(1)
     .optional()
-    .describe("Mensa assegnata; destinazione derivata dal server."),
+    .describe(
+      "Mensa della propria Area autorizzata dal ruolo; destinazione derivata dal server.",
+    ),
   idempotencyKey: zod
     .string()
     .min(1)
@@ -22444,7 +22446,8 @@ export const ListGiacenzeMensaResponse = zod.array(
 );
 
 /**
- * Solo amministratori; include revoche conservate. Nessuna assegnazione implicita.
+ * Solo amministratori; storico delle precedenti assegnazioni, senza effetto sugli accessi. Il ruolo abilita tutte le mense dell'Area dell'operatore.
+ * @deprecated
  */
 
 export const ListUtenteMenseParams = zod.object({
@@ -22464,7 +22467,8 @@ export const ListUtenteMenseResponseItem = zod.object({
 export const ListUtenteMenseResponse = zod.array(ListUtenteMenseResponseItem);
 
 /**
- * Assegnazione/revoca esplicita con audit, senza hard delete; Area coerente obbligatoria all'assegnazione.
+ * Operazione dismessa; restituisce 410. Gli accessi Mensa dipendono dal ruolo e dall'Area, senza assegnazioni individuali.
+ * @deprecated
  */
 
 export const SetUtenteMensaParams = zod.object({
@@ -22477,17 +22481,6 @@ export const setUtenteMensaBodyMotivoMax = 500;
 export const SetUtenteMensaBody = zod.object({
   attiva: zod.boolean(),
   motivo: zod.string().min(1).max(setUtenteMensaBodyMotivoMax),
-});
-
-export const SetUtenteMensaResponse = zod.object({
-  id: zod.number(),
-  utenteId: zod.number(),
-  mensaId: zod.number(),
-  attiva: zod.boolean(),
-  assegnataDa: zod.number(),
-  assegnataAt: zod.coerce.date(),
-  revocataDa: zod.number().nullish(),
-  revocataAt: zod.coerce.date().nullish(),
 });
 
 /**

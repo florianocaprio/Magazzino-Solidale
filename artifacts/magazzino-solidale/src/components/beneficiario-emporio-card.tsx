@@ -1,3 +1,4 @@
+import { operationalCentroId } from "@/lib/service-scope";
 import { RequiredField } from "./ui/required-field";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -71,8 +72,8 @@ export function BeneficiarioEmporioSection({
     hasPermission("emporio.eligibility.manage") &&
     (user?.isAdmin ||
       (hasArea("sociale") &&
-        (user?.centroAscoltoId == null ||
-          user.centroAscoltoId === beneficiario.centroAscoltoId)));
+        (operationalCentroId(user) == null ||
+          operationalCentroId(user) === beneficiario.centroAscoltoId)));
   const change = async (stato: EmporioAbilitazioneInputStato) => {
     setError("");
     setSubmitted(true);

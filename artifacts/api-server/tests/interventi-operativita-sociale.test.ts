@@ -968,6 +968,26 @@ describe("gestione operativa degli interventi Sociali", () => {
     expect(row.stato).toBe("in_corso");
   });
 
+  it("profilo sociale: opera su un altro Centro della stessa Area", async () => {
+    const [center] = await db.insert(centriAscoltoTable)
+      .values({ nome: `Secondo Centro Roma ${rnd()}`, areaOperativaId: roma }).returning();
+    ids.centri.push(center.id);
+    await db.update(beneficiariTable).set({ centroAscoltoId: center.id })
+      .where(eq(beneficiariTable.id, beneficiarioRoma));
+    try {
+      const id = await createIntervento({ stato: "da_pianificare" });
+      const app = makeApp(); // Operatore ancora associato al primo Centro.
+      const read = await request(app).get(`/interventi/${id}/operativita`);
+      expect(read.status, read.text).toBe(200);
+      const start = await request(app).post(`/interventi/${id}/avvia`)
+        .send({ versione: await versioneIntervento(id) });
+      expect(start.status, start.text).toBe(200);
+    } finally {
+      await db.update(beneficiariTable).set({ centroAscoltoId: centroRoma })
+        .where(eq(beneficiariTable.id, beneficiarioRoma));
+    }
+  });
+
   it("isola area operativa, centro e ambito UDS anche sugli ID operativi", async () => {
     const romaId = await createIntervento({ stato: "da_pianificare" });
     const milanoApp = makeApp({

@@ -820,6 +820,7 @@ export * from "./sessioneCassaEmporioStato";
 export * from "./sessioneCassaEmporioUpdate";
 export * from "./sessioneCassaEmporioValidazione";
 export * from "./sessioneCassaEmporioVersioneInput";
+export * from "./setUtenteMensa410";
 export * from "./spesaEmporio";
 export * from "./spesaEmporioChiusuraInput";
 export * from "./spesaEmporioChiusuraResult";
