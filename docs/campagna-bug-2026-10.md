@@ -586,3 +586,33 @@ un’Area automaticamente.
 
 **8082 aggiornata e pronta per la nuova UAT. Prompt 02 non avviato: si attende
 l’OK di Floriano.**
+
+## Rifinitura UAT: badge Disattivato in rosso tenue
+
+Richiesta esplicita di Floriano: colorare lo stato Disattivato con un’etichetta
+rossa tenue coerente con la pagina. Modificata una sola riga di
+`artifacts/magazzino-solidale/src/pages/utenti.tsx`: classi
+`bg-red-500/10 text-red-700`, mantenendo il badge esistente. Nessun cambiamento
+a permessi, dati, API o schema. L’altro file aggiornato è questo registro.
+
+Candidato WEB `2b15ed5f43ec8199628d98d6be42253beea0254e`. Verifiche effettive: installazione frozen lockfile,
+`pnpm run typecheck`, **736 test UI PASS** in 115 file, gruppo canonico API
+core **76 PASS** in 11 file (zero FAIL/SKIP). Gli altri gruppi API non sono
+stati ripetuti per questa modifica esclusivamente grafica. Nessun nuovo test
+aggiunto. Build Docker WEB PASS; budget entry **399,1/400 KiB gzip** invariato.
+Evidenze private: `/private/tmp/utenti-status-ui.log`,
+`/private/tmp/utenti-status-typecheck.log`, `/private/tmp/utenti-status-api-core`.
+
+Aggiornato soltanto WEB sulla **8082**: `magazzino-bugfix-uat-web:sha-2b15ed5f43ec`,
+image ID `sha256:758719f0d0d7b56433a63589155da192b10a08b24bbd7d0ad747c8b893029cd8`. API e PostgreSQL conservano
+container e data di avvio, verificati contro il preflight; ledger **58/58**
+senza discrepanze. HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: 200;
+`/api/utenti` senza sessione: 401. Configurazione Compose confrontata: cambia
+soltanto immagine/revisione WEB. Ricevuta e rollback privati in
+`/Users/florianocaprio/Backups/Magazzino-Solidale/UTENTI-STATUS-WEB-2b15ed5f43ec-2026-10-19T13-17-38-287Z`. Nessun recreate API/DB o nuova migration.
+
+File modificati: `artifacts/magazzino-solidale/src/pages/utenti.tsx` e
+`docs/campagna-bug-2026-10.md`. I quattro documenti locali preesistenti restano
+esclusi. Prova manuale: ricaricare Utenti sulla 8082 e verificare il badge
+Disattivato rosso tenue; UAT visiva di Floriano ancora attesa. Prompt 02 non
+avviato.
