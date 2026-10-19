@@ -18344,6 +18344,7 @@ export const ExecuteCreditoSolidaleRicaricaMensileBody = zod.object({
 export const listVolontariQueryScadutiDaMenoDiMesiMax = 120;
 
 export const ListVolontariQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1).optional(),
   centroAscoltoId: zod.coerce.number().optional(),
   search: zod.coerce.string().optional(),
   stato: zod.enum(["attivi", "non_attivi", "tutti"]).optional(),
@@ -18372,6 +18373,7 @@ export const ListVolontariQueryParams = zod.object({
 export const listVolontariResponseMaxConsegneTurnoMin = 0;
 
 export const ListVolontariResponseItem = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   nome: zod.string(),
   cognome: zod.string(),
@@ -18431,6 +18433,7 @@ export const createVolontarioBodyTwoMaxConsegneTurnoMin = 0;
 
 export const CreateVolontarioBody = zod.unknown().and(
   zod.object({
+    areaOperativaId: zod.number().nullish(),
     nome: zod.string(),
     cognome: zod.string(),
     tipoVolontario: zod.enum(["PERMANENTE", "TEMPORANEO"]).optional(),
@@ -18474,6 +18477,7 @@ export const BulkVolontariBody = zod.object({
   righe: zod.array(
     zod.unknown().and(
       zod.object({
+        areaOperativaId: zod.number().nullish(),
         nome: zod.string(),
         cognome: zod.string(),
         tipoVolontario: zod.enum(["PERMANENTE", "TEMPORANEO"]).optional(),
@@ -18750,6 +18754,7 @@ export const UpdateVolontarioServiceDayBody = zod.object({
 });
 
 export const AnalyzeVolontariImportQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().min(1).optional(),
   centroAscoltoId: zod.coerce.number().optional(),
 });
 
@@ -19050,6 +19055,7 @@ export const ConvertVolontarioToPermanentBody = zod.object({
 export const convertVolontarioToPermanentResponseMaxConsegneTurnoMin = 0;
 
 export const ConvertVolontarioToPermanentResponse = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   nome: zod.string(),
   cognome: zod.string(),
@@ -19117,6 +19123,7 @@ export const GetVolontarioQueryParams = zod.object({
 export const getVolontarioResponseMaxConsegneTurnoMin = 0;
 
 export const GetVolontarioResponse = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   nome: zod.string(),
   cognome: zod.string(),
@@ -19178,6 +19185,7 @@ export const UpdateVolontarioParams = zod.object({
 export const updateVolontarioBodyMaxConsegneTurnoMin = 0;
 
 export const UpdateVolontarioBody = zod.object({
+  areaOperativaId: zod.number().nullish(),
   nome: zod.string().optional(),
   cognome: zod.string().optional(),
   centroAscoltoId: zod.number().nullish(),
@@ -19211,6 +19219,7 @@ export const UpdateVolontarioBody = zod.object({
 export const updateVolontarioResponseMaxConsegneTurnoMin = 0;
 
 export const UpdateVolontarioResponse = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   nome: zod.string(),
   cognome: zod.string(),
@@ -19289,6 +19298,7 @@ export const DeleteVolontarioResponse = zod.object({
 });
 
 export const ListMezziResponseItem = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   codice: zod.string(),
   tipo: zod.string(),
@@ -19385,6 +19395,7 @@ export const GetMezzoParams = zod.object({
 });
 
 export const GetMezzoResponse = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   codice: zod.string(),
   tipo: zod.string(),
@@ -19449,6 +19460,7 @@ export const UpdateMezzoBody = zod.object({
 });
 
 export const UpdateMezzoResponse = zod.object({
+  areaOperativaId: zod.number().nullish(),
   id: zod.number(),
   codice: zod.string(),
   tipo: zod.string(),
@@ -19499,6 +19511,7 @@ export const DeleteMezzoResponse = zod.object({
 export const ListApprovazioniLogisticaResponse = zod.object({
   volontari: zod.array(
     zod.object({
+      areaOperativaId: zod.number().nullish(),
       id: zod.number(),
       nome: zod.string(),
       cognome: zod.string(),

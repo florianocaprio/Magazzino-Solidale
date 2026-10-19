@@ -1,3 +1,4 @@
+import { volunteerAreaFilter, volunteerCallerArea } from "../lib/volontariArea";
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
@@ -58,7 +59,7 @@ router.get("/dashboard/stats", async (req, res) => {
   const [magCount] = await db.select({ n: count() }).from(magazziniTable).where(andScoped(eq(magazziniTable.stato, "attivo"), centroScopeFilter(magazziniTable.centroAscoltoId, caller), areaOperativaScopeFilter(magazziniTable.areaOperativaId, areaOperativa)));
   const [prodCount] = await db.select({ n: count() }).from(prodottiTable).where(eq(prodottiTable.attivo, true));
   const [benCount] = await db.select({ n: count() }).from(beneficiariTable).where(andScoped(eq(beneficiariTable.attivo, true), centroScopeFilter(beneficiariTable.centroAscoltoId, caller), areaOperativaScopeFilter(beneficiariTable.areaOperativaId, areaOperativa)));
-  const [volCount] = await db.select({ n: count() }).from(volontariTable).where(andScoped(eq(volontariTable.attivo, true), centroScopeFilter(volontariTable.centroAscoltoId, caller), idSetScopeFilter(volontariTable.centroAscoltoId, areaOperativaCentroIds)));
+  const [volCount] = await db.select({ n: count() }).from(volontariTable).where(andScoped(eq(volontariTable.attivo, true), volunteerAreaFilter(await volunteerCallerArea(req))));
   const [consOggi] = await db.select({ n: count() }).from(consegneTable).where(andScoped(eq(consegneTable.dataPrevista, oggi), benScopeSql(sql`${consegneTable.beneficiarioId}`, caller, areaOperativa)));
   const [consMese] = await db.select({ n: count() }).from(consegneTable).where(andScoped(gte(consegneTable.dataPrevista, inizioMese), benScopeSql(sql`${consegneTable.beneficiarioId}`, caller, areaOperativa)));
   const [lottiScad] = await db.select({ n: count() }).from(lottiTable).where(andScoped(gt(lottiTable.quantitaResidua, "0"), lte(lottiTable.dataScadenza, in30str), magazzinoScopeFilter(lottiTable.magazzinoId, magIds)));

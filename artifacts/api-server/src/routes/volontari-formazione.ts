@@ -1,3 +1,4 @@
+import { canAccessVolunteer, volunteerMatchesCentre } from "../lib/volontariArea";
 import { Router, type IRouter, type Request } from "express";
 import {
   corsiDeiVolontariTable,
@@ -55,7 +56,7 @@ async function scopedVolunteer(req: Request) {
   if (!Number.isSafeInteger(id) || id <= 0) return { status: 400, error: "Volontario non valido" } as const;
   const [row] = await db.select().from(volontariTable).where(eq(volontariTable.id, id));
   if (!row) return { status: 404, error: "Volontario non trovato" } as const;
-  if (!canAccessCentro(row.centroAscoltoId, callerCentroId(req)) || !inVisibleCentroSet(row.centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req)))) {
+  if (!(await canAccessVolunteer(req, row))) {
     return { status: 403, error: "Volontario non accessibile" } as const;
   }
   return { row } as const;

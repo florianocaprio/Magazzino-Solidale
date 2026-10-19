@@ -47,9 +47,10 @@ export function volunteerScopeFingerprint(
 export async function resolveVolunteerOwnerScope(
   req: Request,
   requestedCenterId: number | null,
+  requestedAreaId?: number | null,
 ): Promise<VolunteerOwnerScope> {
   const callerCenterId = callerCentroId(req);
-  const callerAreaId = callerAreaOperativaId(req);
+  const callerAreaId = callerAreaOperativaId(req) ?? requestedAreaId ?? null;
   const effectiveCenterId = callerCenterId ?? requestedCenterId;
 
   if (effectiveCenterId != null) {
@@ -136,7 +137,7 @@ export function scopeContainsCenter(
   scope: StoredOwnerScope,
   centerId: number | null | undefined,
 ): boolean {
-  if (centerId == null) return scope.scopeTipo === "GLOBALE";
+  if (centerId == null) return scope.scopeTipo === "GLOBALE" || scope.scopeTipo === "AREA";
   if (scope.scopeTipo === "GLOBALE") return true;
   return scope.scopeCentroIdsSnapshot.includes(centerId);
 }

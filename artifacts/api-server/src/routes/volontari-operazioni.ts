@@ -1,3 +1,4 @@
+import { canAccessVolunteer, volunteerMatchesCentre } from "../lib/volontariArea";
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request } from "express";
 import {
@@ -56,11 +57,8 @@ async function loadScopedVolunteer(req: Request, lock = false): Promise<
   if (lock) query = query.for("update") as typeof query;
   const [row] = await query;
   if (!row) return { ok: false, status: 404, error: "Volontario non trovato" };
-  if (!canAccessCentro(row.centroAscoltoId, callerCentroId(req))) {
+  if (!(await canAccessVolunteer(req, row))) {
     return { ok: false, status: 403, error: "Volontario non accessibile per il tuo centro" };
-  }
-  if (!inVisibleCentroSet(row.centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req)))) {
-    return { ok: false, status: 403, error: "Volontario non accessibile per la tua area operativa" };
   }
   return { ok: true, row };
 }
@@ -352,7 +350,8 @@ router.post(
     if (!ids.length || ids.length > 2_000) { res.status(400).json({ error: "Seleziona da 1 a 2.000 volontari" }); return; }
     const visibleIds = await visibleCentroIds(callerAreaOperativaId(req));
     const rows = await db.select().from(volontariTable).where(inArray(volontariTable.id, ids));
-    const allowed = rows.filter((row) => canAccessCentro(row.centroAscoltoId, callerCentroId(req)) && inVisibleCentroSet(row.centroAscoltoId, visibleIds));
+    const access = await Promise.all(rows.map((row) => canAccessVolunteer(req, row)));
+    const allowed = rows.filter((row, index) => access[index]);
     if (allowed.length !== ids.length) { res.status(403).json({ error: "La selezione contiene volontari fuori perimetro" }); return; }
     const states = await operationalStatesForRows(db, allowed, todayRome());
     const items = await Promise.all(allowed.map(async (row) => {
@@ -401,7 +400,7 @@ router.post(
     if (ids.some((id) => !Number.isSafeInteger(id) || id <= 0)) { res.status(400).json({ error: "Selezione non valida" }); return; }
     const visibleIds = await visibleCentroIds(callerAreaOperativaId(req));
     const rows = await db.select().from(volontariTable).where(inArray(volontariTable.id, ids));
-    if (rows.length !== ids.length || rows.some((row) => !canAccessCentro(row.centroAscoltoId, callerCentroId(req)) || !inVisibleCentroSet(row.centroAscoltoId, visibleIds))) {
+    if (rows.length !== ids.length || (await Promise.all(rows.map((row) => canAccessVolunteer(req, row)))).some((allowed) => !allowed)) {
       res.status(403).json({ error: "La selezione contiene volontari non accessibili" }); return;
     }
     const groupId = randomUUID();
@@ -481,7 +480,7 @@ router.post(
       res.status(400).json({ error: "Data o stato della giornata non validi" }); return;
     }
     const centroAscoltoId = req.body?.centroAscoltoId == null ? scoped.row.centroAscoltoId : Number(req.body.centroAscoltoId);
-    if (centroAscoltoId != null && (!canAccessCentro(centroAscoltoId, callerCentroId(req)) || !inVisibleCentroSet(centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req))))) {
+    if (centroAscoltoId != null && (!(await volunteerMatchesCentre(db, scoped.row, centroAscoltoId)) || !canAccessCentro(centroAscoltoId, callerCentroId(req)) || !inVisibleCentroSet(centroAscoltoId, await visibleCentroIds(callerAreaOperativaId(req))))) {
       res.status(403).json({ error: "Centro della giornata non accessibile" }); return;
     }
     const state = await operationalStateForVolunteer(db, scoped.row.id, dataServizio, centroAscoltoId);

@@ -2,6 +2,10 @@ import type { i18n } from "i18next";
 
 const labels = {
   "it": {
+    "referenceCentre": "Centro di riferimento (facoltativo)",
+    "noReferenceCentre": "Nessun Centro di riferimento",
+    "areaHelp": "Operativo in tutti i Centri, mense ed empori dell’Area. Il Centro di riferimento non limita l’operatività.",
+    "areaMissing": "Area da assegnare",
     "cancelShift": "Annulla turno",
     "pending": "Da approvare",
     "rejected": "Respinto",
@@ -22,6 +26,10 @@ const labels = {
     "unavailable": "Non disponibile per questa data/fascia"
   },
   "en": {
+    "referenceCentre": "Reference Centre (optional)",
+    "noReferenceCentre": "No reference Centre",
+    "areaHelp": "Available throughout the Area, including Centres, canteens and emporiums. The reference Centre does not restrict operations.",
+    "areaMissing": "Area to assign",
     "cancelShift": "Cancel shift",
     "pending": "Pending approval",
     "rejected": "Rejected",
@@ -42,6 +50,10 @@ const labels = {
     "unavailable": "Unavailable for this date/slot"
   },
   "es": {
+    "referenceCentre": "Centro de referencia (opcional)",
+    "noReferenceCentre": "Sin Centro de referencia",
+    "areaHelp": "Disponible en todos los Centros, comedores y economatos del Área. El Centro de referencia no limita la actividad.",
+    "areaMissing": "Área pendiente",
     "cancelShift": "Anular turno",
     "pending": "Pendiente de aprobación",
     "rejected": "Rechazado",
@@ -62,6 +74,10 @@ const labels = {
     "unavailable": "No disponible para esta fecha/franja"
   },
   "fr": {
+    "referenceCentre": "Centre de référence (facultatif)",
+    "noReferenceCentre": "Aucun Centre de référence",
+    "areaHelp": "Disponible dans tous les Centres, cantines et épiceries de la zone. Le Centre de référence ne limite pas l’activité.",
+    "areaMissing": "Zone à attribuer",
     "cancelShift": "Annuler le service",
     "pending": "À approuver",
     "rejected": "Refusé",
@@ -82,6 +98,10 @@ const labels = {
     "unavailable": "Indisponible pour cette date/ce créneau"
   },
   "de": {
+    "referenceCentre": "Referenzzentrum (optional)",
+    "noReferenceCentre": "Kein Referenzzentrum",
+    "areaHelp": "Im gesamten Gebiet in Zentren, Kantinen und Sozialmärkten einsetzbar. Das Referenzzentrum beschränkt den Einsatz nicht.",
+    "areaMissing": "Gebiet zuweisen",
     "cancelShift": "Schicht stornieren",
     "pending": "Freigabe ausstehend",
     "rejected": "Abgelehnt",
@@ -102,6 +122,10 @@ const labels = {
     "unavailable": "Für dieses Datum/Zeitfenster nicht verfügbar"
   },
   "ar": {
+    "referenceCentre": "المركز المرجعي (اختياري)",
+    "noReferenceCentre": "لا يوجد مركز مرجعي",
+    "areaHelp": "متاح في جميع مراكز ومطاعم ومتاجر المنطقة. لا يقيّد المركز المرجعي نطاق العمل.",
+    "areaMissing": "يجب تعيين المنطقة",
     "cancelShift": "إلغاء المناوبة",
     "pending": "بانتظار الموافقة",
     "rejected": "مرفوض",

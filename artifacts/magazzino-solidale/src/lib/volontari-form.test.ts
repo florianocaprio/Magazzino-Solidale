@@ -12,6 +12,7 @@ const validDraft = (): VolunteerDraft => ({
   nome: "Ada",
   cognome: "Rossi",
   tipoVolontario: "PERMANENTE",
+  areaOperativaId: 1,
   centroAscoltoId: 1,
   ruoloVolontarioId: 2,
   telefono: "",
@@ -40,6 +41,7 @@ describe("form volontari — validazione e payload", () => {
   });
 
   it.each([
+    ["areaOperativaId", null],
     ["nome", ""],
     ["cognome", ""],
     ["luogoNascita", ""],

@@ -1259,7 +1259,25 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     expect(serviceRow.esitoCommit).toBe("CONFLITTO_GIORNATA_ESISTENTE");
   });
 
-  it("BUG15: la giornata temporanea di una risorsa trasversale vale soltanto nel Centro autorizzato", async () => {
+  it("Area volontario: importa senza Centro di riferimento nell’Area scelta", async () => {
+    const [centre] = await db.select().from(centriAscoltoTable).where(eq(centriAscoltoTable.id, defaultCenterId));
+    const [role] = await db.select().from(ruoliVolontariTable).where(eq(ruoliVolontariTable.id, ruoloId));
+    const surname = unique("AreaImport");
+    const preview = await request(app()).post(`/volontari/import/analizza?areaOperativaId=${centre.areaOperativaId}`)
+      .set("content-type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      .set("x-file-name", "area-senza-centro.xlsx")
+      .send(workbook([[1, "", `${surname} Ada`, "Roma", "1980-01-02", "Via Area 1", "", todayRome(), "2099-12-31", "", "", "", "", role.nome]]));
+    expect(preview.status, preview.text).toBe(201);
+    scope.importazioneVolontariIds.push(preview.body.importazioneId);
+    const commit = await request(app()).post("/volontari/import/conferma").send({ importazioneId: preview.body.importazioneId, righe: [{ numeroRiga: preview.body.righe[0].numeroRiga, ruoloVolontarioId: ruoloId }] });
+    const [created] = await db.select().from(volontariTable).where(eq(volontariTable.cognome, surname));
+    if (created) scope.volontarioIds.push(created.id);
+    expect(commit.body, commit.text).toMatchObject({ creati: 1, errori: 0 });
+    expect(created).toMatchObject({ areaOperativaId: centre.areaOperativaId, centroAscoltoId: null });
+    expect(created.matricola).toBeTruthy();
+  });
+
+  it("Area volontario: la giornata temporanea permette servizio anche in altri Centri della stessa Area", async () => {
     const day = addCalendarDays(todayRome(), 1);
     const volunteer = await approve(await createVolunteer({ tipo: "TEMPORANEO", dataServizio: day }));
     await db.update(volontariTable).set({ centroAscoltoId: null }).where(eq(volontariTable.id, volunteer.id));
@@ -1270,7 +1288,7 @@ describe("Volontari 2.0 — import, registro, privacy e integrazioni", () => {
     expect(available.body.map((v: { id: number }) => v.id)).toContain(volunteer.id);
     const unavailable = await request(app()).get("/volontari").query({ centroAscoltoId: otherCentre, dataRiferimento: day, stato: "attivi" });
     expect(unavailable.status).toBe(200);
-    expect(unavailable.body.map((v: { id: number }) => v.id)).not.toContain(volunteer.id);
+    expect(unavailable.body.map((v: { id: number }) => v.id)).toContain(volunteer.id);
   });
 
   it("BUG02: preview respinge nascite future e la conferma non accetta correzioni future", async () => {

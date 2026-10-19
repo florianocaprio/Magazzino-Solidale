@@ -20,6 +20,7 @@ export const VOLONTARIO_VALIDATION_FIELDS = [
   "telefono",
   "telefonoSecondario",
   "email",
+  "areaOperativaId",
   "centroAscoltoId",
   "ruoloVolontarioId",
   "maxConsegneTurno",
@@ -38,6 +39,7 @@ export type VolontarioFieldErrors = Partial<
 export const VOLONTARIO_EDITABLE_FIELDS = [
   "nome",
   "cognome",
+  "areaOperativaId",
   "centroAscoltoId",
   "telefono",
   "telefonoSecondario",
@@ -74,6 +76,7 @@ export type VolontarioValidationState = Record<string, unknown> & {
   telefono?: unknown;
   telefonoSecondario?: unknown;
   email?: unknown;
+  areaOperativaId?: unknown;
   centroAscoltoId?: unknown;
   ruoloVolontarioId?: unknown;
   maxConsegneTurno?: unknown;

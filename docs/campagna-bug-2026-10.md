@@ -854,3 +854,100 @@ Nessuna decisione pendente. BUG 02/03/15 **sviluppati e verificati automaticamen
 l’autorizzazione persistente «ricompila sempre 8082». La fase distinta ##test
 resta il prossimo incarico; nessun altro prompt avviato. Main e produzione
 non modificati. Quattro documenti locali preesistenti preservati ed esclusi.
+
+## Precisazione UAT consegna 02 — volontari assegnati per Area
+
+Nuovo mandato esplicito di Floriano: il volontario è assegnato a un’Area e
+può operare in tutti i suoi Centri, mense ed empori; il Centro di riferimento
+è facoltativo e organizzativo. Questa decisione sostituisce il precedente
+vincolo operativo per Centro nel blocco B. Nessuna assegnazione automatica di
+ruoli o permessi: l’account continua a usare profilo e Area della consegna 01,
+che resta chiusa. Lo screenshot locale indicato non era disponibile; la
+richiesta testuale è sufficiente e autorevole.
+
+Intervento incrementale:
+
+- `volontari.area_operativa_id`, FK/indice e migrazione append-only
+  `20261019_volontari_area_operativa.sql`. Backfill solo dall’Area certa del
+  Centro esistente; nessuna Area inventata per i legacy senza associazione.
+  I NULL storici rimangono riparabili dall’amministratore globale e non sono
+  risorse condivise globalmente operative. Area richiesta dai writer API;
+  colonna nullable solo per conservare i legacy non classificabili.
+- Centro di riferimento facoltativo e coerente con l’Area; controllo DB
+  aggiuntivo. Per client precedenti/seeding, un Centro con Area certa può
+  valorizzare il nuovo campo, senza ampliare i permessi.
+- Modulo, modifica, filtri, lista desktop/mobile e import: Area esplicita,
+  Area del profilo preimpostata, Centri della stessa Area. Cambiare Area
+  azzera il riferimento incompatibile. Matricole generabili anche senza
+  Centro, dalla configurazione per Area, senza rinumerare quelle esistenti.
+- Elenchi, dettagli, approvazione, dossier, operazioni e formazione autorizzati
+  per Area. Turni/consegne/bolle propongono e accettano volontari dell’Area
+  di servizio anche con un diverso Centro di riferimento. Un’Area diversa
+  resta vietata; rimangono approvazione, assicurazione, sospensioni, conflitti
+  fra Centri, carico e finestra di sette giorni.
+- Giornata temporanea valida nella medesima Area e data, anche prestando
+  servizio in un altro Centro; il Centro della giornata resta un fatto
+  storico, non una limitazione al Centro di riferimento. Giorni annullati,
+  assenti o di altre date non rendono operativo il volontario.
+- Mezzo personale segue l’Area del proprietario anche senza Centro;
+  visibilità, accesso diretto, modifica, approvazione e assegnazioni protetti.
+  Politiche dei mezzi dell’associazione conservate.
+- Registro/report/export includono i volontari senza Centro della propria
+  Area. Nuovi snapshot includono Area; eventi, catene hash, iscrizioni,
+  matricole ed emissioni preesistenti non riscritti.
+
+Prima validazione completa: 1.508 API PASS e 4 skip preesistenti su originali
+esterni; cinque nuovi test di appartenenza/operatività/migrazione e import
+per Area senza Centro. UI 752 PASS; typecheck e codegen riproducibile PASS.
+Dopo l’ultima pulizia delle guardie per Area sono in corso le esecuzioni
+finali API/report/UI/browser: esiti e installazione nel successivo checkpoint
+documentale. UAT personale DA ESEGUIRE; nessun avvio di altri prompt.
+
+### File della precisazione per Area
+
+- `artifacts/api-server/src/lib/logisticaPolicy.ts`
+- `artifacts/api-server/src/lib/reporting/volunteers.ts`
+- `artifacts/api-server/src/lib/volontariArea.ts`
+- `artifacts/api-server/src/lib/volontariLedger.ts`
+- `artifacts/api-server/src/lib/volontariMatricola.ts`
+- `artifacts/api-server/src/lib/volontariOperational.ts`
+- `artifacts/api-server/src/lib/volontariRegisterResolver.ts`
+- `artifacts/api-server/src/lib/volontariScope.ts`
+- `artifacts/api-server/src/lib/volontariValidation.ts`
+- `artifacts/api-server/src/routes/approvazioni-logistica.ts`
+- `artifacts/api-server/src/routes/bolle.ts`
+- `artifacts/api-server/src/routes/consegne.ts`
+- `artifacts/api-server/src/routes/dashboard.ts`
+- `artifacts/api-server/src/routes/mezzi.ts`
+- `artifacts/api-server/src/routes/volontari-export.ts`
+- `artifacts/api-server/src/routes/volontari-formazione.ts`
+- `artifacts/api-server/src/routes/volontari-import.ts`
+- `artifacts/api-server/src/routes/volontari-operazioni.ts`
+- `artifacts/api-server/src/routes/volontari.ts`
+- `artifacts/api-server/tests/logistica-hardening.test.ts`
+- `artifacts/api-server/tests/logistica-reconciliation.test.ts`
+- `artifacts/api-server/tests/scope-helpers.ts`
+- `artifacts/api-server/tests/scoping-direct.test.ts`
+- `artifacts/api-server/tests/volontari-2-api.test.ts`
+- `artifacts/api-server/tests/volontari-area-api.test.ts`
+- `artifacts/api-server/tests/volontari-save-validation-api.test.ts`
+- `artifacts/magazzino-solidale/e2e/volontari-workflows.spec.ts`
+- `artifacts/magazzino-solidale/src/components/volontari/volontari-import-dialog.tsx`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/logisticaCampaign.ts`
+- `artifacts/magazzino-solidale/src/lib/volontari-form.test.ts`
+- `artifacts/magazzino-solidale/src/lib/volontari-form.ts`
+- `artifacts/magazzino-solidale/src/pages/turni.tsx`
+- `artifacts/magazzino-solidale/src/pages/volontari.tsx`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/analyzeVolontariImportParams.ts`
+- `lib/api-zod/src/generated/types/approvazioneVolontario.ts`
+- `lib/api-zod/src/generated/types/listVolontariParams.ts`
+- `lib/api-zod/src/generated/types/mezzo.ts`
+- `lib/api-zod/src/generated/types/volontario.ts`
+- `lib/api-zod/src/generated/types/volontarioFieldErrors.ts`
+- `lib/api-zod/src/generated/types/volontarioInput.ts`
+- `lib/api-zod/src/generated/types/volontarioUpdate.ts`
+- `lib/db/src/schema/volontari.ts`
+- `lib/db/updates/20261019_volontari_area_operativa.sql`

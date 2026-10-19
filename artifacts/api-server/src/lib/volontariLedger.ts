@@ -34,6 +34,7 @@ type VolunteerSnapshotSource = Pick<
   | "dataIscrizione"
   | "progressivoRegistro"
   | "tipoVolontario"
+  | "areaOperativaId"
   | "centroAscoltoId"
   | "ruoloVolontarioId"
   | "ruolo"
@@ -79,6 +80,7 @@ async function volunteerIdentitySnapshot(
     dataIscrizione: volunteer.dataIscrizione ?? null,
     progressivoRegistro: volunteer.progressivoRegistro,
     tipoVolontario: volunteer.tipoVolontario,
+    areaOperativaId: volunteer.areaOperativaId ?? null,
     centroAscoltoId: volunteer.centroAscoltoId ?? null,
     centroAscoltoNome: center?.nome ?? null,
     ruoloVolontarioId: volunteer.ruoloVolontarioId ?? null,

@@ -539,6 +539,7 @@ async function loadConsegne(req: Request, options: ConsegneListOptions) {
       volStatoApprovazione: volontariTable.statoApprovazione,
       volAttivo: volontariTable.attivo,
       volTipo: volontariTable.tipoVolontario,
+      volArea: volontariTable.areaOperativaId,
     })
     .from(consegneTable)
     .leftJoin(
@@ -576,6 +577,7 @@ async function loadConsegne(req: Request, options: ConsegneListOptions) {
       statoApprovazione: string;
       attivo: boolean;
       tipoVolontario: string;
+      areaOperativaId: number | null;
     }>
   >();
   for (const row of rows) {
@@ -593,6 +595,7 @@ async function loadConsegne(req: Request, options: ConsegneListOptions) {
         statoApprovazione: row.volStatoApprovazione,
         attivo: row.volAttivo,
         tipoVolontario: row.volTipo,
+        areaOperativaId: row.volArea,
       });
       volunteerRowsByDate.set(row.c.dataPrevista, current);
     }

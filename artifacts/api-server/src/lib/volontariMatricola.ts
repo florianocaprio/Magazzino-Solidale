@@ -161,31 +161,16 @@ async function identifierScope(
   executor: typeof db | VolontariTx,
   config: PermanentIdentifierConfig,
   centerId: number | null,
+  volunteerAreaId?: number | null,
 ) {
   if (config.ambitoProgressivo === "GLOBALE" && !config.includiCodiceArea)
     return { scopeTipo: "GLOBALE" as const, scopeKey: "GLOBALE", areaId: null, areaCode: null };
-  if (centerId == null)
-    throw new VolunteerIdentifierError(
-      "CENTRO_MATRICOLA_ASSENTE",
-      "Seleziona un Centro associato a un'Area per generare la matricola",
-    );
   const [center] = await executor
-    .select({
-      areaId: centriAscoltoTable.areaOperativaId,
-      areaCode: areeOperativeTable.codiceMatricola,
-      areaSigla: areeOperativeTable.sigla,
-    })
-    .from(centriAscoltoTable)
-    .leftJoin(
-      areeOperativeTable,
-      eq(centriAscoltoTable.areaOperativaId, areeOperativeTable.id),
-    )
-    .where(eq(centriAscoltoTable.id, centerId));
+    .select({ areaId: areeOperativeTable.id, areaCode: areeOperativeTable.codiceMatricola, areaSigla: areeOperativeTable.sigla })
+    .from(areeOperativeTable)
+    .where(volunteerAreaId != null ? eq(areeOperativeTable.id, volunteerAreaId) : sql`${areeOperativeTable.id} = (select area_operativa_id from centri_di_ascolto where id = ${centerId})`);
   if (!center?.areaId)
-    throw new VolunteerIdentifierError(
-      "CODICE_AREA_MATRICOLA_ASSENTE",
-      "Il Centro non è associato a un'Area operativa",
-    );
+    throw new VolunteerIdentifierError("CODICE_AREA_MATRICOLA_ASSENTE", "Assegna un’Area Operativa al volontario per generare la matricola");
   const areaCode = (center.areaCode ?? center.areaSigla)?.trim().toUpperCase() ?? null;
   if (config.includiCodiceArea && !areaCode)
     throw new VolunteerIdentifierError(
@@ -206,8 +191,9 @@ async function nextAvailablePermanentIdentifier(
   executor: typeof db | VolontariTx,
   config: Awaited<ReturnType<typeof activeConfiguration>>,
   centerId: number | null,
+  volunteerAreaId?: number | null,
 ) {
-  const scope = await identifierScope(executor, config, centerId);
+  const scope = await identifierScope(executor, config, centerId, volunteerAreaId);
   const [counter] = await executor
     .select()
     .from(progressiviMatricoleVolontariTable)
@@ -241,9 +227,10 @@ async function nextAvailablePermanentIdentifier(
 
 export async function previewPermanentVolunteerIdentifier(
   centerId: number | null,
+  volunteerAreaId?: number | null,
 ): Promise<PermanentIdentifierPreview> {
   const config = await activeConfiguration(db);
-  const next = await nextAvailablePermanentIdentifier(db, config, centerId);
+  const next = await nextAvailablePermanentIdentifier(db, config, centerId, volunteerAreaId);
   return {
     matricola: next.matricola,
     matricolaNormalizzata: next.normalized,
@@ -322,11 +309,12 @@ export async function assignPermanentVolunteerIdentifier(
 ): Promise<string> {
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('volontari-identificativi'))`);
   const config = await activeConfiguration(tx);
-  const scope = await identifierScope(tx, config, centerId);
+  const [volunteer] = await tx.select({ area: volontariTable.areaOperativaId }).from(volontariTable).where(eq(volontariTable.id, volunteerId));
+  const scope = await identifierScope(tx, config, centerId, volunteer?.area);
   await tx.execute(
     sql`SELECT pg_advisory_xact_lock(hashtext('volontari-matricole'), hashtext(${`${config.id}:${scope.scopeKey}`}))`,
   );
-  const next = await nextAvailablePermanentIdentifier(tx, config, centerId);
+  const next = await nextAvailablePermanentIdentifier(tx, config, centerId, volunteer?.area);
   if (
     expectedPreview &&
     (expectedPreview.configurazioneId !== config.id ||

@@ -190,13 +190,11 @@ function TurniPlanner({ effectiveCentro, selectedArea, centri }: { effectiveCent
       (volontari ?? []).filter((v, idx, all) => {
         if (all.findIndex((x) => x.id === v.id) !== idx) return false;
         const centroOk =
-          v.centroAscoltoId == null ||
-          effectiveCentro == null ||
-          v.centroAscoltoId === effectiveCentro;
+          v.areaOperativaId === selectedArea;
         const approved = (v.statoApprovazione ?? "approvato") === "approvato";
         return centroOk && approved;
       }),
-    [volontari, effectiveCentro],
+    [volontari, selectedArea],
   );
 
   const { data: mezzi, isFetching: fetchingMezzi, isError: errorMezzi } = useListMezzi();
@@ -205,15 +203,14 @@ function TurniPlanner({ effectiveCentro, selectedArea, centri }: { effectiveCent
       (mezzi ?? []).filter((m, idx, all) => {
         if (all.findIndex((x) => x.id === m.id) !== idx) return false;
         const centroOk =
-          m.effectiveCentroId == null ||
-          effectiveCentro == null ||
-          m.effectiveCentroId === effectiveCentro;
+          m.volontarioId != null ? m.areaOperativaId === selectedArea :
+          m.effectiveCentroId == null || m.effectiveCentroId === effectiveCentro;
         const approved =
           (m.statoApprovazione ?? "approvato") === "approvato" &&
           m.stato === "disponibile";
         return centroOk && approved;
       }),
-    [mezzi, effectiveCentro],
+    [mezzi, effectiveCentro, selectedArea],
   );
 
   const { data: turni } = useListTurni(

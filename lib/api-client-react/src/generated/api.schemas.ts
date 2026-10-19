@@ -1580,6 +1580,8 @@ export const VolontarioInputTipoVolontario = {
 } as const;
 
 export type VolontarioInput = unknown & {
+  /** @nullable */
+  areaOperativaId?: number | null;
   nome: string;
   cognome: string;
   tipoVolontario?: VolontarioInputTipoVolontario;
@@ -8202,6 +8204,8 @@ export const VolontarioStatoApprovazione = {
 } as const;
 
 export interface Volontario {
+  /** @nullable */
+  areaOperativaId?: number | null;
   id: number;
   nome: string;
   cognome: string;
@@ -8271,6 +8275,8 @@ export interface Volontario {
 }
 
 export interface VolontarioUpdate {
+  /** @nullable */
+  areaOperativaId?: number | null;
   nome?: string;
   cognome?: string;
   /** @nullable */
@@ -8310,6 +8316,7 @@ export interface VolontarioUpdate {
 }
 
 export interface VolontarioFieldErrors {
+  areaOperativaId?: string;
   nome?: string;
   cognome?: string;
   matricola?: string;
@@ -8899,6 +8906,8 @@ export const MezzoStatoApprovazione = {
 } as const;
 
 export interface Mezzo {
+  /** @nullable */
+  areaOperativaId?: number | null;
   id: number;
   codice: string;
   tipo: string;
@@ -8977,6 +8986,8 @@ export interface ActionResult {
 }
 
 export interface ApprovazioneVolontario {
+  /** @nullable */
+  areaOperativaId?: number | null;
   id: number;
   nome: string;
   cognome: string;
@@ -12031,6 +12042,10 @@ export type ExecuteCreditoSolidaleRicaricaMensile410 = {
 };
 
 export type ListVolontariParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   centroAscoltoId?: number;
   search?: string;
   stato?: ListVolontariStato;
@@ -12106,6 +12121,10 @@ export type PreviewBulkVolontariInsurance200 = {
 export type GetVolontarioDossier200 = { [key: string]: unknown };
 
 export type AnalyzeVolontariImportParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   centroAscoltoId?: number;
 };
 

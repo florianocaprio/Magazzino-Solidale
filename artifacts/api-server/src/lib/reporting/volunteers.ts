@@ -1,6 +1,6 @@
-import { centriAscoltoTable, volontariTable } from "@workspace/db";
+import { volunteerAreaFilter, volunteerContextFilter } from "../volontariArea";
+import { volontariTable } from "@workspace/db";
 import { and } from "drizzle-orm";
-import { centroScopeFilter, idSetScopeFilter } from "../centroScope";
 import { operationalStatesForRows } from "../volontariOperational";
 import { todayRome } from "../volontariDomain";
 import { isReportModuleActive, reportExecutor } from "./queryContext";
@@ -19,36 +19,19 @@ export async function volunteerReportPanel(
   )
     return emptyReportPanel();
   const executor = reportExecutor();
-  const centres =
-    filters.areaOperativaId == null
-      ? null
-      : await executor
-          .select({ id: centriAscoltoTable.id })
-          .from(centriAscoltoTable)
-          .where(
-            centroScopeFilter(
-              centriAscoltoTable.areaOperativaId,
-              filters.areaOperativaId,
-            ),
-          );
   const people = await executor
     .select({
       id: volontariTable.id,
       statoApprovazione: volontariTable.statoApprovazione,
       attivo: volontariTable.attivo,
       tipoVolontario: volontariTable.tipoVolontario,
+      areaOperativaId: volontariTable.areaOperativaId,
     })
     .from(volontariTable)
     .where(
       and(
-        centroScopeFilter(
-          volontariTable.centroAscoltoId,
-          filters.centroAscoltoId,
-        ),
-        idSetScopeFilter(
-          volontariTable.centroAscoltoId,
-          centres?.map((c) => c.id) ?? null,
-        ),
+        volunteerAreaFilter(filters.areaOperativaId),
+        filters.centroAscoltoId == null ? undefined : volunteerContextFilter(filters.centroAscoltoId),
       ),
     )
     .limit(10001);

@@ -4,6 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { centriAscoltoTable } from "./centri";
 import { ruoliVolontariTable } from "./ruoliVolontari";
+import { areeOperativeTable } from "./areeOperative";
 
 export const registroVolontariProgressivoSequence = pgSequence(
   "registro_volontari_progressivo_seq",
@@ -17,6 +18,7 @@ export const volontariTable = pgTable(
     cognome: varchar("cognome", { length: 80 }).notNull(),
     matricola: varchar("matricola", { length: 40 }),
     tipoVolontario: varchar("tipo_volontario", { length: 20 }).notNull().default("PERMANENTE"),
+    areaOperativaId: integer("area_operativa_id").references(() => areeOperativeTable.id),
     centroAscoltoId: integer("centro_ascolto_id").references(() => centriAscoltoTable.id),
     telefono: varchar("telefono", { length: 20 }),
     telefonoSecondario: varchar("telefono_secondario", { length: 20 }),
@@ -62,6 +64,7 @@ export const volontariTable = pgTable(
       table.progressivoRegistro,
     ),
     index("volontari_tipo_idx").on(table.tipoVolontario),
+    index("volontari_area_idx").on(table.areaOperativaId),
     check(
       "volontari_tipo_check",
       sql`${table.tipoVolontario} in ('PERMANENTE','TEMPORANEO')`,

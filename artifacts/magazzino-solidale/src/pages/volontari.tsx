@@ -15,6 +15,7 @@ import {
   useCreateVolontario,
   useDeleteVolontario,
   useListCentriAscolto,
+  useListAreeOperative,
   useListRuoliVolontari,
   useListVolontari,
   useUpdateVolontario,
@@ -106,7 +107,8 @@ import {
   canSuspendVolunteer,
 } from "@/lib/volontari-actions";
 
-const emptyDraft = (centerId: number | null): Draft => ({
+const emptyDraft = (centerId: number | null, areaId: number | null): Draft => ({
+  areaOperativaId: areaId,
   nome: "",
   cognome: "",
   tipoVolontario: "PERMANENTE",
@@ -145,6 +147,7 @@ function reasonLabel(reason?: string | null): string {
     ASSICURAZIONE_SCADUTA: "Assicurazione scaduta",
     ASSICURAZIONE_MANCANTE: "Assicurazione mancante",
     ASSICURAZIONE_NON_ANCORA_VALIDA: "Copertura non ancora valida",
+    AREA_OPERATIVA_MANCANTE: i18n.t("logisticaCampaign.areaMissing"),
     GIORNATA_TEMPORANEA_MANCANTE: "Fuori dalla giornata di servizio",
   };
   return reason
@@ -231,6 +234,8 @@ export default function Volontari() {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
   const lockedCenterId = user?.centroAscoltoId ?? null;
+  const lockedAreaId = user?.areaOperativaId ?? null;
+  const [area, setArea] = useState(lockedAreaId == null ? "all" : String(lockedAreaId));
   const canManage = hasPermission("logistica.volontari.manage");
   const canExport = hasPermission("logistica.volontari.export");
   const [search, setSearch] = useState("");
@@ -265,7 +270,7 @@ export default function Volontari() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Volontario | null>(null);
-  const [draft, setDraft] = useState<Draft>(() => emptyDraft(lockedCenterId));
+  const [draft, setDraft] = useState<Draft>(() => emptyDraft(lockedCenterId, lockedAreaId ?? (area === "all" ? null : Number(area))));
   const [initialDraft, setInitialDraft] = useState<Draft | null>(null);
   const [formErrors, setFormErrors] = useState<VolunteerFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -303,6 +308,7 @@ export default function Volontari() {
   const [removingVolunteer, setRemovingVolunteer] = useState<Volontario | null>(null);
 
   const params: ListVolontariParams = {
+    ...(area !== "all" ? { areaOperativaId: Number(area) } : {}),
     stato: status,
     dataRiferimento: referenceDate,
     ...(search.trim() ? { search: search.trim() } : {}),
@@ -318,6 +324,8 @@ export default function Volontari() {
     query: { queryKey: getListVolontariQueryKey(params) },
   });
   const { data: centers = [] } = useListCentriAscolto();
+  const { data: areas = [] } = useListAreeOperative();
+  const areaLabel = (id?: number | null) => areas.find((a) => a.id === id)?.nome ?? t("logisticaCampaign.areaMissing");
   const { data: roles = [] } = useListRuoliVolontari();
   const currentDossierVolunteer = dossierVolunteer
     ? (volunteers.find((item) => item.id === dossierVolunteer.id) ??
@@ -344,7 +352,7 @@ export default function Volontari() {
 
   const openCreate = () => {
     setEditing(null);
-    const nextDraft = emptyDraft(lockedCenterId);
+    const nextDraft = emptyDraft(lockedCenterId, lockedAreaId ?? (area === "all" ? null : Number(area)));
     setDraft(nextDraft);
     setInitialDraft(null);
     resetFormFeedback();
@@ -361,6 +369,7 @@ export default function Volontari() {
         nome: detail.nome,
         cognome: detail.cognome,
         tipoVolontario: detail.tipoVolontario,
+        areaOperativaId: detail.areaOperativaId ?? null,
         centroAscoltoId: detail.centroAscoltoId ?? null,
         ruoloVolontarioId: detail.ruoloVolontarioId ?? 0,
         telefono: detail.telefono ?? "",
@@ -585,6 +594,7 @@ export default function Volontari() {
   const exportQuery = () => {
     const query = new URLSearchParams();
     if (center !== "all") query.set("centroAscoltoId", center);
+    if (area !== "all") query.set("areaOperativaId", area);
     if (type !== "all") query.set("tipo", type);
     query.set("stato", status);
     query.set("dataRiferimento", referenceDate);
@@ -655,7 +665,7 @@ export default function Volontari() {
         className="text-sm text-destructive"
         role="alert"
       >
-        {field === "dataNascita" ? t("logisticaCampaign.birthInvalid") : formErrors[field]}
+        {field === "dataNascita" ? t("logisticaCampaign.birthInvalid") : field === "areaOperativaId" ? t("logisticaCampaign.selectArea") : formErrors[field]}
       </p>
     ) : null;
   const invalidBorder = (field: VolunteerFormField) =>
@@ -851,15 +861,26 @@ export default function Volontari() {
                 </Select>
               </div>
               {!lockedCenterId && (
+                <>
                 <div className="space-y-1">
-                  <Label>Centro</Label>
+                  <Label>{t("logisticaCampaign.area")}</Label>
+                  <Select value={area} disabled={lockedAreaId != null} onValueChange={(value) => { setArea(value); setCenter("all"); }}>
+                    <SelectTrigger className="min-h-11"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {lockedAreaId == null && <SelectItem value="all">{t("common.all")}</SelectItem>}
+                      {areas.filter((a) => a.attivo).map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("turni.centro")}</Label>
                   <Select value={center} onValueChange={setCenter}>
                     <SelectTrigger className="min-h-11">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Tutti</SelectItem>
-                      {centers.map((item) => (
+                      {centers.filter((item) => item.attivo && (area === "all" || item.areaOperativaId === Number(area))).map((item) => (
                         <SelectItem key={item.id} value={String(item.id)}>
                           {item.nome}
                         </SelectItem>
@@ -867,6 +888,7 @@ export default function Volontari() {
                     </SelectContent>
                   </Select>
                 </div>
+                </>
               )}
               <div className="space-y-1">
                 <Label>Data riferimento</Label>
@@ -959,7 +981,8 @@ export default function Volontari() {
                   </TableHead>
                   <TableHead>Volontario</TableHead>
                   <TableHead>Tipo / Ruolo</TableHead>
-                  <TableHead>Centro</TableHead>
+                  <TableHead>{t("logisticaCampaign.area")}</TableHead>
+                  <TableHead>{t("logisticaCampaign.referenceCentre")}</TableHead>
                   <TableHead>Assicurazione</TableHead>
                   <TableHead>Stato operativo</TableHead>
                   <TableHead className="text-right">Azioni</TableHead>
@@ -969,7 +992,7 @@ export default function Volontari() {
                 {isLoading ? (
                   Array.from({ length: 5 }, (_, index) => (
                     <TableRow key={index}>
-                      <TableCell colSpan={7}>
+                      <TableCell colSpan={8}>
                         <Skeleton className="h-11 w-full" />
                       </TableCell>
                     </TableRow>
@@ -977,7 +1000,7 @@ export default function Volontari() {
                 ) : volunteers.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       className="h-32 text-center text-muted-foreground"
                     >
                       Nessun volontario per i filtri selezionati.
@@ -1017,8 +1040,9 @@ export default function Volontari() {
                           {volunteer.ruoloCatalogoNome ?? volunteer.ruolo}
                         </div>
                       </TableCell>
+                      <TableCell className="text-sm">{areaLabel(volunteer.areaOperativaId)}</TableCell>
                       <TableCell className="text-sm">
-                        {volunteer.centroAscoltoNome ?? "Trasversale"}
+                        {volunteer.centroAscoltoNome ?? t("logisticaCampaign.noReferenceCentre")}
                       </TableCell>
                       <TableCell>
                         <InsuranceBadge volunteer={volunteer} />
@@ -1171,15 +1195,16 @@ export default function Volontari() {
                     <OperationalBadge volunteer={volunteer} />
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div><p className="text-muted-foreground">{t("logisticaCampaign.area")}</p><p>{areaLabel(volunteer.areaOperativaId)}</p></div>
                     <div>
                       <div className="text-xs text-muted-foreground">Ruolo</div>
                       {volunteer.ruoloCatalogoNome ?? volunteer.ruolo}
                     </div>
                     <div>
                       <div className="text-xs text-muted-foreground">
-                        Centro
+                        {t("logisticaCampaign.referenceCentre")}
                       </div>
-                      {volunteer.centroAscoltoNome ?? "Trasversale"}
+                      {volunteer.centroAscoltoNome ?? t("logisticaCampaign.noReferenceCentre")}
                     </div>
                     <div className="col-span-2">
                       <InsuranceBadge volunteer={volunteer} />
@@ -1564,9 +1589,18 @@ export default function Volontari() {
                   {fieldError("ruoloVolontarioId")}
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="volontario-centroAscoltoId">Centro</Label>
+                  <Label htmlFor="volontario-areaOperativaId">{t("logisticaCampaign.area")} *</Label>
+                  <Select disabled={lockedAreaId != null} value={draft.areaOperativaId == null ? "" : String(draft.areaOperativaId)} onValueChange={(value) => setDraft((prev) => ({ ...prev, areaOperativaId: Number(value), centroAscoltoId: null }))}>
+                    <SelectTrigger {...fieldInputProps("areaOperativaId")} className={`min-h-11 ${invalidBorder("areaOperativaId")}`}><SelectValue placeholder={t("logisticaCampaign.selectArea")} /></SelectTrigger>
+                    <SelectContent>{areas.filter((a) => a.attivo && (lockedAreaId == null || a.id === lockedAreaId)).map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.nome}</SelectItem>)}</SelectContent>
+                  </Select>
+                  {fieldError("areaOperativaId")}
+                  <p className="text-sm text-muted-foreground">{t("logisticaCampaign.areaHelp")}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="volontario-centroAscoltoId">{t("logisticaCampaign.referenceCentre")}</Label>
                   <Select
-                    disabled={lockedCenterId != null}
+                    disabled={draft.areaOperativaId == null}
                     value={
                       draft.centroAscoltoId
                         ? String(draft.centroAscoltoId)
@@ -1587,9 +1621,9 @@ export default function Volontari() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">
-                        Trasversale / nessun centro
+                        {t("logisticaCampaign.noReferenceCentre")}
                       </SelectItem>
-                      {centers.map((item) => (
+                      {centers.filter((item) => item.attivo && item.areaOperativaId === draft.areaOperativaId).map((item) => (
                         <SelectItem key={item.id} value={String(item.id)}>
                           {item.nome}
                         </SelectItem>
@@ -1738,6 +1772,7 @@ export default function Volontari() {
           lockedCenterId ?? (center !== "all" ? Number(center) : undefined)
         }
         ruoli={roles}
+        areaOperativaId={lockedAreaId ?? (area === "all" ? null : Number(area))}
         centri={centers}
       />
 

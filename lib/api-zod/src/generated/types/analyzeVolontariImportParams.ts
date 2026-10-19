@@ -7,5 +7,9 @@
  */
 
 export type AnalyzeVolontariImportParams = {
+  /**
+   * @minimum 1
+   */
+  areaOperativaId?: number;
   centroAscoltoId?: number;
 };

@@ -175,6 +175,13 @@ test("Volontari 2.0 mantiene lista, dossier e azioni accessibili", async ({
 test("il form volontario espone tipologia e giornata temporanea", async ({
   page,
 }) => {
+  const areas = await (await page.request.get("/api/aree-operative")).json() as Area[];
+  const centres = await (await page.request.get("/api/centri-ascolto")).json() as Center[];
+  const centre = centres.find((c) => c.attivo && c.areaOperativaId != null)!;
+  const area = areas.find((a) => a.id === centre.areaOperativaId)!;
+  const other = await page.request.post("/api/aree-operative", { data: { nome: `Area alternativa ${Date.now()}`, sigla: "VA", codiceMatricola: "VA", attivo: true } });
+  expect(other.status()).toBe(201);
+  const otherArea = await other.json() as Area;
   await page.goto("/volontari");
   await page.getByRole("button", { name: /nuovo volontario/i }).click();
   const form = page.getByRole("dialog");
@@ -182,6 +189,21 @@ test("il form volontario espone tipologia e giornata temporanea", async ({
     form.getByRole("heading", { name: /nuovo volontario/i }),
   ).toBeVisible();
   await expect(form.getByText(/identità e contatti/i)).toBeVisible();
+  const areaSelect = form.getByLabel(/Area Operativa/);
+  const reference = form.getByLabel("Centro di riferimento (facoltativo)");
+  await expect(reference).toBeDisabled();
+  await areaSelect.click();
+  await page.getByRole("option", { name: area.nome, exact: true }).click();
+  await reference.click();
+  await page.getByRole("option", { name: centre.nome, exact: true }).click();
+  await expect(reference).toContainText(centre.nome);
+  await areaSelect.click();
+  await page.getByRole("option", { name: otherArea.nome, exact: true }).click();
+  await expect(reference).toContainText("Nessun Centro di riferimento");
+  await reference.click();
+  await expect(page.getByRole("option", { name: centre.nome, exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(form.getByText(/Operativo in tutti i Centri, mense ed empori/)).toBeVisible();
   await form.getByText("Permanente", { exact: true }).click();
   await page.getByRole("option", { name: "Temporaneo", exact: true }).click();
   await expect(form.getByText(/prima giornata di servizio/i)).toBeVisible();

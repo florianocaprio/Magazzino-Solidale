@@ -252,7 +252,7 @@ export async function createCentro(
 ): Promise<number> {
   const [c] = await db
     .insert(centriAscoltoTable)
-    .values({ nome })
+    .values({ nome, areaOperativaId: await createAreaOperativa(scope) })
     .returning({ id: centriAscoltoTable.id });
   scope.centroIds.push(c.id);
   return c.id;
@@ -266,7 +266,7 @@ export async function createCentroRec(
   const nome = opts.nome ?? `Centro ${rnd()}`;
   const [c] = await db
     .insert(centriAscoltoTable)
-    .values({ nome, areaOperativaId: opts.areaOperativaId ?? null })
+    .values({ nome, areaOperativaId: opts.areaOperativaId === undefined ? await createAreaOperativa(scope) : opts.areaOperativaId })
     .returning({ id: centriAscoltoTable.id });
   scope.centroIds.push(c.id);
   return { id: c.id, nome };
@@ -441,12 +441,17 @@ export async function createVolontario(
   scope: SeedScope,
   centroId: number | null,
 ): Promise<number> {
+  // Valid synthetic Area assignment; no production legacy data is inferred here.
+  const areaOperativaId = centroId == null
+    ? scope.areaOperativaIds[0] ?? await createAreaOperativa(scope)
+    : (await db.select({ area: centriAscoltoTable.areaOperativaId }).from(centriAscoltoTable).where(eq(centriAscoltoTable.id, centroId)))[0]?.area ?? null;
   const [v] = await db
     .insert(volontariTable)
     .values({
       nome: "Vol",
       cognome: rnd(),
       ruolo: "autista",
+      areaOperativaId,
       centroAscoltoId: centroId,
       attivo: true,
       statoApprovazione: "approvato",

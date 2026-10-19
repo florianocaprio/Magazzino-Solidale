@@ -330,7 +330,7 @@ describe("Volontari — API salvataggio e conversione", () => {
         luogoNascita: expect.any(String),
         dataNascita: expect.any(String),
         indirizzoResidenza: expect.any(String),
-        centroAscoltoId: expect.any(String),
+        areaOperativaId: expect.any(String),
         ruoloVolontarioId: expect.any(String),
       },
     });

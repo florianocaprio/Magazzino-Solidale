@@ -235,7 +235,7 @@ describe("Volontari — scoping per centro", () => {
     expect(res.status).toBe(403);
   });
 
-  it("POST rifiuta l'assegnazione esplicita a un altro centro", async () => {
+  it("POST rifiuta l'assegnazione esplicita a un Centro di un’altra Area", async () => {
     const res = await request(
       makeScopedApp(volontariRouter, {
         id: operatoreId,
@@ -254,9 +254,8 @@ describe("Volontari — scoping per centro", () => {
         codiceFiscaleNonDisponibile: true,
         codiceFiscaleNota: "Non disponibile nel test automatico",
       });
-    expect(res.status).toBe(201);
-    scope.volontarioIds.push(res.body.id);
-    expect(res.body.centroAscoltoId).toBe(centroA);
+    expect(res.status).toBe(422);
+    expect(res.body.fieldErrors.centroAscoltoId).toBeDefined();
   });
 
   it("PATCH /:id fuori centro → 403", async () => {

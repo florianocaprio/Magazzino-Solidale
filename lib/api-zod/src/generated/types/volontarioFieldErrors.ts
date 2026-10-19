@@ -7,6 +7,7 @@
  */
 
 export interface VolontarioFieldErrors {
+  areaOperativaId?: string;
   nome?: string;
   cognome?: string;
   matricola?: string;

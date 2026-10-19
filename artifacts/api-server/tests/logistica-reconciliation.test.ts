@@ -145,7 +145,7 @@ describe("riconciliazione residui Logistica", () => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query("UPDATE volontari SET centro_ascolto_id = $1 WHERE id = $2", [centroB.id, ownerApproval]);
+      await client.query("UPDATE volontari SET centro_ascolto_id = $1, area_operativa_id = $3 WHERE id = $2", [centroB.id, ownerApproval, areaB]);
       const approval = start(request(await areaApp(approvazioniRouter, areaA)).post(`/approvazioni-logistica/mezzi/${pendingMezzo.id}/approva`).send({ versione: pendingMezzo.versione }));
       await letRequestReachLock();
       await client.query("COMMIT");
@@ -159,7 +159,7 @@ describe("riconciliazione residui Logistica", () => {
     const clientAssignment = await pool.connect();
     try {
       await clientAssignment.query("BEGIN");
-      await clientAssignment.query("UPDATE volontari SET centro_ascolto_id = $1 WHERE id = $2", [centroB.id, ownerAssignment]);
+      await clientAssignment.query("UPDATE volontari SET centro_ascolto_id = $1, area_operativa_id = $3 WHERE id = $2", [centroB.id, ownerAssignment, areaB]);
       const assignment = start(request(await areaApp(turniRouter, areaA)).put("/turni").send({ centroAscoltoId: centroA.id, data: "2026-11-06", fascia: "09-13", mezzoId: mezzo, volontari: [] }));
       await letRequestReachLock();
       await clientAssignment.query("COMMIT");
@@ -175,7 +175,7 @@ describe("riconciliazione residui Logistica", () => {
     const clientDelivery = await pool.connect();
     try {
       await clientDelivery.query("BEGIN");
-      await clientDelivery.query("UPDATE volontari SET centro_ascolto_id = $1 WHERE id = $2", [centroB.id, ownerDelivery]);
+      await clientDelivery.query("UPDATE volontari SET centro_ascolto_id = $1, area_operativa_id = $3 WHERE id = $2", [centroB.id, ownerDelivery, areaB]);
       const delivery = start(request(await areaApp(consegneRouter, areaA)).post("/consegne").send({ beneficiarioId: beneficiary, tipoConsegna: "domicilio", indirizzoConsegna: "Via Test 1", dataPrevista: "2026-11-06", fasciaOraria: "Pomeriggio", magazzinoId: magazzino, mezzoId: deliveryMezzo }));
       await letRequestReachLock();
       await clientDelivery.query("COMMIT");
@@ -188,7 +188,7 @@ describe("riconciliazione residui Logistica", () => {
     const clientCreation = await pool.connect();
     try {
       await clientCreation.query("BEGIN");
-      await clientCreation.query("UPDATE volontari SET centro_ascolto_id = $1 WHERE id = $2", [centroB.id, ownerCreation]);
+      await clientCreation.query("UPDATE volontari SET centro_ascolto_id = $1, area_operativa_id = $3 WHERE id = $2", [centroB.id, ownerCreation, areaB]);
       const creation = start(request(await areaApp(mezziRouter, areaA)).post("/mezzi").send({ codice: `R3-CREATE-${Date.now()}`, tipo: "auto", proprieta: "volontario", volontarioId: ownerCreation }));
       await letRequestReachLock();
       await clientCreation.query("COMMIT");

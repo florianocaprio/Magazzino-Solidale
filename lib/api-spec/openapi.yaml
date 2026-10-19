@@ -8135,6 +8135,10 @@ paths:
       operationId: listVolontari
       tags: [volontari]
       parameters:
+        - name: areaOperativaId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
         - name: centroAscoltoId
           in: query
           required: false
@@ -8462,6 +8466,10 @@ paths:
       operationId: analyzeVolontariImport
       tags: [volontari]
       parameters:
+        - name: areaOperativaId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
         - { name: centroAscoltoId, in: query, schema: { type: integer } }
         - {
             name: x-file-name,
@@ -20498,6 +20506,8 @@ components:
     Volontario:
       type: object
       properties:
+        areaOperativaId:
+          type: ["integer", "null"]
         id:
           type: integer
         nome:
@@ -20624,6 +20634,8 @@ components:
     VolontarioInput:
       type: object
       properties:
+        areaOperativaId:
+          type: ["integer", "null"]
         nome:
           type: string
         cognome:
@@ -20692,6 +20704,8 @@ components:
     VolontarioUpdate:
       type: object
       properties:
+        areaOperativaId:
+          type: ["integer", "null"]
         nome:
           type: string
         cognome:
@@ -20742,6 +20756,8 @@ components:
       type: object
       additionalProperties: false
       properties:
+        areaOperativaId:
+          type: string
         nome: { type: string }
         cognome: { type: string }
         matricola: { type: string }
@@ -21298,6 +21314,8 @@ components:
     Mezzo:
       type: object
       properties:
+        areaOperativaId:
+          type: ["integer", "null"]
         id:
           type: integer
         codice:
@@ -21442,6 +21460,8 @@ components:
     ApprovazioneVolontario:
       type: object
       properties:
+        areaOperativaId:
+          type: ["integer", "null"]
         id:
           type: integer
         nome:

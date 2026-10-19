@@ -1,3 +1,4 @@
+import { volunteerMatchesCentre, volunteerAreaFilter } from "../lib/volontariArea";
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
@@ -221,6 +222,7 @@ async function canUseVolontarioConsegna(
   const centroBeneficiario = await beneficiarioCentroId(beneficiarioId);
   const [volontario] = await db
     .select({
+      areaOperativaId: volontariTable.areaOperativaId,
       centroAscoltoId: volontariTable.centroAscoltoId,
       attivo: volontariTable.attivo,
       statoApprovazione: volontariTable.statoApprovazione,
@@ -230,7 +232,8 @@ async function canUseVolontarioConsegna(
   if (!volontario) return false;
   if (!volontario.attivo || volontario.statoApprovazione !== "approvato")
     return false;
-  return canAccessCentro(volontario.centroAscoltoId, centroBeneficiario);
+  const area = await beneficiarioAreaOperativaId(beneficiarioId);
+  return area != null ? volontario.areaOperativaId === area : centroBeneficiario != null && await volunteerMatchesCentre(db, volontario, centroBeneficiario);
 }
 
 async function bollaVolunteerReference(
@@ -1438,7 +1441,8 @@ router.post("/bolle", requirePermission("bolle.manage"), async (req, res) => {
       if (isBeneficiario && body.volontarioConsegnaId != null) {
         const [lockedVolontario] = await tx
           .select({
-            centroAscoltoId: volontariTable.centroAscoltoId,
+            areaOperativaId: volontariTable.areaOperativaId,
+      centroAscoltoId: volontariTable.centroAscoltoId,
             attivo: volontariTable.attivo,
             statoApprovazione: volontariTable.statoApprovazione,
           })
@@ -1633,7 +1637,8 @@ router.get(
         id: volontariTable.id,
         nome: volontariTable.nome,
         cognome: volontariTable.cognome,
-        centroAscoltoId: volontariTable.centroAscoltoId,
+        areaOperativaId: volontariTable.areaOperativaId,
+      centroAscoltoId: volontariTable.centroAscoltoId,
         tipoVolontario: volontariTable.tipoVolontario,
         statoApprovazione: volontariTable.statoApprovazione,
         attivo: volontariTable.attivo,
@@ -1641,12 +1646,7 @@ router.get(
       .from(volontariTable)
       .where(
         and(
-          centroId == null
-            ? undefined
-            : or(
-                eq(volontariTable.centroAscoltoId, centroId),
-                isNull(volontariTable.centroAscoltoId),
-              ),
+          volunteerAreaFilter(await beneficiarioAreaOperativaId(det.beneficiarioId) ?? (centroId == null ? -1 : (await db.select({ area: centriAscoltoTable.areaOperativaId }).from(centriAscoltoTable).where(eq(centriAscoltoTable.id, centroId)))[0]?.area ?? -1)),
           riferimento == null
             ? eq(volontariTable.tipoVolontario, "PERMANENTE")
             : undefined,
@@ -2071,7 +2071,8 @@ router.patch(
           if (nextVolontarioId != null) {
             const [lockedVolontario] = await tx
               .select({
-                centroAscoltoId: volontariTable.centroAscoltoId,
+                areaOperativaId: volontariTable.areaOperativaId,
+      centroAscoltoId: volontariTable.centroAscoltoId,
                 attivo: volontariTable.attivo,
                 statoApprovazione: volontariTable.statoApprovazione,
               })

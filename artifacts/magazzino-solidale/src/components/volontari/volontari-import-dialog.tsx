@@ -101,12 +101,14 @@ export function VolontariImportDialog({
   open,
   onOpenChange,
   centroAscoltoId,
+  areaOperativaId,
   ruoli,
   centri,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   centroAscoltoId?: number;
+  areaOperativaId?: number | null;
   ruoli: RuoloVolontario[];
   centri: Center[];
 }) {
@@ -141,7 +143,7 @@ export function VolontariImportDialog({
     try {
       const result = await analyzeVolontariImport(
         file,
-        centroAscoltoId ? { centroAscoltoId } : undefined,
+        { ...(centroAscoltoId ? { centroAscoltoId } : {}), ...(areaOperativaId ? { areaOperativaId } : {}) },
         { headers: { "x-file-name": file.name } },
       );
       setPreview(result);
