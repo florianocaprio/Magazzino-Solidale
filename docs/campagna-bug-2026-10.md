@@ -1435,3 +1435,35 @@ Ricaricare la 8082 con ⌘⇧R per la nuova prova. Nessun dato personale modific
 dalle verifiche funzionali, nessuna fase 04/merge/main/produzione avviata.
 Consegna 02 resta chiusa; BUG17 attende la UAT integrata del blocco C dopo 04.
 Quattro documenti locali preesistenti esclusi dai commit.
+
+
+### Correzione BUG17 — ambito esplicito e tag degli Enti Esterni
+
+Chiarimento di Floriano: i destinatari sono Enti Esterni (case famiglia e altri
+enti assistiti). L'anagrafica Fornitori deve rimanere invariata. Le modifiche
+preparate su Fornitori, relativi test/API/OpenAPI/generati e traduzioni sono
+state interamente ripristinate, senza commit né installazione. Il controllo
+automatico ha respinto il tentativo di commit alla ricezione del chiarimento;
+nessun successivo tentativo di includere tali file.
+
+- `/enti-esterni` → Nuovo Ente: controllo **Globale** esplicito, oltre alla
+  scelta esistente nel selettore Area. Una spiegazione chiarisce che l'Ente
+  destinatario è utilizzabile in tutte le Aree. Creazione riservata all'Admin
+  globale secondo le autorizzazioni già presenti.
+- L'Ente con Area NULL ha il tag **Globale** accanto alla denominazione.
+  Apertura in modifica e salvataggio mantengono l'ambito globale.
+- Conservati nell'anagrafica Enti i filtri **Solo globali**, **Tutte le Aree e
+  globali** e singola **Area incl. globali**. Il controllo appartiene a questa
+  pagina; viene rimosso dal form condiviso Nuova Bolla.
+- Nella Bolla il selettore continua a proporre Enti destinatari dell'Area del
+  magazzino e globali, con indicazione Globale già presente; nessuna fusione
+  tra Enti e Fornitori. Le indicazioni precedenti sul toggle Solo globali
+  dentro il documento operativo sono sostituite da questo chiarimento.
+
+File modificati: `artifacts/magazzino-solidale/src/pages/enti-esterni.tsx`,
+`artifacts/magazzino-solidale/src/lib/i18n/namespaces/entiEsterni.ts`,
+`artifacts/magazzino-solidale/src/components/documento-operativo.tsx`,
+`artifacts/magazzino-solidale/e2e/m4a-documenti-destinatari.spec.ts` e questo
+registro. Nessuna modifica al database, alle API, a OpenAPI o ai generati.
+Le verifiche e la ricompilazione API/WEB 8082 effettive sono riportate nella
+ricevuta successiva. Nessun avvio della fase 04.

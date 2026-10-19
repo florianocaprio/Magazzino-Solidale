@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -271,10 +273,17 @@ export default function EntiEsterni() {
       )}
       <div id="enti-results" className="space-y-2">
         {(searchReady ? (list.data ?? []) : []).map((item) => (
-          <Card key={item.id}>
+          <Card key={item.id} data-testid={`ente-${item.id}`}>
             <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
               <div>
-                <p className="font-medium">{item.denominazione}</p>
+                <div className="flex flex-wrap items-center gap-2 font-medium">
+                  <span>{item.denominazione}</span>
+                  {item.areaOperativaId == null && (
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      {t("entiEsterni.global")}
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">
                   {item.indirizzo} ·{" "}
                   {item.areaOperativaId == null
@@ -335,13 +344,26 @@ export default function EntiEsterni() {
             </DialogTitle>
           </DialogHeader>
           <form className="space-y-3" onSubmit={save}>
-            <Label>{t("entiEsterni.area")}</Label>
+            {globalAdmin && !editing && (
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <Label htmlFor="ente-global">{t("entiEsterni.global")}</Label>
+                <Switch
+                  id="ente-global"
+                  checked={form.areaOperativaId === "global"}
+                  onCheckedChange={(checked) => setField("areaOperativaId", checked ? "global" : "")}
+                />
+              </div>
+            )}
+            {form.areaOperativaId === "global" && (
+              <p className="text-sm text-muted-foreground">{t("entiEsterni.globalHint")}</p>
+            )}
+            <Label htmlFor="ente-area">{t("entiEsterni.area")}</Label>
             {globalAdmin && !editing ? (
               <Select
                 value={form.areaOperativaId}
                 onValueChange={(value) => setField("areaOperativaId", value)}
               >
-                <SelectTrigger>
+                <SelectTrigger id="ente-area">
                   <SelectValue placeholder={t("entiEsterni.chooseArea")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -358,7 +380,7 @@ export default function EntiEsterni() {
                 </SelectContent>
               </Select>
             ) : (
-              <p className="text-sm">
+              <p id="ente-area" className="text-sm">
                 {form.areaOperativaId === "global"
                   ? t("entiEsterni.global")
                   : (areaNames.get(Number(form.areaOperativaId)) ??

@@ -224,7 +224,7 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     await login(page);
   });
 
-  test("BUG17: crea un Ente globale dalla UI, filtra e mantiene territoriale la Bolla", async ({ page }) => {
+  test("BUG17: definisce un Ente globale, conserva tag e filtro; la Bolla include locali e globali", async ({ page }) => {
     const fixtures = await loadDemoFixtures(page);
     const name = `Globale BUG17 ${runSuffix}`;
     const localName = `Territoriale BUG17 ${runSuffix}`;
@@ -234,7 +234,9 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     await page.goto("/enti-esterni");
     await page.getByRole("button", { name: "Nuovo Ente", exact: true }).click();
     const form = page.getByRole("dialog");
-    await selectOption(page, form.getByRole("combobox"), "Globale");
+    await form.getByRole("switch", { name: "Globale", exact: true }).check();
+    await expect(form.getByRole("combobox", { name: "Area Operativa", exact: true })).toContainText("Globale");
+    await expect(form).toContainText("Ente destinatario utilizzabile in tutte le Aree Operative.");
     await form.getByLabel("Denominazione", { exact: true }).fill(name);
     await form.getByLabel("Indirizzo", { exact: true }).fill("Via sintetica globale 1");
     const saved = page.waitForResponse((r) => r.url().endsWith("/api/enti-destinatari") && r.request().method() === "POST");
@@ -242,6 +244,15 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     const entity = await expectJson<Ente & { areaOperativaId: null }>(await saved, 201);
     expect(entity.areaOperativaId).toBeNull();
     await expect(form).toBeHidden();
+    const card = page.getByTestId(`ente-${entity.id}`);
+    await expect(card.getByText("Globale", { exact: true })).toHaveText("Globale");
+    await card.getByRole("button", { name: "Modifica", exact: true }).click();
+    await expect(form).toContainText("Globale");
+    const updated = page.waitForResponse((r) => r.url().endsWith(`/api/enti-destinatari/${entity.id}`) && r.request().method() === "PATCH");
+    await form.getByRole("button", { name: /salva/i }).click();
+    expect((await expectJson<{ areaOperativaId: null }>(await updated, 200)).areaOperativaId).toBeNull();
+    await expect(form).toBeHidden();
+    await expect(card.getByText("Globale", { exact: true })).toHaveText("Globale");
     const globalFilter = page.getByRole("button", { name: "Solo globali", exact: true });
     await expect(globalFilter).toBeVisible();
     const filtered = page.waitForResponse((r) => r.url().includes("/api/enti-destinatari?") && new URL(r.url()).searchParams.get("ambito") === "globali");
@@ -250,27 +261,24 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     expect(globalItems.length).toBeGreaterThan(0);
     expect(globalItems.every((item) => item.areaOperativaId === null)).toBe(true);
     await expect(page.getByText(name, { exact: true })).toBeVisible();
+    await expect(page.getByText(localName, { exact: true })).toHaveCount(0);
+    const areas = await expectJson<Array<{ id: number; nome: string }>>(await page.request.get("/api/aree-operative"), 200);
+    const areaName = areas.find((area) => area.id === fixtures.origin.areaOperativaId)!.nome;
+    await selectOption(page, page.getByRole("combobox", { name: "Area / ambito", exact: true }), `${areaName} · incl. globali`);
+    await expect(page.getByText(localName, { exact: true })).toBeVisible();
+    await expect(card.getByText("Globale", { exact: true })).toHaveText("Globale");
+    await selectOption(page, page.getByRole("combobox", { name: "Area / ambito", exact: true }), "Tutte le Aree e globali");
+    await expect(page.getByText(localName, { exact: true })).toBeVisible();
+    await expect(card.getByText("Globale", { exact: true })).toHaveText("Globale");
     const dialog = await openCreateBollaDialog(page);
     await selectOption(page, dialog.getByRole("combobox").first(), "Ente esterno");
     await selectOption(page, dialog.getByRole("combobox", { name: /magazzino di uscita/i }), fixtures.origin.nome);
     await dialog.getByRole("combobox").filter({ hasText: /seleziona ente/i }).click();
     await page.getByPlaceholder(/cerca per denominazione/i).fill(localName);
     await page.getByRole("option", { name: new RegExp(localName) }).click();
-    const pickerGlobalFilter = dialog.getByRole("button", { name: "Solo globali", exact: true });
-    await expect(pickerGlobalFilter).toBeVisible();
-    const pickerFiltered = page.waitForResponse((r) => r.url().includes("/api/enti-destinatari?") && new URL(r.url()).searchParams.get("ambito") === "globali" && new URL(r.url()).searchParams.get("areaOperativaId") === String(fixtures.origin.areaOperativaId) && !new URL(r.url()).searchParams.has("search"));
-    await pickerGlobalFilter.click();
-    await expect(pickerGlobalFilter).toHaveAttribute("aria-pressed", "true");
-    const pickerItems = await expectJson<Array<{ areaOperativaId: number | null }>>(await pickerFiltered, 200);
-    expect(pickerItems.length).toBeGreaterThan(0);
-    expect(pickerItems.every((item) => item.areaOperativaId === null)).toBe(true);
-    await expect(dialog.getByRole("combobox").filter({ hasText: /seleziona ente/i })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Solo globali", exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("combobox", { name: /magazzino di uscita/i })).toContainText(fixtures.origin.nome);
-    await pickerGlobalFilter.click();
-    await expect(pickerGlobalFilter).toHaveAttribute("aria-pressed", "false");
-    await pickerGlobalFilter.click();
-    await expect(pickerGlobalFilter).toHaveAttribute("aria-pressed", "true");
-    await dialog.getByRole("combobox").filter({ hasText: /seleziona ente/i }).click();
+    await dialog.getByRole("combobox").filter({ hasText: localName }).click();
     await page.getByPlaceholder(/cerca per denominazione/i).fill(name);
     await page.getByRole("option", { name: new RegExp(`${name}.*Globale`) }).click();
     await expect(dialog.getByRole("combobox", { name: /magazzino di uscita/i })).toContainText(fixtures.origin.nome);

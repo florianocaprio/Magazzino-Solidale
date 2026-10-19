@@ -310,7 +310,6 @@ export function CreaiBollaDialog({
     areaOperativaId: number | null;
   } | null>(null);
   const [enteSearch, setEnteSearch] = useState("");
-  const [enteGlobalOnly, setEnteGlobalOnly] = useState(false);
   const [debouncedEnteSearch, setDebouncedEnteSearch] = useState("");
   const [createError, setCreateError] = useState("");
   const [magazzinoId, setMagazzinoId] = useState("");
@@ -348,7 +347,6 @@ export function CreaiBollaDialog({
       setEnteId("");
       setSelectedEnte(null);
       setEnteSearch("");
-      setEnteGlobalOnly(false);
       setCreateError("");
       commandIntents.discard("bolla:create");
     }
@@ -398,7 +396,6 @@ export function CreaiBollaDialog({
   }, [enteContextArea, selectedEnte]);
   const enteParams = {
     limit: 50,
-    ...(enteGlobalOnly ? { ambito: "globali" as const } : {}),
     ...(enteContextArea != null ? { areaOperativaId: enteContextArea } : {}),
     ...(debouncedEnteSearch.length >= 2 ? { search: debouncedEnteSearch } : {}),
   };
@@ -736,31 +733,11 @@ export function CreaiBollaDialog({
             ))}
           {tipoDestinatario === "ente" && (
             <div className="space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Label>
-                  {t("bolle.destinatarioEnte", { defaultValue: "Ente esterno" })}
-                </Label>
-                <Button
-                  type="button"
-                  variant={enteGlobalOnly ? "default" : "outline"}
-                  aria-pressed={enteGlobalOnly}
-                  onClick={() => {
-                    const globalOnly = !enteGlobalOnly;
-                    setEnteGlobalOnly(globalOnly);
-                    if (globalOnly && selectedEnte?.areaOperativaId != null) {
-                      setEnteId("");
-                      setSelectedEnte(null);
-                      setEnteSearch("");
-                      setDebouncedEnteSearch("");
-                    }
-                    setCreateError("");
-                  }}
-                >
-                  {t("entiEsterni.onlyGlobal")}
-                </Button>
-              </div>
+              <Label>
+                {t("bolle.destinatarioEnte", { defaultValue: "Ente esterno" })}
+              </Label>
               <EnteDestinatarioCombobox
-                items={enteSearchReady ? (enti ?? []).filter((ente) => !enteGlobalOnly || ente.areaOperativaId == null) : []}
+                items={enteSearchReady ? (enti ?? []) : []}
                 value={enteId}
                 onChange={(ente) => {
                   setEnteId(String(ente.id));
