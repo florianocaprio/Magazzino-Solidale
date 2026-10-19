@@ -279,11 +279,11 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     const filter = page.getByRole("combobox", { name: "Area Operativa", exact: true });
     await selectOption(page, filter, `${originArea.nome} · incl. globali`);
     await expect(page.getByText(localName, { exact: true })).toBeVisible();
-    await expect(page.getByText(name, { exact: true })).toBeVisible();
+    await expect(row).toBeVisible();
     await expect(page.getByText(foreignName, { exact: true })).toHaveCount(0);
     await selectOption(page, filter, "Tutte le Aree e globali");
     await expect(page.getByText(foreignName, { exact: true })).toBeVisible();
-    await expect(page.getByText(name, { exact: true })).toBeVisible();
+    await expect(row).toBeVisible();
     await page.goto("/carico-merce");
     await page.getByRole("button", { name: "Nuova pratica", exact: true }).click();
     await selectOption(page, page.getByRole("combobox", { name: "Area Operativa", exact: true }), originArea.nome);
