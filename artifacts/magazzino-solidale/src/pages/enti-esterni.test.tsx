@@ -50,7 +50,17 @@ it("Area prima dell’anagrafica e opzione globale soltanto per amministrazione 
   await act(async () => root.render(<EntiEsterni />)); await click("entiEsterni.new");
   const form = document.querySelector("form")!;
   expect(form.querySelector("select")!.textContent).toContain("entiEsterni.global");
-  expect(form.firstElementChild?.textContent).toBe("entiEsterni.area");
+  const areaLabel = form.querySelector('label[for="ente-area"]')!;
+  expect(areaLabel.textContent).toBe("entiEsterni.area");
+  expect(areaLabel.compareDocumentPosition(form.querySelector("#ente-name")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const globalSwitch = form.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  expect(globalSwitch.getAttribute("aria-checked")).toBe("false");
+  await act(async () => globalSwitch.click());
+  expect(globalSwitch.getAttribute("aria-checked")).toBe("true");
+  expect(form.querySelector("select")!.value).toBe("global");
+  expect(form.textContent).toContain("entiEsterni.globalHint");
+  await act(async () => globalSwitch.click());
+  expect(form.querySelector("select")!.value).toBe("");
 });
 it("l’amministratore di Area vede i globali ma gestisce soltanto i territoriali della propria Area", async () => {
   state.user.areaOperativaId = 1;
@@ -61,6 +71,7 @@ it("l’amministratore di Area vede i globali ma gestisce soltanto i territorial
   expect([...host.querySelectorAll("button")].filter((b) => b.textContent === "entiEsterni.edit")).toHaveLength(1);
   expect(host.querySelector("select")!.textContent).not.toContain("Milano");
   await click("entiEsterni.new");
+  expect(document.querySelector('form [role="switch"]')).toBeNull();
   expect(document.querySelector("form")!.querySelector("select")).toBeNull();
   expect(document.querySelector("form")!.textContent).toContain("Roma");
 });

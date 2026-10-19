@@ -1463,7 +1463,10 @@ nessun successivo tentativo di includere tali file.
 File modificati: `artifacts/magazzino-solidale/src/pages/enti-esterni.tsx`,
 `artifacts/magazzino-solidale/src/lib/i18n/namespaces/entiEsterni.ts`,
 `artifacts/magazzino-solidale/src/components/documento-operativo.tsx`,
-`artifacts/magazzino-solidale/e2e/m4a-documenti-destinatari.spec.ts` e questo
-registro. Nessuna modifica al database, alle API, a OpenAPI o ai generati.
+`artifacts/magazzino-solidale/e2e/m4a-documenti-destinatari.spec.ts`,
+`artifacts/magazzino-solidale/src/pages/enti-esterni.test.tsx` e questo
+registro. Il test unitario verifica ora l’Area prima della denominazione,
+il controllo Globale e la sua assenza per il profilo territoriale, senza
+dipendere dall’essere il primo elemento DOM del form. Nessuna modifica al database, alle API, a OpenAPI o ai generati.
 Le verifiche e la ricompilazione API/WEB 8082 effettive sono riportate nella
 ricevuta successiva. Nessun avvio della fase 04.
