@@ -238,7 +238,13 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     const entity = await expectJson<Ente & { areaOperativaId: null }>(await saved, 201);
     expect(entity.areaOperativaId).toBeNull();
     await expect(form).toBeHidden();
-    await selectOption(page, page.getByRole("combobox", { name: "Area / ambito", exact: true }), "Solo globali");
+    const globalFilter = page.getByRole("button", { name: "Solo globali", exact: true });
+    await expect(globalFilter).toBeVisible();
+    const filtered = page.waitForResponse((r) => r.url().includes("/api/enti-destinatari?") && new URL(r.url()).searchParams.get("ambito") === "globali");
+    await globalFilter.click();
+    const globalItems = await expectJson<Array<{ areaOperativaId: number | null }>>(await filtered, 200);
+    expect(globalItems.length).toBeGreaterThan(0);
+    expect(globalItems.every((item) => item.areaOperativaId === null)).toBe(true);
     await expect(page.getByText(name, { exact: true })).toBeVisible();
     const dialog = await openCreateBollaDialog(page);
     await selectOption(page, dialog.getByRole("combobox").first(), "Ente esterno");

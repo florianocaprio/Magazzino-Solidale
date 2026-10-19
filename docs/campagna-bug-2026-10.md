@@ -1281,3 +1281,31 @@ un globale mantiene magazzino e Area scelti; i documenti restano territoriali.
 Nessuna modifica manuale ai dati richiesta per completare questa migrazione.
 Il BUG 17 resta aperto per la UAT integrata dopo 04. Nessun merge/main/produzione.
 I quattro documenti locali preesistenti conservati ed esclusi dai commit.
+
+
+## Raccordo UAT 03 — filtro globale visibile dopo il riavvio
+
+Floriano segnala che in Enti Esterni non trova il filtro globale e chiede
+espressamente verifica e ricompilazione Docker 8082. Ricognizione successiva
+al riavvio: API e WEB servono già `e8dbbfd65ff79b630b3f18ad2dea703d073b8b27`,
+image ID coerenti con la ricevuta precedente, entry `index-Lc3iSvcQ.js`,
+ledger 60/60 senza pending/checksum difformi. Nessun ritorno a immagini vecchie
+rilevato. La causa della differenza percepita non è attestata come cache.
+
+Floriano conferma la pagina `/enti-esterni`. La scelta Solo globali era nel
+menu Area / ambito: aggiunto anche un pulsante sempre visibile accanto al
+menu, con disposizione verticale sui piccoli schermi. Riusa il medesimo stato,
+azzera la pagina e invia `ambito=globali`; non interpreta Tutte le Aree come
+Solo globali. Nessuna modifica a schema, API, permessi, D04 o documenti.
+
+File modificati:
+
+- `artifacts/magazzino-solidale/src/pages/enti-esterni.tsx`
+- `artifacts/magazzino-solidale/src/pages/enti-esterni.test.tsx`
+- `artifacts/magazzino-solidale/e2e/m4a-documenti-destinatari.spec.ts`
+- questo registro.
+
+Prova aggiornata: pulsante visibile senza aprire il menu, risposta API con
+`areaOperativaId` NULL su tutti i risultati; controllo della pagina azzerata.
+Restano valide la scelta nel menu e tutte le policy precedenti.
+Nuova compilazione API/WEB e verifica 8082 da registrare dopo esecuzione.

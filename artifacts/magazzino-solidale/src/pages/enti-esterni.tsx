@@ -204,36 +204,49 @@ export default function EntiEsterni() {
       </header>
       <div className="space-y-1">
         <Label htmlFor="enti-area-filter">{t("entiEsterni.areaFilter")}</Label>
-        <Select
-          value={areaFilter}
-          onValueChange={(value) => {
-            setAreaFilter(value);
-            setOffset(0);
-          }}
-        >
-          <SelectTrigger id="enti-area-filter">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {user?.areaOperativaId == null && (
-              <SelectItem value="all">{t("entiEsterni.allAreas")}</SelectItem>
-            )}
-            <SelectItem value="global">
-              {t("entiEsterni.onlyGlobal")}
-            </SelectItem>
-            {areas
-              ?.filter(
-                (area) =>
-                  user?.areaOperativaId == null ||
-                  area.id === user.areaOperativaId,
-              )
-              .map((area) => (
-                <SelectItem key={area.id} value={String(area.id)}>
-                  {area.nome} · {t("entiEsterni.withGlobal")}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <Select
+            value={areaFilter}
+            onValueChange={(value) => {
+              setAreaFilter(value);
+              setOffset(0);
+            }}
+          >
+            <SelectTrigger id="enti-area-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {user?.areaOperativaId == null && (
+                <SelectItem value="all">{t("entiEsterni.allAreas")}</SelectItem>
+              )}
+              <SelectItem value="global">
+                {t("entiEsterni.onlyGlobal")}
+              </SelectItem>
+              {areas
+                ?.filter(
+                  (area) =>
+                    user?.areaOperativaId == null ||
+                    area.id === user.areaOperativaId,
+                )
+                .map((area) => (
+                  <SelectItem key={area.id} value={String(area.id)}>
+                    {area.nome} · {t("entiEsterni.withGlobal")}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant={areaFilter === "global" ? "default" : "outline"}
+            aria-controls="enti-results"
+            onClick={() => {
+              setAreaFilter("global");
+              setOffset(0);
+            }}
+          >
+            {t("entiEsterni.onlyGlobal")}
+          </Button>
+        </div>
       </div>
       <Label htmlFor="enti-search">{t("entiEsterni.search")}</Label>
       <Input
@@ -256,7 +269,7 @@ export default function EntiEsterni() {
           {t("entiEsterni.loadError")}
         </p>
       )}
-      <div className="space-y-2">
+      <div id="enti-results" className="space-y-2">
         {(searchReady ? (list.data ?? []) : []).map((item) => (
           <Card key={item.id}>
             <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">

@@ -38,10 +38,13 @@ it("cambia filtro Area/globali azzerando la pagina e inviando il contesto al ser
   await act(async () => root.render(<EntiEsterni />));
   await click("entiEsterni.next");
   expect(state.params.at(-1)?.offset).toBe(50);
-  for (const value of ["1", "global"]) {
-    await act(async () => { const select = document.querySelector("select")!; select.value = value; select.dispatchEvent(new Event("change", { bubbles: true })); });
-    expect(state.params.at(-1)).toMatchObject(value === "global" ? { offset: 0, ambito: "globali" } : { offset: 0, areaOperativaId: 1 });
-  }
+  await act(async () => { const select = document.querySelector("select")!; select.value = "1"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(state.params.at(-1)).toMatchObject({ offset: 0, areaOperativaId: 1 });
+  await click("entiEsterni.next");
+  expect(state.params.at(-1)?.offset).toBe(50);
+  await click("entiEsterni.onlyGlobal");
+  expect(state.params.at(-1)).toMatchObject({ offset: 0, ambito: "globali" });
+  expect(state.params.at(-1)).not.toHaveProperty("areaOperativaId");
 });
 it("Area prima dell’anagrafica e opzione globale soltanto per amministrazione globale", async () => {
   await act(async () => root.render(<EntiEsterni />)); await click("entiEsterni.new");
