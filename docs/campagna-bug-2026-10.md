@@ -1,6 +1,6 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-19 ottobre 2026, Europe/Rome. **Consegne 01, 02 e checkpoint 03 chiusi con OK di Floriano; consegna 04 e addendum BUG 21 installati e verificati sulla 8082; UAT del blocco C da eseguire.**
+19 ottobre 2026, Europe/Rome. **Consegne 01, 02 e checkpoint 03 chiusi con OK di Floriano; consegna 04 e addendum BUG 21 installati e verificati sulla 8082; UAT del blocco C da eseguire; correttivo tessera/codici beneficiari installato sulla 8082 (`6088327`).**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
@@ -1978,3 +1978,44 @@ reload Vite dopo una modifica al file E2E. Traccia: nuova connessione Vite
 immediatamente dopo la risoluzione del controllo. Ripetute integralmente le
 due suite a sorgenti fermi, nessun retry, timeout o asserzione indebolita.
 Codegen ripetuto e confrontato per SHA-256: output byte per byte identico.
+
+### Ricevuta 8082 del correttivo tessera/codici
+
+Candidato installato: `6088327aed83cf7e17f627e3c99b3cdf3917c6e2`. Immagini costruite da archivio Git di
+questa SHA; nessun file locale o documento preesistente nel contesto di build.
+
+- /magazzino-api: `magazzino-bugfix-uat-api:sha-6088327aed83`, ID `sha256:918b93eb69261c92c0758e4eff265ca3f2feff195475aeced6869f76fd778964`.
+- /magazzino-web: `magazzino-bugfix-uat-web:sha-6088327aed83`, ID `sha256:668d8517963af79a4a8cb5d34e9f1ada013891d86fe1fa09d1855228ffcb8ac2`.
+
+Backup privato completo database/uploads, indici archivi e SHA-256 verificati:
+`/Users/florianocaprio/Backups/Magazzino-Solidale/TESSERA-CODICI-6088327aed83-2026-10-19T21-39-42-017Z`.
+Ripristino effettivo su PostgreSQL temporaneo isolato, senza porte esposte né
+applicazione, migration runner canonico **60→61 PASS** e replay PASS. Nuova
+configurazione iniziale presente, contatori vuoti; impronte complete di 15
+tabelle operative/anagrafiche/audit invariate. Archivio uploads estratto per
+verificarne il ripristino. Copia del DB e rete temporanee rimosse.
+`restoreTested=true`, `businessIntegrityUnchanged=true`.
+
+Ricreati soltanto API/WEB dopo confronto della catena Compose reale (sole
+immagini, revisioni e versione sorgente migration). Stesso container/avvio di
+PostgreSQL, stessi volumi persistenti. Runner applicato dall'entrypoint;
+ledger reale **61/61**, zero pending/checksum difformi/mancanti/fuori ordine.
+Impronte delle 15 tabelle preesistenti ancora identiche al backup.
+
+Verifica HTTP: `/`, `/config.js`, `/api/healthz`, `/api/readyz` **200**;
+`/api/utenti` anonimo **401**. Entry `/assets/index-SrNFwWT0.js` e tutti i chunk
+coinvolti (configurazione, dettaglio beneficiario, UDS, Enti, Fornitori, carico,
+Richieste) confrontati per SHA-256 fra immagine e HTTP. Pannello nuovo e modulo
+PDF con codice/token distinti presenti. Il verificatore inizialmente aveva
+selezionato l'helper `carico-merce-*` anziché la pagina omonima: ora verifica
+entrambi i chunk e identifica la pagina per il contenuto atteso; codice
+applicativo e immagini invariati. Budget entry **400,0/400 KiB gzip**,
+limite invariato, PASS anche sull'immagine Docker.
+
+Le immagini precedenti e l'override di rollback restano nel backup. Con il
+ledger 61 non basta riavviare un vecchio runner con 60 file: per un rollback
+completo occorre il ripristino coerente del backup verificato. Nessuna
+rinumerazione massiva dei beneficiari preesistenti eseguita o richiesta.
+
+Il successivo commit della ricevuta è solo documentale. Resta in attesa
+l'OK UAT di Floriano per passare al prompt 05.
