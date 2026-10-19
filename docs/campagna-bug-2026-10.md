@@ -1,6 +1,6 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-20 ottobre 2026, Europe/Rome. **Consegne 01–04 chiuse con OK di Floriano, compreso il correttivo tessera/codici beneficiari `6088327`; consegna 05 (blocco D) installata e verificata sulla 8082 (`89e17af`); UAT 05 da eseguire.**
+20 ottobre 2026, Europe/Rome. **Consegne 01–04 chiuse con OK di Floriano, compreso il correttivo tessera/codici beneficiari `6088327`; consegna 05 (blocco D) e correttivo UAT installati e verificati sulla 8082 (`6bf7864`); UAT 05 da completare con Floriano.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
@@ -109,19 +109,19 @@ I test automatici non sostituiscono la UAT personale. D03 mantiene il comportame
 | 01 | A | 01 | CHIUSO; UAT OK | Nessuno; D01 approvata | 7d70906 | PASS; 4 skip esterni dichiarati nel blocco precedente | OK Floriano 19/10 | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 |
 | 02  | B      | 02     | CHIUSO; UAT OK | Nessuno; D01 approvata                                         | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 03  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
-| 04  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 89e17afe1bf41154e9ed336a987adbbd6143a239 | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
+| 04  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 | PASS mirati; 4 skip esterni | DA ESEGUIRE | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 |
 | 05 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 | 06 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 | 07 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 | 08 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 | 09 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
-| 10  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 89e17afe1bf41154e9ed336a987adbbd6143a239 | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
-| 11  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 89e17afe1bf41154e9ed336a987adbbd6143a239 | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
-| 12  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; precisazione D03 applicata | 89e17afe1bf41154e9ed336a987adbbd6143a239 | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
-| 13  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 89e17afe1bf41154e9ed336a987adbbd6143a239 | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
-| 14  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 89e17afe1bf41154e9ed336a987adbbd6143a239 | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
+| 10  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 | PASS mirati; 4 skip esterni | DA ESEGUIRE | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 |
+| 11  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 | PASS mirati; 4 skip esterni | DA ESEGUIRE | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 |
+| 12  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; precisazione D03 applicata | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 | PASS mirati; 4 skip esterni | DA ESEGUIRE | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 |
+| 13  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 | PASS mirati; 4 skip esterni | DA ESEGUIRE | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 |
+| 14  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 | PASS mirati; 4 skip esterni | DA ESEGUIRE | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 |
 | 15  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
-| 16  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 89e17afe1bf41154e9ed336a987adbbd6143a239 | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
+| 16  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 | PASS mirati; 4 skip esterni | DA ESEGUIRE | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 |
 | 17 | C | 03, 04 | CHIUSO; UAT OK | Nessuno; Enti e Fornitori locali/globali verificati | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; skip dichiarati nella ricevuta | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 19  | E      | 07     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -141,7 +141,7 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | CHIUSA; OK UAT Floriano 19/10 |
 | 03 | C: 17, prima parte | Tecnica | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 | PASS: 1.521 API + 4 skip; 756 UI; 9 browser + 36 skip di matrice; build/budget | Installata, asset HTTP verificati; ledger 60/60 | CHIUSO; OK Floriano; regressione integrata nel 04 |
 | 04 | C: 05–09, 21 e regressione 17 | Funzionale | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS; correttivo e ricevuta sotto | Installata; hash HTTP e ledger 61/61 verificati | OK UAT Floriano 20/10 |
-| 05       | D: 04, 10–14, 16              | Funzionale      | 89e17afe1bf41154e9ed336a987adbbd6143a239 | PASS; 1.528 API, 781 UI, 22 browser; skip dichiarati | Installata; hash HTTP JS/CSS e ledger 61/61 | UAT DA ESEGUIRE |
+| 05       | D: 04, 10–14, 16              | Funzionale      | 6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49 | PASS; 1.529 API, 782 UI, 22 browser; skip dichiarati | Installata; hash HTTP JS/CSS e ledger 61/61 | UAT DA ESEGUIRE |
 | 06       | E: 18, modello e integrazioni | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
 | 07       | E: 18 UI, 19                  | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 08       | F: 20 e gate finali           | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
@@ -2277,10 +2277,14 @@ con il comando ufficiale; seconda generazione identica byte per byte.
 
 ### Verifiche del correttivo 05
 
-- `pnpm install --frozen-lockfile`: PASS, lockfile invariato.
-- `pnpm run typecheck`: PASS (log finale `blocco05fix-typecheck-final.log`).
+- `CI=true pnpm install --frozen-lockfile`: PASS, lockfile invariato. Il primo
+  tentativo senza CI era stato interrotto da `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`;
+  l'esito positivo è confermato dall'esecuzione successiva non interattiva
+  (`/private/tmp/blocco05fix-install-ci.log`), non dal primo tentativo.
+- `pnpm run typecheck`: PASS (log finale `blocco05fix-typecheck-postinstall.log`).
 - `pnpm --filter @workspace/magazzino-solidale run test --maxWorkers=2`:
-  **782 PASS, 121 file**, esecuzione finale dopo le modifiche.
+  **782 PASS, 121 file**, confermati anche dopo installazione CI (log
+  `/private/tmp/blocco05fix-ui-postinstall.log`).
 - API, runner canonico `node scripts/quality-gates-run.mjs api general`:
   **1.529 PASS + 4 SKIP, 140 file**, evidenza privata
   `/private/tmp/blocco05fix-api-2`. Le 12 prove di carico passano, inclusi copia
@@ -2306,5 +2310,42 @@ con il comando ufficiale; seconda generazione identica byte per byte.
   inalterati e fuori dai commit. Nessun file `.env`, segreto, log o screenshot
   aggiunto. Test API/browser esclusivamente su DB temporanei, rimossi dal runner.
 
-Installazione sulla 8082 da completare con immagini del checkpoint e ricevuta
-separata. Nessuna UAT umana attestata automaticamente.
+Installazione 8082 completata nella ricevuta seguente. Nessuna UAT umana
+attestata automaticamente.
+
+### Ricevuta 8082 — correttivo UAT 05
+
+Codice installato: `6bf78648b2d2ae733c2a77bd8d7bd0dfd2514a49`. Immagini costruite da `git archive`
+del checkpoint, con revisioni OCI e tag immutabili:
+
+- API: `magazzino-bugfix-uat-api:sha-6bf78648b2d2`,
+  ID `sha256:bab4fa45bd208f177fc805df9a127fd4dcd18333d27276fde7597f70ecaf118b`.
+- WEB: `magazzino-bugfix-uat-web:sha-6bf78648b2d2`,
+  ID `sha256:9b1dca776511b299d81e5e2abf757978e077d146699e5840e4fd3d917604f8a3`.
+
+Backup privato precedente all'aggiornamento:
+`/Users/florianocaprio/Backups/Magazzino-Solidale/BLOCCO05-CORRETTIVO-6bf78648b2d2-2026-10-19T23-10-22-292Z`.
+Dump PostgreSQL custom e archivio uploads verificati mediante indici e SHA-256;
+permessi cartella 0700, file 0600. Nessun nuovo restore eseguito (`restoreTested=false`):
+non ci sono nuove migration in questo correttivo. Metadati, backup e log restano
+fuori Git. Conservato anche l'override di rollback alle immagini precedenti.
+
+Applicata la catena Compose reale, con sole differenze consentite a immagini,
+revisioni e versione sorgente migration. Ricreati API e WEB con
+`--no-deps --no-build`. PostgreSQL conserva ID, avvio e volume; uploads conserva
+il medesimo volume. Ledger **61/61**, nessuna migration pendente o difforme.
+Impronte integrali delle **24 tabelle** già elencate nella ricevuta 05 precedenti
+e successive **tutte identiche**, inclusi pratiche, righe, rettifiche, stock e audit.
+
+HTTP `/`, `/config.js`, `/api/healthz` e `/api/readyz`: **200**;
+`/api/utenti` anonimo: **401**. Entry `/assets/index-DKsxEa49.js`;
+budget dell'immagine **386,6/400 KiB gzip**. Asset JS/CSS serviti confrontati per
+SHA-256 con l'immagine, compresi Carico, scanner, Giacenze, Approvvigionamenti e
+regressioni Enti/Fornitori. Verificata la presenza di Apertura Pratica, Prodotto
+salvato, Inserimento prodotti e rettifica delle righe nel codice effettivamente
+servito. Ricevuta privata `/private/tmp/blocco05fix-release-result.json`.
+
+Questa ricevuta è solo documentale e non cambia il codice installato. Branch
+`codex/bugfix-uat-ottobre-2026`, main e produzione esclusi. Workflow nuovamente
+verificato: nessun deploy sul push del branch; zero hook e zero ambienti GitHub.
+La consegna 05 resta in attesa dell'OK UAT di Floriano prima del prompt 06.
