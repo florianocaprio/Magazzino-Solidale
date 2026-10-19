@@ -238,7 +238,7 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     const entity = await expectJson<Ente & { areaOperativaId: null }>(await saved, 201);
     expect(entity.areaOperativaId).toBeNull();
     await expect(form).toBeHidden();
-    await selectOption(page, page.getByRole("combobox"), "Solo globali");
+    await selectOption(page, page.getByRole("combobox", { name: "Area / ambito", exact: true }), "Solo globali");
     await expect(page.getByText(name, { exact: true })).toBeVisible();
     const dialog = await openCreateBollaDialog(page);
     await selectOption(page, dialog.getByRole("combobox").first(), "Ente esterno");
