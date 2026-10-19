@@ -6,6 +6,7 @@ import {
   useUpdateUtente,
   useDeleteUtente,
   useResetUtentePassword,
+  useSetUtenteTemporaryPassword,
   useListRuoli,
   useListCentriAscolto,
   useListAreeOperative,
@@ -67,7 +68,14 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, Pencil, Power, KeyRound } from "lucide-react";
+import {
+  MoreHorizontal,
+  Plus,
+  Pencil,
+  Power,
+  KeyRound,
+  Trash2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 import { ruoliNelPerimetro } from "@/lib/admin-scope";
@@ -81,7 +89,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Utenti() {
   const { t } = useTranslation();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refresh } = useAuth();
   const lockedCentroId = currentUser?.centroAscoltoId ?? null;
   const isCentroLocked = lockedCentroId != null;
   const lockedAreaOperativaId = currentUser?.areaOperativaId ?? null;
@@ -117,11 +125,23 @@ export default function Utenti() {
   const updateUtente = useUpdateUtente();
   const deleteUtente = useDeleteUtente();
   const resetPassword = useResetUtentePassword();
+  const temporaryReset = useSetUtenteTemporaryPassword();
+  const pending =
+    createUtente.isPending ||
+    updateUtente.isPending ||
+    deleteUtente.isPending ||
+    resetPassword.isPending ||
+    temporaryReset.isPending;
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Utente | null>(null);
   const [deleting, setDeleting] = useState<Utente | null>(null);
   const [resetting, setResetting] = useState<Utente | null>(null);
+  const [resetMode, setResetMode] = useState<"email" | "temporary">("email");
+  const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [removeIfUnused, setRemoveIfUnused] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -158,8 +178,25 @@ export default function Utenti() {
     },
   );
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: getListUtentiQueryKey() });
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: getListUtentiQueryKey() });
+    await refresh();
+  };
+
+  const openReset = (u: Utente, mode: "email" | "temporary") => {
+    setTemporaryPassword("");
+    setConfirmPassword("");
+    setResetError(null);
+    setResetMode(mode);
+    setResetting(u);
+  };
+  const closeReset = () => {
+    if (pending) return;
+    setResetting(null);
+    setTemporaryPassword("");
+    setConfirmPassword("");
+    setResetError(null);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -204,6 +241,7 @@ export default function Utenti() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (pending) return;
     setFormError(null);
     const ruoloIdValue = ruoloId === NO_ROLE ? null : parseInt(ruoloId, 10);
     const centroIdValue = isCentroLocked
@@ -283,13 +321,17 @@ export default function Utenti() {
   };
 
   const confirmDelete = () => {
-    if (!deleting) return;
+    if (!deleting || pending) return;
     deleteUtente.mutate(
-      { id: deleting.id },
+      { id: deleting.id, params: { removeIfUnused } },
       {
         onSuccess: () => {
           invalidate();
-          toast({ title: t("utenti.toastDeleted") });
+          toast({
+            title: t(
+              removeIfUnused ? "utenti.toastRemoved" : "utenti.toastDeleted",
+            ),
+          });
           setDeleting(null);
         },
         onError: (err) => {
@@ -306,7 +348,36 @@ export default function Utenti() {
 
   const confirmReset = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetting) return;
+    if (!resetting || pending) return;
+    if (resetMode === "temporary") {
+      if (
+        temporaryPassword.length < 8 ||
+        !/[A-Za-z]/.test(temporaryPassword) ||
+        !/[0-9]/.test(temporaryPassword)
+      ) {
+        setResetError(t("utenti.temporaryPolicy"));
+        return;
+      }
+      if (temporaryPassword !== confirmPassword) {
+        setResetError(t("utenti.passwordMismatch"));
+        return;
+      }
+      temporaryReset.mutate(
+        { id: resetting.id, data: { newPassword: temporaryPassword } },
+        {
+          onSuccess: () => {
+            setResetting(null);
+            setTemporaryPassword("");
+            setConfirmPassword("");
+            setResetError(null);
+            void invalidate();
+            toast({ title: t("utenti.temporarySuccess") });
+          },
+          onError: (err) => setResetError(extractError(err)),
+        },
+      );
+      return;
+    }
     if (!resettingHasValidEmail) {
       toast({
         title: t("utenti.error"),
@@ -337,7 +408,7 @@ export default function Utenti() {
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center gap-4">
+      <div className="flex flex-wrap justify-between items-center gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{t("utenti.title")}</h1>
           <p className="text-sm text-muted-foreground">
@@ -424,6 +495,9 @@ export default function Utenti() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="sticky start-0 z-20 bg-card">
+                    {t("utenti.actions")}
+                  </TableHead>
                   <TableHead>{t("utenti.colUsername")}</TableHead>
                   <TableHead>{t("common.email")}</TableHead>
                   <TableHead>{t("common.name")}</TableHead>
@@ -434,16 +508,129 @@ export default function Utenti() {
                   <TableHead>{t("utenti.colZona")}</TableHead>
                   <TableHead>{t("common.status")}</TableHead>
                   <TableHead>{t("utenti.colUltimoAccesso")}</TableHead>
-                  <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {utenti?.map((u) => (
                   <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.username}</TableCell>
+                    <TableCell className="sticky start-0 z-10 bg-card">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="min-h-11"
+                            disabled={pending}
+                            aria-label={t("utenti.actionsFor", {
+                              username: u.username,
+                            })}
+                          >
+                            <MoreHorizontal
+                              className="me-2 h-4 w-4"
+                              aria-hidden="true"
+                            />
+                            {t("utenti.actions")}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            disabled={
+                              u.isSuperAdmin && !currentUser?.isSuperAdmin
+                            }
+                            onClick={() => openEdit(u)}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            {t("common.edit")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={
+                              u.isSuperAdmin && !currentUser?.isSuperAdmin
+                            }
+                            onClick={() => openReset(u, "email")}
+                          >
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            {t("utenti.resetPassword")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={
+                              pending ||
+                              !u.attivo ||
+                              (u.isSuperAdmin && !currentUser?.isSuperAdmin)
+                            }
+                            onClick={() => openReset(u, "temporary")}
+                          >
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            {t("utenti.temporaryAction")}
+                          </DropdownMenuItem>
+                          {!u.attivo && (
+                            <DropdownMenuItem
+                              disabled={
+                                pending ||
+                                (u.isSuperAdmin && !currentUser?.isSuperAdmin)
+                              }
+                              onClick={() =>
+                                updateUtente.mutate(
+                                  { id: u.id, data: { attivo: true } },
+                                  {
+                                    onSuccess: () => {
+                                      void invalidate();
+                                      toast({
+                                        title: t("utenti.toastUpdated"),
+                                      });
+                                    },
+                                    onError: (err) =>
+                                      toast({
+                                        title: t("utenti.error"),
+                                        description: extractError(err),
+                                        variant: "destructive",
+                                      }),
+                                  },
+                                )
+                              }
+                            >
+                              <Power className="mr-2 h-4 w-4" />
+                              {t("utenti.reactivate")}
+                            </DropdownMenuItem>
+                          )}
+                          {u.attivo && (
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              disabled={
+                                u.id === currentUser?.id ||
+                                (u.isSuperAdmin && !currentUser?.isSuperAdmin)
+                              }
+                              onClick={() => {
+                                setRemoveIfUnused(false);
+                                setDeleting(u);
+                              }}
+                            >
+                              <Power className="mr-2 h-4 w-4" />
+                              {t("common.deactivate")}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            disabled={
+                              pending ||
+                              u.id === currentUser?.id ||
+                              (u.isSuperAdmin && !currentUser?.isSuperAdmin)
+                            }
+                            onClick={() => {
+                              setRemoveIfUnused(true);
+                              setDeleting(u);
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {t("utenti.remove")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                    <TableCell className="font-medium break-all">
+                      {u.username}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       <div className="flex flex-col gap-1">
-                        <span>{u.email ?? "—"}</span>
+                        <span className="break-all">{u.email ?? "—"}</span>
                         {u.emailDaAggiornare && (
                           <Badge variant="secondary" className="w-fit">
                             {t("utenti.emailDaAggiornare")}
@@ -489,48 +676,6 @@ export default function Utenti() {
                       {u.ultimoAccesso
                         ? new Date(u.ultimoAccesso).toLocaleString("it-IT")
                         : t("utenti.never")}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            disabled={
-                              u.isSuperAdmin && !currentUser?.isSuperAdmin
-                            }
-                            onClick={() => openEdit(u)}
-                          >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            {t("common.edit")}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled={
-                              u.isSuperAdmin && !currentUser?.isSuperAdmin
-                            }
-                            onClick={() => setResetting(u)}
-                          >
-                            <KeyRound className="mr-2 h-4 w-4" />
-                            {t("utenti.resetPassword")}
-                          </DropdownMenuItem>
-                          {u.attivo && (
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              disabled={
-                                u.id === currentUser?.id ||
-                                (u.isSuperAdmin && !currentUser?.isSuperAdmin)
-                              }
-                              onClick={() => setDeleting(u)}
-                            >
-                              <Power className="mr-2 h-4 w-4" />
-                              {t("common.deactivate")}
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -744,6 +889,7 @@ export default function Utenti() {
               <Label htmlFor="u-attivo">{t("utenti.accountAttivo")}</Label>
               <Switch
                 id="u-attivo"
+                disabled={editingSelf || pending}
                 checked={attivo}
                 onCheckedChange={setAttivo}
               />
@@ -769,20 +915,66 @@ export default function Utenti() {
         </SheetContent>
       </Sheet>
 
-      <Dialog
-        open={!!resetting}
-        onOpenChange={(open) => !open && setResetting(null)}
-      >
+      <Dialog open={!!resetting} onOpenChange={(open) => !open && closeReset()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("utenti.resetTitle")}</DialogTitle>
+            <DialogTitle>
+              {t(
+                resetMode === "temporary"
+                  ? "utenti.temporaryAction"
+                  : "utenti.resetTitle",
+              )}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={confirmReset} className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              {t("utenti.resetConfirm")}
+              {t(
+                resetMode === "temporary"
+                  ? "utenti.temporaryHelp"
+                  : "utenti.resetConfirm",
+              )}
             </p>
             <p className="text-sm font-medium">{resetting?.email ?? "—"}</p>
-            {!resettingHasValidEmail && (
+            {resetMode === "temporary" && (
+              <>
+                <p className="text-sm font-medium">{resetting?.username}</p>
+                <Label htmlFor="u-temporary">
+                  {t("utenti.temporaryAction")}
+                </Label>
+                <Input
+                  id="u-temporary"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  disabled={pending}
+                  value={temporaryPassword}
+                  onChange={(e) => setTemporaryPassword(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t("utenti.temporaryPolicy")}
+                </p>
+                <Label htmlFor="u-temporary-confirm">
+                  {t("utenti.confirmPassword")}
+                </Label>
+                <Input
+                  id="u-temporary-confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  disabled={pending}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </>
+            )}
+            {resetError && (
+              <p role="alert" className="text-sm text-destructive">
+                {resetError}
+              </p>
+            )}
+            {resetMode === "email" && !resettingHasValidEmail && (
               <p className="text-sm text-destructive">
                 {t("utenti.emailInvalidForReset")}
               </p>
@@ -791,15 +983,22 @@ export default function Utenti() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setResetting(null)}
+                onClick={closeReset}
+                disabled={pending}
               >
                 {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
-                disabled={resetPassword.isPending || !resettingHasValidEmail}
+                disabled={
+                  pending || (resetMode === "email" && !resettingHasValidEmail)
+                }
               >
-                {t("utenti.resetButton")}
+                {t(
+                  resetMode === "temporary"
+                    ? "utenti.temporaryAction"
+                    : "utenti.resetButton",
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -808,24 +1007,34 @@ export default function Utenti() {
 
       <AlertDialog
         open={!!deleting}
-        onOpenChange={(open) => !open && setDeleting(null)}
+        onOpenChange={(open) => !open && !pending && setDeleting(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("utenti.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t(removeIfUnused ? "utenti.removeTitle" : "utenti.deleteTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("utenti.deleteDescBefore")}{" "}
               <span className="font-medium">{deleting?.username}</span>{" "}
-              {t("utenti.deleteDescAfter")}
+              {t(
+                removeIfUnused ? "utenti.removeHelp" : "utenti.deleteDescAfter",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={pending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
+              disabled={pending}
+              onClick={(event) => {
+                event.preventDefault();
+                confirmDelete();
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {t("common.deactivate")}
+              {t(removeIfUnused ? "utenti.remove" : "common.deactivate")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

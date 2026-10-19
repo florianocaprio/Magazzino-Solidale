@@ -1,3 +1,4 @@
+import { sessionStub } from "./helpers/session-stub";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
@@ -16,12 +17,7 @@ const createdUserIds: number[] = [];
 function makeApp(sessionUserId: number): Express {
   const a = express();
   a.use(express.json());
-  a.use((req, _res, next) => {
-    (req as unknown as { session: { userId: number } }).session = {
-      userId: sessionUserId,
-    };
-    next();
-  });
+  a.use(sessionStub(sessionUserId));
   a.use(utentiRouter);
   return a;
 }

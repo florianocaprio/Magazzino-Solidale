@@ -1,6 +1,8 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-19 ottobre 2026, Europe/Rome. **Prompt 00: preparazione della campagna.**
+19 ottobre 2026, Europe/Rome. **Prompt 01: BUG 01 Utenti, candidato in verifica.**
+
+Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
 Le correzioni iniziano dopo un distinto incarico per il prompt 01; `##test` e
 `##merge` sono fasi successive, attivate espressamente.
@@ -99,32 +101,32 @@ Nessuna decisione residua blocca l'avvio del prompt 01.
 
 ## Registro dei BUG
 
-Tutti i BUG sono **DA SVILUPPARE**. Le UAT sono **DA ESEGUIRE** e non derivano
+Il BUG 01 è **IN VERIFICA**; gli altri BUG sono **DA SVILUPPARE**. Le UAT sono **DA ESEGUIRE** e non derivano
 dai test automatici. Il candidato iniziale non è un candidato verificato della
 campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 
-| BUG | Blocco | Prompt | Stato         | Requisiti sospesi                                              | Commit | Automatico   | UAT         | Ultimo candidato verificato |
-| --- | ------ | ------ | ------------- | -------------------------------------------------------------- | ------ | ------------ | ----------- | --------------------------- |
-| 01  | A      | 01     | DA SVILUPPARE | Nessuno; D01 approvata                                         | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 02  | B      | 02     | DA SVILUPPARE | Nessuno; D01 approvata                                         | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 03  | B      | 02     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 04  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 05  | C      | 04     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 06  | C      | 04     | DA SVILUPPARE | Nessuno; requisito sostitutivo Area/Centro prima della ricerca | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 07  | C      | 04     | DA SVILUPPARE | Nessuno; D02 approvata                                         | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 08  | C      | 04     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 09  | C      | 04     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 10  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 11  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 12  | D      | 05     | DA SVILUPPARE | Raccordo D03 con le attuali pratiche Aperte                    | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 13  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 14  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 15  | B      | 02     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 16  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 17  | C      | 03, 04 | DA SVILUPPARE | Nessuno; D04 approvata; UAT dopo 04                            | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 18  | E      | 06, 07 | DA SVILUPPARE | Analisi tecnica del modello nel 06; UAT dopo 07                | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 19  | E      | 07     | DA SVILUPPARE | Nessuno                                                        | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
-| 20  | F      | 08     | DA SVILUPPARE | Nessuno; conservare UX20-01–14                                 | —      | NON ESEGUITO | DA ESEGUIRE | —                           |
+| BUG | Blocco | Prompt | Stato         | Requisiti sospesi                                              | Commit                          | Automatico                | UAT         | Ultimo candidato verificato |
+| --- | ------ | ------ | ------------- | -------------------------------------------------------------- | ------------------------------- | ------------------------- | ----------- | --------------------------- |
+| 01  | A      | 01     | IN VERIFICA   | Nessuno; D01 approvata                                         | Checkpoint applicativo corrente | Verifiche finali in corso | DA ESEGUIRE | —                           |
+| 02  | B      | 02     | DA SVILUPPARE | Nessuno; D01 approvata                                         | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 03  | B      | 02     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 04  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 05  | C      | 04     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 06  | C      | 04     | DA SVILUPPARE | Nessuno; requisito sostitutivo Area/Centro prima della ricerca | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 07  | C      | 04     | DA SVILUPPARE | Nessuno; D02 approvata                                         | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 08  | C      | 04     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 09  | C      | 04     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 10  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 11  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 12  | D      | 05     | DA SVILUPPARE | Raccordo D03 con le attuali pratiche Aperte                    | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 13  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 14  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 15  | B      | 02     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 16  | D      | 05     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 17  | C      | 03, 04 | DA SVILUPPARE | Nessuno; D04 approvata; UAT dopo 04                            | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 18  | E      | 06, 07 | DA SVILUPPARE | Analisi tecnica del modello nel 06; UAT dopo 07                | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 19  | E      | 07     | DA SVILUPPARE | Nessuno                                                        | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
+| 20  | F      | 08     | DA SVILUPPARE | Nessuno; conservare UX20-01–14                                 | —                               | NON ESEGUITO              | DA ESEGUIRE | —                           |
 
 ## Otto consegne
 
@@ -133,16 +135,16 @@ Il prompt 00 non costituisce una nona consegna. I checkpoint 03 e 06 non
 chiudono BUG 17 e BUG 18. Per le consegne funzionali serve l'OK UAT esplicito di
 Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna.
 
-| Consegna | Blocco e BUG                  | Tipo            | SHA | Controlli e risultato reale | Versione 8082                 | Esito                        |
-| -------- | ----------------------------- | --------------- | --- | --------------------------- | ----------------------------- | ---------------------------- |
-| 01       | A: 01                         | Funzionale      | —   | NON ESEGUITI                | Non installata                | UAT DA ESEGUIRE              |
-| 02       | B: 02, 03, 15                 | Funzionale      | —   | NON ESEGUITI                | Non installata                | UAT DA ESEGUIRE              |
-| 03       | C: 17, prima parte            | Tecnica isolata | —   | NON ESEGUITI                | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto |
-| 04       | C: 05–09 e regressione 17     | Funzionale      | —   | NON ESEGUITI                | Non installata                | UAT DA ESEGUIRE              |
-| 05       | D: 04, 10–14, 16              | Funzionale      | —   | NON ESEGUITI                | Non installata                | UAT DA ESEGUIRE              |
-| 06       | E: 18, modello e integrazioni | Tecnica isolata | —   | NON ESEGUITI                | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto |
-| 07       | E: 18 UI, 19                  | Funzionale      | —   | NON ESEGUITI                | Non installata                | UAT DA ESEGUIRE              |
-| 08       | F: 20 e gate finali           | Funzionale      | —   | NON ESEGUITI                | Non installata                | UAT DA ESEGUIRE              |
+| Consegna | Blocco e BUG                  | Tipo            | SHA                             | Controlli e risultato reale | Versione 8082                               | Esito                        |
+| -------- | ----------------------------- | --------------- | ------------------------------- | --------------------------- | ------------------------------------------- | ---------------------------- |
+| 01       | A: 01                         | Funzionale      | Checkpoint applicativo corrente | Verifiche finali in corso   | Ricompilazione autorizzata, in preparazione | UAT DA ESEGUIRE              |
+| 02       | B: 02, 03, 15                 | Funzionale      | —                               | NON ESEGUITI                | Non installata                              | UAT DA ESEGUIRE              |
+| 03       | C: 17, prima parte            | Tecnica isolata | —                               | NON ESEGUITI                | Nessun aggiornamento previsto               | UAT NON PREVISTA; BUG aperto |
+| 04       | C: 05–09 e regressione 17     | Funzionale      | —                               | NON ESEGUITI                | Non installata                              | UAT DA ESEGUIRE              |
+| 05       | D: 04, 10–14, 16              | Funzionale      | —                               | NON ESEGUITI                | Non installata                              | UAT DA ESEGUIRE              |
+| 06       | E: 18, modello e integrazioni | Tecnica isolata | —                               | NON ESEGUITI                | Nessun aggiornamento previsto               | UAT NON PREVISTA; BUG aperto |
+| 07       | E: 18 UI, 19                  | Funzionale      | —                               | NON ESEGUITI                | Non installata                              | UAT DA ESEGUIRE              |
+| 08       | F: 20 e gate finali           | Funzionale      | —                               | NON ESEGUITI                | Non installata                              | UAT DA ESEGUIRE              |
 
 ## Verifiche iniziali e pubblicazione documentale
 
@@ -195,5 +197,18 @@ Nessun deploy 8082/Hetzner o modifica al database persistente in prompt 00.
 La futura certificazione finale richiede il candidato 08, tutte le decisioni e
 UAT risolte, i gate pertinenti e un distinto mandato `##merge` di Floriano.
 
-**PRONTO PER IL PROMPT 01**. Nessun impedimento concreto per il suo avvio;
-attendere il distinto incarico di Floriano.
+## Consegna 01 — BUG 01 Utenti
+
+SHA iniziale `cf0704b9871da5cf081c3bce3ce82e0506d3c5c1`. Il prompt 02 inviato in precedenza è stato interrotto senza interventi; resta in attesa.
+
+Il 19 ottobre Floriano ha attivato il prompt 01 e chiesto espressamente di ricompilare sempre la 8082 per la propria prova, dando poi OK prima della fase successiva. Questa istruzione autorizza la preparazione della 8082 dopo i controlli in questo incarico, senza attendere un ulteriore messaggio `##test`. Restano esclusi main e produzione Hetzner.
+
+Interventi: azioni nella prima colonna fissa con etichetta accessibile; modifica e riattivazione/disattivazione; Elimina con D01; password temporanea separata dal link email; cambio obbligatorio, revoca atomica di sessioni/token e versione delle credenziali nelle sessioni. Il reset e la rimozione rifiutano un profilo cambiato durante l’operazione; il cambio password rifiuta sessioni superate da un reset concorrente.
+
+OpenAPI estesa in modo additivo: `POST /utenti/{id}/temporary-password`, parametro opzionale `removeIfUnused` sul DELETE ed evento `USER_DELETED`. Il DELETE senza parametro conserva la disattivazione esistente. Client rigenerati con il comando ufficiale; export esplicito nel barrel Zod per la collisione Orval tra validatore del path e tipo query. Nessuna migration: schema e 58 update storici invariati.
+
+D01 applicata senza eccezioni implicite: ultimo accesso, sessioni, token e ogni FK, anche di audit o SET NULL/CASCADE, impediscono la cancellazione fisica. I record collegati, compresi i dimostrativi, vengono disattivati e rimangono riattivabili. La sola creazione via API produce un audit e costituisce già una dipendenza da conservare.
+
+Le sessioni precedenti prive della versione delle credenziali richiedono un nuovo login dopo l’aggiornamento. I segreti non sono restituiti o registrati in audit; anche gli errori dei nuovi writer delle credenziali non espongono i parametri SQL.
+
+Candidato locale congelato per i controlli finali API/UI e build API/WEB con budget 400 KiB invariato. Aggiornamento 8082 e pubblicazione solo dopo esito positivo; backup e metadati operativi resteranno fuori repository. La UAT non è ancora eseguita.

@@ -5,6 +5,7 @@ import { AREA_BY_SEGMENT, ALL_AREA_KEYS } from "../lib/areas";
 import { isBootstrapMode } from "../lib/bootstrap";
 import { SUPER_ADMIN_ROLE_NAME } from "../lib/seedRoles";
 import type { PermissionKey } from "../lib/permissions";
+import { passwordSessionVersion } from "../lib/userAccess";
 
 export interface SessionUser {
   id: number;
@@ -30,11 +31,13 @@ export interface SessionUser {
   aree: string[];
   permessi: string[];
   mustChangePassword: boolean;
+  passwordVersion?: string;
 }
 
 declare module "express-session" {
   interface SessionData {
     userId?: number;
+    passwordVersion?: string;
   }
 }
 
@@ -59,6 +62,7 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
       matricola: utentiTable.matricola,
       attivo: utentiTable.attivo,
       mustChangePassword: utentiTable.mustChangePassword,
+      passwordHash: utentiTable.passwordHash,
       ruoloId: utentiTable.ruoloId,
       ruoloNome: ruoliTable.nome,
       centroAscoltoId: utentiTable.centroAscoltoId,
@@ -108,6 +112,7 @@ export async function loadSessionUser(userId: number): Promise<SessionUser | nul
     aree: row.aree ?? [],
     permessi: row.permessi ?? [],
     mustChangePassword: row.mustChangePassword,
+    passwordVersion: passwordSessionVersion(row.passwordHash),
   };
 }
 
@@ -177,7 +182,7 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
   const userId = req.session?.userId;
   if (userId) {
     const user = await loadSessionUser(userId);
-    if (user) {
+    if (user && req.session.passwordVersion === user.passwordVersion) {
       req.user = user;
       next();
       return;

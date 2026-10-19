@@ -166,6 +166,7 @@ import type {
   CreditoSolidaleStornoInput,
   DashboardStats,
   DeleteMezzo200,
+  DeleteUtenteParams,
   DeleteVolontario200,
   DocumentoOperativoDettaglio,
   DocumentoOperativoPage,
@@ -467,6 +468,7 @@ import type {
   SpesaEmporioStornoInput,
   SpesaEmporioStornoResult,
   SystemLogListResponse,
+  TemporaryPasswordInput,
   TesseraBeneficiario,
   TesseraBeneficiarioAnagraficaInput,
   TesseraBeneficiarioInput,
@@ -40205,35 +40207,48 @@ export const useUpdateUtente = <
   return useMutation(getUpdateUtenteMutationOptions(options));
 };
 
-export const getDeleteUtenteUrl = (id: number) => {
-  return `/api/utenti/${id}`;
+export const getDeleteUtenteUrl = (id: number, params?: DeleteUtenteParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/utenti/${id}?${stringifiedParams}`
+    : `/api/utenti/${id}`;
 };
 
 export const deleteUtente = async (
   id: number,
+  params?: DeleteUtenteParams,
   options?: RequestInit,
 ): Promise<void> => {
-  return customFetch<void>(getDeleteUtenteUrl(id), {
+  return customFetch<void>(getDeleteUtenteUrl(id, params), {
     ...options,
     method: "DELETE",
   });
 };
 
 export const getDeleteUtenteMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof deleteUtente>>,
     TError,
-    { id: number },
+    { id: number; params?: DeleteUtenteParams },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof deleteUtente>>,
   TError,
-  { id: number },
+  { id: number; params?: DeleteUtenteParams },
   TContext
 > => {
   const mutationKey = ["deleteUtente"];
@@ -40247,11 +40262,11 @@ export const getDeleteUtenteMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof deleteUtente>>,
-    { id: number }
+    { id: number; params?: DeleteUtenteParams }
   > = (props) => {
-    const { id } = props ?? {};
+    const { id, params } = props ?? {};
 
-    return deleteUtente(id, requestOptions);
+    return deleteUtente(id, params, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -40261,23 +40276,23 @@ export type DeleteUtenteMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteUtente>>
 >;
 
-export type DeleteUtenteMutationError = ErrorType<unknown>;
+export type DeleteUtenteMutationError = ErrorType<void>;
 
 export const useDeleteUtente = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof deleteUtente>>,
     TError,
-    { id: number },
+    { id: number; params?: DeleteUtenteParams },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof deleteUtente>>,
   TError,
-  { id: number },
+  { id: number; params?: DeleteUtenteParams },
   TContext
 > => {
   return useMutation(getDeleteUtenteMutationOptions(options));
@@ -40359,4 +40374,86 @@ export const useResetUtentePassword = <
   TContext
 > => {
   return useMutation(getResetUtentePasswordMutationOptions(options));
+};
+
+export const getSetUtenteTemporaryPasswordUrl = (id: number) => {
+  return `/api/utenti/${id}/temporary-password`;
+};
+
+export const setUtenteTemporaryPassword = async (
+  id: number,
+  temporaryPasswordInput: TemporaryPasswordInput,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getSetUtenteTemporaryPasswordUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(temporaryPasswordInput),
+  });
+};
+
+export const getSetUtenteTemporaryPasswordMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setUtenteTemporaryPassword>>,
+    TError,
+    { id: number; data: BodyType<TemporaryPasswordInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setUtenteTemporaryPassword>>,
+  TError,
+  { id: number; data: BodyType<TemporaryPasswordInput> },
+  TContext
+> => {
+  const mutationKey = ["setUtenteTemporaryPassword"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setUtenteTemporaryPassword>>,
+    { id: number; data: BodyType<TemporaryPasswordInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setUtenteTemporaryPassword(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetUtenteTemporaryPasswordMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setUtenteTemporaryPassword>>
+>;
+export type SetUtenteTemporaryPasswordMutationBody =
+  BodyType<TemporaryPasswordInput>;
+export type SetUtenteTemporaryPasswordMutationError = ErrorType<void>;
+
+export const useSetUtenteTemporaryPassword = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setUtenteTemporaryPassword>>,
+    TError,
+    { id: number; data: BodyType<TemporaryPasswordInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setUtenteTemporaryPassword>>,
+  TError,
+  { id: number; data: BodyType<TemporaryPasswordInput> },
+  TContext
+> => {
+  return useMutation(getSetUtenteTemporaryPasswordMutationOptions(options));
 };

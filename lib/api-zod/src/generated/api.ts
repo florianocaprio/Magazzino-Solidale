@@ -17582,6 +17582,7 @@ export const ListSuperAdminLogSistemaQueryParams = zod.object({
       "PASSWORD_CHANGED_BY_ADMIN",
       "USER_CREATED",
       "USER_DISABLED",
+      "USER_DELETED",
       "USER_ROLE_CHANGED",
       "ACCOUNT_LOCKED",
       "ACCOUNT_UNLOCKED",
@@ -17616,6 +17617,7 @@ export const ListSuperAdminLogSistemaResponse = zod.object({
         "PASSWORD_CHANGED_BY_ADMIN",
         "USER_CREATED",
         "USER_DISABLED",
+        "USER_DELETED",
         "USER_ROLE_CHANGED",
         "ACCOUNT_LOCKED",
         "ACCOUNT_UNLOCKED",
@@ -23265,10 +23267,29 @@ export const DeleteUtenteParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const DeleteUtenteQueryParams = zod.object({
+  removeIfUnused: zod.coerce
+    .boolean()
+    .optional()
+    .describe(
+      "Remove only never-used users without dependencies; otherwise deactivate preserving history. Omitted keeps legacy deactivation.",
+    ),
+});
+
 export const ResetUtentePasswordParams = zod.object({
   id: zod.coerce.number(),
 });
 
 export const ResetUtentePasswordResponse = zod.object({
   message: zod.string(),
+});
+
+export const SetUtenteTemporaryPasswordParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const setUtenteTemporaryPasswordBodyNewPasswordMin = 8;
+
+export const SetUtenteTemporaryPasswordBody = zod.object({
+  newPassword: zod.string().min(setUtenteTemporaryPasswordBodyNewPasswordMin),
 });

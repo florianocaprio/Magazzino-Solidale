@@ -5916,6 +5916,7 @@ export const SystemLogEventType = {
   PASSWORD_CHANGED_BY_ADMIN: "PASSWORD_CHANGED_BY_ADMIN",
   USER_CREATED: "USER_CREATED",
   USER_DISABLED: "USER_DISABLED",
+  USER_DELETED: "USER_DELETED",
   USER_ROLE_CHANGED: "USER_ROLE_CHANGED",
   ACCOUNT_LOCKED: "ACCOUNT_LOCKED",
   ACCOUNT_UNLOCKED: "ACCOUNT_UNLOCKED",
@@ -10255,6 +10256,11 @@ export interface Utente {
   dataCreazione: string;
 }
 
+export interface TemporaryPasswordInput {
+  /** @minLength 8 */
+  newPassword: string;
+}
+
 export interface UtenteInput {
   /** @minLength 1 */
   username: string;
@@ -12638,4 +12644,11 @@ export type ListUtentiParams = {
   areaOperativaId?: number;
   matricola?: string;
   query?: string;
+};
+
+export type DeleteUtenteParams = {
+  /**
+   * Remove only never-used users without dependencies; otherwise deactivate preserving history. Omitted keeps legacy deactivation.
+   */
+  removeIfUnused?: boolean;
 };

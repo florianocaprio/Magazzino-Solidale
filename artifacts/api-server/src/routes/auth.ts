@@ -16,6 +16,7 @@ import { isValidUserEmail, normalizeEmail } from "../lib/userEmail";
 import { sendPasswordChangedEmail, sendPasswordResetEmail } from "../lib/emailService";
 import { checkForgotPasswordRateLimit, createPasswordResetLinkForUser, FORGOT_PASSWORD_RESPONSE_MESSAGE, hashPasswordResetToken, invalidateActivePasswordResetTokens, RESET_PASSWORD_CONFIRM_MISMATCH_MESSAGE, RESET_PASSWORD_INVALID_TOKEN_MESSAGE, RESET_PASSWORD_SUCCESS_MESSAGE, validatePasswordForReset } from "../lib/passwordReset";
 import { validatePassword } from "../lib/passwordPolicy";
+import { passwordSessionVersion, revokeUserAccess } from "../lib/userAccess";
 
 const router: IRouter = Router();
 
@@ -246,9 +247,10 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
         .update(passwordResetTokensTable)
         .set({ invalidatedAt: now })
         .where(and(eq(passwordResetTokensTable.utenteId, user.id), ne(passwordResetTokensTable.id, tokenRow.id), isNull(passwordResetTokensTable.usedAt), isNull(passwordResetTokensTable.invalidatedAt)));
+      await revokeUserAccess(user.id, tx, now);
     });
   } catch (error) {
-    req.log.warn({ err: error, userId: user.id }, "Password reset token consumption failed");
+    req.log.warn({ userId: user.id }, "Password reset token consumption failed");
     await logSystemEvent({
       evento: "PASSWORD_RESET_COMPLETED",
       esito: "FAILED",
@@ -351,7 +353,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   await db.update(utentiTable).set({ ultimoAccesso: new Date() }).where(eq(utentiTable.id, row.id));
 
   const user = await loadSessionUser(row.id);
-  if (!user) {
+  if (!user || user.passwordVersion !== passwordSessionVersion(row.passwordHash)) {
     res.status(401).json({ error: "Credenziali non valide" });
     return;
   }
@@ -364,6 +366,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       return;
     }
     req.session.userId = row.id;
+    req.session.passwordVersion = user.passwordVersion;
     req.session.save((err) => {
       if (err) {
         req.log.error({ err }, "Failed to persist session on login");
@@ -420,20 +423,55 @@ router.post("/auth/change-password", requireAuth, async (req, res): Promise<void
 
   const [row] = await db.select().from(utentiTable).where(eq(utentiTable.id, req.user!.id));
 
-  if (!row) {
+  if (!row || req.session.passwordVersion !== passwordSessionVersion(row.passwordHash)) {
     res.status(401).json({ error: "Non autenticato" });
     return;
   }
 
   const hash = await bcrypt.hash(newPassword, 10);
-  await db
-    .update(utentiTable)
-    .set({
-      passwordHash: hash,
-      mustChangePassword: false,
-      lastPasswordChangeAt: new Date(),
-    })
-    .where(eq(utentiTable.id, row.id));
+  if (await bcrypt.compare(newPassword, row.passwordHash)) {
+    res
+      .status(400)
+      .json({ error: "Scegli una password diversa da quella attuale" });
+    return;
+  }
+  const now = new Date();
+  const changed = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(utentiTable)
+      .set({
+        passwordHash: hash,
+        mustChangePassword: false,
+        lastPasswordChangeAt: now,
+      })
+      .where(
+        and(
+          eq(utentiTable.id, row.id),
+          eq(utentiTable.attivo, true),
+          eq(utentiTable.passwordHash, row.passwordHash),
+        ),
+      )
+      .returning({ id: utentiTable.id });
+    if (!updated) return false;
+    await revokeUserAccess(row.id, tx, now);
+    return true;
+  }).catch(() => {
+    req.log.error({ userId: row.id }, "Password change failed");
+    return null;
+  });
+  if (changed === null) {
+    res.status(500).json({ error: "Cambio password non riuscito. Riprova." });
+    return;
+  }
+  if (!changed) {
+    res
+      .status(409)
+      .json({ error: "Le credenziali sono cambiate. Accedi nuovamente." });
+    return;
+  }
+  // Keep only this session valid. A late write of an older session remains
+  // unusable because requireAuth compares its version with the current hash.
+  req.session.passwordVersion = passwordSessionVersion(hash);
 
   await logSystemEvent({
     evento: "PASSWORD_CHANGED_BY_USER",

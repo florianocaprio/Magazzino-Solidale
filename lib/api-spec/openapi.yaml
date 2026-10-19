@@ -10776,9 +10776,16 @@ paths:
           required: true
           schema:
             type: integer
+        - name: removeIfUnused
+          in: query
+          description: Remove only never-used users without dependencies; otherwise deactivate preserving history. Omitted keeps legacy deactivation.
+          schema:
+            type: boolean
       responses:
         "204":
           description: Deleted
+        "409":
+          description: Protected administrator or user profile changed during removal
 
   /utenti/{id}/reset-password:
     post:
@@ -10801,6 +10808,34 @@ paths:
           description: User has no valid email address
         "403":
           description: Not authorized
+
+  /utenti/{id}/temporary-password:
+    post:
+      operationId: setUtenteTemporaryPassword
+      tags: [utenti]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemporaryPasswordInput"
+      responses:
+        "204":
+          description: Temporary password assigned; previous sessions and recovery tokens revoked; password change required.
+        "400":
+          description: Invalid password or inactive user
+        "403":
+          description: Not authorized
+        "404":
+          description: User not found
+        "409":
+          description: User changed during the operation
 
 # ─── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
@@ -17513,6 +17548,7 @@ components:
         - PASSWORD_CHANGED_BY_ADMIN
         - USER_CREATED
         - USER_DISABLED
+        - USER_DELETED
         - USER_ROLE_CHANGED
         - ACCOUNT_LOCKED
         - ACCOUNT_UNLOCKED
@@ -22696,6 +22732,15 @@ components:
           emailDaAggiornare,
           dataCreazione,
         ]
+
+    TemporaryPasswordInput:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword:
+          type: string
+          minLength: 8
+          writeOnly: true
 
     UtenteInput:
       type: object

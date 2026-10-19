@@ -1,3 +1,4 @@
+import { sessionStub } from "./helpers/session-stub";
 import express, {
   type Express,
   type RequestHandler,
@@ -179,10 +180,7 @@ export function makeScopedApp(
 export function makeSessionApp(router: Router, userId: number): Express {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => {
-    (req as unknown as { session: { userId: number } }).session = { userId };
-    next();
-  });
+  app.use(sessionStub(userId));
   app.use(router);
   return app;
 }
