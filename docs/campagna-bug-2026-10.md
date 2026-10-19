@@ -108,8 +108,8 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | BUG | Blocco | Prompt | Stato                     | Requisiti sospesi                                              | Commit           | Automatico                      | UAT         | Ultimo candidato verificato              |
 | --- | ------ | ------ | ------------------------- | -------------------------------------------------------------- | ---------------- | ------------------------------- | ----------- | ---------------------------------------- |
 | 01 | A | 01 | CHIUSO; UAT OK | Nessuno; D01 approvata | 7d70906 | PASS; 4 skip esterni dichiarati nel blocco precedente | OK Floriano 19/10 | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 |
-| 02  | B      | 02     | SVILUPPATO; precisazione Area recepita | Nessuno; D01 approvata                                         | 0d05e6e0a78b04ed51671c399409409666e217fc | PASS mirati; 4 skip esterni | DA ESEGUIRE | 0d05e6e0a78b04ed51671c399409409666e217fc |
-| 03  | B      | 02     | SVILUPPATO; precisazione Area recepita | Nessuno                                                        | 0d05e6e0a78b04ed51671c399409409666e217fc | PASS mirati; 4 skip esterni | DA ESEGUIRE | 0d05e6e0a78b04ed51671c399409409666e217fc |
+| 02  | B      | 02     | SVILUPPATO; Area/Centro facoltativo recepiti | Nessuno; D01 approvata                                         | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | DA ESEGUIRE | 3c882b610be185ef5f62867ac562e8e7b322b08d |
+| 03  | B      | 02     | SVILUPPATO; Area/Centro facoltativo recepiti | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | DA ESEGUIRE | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 04  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 05  | C      | 04     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 06  | C      | 04     | DA SVILUPPARE             | Nessuno; requisito sostitutivo Area/Centro prima della ricerca | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -121,7 +121,7 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 12  | D      | 05     | DA SVILUPPARE             | Raccordo D03 con le attuali pratiche Aperte                    | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 13  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 14  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 15  | B      | 02     | SVILUPPATO; precisazione Area recepita | Nessuno                                                        | 0d05e6e0a78b04ed51671c399409409666e217fc | PASS mirati; 4 skip esterni | DA ESEGUIRE | 0d05e6e0a78b04ed51671c399409409666e217fc |
+| 15  | B      | 02     | SVILUPPATO; Area/Centro facoltativo recepiti | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | DA ESEGUIRE | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 16  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 17  | C      | 03, 04 | DA SVILUPPARE             | Nessuno; D04 approvata; UAT dopo 04                            | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -138,7 +138,7 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | Consegna | Blocco e BUG                  | Tipo            | SHA                                      | Controlli e risultato reale                                                   | Versione 8082                 | Esito                                       |
 | -------- | ----------------------------- | --------------- | ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------- |
 | 01 | A: 01 | Funzionale | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 | PASS; ultimi controlli 737 UI e 76 API core | Installata e verificata | CHIUSA; OK UAT Floriano 19/10 |
-| 02 | B: 02, 03, 15 | Funzionale | 0d05e6e0a78b04ed51671c399409409666e217fc | PASS: 1.591 API + 4 skip esterni; 752 UI; 15 browser; build/budget | Installata, ledger 59/59 | UAT DA ESEGUIRE; prossimo ##test |
+| 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | UAT DA ESEGUIRE; prossimo ##test |
 | 03       | C: 17, prima parte            | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
 | 04       | C: 05–09 e regressione 17     | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 05       | D: 04, 10–14, 16              | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
@@ -1076,3 +1076,56 @@ Matrice API su permanenti/temporanei condivisi e con riferimento, esclusione
 fuori Area, giornata e assegnazione diretta; Bolla verifica picker e rifiuto
 del riferimento diverso; UI Turni verifica il filtro anche su risposta mista.
 Verifiche e ricevuta della nuova 8082 seguono dopo l’esecuzione effettiva.
+
+### Ricevuta — Centro facoltativo e 8082 aggiornata
+
+Checkpoint applicativo `3c882b610be185ef5f62867ac562e8e7b322b08d` (API e WEB).
+
+- `pnpm install --frozen-lockfile`: PASS con Node 24 e CI=true dopo la prima
+  invocazione senza TTY; lockfile invariato.
+- `pnpm run typecheck`: PASS, compresa l’ultima versione dei test.
+- `pnpm --filter @workspace/magazzino-solidale run test`: **753 PASS**, 118 file.
+  Prima esecuzione: fixture del nuovo test priva del flag operativo, corretta
+  per rappresentare volontari selezionabili; nessuna asserzione rimossa.
+- `node scripts/quality-gates-run.mjs api general reporting`: **1.508 PASS +
+  4 SKIP** in general (139 file), **83 PASS** reporting (6 file), **24 PASS**
+  runner PostgreSQL. Totale API **1.591 PASS**, quattro acceptance di originali
+  esterni non eseguite. PostgreSQL temporanei attestati, fresh/replay e ledger
+  **59/59**, cleanup completato. Evidenze `/private/tmp/vol-centro-api`.
+- `node scripts/quality-gates-run.mjs browser volontari-workflows.spec.ts`:
+  **15 PASS**, cinque viewport 390–1440 px, in sequenza dopo API e con lock
+  condiviso, solo dati sintetici temporanei. Evidenze
+  `/private/tmp/vol-centro-browser`. NODE_PATH ai moduli nativi macOS temporanei,
+  invariati dipendenze e runner canonico. Nessuna suite funzionale sui dati 8082.
+- Build Docker da archivio del checkpoint: API e WEB PASS;
+  **399,2/400 KiB gzip**, entry `index-DDEq_xxN.js`, soglia invariata.
+
+Backup completo DB (`pg_dump -Fc`) e uploads, SHA-256 e indici archivi verificati:
+`/Users/florianocaprio/Backups/Magazzino-Solidale/VOLONTARI-CENTRO-3c882b610be1-2026-10-19T15-26-24-508Z`.
+Per questo backup `restoreTested=false`: nessuna nuova migration, nessuna
+nuova prova di ripristino dichiarata. La verifica precedente 58→59 rimane
+registrata nella ricevuta antecedente.
+
+Ricreati soltanto API/WEB, dopo confronto Compose con variazioni limitate a
+immagini e revisione. PostgreSQL con stesso container e avvio del 06/10,
+volumi DB/uploads invariati. Ledger **59/59**, zero pending/checksum difformi,
+mancanti o fuori ordine. Tutti gli attributi dei volontari, compresa Area,
+e gli eventi/hash del registro invariati rispetto al backup.
+
+- API `magazzino-bugfix-uat-api:sha-3c882b610be1`, image ID
+  `sha256:bf16c19170d59c55d15be396236e1655f008db3cd66c8c4c85bce8cc94fc340e`.
+- WEB `magazzino-bugfix-uat-web:sha-3c882b610be1`, image ID
+  `sha256:df1b7db568bb6dcc739ce629b617c5dda25900cebe4887cb5b6eb7ea16d05ccb`.
+- Label Git immagini/container: checkpoint sopra; API healthy.
+- HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: **200**;
+  `/api/utenti` senza sessione: **401**.
+
+UAT: ricaricare la 8082. Con Area assegnata e nessun Centro, verificare la
+presenza in entrambi i Centri dell’Area; assegnando Centro A, verificare la
+presenza soltanto in A e l’assenza dalle selezioni di B. Un’altra Area rimane
+esclusa in entrambi i casi. Approvazione/assicurazione ancora necessarie per
+l’assegnazione operativa. Matricola generabile senza Centro.
+Restano i due legacy senza Area da completare manualmente con profilo globale,
+senza attribuzioni arbitrarie; nuovi salvataggi richiedono un’Area valida.
+**UAT DA ESEGUIRE**, consegna 01 chiusa, nessuna fase successiva avviata.
+I quattro documenti locali preesistenti restano invariati ed esclusi dai commit.
