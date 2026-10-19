@@ -1,3 +1,4 @@
+import { invalidateLogisticaResources, isStaleLogisticaError } from "@/lib/logistica-cache";
 import { useState } from "react";
 import { useListMezzi, useCreateMezzo, useUpdateMezzo, useBulkMezzi, useListVolontari, useListCentriAscolto, getListMezziQueryKey } from "@workspace/api-client-react";
 import { BulkImportDialog, matchByName, type MapRowResult } from "@/components/bulk-import-dialog";
@@ -119,6 +120,17 @@ export default function Mezzi() {
     setIsFormOpen(true);
   };
 
+  const onMutationError = async (error: unknown) => {
+    if (isStaleLogisticaError(error)) {
+      await invalidateLogisticaResources(queryClient, "mezzi", editingId ?? undefined);
+      setIsFormOpen(false);
+      setRetiringMezzo(null);
+    }
+    toast({ variant: "destructive", description: isStaleLogisticaError(error)
+      ? t("approvazioniLogistica.stale")
+      : ((error as { data?: { error?: string } })?.data?.error ?? t("common.error")) });
+  };
+
   const onSubmit = (data: z.infer<typeof formSchema>) => {
     const { volontarioId: volStr, centroAscoltoId: centroStr, ...rest } = data;
     const isVolontario = data.proprieta === "volontario";
@@ -134,16 +146,18 @@ export default function Mezzi() {
     if (editingId && editingVersion != null) {
       const { codice: _codice, ...update } = payload;
       updateMezzo.mutate({ id: editingId, data: { ...update, versione: editingVersion } }, {
+        onError: onMutationError,
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
+          invalidateLogisticaResources(queryClient, "mezzi");
           toast({ title: t("mezzi.toastUpdated") });
           setIsFormOpen(false);
         }
       });
     } else {
       createMezzo.mutate({ data: payload }, {
+        onError: onMutationError,
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
+          invalidateLogisticaResources(queryClient, "mezzi");
           toast({
             title: t("mezzi.toastCreated"),
             description: t("mezzi.pendingCreated", { defaultValue: "Mezzo inserito in attesa di approvazione" }),
@@ -157,8 +171,9 @@ export default function Mezzi() {
   const handleRetire = () => {
     if (!retiringMezzo) return;
     updateMezzo.mutate({ id: retiringMezzo.id, data: { stato: "ritirato", versione: retiringMezzo.versione } }, {
+      onError: onMutationError,
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() });
+        invalidateLogisticaResources(queryClient, "mezzi");
         toast({ title: t("mezzi.toastRetired", { defaultValue: "Mezzo ritirato" }) });
         setRetiringMezzo(null);
       }
@@ -300,7 +315,7 @@ export default function Mezzi() {
           };
         }}
         onImport={async (righe) => bulkMezzi.mutateAsync({ data: { righe: righe as never } })}
-        onDone={() => queryClient.invalidateQueries({ queryKey: getListMezziQueryKey() })}
+        onDone={() => invalidateLogisticaResources(queryClient, "mezzi")}
       />
 
       <Card>

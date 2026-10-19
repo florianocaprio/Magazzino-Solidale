@@ -1,3 +1,10 @@
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
+import { registerLogisticaCampaign } from "@/lib/i18n/namespaces/logisticaCampaign";
+import { VolunteerApprovalBadge } from "@/components/volontari/volunteer-approval-badge";
+import { todayDateOnly } from "@/lib/date-only";
+import { invalidateLogisticaResources, isStaleLogisticaError } from "@/lib/logistica-cache";
 import { useState } from "react";
 import {
   confirmBulkVolontariInsurance,
@@ -6,6 +13,7 @@ import {
   getListVolontariQueryKey,
   previewBulkVolontariInsurance,
   useCreateVolontario,
+  useDeleteVolontario,
   useListCentriAscolto,
   useListRuoliVolontari,
   useListVolontari,
@@ -217,7 +225,10 @@ function InsuranceBadge({ volunteer }: { volunteer: Volontario }) {
 const touchCheckboxClass =
   "relative h-11 w-11 border-0 bg-transparent shadow-none before:absolute before:h-4 before:w-4 before:rounded-sm before:border before:border-primary data-[state=checked]:bg-transparent data-[state=checked]:before:bg-primary [&_svg]:relative [&_svg]:z-10";
 
+registerLogisticaCampaign(i18n);
+
 export default function Volontari() {
+  const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
   const lockedCenterId = user?.centroAscoltoId ?? null;
   const canManage = hasPermission("logistica.volontari.manage");
@@ -288,6 +299,8 @@ export default function Volontari() {
   const { toast } = useToast();
   const createVolunteer = useCreateVolontario();
   const updateVolunteer = useUpdateVolontario();
+  const deleteVolunteer = useDeleteVolontario();
+  const [removingVolunteer, setRemovingVolunteer] = useState<Volontario | null>(null);
 
   const params: ListVolontariParams = {
     stato: status,
@@ -437,12 +450,16 @@ export default function Volontari() {
           description: "L'anagrafica è in attesa di approvazione.",
         });
       }
-      await queryClient.invalidateQueries({
-        queryKey: getListVolontariQueryKey(),
-      });
+      await invalidateLogisticaResources(queryClient, "volontari");
       setFormOpen(false);
       if (!editing) setResumeConversionAfterSave(false);
     } catch (error) {
+      if (isStaleLogisticaError(error)) {
+        await invalidateLogisticaResources(queryClient, "volontari", editing?.id);
+        setFormOpen(false);
+        toast({ variant: "destructive", description: t("approvazioniLogistica.stale") });
+        return;
+      }
       const data = volunteerApiErrorData(error);
       const serverErrors = data.fieldErrors ?? {};
       setFormErrors(serverErrors);
@@ -458,6 +475,22 @@ export default function Volontari() {
         description: data.message ?? data.error ?? errorMessage(error),
         variant: "destructive",
       });
+    }
+  };
+
+  const removeVolunteer = async () => {
+    if (!removingVolunteer) return;
+    try {
+      await deleteVolunteer.mutateAsync({ id: removingVolunteer.id, data: { versione: removingVolunteer.versione, removeIfUnused: true } });
+      await invalidateLogisticaResources(queryClient, "volontari", removingVolunteer.id);
+      setRemovingVolunteer(null);
+      toast({ description: t("logisticaCampaign.removed") });
+    } catch (error) {
+      if (isStaleLogisticaError(error)) {
+        await invalidateLogisticaResources(queryClient, "volontari", removingVolunteer.id);
+        setRemovingVolunteer(null);
+      }
+      toast({ variant: "destructive", description: isStaleLogisticaError(error) ? t("approvazioniLogistica.stale") : errorMessage(error) });
     }
   };
 
@@ -533,9 +566,7 @@ export default function Volontari() {
           incluso: row.incluso,
         })),
       });
-      await queryClient.invalidateQueries({
-        queryKey: getListVolontariQueryKey(),
-      });
+      await invalidateLogisticaResources(queryClient, "volontari");
       setBulkOpen(false);
       setBulkPreview([]);
       setSelectedIds(new Set());
@@ -624,7 +655,7 @@ export default function Volontari() {
         className="text-sm text-destructive"
         role="alert"
       >
-        {formErrors[field]}
+        {field === "dataNascita" ? t("logisticaCampaign.birthInvalid") : formErrors[field]}
       </p>
     ) : null;
   const invalidBorder = (field: VolunteerFormField) =>
@@ -993,6 +1024,7 @@ export default function Volontari() {
                         <InsuranceBadge volunteer={volunteer} />
                       </TableCell>
                       <TableCell>
+                        <VolunteerApprovalBadge state={volunteer.statoApprovazione} suspended={volunteer.sospesoManualmente} />
                         <OperationalBadge volunteer={volunteer} />
                       </TableCell>
                       <TableCell>
@@ -1015,6 +1047,9 @@ export default function Volontari() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem className="min-h-11 text-destructive" onClick={() => setRemovingVolunteer(volunteer)}>
+                                  {t("logisticaCampaign.remove")}
+                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                   className="min-h-11"
                                   onClick={() => openEdit(volunteer)}
@@ -1132,6 +1167,7 @@ export default function Volontari() {
                         </div>
                       </div>
                     </div>
+                    <VolunteerApprovalBadge state={volunteer.statoApprovazione} suspended={volunteer.sospesoManualmente} />
                     <OperationalBadge volunteer={volunteer} />
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -1165,6 +1201,9 @@ export default function Volontari() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem className="min-h-11 text-destructive" onClick={() => setRemovingVolunteer(volunteer)}>
+                            {t("logisticaCampaign.remove")}
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             className="min-h-11"
                             onClick={() => openEdit(volunteer)}
@@ -1353,6 +1392,7 @@ export default function Volontari() {
                     {...fieldInputProps("dataNascita")}
                     className={invalidBorder("dataNascita")}
                     type="date"
+                    max={todayDateOnly()}
                     value={draft.dataNascita}
                     onChange={(event) =>
                       setField("dataNascita", event.target.value)
@@ -1669,6 +1709,18 @@ export default function Volontari() {
         }}
         onOperation={openOperation}
       />
+      <AlertDialog open={removingVolunteer != null} onOpenChange={(open) => !open && !deleteVolunteer.isPending && setRemovingVolunteer(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("logisticaCampaign.removeTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{removingVolunteer?.nome} {removingVolunteer?.cognome}. {t("logisticaCampaign.removeHelp")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteVolunteer.isPending}>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction disabled={deleteVolunteer.isPending} onClick={(event) => { event.preventDefault(); void removeVolunteer(); }}>{t("logisticaCampaign.remove")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <VolontarioOperationDialog
         volontario={operationVolunteer}
         operation={operation}

@@ -3665,6 +3665,13 @@ export interface RientroTrasportoDettaglio {
   documenti?: RientroTrasportoDocumento[];
 }
 
+export interface VolontarioRemoveInput {
+  /** @minimum 1 */
+  versione: number;
+  /** Delete permanently only if never used and without dependencies; otherwise remove from operations and retain all history. Omit for legacy deactivation. */
+  removeIfUnused?: boolean;
+}
+
 export interface VersioneInput {
   /** @minimum 1 */
   versione: number;

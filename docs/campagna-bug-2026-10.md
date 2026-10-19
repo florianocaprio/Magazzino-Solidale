@@ -1,6 +1,6 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-19 ottobre 2026, Europe/Rome. **Consegna 01: BUG 01 Utenti, PRONTO PER UAT sulla 8082.**
+19 ottobre 2026, Europe/Rome. **Consegna 01 chiusa con OK UAT di Floriano; consegna 02 sviluppata, UAT personale da eseguire.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
@@ -101,15 +101,15 @@ Nessuna decisione residua blocca l'avvio del prompt 01.
 
 ## Registro dei BUG
 
-Il BUG 01 è **SVILUPPATO E VERIFICATO AUTOMATICAMENTE, IN ATTESA UAT**; gli altri BUG sono **DA SVILUPPARE**. Le UAT sono **DA ESEGUIRE** e non derivano
+Il BUG 01 è **CHIUSO CON OK UAT DI FLORIANO**; BUG 02/03/15 sono sviluppati e gli altri BUG restano da sviluppare. Le UAT successive sono **DA ESEGUIRE** e non derivano
 dai test automatici. Il candidato iniziale non è un candidato verificato della
 campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 
 | BUG | Blocco | Prompt | Stato                     | Requisiti sospesi                                              | Commit           | Automatico                      | UAT         | Ultimo candidato verificato              |
 | --- | ------ | ------ | ------------------------- | -------------------------------------------------------------- | ---------------- | ------------------------------- | ----------- | ---------------------------------------- |
-| 01  | A      | 01     | SVILUPPATO; IN ATTESA UAT | Nessuno; D01 approvata                                         | 50d55b2, 9d58529 | PASS; 4 skip esterni dichiarati | DA ESEGUIRE | 9d5852991a6aa81426ab7688998175303f4ab8e8 |
-| 02  | B      | 02     | DA SVILUPPARE             | Nessuno; D01 approvata                                         | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 03  | B      | 02     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
+| 01 | A | 01 | CHIUSO; UAT OK | Nessuno; D01 approvata | 7d70906 | PASS; 4 skip esterni dichiarati nel blocco precedente | OK Floriano 19/10 | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 |
+| 02  | B      | 02     | SVILUPPATO | Nessuno; D01 approvata                                         | checkpoint prompt 02 | PASS mirati; 4 skip esterni | DA ESEGUIRE | checkpoint prompt 02 |
+| 03  | B      | 02     | SVILUPPATO | Nessuno                                                        | checkpoint prompt 02 | PASS mirati; 4 skip esterni | DA ESEGUIRE | checkpoint prompt 02 |
 | 04  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 05  | C      | 04     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 06  | C      | 04     | DA SVILUPPARE             | Nessuno; requisito sostitutivo Area/Centro prima della ricerca | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -121,7 +121,7 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 12  | D      | 05     | DA SVILUPPARE             | Raccordo D03 con le attuali pratiche Aperte                    | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 13  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 14  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 15  | B      | 02     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
+| 15  | B      | 02     | SVILUPPATO | Nessuno                                                        | checkpoint prompt 02 | PASS mirati; 4 skip esterni | DA ESEGUIRE | checkpoint prompt 02 |
 | 16  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 17  | C      | 03, 04 | DA SVILUPPARE             | Nessuno; D04 approvata; UAT dopo 04                            | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -137,7 +137,7 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 
 | Consegna | Blocco e BUG                  | Tipo            | SHA                                      | Controlli e risultato reale                                                   | Versione 8082                 | Esito                                       |
 | -------- | ----------------------------- | --------------- | ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------- |
-| 01       | A: 01                         | Funzionale      | 9d5852991a6aa81426ab7688998175303f4ab8e8 | API 1.564 PASS / 4 skip; UI 730 PASS; typecheck, codegen, build e budget PASS | API/WEB sha-9d5852991a6a      | PRONTO PER UAT; esito personale DA ESEGUIRE |
+| 01 | A: 01 | Funzionale | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 | PASS; ultimi controlli 737 UI e 76 API core | Installata e verificata | CHIUSA; OK UAT Floriano 19/10 |
 | 02       | B: 02, 03, 15                 | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 03       | C: 17, prima parte            | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
 | 04       | C: 05–09 e regressione 17     | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
@@ -661,3 +661,153 @@ dai commit; nessun log, screenshot, credenziale o file locale aggiunto a Git.
 Prova manuale: ricaricare la 8082, aprire Nuovo utente, digitare la password
 iniziale e usare l’occhio per mostrarla/nasconderla. UAT visiva di Floriano
 ancora attesa; prompt 02 non avviato.
+
+## Avvio prompt 02 — blocco B
+
+Floriano conferma «Il punto precedente è CHIUSO e funziona bene» e trasmette
+`BUG 4/02_Volontari_Mezzi_Turni.txt`: attivati soltanto BUG 02/03/15.
+Si riusano branch della campagna e D01 approvata; nessuna nuova domanda
+funzionale necessaria. Il prompt 01, comprese le rifiniture del form Utenti,
+ha OK UAT esplicito. ##test della consegna 02 non è ancora attivato.
+La ricompilazione sulla 8082 resta autorizzata dall’istruzione precedente
+di Floriano di aggiornare sempre l’ambiente per la sua prova personale.
+
+Analisi: i file Volontari/Mezzi/Turni e API del blocco non differivano dalla
+baseline f668b7e; solo i form Beneficiari contenevano gli adeguamenti minimi
+ai filtri dei servizi per Area della consegna precedente. L’account ora è
+autorizzato per Area, come richiesto successivamente da Floriano: il Centro
+del turno è un contesto operativo selezionato, non un nuovo vincolo account.
+
+Implementati: rimozione D01, badge approvazione desktop/mobile, nascite
+manuali/import con giorno civile Europe/Rome, invalidazioni mirate e 409,
+contesto Area/Centro e finestra di pianificazione civile di sette giorni.
+Schema DB invariato; API DELETE Volontari estesa con un flag opzionale,
+con compatibilità del vecchio comportamento in assenza del flag.
+
+## Consegna 02 — sviluppo BUG 02, 03 e 15
+
+**BUG 02 sviluppato.** Elimina distinta da Sospendi, secondo D01.
+Sotto lock e controllo versione, cancellazione fisica solo senza audit e senza
+alcuna dipendenza FK (incluse SET NULL/CASCADE). Altrimenti cessazione operativa
+con identità, storico, relazioni e registro conservati, nessuna cascata.
+Una registrazione nel ledger è già una dipendenza protetta. Un pending cessato
+esce dalla coda e non è approvabile, senza falsificare il suo stato in rifiuto.
+Il vecchio DELETE senza flag resta compatibile. Badge Da approvare desktop/mobile,
+link solo con grant di lettura Approvazioni e Area Logistica; gestione volontari
+non autorizza approvazioni. Nascita reale/non futura in UI/API, modifica,
+preview e commit import con correzioni. Calendari beneficiari/nucleo allineati;
+oggi valido, giorni civili Europe/Rome, nessuna nuova policy di età.
+
+**BUG 03 sviluppato.** Invalidazione mirata con chiavi canoniche di coda,
+liste filtrate, dettagli/dossier, mezzi, selettori Turni e carico; applicata
+anche a import/eventi. Nessun polling, invalidazione globale o staleTime ridotto.
+Il 409 ricarica il dato autorevole e mostra errore, senza esito positivo fittizio
+né disponibilità ottimistica di risorse ancora pending.
+
+**BUG 15 sviluppato.** Area → Centro, valori del profilo bloccati e Centri
+attivi coerenti. Il Centro è contesto del turno, non vincolo dell’account.
+Cambio contesto: reset di modali/selezioni e risposte tardive ignorate.
+Disponibilità alla data e nel Centro selezionati, risorse trasversali conservate;
+giornate dei temporanei specifiche del Centro. Approvazione, assicurazione,
+sospensioni, conflitti anche fra Centri e carico restano vincolanti.
+Pianificazione/riassegnazione da oggi−7 incluso, UI/API, giorni civili anche
+su cambio anno e ora legale; futuro consentito. Storico leggibile, no-op
+senza cambio versione, annullamento secondo policy esistenti; conferma/chiusura
+non ristrette dal nuovo limite. Completati e vincoli delle consegne protetti.
+Nuove etichette in italiano, inglese, spagnolo, francese, tedesco e arabo.
+
+### Verifiche della consegna 02
+
+- `pnpm install --frozen-lockfile`: PASS, lockfile invariato.
+- `pnpm run typecheck`: PASS su tutti i workspace previsti.
+- UI completa: **751 PASS**, 118 file, zero skip. Nuove prove comportamentali
+  su cache fresca, quattro azioni approva/rifiuta e 409, badge e grant,
+  Area/Centro, reset/callback tardive, storico annullabile e date civili.
+- Runner `api general`: **1.502 PASS, 4 SKIP**, 138 file. Include le suite
+  richieste e D01 unused/storico/versione, nascita oggi/domani/impossibile,
+  import e correzioni, temporanei per Centro, oggi−7/−8/futuro in quattro clock
+  con cambio anno e ora legale. I quattro skip preesistenti richiedono gli
+  originali esterni AGEA/FSE: acceptance originali **NON ESEGUITE**.
+- Runner `api reporting`: **83 PASS**, 6 file, zero skip, regressione storico.
+- Runner PostgreSQL: **24 PASS**; fresh/replay e ledger temporanei **58/58**.
+- Runner `browser volontari-workflows.spec.ts`: **15 PASS**, cinque viewport
+  390–1440 px. Primo tentativo fermo prima dei test per moduli macOS esclusi
+  dagli override del workspace; ripresa con versioni native corrispondenti
+  solo in `/private/tmp/prompt02-native`, mediante `NODE_PATH`. Dipendenze,
+  lockfile, override, runner, attestazioni e lock di sicurezza invariati.
+- Runner API/browser in sequenza su PostgreSQL temporanei attestati, nessuna
+  suite mutativa sul DB personale 8082. Cleanup container/reti completato,
+  nessun volume creato. Quattro documenti preesistenti invariati per SHA-256.
+
+Evidenze fuori Git: `/private/tmp/prompt02-install.log`,
+`/private/tmp/prompt02-typecheck-r4.log`, `/private/tmp/prompt02-ui-r6.log`,
+`/private/tmp/prompt02-r2-api-general`, `/private/tmp/prompt02-r1-api-reporting`,
+`/private/tmp/prompt02-browser-volontari-r2`.
+Un primo test D01 leggeva come colonna un campo amministrativo derivato:
+corretto verificandolo attraverso l’API; esiti sopra delle riprese riuscite.
+Fixture logistiche con date fisse ora deterministiche tramite clock controllato,
+nessun bypass della guardia nell’applicazione. Mock i18n dei test beneficiari
+allineati alla registrazione lazy delle nuove traduzioni.
+
+OpenAPI introduce `VolontarioRemoveInput`, con `removeIfUnused` boolean opzionale
+(default false); generated rigenerati dal comando ufficiale.
+**Nessuna migrazione o modifica dello schema DB.** Build/budget e ricevuta 8082
+nel checkpoint di installazione. Nessuna decisione funzionale pendente.
+UAT personale **DA ESEGUIRE**, ##test non attivato dalla sola lettura del file.
+
+### File modificati nel checkpoint 02
+
+- `artifacts/api-server/src/lib/volontariValidation.ts`
+- `artifacts/api-server/src/lib/volontariWorkbook.ts`
+- `artifacts/api-server/src/lib/volontarioRemoval.ts`
+- `artifacts/api-server/src/routes/approvazioni-logistica.ts`
+- `artifacts/api-server/src/routes/turni.ts`
+- `artifacts/api-server/src/routes/volontari-import.ts`
+- `artifacts/api-server/src/routes/volontari.ts`
+- `artifacts/api-server/tests/logistica-hardening.test.ts`
+- `artifacts/api-server/tests/logistica-lock-order.test.ts`
+- `artifacts/api-server/tests/logistica-reconciliation.test.ts`
+- `artifacts/api-server/tests/turni-mezzo-conflitto.test.ts`
+- `artifacts/api-server/tests/turni-window-bug15.test.ts`
+- `artifacts/api-server/tests/volontari-2-api.test.ts`
+- `artifacts/api-server/tests/volontari-save-validation-api.test.ts`
+- `artifacts/magazzino-solidale/src/components/beneficiari-provvisori.test.tsx`
+- `artifacts/magazzino-solidale/src/components/beneficiario-tessera.test.tsx`
+- `artifacts/magazzino-solidale/src/components/logistica-bug03.test.tsx`
+- `artifacts/magazzino-solidale/src/components/volontari/volontari-import-dialog.tsx`
+- `artifacts/magazzino-solidale/src/components/volontari/volontario-dossier-sheet.tsx`
+- `artifacts/magazzino-solidale/src/components/volontari/volontario-operation-dialog.tsx`
+- `artifacts/magazzino-solidale/src/components/volontari/volunteer-approval-badge.tsx`
+- `artifacts/magazzino-solidale/src/lib/date-only.test.ts`
+- `artifacts/magazzino-solidale/src/lib/date-only.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/logisticaCampaign.ts`
+- `artifacts/magazzino-solidale/src/lib/logistica-cache.ts`
+- `artifacts/magazzino-solidale/src/lib/logistica-hardening-ui.test.ts`
+- `artifacts/magazzino-solidale/src/lib/volontari-2-ui.test.ts`
+- `artifacts/magazzino-solidale/src/lib/volontari-form.ts`
+- `artifacts/magazzino-solidale/src/pages/approvazioni-logistica.tsx`
+- `artifacts/magazzino-solidale/src/pages/beneficiari.tsx`
+- `artifacts/magazzino-solidale/src/pages/beneficiario-dettaglio.tsx`
+- `artifacts/magazzino-solidale/src/pages/mezzi.tsx`
+- `artifacts/magazzino-solidale/src/pages/turni.test.tsx`
+- `artifacts/magazzino-solidale/src/pages/turni.tsx`
+- `artifacts/magazzino-solidale/src/pages/volontari.tsx`
+- `docs/campagna-bug-2026-10.md`
+- `lib/api-client-react/src/generated/api.schemas.ts`
+- `lib/api-client-react/src/generated/api.ts`
+- `lib/api-spec/openapi.yaml`
+- `lib/api-zod/src/generated/api.ts`
+- `lib/api-zod/src/generated/types/index.ts`
+- `lib/api-zod/src/generated/types/volontarioRemoveInput.ts`
+
+### Unica sequenza UAT personale proposta
+
+Creare volontario/mezzo → vedere Da approvare → approvare con profilo abilitato
+→ tornare subito all’elenco → scegliere Area/Centro in Turni → pianificare
+con la risorsa ammessa (approvata, assicurata e disponibile alla data).
+Provare nascita oggi accettata, domani/impossibile respinte anche nell’import
+e nel nucleo; oggi−7 ammesso, oggi−8 bloccato per nuovi turni/riassegnazioni,
+storico leggibile e annullabile secondo le policy.
+Al 19/10/2026: 12/10 incluso, 11/10 escluso dalla pianificazione.
+Fermarsi: prossimo incarico **##test della consegna 02**; nessun avvio automatico
+del prompt 03, nessuna chiusura UAT ricavata dai test automatici.

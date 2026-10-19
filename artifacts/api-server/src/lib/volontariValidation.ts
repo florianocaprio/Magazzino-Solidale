@@ -1,5 +1,5 @@
 import {
-  isDateOnly,
+  isDateOnly, todayRome,
   normalizeCodiceFiscale,
   normalizeEmail,
   normalizePhone,
@@ -184,6 +184,10 @@ export function validateVolontarioState(
   if (!isDateOnly(state.dataNascita)) {
     errors.dataNascita =
       "La data di nascita è obbligatoria e deve essere valida";
+  }
+
+  if (isDateOnly(state.dataNascita) && state.dataNascita > todayRome()) {
+    errors.dataNascita = "La data di nascita deve essere reale e non futura.";
   }
 
   const cf = normalizeCodiceFiscale(state.codiceFiscale);

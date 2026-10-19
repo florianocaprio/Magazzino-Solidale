@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it , vi } from "vitest";
 import request from "supertest";
 import { and, eq } from "drizzle-orm";
 import {
@@ -37,6 +37,12 @@ let scope: SeedScope;
 let ruoloVolontarioId: number;
 let defaultCentroAscoltoId: number;
 let volunteerSequence = 0;
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-01T12:00:00+02:00"));
+});
+afterEach(() => vi.useRealTimers());
 
 beforeEach(async () => {
   scope = newScope();

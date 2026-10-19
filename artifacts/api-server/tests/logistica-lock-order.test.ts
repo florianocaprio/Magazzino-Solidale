@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it , vi } from "vitest";
 import request from "supertest";
 import { eq } from "drizzle-orm";
 import {
@@ -26,6 +26,12 @@ import {
 } from "./scope-helpers";
 
 let scope: SeedScope;
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-30T12:00:00+02:00"));
+});
+afterEach(() => vi.useRealTimers());
 
 beforeEach(() => {
   scope = newScope();

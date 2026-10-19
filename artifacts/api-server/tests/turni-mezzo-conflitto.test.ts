@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll , vi } from "vitest";
 import request from "supertest";
 import { pool } from "@workspace/db";
 import turniRouter from "../src/routes/turni";
@@ -29,6 +29,12 @@ const appGlobal = () =>
 
 const DATA = "2026-07-15";
 const FASCIA = "09-13";
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-07-15T12:00:00+02:00"));
+});
+afterEach(() => vi.useRealTimers());
 
 beforeEach(() => {
   scope = newScope();

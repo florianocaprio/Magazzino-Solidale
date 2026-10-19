@@ -1,3 +1,4 @@
+import { volontarioNotRemoved } from "../lib/volontarioRemoval";
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import { volontariTable, mezziTable, centriAscoltoTable } from "@workspace/db";
@@ -143,7 +144,7 @@ router.get("/approvazioni-logistica", requirePermission("logistica.approvazioni.
     })
     .from(volontariTable)
     .leftJoin(centriAscoltoTable, eq(volontariTable.centroAscoltoId, centriAscoltoTable.id))
-    .where(andScoped(eq(volontariTable.statoApprovazione, PENDING), scope))
+    .where(andScoped(eq(volontariTable.statoApprovazione, PENDING), scope, volontarioNotRemoved(volontariTable.id)))
     .orderBy(desc(volontariTable.dataCreazione)) : [];
 
   const mezzoScope = andScoped(
@@ -201,7 +202,7 @@ router.post("/approvazioni-logistica/volontari/:id/approva", requireModulo("VOLO
       const [row] = await tx
         .update(volontariTable)
         .set({ matricola, statoApprovazione: "approvato", attivo: true, versione: sql`${volontariTable.versione} + 1`, dataAggiornamento: new Date() })
-        .where(and(eq(volontariTable.id, id), eq(volontariTable.versione, versione), eq(volontariTable.statoApprovazione, PENDING)))
+        .where(and(eq(volontariTable.id, id), eq(volontariTable.versione, versione), eq(volontariTable.statoApprovazione, PENDING), volontarioNotRemoved(id)))
         .returning({ versione: volontariTable.versione });
       if (!row) return [];
       await auditLogistica(tx, req, { entita: "volontario", id, azione: "approvazione", precedente: { statoApprovazione: PENDING, versione }, nuovo: { statoApprovazione: "approvato", attivo: true, versione: row.versione } });
@@ -230,7 +231,7 @@ router.post("/approvazioni-logistica/volontari/:id/respingi", requireModulo("VOL
   if (versione == null) { res.status(400).json({ error: "versione obbligatoria e valida" }); return; }
   if (existing.statoApprovazione !== PENDING) { res.status(409).json({ error: "Transizione di approvazione non consentita" }); return; }
   const [updated] = await db.transaction(async (tx) => {
-    const [row] = await tx.update(volontariTable).set({ statoApprovazione: "respinto", attivo: false, versione: sql`${volontariTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(volontariTable.id, id), eq(volontariTable.versione, versione), eq(volontariTable.statoApprovazione, PENDING))).returning({ versione: volontariTable.versione });
+    const [row] = await tx.update(volontariTable).set({ statoApprovazione: "respinto", attivo: false, versione: sql`${volontariTable.versione} + 1`, dataAggiornamento: new Date() }).where(and(eq(volontariTable.id, id), eq(volontariTable.versione, versione), eq(volontariTable.statoApprovazione, PENDING), volontarioNotRemoved(id))).returning({ versione: volontariTable.versione });
     if (!row) return [];
     await auditLogistica(tx, req, { entita: "volontario", id, azione: "rifiuto", precedente: { statoApprovazione: PENDING, versione }, nuovo: { statoApprovazione: "respinto", attivo: false, versione: row.versione } });
     return [row];

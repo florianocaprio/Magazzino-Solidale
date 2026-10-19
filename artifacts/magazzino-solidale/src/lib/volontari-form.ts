@@ -1,3 +1,5 @@
+import { isNotFutureDateOnly } from "./date-only";
+
 export type VolunteerFormField =
   | "nome"
   | "cognome"
@@ -79,6 +81,8 @@ export function validateVolunteerDraft(
   if (!DATE_RE.test(draft.dataNascita))
     errors.dataNascita =
       "La data di nascita è obbligatoria e deve essere valida";
+  else if (!isNotFutureDateOnly(draft.dataNascita))
+    errors.dataNascita = "La data di nascita deve essere reale e non futura.";
   if (!draft.indirizzoResidenza.trim())
     errors.indirizzoResidenza = "L'indirizzo di residenza è obbligatorio";
   if (!draft.domicilioCoincideResidenza && !draft.indirizzoDomicilio.trim())

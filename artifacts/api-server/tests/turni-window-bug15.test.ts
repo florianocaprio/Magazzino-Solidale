@@ -1,0 +1,40 @@
+import { afterAll, afterEach, beforeEach, expect, it, vi } from "vitest";
+import request from "supertest";
+import { db, pool, turniTable, turniVolontariTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import router from "../src/routes/turni";
+import { addCalendarDays, todayRome } from "../src/lib/volontariDomain";
+import { cleanup, createAreaOperativa, createCentroRec, createVolontario, makeScopedApp, newScope, type SeedScope } from "./scope-helpers";
+let scope: SeedScope;
+const app = () => makeScopedApp(router, { id: 0, centroAscoltoId: null, areaOperativaId: null });
+beforeEach(() => { scope = newScope(); vi.useFakeTimers({ toFake: ["Date"] }); });
+afterEach(async () => { vi.useRealTimers(); await cleanup(scope); });
+afterAll(async () => pool.end());
+it.each(["2026-10-19T00:30:00+02:00", "2026-03-30T00:30:00+02:00", "2026-10-26T00:30:00+01:00", "2027-01-03T00:30:00+01:00"])("BUG15: soglia civile oggi−7/−8, futuro e storico (%s)", async (clock) => {
+  vi.setSystemTime(new Date(clock));
+  const area = await createAreaOperativa(scope);
+  const centre = await createCentroRec(scope, { areaOperativaId: area });
+  const volunteer = await createVolontario(scope, centre.id);
+  const body = (data: string) => ({ centroAscoltoId: centre.id, data, fascia: "09-13", volontari: [{ volontarioId: volunteer }] });
+  for (const offset of [-7, 1]) {
+    const response = await request(app()).put("/turni").send(body(addCalendarDays(todayRome(), offset)));
+    expect(response.status, response.text).toBe(200);
+    scope.turnoIds.push(response.body.id);
+  }
+  const oldDate = addCalendarDays(todayRome(), -8);
+  expect((await request(app()).put("/turni").send(body(oldDate))).status).toBe(400);
+  const [old] = await db.insert(turniTable).values({ centroAscoltoId: centre.id, data: oldDate, fascia: "09-13", stato: "pianificato" }).returning();
+  scope.turnoIds.push(old.id);
+  expect((await request(app()).get("/turni").query({ da: oldDate, a: oldDate })).body.some((row: { id: number }) => row.id === old.id)).toBe(true);
+  await db.insert(turniVolontariTable).values({ turnoId: old.id, volontarioId: volunteer });
+  const noOp = await request(app()).put("/turni").send({ ...body(oldDate), versione: old.versione });
+  expect(noOp.status, noOp.text).toBe(200);
+  expect(noOp.body.versione).toBe(old.versione);
+  const other = await createVolontario(scope, centre.id);
+  expect((await request(app()).put("/turni").send({ ...body(oldDate), versione: old.versione, volontari: [{ volontarioId: other }] })).status).toBe(400);
+  const confirmed = await request(app()).patch(`/turni/${old.id}/stato`).send({ versione: old.versione, stato: "confermato" });
+  expect(confirmed.status, confirmed.text).toBe(200);
+  const cancelled = await request(app()).patch(`/turni/${old.id}/stato`).send({ versione: confirmed.body.versione, stato: "annullato", motivoAnnullamento: "Correzione storica" });
+  expect(cancelled.status).toBe(200);
+  expect((await db.select().from(turniTable).where(eq(turniTable.id, old.id)))[0].stato).toBe("annullato");
+});

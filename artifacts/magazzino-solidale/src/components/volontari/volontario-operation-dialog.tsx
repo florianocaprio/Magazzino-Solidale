@@ -1,3 +1,4 @@
+import { invalidateLogisticaResources, isStaleLogisticaError } from "@/lib/logistica-cache";
 import { useEffect, useMemo, useState } from "react";
 import {
   getListVolontariQueryKey,
@@ -177,9 +178,7 @@ export function VolontarioOperationDialog({
         });
         toast({ title: "Copertura assicurativa registrata" });
       }
-      await queryClient.invalidateQueries({
-        queryKey: getListVolontariQueryKey(),
-      });
+      await invalidateLogisticaResources(queryClient, "volontari");
       await queryClient.invalidateQueries({
         queryKey: ["volontario-dossier", volontario.id],
       });
@@ -188,6 +187,10 @@ export function VolontarioOperationDialog({
       });
       close();
     } catch (error) {
+      if (isStaleLogisticaError(error)) {
+        await invalidateLogisticaResources(queryClient, "volontari", volontario.id);
+        close();
+      }
       toast({
         title: "Operazione non riuscita",
         description: errorMessage(error),

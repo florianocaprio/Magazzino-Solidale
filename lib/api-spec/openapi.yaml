@@ -8867,10 +8867,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/VersioneInput"
+              $ref: "#/components/schemas/VolontarioRemoveInput"
       responses:
         "200":
-          description: Volunteer deactivated; the historical record is always retained
+          description: Volunteer removed from operations; historical references retained
           content:
             application/json:
               schema:
@@ -8883,7 +8883,7 @@ paths:
                   versione:
                     type: integer
         "204":
-          description: Volunteer already absent
+          description: Unused volunteer deleted permanently, or already absent
         "400":
           description: Missing or invalid version
         "403":
@@ -15122,6 +15122,18 @@ components:
         quantita: { $ref: "#/components/schemas/QuantitaContabile" }
         scaricoId: { type: ["integer", "null"] }
         nota: { type: ["string", "null"] }
+
+    VolontarioRemoveInput:
+      type: object
+      required: [versione]
+      properties:
+        versione:
+          type: integer
+          minimum: 1
+        removeIfUnused:
+          type: boolean
+          default: false
+          description: Delete permanently only if never used and without dependencies; otherwise remove from operations and retain all history. Omit for legacy deactivation.
 
     VersioneInput:
       type: object

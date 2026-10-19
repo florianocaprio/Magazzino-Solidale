@@ -1,3 +1,4 @@
+import { invalidateLogisticaResources } from "@/lib/logistica-cache";
 import { useMemo, useRef, useState } from "react";
 import {
   analyzeVolontariImport,
@@ -246,9 +247,7 @@ export function VolontariImportDialog({
         }),
       });
       const summary = result as Record<string, unknown>;
-      await queryClient.invalidateQueries({
-        queryKey: getListVolontariQueryKey(),
-      });
+      await invalidateLogisticaResources(queryClient, "volontari");
       toast({
         title: summary.replayIdempotente
           ? "Importazione già applicata"

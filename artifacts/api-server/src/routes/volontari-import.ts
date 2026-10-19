@@ -559,6 +559,11 @@ router.post(
           continue;
         }
         const data = { ...(stored.datiNormalizzati as NormalizedImport), ...corrections } as NormalizedImport;
+        if (data.dataNascita != null && (!isDateOnly(data.dataNascita) || data.dataNascita > todayRome())) {
+          errori += 1;
+          await tx.update(importazioniVolontariRigheTable).set({ esitoCommit: "ERRORE_DATA_NASCITA", avvisi: [...stored.avvisi, "La data di nascita deve essere reale e non futura."] }).where(eq(importazioniVolontariRigheTable.id, stored.id));
+          continue;
+        }
         data.matricola = typeof data.matricola === "string" ? data.matricola.trim() || null : null;
         data.codiceFiscaleNormalizzato = normalizeCodiceFiscale(
           data.codiceFiscale,

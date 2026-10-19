@@ -926,6 +926,7 @@ export * from "./volontarioOperationalState";
 export * from "./volontarioOperationalStateStatoAssicurazione";
 export * from "./volontarioPermanentConversionInput";
 export * from "./volontarioPermanentConversionPreviewResponse";
+export * from "./volontarioRemoveInput";
 export * from "./volontarioRiattivazioneInput";
 export * from "./volontarioServiceDayInput";
 export * from "./volontarioServiceDayInputStato";

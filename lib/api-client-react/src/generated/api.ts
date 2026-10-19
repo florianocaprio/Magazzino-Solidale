@@ -521,6 +521,7 @@ import type {
   VolontarioKnownConflictResponse,
   VolontarioPermanentConversionInput,
   VolontarioPermanentConversionPreviewResponse,
+  VolontarioRemoveInput,
   VolontarioRiattivazioneInput,
   VolontarioServiceDayInput,
   VolontarioServiceDayUpdateInput,
@@ -32745,14 +32746,14 @@ export const getDeleteVolontarioUrl = (id: number) => {
 
 export const deleteVolontario = async (
   id: number,
-  versioneInput: VersioneInput,
+  volontarioRemoveInput: VolontarioRemoveInput,
   options?: RequestInit,
 ): Promise<DeleteVolontario200 | void> => {
   return customFetch<DeleteVolontario200 | void>(getDeleteVolontarioUrl(id), {
     ...options,
     method: "DELETE",
     headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(versioneInput),
+    body: JSON.stringify(volontarioRemoveInput),
   });
 };
 
@@ -32763,14 +32764,14 @@ export const getDeleteVolontarioMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof deleteVolontario>>,
     TError,
-    { id: number; data: BodyType<VersioneInput> },
+    { id: number; data: BodyType<VolontarioRemoveInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof deleteVolontario>>,
   TError,
-  { id: number; data: BodyType<VersioneInput> },
+  { id: number; data: BodyType<VolontarioRemoveInput> },
   TContext
 > => {
   const mutationKey = ["deleteVolontario"];
@@ -32784,7 +32785,7 @@ export const getDeleteVolontarioMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof deleteVolontario>>,
-    { id: number; data: BodyType<VersioneInput> }
+    { id: number; data: BodyType<VolontarioRemoveInput> }
   > = (props) => {
     const { id, data } = props ?? {};
 
@@ -32797,7 +32798,7 @@ export const getDeleteVolontarioMutationOptions = <
 export type DeleteVolontarioMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteVolontario>>
 >;
-export type DeleteVolontarioMutationBody = BodyType<VersioneInput>;
+export type DeleteVolontarioMutationBody = BodyType<VolontarioRemoveInput>;
 export type DeleteVolontarioMutationError = ErrorType<void>;
 
 export const useDeleteVolontario = <
@@ -32807,14 +32808,14 @@ export const useDeleteVolontario = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof deleteVolontario>>,
     TError,
-    { id: number; data: BodyType<VersioneInput> },
+    { id: number; data: BodyType<VolontarioRemoveInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof deleteVolontario>>,
   TError,
-  { id: number; data: BodyType<VersioneInput> },
+  { id: number; data: BodyType<VolontarioRemoveInput> },
   TContext
 > => {
   return useMutation(getDeleteVolontarioMutationOptions(options));

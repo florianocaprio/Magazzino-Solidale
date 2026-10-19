@@ -1,4 +1,6 @@
 import { operationalCentroId } from "@/lib/service-scope";
+import i18n from "@/lib/i18n";
+import { registerLogisticaCampaign } from "@/lib/i18n/namespaces/logisticaCampaign";
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -42,12 +44,14 @@ import { buildBeneficiarioDuplicateParams, canSearchBeneficiarioDuplicates, requ
 import { FseBeneficiariActions } from "@/components/fse-beneficiari-actions";
 import { UnsavedChangesDialog, useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 
+registerLogisticaCampaign(i18n);
+
 const makeFormSchema = (t: (k: string) => string, areaRequired: boolean) => z.object({
   cognome: z.string().trim().min(2),
   nome: z.string().trim().min(2),
   soprannome: z.string().optional(),
   codiceFiscale: z.string().optional(),
-  dataNascita: z.string().optional().refine(isNotFutureDateOnly, "La data di nascita non può essere successiva alla data odierna."),
+  dataNascita: z.string().optional().refine(isNotFutureDateOnly, t("logisticaCampaign.birthInvalid")),
   sesso: z.string().trim().min(1, t("beneficiari.sessoRequired")),
   cittadinanza: z.string().optional(),
   areaProvenienza: z.string().trim().min(1, t("common.requiredField")),

@@ -1,3 +1,4 @@
+import { hasVolontarioHistory } from "../lib/volontarioRemoval";
 import { Router, type IRouter, type Request } from "express";
 import { randomUUID } from "node:crypto";
 import { db } from "@workspace/db";
@@ -365,7 +366,7 @@ router.get(
         ),
       )
       .orderBy(desc(volontariTable.id));
-    const states = await operationalStatesForRows(db, rows, dataRiferimento);
+    const states = await operationalStatesForRows(db, rows, dataRiferimento, req.query.centroAscoltoId == null ? caller : Number(req.query.centroAscoltoId));
     let result = rows.map((row) => fmt(row, states.get(row.id), false));
     const stato =
       typeof req.query.stato === "string"
@@ -1389,6 +1390,11 @@ router.delete(
     const caller = callerCentroId(req);
     const id = parseInt(String(req.params.id));
     const visibleIds = await visibleCentroIds(callerAreaOperativaId(req));
+    const removeIfUnused = req.body?.removeIfUnused === true;
+    if (req.body?.removeIfUnused !== undefined && typeof req.body.removeIfUnused !== "boolean") {
+      res.status(400).json({ error: "removeIfUnused non valido" });
+      return;
+    }
     const result = await db.transaction(async (tx) => {
       const [existing] = await tx
         .select()
@@ -1403,6 +1409,12 @@ router.delete(
         return { status: 403 as const };
       const versione = parseRequiredVersion(req.body?.versione);
       if (versione == null) return { status: 400 as const };
+      if (versione !== existing.versione) return { status: 409 as const };
+      if (removeIfUnused && !(await hasVolontarioHistory(tx, id))) {
+        await auditLogistica(tx, req, { entita: "volontario", id, azione: "eliminazione", precedente: { versione, centroAscoltoId: existing.centroAscoltoId }, nuovo: null });
+        await tx.delete(volontariTable).where(eq(volontariTable.id, id));
+        return { status: 204 as const };
+      }
       const [row] = await tx
         .update(volontariTable)
         .set({
@@ -1423,15 +1435,15 @@ router.delete(
         id: row.id,
         azione: "disattivazione",
         precedente: { versione: existing.versione, attivo: existing.attivo },
-        nuovo: { versione: row.versione, attivo: false },
+        nuovo: { versione: row.versione, attivo: false, preservedForHistory: removeIfUnused },
       });
       const date = todayRome();
       await tx.insert(statiVolontariTable).values({
         volontarioId: id,
         tipoEvento: "SOSPENSIONE",
         dataEffettiva: date,
-        motivo: "sospensione organizzativa",
-        note: "Compatibilità disattivazione",
+        motivo: removeIfUnused ? "dimissioni_cessazione" : "sospensione organizzativa",
+        note: removeIfUnused ? "Rimozione operativa; storico conservato" : "Compatibilità disattivazione",
         creatoDa: actorId(req),
       });
       await appendVolontarioLedgerEvent(tx, {
@@ -1442,8 +1454,8 @@ router.delete(
         dataEffettiva: date,
         snapshot: await buildVolunteerEventSnapshot(tx, existing, {
           statoPrecedente: existing.attivo ? "ATTIVO" : "NON_ATTIVO",
-          nuovoStato: "SOSPESO",
-          motivo: "sospensione_organizzativa",
+          nuovoStato: removeIfUnused ? "CESSATO" : "SOSPESO",
+          motivo: removeIfUnused ? "dimissioni_cessazione" : "sospensione_organizzativa",
           dataEffettiva: date,
           versione: row.versione,
           datiEvento: { origine: "disattivazione_compatibilita" },

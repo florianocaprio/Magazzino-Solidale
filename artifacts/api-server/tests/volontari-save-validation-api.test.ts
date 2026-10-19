@@ -1,3 +1,4 @@
+import approvazioniRouter from "../src/routes/approvazioni-logistica";
 /* @vitest-environment node */
 
 import { Router } from "express";
@@ -12,7 +13,7 @@ import {
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import volontariRouter from "../src/routes/volontari";
-import { todayRome } from "../src/lib/volontariDomain";
+import { addCalendarDays, todayRome } from "../src/lib/volontariDomain";
 import {
   cleanup,
   createAreaOperativa,
@@ -25,6 +26,7 @@ import {
 
 const routers = Router();
 routers.use(volontariRouter);
+routers.use(approvazioniRouter);
 const app = () =>
   makeScopedApp(routers, {
     id: 0,
@@ -99,6 +101,47 @@ async function insertLegacy(
 }
 
 describe("Volontari — API salvataggio e conversione", () => {
+  it("BUG02: accetta nascita oggi e rifiuta domani o date impossibili in creazione e modifica", async () => {
+    const created = await request(app()).post("/volontari").send(completePayload({ dataNascita: todayRome() }));
+    expect(created.status, created.text).toBe(201);
+    scope.volontarioIds.push(created.body.id);
+    for (const birth of [addCalendarDays(todayRome(), 1), "2026-02-30"]) {
+      const create = await request(app()).post("/volontari").send(completePayload({ dataNascita: birth }));
+      expect(create.status).toBe(422);
+      expect(create.body.fieldErrors).toHaveProperty("dataNascita");
+      const edit = await request(app()).patch(`/volontari/${created.body.id}`).send({ versione: created.body.versione, dataNascita: birth });
+      expect(edit.status).toBe(422);
+      expect(edit.body.fieldErrors).toHaveProperty("dataNascita");
+    }
+    const [stored] = await db.select().from(volontariTable).where(eq(volontariTable.id, created.body.id));
+    expect(stored.dataNascita).toBe(todayRome());
+    expect(stored.versione).toBe(created.body.versione);
+  });
+
+  it("D01: elimina soltanto il volontario mai usato e senza dipendenze; conserva il registrato", async () => {
+    const unused = await insertLegacy();
+    const stale = await request(app()).delete(`/volontari/${unused.id}`).send({ versione: unused.versione + 1, removeIfUnused: true });
+    expect(stale.status).toBe(409);
+    const removed = await request(app()).delete(`/volontari/${unused.id}`).send({ versione: unused.versione, removeIfUnused: true });
+    expect(removed.status, removed.text).toBe(204);
+    expect(await db.select().from(volontariTable).where(eq(volontariTable.id, unused.id))).toHaveLength(0);
+    const created = await request(app()).post("/volontari").send(completePayload());
+    expect(created.status).toBe(201);
+    scope.volontarioIds.push(created.body.id);
+    const beforeLedger = await db.select().from(registroVolontariEventiTable).where(eq(registroVolontariEventiTable.volontarioId, created.body.id));
+    const retired = await request(app()).delete(`/volontari/${created.body.id}`).send({ versione: created.body.versione, removeIfUnused: true });
+    expect(retired.status, retired.text).toBe(200);
+    const [kept] = await db.select().from(volontariTable).where(eq(volontariTable.id, created.body.id));
+    expect(kept.attivo).toBe(false);
+    expect((await request(app()).get(`/volontari/${kept.id}`)).body).toMatchObject({ abilitatoAmministrativamente: false, operativo: false });
+    const queue = await request(app()).get("/approvazioni-logistica");
+    expect(queue.status, queue.text).toBe(200);
+    expect(queue.body.volontari.some((row: { id: number }) => row.id === kept.id)).toBe(false);
+    expect((await request(app()).post(`/approvazioni-logistica/volontari/${kept.id}/approva`).send({ versione: kept.versione })).status).toBe(409);
+    const ledger = await db.select().from(registroVolontariEventiTable).where(eq(registroVolontariEventiTable.volontarioId, kept.id));
+    expect(ledger.map((r) => r.id)).toEqual(expect.arrayContaining(beforeLedger.map((r) => r.id)));
+  });
+
   it("restituisce tutti i fieldErrors e non scrive su creazione invalida", async () => {
     const before = await db
       .select({ id: volontariTable.id })

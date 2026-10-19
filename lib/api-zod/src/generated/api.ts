@@ -19271,8 +19271,16 @@ export const DeleteVolontarioParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const deleteVolontarioBodyRemoveIfUnusedDefault = false;
+
 export const DeleteVolontarioBody = zod.object({
   versione: zod.number().min(1),
+  removeIfUnused: zod
+    .boolean()
+    .default(deleteVolontarioBodyRemoveIfUnusedDefault)
+    .describe(
+      "Delete permanently only if never used and without dependencies; otherwise remove from operations and retain all history. Omit for legacy deactivation.",
+    ),
 });
 
 export const DeleteVolontarioResponse = zod.object({

@@ -1,5 +1,5 @@
 /* @vitest-environment node */
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it , vi } from "vitest";
 import request from "supertest";
 import { httpListeners } from "./helpers/http-listeners";
 const listeners = httpListeners();
@@ -14,6 +14,12 @@ import volontariRouter from "../src/routes/volontari";
 import { cleanup, createAreaOperativa, createBeneficiario, createCentroRec, createMagazzino, createMezzo, createRuoloVolontario, createVolontario, makeScopedApp, newScope, type SeedScope } from "./scope-helpers";
 
 let scope: SeedScope;
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-01T12:00:00+02:00"));
+});
+afterEach(() => vi.useRealTimers());
+
 beforeEach(async () => { scope = newScope(); await createRuoloVolontario(scope); });
 afterEach(async () => { await listeners.close(); await db.delete(auditConfigurazioniTable).where(eq(auditConfigurazioniTable.area, "logistica")); await cleanup(scope); });
 afterAll(async () => { await pool.end(); });

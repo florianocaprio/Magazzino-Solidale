@@ -1,4 +1,6 @@
 import { operationalCentroId } from "@/lib/service-scope";
+import i18n from "@/lib/i18n";
+import { registerLogisticaCampaign } from "@/lib/i18n/namespaces/logisticaCampaign";
 import { CreditoRettificaDialog } from "@/components/credito-rettifica-dialog";
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "wouter";
@@ -130,6 +132,8 @@ import {
 } from "@/components/beneficiario-emporio-card";
 import { emporioReadableData } from "@/hooks/use-emporio-security";
 import { BeneficiarioFseCard } from "@/components/beneficiario-fse-card";
+
+registerLogisticaCampaign(i18n);
 
 const NONE_VALUE = "__none__";
 const STATI_CREDITO_SOLIDALE = [
@@ -1052,7 +1056,7 @@ const makeEditSchema = (t: (k: string) => string) =>
       .optional()
       .refine(
         isNotFutureDateOnly,
-        "La data di nascita non può essere successiva alla data odierna.",
+        t("logisticaCampaign.birthInvalid"),
       ),
     sesso: z.string().trim().min(1, t("beneficiari.sessoRequired")),
     cittadinanza: z.string().optional(),
@@ -2414,7 +2418,7 @@ const makeMembroSchema = (t: (k: string) => string) =>
       .string()
       .trim()
       .min(1, t("beneficiarioDettaglio.required"))
-      .refine(isNotFutureDateOnly, "La data di nascita non può essere futura."),
+      .refine(isNotFutureDateOnly, t("logisticaCampaign.birthInvalid")),
     sesso: z.string().trim().min(1, t("beneficiarioDettaglio.required")),
     areaProvenienza: z.string().optional(),
     note: z.string().optional(),
@@ -2748,8 +2752,9 @@ function NucleoSection({
                         {t("beneficiarioDettaglio.dataNascita")}
                       </FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" max={todayDateOnly()} {...field} />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
