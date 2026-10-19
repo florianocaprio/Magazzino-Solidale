@@ -1,6 +1,6 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-19 ottobre 2026, Europe/Rome. **Consegne 01, 02 e checkpoint 03 chiusi con OK di Floriano; consegna 04 e addendum BUG 21 verificati tecnicamente, installazione 8082 in preparazione e UAT del blocco C da eseguire.**
+19 ottobre 2026, Europe/Rome. **Consegne 01, 02 e checkpoint 03 chiusi con OK di Floriano; consegna 04 e addendum BUG 21 installati e verificati sulla 8082; UAT del blocco C da eseguire.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
@@ -111,11 +111,11 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 02  | B      | 02     | CHIUSO; UAT OK | Nessuno; D01 approvata                                         | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 03  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 04  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 05 | C | 04 | PRONTO PER UAT; DA INSTALLARE | Nessuno; D02 confermata per BUG 07 | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
-| 06 | C | 04 | PRONTO PER UAT; DA INSTALLARE | Nessuno; D02 confermata per BUG 07 | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
-| 07 | C | 04 | PRONTO PER UAT; DA INSTALLARE | Nessuno; D02 confermata per BUG 07 | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
-| 08 | C | 04 | PRONTO PER UAT; DA INSTALLARE | Nessuno; D02 confermata per BUG 07 | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
-| 09 | C | 04 | PRONTO PER UAT; DA INSTALLARE | Nessuno; D02 confermata per BUG 07 | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
+| 05 | C | 04 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; D02 confermata per BUG 07 | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
+| 06 | C | 04 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; D02 confermata per BUG 07 | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
+| 07 | C | 04 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; D02 confermata per BUG 07 | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
+| 08 | C | 04 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; D02 confermata per BUG 07 | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
+| 09 | C | 04 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; D02 confermata per BUG 07 | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
 | 10  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 11  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 12  | D      | 05     | DA SVILUPPARE             | Raccordo D03 con le attuali pratiche Aperte                    | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -127,7 +127,7 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 19  | E      | 07     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 20  | F      | 08     | DA SVILUPPARE             | Nessuno; conservare UX20-01–14                                 | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 21 | C | 04 + addendum 2.2 | PRONTO PER UAT; DA INSTALLARE | Un solo ID con stati, territorio, tessera e Zona UDS | Candidato di questo commit | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
+| 21 | C | 04 + addendum 2.2 | PRONTO PER UAT; INSTALLATO 8082 | Un solo ID con stati, territorio, tessera e Zona UDS | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
 
 ## Otto consegne
 
@@ -141,7 +141,7 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | 01 | A: 01 | Funzionale | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 | PASS; ultimi controlli 737 UI e 76 API core | Installata e verificata | CHIUSA; OK UAT Floriano 19/10 |
 | 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | CHIUSA; OK UAT Floriano 19/10 |
 | 03 | C: 17, prima parte | Tecnica | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 | PASS: 1.521 API + 4 skip; 756 UI; 9 browser + 36 skip di matrice; build/budget | Installata, asset HTTP verificati; ledger 60/60 | CHIUSO; OK Floriano; regressione integrata nel 04 |
-| 04 | C: 05–09, 21 e regressione 17 | Funzionale | Candidato di questo commit | PASS mirati; evidenze sotto | Da ricompilare prima della consegna | UAT DA ESEGUIRE |
+| 04 | C: 05–09, 21 e regressione 17 | Funzionale | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | Installata; asset HTTP verificati; ledger 60/60 | UAT DA ESEGUIRE |
 | 05       | D: 04, 10–14, 16              | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 06       | E: 18, modello e integrazioni | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
 | 07       | E: 18 UI, 19                  | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
@@ -1818,3 +1818,49 @@ inclusi nel candidato; esclusi i quattro documenti locali preesistenti.
 - `lib/api-zod/src/generated/types/getBollaBeneficiarioConsegnaParams.ts`
 - `lib/api-zod/src/generated/types/index.ts`
 - `lib/api-zod/src/generated/types/listBollaBeneficiariCandidatiParams.ts`
+
+### Ricevuta di installazione 04 sulla 8082
+
+Candidato applicativo **`5efbe5eeed7343cbe7f286821a3d6ffeaed57873`**, branch
+`codex/bugfix-uat-ottobre-2026`. Il successivo commit della ricevuta modifica
+soltanto questo registro e non cambia il contenuto delle immagini installate.
+
+Le immagini sono state costruite da `git archive` della SHA esatta, escludendo
+file locali e documenti preesistenti. Rigenerazione API dopo il commit:
+nessuna differenza nei derivati tracciati. Workflow verificato: push di questo
+branch non avvia deploy; nessun merge o push su main e nessun accesso mutativo
+alla produzione. Il prompt 05 resta da attivare dopo l'OK UAT di Floriano.
+
+- `/magazzino-api`: immagine `magazzino-bugfix-uat-api:sha-5efbe5eeed73`, ID `sha256:cc401246dc00f6a7bdb61bbddbfea749cabf5be7afe99988543ce250b9f6b3a3`; stato healthy.
+- `/magazzino-web`: immagine `magazzino-bugfix-uat-web:sha-5efbe5eeed73`, ID `sha256:754fcf99416644082143d9f88d81274c4660c3f01d7ab3eb950ede076219fb24`; stato healthcheck non previsto.
+- `/magazzino-postgres`: immagine `postgres:16-alpine`, ID `sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea`; stato healthy.
+
+API e WEB hanno la label di revisione uguale al candidato. PostgreSQL conserva
+ID e ora di avvio precedenti; volumi pgdata e uploads conservati. Il preflight
+e il controllo finale del ledger confermano **60/60**, zero pending, checksum
+difformi, file mancanti o fuori ordine. Nessuna nuova migration per il blocco 04.
+
+Backup privato precedente al recreate: `/Users/florianocaprio/Backups/Magazzino-Solidale/BLOCCO04-UDS-5efbe5eeed73-2026-10-19T21-08-21-045Z`.
+Dump PostgreSQL custom e archivio uploads hanno indice verificato e SHA-256
+registrati nel preflight privato. Non è stato eseguito un restore di prova
+(`restoreTested=false`); non si effettua qui una modifica di schema. Catena
+Compose effettiva letta dal WEB e riprodotta, cambiando soltanto immagini,
+label di revisione e versione sorgente del runner API. Override di rollback
+con immagini, label e versione sorgente precedenti conservato nel backup.
+
+Confronto prima/dopo invariato per Beneficiari, nucleo, tessere, abilitazioni
+Mensa/Emporio, interventi, Bolle, Richieste, Enti/Fornitori, Lotti, Movimenti,
+Prenotazioni e audit. Nessun dato dimostrativo o test mutativo introdotto
+nel database personale.
+
+HTTP verificato: `/`, `/config.js`, `/api/healthz`, `/api/readyz` → 200;
+`/api/utenti` senza sessione → 401. Entry `/assets/index-FUhdW7Up.js`.
+**Initial entry index-FUhdW7Up.js: 1435.6 KiB, 399.9 KiB gzip**. Asset di Beneficiari, scheda UDS, directory UDS,
+creazione UDS, Scarichi, Richieste, documento comune e testi Blocco04 confrontati
+via SHA-256 tra immagine e HTTP. Conservati e verificati anche gli asset della
+regressione Enti/Fornitori e dei Carichi; assenza di Solo globali nella Bolla.
+
+Esito tecnico della consegna 04: **PASS mirati e INSTALLATA sulla 8082**.
+**UAT personale ancora DA ESEGUIRE**: ricaricare `http://localhost:8082` con
+⌘⇧R e svolgere la checklist sopra. Nessuna chiusura automatica dei BUG 05–09/21
+e nessun trasferimento dell'OK del punto 03 alla nuova UAT integrata.
