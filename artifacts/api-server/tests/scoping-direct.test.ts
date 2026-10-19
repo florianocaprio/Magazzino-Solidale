@@ -113,6 +113,61 @@ describe("Fornitori — scoping per area operativa", () => {
     expect(idsOf(res.body)).toEqual(expect.arrayContaining([fA, fB]));
   });
 
+  it("BUG17: Solo globali esclude i locali, anche con filtro Area", async () => {
+    const local = await createFornitore(scope, areaOperativaA);
+    const foreign = await createFornitore(scope, areaOperativaB);
+    const global = await createFornitore(scope, null);
+    for (const callerArea of [null, areaOperativaA]) {
+      const app = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: callerArea });
+      const res = await request(app).get(`/fornitori?ambito=globali&areaOperativaId=${areaOperativaB}`);
+      expect(res.status).toBe(200);
+      expect(idsOf(res.body)).toContain(global);
+      expect(idsOf(res.body)).not.toContain(local);
+      expect(idsOf(res.body)).not.toContain(foreign);
+      expect(res.body.every((f: { areaOperativaId: number | null }) => f.areaOperativaId === null)).toBe(true);
+    }
+  });
+
+  it("BUG17: il filtro Area include locali e globali senza altre Aree", async () => {
+    const local = await createFornitore(scope, areaOperativaA);
+    const foreign = await createFornitore(scope, areaOperativaB);
+    const global = await createFornitore(scope, null);
+    const app = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: null });
+    const res = await request(app).get(`/fornitori?areaOperativaId=${areaOperativaA}`);
+    expect(res.status).toBe(200);
+    expect(idsOf(res.body)).toEqual(expect.arrayContaining([local, global]));
+    expect(idsOf(res.body)).not.toContain(foreign);
+    const scoped = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA });
+    const attempted = await request(scoped).get(`/fornitori?areaOperativaId=${areaOperativaB}`);
+    expect(attempted.status).toBe(200);
+    expect(idsOf(attempted.body)).toEqual(expect.arrayContaining([local, global]));
+    expect(idsOf(attempted.body)).not.toContain(foreign);
+  });
+
+  it.each(["ambito=altro", "ambito=globali&ambito=tutti", "areaOperativaId=0", "areaOperativaId=1x", "areaOperativaId=NaN"])("BUG17: rifiuta il filtro malformato %s", async (query) => {
+    const app = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: null });
+    expect((await request(app).get(`/fornitori?${query}`)).status).toBe(400);
+  });
+
+  it("BUG17: crea e modifica un globale; il territoriale può leggerlo ma non gestirlo", async () => {
+    const admin = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: null });
+    const created = await request(admin).post("/fornitori").send({ nome: "Globale BUG17", tipo: "commerciale", areaOperativaId: null });
+    expect(created.status).toBe(201);
+    scope.fornitoreIds.push(created.body.id);
+    expect(created.body.areaOperativaId).toBeNull();
+    const edited = await request(admin).patch(`/fornitori/${created.body.id}`).send({ nome: "Globale BUG17 aggiornato", areaOperativaId: null });
+    expect(edited.status).toBe(200);
+    expect(edited.body.areaOperativaId).toBeNull();
+    const scoped = makeScopedApp(fornitoriRouter, { id: operatoreId, areaOperativaId: areaOperativaA });
+    expect((await request(scoped).get(`/fornitori/${created.body.id}`)).status).toBe(200);
+    expect((await request(scoped).patch(`/fornitori/${created.body.id}`).send({ nome: "Non consentito" })).status).toBe(403);
+    expect((await request(scoped).delete(`/fornitori/${created.body.id}`)).status).toBe(403);
+    const attempted = await request(scoped).post("/fornitori").send({ nome: "Tentativo globale", tipo: "commerciale", areaOperativaId: null });
+    expect(attempted.status).toBe(201);
+    scope.fornitoreIds.push(attempted.body.id);
+    expect(attempted.body.areaOperativaId).toBe(areaOperativaA);
+  });
+
   it("GET /:id fuori area operativa → 403", async () => {
     const fB = await createFornitore(scope, areaOperativaB);
     const res = await request(

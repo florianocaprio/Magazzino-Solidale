@@ -7310,7 +7310,19 @@ export const GetScaricoResponse = zod.object({
 });
 
 export const ListFornitoriQueryParams = zod.object({
-  areaOperativaId: zod.coerce.number().optional(),
+  ambito: zod
+    .enum(["tutti", "globali"])
+    .optional()
+    .describe(
+      "Tutti i fornitori autorizzati oppure solo quelli globali (Area nulla).",
+    ),
+  areaOperativaId: zod.coerce
+    .number()
+    .min(1)
+    .optional()
+    .describe(
+      "Area locale da includere insieme ai fornitori globali; i profili territoriali restano limitati alla propria Area.",
+    ),
 });
 
 export const ListFornitoriResponseItem = zod.object({

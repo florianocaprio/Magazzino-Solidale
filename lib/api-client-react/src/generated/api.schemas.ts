@@ -11179,8 +11179,24 @@ export type ListScarichiParams = {
 };
 
 export type ListFornitoriParams = {
+  /**
+   * Tutti i fornitori autorizzati oppure solo quelli globali (Area nulla).
+   */
+  ambito?: ListFornitoriAmbito;
+  /**
+   * Area locale da includere insieme ai fornitori globali; i profili territoriali restano limitati alla propria Area.
+   * @minimum 1
+   */
   areaOperativaId?: number;
 };
+
+export type ListFornitoriAmbito =
+  (typeof ListFornitoriAmbito)[keyof typeof ListFornitoriAmbito];
+
+export const ListFornitoriAmbito = {
+  tutti: "tutti",
+  globali: "globali",
+} as const;
 
 export type ListApprovvigionamentiParams = {
   stato?: string;

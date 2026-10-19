@@ -481,6 +481,7 @@ export * from "./listDocumentiOperativiTipoAggregato";
 export * from "./listEccezioniMensaParams";
 export * from "./listEntiDestinatariAmbito";
 export * from "./listEntiDestinatariParams";
+export * from "./listFornitoriAmbito";
 export * from "./listFornitoriParams";
 export * from "./listFseAdministrativeSourcesParams";
 export * from "./listFseExportsParams";

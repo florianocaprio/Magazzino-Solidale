@@ -1526,3 +1526,46 @@ Percorso di prova: `http://localhost:8082/enti-esterni`, ricaricare con ⌘⇧R.
 Admin globale → Nuovo Ente → Globale; verificare tag, filtri e disponibilità
 in Nuova Bolla dell'Area. Consegna 02 resta chiusa. Nessuna fase 04, merge,
 main o produzione avviata; quattro documenti locali preesistenti esclusi.
+
+
+### Estensione autorizzata BUG17 — Fornitori locali e globali
+
+Floriano richiede ora esplicitamente di ripristinare le modifiche ai Fornitori,
+con impostazione coerente agli Enti Esterni, chiarendo che il Fornitore non è
+il destinatario di una Bolla. Questa richiesta sostituisce il precedente
+vincolo di lasciare invariata l'anagrafica Fornitori; i comportamenti degli
+Enti Esterni e delle Bolle già installati restano conservati.
+
+- Fornitori e Donatori: controllo **Globale**, scelta dell'Area per i locali,
+  indicazione di utilizzo in tutte le Aree e tag **Globale** accanto al nome.
+  Il form richiede di scegliere esplicitamente un'Area o Globale. Modifica
+  e salvataggio conservano l'ambito assegnato.
+- Stessi filtri degli Enti: **Solo globali**, **Tutte le Aree e globali**,
+  **singola Area incl. globali**. Anche il profilo territoriale può filtrare
+  i globali, restando limitato alla propria Area quando sceglie i locali.
+- I carichi propongono automaticamente i fornitori locali dell'Area e quelli
+  globali, ora riconoscibili nel selettore. Nessun collegamento inventato tra
+  Fornitori ed Enti destinatari, nessun nuovo pulsante nelle Bolle.
+- Nessuna migrazione: Area NULL identifica già un Fornitore globale. Permessi
+  esistenti conservati: profili territoriali leggono i globali ma non li
+  modificano/disattivano; la loro creazione resta assegnata alla propria Area.
+- API GET `/fornitori`: nuovo parametro facoltativo `ambito=tutti|globali`,
+  filtro applicato nel database insieme al perimetro autorizzato e con
+  validazione dei parametri. Nessun cambiamento ai payload di scrittura.
+  OpenAPI aggiornato, client e validatori rigenerati con il comando ufficiale
+  `pnpm --filter @workspace/api-spec run codegen`; lockfile invariato.
+
+File coinvolti:
+`artifacts/api-server/src/routes/fornitori.ts`,
+`artifacts/api-server/tests/scoping-direct.test.ts`,
+`artifacts/magazzino-solidale/src/pages/fornitori.tsx`,
+`artifacts/magazzino-solidale/src/pages/carico-merce.tsx`,
+`artifacts/magazzino-solidale/src/lib/i18n/namespaces/fornitori.ts`,
+`artifacts/magazzino-solidale/e2e/m4a-documenti-destinatari.spec.ts`,
+`lib/api-spec/openapi.yaml`,
+`lib/api-client-react/src/generated/api.schemas.ts`,
+`lib/api-zod/src/generated/api.ts`,
+`lib/api-zod/src/generated/types/{index,listFornitoriParams,listFornitoriAmbito}.ts`
+e questo registro. Test e ricompilazione 8082 effettivi sono registrati nella
+ricevuta seguente dopo completamento. Prosegue solo il checkpoint 03;
+nessun avvio del prompt 04 e nessuna riapertura della consegna 02.

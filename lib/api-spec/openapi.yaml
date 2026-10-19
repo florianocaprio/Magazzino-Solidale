@@ -3195,10 +3195,18 @@ paths:
       operationId: listFornitori
       tags: [fornitori]
       parameters:
+        - name: ambito
+          in: query
+          description: Tutti i fornitori autorizzati oppure solo quelli globali (Area nulla).
+          schema:
+            type: string
+            enum: [tutti, globali]
         - name: areaOperativaId
           in: query
+          description: Area locale da includere insieme ai fornitori globali; i profili territoriali restano limitati alla propria Area.
           schema:
             type: integer
+            minimum: 1
       responses:
         "200":
           description: List of suppliers

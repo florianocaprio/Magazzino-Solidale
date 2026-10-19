@@ -1351,7 +1351,7 @@ function CarichiContent() {
                   )
                   .map((supplier) => (
                     <SelectItem key={supplier.id} value={String(supplier.id)}>
-                      {supplier.nome}
+                      {supplier.nome}{supplier.areaOperativaId == null && ` · ${t("fornitori.global")}`}
                     </SelectItem>
                   ))}
               </SelectContent>
