@@ -1,4 +1,4 @@
-import { volunteerMatchesCentre, volunteerAreaFilter } from "../lib/volontariArea";
+import { volunteerMatchesCentre, volunteerAreaFilter, volunteerContextFilter } from "../lib/volontariArea";
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
@@ -233,7 +233,10 @@ async function canUseVolontarioConsegna(
   if (!volontario.attivo || volontario.statoApprovazione !== "approvato")
     return false;
   const area = await beneficiarioAreaOperativaId(beneficiarioId);
-  return area != null ? volontario.areaOperativaId === area : centroBeneficiario != null && await volunteerMatchesCentre(db, volontario, centroBeneficiario);
+  if (area != null && volontario.areaOperativaId !== area) return false;
+  return centroBeneficiario != null
+    ? await volunteerMatchesCentre(db, volontario, centroBeneficiario)
+    : area != null && volontario.centroAscoltoId == null;
 }
 
 async function bollaVolunteerReference(
@@ -1647,6 +1650,7 @@ router.get(
       .where(
         and(
           volunteerAreaFilter(await beneficiarioAreaOperativaId(det.beneficiarioId) ?? (centroId == null ? -1 : (await db.select({ area: centriAscoltoTable.areaOperativaId }).from(centriAscoltoTable).where(eq(centriAscoltoTable.id, centroId)))[0]?.area ?? -1)),
+          centroId == null ? isNull(volontariTable.centroAscoltoId) : volunteerContextFilter(centroId),
           riferimento == null
             ? eq(volontariTable.tipoVolontario, "PERMANENTE")
             : undefined,

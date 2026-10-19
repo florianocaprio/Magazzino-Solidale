@@ -642,6 +642,10 @@ describe("M4A — destinatario Ente e facciata documentale", () => {
     const beneficiarioId = await createBeneficiario(scope, centro.id);
     const permanent = await createVolontario(scope, centro.id);
     const temporary = await createVolontario(scope, centro.id);
+    const otherCentre = await createCentroRec(scope, { areaOperativaId: areaId });
+    const otherReference = await createVolontario(scope, otherCentre.id);
+    const shared = await createVolontario(scope, centro.id);
+    await db.update(volontariTable).set({ centroAscoltoId: null }).where(eq(volontariTable.id, shared));
     await db
       .update(volontariTable)
       .set({ tipoVolontario: "TEMPORANEO" })
@@ -679,6 +683,15 @@ describe("M4A — destinatario Ente e facciata documentale", () => {
       candidates.body.some((item: { id: number }) => item.id === temporary),
     ).toBe(false);
     expect(candidates.body[0]).not.toHaveProperty("telefono");
+    expect(candidates.body.some((item: { id: number }) => item.id === shared)).toBe(true);
+    expect(candidates.body.some((item: { id: number }) => item.id === otherReference)).toBe(false);
+    const denied = await request(warehouseOnly).patch(`/bolle/${created.body.id}`).send({
+      idempotencyKey: commandKey("r2-assign-other-centre"),
+      versione: created.body.versione,
+      volontarioConsegnaId: otherReference,
+      trasportatoreNome: null,
+    });
+    expect(denied.status, denied.text).toBe(403);
     const assigned = await request(warehouseOnly)
       .patch(`/bolle/${created.body.id}`)
       .send({

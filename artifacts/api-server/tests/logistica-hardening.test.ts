@@ -83,6 +83,12 @@ function volunteerInput(overrides: Record<string, unknown> = {}) {
   };
 }
 
+async function createSharedVolunteer(centreId: number) {
+  const id = await createVolontario(scope, centreId);
+  await db.update(volontariTable).set({ centroAscoltoId: null }).where(eq(volontariTable.id, id));
+  return id;
+}
+
 describe("hardening Logistica", () => {
   it("separa permission view e manage lato server", async () => {
     expect(ALL_PERMISSION_KEYS).toEqual(expect.arrayContaining([
@@ -274,7 +280,7 @@ describe("hardening Logistica", () => {
     expect(pendingResult.status).toBe(403);
     expect((await request(app(turniRouter)).put("/turni").send({ centroAscoltoId: centroA.id, data: "2026-09-01", fascia: "Mattina", volontari: [] })).status).toBe(400);
 
-    const volontario = await createVolontario(scope, centroA.id);
+    const volontario = await createSharedVolunteer(centroA.id);
     const first = await request(app(turniRouter)).put("/turni").send({
       centroAscoltoId: centroA.id,
       data: "2026-09-02",
@@ -305,7 +311,7 @@ describe("hardening Logistica", () => {
     const area = await createAreaOperativa(scope);
     const centroA = await createCentroRec(scope, { areaOperativaId: area });
     const centroB = await createCentroRec(scope, { areaOperativaId: area });
-    const volontario = await createVolontario(scope, centroA.id);
+    const volontario = await createSharedVolunteer(centroA.id);
     const payload = (centroAscoltoId: number) => ({ centroAscoltoId, data: "2026-09-03", fascia: "18-20", volontari: [{ volontarioId: volontario }] });
     const responses = await Promise.all([
       request(app(turniRouter)).put("/turni").send(payload(centroA.id)),
@@ -320,8 +326,8 @@ describe("hardening Logistica", () => {
     const centroA = await createCentroRec(scope, { areaOperativaId: area });
     const centroB = await createCentroRec(scope, { areaOperativaId: area });
     const mezzo = await createMezzo(scope, { centroId: null });
-    const volontarioA = await createVolontario(scope, centroA.id);
-    const volontarioB = await createVolontario(scope, centroA.id);
+    const volontarioA = await createSharedVolunteer(centroA.id);
+    const volontarioB = await createSharedVolunteer(centroA.id);
     const responses = await Promise.all([
       request(app(turniRouter)).put("/turni").send({ centroAscoltoId: centroA.id, data: "2026-09-10", fascia: "14-18", mezzoId: mezzo, volontari: [{ volontarioId: volontarioA }] }),
       request(app(turniRouter)).put("/turni").send({ centroAscoltoId: centroB.id, data: "2026-09-10", fascia: "14-18", mezzoId: mezzo, volontari: [{ volontarioId: volontarioB }] }),

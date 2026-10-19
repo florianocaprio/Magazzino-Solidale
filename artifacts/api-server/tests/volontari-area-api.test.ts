@@ -97,7 +97,7 @@ async function create(reference: number | null = null, temporary = false) {
   return response.body.id as number;
 }
 
-it("Area obbligatoria, Centro facoltativo: visibilità, matricola e turni su tutta l’Area", async () => {
+it("Area obbligatoria, Centro facoltativo: visibilità e turni condivisi oppure limitati al riferimento", async () => {
   for (const reference of [null, centreA]) {
     const id = await create(reference);
     const available = await request(app(area))
@@ -107,7 +107,11 @@ it("Area obbligatoria, Centro facoltativo: visibilità, matricola e turni su tut
         stato: "attivi",
         dataRiferimento: todayRome(),
       });
-    expect(available.body.map((v: { id: number }) => v.id)).toContain(id);
+    expect(available.status).toBe(200);
+    expect(available.body.some((v: { id: number }) => v.id === id)).toBe(reference == null);
+    const ownCentre = await request(app(area)).get("/volontari").query({ centroAscoltoId: centreA, stato: "attivi", dataRiferimento: todayRome() });
+    expect(ownCentre.body.map((v: { id: number }) => v.id)).toContain(id);
+    expect((await request(app(area)).get(`/volontari/${id}`)).status).toBe(200);
     const planned = await request(app(area))
       .put("/turni")
       .send({
@@ -116,8 +120,13 @@ it("Area obbligatoria, Centro facoltativo: visibilità, matricola e turni su tut
         fascia: reference == null ? "09-13" : "14-18",
         volontari: [{ volontarioId: id }],
       });
-    expect(planned.status, planned.text).toBe(200);
-    scope.turnoIds.push(planned.body.id);
+    expect(planned.status, planned.text).toBe(reference == null ? 200 : 403);
+    if (planned.status === 200) scope.turnoIds.push(planned.body.id);
+    else {
+      const ownPlan = await request(app(area)).put("/turni").send({ centroAscoltoId: centreA, data: todayRome(), fascia: "14-18", volontari: [{ volontarioId: id }] });
+      expect(ownPlan.status, ownPlan.text).toBe(200);
+      scope.turnoIds.push(ownPlan.body.id);
+    }
     expect((await request(app(otherArea)).get(`/volontari/${id}`)).status).toBe(
       403,
     );
@@ -151,23 +160,23 @@ it("Area obbligatoria, Centro facoltativo: visibilità, matricola e turni su tut
   }
 });
 
-it("temporaneo: la giornata nell’Area non vincola al Centro di riferimento", async () => {
-  const id = await create(centreA, true);
-  const available = await request(app(area))
-    .get("/volontari")
-    .query({
-      centroAscoltoId: centreB,
-      stato: "attivi",
-      dataRiferimento: todayRome(),
-    });
-  expect(available.body.map((v: { id: number }) => v.id)).toContain(id);
-  expect(
-    (
-      await request(app())
-        .post(`/volontari/${id}/giornate`)
-        .send({ dataServizio: "2026-11-01", centroAscoltoId: foreignCentre })
-    ).status,
-  ).toBe(403);
+it("temporaneo: condivide la giornata nell’Area solo se privo di Centro di riferimento", async () => {
+  for (const reference of [null, centreA]) {
+    const id = await create(reference, true);
+    for (const centre of [centreA, centreB]) {
+      const available = await request(app(area)).get("/volontari").query({
+        centroAscoltoId: centre, stato: "attivi", dataRiferimento: todayRome(),
+      });
+      expect(available.status).toBe(200);
+      expect(available.body.some((v: { id: number }) => v.id === id)).toBe(reference == null || centre === reference);
+    }
+    if (reference != null) {
+      expect((await request(app(area)).post(`/volontari/${id}/giornate`)
+        .send({ dataServizio: "2026-11-01", centroAscoltoId: centreB })).status).toBe(403);
+    }
+    expect((await request(app()).post(`/volontari/${id}/giornate`)
+      .send({ dataServizio: "2026-11-01", centroAscoltoId: foreignCentre })).status).toBe(403);
+  }
 });
 
 it("il mezzo personale senza Centro eredita l’Area: disponibile all’interno, protetto dall’esterno", async () => {

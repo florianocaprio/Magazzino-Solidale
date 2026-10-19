@@ -4,7 +4,7 @@ const labels = {
   "it": {
     "referenceCentre": "Centro di riferimento (facoltativo)",
     "noReferenceCentre": "Nessun Centro di riferimento",
-    "areaHelp": "Operativo in tutti i Centri, mense ed empori dell’Area. Il Centro di riferimento non limita l’operatività.",
+    "areaHelp": "Senza Centro di riferimento è visibile in tutti i Centri dell’Area; con un Centro è visibile e selezionabile solo in quello.",
     "areaMissing": "Area da assegnare",
     "cancelShift": "Annulla turno",
     "pending": "Da approvare",
@@ -28,7 +28,7 @@ const labels = {
   "en": {
     "referenceCentre": "Reference Centre (optional)",
     "noReferenceCentre": "No reference Centre",
-    "areaHelp": "Available throughout the Area, including Centres, canteens and emporiums. The reference Centre does not restrict operations.",
+    "areaHelp": "Without a reference Centre, visible in every Centre in the Area; with a Centre, visible and selectable only there.",
     "areaMissing": "Area to assign",
     "cancelShift": "Cancel shift",
     "pending": "Pending approval",
@@ -52,7 +52,7 @@ const labels = {
   "es": {
     "referenceCentre": "Centro de referencia (opcional)",
     "noReferenceCentre": "Sin Centro de referencia",
-    "areaHelp": "Disponible en todos los Centros, comedores y economatos del Área. El Centro de referencia no limita la actividad.",
+    "areaHelp": "Sin Centro de referencia, visible en todos los Centros del Área; con Centro, visible y seleccionable solo allí.",
     "areaMissing": "Área pendiente",
     "cancelShift": "Anular turno",
     "pending": "Pendiente de aprobación",
@@ -76,7 +76,7 @@ const labels = {
   "fr": {
     "referenceCentre": "Centre de référence (facultatif)",
     "noReferenceCentre": "Aucun Centre de référence",
-    "areaHelp": "Disponible dans tous les Centres, cantines et épiceries de la zone. Le Centre de référence ne limite pas l’activité.",
+    "areaHelp": "Sans Centre de référence, visible dans tous les Centres de la zone ; avec un Centre, visible et sélectionnable uniquement dans celui-ci.",
     "areaMissing": "Zone à attribuer",
     "cancelShift": "Annuler le service",
     "pending": "À approuver",
@@ -100,7 +100,7 @@ const labels = {
   "de": {
     "referenceCentre": "Referenzzentrum (optional)",
     "noReferenceCentre": "Kein Referenzzentrum",
-    "areaHelp": "Im gesamten Gebiet in Zentren, Kantinen und Sozialmärkten einsetzbar. Das Referenzzentrum beschränkt den Einsatz nicht.",
+    "areaHelp": "Ohne Referenzzentrum in allen Zentren des Gebiets sichtbar; mit Referenzzentrum nur dort sichtbar und auswählbar.",
     "areaMissing": "Gebiet zuweisen",
     "cancelShift": "Schicht stornieren",
     "pending": "Freigabe ausstehend",
@@ -124,7 +124,7 @@ const labels = {
   "ar": {
     "referenceCentre": "المركز المرجعي (اختياري)",
     "noReferenceCentre": "لا يوجد مركز مرجعي",
-    "areaHelp": "متاح في جميع مراكز ومطاعم ومتاجر المنطقة. لا يقيّد المركز المرجعي نطاق العمل.",
+    "areaHelp": "بدون مركز مرجعي، يظهر في جميع مراكز المنطقة؛ ومع مركز مرجعي، يظهر ويمكن اختياره في ذلك المركز فقط.",
     "areaMissing": "يجب تعيين المنطقة",
     "cancelShift": "إلغاء المناوبة",
     "pending": "بانتظار الموافقة",

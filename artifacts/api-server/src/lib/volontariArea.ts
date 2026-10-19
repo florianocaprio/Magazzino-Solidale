@@ -20,9 +20,10 @@ export function volunteerAreaFilter(areaId: number | null): SQL | undefined {
     : eq(volontariTable.areaOperativaId, areaId);
 }
 
-/** Centre selects the service context, never the volunteer's reference Centre. */
+/** Shared volunteers serve every Centre in their Area; others only their reference Centre. */
 export function volunteerContextFilter(centreId: number): SQL {
-  return sql`${volontariTable.areaOperativaId} = (select area_operativa_id from centri_di_ascolto where id = ${centreId})`;
+  return sql`${volontariTable.areaOperativaId} = (select area_operativa_id from centri_di_ascolto where id = ${centreId})
+    and (${volontariTable.centroAscoltoId} is null or ${volontariTable.centroAscoltoId} = ${centreId})`;
 }
 
 export async function volunteerCallerArea(
@@ -53,7 +54,8 @@ export async function volunteerMatchesCentre(
   row: VolunteerArea,
   centreId: number,
 ): Promise<boolean> {
-  if (row.areaOperativaId == null) return false;
+  if (row.areaOperativaId == null ||
+      (row.centroAscoltoId != null && row.centroAscoltoId !== centreId)) return false;
   const [centre] = await executor
     .select({ area: centriAscoltoTable.areaOperativaId })
     .from(centriAscoltoTable)

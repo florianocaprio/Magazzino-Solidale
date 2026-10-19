@@ -206,7 +206,7 @@ test("il form volontario espone tipologia e giornata temporanea", async ({
   await reference.click();
   await expect(page.getByRole("option", { name: centre.nome, exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
-  await expect(form.getByText(/Operativo in tutti i Centri, mense ed empori/)).toBeVisible();
+  await expect(form.getByText(/Senza Centro di riferimento è visibile in tutti i Centri/)).toBeVisible();
   await form.getByText("Permanente", { exact: true }).click();
   await page.getByRole("option", { name: "Temporaneo", exact: true }).click();
   await expect(form.getByText(/prima giornata di servizio/i)).toBeVisible();

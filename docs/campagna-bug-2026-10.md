@@ -1034,3 +1034,45 @@ resta soggetta ai permessi del profilo, senza grant automatici per mensa o empor
 **UAT personale DA ESEGUIRE**. Consegna 01 resta chiusa; nessun altro prompt,
 ##test, merge, main o produzione avviato. Quattro documenti locali preesistenti
 invariati ed esclusi dai commit.
+
+
+## Precisazione successiva UAT — Centro facoltativo come limite di visibilità
+
+Il 19/10 Floriano specifica: Area obbligatoria, Centro di ascolto facoltativo;
+se assente il volontario è visibile in tutti i Centri della propria Area,
+se presente soltanto nel Centro di riferimento. Questa decisione sostituisce
+la precedente indicazione di operatività senza limiti del Centro di riferimento.
+
+- Confermati Area obbligatoria, Centro della stessa Area facoltativo e
+  generazione matricola dall’Area anche senza Centro.
+- Nei contesti di servizio/filtri Centro: volontari condivisi oppure del
+  riferimento selezionato, sempre entro la propria Area. Controllo server
+  anche per assegnazioni dirette a turni, consegne, mezzi personali e giornate.
+- Picker Bolla e assegnazione diretta applicano lo stesso limite: nessun
+  volontario di altro Centro della stessa Area. Senza Centro del beneficiario,
+  solo volontari condivisi della sua Area, senza attribuire contesti arbitrari.
+- L’anagrafica amministrativa dell’Area resta accessibile ai profili abilitati;
+  il filtro Centro applica il perimetro sopra descritto. Nessuna nuova
+  assegnazione Centro agli account e nessuna modifica ai ruoli di Utenti.
+- Coperture, approvazione, sospensioni, date, conflitti/carico e storico restano
+  invariati; nessuna nuova migration, modifica OpenAPI o rigenerazione tipi.
+
+File modificati in questa precisazione:
+
+- `artifacts/api-server/src/lib/volontariArea.ts`
+- `artifacts/api-server/src/routes/bolle.ts`
+- `artifacts/api-server/tests/volontari-area-api.test.ts`
+- `artifacts/api-server/tests/logistica-hardening.test.ts`
+- `artifacts/api-server/tests/documenti-operativi-m4a.test.ts`
+- `artifacts/magazzino-solidale/src/pages/turni.tsx`
+- `artifacts/magazzino-solidale/src/pages/turni.test.tsx`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/logisticaCampaign.ts`
+- `artifacts/magazzino-solidale/e2e/volontari-workflows.spec.ts`
+- questo registro.
+
+Fixture dei test di concorrenza rese esplicitamente condivise nell’Area;
+le asserzioni su doppie assegnazioni e serializzazione restano vincolanti.
+Matrice API su permanenti/temporanei condivisi e con riferimento, esclusione
+fuori Area, giornata e assegnazione diretta; Bolla verifica picker e rifiuto
+del riferimento diverso; UI Turni verifica il filtro anche su risposta mista.
+Verifiche e ricevuta della nuova 8082 seguono dopo l’esecuzione effettiva.

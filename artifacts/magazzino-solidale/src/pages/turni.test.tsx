@@ -1,13 +1,13 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ user: { areaOperativaId: null as number | null, centroAscoltoId: null as number | null }, queries: [] as Array<Record<string, unknown>>, turns: [] as Array<Record<string, unknown>>, mutate: vi.fn(), invalidate: vi.fn().mockResolvedValue(undefined) }));
+const state = vi.hoisted(() => ({ user: { areaOperativaId: null as number | null, centroAscoltoId: null as number | null }, volunteers: [] as Array<Record<string, unknown>>, queries: [] as Array<Record<string, unknown>>, turns: [] as Array<Record<string, unknown>>, mutate: vi.fn(), invalidate: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@workspace/api-client-react", async (original) => ({
   ...await original<typeof import("@workspace/api-client-react")>(),
   useListAreeOperative: () => ({ data: [{ id: 1, nome: "Roma", attivo: true }, { id: 2, nome: "Milano", attivo: true }] }),
   useListCentriAscolto: () => ({ data: [{ id: 10, nome: "Roma A", areaOperativaId: 1, attivo: true }, { id: 11, nome: "Roma B", areaOperativaId: 1, attivo: true }, { id: 20, nome: "Milano A", areaOperativaId: 2, attivo: true }] }),
   useListRuoliVolontari: () => ({ data: [] }),
-  useListVolontari: (params: Record<string, unknown>) => { state.queries.push(params); return { data: [], isFetching: false, isError: false }; },
+  useListVolontari: (params: Record<string, unknown>) => { state.queries.push(params); return { data: state.volunteers, isFetching: false, isError: false }; },
   useListMezzi: () => ({ data: [], isFetching: false, isError: false }),
   useListTurni: () => ({ data: state.turns, isFetching: false, isError: false }),
   useGetVolontariCarico: () => ({ data: [], isFetching: false, isError: false }),
@@ -39,7 +39,7 @@ async function click(label: string) {
 }
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  vi.clearAllMocks(); state.queries = []; state.turns = []; state.user = { areaOperativaId: null, centroAscoltoId: null };
+  vi.clearAllMocks(); state.queries = []; state.turns = []; state.volunteers = []; state.user = { areaOperativaId: null, centroAscoltoId: null };
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-19T12:00:00+02:00"));
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(<Turni />));
@@ -92,4 +92,19 @@ it("mantiene consultabile e annullabile lo storico senza permettere riassegnazio
   expect(dialog.textContent).not.toContain("turni.save");
   await click("logisticaCampaign.cancelShift");
   expect(state.mutate.mock.calls[0][0].data).toMatchObject({ data: "2026-10-11", versione: 3, volontari: [], mezzoId: null });
+});
+
+it("propone i condivisi e il riferimento locale, escludendo altri Centri e altre Aree", async () => {
+  state.volunteers = [
+    { id: 1, nome: "Condiviso", cognome: "Area", areaOperativaId: 1, centroAscoltoId: null, operativo: true, maxConsegneTurno: 0 },
+    { id: 2, nome: "Locale", cognome: "RomaA", areaOperativaId: 1, centroAscoltoId: 10, operativo: true, maxConsegneTurno: 0 },
+    { id: 3, nome: "AltroCentro", cognome: "RomaB", areaOperativaId: 1, centroAscoltoId: 11, operativo: true, maxConsegneTurno: 0 },
+    { id: 4, nome: "AltraArea", cognome: "Milano", areaOperativaId: 2, centroAscoltoId: null, operativo: true, maxConsegneTurno: 0 },
+  ];
+  await choose(0, "1"); await choose(1, "10"); await click("turni.emptySlot"); await click("turni.addVolontario");
+  const options = document.querySelector('[role="dialog"]')!.querySelector("select")!.textContent;
+  expect(options).toContain("Condiviso");
+  expect(options).toContain("Locale");
+  expect(options).not.toContain("AltroCentro");
+  expect(options).not.toContain("AltraArea");
 });
