@@ -81,7 +81,7 @@ const it = {
   activityDescriptionRequired: "Inserisci la Descrizione.",
   createActivity: "Crea raccolta / attività",
   incomplete: "Da completare",
-  close: "Chiudi carico",
+  close: "Chiudi Carico",
   reopen: "Riapri",
   cancel: "Annulla bozza",
   reason: "Motivo",

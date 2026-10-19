@@ -165,6 +165,7 @@ const labels: Record<string, string> = {
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
+    i18n: { resolvedLanguage: "it", language: "it" },
     t: (key: string, values?: Record<string, string>) => {
       let translated = labels[key] ?? key;
       for (const [name, value] of Object.entries(values ?? {})) {
@@ -358,7 +359,9 @@ describe("Giacenze M1B — Area Operativa → Magazzino", () => {
 
     expect(option("Mag A1")).toBeDefined();
     const inactiveWarehouse = option("Mag A2 — Inattivo");
-    expect(document.querySelector("tbody")?.textContent).toContain("30");
+    expect(document.querySelector("tbody")?.textContent).toContain("30,00");
+    expect(document.querySelector("tbody")?.textContent).toContain("2,00");
+    expect(document.querySelector("tbody")?.textContent).toContain("28,00");
     expect(document.body.textContent).not.toContain("Mag B1");
     expect(document.body.textContent).not.toContain("Legacy");
 

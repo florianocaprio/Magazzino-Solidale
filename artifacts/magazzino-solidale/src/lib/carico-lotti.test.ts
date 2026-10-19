@@ -1,3 +1,4 @@
+import { formatMagazzinoQuantity } from "./magazzino-quantity";
 import { describe, expect, it } from "vitest";
 import type { Lotto } from "@workspace/api-client-react";
 import {
@@ -174,5 +175,43 @@ describe("UX-CARICO-LOTTI — filtri e stato dei lotti fisici", () => {
     expect(canonicalLegacyLottiSearch("?tab=scadenza")).toBe(
       "/carico-merce?tab=lotti&inScadenza=true",
     );
+  });
+});
+
+describe("BUG04 — quantità di consultazione del Magazzino", () => {
+  it.each([
+    ["80.000000", "80,00"],
+    ["20", "20,00"],
+    [0, "0,00"],
+    ["1.005000", "1,01"],
+    ["99999999.999999", "100.000.000,00"],
+    ["0.000001", "0,00"],
+    [null, "—"],
+    [undefined, "—"],
+  ])("mostra %s a due decimali senza alterare il valore", (raw, expected) => {
+    expect(formatMagazzinoQuantity(raw, "it")).toBe(expected);
+  });
+  it("rispetta locale, valori mancanti e testo non numerico", () => {
+    expect(formatMagazzinoQuantity("1234.5", "en")).toBe("1,234.50");
+    expect(formatMagazzinoQuantity("1234.5", "de")).toBe("1.234,50");
+    expect(formatMagazzinoQuantity(null, "it", "")).toBe("");
+    expect(formatMagazzinoQuantity("non disponibile", "it")).toBe(
+      "non disponibile",
+    );
+  });
+  it("il testo 0,00 non cambia stato e disponibilità di un residuo positivo minimo", () => {
+    const tiny = lot({
+      quantitaResiduaPrecisa: "0.000001",
+      disponibileRealePrecisa: "0.000001",
+      dataScadenza: null,
+    });
+    expect(formatMagazzinoQuantity(tiny.quantitaResiduaPrecisa, "it")).toBe(
+      "0,00",
+    );
+    expect(physicalLotState(tiny, "2026-10-20")).toBe("available");
+    expect(
+      filterPhysicalLots([tiny], { ...filters, status: "available" }),
+    ).toHaveLength(1);
+    expect(tiny.quantitaResiduaPrecisa).toBe("0.000001");
   });
 });

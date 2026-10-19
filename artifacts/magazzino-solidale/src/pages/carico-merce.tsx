@@ -1,3 +1,5 @@
+import i18nInstance from "@/lib/i18n";
+import { registerBlocco05 } from "@/lib/i18n/namespaces/blocco05";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -45,6 +47,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { formatMagazzinoQuantity } from "@/lib/magazzino-quantity";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -79,6 +90,7 @@ import {
 import {
   blocksCaricoDraftSave,
   caricoDraftFromRow,
+  caricoStatusBadgeClass,
   isCaricoRowDraftDirty,
   newCommandKey,
   normalizeUiQuantity,
@@ -101,6 +113,8 @@ import {
   Plus,
   Save,
 } from "lucide-react";
+
+registerBlocco05(i18nInstance);
 
 const ORIGINS: OrigineCaricoManuale[] = [
   "DONAZIONE",
@@ -177,7 +191,7 @@ function rowIssueKey(field: CaricoRowField, issue: CaricoRowIssue): string {
 }
 
 function CarichiContent() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const { hasPermission } = useAuth();
   const canReceive = hasPermission("magazzino.stock.receive");
@@ -195,6 +209,16 @@ function CarichiContent() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [productSearch, setProductSearch] = useState("");
+  const [productPanelOpen, setProductPanelOpen] = useState(false);
+  const [panelFocusReleased, setPanelFocusReleased] = useState(true);
+  const [addedProductName, setAddedProductName] = useState("");
+  const [rowToReveal, setRowToReveal] = useState<{
+    practiceId: number;
+    rowId: number;
+  } | null>(null);
+  const productSearchInput = useRef<HTMLInputElement>(null);
+  const addProductsButton = useRef<HTMLButtonElement>(null);
+  const addingProduct = useRef(false);
   const [rowDrafts, setRowDrafts] = useState<Record<number, CaricoRowDraft>>(
     {},
   );
@@ -364,6 +388,9 @@ function CarichiContent() {
       setRowErrors({});
       setRowSavedIncomplete(new Set());
       setFocusRowField(null);
+      setProductPanelOpen(false);
+      setRowToReveal(null);
+      setAddedProductName("");
       setHeaderAttempted(false);
       setHeaderError(null);
       setSectionError(null);
@@ -473,7 +500,16 @@ function CarichiContent() {
                 : null;
 
   useEffect(() => {
-    if (pending || !focusRowField) return;
+    if (
+      pending ||
+      !focusRowField ||
+      productPanelOpen ||
+      !panelFocusReleased ||
+      confirmRegister ||
+      fseImportOpen ||
+      activityOpen
+    )
+      return;
     const handle = requestAnimationFrame(() => {
       const suffix = {
         quantita: "quantity",
@@ -490,7 +526,51 @@ function CarichiContent() {
       setFocusRowField(null);
     });
     return () => cancelAnimationFrame(handle);
-  }, [focusRowField, pending, practice]);
+  }, [
+    focusRowField,
+    pending,
+    practice,
+    productPanelOpen,
+    panelFocusReleased,
+    confirmRegister,
+    fseImportOpen,
+    activityOpen,
+  ]);
+
+  useEffect(() => {
+    if (
+      !rowToReveal ||
+      productPanelOpen ||
+      !panelFocusReleased ||
+      pending ||
+      confirmRegister ||
+      fseImportOpen ||
+      activityOpen ||
+      unsavedGuard.dialogOpen ||
+      practice?.id !== rowToReveal.practiceId
+    )
+      return;
+    const frame = requestAnimationFrame(() => {
+      const input = document.getElementById(
+        `carico-quantity-${rowToReveal.rowId}`,
+      );
+      if (!(input instanceof HTMLInputElement) || input.disabled) return;
+      input.closest("[data-testid]")?.scrollIntoView({ block: "center" });
+      input.focus({ preventScroll: true });
+      setRowToReveal(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [
+    rowToReveal,
+    productPanelOpen,
+    panelFocusReleased,
+    pending,
+    practice,
+    confirmRegister,
+    fseImportOpen,
+    activityOpen,
+    unsavedGuard.dialogOpen,
+  ]);
 
   const updateDetailCache = (value: CaricoPraticaDettaglio) => {
     queryClient.setQueryData(getGetCaricoPraticaQueryKey(value.id), value);
@@ -577,7 +657,9 @@ function CarichiContent() {
   };
 
   const addProduct = async (productId: number) => {
-    if (!practice || pending) return;
+    if (!practice || pending || !canEditManual || addingProduct.current) return;
+    addingProduct.current = true;
+    const clientId = crypto.randomUUID();
     try {
       const updated = await addRowMutation.mutateAsync({
         id: practice.id,
@@ -586,15 +668,21 @@ function CarichiContent() {
           prodottoId: productId,
           fondoOrigine: "NESSUN_FONDO",
           quantita: null,
-          clientId: crypto.randomUUID(),
+          clientId,
         },
       });
       updateDetailCache(updated);
-      setProductSearch("");
-      setSectionError(null);
+      const added = updated.righe.find((row) => row.clientId === clientId);
+      setAddedProductName(added?.prodottoNome ?? "");
+      setRowToReveal(
+        added ? { practiceId: updated.id, rowId: added.id } : null,
+      );
+      setSectionError(added ? null : t("blocco05.rowNotFound"));
     } catch (error) {
       setSectionError(errorMessage(error, t("caricoPratiche.error")));
       showError(error);
+    } finally {
+      addingProduct.current = false;
     }
   };
 
@@ -799,6 +887,10 @@ function CarichiContent() {
     unsavedGuard.requestClose(() => {
       setSelectedId(null);
       setCreating(false);
+      previousPractice.current = null;
+      setRowDrafts({});
+      setRowToReveal(null);
+      setProductPanelOpen(false);
       setDirty(false);
       setHeaderAttempted(false);
       setHeaderError(null);
@@ -947,7 +1039,10 @@ function CarichiContent() {
                 <div>
                   <div className="flex items-center gap-2">
                     <strong>{item.codice}</strong>
-                    <Badge variant="outline">
+                    <Badge
+                      variant="outline"
+                      className={caricoStatusBadgeClass(item.stato)}
+                    >
                       {statusLabel(t, item.stato)}
                     </Badge>
                   </div>
@@ -988,7 +1083,12 @@ function CarichiContent() {
         {practice && (
           <div className="flex flex-wrap items-center gap-2">
             <strong>{practice.codice}</strong>
-            <Badge>{statusLabel(t, practice.stato)}</Badge>
+            <Badge
+              variant="outline"
+              className={caricoStatusBadgeClass(practice.stato)}
+            >
+              {statusLabel(t, practice.stato)}
+            </Badge>
             {canOpenFseImport && (
               <Button
                 variant="outline"
@@ -1351,7 +1451,9 @@ function CarichiContent() {
                   )
                   .map((supplier) => (
                     <SelectItem key={supplier.id} value={String(supplier.id)}>
-                      {supplier.nome}{supplier.areaOperativaId == null && ` · ${t("fornitori.global")}`}
+                      {supplier.nome}
+                      {supplier.areaOperativaId == null &&
+                        ` · ${t("fornitori.global")}`}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -1407,25 +1509,43 @@ function CarichiContent() {
       </Card>
 
       {practice && canEditManual && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("caricoPratiche.addProduct")}</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              {t("uxCaricoLotti.lotLegend")}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <Sheet
+          open={productPanelOpen}
+          onOpenChange={(open) => {
+            setProductPanelOpen(open);
+            if (open) setPanelFocusReleased(false);
+          }}
+        >
+          <SheetContent
+            className="flex w-full flex-col gap-4 sm:max-w-lg"
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              productSearchInput.current?.focus();
+            }}
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              setPanelFocusReleased(true);
+              if (!rowToReveal) addProductsButton.current?.focus();
+            }}
+          >
+            <SheetHeader className="pe-8">
+              <SheetTitle>{t("caricoPratiche.addProduct")}</SheetTitle>
+              <SheetDescription>
+                {t("uxCaricoLotti.lotLegend")}
+              </SheetDescription>
+            </SheetHeader>
             {sectionError && (
               <Alert variant="destructive">
                 <AlertDescription>{sectionError}</AlertDescription>
               </Alert>
             )}
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input
-                aria-label={t("caricoPratiche.productSearch")}
+                ref={productSearchInput}
+                aria-label={t("blocco05.searchProducts")}
                 value={productSearch}
                 onChange={(event) => setProductSearch(event.target.value)}
-                placeholder={t("caricoPratiche.productSearch")}
+                placeholder={t("blocco05.searchProducts")}
               />
               <BarcodeScannerButton
                 onScan={scanProduct}
@@ -1434,7 +1554,7 @@ function CarichiContent() {
                 label={t("caricoPratiche.scan")}
               />
             </div>
-            <ScrollArea className="h-48 rounded-md border p-2">
+            <ScrollArea className="min-h-0 flex-1 rounded-md border p-2">
               <div className="grid gap-1">
                 {productChoices.map((product) => (
                   <Button
@@ -1464,8 +1584,18 @@ function CarichiContent() {
                 </p>
               )}
             </ScrollArea>
-          </CardContent>
-        </Card>
+            {addedProductName && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {t("blocco05.productAdded", { name: addedProductName })}
+              </p>
+            )}
+            <SheetClose asChild>
+              <Button type="button" variant="outline">
+                {t("blocco05.closePanel")}
+              </Button>
+            </SheetClose>
+          </SheetContent>
+        </Sheet>
       )}
 
       {practice && (
@@ -1835,14 +1965,14 @@ function CarichiContent() {
                       }
                       onClick={() => void saveRow(row)}
                     >
-                      {t("caricoPratiche.saveDraft")}
+                      {t("blocco05.insertProduct")}
                     </Button>
                     <Button
                       variant="ghost"
                       disabled={pending || !canRemoveRow}
                       onClick={() => void removeRow(row)}
                     >
-                      {t("caricoPratiche.removeRow")}
+                      {t("blocco05.removeProduct")}
                     </Button>
                   </div>
                   {!draft.quantita && (
@@ -1900,18 +2030,36 @@ function CarichiContent() {
                 )}
               </Alert>
             )}
-            <Button
-              aria-describedby={
-                registrationBlockReason ? "carico-register-reason" : undefined
-              }
-              disabled={Boolean(registrationBlockReason)}
-              onClick={() => setConfirmRegister(true)}
-            >
-              {registerMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                aria-describedby={
+                  registrationBlockReason ? "carico-register-reason" : undefined
+                }
+                disabled={Boolean(registrationBlockReason)}
+                onClick={() => setConfirmRegister(true)}
+              >
+                {registerMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {t("caricoPratiche.register")}
+              </Button>
+              {canEditManual && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  ref={addProductsButton}
+                  disabled={pending}
+                  onClick={() => {
+                    setPanelFocusReleased(false);
+                    setAddedProductName("");
+                    setProductPanelOpen(true);
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t("blocco05.addMore")}
+                </Button>
               )}
-              {t("caricoPratiche.register")}
-            </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1937,7 +2085,11 @@ function CarichiContent() {
                   </span>
                 </span>
                 <Badge>
-                  {row.quantita} {row.unitaMisura}
+                  {formatMagazzinoQuantity(
+                    row.quantita,
+                    i18n.resolvedLanguage ?? i18n.language,
+                  )}{" "}
+                  {row.unitaMisura}
                 </Badge>
               </div>
             ))}
@@ -1971,11 +2123,20 @@ function CarichiContent() {
         <div className="flex flex-wrap gap-2">
           {practice.stato === "aperta" && (
             <Button
-              variant="outline"
+              className="bg-emerald-700 text-white hover:bg-emerald-800"
               disabled={pending || pendingRows.length > 0}
               onClick={() => void lifecycle("close")}
             >
               {t("caricoPratiche.close")}
+            </Button>
+          )}
+          {practice.stato === "aperta" && canReceive && (
+            <Button
+              className="bg-violet-700 text-white hover:bg-violet-800"
+              disabled={pending}
+              onClick={leaveDetail}
+            >
+              {t("blocco05.suspend")}
             </Button>
           )}
           {practice.stato === "chiusa" && (
@@ -1996,11 +2157,6 @@ function CarichiContent() {
               {t("caricoPratiche.cancel")}
             </Button>
           )}
-          <Button asChild variant="ghost">
-            <Link href="/carico-merce?tab=lotti">
-              {t("uxCaricoLotti.tabLotti")}
-            </Link>
-          </Button>
         </div>
       )}
 
@@ -2034,7 +2190,12 @@ function CarichiContent() {
               {selectedPendingRows.map((row) => (
                 <li key={row.id}>
                   {row.prodottoNome}:{" "}
-                  {rowDrafts[row.id]?.quantita ?? row.quantita}{" "}
+                  {formatMagazzinoQuantity(
+                    normalizeUiQuantity(
+                      rowDrafts[row.id]?.quantita ?? row.quantita ?? "",
+                    ),
+                    i18n.resolvedLanguage ?? i18n.language,
+                  )}{" "}
                   {row.unitaMisura}
                 </li>
               ))}

@@ -74,6 +74,7 @@ export function BarcodeScannerButton({
   // its video is actually available, rather than relying on effect timing.
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const onScanRef = useRef(onScan);
 
   useEffect(() => {
@@ -145,6 +146,7 @@ export function BarcodeScannerButton({
   return (
     <>
       <Button
+        ref={triggerRef}
         type="button"
         variant={variant}
         size={withLabel ? "default" : "icon"}
@@ -162,7 +164,14 @@ export function BarcodeScannerButton({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent
+          className="sm:max-w-md"
+          onCloseAutoFocus={(event) => {
+            if (!triggerRef.current || triggerRef.current.disabled) return;
+            event.preventDefault();
+            triggerRef.current.focus();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{t("barcodeScanner.title")}</DialogTitle>
             <DialogDescription>{t("barcodeScanner.hint")}</DialogDescription>

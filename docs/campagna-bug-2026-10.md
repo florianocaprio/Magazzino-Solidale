@@ -1,6 +1,6 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-19 ottobre 2026, Europe/Rome. **Consegne 01, 02 e checkpoint 03 chiusi con OK di Floriano; consegna 04 e addendum BUG 21 installati e verificati sulla 8082; UAT del blocco C da eseguire; correttivo tessera/codici beneficiari installato sulla 8082 (`6088327`).**
+20 ottobre 2026, Europe/Rome. **Consegne 01–04 chiuse con OK di Floriano, compreso il correttivo tessera/codici beneficiari `6088327`; consegna 05 (blocco D) verificata automaticamente; preparazione 8082 in corso.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
@@ -101,33 +101,32 @@ Nessuna decisione residua blocca l'avvio del prompt 01.
 
 ## Registro dei BUG
 
-Il BUG 01 è **CHIUSO CON OK UAT DI FLORIANO**; BUG 02/03/15 sono CHIUSI con OK UAT di Floriano; il checkpoint 03 è approvato da Floriano e la regressione integrata del BUG 17 resta nella UAT 04. Le UAT successive sono **DA ESEGUIRE** e non derivano
-dai test automatici. Il candidato iniziale non è un candidato verificato della
-campagna. Il punto D03 è un raccordo da verificare nel blocco D.
+I BUG dei blocchi A–C, incluso 21 e regressione 17, sono **CHIUSI CON OK UAT DI FLORIANO**. Il 20/10 Floriano conferma che il punto 04 funziona sulla 8082 e autorizza lo sviluppo 05 e la successiva ricompilazione/installazione personale. Le UAT successive restano DA ESEGUIRE.
+I test automatici non sostituiscono la UAT personale. D03 mantiene il comportamento delle pratiche Aperte: salvataggi espliciti, errori sul form e protezione dall’abbandono.
 
 | BUG | Blocco | Prompt | Stato                     | Requisiti sospesi                                              | Commit           | Automatico                      | UAT         | Ultimo candidato verificato              |
 | --- | ------ | ------ | ------------------------- | -------------------------------------------------------------- | ---------------- | ------------------------------- | ----------- | ---------------------------------------- |
 | 01 | A | 01 | CHIUSO; UAT OK | Nessuno; D01 approvata | 7d70906 | PASS; 4 skip esterni dichiarati nel blocco precedente | OK Floriano 19/10 | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 |
 | 02  | B      | 02     | CHIUSO; UAT OK | Nessuno; D01 approvata                                         | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 03  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
-| 04  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 05 | C | 04 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; D02 confermata per BUG 07 | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
-| 06 | C | 04 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; D02 confermata per BUG 07 | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
-| 07 | C | 04 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; D02 confermata per BUG 07 | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
-| 08 | C | 04 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; D02 confermata per BUG 07 | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
-| 09 | C | 04 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; D02 confermata per BUG 07 | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
-| 10  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 11  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 12  | D      | 05     | DA SVILUPPARE             | Raccordo D03 con le attuali pratiche Aperte                    | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 13  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 14  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
+| 04  | D      | 05     | PRONTO PER UAT | Nessuno | checkpoint 05; vedi ricevuta | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
+| 05 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
+| 06 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
+| 07 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
+| 08 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
+| 09 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
+| 10  | D      | 05     | PRONTO PER UAT | Nessuno | checkpoint 05; vedi ricevuta | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
+| 11  | D      | 05     | PRONTO PER UAT | Nessuno | checkpoint 05; vedi ricevuta | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
+| 12  | D      | 05     | PRONTO PER UAT | Nessuno; precisazione D03 applicata | checkpoint 05; vedi ricevuta | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
+| 13  | D      | 05     | PRONTO PER UAT | Nessuno | checkpoint 05; vedi ricevuta | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
+| 14  | D      | 05     | PRONTO PER UAT | Nessuno | checkpoint 05; vedi ricevuta | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
 | 15  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
-| 16  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 17 | C | 03, 04 | CHECKPOINT 03 APPROVATO; REGRESSIONE 04 | Nessuno; Enti e Fornitori locali/globali; UAT dopo 04 | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 | PASS mirati; skip dichiarati nella ricevuta | DA ESEGUIRE dopo 04 | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 |
+| 16  | D      | 05     | PRONTO PER UAT | Nessuno | checkpoint 05; vedi ricevuta | PASS mirati; 4 skip esterni | DA ESEGUIRE | —                                        |
+| 17 | C | 03, 04 | CHIUSO; UAT OK | Nessuno; Enti e Fornitori locali/globali verificati | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; skip dichiarati nella ricevuta | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 19  | E      | 07     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 20  | F      | 08     | DA SVILUPPARE             | Nessuno; conservare UX20-01–14                                 | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 21 | C | 04 + addendum 2.2 | PRONTO PER UAT; INSTALLATO 8082 | Un solo ID con stati, territorio, tessera e Zona UDS | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | DA ESEGUIRE | — |
+| 21 | C | 04 + addendum 2.2 | CHIUSO; UAT OK | Un solo ID con stati, territorio, tessera e Zona UDS | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 
 ## Otto consegne
 
@@ -141,8 +140,8 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | 01 | A: 01 | Funzionale | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 | PASS; ultimi controlli 737 UI e 76 API core | Installata e verificata | CHIUSA; OK UAT Floriano 19/10 |
 | 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | CHIUSA; OK UAT Floriano 19/10 |
 | 03 | C: 17, prima parte | Tecnica | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 | PASS: 1.521 API + 4 skip; 756 UI; 9 browser + 36 skip di matrice; build/budget | Installata, asset HTTP verificati; ledger 60/60 | CHIUSO; OK Floriano; regressione integrata nel 04 |
-| 04 | C: 05–09, 21 e regressione 17 | Funzionale | 5efbe5eeed7343cbe7f286821a3d6ffeaed57873 | PASS mirati; evidenze sotto | Installata; asset HTTP verificati; ledger 60/60 | UAT DA ESEGUIRE |
-| 05       | D: 04, 10–14, 16              | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
+| 04 | C: 05–09, 21 e regressione 17 | Funzionale | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS; correttivo e ricevuta sotto | Installata; hash HTTP e ledger 61/61 verificati | OK UAT Floriano 20/10 |
+| 05       | D: 04, 10–14, 16              | Funzionale      | checkpoint 05; vedi ricevuta | PASS mirati; evidenze sotto | Non installata                | UAT DA ESEGUIRE                             |
 | 06       | E: 18, modello e integrazioni | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
 | 07       | E: 18 UI, 19                  | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 08       | F: 20 e gate finali           | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
@@ -2019,3 +2018,141 @@ rinumerazione massiva dei beneficiari preesistenti eseguita o richiesta.
 
 Il successivo commit della ricevuta è solo documentale. Resta in attesa
 l'OK UAT di Floriano per passare al prompt 05.
+
+## Consegna 05 — blocco D, Carico Merce e dettagli Magazzino, 20 ottobre 2026
+
+Floriano conferma sulla 8082 la chiusura della consegna 04, compreso il
+correttivo tessera/codici `6088327`, e incarica il prompt 05 chiedendo
+espressamente di ricompilare la 8082. Questa richiesta diretta autorizza la
+preparazione personale dopo i controlli, anche se il file 05 la rinvia a un
+successivo `##test`. UAT 05 ancora da eseguire da Floriano; nessuna attivazione
+06, merge, main, produzione o ampliamento dei permessi.
+
+- **BUG 04:** `formatMagazzinoQuantity` arrotonda il solo testo a due decimali
+  esatti, in locale corrente e senza aritmetica floating point sulle stringhe
+  decimali. Applicato ai quattro valori dei Lotti fisici, residui delle Raccolte,
+  storico carichi, righe registrate/riepilogo della conferma e Giacenze. Mancanti
+  e zero distinti; scorta minima assente conserva la cella vuota. Export numerici,
+  input, quantità canoniche, precisione 6/9 e criteri di disponibilità invariati.
+  Il caso positivo `0.000001` resta disponibile anche se mostrato `0,00`.
+- **BUG 10:** soltanto la riga usa **Inserisci Prodotto** e **Rimuovi Prodotto**,
+  con chiavi distinte nelle sei lingue. La testata mantiene **Salva bozza**.
+  Conservati salvataggio incompleto, rifiuto di valori malformati/negativi,
+  selezione delle sole righe complete e immutabilità delle righe registrate.
+- **BUG 11/14:** un solo Sheet contiene il selettore esistente, ricerca per
+  nome/codice/barcode, prodotti attivi, scanner e requisiti lotto. **Inserire
+  altri prodotti**, accanto a Conferma, dipende da `canEditManual` e operazioni
+  in corso, non da selezione o motivo del blocco inventariale. Funziona in Bozza,
+  Aperta, dopo conferma e ripresa; restrizioni AGEA/SALDO e stati terminali
+  conservate. Un solo handler per click/scansioni, guardia contro doppio invio,
+  nuova riga identificata tramite `clientId` già nel contratto tipizzato.
+  Il focus resta nel pannello/scanner; alla chiusura, dopo rendering e rilascio
+  del focus modale, viene mostrata la quantità della nuova riga. Il riferimento
+  viene consumato: i refetch non provocano nuovi salti. Draft, versioni e
+  riconciliazione cache conservati. Chiusura del pannello esplicita e tradotta.
+- **BUG 12 / D03:** **Chiudi Carico** verde e **Sospendi Carico** viola; eliminato
+  il solo link Lotti dal footer, mantenuti tab e navigazione. Sospendi esiste
+  soltanto per Aperta e richiama il ritorno protetto già usato dalle pratiche,
+  senza comandi API né cambi di stato. Applicata la precisazione di Floriano
+  «Si deve comportare come avviene adesso con le pratiche Aperte. Se il
+  salvataggio fallisce si resta sul form»: salvataggi espliciti e dialogo per
+  modifiche non salvate; nessun nuovo autosalvataggio o scarto implicito. Resta
+  conserva i valori; lo scarto avviene solo con la scelta esplicita del dialogo.
+  Un salvataggio fallito conserva il form e il draft. Chiudi resta il comando
+  esistente, impedito con pendenti e senza un'ulteriore contabilizzazione.
+- **BUG 13:** unica mappatura di presentazione per lista/intestazione: Bozza
+  neutra, Aperta blu, Chiusa verde, Annullata rossa, con testo tradotto e colori
+  per entrambi i temi. Stati DB e altri domini invariati.
+- **BUG 16:** Prodotto/Quantità si adattano alla larghezza, Aggiungi occupa una
+  riga intera e mantiene dimensioni utilizzabili. Menu prodotti confinato al
+  trigger e allo spazio verticale disponibile, con nomi lunghi a capo.
+  Conservati addRiga, validazione, esclusione dei prodotti presenti e bozza.
+
+Adeguamento minimo dello scanner condiviso: riferimento al pulsante di apertura
+per ripristinare il focus alla chiusura del dialogo, necessario quando lo scanner
+è nel nuovo pannello. Decodifica, errori, stop della fotocamera e deduplicazione
+conservati. Traduzioni `caricoPratiche` caricate assieme alla pagina (unico
+consumatore di runtime con i suoi componenti), con registrazione preventiva
+nelle sei lingue; nuove etichette nella risorsa lazy `blocco05`. Nessuna API,
+OpenAPI, tipo generato, migration, dipendenza o lockfile modificati.
+
+### Prove UAT 05 sulla 8082
+
+1. Creare una pratica manuale su un prodotto di prova con stock iniziale zero.
+   Aggiungere una riga dal pannello, quantità 80, **Inserisci Prodotto**: deve
+   salvare la riga senza caricare stock. La testata mantiene **Salva bozza**.
+2. **Conferma carico** una volta: stato **Aperta** blu, stock 80, righe registrate
+   senza azioni di modifica/rimozione. Quantità consultive mostrate come `80,00`.
+3. **Sospendi Carico**: ritorno all'elenco, pratica ancora Aperta e stock 80.
+   Con valori locali non salvati, verificare il dialogo e **Resta e continua**;
+   salvare esplicitamente prima di uscire. Se il salvataggio fallisce, restano
+   form e valori digitati: non viene registrata merce.
+4. Riprendere la pratica, usare **Inserire altri prodotti** accanto a Conferma,
+   aggiungere 20 e salvare la riga: stock ancora 80. Confermare solo la nuova
+   riga: stock finale 100, prima riga invariata e nessuna duplicazione degli 80.
+5. Con righe pendenti, **Chiudi Carico** deve essere disabilitato. Senza pendenti,
+   Chiudi verde porta a **Chiusa** verde, stock ancora 100. Nessuna aggiunta in
+   Chiusa senza il comando distinto e motivato di riapertura.
+6. Verificare due decimali in Lotti fisici, Raccolte e Giacenze; il tab Lotti
+   rimane disponibile. In Approvvigionamenti, da pannello stretto/tablet,
+   scegliere un nome prodotto lungo, quantità, Aggiungi e salvare la bozza:
+   pulsante interamente visibile e prodotto non più nella lista dei disponibili.
+
+### File modificati nella consegna 05
+
+- `artifacts/magazzino-solidale/e2e/carico-lotti-formal.spec.ts`
+- `artifacts/magazzino-solidale/e2e/carico-pratiche-m3a.spec.ts`
+- `artifacts/magazzino-solidale/e2e/carico-ux-01.spec.ts`
+- `artifacts/magazzino-solidale/src/components/barcode-scanner-button.tsx`
+- `artifacts/magazzino-solidale/src/components/carico-merce-tabs.test.tsx`
+- `artifacts/magazzino-solidale/src/components/carico-merce-tabs.tsx`
+- `artifacts/magazzino-solidale/src/components/giacenze-m1b.test.tsx`
+- `artifacts/magazzino-solidale/src/lib/carico-lotti.test.ts`
+- `artifacts/magazzino-solidale/src/lib/carico-merce.test.ts`
+- `artifacts/magazzino-solidale/src/lib/carico-merce.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/index.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/approvvigionamenti.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/blocco05.ts`
+- `artifacts/magazzino-solidale/src/lib/i18n/namespaces/caricoPratiche.ts`
+- `artifacts/magazzino-solidale/src/lib/magazzino-quantity.ts`
+- `artifacts/magazzino-solidale/src/pages/approvvigionamenti.tsx`
+- `artifacts/magazzino-solidale/src/pages/carico-merce.tsx`
+- `artifacts/magazzino-solidale/src/pages/giacenze.tsx`
+- `docs/campagna-bug-2026-10.md`
+
+### Verifiche tecniche 05
+
+- `pnpm install --frozen-lockfile`: PASS. `pnpm run typecheck`: PASS sul codice
+  finale. Nessun package/lockfile aggiornato.
+- UI finale: **781 PASS / 121 file** (`/private/tmp/blocco05-ui-last.log`).
+  Inclusi formatter, quattro valori renderizzati, mancanti/zero, residuo minimo
+  positivo, locale, stati, draft dopo aggiunta/salvataggio e registrazione lazy
+  delle traduzioni nelle sei lingue. Conservate le prove di precisione contabile.
+- API via runner canonico, gruppo general ricavato da `plan`: **1.528 PASS +
+  4 SKIP esterni**. Compresi `carico-pratiche-m3a` (11),
+  `carichi-magazzino-2-0a` (22), `inventory-decimal-2-0a` (7) e
+  Approvvigionamenti. Quattro SKIP per originali AGEA/SIFEAD/FSE esterni non
+  disponibili, stessi casi già dichiarati nelle consegne precedenti. Evidenze
+  `/private/tmp/blocco05-api-1`; backend e database schema non modificati.
+- Browser: **22 PASS + 13 SKIP** intenzionali della matrice viewport. Lotti (10)
+  e tab (5) in `/private/tmp/blocco05-browser-1`; ciclo M3A (2) ripetuto dopo la
+  correzione del focus in `/private/tmp/blocco05-browser-2`; UX/pannello stretto
+  (5) finale in `/private/tmp/blocco05-browser-3`. Nessun retry o test indebolito.
+  Scenario sintetico 80+20, due sessioni/versione obsoleta, stato Aperta,
+  sospensione senza POST/PATCH, guardia sui draft, salvataggio fallito con valore
+  conservato, stock finale 100, prime righe intatte, chiusura senza nuovo stock.
+  Testati errore/scambio focus scanner nel pannello, aggiunta fallita, ricerca
+  conservata e A preservata mentre si salva B. Approvvigionamenti: pulsante
+  entro i bordi e almeno 44 px, nome lungo selezionabile, esclusione già aggiunto
+  e salvataggio bozza reale su mobile 390 e tablet 820.
+- Le prove iniziali UX hanno rilevato focus non ripristinato dal dialogo scanner
+  e menu prodotto fuori schermo. Corretti il riferimento al trigger e i limiti
+  di larghezza/altezza del solo menu coinvolto: il vecchio valore CSS
+  `max-height:--radix-select-content-available-height` non era valido; il limite
+  contestuale usa `var(...)`. Ripetuta integralmente la suite UX fino al PASS.
+- Build WEB e `build:budget`: PASS; entry `index-uBdnyoiF.js`, **386,5/400 KiB
+  gzip**, limite invariato. Un primo budget 400,1 è stato risolto caricando le
+  traduzioni del Carico con la pagina, senza eliminarle o aumentare soglie.
+- Tutti i test API/browser su PostgreSQL temporanei attestati dal runner, lock
+  condiviso rispettato e ambienti rimossi. Nessun test mutativo sulla 8082.
+  Quattro documenti preesistenti confrontati per SHA-256 e preservati fuori Git.

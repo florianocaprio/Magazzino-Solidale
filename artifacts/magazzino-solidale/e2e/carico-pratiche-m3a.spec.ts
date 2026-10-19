@@ -156,18 +156,25 @@ test.describe("M3A — pratica di carico persistente", () => {
     await resumedPage.goto("/carico-merce");
     await openPracticeFromList(resumedPage, area, description);
     await resumedPage
-      .getByLabel(/cerca per nome o codice/i)
+      .getByRole("button", { name: "Inserire altri prodotti" })
+      .click();
+    await resumedPage
+      .getByLabel(/cerca per nome, codice o barcode/i)
       .fill(product.codice);
     await resumedPage
       .getByRole("button", { name: new RegExp(product.codice, "i") })
       .click();
+    await resumedPage
+      .getByRole("button", { name: "Chiudi pannello", exact: true })
+      .click();
+    await expect(resumedPage.getByLabel(/quantità/i)).toBeFocused();
     await resumedPage.getByLabel(/quantità/i).fill("80");
     await expect(resumedPage.getByRole("checkbox")).toBeEnabled();
     await expect(
       resumedPage.getByRole("button", { name: /conferma carico a magazzino/i }),
     ).toBeDisabled();
     await resumedPage
-      .getByRole("button", { name: /salva bozza/i })
+      .getByRole("button", { name: "Inserisci Prodotto", exact: true })
       .last()
       .click();
     await expect(resumedPage.getByRole("checkbox")).toBeChecked();
@@ -185,21 +192,82 @@ test.describe("M3A — pratica di carico persistente", () => {
       .click();
     expect((await firstRegistrationResponse).status()).toBe(201);
     await expect(
-      resumedPage.getByText(`80.00 ${product.unitaMisura}`, { exact: true }),
+      resumedPage.getByText(`80,00 ${product.unitaMisura}`, { exact: true }),
     ).toBeVisible();
+    expect(await readStock(resumedPage)).toBe(before + 80);
+    const suspendWrites: string[] = [];
+    const recordSuspend = (request: import("@playwright/test").Request) => {
+      if (
+        /carico-pratiche/.test(request.url()) &&
+        !["GET", "HEAD"].includes(request.method())
+      )
+        suspendWrites.push(request.url());
+    };
+    resumedPage.on("request", recordSuspend);
+    await expect(
+      resumedPage.getByRole("button", { name: "Sospendi Carico" }),
+    ).toHaveClass(/bg-violet-700/);
+    await resumedPage.getByRole("button", { name: "Sospendi Carico" }).click();
+    await expect(
+      resumedPage.getByRole("button", { name: /nuova pratica/i }),
+    ).toBeVisible();
+    resumedPage.off("request", recordSuspend);
+    expect(suspendWrites).toEqual([]);
     expect(await readStock(resumedPage)).toBe(before + 80);
 
     await resumedPage.reload();
     await openPracticeFromList(resumedPage, area, description);
     await resumedPage
-      .getByLabel(/cerca per nome o codice/i)
+      .getByRole("button", { name: "Inserire altri prodotti" })
+      .click();
+    await resumedPage
+      .getByLabel(/cerca per nome, codice o barcode/i)
       .fill(product.codice);
     await resumedPage
       .getByRole("button", { name: new RegExp(product.codice, "i") })
       .click();
-    await resumedPage.getByLabel(/quantità/i).fill("20");
     await resumedPage
-      .getByRole("button", { name: /salva bozza/i })
+      .getByRole("button", { name: "Chiudi pannello", exact: true })
+      .click();
+    await expect(resumedPage.getByLabel(/quantità/i)).toBeFocused();
+    await resumedPage.getByLabel(/quantità/i).fill("20");
+    await expect(
+      resumedPage.getByRole("button", { name: "Chiudi Carico", exact: true }),
+    ).toBeDisabled();
+    suspendWrites.length = 0;
+    resumedPage.on("request", recordSuspend);
+    await resumedPage.getByRole("button", { name: "Sospendi Carico" }).click();
+    await expect(resumedPage.getByRole("alertdialog")).toBeVisible();
+    await resumedPage
+      .getByRole("button", { name: /resta e continua/i })
+      .click();
+    resumedPage.off("request", recordSuspend);
+    expect(suspendWrites).toEqual([]);
+    await expect(resumedPage.getByLabel(/quantità/i)).toHaveValue("20");
+    // Un salvataggio esplicito fallito lascia la pratica e il draft sul form.
+    await resumedPage.route(
+      "**/api/carico-pratiche/*/righe/*",
+      async (route) => {
+        if (route.request().method() !== "PATCH") return route.continue();
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "Salvataggio non disponibile" }),
+        });
+      },
+    );
+    await resumedPage
+      .getByRole("button", { name: "Inserisci Prodotto", exact: true })
+      .click();
+    await expect(resumedPage.getByTestId(/^carico-row-/)).toContainText(
+      "Salvataggio non disponibile",
+    );
+    await expect(resumedPage.getByLabel(/quantità/i)).toHaveValue("20");
+    expect(await readStock(resumedPage)).toBe(before + 80);
+    await resumedPage.unroute("**/api/carico-pratiche/*/righe/*");
+
+    await resumedPage
+      .getByRole("button", { name: "Inserisci Prodotto", exact: true })
       .last()
       .click();
     await expect(resumedPage.getByRole("checkbox")).toBeChecked();
@@ -263,6 +331,29 @@ test.describe("M3A — pratica di carico persistente", () => {
       { data: { versione: version, note: "Modifica dalla sessione B" } },
     );
     expect(staleFromB.status()).toBe(409);
+    // Ricarico per adottare la versione aggiornata da A prima del comando di chiusura.
+    await resumedPage.reload();
+    await openPracticeFromList(resumedPage, area, description);
+    await expect(
+      resumedPage.getByRole("button", {
+        name: "Inserisci Prodotto",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    const close = resumedPage.getByRole("button", {
+      name: "Chiudi Carico",
+      exact: true,
+    });
+    await expect(close).toBeEnabled();
+    await expect(close).toHaveClass(/bg-emerald-700/);
+    await close.click();
+    await expect(
+      resumedPage.getByRole("button", { name: /^riapri$/i }),
+    ).toBeVisible();
+    await expect(
+      resumedPage.getByRole("button", { name: "Inserire altri prodotti" }),
+    ).toHaveCount(0);
+    expect(await readStock(resumedPage)).toBe(before + 100);
     await concurrentContext.close();
     await resumedContext.close();
   });
@@ -414,7 +505,7 @@ test.describe("M3A — pratica di carico persistente", () => {
           ) && response.request().method() === "PATCH",
     );
     await page
-      .getByRole("button", { name: /salva bozza/i })
+      .getByRole("button", { name: "Inserisci Prodotto", exact: true })
       .last()
       .click();
     expect((await saveResponse).status()).toBe(200);

@@ -204,8 +204,8 @@ test("UX-LOT — lotto fisico: filtri, lineage e storico esauriti", async ({
   await expect(row).toContainText(`DDT-A-${suffix}`);
   await expect(row).toContainText(`DDT-B-${suffix}`);
   await expect(row).toContainText(supplier.nome);
-  await expect(row).toContainText("3.000000");
-  await expect(row).toContainText("0.000000");
+  await expect(row).toContainText("3,00");
+  await expect(row).toContainText("0,00");
   await row.getByText("2 carichi collegati").click();
   await expect(row).toContainText("#");
   await selectOption(

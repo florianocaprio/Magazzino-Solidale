@@ -217,3 +217,18 @@ export function shouldAcceptBarcodeScan(
 ) {
   return previous?.value !== value || now - previous.at >= 2500;
 }
+
+/** Mappatura di sola presentazione condivisa da lista e dettaglio del Carico. */
+export function caricoStatusBadgeClass(status: string): string {
+  const classes: Record<string, string> = {
+    bozza:
+      "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200",
+    aperta:
+      "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200",
+    chiusa:
+      "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
+    annullata:
+      "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200",
+  };
+  return classes[status] ?? classes.bozza;
+}

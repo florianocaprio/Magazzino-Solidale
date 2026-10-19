@@ -916,15 +916,18 @@ export default function Approvvigionamenti() {
                 {editingId === null && (
                   <div className="space-y-3 rounded-lg border p-3">
                     <Label>Prodotti richiesti</Label>
-                    <div className="grid grid-cols-[1fr_120px_auto] gap-2">
+                    <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_7.5rem]">
                       <Select
                         value={draftProdottoId}
                         onValueChange={setDraftProdottoId}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger
+                          className="min-w-0"
+                          aria-label={t("approvvigionamenti.requestedProduct")}
+                        >
                           <SelectValue placeholder="Seleziona prodotto" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)] max-h-[var(--radix-select-content-available-height)]">
                           {(prodotti ?? [])
                             .filter(
                               (p) =>
@@ -932,7 +935,11 @@ export default function Approvvigionamenti() {
                                 !righeDraft.some((r) => r.prodottoId === p.id),
                             )
                             .map((p) => (
-                              <SelectItem key={p.id} value={String(p.id)}>
+                              <SelectItem
+                                key={p.id}
+                                value={String(p.id)}
+                                className="min-w-0 whitespace-normal break-words"
+                              >
                                 {p.nome}
                               </SelectItem>
                             ))}
@@ -942,6 +949,7 @@ export default function Approvvigionamenti() {
                         type="number"
                         min="0.01"
                         step="0.01"
+                        aria-label={t("approvvigionamenti.requestedQuantity")}
                         value={draftQuantita}
                         onChange={(event) =>
                           setDraftQuantita(event.target.value)
@@ -950,6 +958,7 @@ export default function Approvvigionamenti() {
                       <Button
                         type="button"
                         variant="outline"
+                        className="w-full sm:col-span-2"
                         onClick={addRiga}
                         disabled={
                           !draftProdottoId || Number(draftQuantita) <= 0
