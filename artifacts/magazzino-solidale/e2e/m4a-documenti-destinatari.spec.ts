@@ -227,6 +227,10 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
   test("BUG17: crea un Ente globale dalla UI, filtra e mantiene territoriale la Bolla", async ({ page }) => {
     const fixtures = await loadDemoFixtures(page);
     const name = `Globale BUG17 ${runSuffix}`;
+    const localName = `Territoriale BUG17 ${runSuffix}`;
+    await expectJson<Ente>(await page.request.post("/api/enti-destinatari", {
+      data: { idempotencyKey: key("bug17-local-picker"), denominazione: localName, indirizzo: "Via territoriale sintetica 1", areaOperativaId: fixtures.origin.areaOperativaId },
+    }), 201);
     await page.goto("/enti-esterni");
     await page.getByRole("button", { name: "Nuovo Ente", exact: true }).click();
     const form = page.getByRole("dialog");
@@ -249,6 +253,23 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     const dialog = await openCreateBollaDialog(page);
     await selectOption(page, dialog.getByRole("combobox").first(), "Ente esterno");
     await selectOption(page, dialog.getByRole("combobox", { name: /magazzino di uscita/i }), fixtures.origin.nome);
+    await dialog.getByRole("combobox").filter({ hasText: /seleziona ente/i }).click();
+    await page.getByPlaceholder(/cerca per denominazione/i).fill(localName);
+    await page.getByRole("option", { name: new RegExp(localName) }).click();
+    const pickerGlobalFilter = dialog.getByRole("button", { name: "Solo globali", exact: true });
+    await expect(pickerGlobalFilter).toBeVisible();
+    const pickerFiltered = page.waitForResponse((r) => r.url().includes("/api/enti-destinatari?") && new URL(r.url()).searchParams.get("ambito") === "globali" && new URL(r.url()).searchParams.get("areaOperativaId") === String(fixtures.origin.areaOperativaId) && !new URL(r.url()).searchParams.has("search"));
+    await pickerGlobalFilter.click();
+    await expect(pickerGlobalFilter).toHaveAttribute("aria-pressed", "true");
+    const pickerItems = await expectJson<Array<{ areaOperativaId: number | null }>>(await pickerFiltered, 200);
+    expect(pickerItems.length).toBeGreaterThan(0);
+    expect(pickerItems.every((item) => item.areaOperativaId === null)).toBe(true);
+    await expect(dialog.getByRole("combobox").filter({ hasText: /seleziona ente/i })).toBeVisible();
+    await expect(dialog.getByRole("combobox", { name: /magazzino di uscita/i })).toContainText(fixtures.origin.nome);
+    await pickerGlobalFilter.click();
+    await expect(pickerGlobalFilter).toHaveAttribute("aria-pressed", "false");
+    await pickerGlobalFilter.click();
+    await expect(pickerGlobalFilter).toHaveAttribute("aria-pressed", "true");
     await dialog.getByRole("combobox").filter({ hasText: /seleziona ente/i }).click();
     await page.getByPlaceholder(/cerca per denominazione/i).fill(name);
     await page.getByRole("option", { name: new RegExp(`${name}.*Globale`) }).click();

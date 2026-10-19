@@ -1362,3 +1362,31 @@ Tutte le Aree conserva il significato di insieme completo accessibile.
 BUG 17 resta in attesa di UAT integrata dopo 04; nessun prompt successivo,
 merge/main o produzione attivato. Quattro documenti locali preesistenti
 conservati ed esclusi dai commit.
+
+
+## Precisazione UAT 03 — globali anche in Bolle / Nuovo documento
+
+Floriano precisa che il filtro è richiesto sia in Enti Esterni sia nel
+selettore Ente della Bolla. Conservato il pulsante della pagina anagrafica;
+aggiunto al componente condiviso `CreaiBollaDialog` un pulsante Solo globali
+attivabile/disattivabile, visibile quando il destinatario è Ente esterno.
+La query usa `ambito=globali` mantenendo l’Area del contesto/magazzino. Non
+modifica Area o magazzino dell’operazione né amplia permessi o visibilità.
+Attivando il filtro, un territoriale selezionato viene azzerato insieme alla
+sua ricerca; un globale già scelto resta selezionato. Il filtro si azzera
+alla chiusura del form. Alla disattivazione tornano territoriali + globali
+utilizzabili. Risposta precedente/mista filtrata anche lato picker durante
+il cambio query, oltre alla policy server già presente.
+
+File modificati:
+
+- `artifacts/magazzino-solidale/src/components/documento-operativo.tsx`
+- `artifacts/magazzino-solidale/e2e/m4a-documenti-destinatari.spec.ts`
+- questo registro.
+
+Il test browser parte da un territoriale scelto e verifica reset della
+selezione/ricerca, risposta con soli NULL, Area del magazzino nella query,
+toggle del filtro, magazzino preservato e Bolla globale ancora territoriale.
+Per il prompt 04 preservare anche questi stati e reset del ramo Ente.
+Nessuna modifica schema, OpenAPI o API; ledger ancora 60/60. Nessun avvio 04.
+Ricompilazione API/WEB e nuova ricevuta 8082 seguono le verifiche effettive.
