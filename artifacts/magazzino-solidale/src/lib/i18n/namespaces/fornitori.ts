@@ -18,7 +18,6 @@ export const fornitori = {
     onlyGlobal: "Solo globali",
     withGlobal: "incl. globali",
     globalHint: "Utilizzabile in tutte le Aree Operative.",
-    chooseArea: "Seleziona un’Area Operativa o Globale.",
     tipi: {
       commerciale: "Azienda Commerciale",
       donatore_privato: "Donatore Privato",
@@ -56,7 +55,6 @@ export const fornitori = {
     onlyGlobal: "Solo globales",
     withGlobal: "incl. globales",
     globalHint: "Disponible en todas las Áreas Operativas.",
-    chooseArea: "Selecciona un Área Operativa o Global.",
     tipi: {
       commerciale: "Empresa Comercial",
       donatore_privato: "Donante Privado",
@@ -94,7 +92,6 @@ export const fornitori = {
     onlyGlobal: "Global only",
     withGlobal: "incl. global",
     globalHint: "Available in all Operational Areas.",
-    chooseArea: "Select an Operational Area or Global.",
     tipi: {
       commerciale: "Commercial Company",
       donatore_privato: "Private Donor",
@@ -132,7 +129,6 @@ export const fornitori = {
     onlyGlobal: "Globaux uniquement",
     withGlobal: "globales incluses",
     globalHint: "Disponible dans toutes les zones opérationnelles.",
-    chooseArea: "Sélectionnez une zone opérationnelle ou Global.",
     tipi: {
       commerciale: "Entreprise commerciale",
       donatore_privato: "Donateur privé",
@@ -170,7 +166,6 @@ export const fornitori = {
     onlyGlobal: "Nur globale",
     withGlobal: "inkl. globale",
     globalHint: "In allen Betriebsbereichen verfügbar.",
-    chooseArea: "Betriebsbereich oder Global auswählen.",
     tipi: {
       commerciale: "Handelsunternehmen",
       donatore_privato: "Privater Spender",
@@ -208,7 +203,6 @@ export const fornitori = {
     onlyGlobal: "العامون فقط",
     withGlobal: "يشمل العامين",
     globalHint: "متاح في جميع المناطق التشغيلية.",
-    chooseArea: "اختر منطقة تشغيلية أو النطاق العام.",
     tipi: {
       commerciale: "شركة تجارية",
       donatore_privato: "متبرع خاص",

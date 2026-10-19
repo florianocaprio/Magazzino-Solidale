@@ -1569,3 +1569,13 @@ File coinvolti:
 e questo registro. Test e ricompilazione 8082 effettivi sono registrati nella
 ricevuta seguente dopo completamento. Prosegue solo il checkpoint 03;
 nessun avvio del prompt 04 e nessuna riapertura della consegna 02.
+
+
+La prova browser Fornitori prepara esplicitamente una seconda Area sintetica,
+crea un locale dalla UI e un globale dalla UI, verifica la validazione dell'Area,
+la persistenza del tag dopo modifica, i filtri tutti/globali/Area e la selezione
+nei carichi di due Aree. Usa il messaggio standard `common.requiredField` del
+progetto. Le prime due esecuzioni si sono fermate sulla preparazione della
+seconda Area assente nel demo e sull'aspettativa di un messaggio diverso dal
+validatore comune; corrette le precondizioni e l'asserzione, senza rimuovere
+le verifiche di isolamento. Lo stato finale è verificato dalla nuova esecuzione.

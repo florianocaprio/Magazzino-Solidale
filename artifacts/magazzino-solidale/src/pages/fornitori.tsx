@@ -107,7 +107,7 @@ export default function Fornitori() {
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     const { areaOperativaId, ...rest } = values;
     if (!areaOperativaId) {
-      form.setError("areaOperativaId", { type: "required", message: t("fornitori.chooseArea") });
+      form.setError("areaOperativaId", { type: "required", message: t("common.requiredField") });
       return;
     }
     const data = {

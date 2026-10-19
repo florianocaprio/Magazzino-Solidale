@@ -231,8 +231,9 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     const foreignName = `Fornitore Altra Area BUG17 ${runSuffix}`;
     const areas = await expectJson<Array<{ id: number; nome: string; attivo: boolean }>>(await page.request.get("/api/aree-operative"), 200);
     const originArea = areas.find((area) => area.id === fixtures.origin.areaOperativaId)!;
-    const otherArea = areas.find((area) => area.attivo && area.id !== originArea.id)!;
-    expect(otherArea).toBeTruthy();
+    const otherArea = await expectJson<{ id: number; nome: string }>(await page.request.post("/api/aree-operative", {
+      data: { nome: `Area Fornitori BUG17 ${runSuffix}`, sigla: "FG", codiceMatricola: "FG", attivo: true },
+    }), 201);
     await expectJson(await page.request.post("/api/fornitori", {
       data: { nome: foreignName, tipo: "commerciale", areaOperativaId: otherArea.id },
     }), 201);
@@ -242,7 +243,8 @@ test.describe("M4A — tre destinatari su UI, API e PostgreSQL reali", () => {
     await form.getByLabel("Nominativo / Ragione Sociale").fill(localName);
     await expect(form.getByRole("switch", { name: "Globale", exact: true })).not.toBeChecked();
     await form.getByRole("button", { name: "Salva", exact: true }).click();
-    await expect(form.getByText("Seleziona un’Area Operativa o Globale.", { exact: true })).toBeVisible();
+    await expect(form.getByRole("combobox", { name: "Area Operativa", exact: true })).toHaveAttribute("aria-invalid", "true");
+    await expect(form.getByText("Campo obbligatorio", { exact: true })).toBeVisible();
     await selectOption(page, form.getByRole("combobox", { name: "Area Operativa", exact: true }), originArea.nome);
     const localSaved = page.waitForResponse((r) => r.url().endsWith("/api/fornitori") && r.request().method() === "POST");
     await form.getByRole("button", { name: "Salva", exact: true }).click();
