@@ -123,7 +123,7 @@ campagna. Il punto D03 è un raccordo da verificare nel blocco D.
 | 14  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 15  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 16  | D      | 05     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 17 | C | 03, 04 | CHECKPOINT 03 PRONTO PER ##test | Nessuno; D04 approvata; UAT dopo 04 | e8dbbfd65ff79b630b3f18ad2dea703d073b8b27 | PASS mirati; skip dichiarati nella ricevuta | DA ESEGUIRE dopo 04 | e8dbbfd65ff79b630b3f18ad2dea703d073b8b27 |
+| 17 | C | 03, 04 | CHECKPOINT 03 PRONTO PER ##test | Nessuno; D04 approvata; UAT dopo 04 | 02b0345a1087df83c0b6a3b42ed3dd9760559ecb | PASS mirati; skip dichiarati nella ricevuta | DA ESEGUIRE dopo 04 | 02b0345a1087df83c0b6a3b42ed3dd9760559ecb |
 | 18  | E      | 06, 07 | DA SVILUPPARE             | Analisi tecnica del modello nel 06; UAT dopo 07                | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 19  | E      | 07     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
 | 20  | F      | 08     | DA SVILUPPARE             | Nessuno; conservare UX20-01–14                                 | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
@@ -139,7 +139,7 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | -------- | ----------------------------- | --------------- | ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------- |
 | 01 | A: 01 | Funzionale | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 | PASS; ultimi controlli 737 UI e 76 API core | Installata e verificata | CHIUSA; OK UAT Floriano 19/10 |
 | 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | CHIUSA; OK UAT Floriano 19/10 |
-| 03 | C: 17, prima parte | Tecnica | e8dbbfd65ff79b630b3f18ad2dea703d073b8b27 | PASS: 1.596 API + 4 skip; 756 UI; 11 browser + 34 skip di matrice; build/budget | Installata su richiesta esplicita; ledger 60/60 | Checkpoint pronto per ##test; UAT integrata dopo 04 |
+| 03 | C: 17, prima parte | Tecnica | 02b0345a1087df83c0b6a3b42ed3dd9760559ecb | PASS: 1.513 API + 4 skip; 756 UI; 8 browser + 32 skip di matrice; build/budget | Installata su richiesta esplicita; ledger 60/60 | Checkpoint pronto per ##test; UAT integrata dopo 04 |
 | 04       | C: 05–09 e regressione 17     | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 05       | D: 04, 10–14, 16              | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
 | 06       | E: 18, modello e integrazioni | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
@@ -1309,3 +1309,56 @@ Prova aggiornata: pulsante visibile senza aprire il menu, risposta API con
 `areaOperativaId` NULL su tutti i risultati; controllo della pagina azzerata.
 Restano valide la scelta nel menu e tutte le policy precedenti.
 Nuova compilazione API/WEB e verifica 8082 da registrare dopo esecuzione.
+
+
+### Ricevuta — pulsante globale visibile e nuova ricompilazione Docker 8082
+
+Checkpoint applicativo `02b0345a1087df83c0b6a3b42ed3dd9760559ecb`. Modifica limitata al pulsante sempre visibile
+in Enti Esterni e ai due test correlati, oltre al registro sopra elencato.
+
+- `pnpm install --frozen-lockfile` (CI=true): PASS, lockfile invariato.
+- `pnpm run typecheck`: PASS.
+- `pnpm --filter @workspace/magazzino-solidale run test`: **756 PASS**, 119 file.
+- Runner canonico `api general`: **1.513 PASS + 4 SKIP esterni**, 139 file;
+  runner PostgreSQL **24 PASS**, fresh/replay a ledger **60/60**. Evidenze
+  `/private/tmp/enti03-visible-api`. Backend e contratti invariati.
+- Runner canonico `browser m4a-documenti-destinatari.spec.ts`: **8 PASS**,
+  **32 SKIP** previsti sulle repliche non desktop dei lifecycle mutativi.
+  Il nuovo test fa clic sul pulsante sempre visibile e verifica la chiamata
+  `ambito=globali` e Area NULL in tutti i risultati restituiti. Passano anche
+  le regressioni documentali preesistenti. Evidenze
+  `/private/tmp/enti03-visible-browser`. API/browser in sequenza con lock;
+  tutte le prove funzionali su PostgreSQL temporanei attestati e dati sintetici.
+  Moduli nativi macOS ripristinati solo in cartella temporanea dopo il riavvio,
+  senza modificare dipendenze o attestazioni.
+- **API e WEB entrambe ricompilate** da archivio Git del checkpoint;
+  budget **399,5/400 KiB gzip**, entry `index-BDdmi8Da.js`, soglia invariata.
+
+Backup completo DB/uploads, SHA-256 e indici archivi verificati:
+`/Users/florianocaprio/Backups/Magazzino-Solidale/ENTI-GLOBALI-VISIBILI-02b0345a1087-2026-10-19T16-57-53-248Z`.
+Nessuna nuova migration; ledger prima/dopo **60/60** senza difformità.
+Per questo backup `restoreTested=false`; nessuna nuova prova di ripristino
+necessaria o dichiarata. Il preflight 59→60 precedente resta documentato.
+
+Ricreati esclusivamente API e WEB con confronto Compose (sole immagini,
+revisione e versione sorgente migration). PostgreSQL con stesso container e
+stesso avvio della ricognizione dopo il riavvio; volumi DB/uploads preservati.
+Impronte integrali di Enti, Bolle, Richieste, lotti, movimenti, prenotazioni e
+audit invariate rispetto al backup. Nessuna modifica ai dati personali.
+
+- API `magazzino-bugfix-uat-api:sha-02b0345a1087`; image ID `sha256:183a1ccd294c73f50a56c847685be66a3d9f3d6cfe2e7da99f4fdbbd0ebe9cf6`.
+- WEB `magazzino-bugfix-uat-web:sha-02b0345a1087`; image ID `sha256:53ce783a872f5e4c66c0596e7939cceeb174211c755cec353356104ad03ba56b`.
+- Label revision immagini/container uguali al checkpoint; API healthy.
+- HTTP `/`, `/config.js`, `/api/healthz`, `/api/readyz`: **200**;
+  `/api/utenti` senza sessione: **401**.
+- Verificati `/enti-esterni`, entry e chunk di pagina `enti-esterni-Ckmf7UGz.js`:
+  SHA-256 del contenuto realmente servito sulla 8082 uguale al file della nuova
+  build, incluso il pulsante che controlla `enti-results`. Non una verifica
+  basata soltanto sul tag immagine o sul codice locale.
+
+Nuova prova: ricaricare `/enti-esterni` (anche con ⌘⇧R) e cliccare il pulsante
+**Solo globali** accanto al menu Area; solo i record globali devono comparire.
+Tutte le Aree conserva il significato di insieme completo accessibile.
+BUG 17 resta in attesa di UAT integrata dopo 04; nessun prompt successivo,
+merge/main o produzione attivato. Quattro documenti locali preesistenti
+conservati ed esclusi dai commit.
