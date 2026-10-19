@@ -352,3 +352,82 @@ evidenze private; i risultati finali saranno registrati separatamente.
 - `lib/api-zod/src/generated/types/setUtenteMensa410.ts`
 
 I file generated derivano dal comando ufficiale `pnpm --filter @workspace/api-spec run codegen`. Il componente `utente-mense.tsx` è rimosso. I quattro documenti locali preesistenti sono esclusi e verificati per SHA-256.
+
+
+### Verifica conclusiva e 8082 aggiornata dopo il chiarimento
+
+Candidato codice `e897fd5389c5848e7e1eab9d24f4dc77d9743d5d` (commit principale
+`bd4b758db83783a47d1e28f69340695af498aa1a`, seguito dalla separazione del nuovo
+controllo dei servizi rispetto al flusso UDS). Sono state verificate anche le
+schede FSE e l'import/export per i Centri della propria Area, senza estendere
+lo scoping dei moduli logistici.
+
+| Controllo | Esito effettivo |
+| --- | --- |
+| Installazione Node 24, `CI=true pnpm install --frozen-lockfile` | PASS; lockfile invariato. Ripresa con rete autorizzata dopo il blocco DNS sandbox. Warning core-js preesistente, allowlist invariata. |
+| `pnpm run typecheck` | PASS su tutte le librerie e applicazioni dopo l'ultima correzione. |
+| `pnpm --filter @workspace/api-spec run codegen` | PASS; rigenerazione ripetuta e nessuna differenza rispetto al candidato nei generated. |
+| API, 6 gruppi pertinenti | **2.009 PASS, 0 FAIL, 4 SKIP**, 161 file. Nessun test saltato o requisito indebolito per ottenere il verde. |
+| Runner migrazioni PostgreSQL | 24 PASS; bootstrap fresh/replay e ledger temporanei 58/58 senza discrepanze. |
+| `pnpm --filter @workspace/magazzino-solidale run test` | **736 PASS**, 115 file, zero FAIL/SKIP. |
+| Build Docker API e WEB dal candidato | PASS; entry WEB **399,1/400 KiB gzip**, budget invariato. |
+| Diff, generated e documenti locali | PASS; quattro documenti preesistenti invariati per SHA-256, esclusi dai commit. |
+
+Comando API canonico: `node scripts/quality-gates-run.mjs api core general` sul
+candidato e897fd5. Gli altri quattro gruppi erano già PASS e i relativi percorsi
+autorizzativi non sono cambiati nella correzione successiva: questa aggiunge un
+filtro separato per le anagrafiche dei servizi e preserva il collegamento UDS.
+Le nuove prove coprono il CRUD su altro Centro della stessa Area, il rifiuto
+nel payload di un Centro esterno, gli ID legacy senza Area e le schede FSE,
+oltre a tutte le Mense senza assegnazione e alle revoche concorrenti di ruolo/Area.
+
+Evidenze per gruppo (solo risultati conclusivi, senza sommare le riesecuzioni):
+- `api-core`: 76 PASS, 0 SKIP, 11 file; `/private/tmp/bug01-area-certified-api-e897fd5`.
+- `api-general`: 1491 PASS, 4 SKIP, 137 file; `/private/tmp/bug01-area-certified-api-e897fd5`.
+- `api-reporting`: 83 PASS, 0 SKIP, 6 file; `/private/tmp/bug01-area-final-api-reporting`.
+- `api-interventi`: 21 PASS, 0 SKIP, 2 file; `/private/tmp/bug01-area-final-api-interventi`.
+- `api-mensa`: 108 PASS, 0 SKIP, 1 file; `/private/tmp/bug01-area-final-api-mensa`.
+- `api-emporio`: 230 PASS, 0 SKIP, 4 file; `/private/tmp/bug01-area-final-api-emporio`.
+
+I quattro SKIP sono le acceptance sugli originali esterni già non disponibili
+nel prompt 00 (agea-import, agea-sifead-parser, fse-import-parser-m3b,
+fse-import-practice-m3b); nessun nuovo skip. Maps e snapshot FSE R2 non sono
+stati rieseguiti: non sono coinvolti nel cambiamento. Suite browser non eseguita;
+la nuova prova UAT di Floriano rimane da fare.
+
+La build WEB nativa macOS è stata tentata ma non disponibile per il binario
+opzionale mancante `lightningcss.darwin-arm64.node`. La build Docker effettivamente
+installata passa e non richiede interventi manuali per la 8082. Per una futura
+build nativa, ripristinare la dipendenza opzionale e usare Node 24 con
+`PORT=8082 BASE_PATH=/ pnpm --filter @workspace/magazzino-solidale run build`.
+
+Installate soltanto API e WEB su `http://127.0.0.1:8082/`, revisione `e897fd5389c5848e7e1eab9d24f4dc77d9743d5d`:
+
+- `/magazzino-api`: `magazzino-bugfix-uat-api:sha-e897fd5389c5`, image ID `sha256:809833c7128d06d545cab80f1c0471ed343da22b388d43a46a21fefed3b7b156`, stato `healthy`.
+- `/magazzino-web`: `magazzino-bugfix-uat-web:sha-e897fd5389c5`, image ID `sha256:8d9ed0f7791140223f9213c0665f7a54990cb69a2ae235df3907817826358f9e`, stato `not-defined`.
+
+PostgreSQL conserva container `af6bd975d17d0fb187820b50a860a51075ac8c64656356e59c1c12b7ea402797` e avvio del
+6 ottobre. Nessuna migration nuova; ledger initialized=true, **58/58**, nessun
+pending, mismatch o file fuori ordine. Configurazione Compose confrontata:
+solo immagini, label revisione e DB_MIGRATION_SOURCE_VERSION differiscono.
+Conservati porte, rete, volumi e dati. `/`, `/config.js`, `/api/healthz` e
+`/api/readyz` restituiscono 200; `/api/utenti` senza sessione restituisce 401.
+Nessun login o test mutativo automatico sulla 8082.
+
+Backup privato precedente all'installazione: `/Users/florianocaprio/Backups/Magazzino-Solidale/BUG01-AREA-e897fd5389c5-2026-10-19T12-31-21-694Z`.
+Dump e uploads verificati per indice e SHA-256, con permessi privati; restore
+non eseguito, non essendoci variazioni di schema. Ricevuta e rollback immagini
+restano nella stessa directory privata, fuori Git. Nessun accesso Hetzner o
+modifica di main in questo chiarimento.
+
+Prova richiesta: ricaricare la 8082; in modifica Utenti verificare che il ruolo
+sia selezionabile e che il pannello di assegnazione Mensa sia assente. Con un
+operatore abilitato e Area assegnata, verificare tutte le Mense/Centri/Empori
+della propria Area anche se il Centro anagrafico è diverso. Dopo un cambio
+ruolo, ricaricare la sessione dell'operatore e controllare le funzioni abilitate.
+Ruolo e Area rimangono necessari; le abilitazioni dei beneficiari e le regole
+UDS/logistiche restano distinte. I riferimenti territoriali incoerenti/inattivi
+continuano a essere respinti.
+
+**Correzione pronta su 8082; UAT di Floriano ancora attesa. Non avviare prompt 02
+prima del suo OK.**
