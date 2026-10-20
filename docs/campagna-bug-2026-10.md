@@ -1,8 +1,8 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-Correttivo UAT FSE+ del 20/10: Importa solo selezionati con riepilogo prima della conferma, conteggi da esiti effettivi e ripresa delle altre righe con lo stesso file. Importazione completa conserva i controlli precedenti. API e WEB ricompilati e aggiornati a `ce6d9a8` sulla 8082; backup ripristinato e 43 tabelle invariate. Ricevuta e file modificati: [FSE-Importazione-Selezionati-20261020.md](FSE-Importazione-Selezionati-20261020.md). Restano inclusi colori delle differenze/proposte e limite Nginx con nota di rilascio Hetzner ([FSE-Upload-Nginx-20261020.md](FSE-Upload-Nginx-20261020.md)). La riduzione automatica preesistente delle priorità di 19 beneficiari appartiene al riavvio della versione precedente, già documentato nel primo resoconto.
+Correttivo UAT Beneficiari del 20/10: import FSE+ già completo, Area prima del Centro, prima abilitazione Emporio con Credito, politica selezionabile e comandi servizi in Modifica anagrafica. API e WEB ricompilati sulla 8082 al codice `9622c7d`; ledger 63/63. Corretti 109 import provvisori, 3 Aree mancanti e 3 prime abilitazioni Credito; quote e saldi conservati. Backup ripristinato e 44 altre tabelle invariate. Ricevuta e file modificati: [Beneficiari-Servizi-FSE-20261020.md](Beneficiari-Servizi-FSE-20261020.md). Restano inclusi import selettivo, colori e limite Nginx già documentati.
 
-20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Prompt 06 e 07 completati; correttivi FSE+ installati sulla 8082: codice `ce6d9a8`, ledger 62/62. UAT BUG18 e correttivi FSE+ da confermare con Floriano. Prompt 08 non avviato.**
+20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Prompt 06 e 07 completati; correttivi FSE+ installati sulla 8082: codice `9622c7d`, ledger 63/63. UAT BUG18 e correttivi FSE+ da confermare con Floriano. Prompt 08 non avviato.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
