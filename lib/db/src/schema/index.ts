@@ -60,3 +60,5 @@ export * from "./mapsGeocodeCache";
 export * from "./creditoRicaricheMensili";
 
 export * from "./codiciBeneficiari";
+
+export * from "./lottiProduttore";

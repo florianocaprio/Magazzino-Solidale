@@ -10,6 +10,7 @@ import {
   magazziniTable,
   beneficiariTable,
   prodottiTable,
+  lottiProduttoreTable,
   fornitoriTable,
   volontariTable,
   mezziTable,
@@ -266,7 +267,13 @@ export async function createCentroRec(
   const nome = opts.nome ?? `Centro ${rnd()}`;
   const [c] = await db
     .insert(centriAscoltoTable)
-    .values({ nome, areaOperativaId: opts.areaOperativaId === undefined ? await createAreaOperativa(scope) : opts.areaOperativaId })
+    .values({
+      nome,
+      areaOperativaId:
+        opts.areaOperativaId === undefined
+          ? await createAreaOperativa(scope)
+          : opts.areaOperativaId,
+    })
     .returning({ id: centriAscoltoTable.id });
   scope.centroIds.push(c.id);
   return { id: c.id, nome };
@@ -442,9 +449,15 @@ export async function createVolontario(
   centroId: number | null,
 ): Promise<number> {
   // Valid synthetic Area assignment; no production legacy data is inferred here.
-  const areaOperativaId = centroId == null
-    ? scope.areaOperativaIds[0] ?? await createAreaOperativa(scope)
-    : (await db.select({ area: centriAscoltoTable.areaOperativaId }).from(centriAscoltoTable).where(eq(centriAscoltoTable.id, centroId)))[0]?.area ?? null;
+  const areaOperativaId =
+    centroId == null
+      ? (scope.areaOperativaIds[0] ?? (await createAreaOperativa(scope)))
+      : ((
+          await db
+            .select({ area: centriAscoltoTable.areaOperativaId })
+            .from(centriAscoltoTable)
+            .where(eq(centriAscoltoTable.id, centroId))
+        )[0]?.area ?? null);
   const [v] = await db
     .insert(volontariTable)
     .values({
@@ -529,12 +542,13 @@ export async function createUtente(
       ? await createRuolo(scope, { isAdmin: true })
       : opts.ruoloId;
   // Valid account fixtures carry an Area; Centre is retained as legacy metadata.
-  const [center] = opts.centroId == null
-    ? []
-    : await db
-        .select({ areaOperativaId: centriAscoltoTable.areaOperativaId })
-        .from(centriAscoltoTable)
-        .where(eq(centriAscoltoTable.id, opts.centroId));
+  const [center] =
+    opts.centroId == null
+      ? []
+      : await db
+          .select({ areaOperativaId: centriAscoltoTable.areaOperativaId })
+          .from(centriAscoltoTable)
+          .where(eq(centriAscoltoTable.id, opts.centroId));
   const [u] = await db
     .insert(utentiTable)
     .values({
@@ -1014,6 +1028,9 @@ export async function cleanup(scope: SeedScope): Promise<void> {
     await db.delete(mezziTable).where(inArray(mezziTable.id, scope.mezzoIds));
   }
   if (scope.prodottoIds.length > 0) {
+    await db
+      .delete(lottiProduttoreTable)
+      .where(inArray(lottiProduttoreTable.prodottoId, scope.prodottoIds));
     await db
       .delete(prodottiTable)
       .where(inArray(prodottiTable.id, scope.prodottoIds));

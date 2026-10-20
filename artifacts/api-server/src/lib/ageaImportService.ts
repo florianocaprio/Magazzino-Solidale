@@ -1,3 +1,4 @@
+import { verifiedFseLotOrigin } from "./producerLots";
 import { createHash } from "node:crypto";
 import {
   carichiMagazzinoTable,
@@ -1449,6 +1450,7 @@ export async function confirmAgeaImport(
       executionContext: "system",
       creatoDa: userId,
       righe: positiveParties.map((party) => ({
+        trustedImport: verifiedFseLotOrigin(`AGEA import #${fresh.id}`),
         prodottoId: party.prodottoId!,
         fondoOrigine: party.fondoOrigine as
           | "FSE_PLUS"
@@ -1613,6 +1615,7 @@ export async function confirmAgeaImport(
               `Quantità incompatibile in riga ${row.numeroRiga}`,
             );
           return {
+            trustedImport: verifiedFseLotOrigin(`AGEA import #${fresh.id}`),
             prodottoId: row.prodottoIdSnapshot!,
             fondoOrigine: row.fondoNormalizzato as
               | "FSE_PLUS"

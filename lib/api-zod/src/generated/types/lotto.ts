@@ -8,9 +8,20 @@
 import type { FondoOrigine } from "./fondoOrigine";
 import type { LottoDocumentiCaricoItem } from "./lottoDocumentiCaricoItem";
 import type { LottoLineageCarichiItem } from "./lottoLineageCarichiItem";
+import type { LottoOrigineAnagrafica } from "./lottoOrigineAnagrafica";
 import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface Lotto {
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
+  /**
+   * Origine dell’anagrafica; null per dati storici non attestati.
+   * @nullable
+   */
+  origineAnagrafica?: LottoOrigineAnagrafica;
   id: number;
   prodottoId: number;
   /** @nullable */

@@ -1,3 +1,4 @@
+import { lottiProduttoreTable } from "./lottiProduttore";
 import { sql } from "drizzle-orm";
 import {
   check,
@@ -109,6 +110,10 @@ export const caricoPraticaRigheTable = pgTable(
     caricoPraticaId: integer("carico_pratica_id")
       .notNull()
       .references(() => caricoPraticheTable.id, { onDelete: "cascade" }),
+    lottoProduttoreId: integer("lotto_produttore_id").references(
+      () => lottiProduttoreTable.id,
+      { onDelete: "restrict" },
+    ),
     clientId: varchar("client_id", { length: 100 }),
     prodottoId: integer("prodotto_id")
       .notNull()

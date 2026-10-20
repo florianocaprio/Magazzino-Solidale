@@ -1,3 +1,7 @@
+import {
+  validateProducerLotSelection,
+  verifiedFseLotOrigin,
+} from "../lib/producerLots";
 import { createHash, randomUUID } from "node:crypto";
 import { Router, type IRouter, type Response } from "express";
 import {
@@ -321,6 +325,7 @@ async function validateHeader(
 async function normalizeDraftLine(
   tx: InventoryTransaction,
   input: Record<string, unknown>,
+  areaOperativaId?: number,
 ) {
   const prodottoId = positiveId(input.prodottoId, "prodottoId");
   const [prodotto] = await tx
@@ -363,7 +368,23 @@ async function normalizeDraftLine(
       throw error;
     }
   }
+  const lottoProduttoreId =
+    input.lottoProduttoreId == null
+      ? null
+      : positiveId(input.lottoProduttoreId, "lottoProduttoreId");
+  if (lottoProduttoreId != null) {
+    if (areaOperativaId == null)
+      throw new CaricoPraticaError(400, "Area richiesta per il lotto");
+    await validateProducerLotSelection(tx, {
+      areaOperativaId,
+      prodottoId,
+      lottoProduttoreId,
+      codiceLotto: input.codiceLottoProduttore as string | null,
+      dataScadenza: input.dataScadenza as string | null,
+    });
+  }
   return {
+    lottoProduttoreId,
     prodottoId,
     fondoOrigine,
     quantita,
@@ -752,7 +773,9 @@ router.post(
         const { magazzino: _magazzino, ...headerValues } = header;
         const normalizedRows = [];
         for (const row of body.righe as Record<string, unknown>[]) {
-          normalizedRows.push(await normalizeDraftLine(tx, row));
+          normalizedRows.push(
+            await normalizeDraftLine(tx, row, header.areaOperativaId),
+          );
         }
         const [practice] = await tx
           .insert(caricoPraticheTable)
@@ -766,6 +789,7 @@ router.post(
         for (const row of normalizedRows) {
           await tx.insert(caricoPraticaRigheTable).values({
             caricoPraticaId: practice.id,
+            lottoProduttoreId: row.lottoProduttoreId,
             prodottoId: row.prodottoId,
             fondoOrigine: row.fondoOrigine,
             quantita: row.quantita,
@@ -854,6 +878,18 @@ router.patch(
             ...practice,
             ...body,
           });
+          if (header.areaOperativaId !== practice.areaOperativaId) {
+            // A deliberate territorial change invalidates a pending registry choice, never its raw code.
+            await tx
+              .update(caricoPraticaRigheTable)
+              .set({ lottoProduttoreId: null })
+              .where(
+                and(
+                  eq(caricoPraticaRigheTable.caricoPraticaId, id),
+                  sql`${caricoPraticaRigheTable.registrataAt} is null`,
+                ),
+              );
+          }
           values = header;
           delete (values as Record<string, unknown>).magazzino;
         }
@@ -900,11 +936,16 @@ router.post(
         requireVersion(practice, version(req.body?.versione));
         requireWorkingState(practice);
         requireManualPracticeEdit(practice);
-        const row = await normalizeDraftLine(tx, req.body ?? {});
+        const row = await normalizeDraftLine(
+          tx,
+          req.body ?? {},
+          practice.areaOperativaId,
+        );
         const [created] = await tx
           .insert(caricoPraticaRigheTable)
           .values({
             caricoPraticaId: id,
+            lottoProduttoreId: row.lottoProduttoreId,
             prodottoId: row.prodottoId,
             fondoOrigine: row.fondoOrigine,
             quantita: row.quantita,
@@ -977,10 +1018,15 @@ router.patch(
           );
         if (existing.registrataAt)
           throw new CaricoPraticaError(409, "Una riga registrata è immutabile");
-        const row = await normalizeDraftLine(tx, { ...existing, ...req.body });
+        const row = await normalizeDraftLine(
+          tx,
+          { ...existing, ...req.body },
+          practice.areaOperativaId,
+        );
         await tx
           .update(caricoPraticaRigheTable)
           .set({
+            lottoProduttoreId: row.lottoProduttoreId,
             prodottoId: row.prodottoId,
             fondoOrigine: row.fondoOrigine,
             quantita: row.quantita,
@@ -1243,6 +1289,15 @@ router.post(
               `La riga ${riga.id} è incompleta: quantità mancante`,
             );
           return {
+            lottoProduttoreId: riga.lottoProduttoreId,
+            trustedImport:
+              practice.origineCarico === "AGEA_SIFEAD" ||
+              (practice.tipoPratica === "SALDO_INIZIALE" &&
+                initialCoverage?.stato === "PROPOSTA")
+                ? verifiedFseLotOrigin(
+                    `FSE+ pratica #${practice.id}, riga #${riga.id}`,
+                  )
+                : undefined,
             prodottoId: riga.prodottoId,
             fondoOrigine: riga.fondoOrigine as FondoOrigine,
             quantitaOperativa: riga.quantita,
@@ -1677,6 +1732,7 @@ router.post(
             .insert(caricoPraticaRigheTable)
             .values({
               caricoPraticaId: id,
+              lottoProduttoreId: source.riga.lottoProduttoreId,
               prodottoId: source.riga.prodottoId,
               fondoOrigine: source.riga.fondoOrigine,
               quantita: remainingSource.toDb(),

@@ -1147,6 +1147,8 @@ export const ListCarichiResponse = zod.array(ListCarichiResponseItem);
 
 export const createCaricoBodyIdempotencyKeyMax = 120;
 
+export const createCaricoBodyRigheItemProduttoreMax = 200;
+
 export const createCaricoBodyRigheItemQuantitaOperativaRegExp = new RegExp(
   "^[0-9]+(?:\\.[0-9]{1,6})?$",
 );
@@ -1184,6 +1186,11 @@ export const CreateCaricoBody = zod.object({
   righe: zod
     .array(
       zod.object({
+        produttore: zod
+          .string()
+          .max(createCaricoBodyRigheItemProduttoreMax)
+          .nullish(),
+        lottoProduttoreId: zod.number().min(1).nullish(),
         prodottoId: zod.number().min(1),
         fondoOrigine: zod.enum([
           "FSE_PLUS",
@@ -1693,6 +1700,7 @@ export const CreateCaricoPraticaBody = zod.object({
   righe: zod
     .array(
       zod.object({
+        lottoProduttoreId: zod.number().min(1).nullish(),
         clientId: zod
           .string()
           .max(createCaricoPraticaBodyRigheItemClientIdMax)
@@ -1798,6 +1806,7 @@ export const GetCaricoPraticaResponse = zod
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -1963,6 +1972,7 @@ export const UpdateCaricoPraticaResponse = zod
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -2055,6 +2065,7 @@ export const addCaricoPraticaRigaBodyOneFattoreKgLtPezzoOneRegExp = new RegExp(
 
 export const AddCaricoPraticaRigaBody = zod
   .object({
+    lottoProduttoreId: zod.number().min(1).nullish(),
     clientId: zod
       .string()
       .max(addCaricoPraticaRigaBodyOneClientIdMax)
@@ -2118,6 +2129,7 @@ export const updateCaricoPraticaRigaBodyOneFattoreKgLtPezzoOneRegExp =
 
 export const UpdateCaricoPraticaRigaBody = zod
   .object({
+    lottoProduttoreId: zod.number().min(1).nullish(),
     clientId: zod
       .string()
       .max(updateCaricoPraticaRigaBodyOneClientIdMax)
@@ -2220,6 +2232,7 @@ export const UpdateCaricoPraticaRigaResponse = zod
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -2362,6 +2375,7 @@ export const DeleteCaricoPraticaRigaResponse = zod
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -2585,6 +2599,7 @@ export const CloseCaricoPraticaResponse = zod
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -2727,6 +2742,7 @@ export const ReopenCaricoPraticaResponse = zod
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -2869,6 +2885,7 @@ export const CancelCaricoPraticaResponse = zod
       fornitoreNome: zod.string().nullish(),
       righe: zod.array(
         zod.object({
+          lottoProduttoreId: zod.number().min(1).nullish(),
           id: zod.number(),
           caricoPraticaId: zod.number(),
           clientId: zod.string().nullish(),
@@ -5442,6 +5459,392 @@ export const ArchiveLottoLogicoResponse = zod.object({
     ),
 });
 
+/**
+ * @summary Anagrafiche territoriali, incluse le preregistrazioni senza merce
+ */
+
+export const listLottiProduttoreQueryLimitMax = 100;
+
+export const ListLottiProduttoreQueryParams = zod.object({
+  areaOperativaId: zod.coerce.number().optional(),
+  prodottoId: zod.coerce.number().optional(),
+  origine: zod.enum(["MANUALE", "AUTOMATICO", "IMPORTATO"]).optional(),
+  q: zod.coerce.string().optional(),
+  page: zod.coerce.number().min(1).optional(),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listLottiProduttoreQueryLimitMax)
+    .optional(),
+});
+
+export const listLottiProduttoreResponseItemsItemPartiteItemQuantitaResiduaRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const listLottiProduttoreResponseItemsItemPartiteItemQuantitaPrenotataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const listLottiProduttoreResponseItemsItemPartiteItemDisponibileRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const listLottiProduttoreResponseItemsItemResiduoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const listLottiProduttoreResponseItemsItemPrenotatoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const listLottiProduttoreResponseItemsItemDisponibileRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+
+export const ListLottiProduttoreResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      areaOperativaId: zod.number(),
+      prodottoId: zod.number(),
+      prodottoNome: zod.string(),
+      prodottoCodice: zod.string(),
+      unitaMisura: zod.string(),
+      codiceOriginale: zod.string().nullish(),
+      codiceCanonico: zod.string().nullish(),
+      riferimentoInterno: zod.string(),
+      dataScadenza: zod.coerce.date().nullish(),
+      produttore: zod.string().nullish(),
+      produttoreCanonico: zod.string().nullish(),
+      note: zod.string().nullish(),
+      origine: zod
+        .union([
+          zod.literal("MANUALE"),
+          zod.literal("AUTOMATICO"),
+          zod.literal("IMPORTATO"),
+          zod.literal(null),
+        ])
+        .nullish(),
+      fonte: zod.string().nullish(),
+      primoAutoreId: zod.number().nullish(),
+      autore: zod.string().nullish(),
+      primaCreazioneAt: zod.coerce.date().nullish(),
+      dataAssociazione: zod.coerce.date(),
+      partite: zod.array(
+        zod.object({
+          id: zod.number(),
+          magazzinoId: zod.number(),
+          magazzinoNome: zod.string(),
+          fondoOrigine: zod.enum([
+            "FSE_PLUS",
+            "FONDO_NAZIONALE",
+            "FONDO_NAZIONALE_COFINANZIATO",
+            "NESSUN_FONDO",
+          ]),
+          lottoLogicoId: zod.number().nullish(),
+          dataScadenza: zod.coerce.date().nullish(),
+          quantitaResidua: zod
+            .string()
+            .regex(
+              listLottiProduttoreResponseItemsItemPartiteItemQuantitaResiduaRegExp,
+            )
+            .describe(
+              "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+            ),
+          quantitaPrenotata: zod
+            .string()
+            .regex(
+              listLottiProduttoreResponseItemsItemPartiteItemQuantitaPrenotataRegExp,
+            )
+            .describe(
+              "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+            ),
+          disponibile: zod
+            .string()
+            .regex(
+              listLottiProduttoreResponseItemsItemPartiteItemDisponibileRegExp,
+            )
+            .describe(
+              "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+            ),
+        }),
+      ),
+      numeroPartiteVisibili: zod.number(),
+      residuo: zod
+        .string()
+        .regex(listLottiProduttoreResponseItemsItemResiduoRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+      prenotato: zod
+        .string()
+        .regex(listLottiProduttoreResponseItemsItemPrenotatoRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+      disponibile: zod
+        .string()
+        .regex(listLottiProduttoreResponseItemsItemDisponibileRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+      statoPartite: zod.enum([
+        "PARTITE_VISIBILI",
+        "MAI_CARICATO",
+        "NESSUNA_PARTITA_VISIBILE",
+      ]),
+    }),
+  ),
+  page: zod.number(),
+  hasMore: zod.boolean(),
+});
+
+/**
+ * @summary Pre-registra un lotto senza stock, origine assegnata dal server
+ */
+
+export const preregisterLottoProduttoreBodyCodiceLottoMax = 80;
+
+export const preregisterLottoProduttoreBodyProduttoreMax = 200;
+
+export const preregisterLottoProduttoreBodyNoteMax = 4000;
+
+export const preregisterLottoProduttoreBodyIdempotencyKeyMax = 100;
+
+export const PreregisterLottoProduttoreBody = zod.object({
+  areaOperativaId: zod.number().min(1),
+  prodottoId: zod.number().min(1),
+  codiceLotto: zod
+    .string()
+    .max(preregisterLottoProduttoreBodyCodiceLottoMax)
+    .nullish(),
+  dataScadenza: zod.coerce.date().nullish(),
+  produttore: zod
+    .string()
+    .max(preregisterLottoProduttoreBodyProduttoreMax)
+    .nullish(),
+  note: zod.string().max(preregisterLottoProduttoreBodyNoteMax).nullish(),
+  idempotencyKey: zod
+    .string()
+    .min(1)
+    .max(preregisterLottoProduttoreBodyIdempotencyKeyMax),
+});
+
+export const preregisterLottoProduttoreResponseOnePartiteItemQuantitaResiduaRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const preregisterLottoProduttoreResponseOnePartiteItemQuantitaPrenotataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const preregisterLottoProduttoreResponseOnePartiteItemDisponibileRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const preregisterLottoProduttoreResponseOneResiduoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const preregisterLottoProduttoreResponseOnePrenotatoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const preregisterLottoProduttoreResponseOneDisponibileRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+
+export const PreregisterLottoProduttoreResponse = zod
+  .object({
+    id: zod.number(),
+    areaOperativaId: zod.number(),
+    prodottoId: zod.number(),
+    prodottoNome: zod.string(),
+    prodottoCodice: zod.string(),
+    unitaMisura: zod.string(),
+    codiceOriginale: zod.string().nullish(),
+    codiceCanonico: zod.string().nullish(),
+    riferimentoInterno: zod.string(),
+    dataScadenza: zod.coerce.date().nullish(),
+    produttore: zod.string().nullish(),
+    produttoreCanonico: zod.string().nullish(),
+    note: zod.string().nullish(),
+    origine: zod
+      .union([
+        zod.literal("MANUALE"),
+        zod.literal("AUTOMATICO"),
+        zod.literal("IMPORTATO"),
+        zod.literal(null),
+      ])
+      .nullish(),
+    fonte: zod.string().nullish(),
+    primoAutoreId: zod.number().nullish(),
+    autore: zod.string().nullish(),
+    primaCreazioneAt: zod.coerce.date().nullish(),
+    dataAssociazione: zod.coerce.date(),
+    partite: zod.array(
+      zod.object({
+        id: zod.number(),
+        magazzinoId: zod.number(),
+        magazzinoNome: zod.string(),
+        fondoOrigine: zod.enum([
+          "FSE_PLUS",
+          "FONDO_NAZIONALE",
+          "FONDO_NAZIONALE_COFINANZIATO",
+          "NESSUN_FONDO",
+        ]),
+        lottoLogicoId: zod.number().nullish(),
+        dataScadenza: zod.coerce.date().nullish(),
+        quantitaResidua: zod
+          .string()
+          .regex(
+            preregisterLottoProduttoreResponseOnePartiteItemQuantitaResiduaRegExp,
+          )
+          .describe(
+            "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+          ),
+        quantitaPrenotata: zod
+          .string()
+          .regex(
+            preregisterLottoProduttoreResponseOnePartiteItemQuantitaPrenotataRegExp,
+          )
+          .describe(
+            "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+          ),
+        disponibile: zod
+          .string()
+          .regex(
+            preregisterLottoProduttoreResponseOnePartiteItemDisponibileRegExp,
+          )
+          .describe(
+            "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+          ),
+      }),
+    ),
+    numeroPartiteVisibili: zod.number(),
+    residuo: zod
+      .string()
+      .regex(preregisterLottoProduttoreResponseOneResiduoRegExp)
+      .describe(
+        "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+      ),
+    prenotato: zod
+      .string()
+      .regex(preregisterLottoProduttoreResponseOnePrenotatoRegExp)
+      .describe(
+        "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+      ),
+    disponibile: zod
+      .string()
+      .regex(preregisterLottoProduttoreResponseOneDisponibileRegExp)
+      .describe(
+        "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+      ),
+    statoPartite: zod.enum([
+      "PARTITE_VISIBILI",
+      "MAI_CARICATO",
+      "NESSUNA_PARTITA_VISIBILE",
+    ]),
+  })
+  .and(
+    zod.object({
+      creato: zod.boolean(),
+    }),
+  );
+
+/**
+ * @summary Dettaglio dell'anagrafica e partite nell'ambito autorizzato
+ */
+export const GetLottoProduttoreParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const getLottoProduttoreResponsePartiteItemQuantitaResiduaRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const getLottoProduttoreResponsePartiteItemQuantitaPrenotataRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const getLottoProduttoreResponsePartiteItemDisponibileRegExp =
+  new RegExp("^[0-9]+(?:\\.[0-9]{1,6})?$");
+export const getLottoProduttoreResponseResiduoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const getLottoProduttoreResponsePrenotatoRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+export const getLottoProduttoreResponseDisponibileRegExp = new RegExp(
+  "^[0-9]+(?:\\.[0-9]{1,6})?$",
+);
+
+export const GetLottoProduttoreResponse = zod.object({
+  id: zod.number(),
+  areaOperativaId: zod.number(),
+  prodottoId: zod.number(),
+  prodottoNome: zod.string(),
+  prodottoCodice: zod.string(),
+  unitaMisura: zod.string(),
+  codiceOriginale: zod.string().nullish(),
+  codiceCanonico: zod.string().nullish(),
+  riferimentoInterno: zod.string(),
+  dataScadenza: zod.coerce.date().nullish(),
+  produttore: zod.string().nullish(),
+  produttoreCanonico: zod.string().nullish(),
+  note: zod.string().nullish(),
+  origine: zod
+    .union([
+      zod.literal("MANUALE"),
+      zod.literal("AUTOMATICO"),
+      zod.literal("IMPORTATO"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  fonte: zod.string().nullish(),
+  primoAutoreId: zod.number().nullish(),
+  autore: zod.string().nullish(),
+  primaCreazioneAt: zod.coerce.date().nullish(),
+  dataAssociazione: zod.coerce.date(),
+  partite: zod.array(
+    zod.object({
+      id: zod.number(),
+      magazzinoId: zod.number(),
+      magazzinoNome: zod.string(),
+      fondoOrigine: zod.enum([
+        "FSE_PLUS",
+        "FONDO_NAZIONALE",
+        "FONDO_NAZIONALE_COFINANZIATO",
+        "NESSUN_FONDO",
+      ]),
+      lottoLogicoId: zod.number().nullish(),
+      dataScadenza: zod.coerce.date().nullish(),
+      quantitaResidua: zod
+        .string()
+        .regex(getLottoProduttoreResponsePartiteItemQuantitaResiduaRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+      quantitaPrenotata: zod
+        .string()
+        .regex(getLottoProduttoreResponsePartiteItemQuantitaPrenotataRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+      disponibile: zod
+        .string()
+        .regex(getLottoProduttoreResponsePartiteItemDisponibileRegExp)
+        .describe(
+          "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+        ),
+    }),
+  ),
+  numeroPartiteVisibili: zod.number(),
+  residuo: zod
+    .string()
+    .regex(getLottoProduttoreResponseResiduoRegExp)
+    .describe(
+      "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+    ),
+  prenotato: zod
+    .string()
+    .regex(getLottoProduttoreResponsePrenotatoRegExp)
+    .describe(
+      "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+    ),
+  disponibile: zod
+    .string()
+    .regex(getLottoProduttoreResponseDisponibileRegExp)
+    .describe(
+      "Decimale esatto; non convertire in number JavaScript per i calcoli.",
+    ),
+  statoPartite: zod.enum([
+    "PARTITE_VISIBILI",
+    "MAI_CARICATO",
+    "NESSUNA_PARTITA_VISIBILE",
+  ]),
+});
+
 export const ListLottiQueryParams = zod.object({
   prodottoId: zod.coerce.number().optional(),
   magazzinoId: zod.coerce.number().optional(),
@@ -5494,6 +5897,16 @@ export const listLottiResponseDisponibileRealePrecisaRegExp = new RegExp(
 );
 
 export const ListLottiResponseItem = zod.object({
+  lottoProduttoreId: zod.number().min(1).nullish(),
+  origineAnagrafica: zod
+    .union([
+      zod.literal("MANUALE"),
+      zod.literal("AUTOMATICO"),
+      zod.literal("IMPORTATO"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Origine dell’anagrafica; null per dati storici non attestati."),
   id: zod.number(),
   prodottoId: zod.number(),
   lottoLogicoId: zod.number().nullish(),
@@ -5600,6 +6013,7 @@ export const ListLottiResponse = zod.array(ListLottiResponseItem);
 export const createLottoBodyQuantitaCaricataExclusiveMin = 0;
 
 export const CreateLottoBody = zod.object({
+  lottoProduttoreId: zod.number().min(1).nullish(),
   prodottoId: zod.number(),
   lottoLogicoId: zod.number().nullish(),
   codiceLotto: zod.string().optional(),
@@ -5636,6 +6050,16 @@ export const getLottoResponseDisponibileRealePrecisaRegExp = new RegExp(
 );
 
 export const GetLottoResponse = zod.object({
+  lottoProduttoreId: zod.number().min(1).nullish(),
+  origineAnagrafica: zod
+    .union([
+      zod.literal("MANUALE"),
+      zod.literal("AUTOMATICO"),
+      zod.literal("IMPORTATO"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Origine dell’anagrafica; null per dati storici non attestati."),
   id: zod.number(),
   prodottoId: zod.number(),
   lottoLogicoId: zod.number().nullish(),
@@ -5765,6 +6189,16 @@ export const updateLottoResponseDisponibileRealePrecisaRegExp = new RegExp(
 );
 
 export const UpdateLottoResponse = zod.object({
+  lottoProduttoreId: zod.number().min(1).nullish(),
+  origineAnagrafica: zod
+    .union([
+      zod.literal("MANUALE"),
+      zod.literal("AUTOMATICO"),
+      zod.literal("IMPORTATO"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Origine dell’anagrafica; null per dati storici non attestati."),
   id: zod.number(),
   prodottoId: zod.number(),
   lottoLogicoId: zod.number().nullish(),
@@ -5911,6 +6345,16 @@ export const rettificaLottoResponseDisponibileRealePrecisaRegExp = new RegExp(
 );
 
 export const RettificaLottoResponse = zod.object({
+  lottoProduttoreId: zod.number().min(1).nullish(),
+  origineAnagrafica: zod
+    .union([
+      zod.literal("MANUALE"),
+      zod.literal("AUTOMATICO"),
+      zod.literal("IMPORTATO"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Origine dell’anagrafica; null per dati storici non attestati."),
   id: zod.number(),
   prodottoId: zod.number(),
   lottoLogicoId: zod.number().nullish(),

@@ -2558,6 +2558,66 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/LottoLogico" }
 
+  /lotti-produttore:
+    get:
+      operationId: listLottiProduttore
+      tags: [Lotti]
+      summary: Anagrafiche territoriali, incluse le preregistrazioni senza merce
+      parameters:
+        - { name: areaOperativaId, in: query, schema: { type: integer } }
+        - { name: prodottoId, in: query, schema: { type: integer } }
+        - { name: origine, in: query, schema: { type: string, enum: [MANUALE, AUTOMATICO, IMPORTATO] } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Anagrafiche e saldi delle sole partite visibili
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/LottoProduttore" } }
+                  page: { type: integer }
+                  hasMore: { type: boolean }
+                required: [items, page, hasMore]
+    post:
+      operationId: preregisterLottoProduttore
+      tags: [Lotti]
+      summary: Pre-registra un lotto senza stock, origine assegnata dal server
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LottoProduttoreInput" }
+      responses:
+        "201":
+          description: Anagrafica creata senza movimenti
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoProduttorePreregisResult" }
+        "200":
+          description: Anagrafica riutilizzata o replay, origine invariata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoProduttorePreregisResult" }
+        "409":
+          description: Identità o chiave di retry incompatibile
+  /lotti-produttore/{id}:
+    get:
+      operationId: getLottoProduttore
+      tags: [Lotti]
+      summary: Dettaglio dell'anagrafica e partite nell'ambito autorizzato
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Anagrafica con aggregati senza duplicazioni di lineage
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LottoProduttore" }
+
   /lotti:
     get:
       operationId: listLotti
@@ -14033,6 +14093,8 @@ components:
     CaricoMagazzinoRigaInput:
       type: object
       properties:
+        produttore: { type: [string, "null"], maxLength: 200 }
+        lottoProduttoreId: { type: [integer, "null"], minimum: 1 }
         prodottoId: { type: integer, minimum: 1 }
         fondoOrigine:
           $ref: "#/components/schemas/FondoOrigine"
@@ -14135,6 +14197,7 @@ components:
     CaricoPraticaRiga:
       type: object
       properties:
+        lottoProduttoreId: { type: [integer, "null"], minimum: 1 }
         id: { type: integer }
         caricoPraticaId: { type: integer }
         clientId: { type: [string, "null"] }
@@ -14223,6 +14286,7 @@ components:
       type: object
       additionalProperties: false
       properties:
+        lottoProduttoreId: { type: [integer, "null"], minimum: 1 }
         clientId: { type: [string, "null"], maxLength: 100 }
         prodottoId: { type: integer, minimum: 1 }
         fondoOrigine:
@@ -14383,6 +14447,68 @@ components:
         [praticaId, rigaId, lottoId, movimentoId, quantita, versione, replay]
 
     # ── Lotti ─────────────────────────────────────────────────────────────
+    LottoProduttoreInput:
+      type: object
+      additionalProperties: false
+      properties:
+        areaOperativaId: { type: integer, minimum: 1 }
+        prodottoId: { type: integer, minimum: 1 }
+        codiceLotto: { type: [string, "null"], maxLength: 80 }
+        dataScadenza: { type: [string, "null"], format: date }
+        produttore: { type: [string, "null"], maxLength: 200 }
+        note: { type: [string, "null"], maxLength: 4000 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 100 }
+      required: [areaOperativaId, prodottoId, idempotencyKey]
+    LottoProduttorePartita:
+      type: object
+      properties:
+        id: { type: integer }
+        magazzinoId: { type: integer }
+        magazzinoNome: { type: string }
+        fondoOrigine: { $ref: "#/components/schemas/FondoOrigine" }
+        lottoLogicoId: { type: [integer, "null"] }
+        dataScadenza: { type: [string, "null"], format: date }
+        quantitaResidua: { $ref: "#/components/schemas/QuantitaContabile" }
+        quantitaPrenotata: { $ref: "#/components/schemas/QuantitaContabile" }
+        disponibile: { $ref: "#/components/schemas/QuantitaContabile" }
+      required: [id, magazzinoId, magazzinoNome, fondoOrigine, quantitaResidua, quantitaPrenotata, disponibile]
+    LottoProduttore:
+      type: object
+      properties:
+        id: { type: integer }
+        areaOperativaId: { type: integer }
+        prodottoId: { type: integer }
+        prodottoNome: { type: string }
+        prodottoCodice: { type: string }
+        unitaMisura: { type: string }
+        codiceOriginale: { type: [string, "null"] }
+        codiceCanonico: { type: [string, "null"] }
+        riferimentoInterno: { type: string }
+        dataScadenza: { type: [string, "null"], format: date }
+        produttore: { type: [string, "null"] }
+        produttoreCanonico: { type: [string, "null"] }
+        note: { type: [string, "null"] }
+        origine: { type: [string, "null"], enum: [MANUALE, AUTOMATICO, IMPORTATO, null] }
+        fonte: { type: [string, "null"] }
+        primoAutoreId: { type: [integer, "null"] }
+        autore: { type: [string, "null"] }
+        primaCreazioneAt: { type: [string, "null"], format: date-time }
+        dataAssociazione: { type: string, format: date-time }
+        partite: { type: array, items: { $ref: "#/components/schemas/LottoProduttorePartita" } }
+        numeroPartiteVisibili: { type: integer }
+        residuo: { $ref: "#/components/schemas/QuantitaContabile" }
+        prenotato: { $ref: "#/components/schemas/QuantitaContabile" }
+        disponibile: { $ref: "#/components/schemas/QuantitaContabile" }
+        statoPartite: { type: string, enum: [PARTITE_VISIBILI, MAI_CARICATO, NESSUNA_PARTITA_VISIBILE] }
+      required: [id, areaOperativaId, prodottoId, prodottoNome, prodottoCodice, unitaMisura, riferimentoInterno, dataAssociazione, partite, numeroPartiteVisibili, residuo, prenotato, disponibile, statoPartite]
+    LottoProduttorePreregisResult:
+      allOf:
+        - { $ref: "#/components/schemas/LottoProduttore" }
+        - type: object
+          properties:
+            creato: { type: boolean }
+          required: [creato]
+
     LottoLogico:
       type: object
       properties:
@@ -14453,6 +14579,11 @@ components:
     Lotto:
       type: object
       properties:
+        lottoProduttoreId: { type: [integer, "null"], minimum: 1 }
+        origineAnagrafica:
+          type: [string, "null"]
+          enum: [MANUALE, AUTOMATICO, IMPORTATO, null]
+          description: Origine dell’anagrafica; null per dati storici non attestati.
         id:
           type: integer
         prodottoId:
@@ -14583,6 +14714,7 @@ components:
     LottoInput:
       type: object
       properties:
+        lottoProduttoreId: { type: [integer, "null"], minimum: 1 }
         prodottoId:
           type: integer
         lottoLogicoId:

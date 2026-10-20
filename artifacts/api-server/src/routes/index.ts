@@ -5,6 +5,7 @@ import dashboardRouter from "./dashboard";
 import magazziniRouter from "./magazzini";
 import prodottiRouter from "./prodotti";
 import fornitoriRouter from "./fornitori";
+import lottiProduttoreRouter from "./lotti-produttore";
 import lottiRouter from "./lotti";
 import lottiLogiciRouter from "./lotti-logici";
 import carichiRouter from "./carichi";
@@ -93,6 +94,7 @@ router.use(
     "/carico-pratiche",
     "/lotti",
     "/lotti-logici",
+    "/lotti-produttore",
     "/preparazione-consegne",
     "/scarichi",
     "/bolle",
@@ -108,6 +110,7 @@ router.use(magazziniRouter);
 router.use(prodottiRouter);
 router.use(fornitoriRouter);
 router.use(lottiRouter);
+router.use(lottiProduttoreRouter);
 router.use(lottiLogiciRouter);
 router.use(carichiRouter);
 router.use(caricoPraticheRouter);

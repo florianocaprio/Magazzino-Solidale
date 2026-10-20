@@ -26,6 +26,7 @@ import {
   importazioniAgeaTable,
   lottiLogiciTable,
   lottiTable,
+  lottiProduttoreTable,
   magazziniTable,
   mappatureProdottiEsterniTable,
   movimentiEsterniAgeaTable,
@@ -3291,6 +3292,16 @@ describe("M3B — import FSE+ nella pratica Carico Merce", () => {
         idempotencyKey: `m3b-register-balance-${suffix}`,
       });
     expect(registered.status).toBe(201);
+    const importedMasters = await db
+      .select({ origine: lottiProduttoreTable.origine })
+      .from(lottiTable)
+      .innerJoin(
+        lottiProduttoreTable,
+        eq(lottiTable.lottoProduttoreId, lottiProduttoreTable.id),
+      )
+      .where(eq(lottiTable.magazzinoId, initialWarehouseId));
+    expect(importedMasters).toHaveLength(1);
+    expect(importedMasters[0].origine).toBe("IMPORTATO");
 
     const movements = await db
       .select()

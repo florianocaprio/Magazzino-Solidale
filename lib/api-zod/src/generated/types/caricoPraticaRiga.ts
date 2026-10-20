@@ -10,6 +10,11 @@ import type { FondoOrigine } from "./fondoOrigine";
 import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface CaricoPraticaRiga {
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
   id: number;
   caricoPraticaId: number;
   /** @nullable */

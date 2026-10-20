@@ -1,3 +1,4 @@
+import { resolveProducerLot, linkProducerLot } from "../lib/producerLots";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   assertAssignedMensa,
@@ -13,6 +14,7 @@ import {
   magazziniTable,
   prodottiTable,
   lottiTable,
+  lottiProduttoreTable,
   movimentiTable,
   utentiTable,
   volontariTable,
@@ -2100,6 +2102,39 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
             )
             .for("update");
         }
+        const sourceMaster = u.lotto?.lottoProduttoreId
+          ? (
+              await tx
+                .select({ produttore: lottiProduttoreTable.produttore })
+                .from(lottiProduttoreTable)
+                .where(eq(lottiProduttoreTable.id, u.lotto.lottoProduttoreId))
+            )[0]
+          : null;
+        const producerMaster = (
+          await resolveProducerLot(tx, {
+            areaOperativaId: destinationWarehouse.areaOperativaId!,
+            prodottoId: u.m.prodottoId,
+            codiceLotto: u.lotto?.codiceLotto,
+            dataScadenza: u.lotto?.dataScadenza,
+            produttore: sourceMaster?.produttore,
+            lottoProduttoreId:
+              sourceWarehouse.areaOperativaId ===
+              destinationWarehouse.areaOperativaId
+                ? u.lotto?.lottoProduttoreId
+                : destLotto?.lottoProduttoreId,
+            actorId: req.user!.id,
+            audit,
+            legacy: Boolean(destLotto && !destLotto.lottoProduttoreId),
+          })
+        ).master;
+        if (
+          destLotto?.lottoProduttoreId != null &&
+          destLotto.lottoProduttoreId !== producerMaster.id
+        )
+          throw new InventoryLedgerError(
+            409,
+            "Anagrafica lotto di destinazione incompatibile",
+          );
         if (destLotto) {
           if (
             (destLotto.dataScadenza ?? null) !== (u.lotto?.dataScadenza ?? null)
@@ -2155,6 +2190,13 @@ router.post("/trasferimenti/:id/conferma", async (req, res) => {
             .returning();
         }
 
+        destLotto = await linkProducerLot(
+          tx,
+          destLotto,
+          producerMaster.id,
+          audit,
+          req.user!.id,
+        );
         await tx.insert(movimentiTable).values({
           tipoMovimento: "trasferimento",
           tipoDettaglio: "entrata",

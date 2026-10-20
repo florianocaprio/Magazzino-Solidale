@@ -2648,6 +2648,16 @@ export type CaricoMagazzinoDettaglio = CaricoMagazzino & {
 };
 
 export interface CaricoMagazzinoRigaInput {
+  /**
+   * @maxLength 200
+   * @nullable
+   */
+  produttore?: string | null;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
   /** @minimum 1 */
   prodottoId: number;
   fondoOrigine: FondoOrigine;
@@ -2748,6 +2758,11 @@ export interface CaricoPratica {
 }
 
 export interface CaricoPraticaRiga {
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
   id: number;
   caricoPraticaId: number;
   /** @nullable */
@@ -2807,6 +2822,11 @@ export type CaricoPraticaDettaglio = CaricoPratica & {
 };
 
 export interface CaricoPraticaRigaInput {
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
   /**
    * @maxLength 100
    * @nullable
@@ -2961,6 +2981,114 @@ export interface CaricoPraticaRettificaResult {
   replay: boolean;
 }
 
+export interface LottoProduttoreInput {
+  /** @minimum 1 */
+  areaOperativaId: number;
+  /** @minimum 1 */
+  prodottoId: number;
+  /**
+   * @maxLength 80
+   * @nullable
+   */
+  codiceLotto?: string | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /**
+   * @maxLength 200
+   * @nullable
+   */
+  produttore?: string | null;
+  /**
+   * @maxLength 4000
+   * @nullable
+   */
+  note?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  idempotencyKey: string;
+}
+
+export interface LottoProduttorePartita {
+  id: number;
+  magazzinoId: number;
+  magazzinoNome: string;
+  fondoOrigine: FondoOrigine;
+  /** @nullable */
+  lottoLogicoId?: number | null;
+  /** @nullable */
+  dataScadenza?: string | null;
+  quantitaResidua: QuantitaContabile;
+  quantitaPrenotata: QuantitaContabile;
+  disponibile: QuantitaContabile;
+}
+
+/**
+ * @nullable
+ */
+export type LottoProduttoreOrigine =
+  | (typeof LottoProduttoreOrigine)[keyof typeof LottoProduttoreOrigine]
+  | null;
+
+export const LottoProduttoreOrigine = {
+  MANUALE: "MANUALE",
+  AUTOMATICO: "AUTOMATICO",
+  IMPORTATO: "IMPORTATO",
+} as const;
+
+export type LottoProduttoreStatoPartite =
+  (typeof LottoProduttoreStatoPartite)[keyof typeof LottoProduttoreStatoPartite];
+
+export const LottoProduttoreStatoPartite = {
+  PARTITE_VISIBILI: "PARTITE_VISIBILI",
+  MAI_CARICATO: "MAI_CARICATO",
+  NESSUNA_PARTITA_VISIBILE: "NESSUNA_PARTITA_VISIBILE",
+} as const;
+
+export interface LottoProduttore {
+  id: number;
+  areaOperativaId: number;
+  prodottoId: number;
+  prodottoNome: string;
+  prodottoCodice: string;
+  unitaMisura: string;
+  /** @nullable */
+  codiceOriginale?: string | null;
+  /** @nullable */
+  codiceCanonico?: string | null;
+  riferimentoInterno: string;
+  /** @nullable */
+  dataScadenza?: string | null;
+  /** @nullable */
+  produttore?: string | null;
+  /** @nullable */
+  produttoreCanonico?: string | null;
+  /** @nullable */
+  note?: string | null;
+  /** @nullable */
+  origine?: LottoProduttoreOrigine;
+  /** @nullable */
+  fonte?: string | null;
+  /** @nullable */
+  primoAutoreId?: number | null;
+  /** @nullable */
+  autore?: string | null;
+  /** @nullable */
+  primaCreazioneAt?: string | null;
+  dataAssociazione: string;
+  partite: LottoProduttorePartita[];
+  numeroPartiteVisibili: number;
+  residuo: QuantitaContabile;
+  prenotato: QuantitaContabile;
+  disponibile: QuantitaContabile;
+  statoPartite: LottoProduttoreStatoPartite;
+}
+
+export type LottoProduttorePreregisResult = LottoProduttore & {
+  creato: boolean;
+};
+
 export type LottoLogicoStato =
   (typeof LottoLogicoStato)[keyof typeof LottoLogicoStato];
 
@@ -3028,6 +3156,20 @@ export interface LottoLogicoTransitionInput {
   motivo?: string;
 }
 
+/**
+ * Origine dell’anagrafica; null per dati storici non attestati.
+ * @nullable
+ */
+export type LottoOrigineAnagrafica =
+  | (typeof LottoOrigineAnagrafica)[keyof typeof LottoOrigineAnagrafica]
+  | null;
+
+export const LottoOrigineAnagrafica = {
+  MANUALE: "MANUALE",
+  AUTOMATICO: "AUTOMATICO",
+  IMPORTATO: "IMPORTATO",
+} as const;
+
 export type LottoDocumentiCaricoItem = {
   caricoId: number;
   numero: string;
@@ -3053,6 +3195,16 @@ export type LottoLineageCarichiItem = {
 };
 
 export interface Lotto {
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
+  /**
+   * Origine dell’anagrafica; null per dati storici non attestati.
+   * @nullable
+   */
+  origineAnagrafica?: LottoOrigineAnagrafica;
   id: number;
   prodottoId: number;
   /** @nullable */
@@ -3118,6 +3270,11 @@ export const LottoInputCausale = {
 } as const;
 
 export interface LottoInput {
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
   prodottoId: number;
   /** @nullable */
   lottoLogicoId?: number | null;
@@ -11234,6 +11391,37 @@ export type ListLottiLogiciParams = {
    */
   areaOperativaId?: number;
   includeStorico?: boolean;
+};
+
+export type ListLottiProduttoreParams = {
+  areaOperativaId?: number;
+  prodottoId?: number;
+  origine?: ListLottiProduttoreOrigine;
+  q?: string;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type ListLottiProduttoreOrigine =
+  (typeof ListLottiProduttoreOrigine)[keyof typeof ListLottiProduttoreOrigine];
+
+export const ListLottiProduttoreOrigine = {
+  MANUALE: "MANUALE",
+  AUTOMATICO: "AUTOMATICO",
+  IMPORTATO: "IMPORTATO",
+} as const;
+
+export type ListLottiProduttore200 = {
+  items: LottoProduttore[];
+  page: number;
+  hasMore: boolean;
 };
 
 export type ListLottiParams = {

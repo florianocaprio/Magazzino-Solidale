@@ -25,6 +25,7 @@ import {
   menseTable,
   pool,
   prodottiTable,
+  lottiProduttoreTable,
   prenotazioniMagazzinoTable,
   scarichiTable,
   scaricoRigheTable,
@@ -662,8 +663,11 @@ afterEach(async () => {
       .where(inArray(lottiTable.id, ids.lots.splice(0)));
   if (ids.products.length)
     await db
-      .delete(prodottiTable)
-      .where(inArray(prodottiTable.id, ids.products.splice(0)));
+      .delete(lottiProduttoreTable)
+      .where(inArray(lottiProduttoreTable.prodottoId, ids.products.splice(0)));
+  await db
+    .delete(prodottiTable)
+    .where(inArray(prodottiTable.id, ids.products.splice(0)));
   if (ids.warehouses.length)
     await db
       .delete(magazziniTable)

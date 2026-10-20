@@ -7,6 +7,7 @@ import {
   scaricoRigheTable,
   magazziniTable,
   prodottiTable,
+  lottiProduttoreTable,
   lottiTable,
   movimentiTable,
   utentiTable,
@@ -337,6 +338,9 @@ export async function cleanup(scope: SeedScope): Promise<void> {
       .where(inArray(scarichiTable.id, scope.scaricoIds));
   }
   if (scope.prodottoIds.length > 0) {
+    await db
+      .delete(lottiProduttoreTable)
+      .where(inArray(lottiProduttoreTable.prodottoId, scope.prodottoIds));
     await db
       .delete(prodottiTable)
       .where(inArray(prodottiTable.id, scope.prodottoIds));

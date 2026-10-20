@@ -11,6 +11,11 @@ import type { QuantitaContabile } from "./quantitaContabile";
 
 export interface CaricoPraticaRigaInput {
   /**
+   * @minimum 1
+   * @nullable
+   */
+  lottoProduttoreId?: number | null;
+  /**
    * @maxLength 100
    * @nullable
    */

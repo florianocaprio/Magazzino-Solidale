@@ -22,6 +22,7 @@ import {
   movimentiTable,
   pool,
   prodottiTable,
+  lottiProduttoreTable,
   prenotazioniMagazzinoTable,
   utentiTable,
 } from "@workspace/db";
@@ -312,6 +313,11 @@ afterAll(async () => {
   await db
     .delete(lottiTable)
     .where(inArray(lottiTable.magazzinoId, [magazzinoAId, magazzinoBId]));
+  await db
+    .delete(lottiProduttoreTable)
+    .where(
+      inArray(lottiProduttoreTable.prodottoId, [prodottoPzId, prodottoKgId]),
+    );
   await db
     .delete(prodottiTable)
     .where(inArray(prodottiTable.id, [prodottoPzId, prodottoKgId]));

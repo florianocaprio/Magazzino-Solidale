@@ -316,6 +316,8 @@ import type {
   ListLottiLogiciParams,
   ListLottiMensaParams,
   ListLottiParams,
+  ListLottiProduttore200,
+  ListLottiProduttoreParams,
   ListMagazziniMensaParams,
   ListMensaAbilitazioniParams,
   ListMenseParams,
@@ -344,6 +346,9 @@ import type {
   LottoLogicoInput,
   LottoLogicoTransitionInput,
   LottoLogicoUpdate,
+  LottoProduttore,
+  LottoProduttoreInput,
+  LottoProduttorePreregisResult,
   LottoUpdate,
   Magazzino,
   MagazzinoInput,
@@ -9784,6 +9789,286 @@ export const useArchiveLottoLogico = <
 > => {
   return useMutation(getArchiveLottoLogicoMutationOptions(options));
 };
+
+export const getListLottiProduttoreUrl = (
+  params?: ListLottiProduttoreParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/lotti-produttore?${stringifiedParams}`
+    : `/api/lotti-produttore`;
+};
+
+/**
+ * @summary Anagrafiche territoriali, incluse le preregistrazioni senza merce
+ */
+export const listLottiProduttore = async (
+  params?: ListLottiProduttoreParams,
+  options?: RequestInit,
+): Promise<ListLottiProduttore200> => {
+  return customFetch<ListLottiProduttore200>(
+    getListLottiProduttoreUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListLottiProduttoreQueryKey = (
+  params?: ListLottiProduttoreParams,
+) => {
+  return [`/api/lotti-produttore`, ...(params ? [params] : [])] as const;
+};
+
+export const getListLottiProduttoreQueryOptions = <
+  TData = Awaited<ReturnType<typeof listLottiProduttore>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLottiProduttoreParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLottiProduttore>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListLottiProduttoreQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listLottiProduttore>>
+  > = ({ signal }) =>
+    listLottiProduttore(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listLottiProduttore>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListLottiProduttoreQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listLottiProduttore>>
+>;
+export type ListLottiProduttoreQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Anagrafiche territoriali, incluse le preregistrazioni senza merce
+ */
+
+export function useListLottiProduttore<
+  TData = Awaited<ReturnType<typeof listLottiProduttore>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLottiProduttoreParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLottiProduttore>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListLottiProduttoreQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getPreregisterLottoProduttoreUrl = () => {
+  return `/api/lotti-produttore`;
+};
+
+/**
+ * @summary Pre-registra un lotto senza stock, origine assegnata dal server
+ */
+export const preregisterLottoProduttore = async (
+  lottoProduttoreInput: LottoProduttoreInput,
+  options?: RequestInit,
+): Promise<LottoProduttorePreregisResult> => {
+  return customFetch<LottoProduttorePreregisResult>(
+    getPreregisterLottoProduttoreUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(lottoProduttoreInput),
+    },
+  );
+};
+
+export const getPreregisterLottoProduttoreMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof preregisterLottoProduttore>>,
+    TError,
+    { data: BodyType<LottoProduttoreInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof preregisterLottoProduttore>>,
+  TError,
+  { data: BodyType<LottoProduttoreInput> },
+  TContext
+> => {
+  const mutationKey = ["preregisterLottoProduttore"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof preregisterLottoProduttore>>,
+    { data: BodyType<LottoProduttoreInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return preregisterLottoProduttore(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PreregisterLottoProduttoreMutationResult = NonNullable<
+  Awaited<ReturnType<typeof preregisterLottoProduttore>>
+>;
+export type PreregisterLottoProduttoreMutationBody =
+  BodyType<LottoProduttoreInput>;
+export type PreregisterLottoProduttoreMutationError = ErrorType<void>;
+
+/**
+ * @summary Pre-registra un lotto senza stock, origine assegnata dal server
+ */
+export const usePreregisterLottoProduttore = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof preregisterLottoProduttore>>,
+    TError,
+    { data: BodyType<LottoProduttoreInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof preregisterLottoProduttore>>,
+  TError,
+  { data: BodyType<LottoProduttoreInput> },
+  TContext
+> => {
+  return useMutation(getPreregisterLottoProduttoreMutationOptions(options));
+};
+
+export const getGetLottoProduttoreUrl = (id: number) => {
+  return `/api/lotti-produttore/${id}`;
+};
+
+/**
+ * @summary Dettaglio dell'anagrafica e partite nell'ambito autorizzato
+ */
+export const getLottoProduttore = async (
+  id: number,
+  options?: RequestInit,
+): Promise<LottoProduttore> => {
+  return customFetch<LottoProduttore>(getGetLottoProduttoreUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLottoProduttoreQueryKey = (id: number) => {
+  return [`/api/lotti-produttore/${id}`] as const;
+};
+
+export const getGetLottoProduttoreQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLottoProduttore>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLottoProduttore>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLottoProduttoreQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getLottoProduttore>>
+  > = ({ signal }) => getLottoProduttore(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLottoProduttore>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLottoProduttoreQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLottoProduttore>>
+>;
+export type GetLottoProduttoreQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Dettaglio dell'anagrafica e partite nell'ambito autorizzato
+ */
+
+export function useGetLottoProduttore<
+  TData = Awaited<ReturnType<typeof getLottoProduttore>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLottoProduttore>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLottoProduttoreQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 export const getListLottiUrl = (params?: ListLottiParams) => {
   const normalizedParams = new URLSearchParams();

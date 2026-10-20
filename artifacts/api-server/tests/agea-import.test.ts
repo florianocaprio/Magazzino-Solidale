@@ -22,6 +22,7 @@ import {
   movimentiTable,
   pool,
   prodottiTable,
+  lottiProduttoreTable,
   riconciliazioniFseRigheTable,
   riconciliazioniFseTable,
   systemLogsTable,
@@ -534,6 +535,9 @@ afterAll(async () => {
           ),
         );
       await db
+        .delete(lottiProduttoreTable)
+        .where(inArray(lottiProduttoreTable.prodottoId, acceptanceProductIds));
+      await db
         .delete(prodottiTable)
         .where(inArray(prodottiTable.id, acceptanceProductIds));
     }
@@ -571,9 +575,15 @@ afterAll(async () => {
         inArray(mappatureProdottiEsterniTable.prodottoId, extraProductIds),
       );
     await db
+      .delete(lottiProduttoreTable)
+      .where(inArray(lottiProduttoreTable.prodottoId, extraProductIds));
+    await db
       .delete(prodottiTable)
       .where(inArray(prodottiTable.id, extraProductIds));
   }
+  await db
+    .delete(lottiProduttoreTable)
+    .where(eq(lottiProduttoreTable.prodottoId, productId));
   await db.delete(prodottiTable).where(eq(prodottiTable.id, productId));
   if (isolatedSourceId)
     await db

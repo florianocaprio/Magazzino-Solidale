@@ -1,6 +1,6 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-20 ottobre 2026, Europe/Rome. **Consegne 01–04 chiuse con OK di Floriano, compreso il correttivo tessera/codici beneficiari `6088327`; consegna 05 (blocco D) e correttivo UAT installati e verificati sulla 8082 (`ad1b190`, riapertura con sole aggiunte); UAT 05 da completare con Floriano.**
+20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Ultima UAT 05 confermata sul correttivo `ad1b190`. Prompt 06 e 07 autorizzati insieme: BUG18 in lavorazione; consegna completa sulla 8082 dopo modello, interfaccia e verifiche.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
@@ -2446,3 +2446,108 @@ il controllo `soloAggiunte`. Ricevuta privata
 Il commit di questa ricevuta è solo documentale: il codice installato resta
 quello indicato sopra. Pubblicazione limitata al branch della campagna, senza
 main, merge o produzione. Prompt 06 non avviato, come richiesto da Floriano.
+
+
+## Consegne 06–07 — BUG18, lotto produttore distinto dalle partite
+
+Floriano ha chiuso 05 e richiesto esplicitamente entrambi i prompt della cartella
+BUG 4 e la ricompilazione della 8082. Questa richiesta diretta sostituisce le
+attese fra 06, `##test` e 07 indicate nei documenti: checkpoint tecnico 06 e
+consegna completa 07, senza avviare 08. Si conserva il branch della campagna.
+
+### Modello e migrazione
+
+Migration append-only `20261020_lotti_produttore.sql`: tabella territoriale senza
+quantità, FK nullable su partite e righe di pratica. Nessun backfill, nessuna
+riscrittura di codici, movimenti, quantità, fondi o hash FSE. I vecchi ID restano
+invariati. Le dipendenze usano RESTRICT, compreso il primo autore; l'eliminazione
+utenti esistente rileva già dinamicamente tutte le FK e conserva gli storici.
+
+Identità nuova per Area/prodotto/codice canonico NFC, trim ai bordi e maiuscole;
+restano significativi punteggiatura, zeri e spazi interni. I normalizzatori del
+ledger/FSE non cambiano. Scadenza e produttore noti discordanti producono 409 e
+rollback. Metadati mancanti possono essere completati senza cancellare quelli
+noti. Il produttore è il fabbricante, distinto dal fornitore. Senza codice si
+usa un riferimento interno separato e un ID stabile, senza deduplicare i NULL
+né aggirare i requisiti del prodotto.
+
+Origine della prima creazione immutabile: MANUALE soltanto dalla preregistrazione;
+AUTOMATICO dal normale carico; IMPORTATO soltanto da writer FSE verificati per
+riga, nella stessa transazione del carico. Il fondo non determina l'origine.
+Un master storico associato durante un carico mantiene origine/autore/data
+storica sconosciuti, distinti dalla data tecnica di associazione. I replay già
+completati vengono riconosciuti prima della risoluzione anagrafica.
+
+La risoluzione comune precede gli effetti sulle partite. Il lock transazionale
+di ingresso viene acquisito prima delle business key fisiche ed è riutilizzabile
+nei comandi composti; serializza conservativamente gli ingressi per evitare
+inversioni fra carichi concorrenti, preregistrazione, trasferimenti e import.
+Tradeoff: ingressi concorrenti su Aree diverse condividono questo breve lock.
+
+### Percorsi integrati e perimetro
+
+| Percorso | Integrazione e invarianti |
+| --- | --- |
+| Carico diretto, POST legacy lotti, wrapper inventariale | Resolver nel ledger comune, dopo replay; aggancio nullable senza sostituire ID partita |
+| Pratiche manuali e FSE | ID anagrafico nelle bozze, validazione Area/prodotto/codice/scadenza al salvataggio e alla registrazione; cambio Area invalida soltanto la scelta pendente |
+| Approvvigionamenti | Ricezione attraverso il wrapper comune e scelta esplicita validata |
+| AGEA incrementale e bootstrap saldo | Prova server della provenienza importata; sola analisi non crea anagrafiche |
+| FSE M3B ordinario e saldo | Provenienza dalle righe acquisite/validate e dalla copertura saldo verificata, senza modificare claim o hash |
+| Trasferimenti | Riusa nella stessa Area, risolve nella destinazione cross-Area; copia produttore noto, conserva natura e lineage |
+| Rientri, storni, rettifiche | Conservano la partita e il collegamento esistenti, senza rematch |
+
+API separate `/lotti-produttore`: preregistrazione, ricerca paginata e dettaglio.
+Gate di modulo e permessi su GET e POST. Area senza giacenza consultabile;
+partite/saldi/prenotazioni calcolati soltanto dopo filtro dei magazzini visibili,
+compreso il Centro legacy. Un amministratore assegnato resta nella propria
+Area; utente ordinario senza Area respinto. Fonte FSE limitata al relativo
+permesso. In assenza di partite visibili non viene dedotta assenza globale;
+«Mai caricato» soltanto nel perimetro completo e senza partite legacy incerte.
+Contratto OpenAPI esteso con DTO dedicati; client e validatori rigenerati con
+Orval ufficiale, senza modifiche manuali ai generati.
+
+### Interfaccia 07
+
+Candidato locale in verifica: questa parte verrà inclusa nel checkpoint 07,
+dopo le prove browser. Nessuna installazione intermedia del solo backend.
+
+Carico Merce → Lotti fisici: preregistrazione senza quantità/fondo/magazzino,
+ricerca e filtro delle tre origini, scheda con metadati e saldi territoriali,
+link alle partite reali. Storico senza attestazione esplicitamente sconosciuto.
+Lookup paginato sulle righe manuali anche per lotti mai caricati; l'ID scelto
+resta nella bozza e viene cancellato quando si cambia codice o contesto.
+Non si correggono automaticamente i dati di una riga FSE discordante.
+
+Catalogo: badge viola FSE+ e obbligo lotto blu indipendenti; descrizione del
+flag distingue classificazione del catalogo dai fondi delle singole partite.
+
+Wizard FSE: configurazione sorgente separata dai file, pulsanti Registro e
+Giacenze, nomi dei file, XLSX/XLS/CSV e limite effettivo 10 MiB. Nuovi carichi
+richiede Registro; Saldo iniziale entrambi, data e copertura storica. Quattro
+schermate effettive con esito esplicito e ritorno alla pratica; nessun carico
+contabile durante l'acquisizione o l'aggiunta. Registro acquisito conservato
+quando Giacenze fallisce; retry nella stessa sessione, anche dalla ripresa.
+Prodotto creato conservato se il mapping fallisce, con riuso esplicito dell'ID.
+Selezioni e idempotency key esistenti restano legate alla stessa intenzione.
+Test reali DOM verificano errore parziale, retry, limite file e quarto passaggio.
+
+### Verifiche e installazione
+
+Checkpoint tecnico 06 validato il 20 ottobre 2026. Runner canonico su database
+Docker temporanei: fresh install e replay PASS; tutti gli otto gruppi API PASS,
+**2.083 test riusciti, 4 SKIP esterni preesistenti, 168 file**. Dettaglio: core
+79, reporting 83, interventi 21, mensa 108, emporio 230, maps 18, fse 2, general
+1.542. General include 11 nuove prove del resolver, upgrade/replay della nuova
+migration e origine IMPORTATO dal saldo FSE realmente registrato. Fixture di
+cleanup adeguati alle nuove FK, senza indebolire vincoli o saltare test.
+
+Evidenze private: `/private/tmp/blocco0607-api-complete` (fresh/core/reporting/
+interventi), `/private/tmp/blocco0607-api-remaining` (mensa/emporio/maps/fse),
+`/private/tmp/blocco0607-api-release` (general definitivo).
+`CI=true pnpm install --frozen-lockfile` PASS, `pnpm run typecheck` PASS;
+rigenerazione ufficiale ripetuta: 986 file generati identici. I quattro documenti
+locali preesistenti conservano gli SHA-256 iniziali e restano fuori dal commit.
+
+UI: 789 test PASS in 122 file. Build e budget PASS, 386,7/400 KiB gzip.
+Browser e ricevuta Docker della consegna completa 07 ancora da aggiungere.
+Nessun test funzionale sul DB personale; nessun merge/main/produzione.

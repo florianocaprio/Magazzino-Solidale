@@ -13,6 +13,7 @@ import {
   movimentiTable,
   pool,
   prodottiTable,
+  lottiProduttoreTable,
   systemLogsTable,
   utentiTable,
   areeOperativeTable,
@@ -218,8 +219,17 @@ afterAll(async () => {
   await db
     .delete(lottiTable)
     .where(eq(lottiTable.magazzinoId, altroMagazzinoId));
+  await db
+    .delete(lottiProduttoreTable)
+    .where(eq(lottiProduttoreTable.prodottoId, prodottoLiberoId));
   await db.delete(prodottiTable).where(eq(prodottiTable.id, prodottoLiberoId));
+  await db
+    .delete(lottiProduttoreTable)
+    .where(eq(lottiProduttoreTable.prodottoId, prodottoLottoId));
   await db.delete(prodottiTable).where(eq(prodottiTable.id, prodottoLottoId));
+  await db
+    .delete(lottiProduttoreTable)
+    .where(eq(lottiProduttoreTable.prodottoId, prodottoPezziId));
   await db.delete(prodottiTable).where(eq(prodottiTable.id, prodottoPezziId));
   await db.delete(magazziniTable).where(eq(magazziniTable.id, magazzinoId));
   await db

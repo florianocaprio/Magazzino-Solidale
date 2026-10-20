@@ -38,6 +38,7 @@ export const AREA_BY_SEGMENT: Record<string, string | string[]> = {
   magazzini: ["magazzino", EMPORIO_AREA_KEY],
   prodotti: "magazzino",
   lotti: "magazzino",
+  "lotti-produttore": "magazzino",
   movimenti: "magazzino",
   giacenze: "magazzino",
   trasferimenti: ["magazzino", MENSA_AREA_KEY],
