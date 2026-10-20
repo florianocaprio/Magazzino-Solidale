@@ -330,12 +330,13 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     });
     await expect(suggested).toBeVisible();
     await suggested.click();
+    const correctionButton = page.getByRole("button", {
+      name: "Correggi o conferma", exact: true,
+    });
     await expect(
-      page.getByText("Da verificare", { exact: true }),
+      correctionButton.locator("..").getByText("Da verificare", { exact: true }),
     ).toBeVisible();
-    await page
-      .getByRole("button", { name: "Correggi o conferma", exact: true })
-      .click();
+    await correctionButton.click();
     await page
       .getByPlaceholder("Motivo obbligatorio")
       .fill("Conferma data documento come fallback E2E");

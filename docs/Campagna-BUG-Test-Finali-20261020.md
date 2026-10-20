@@ -51,6 +51,16 @@ La verifica delle suite non raggiunte dal primo ciclo ha rilevato due ulteriori 
 
 ### Provenienza e passaggi finali
 
-Dal codice UAT `fb2ba4b` cambiano soltanto otto test browser e tre documenti: applicazione, API, schema, migration, dipendenze e configurazione restano identici. Le evidenze API/originali FSE e la UAT personale sono quindi riutilizzabili per i rispettivi input invariati. Il nuovo checkpoint richiede comunque un ciclo CI completo su tutti i 49 spec; un KO o una suite non eseguita non costituiscono PASS.
+Dal codice UAT `fb2ba4b` cambiano soltanto dieci test browser e tre documenti: applicazione, API, schema, migration, dipendenze e configurazione restano identici. Le evidenze API/originali FSE e la UAT personale sono quindi riutilizzabili per i rispettivi input invariati. Il nuovo checkpoint richiede comunque un ciclo CI completo su tutti i 49 spec; un KO o una suite non eseguita non costituiscono PASS.
 
 Il riferimento stabile alla PR raccoglie la SHA verificata, il run finale, i conteggi complessivi, le immagini effettivamente installate e l’eventuale SHA di merge. La nuova build personale deve conservare PostgreSQL, uploads, ledger 63/63 e le impronte delle 45 tabelle applicative, dopo backup e ripristino di prova isolato. Nessuna suite mutativa va eseguita sulla 8082. Non è previsto alcun aggiornamento Hetzner in questo mandato.
+
+
+### Secondo ciclo completo — selettore FSE e sincronizzazione replay
+
+Sul checkpoint `04ea7fc` il run [39462914762](https://github.com/florianocaprio/Magazzino-Solidale/actions/runs/39462914762) ha statico/Docker e API completi PASS (2.098 PASS / 7 SKIP in CI). Le partizioni browser 0 e 2 hanno segnalato due ulteriori KO, quindi il run non costituisce un GO complessivo:
+
+- `fse-import-practice-m3b.spec.ts`: «Da verificare» era cercato sull’intera pagina e poteva risolvere sia il contatore sia il badge. Ora viene cercato nella riga con «Correggi o conferma», conservando l’esatto stato atteso. Ripetizione completa: **11 PASS / 24 SKIP** di matrice/originali non forniti a questa ripetizione; i file originali restano coperti dalla precedente prova privata.
+- `m4b1-prenotazioni.spec.ts`: in CI il bottone Avvia non risultava visibile dopo il replay POST riuscito. Il medesimo test non modificato è passato integralmente in locale (10 PASS / 10 SKIP), quindi la causa applicativa non è dimostrata. La sincronizzazione ora richiede sia lo stato della risposta replay sia la rilettura canonica del documento prima degli assert UI/stock. Nessuna soglia o timeout aumentato; restano identici intenzione, un solo movimento e quantità. Ripetizione completa dopo l’adeguamento: **10 PASS / 10 SKIP**.
+
+Evidenze: `/private/tmp/bug09-browser-round2-diag`, `/private/tmp/bug09-browser-round2-sync`, `/private/tmp/bug09-ci-round2-api` e partizioni browser omonime. Applicazione, schema e dipendenze restano invariati; nuovo ciclo completo richiesto prima del merge. I risultati delle partizioni ancora attive del secondo ciclo restano separati dal candidato aggiornato.

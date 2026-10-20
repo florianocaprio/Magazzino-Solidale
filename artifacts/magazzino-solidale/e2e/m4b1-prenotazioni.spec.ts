@@ -242,8 +242,22 @@ test.describe("M4B.1 — azioni reali del dettaglio Trasferimento", () => {
           response.request().method() === "POST" &&
           response.status() === 200,
       );
+      // A successful command precedes the canonical detail refetch. Wait for
+      // the state that drives the buttons, rather than racing that read in CI.
+      const expectedState = suffix === "prepara" ? "preparato" : "in_transito";
+      const refreshedDocument = page.waitForResponse(async (response) => {
+        if (
+          new URL(response.url()).pathname !==
+            `/api/documenti-operativi/trasferimento/${transfer.id}` ||
+          response.request().method() !== "GET" ||
+          response.status() !== 200
+        )
+          return false;
+        return (await response.json()).dettaglio.stato === expectedState;
+      });
       await detail.getByRole("button", { name: buttonName }).click();
-      await replayResponse;
+      expect((await (await replayResponse).json()).stato).toBe(expectedState);
+      await refreshedDocument;
       expect(attempts).toBe(2);
       expect(secondBody).toEqual(firstBody);
       await page.unroute(path);
