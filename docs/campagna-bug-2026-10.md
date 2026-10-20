@@ -130,7 +130,7 @@ I test automatici non sostituiscono la UAT personale. D03 mantiene il comportame
 | 18 | E | 06, 07 | CHIUSO; UAT OK | Nessuno; lotti e correttivi FSE+ accettati | 291af99 (include checkpoint 06/07 e correttivi) | PASS mirati; ricevute 06/07 e correttivi collegate | OK Floriano 20/10 | 291af99f3f40933d4fe7711c00d542a25875b04c |
 | 19 | E | 07 | CHIUSO; UAT OK | Nessuno; lotti e correttivi FSE+ accettati | 291af99 (include checkpoint 06/07 e correttivi) | PASS mirati; ricevute 06/07 e correttivi collegate | OK Floriano 20/10 | 291af99f3f40933d4fe7711c00d542a25875b04c |
 | 20 | F | 08 | CHIUSO; UAT OK | Nessuno; UX20-01–14 verificati automaticamente | fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80 | 822 UI; 97 API; 193 browser PASS + 12 skip di matrice; build/budget PASS | OK Floriano 20/10 | fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80 |
-| 21 | C | 04 + addendum 2.2 | CHIUSO; UAT OK | Un solo ID con stati, territorio, tessera e Zona UDS | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
+| 21 | C | 04 + addendum 2.2 | CHIUSO; UAT OK | Nessuno; un solo ID con stati, territorio, tessera e Zona UDS | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 
 ## Otto consegne
 
@@ -2712,3 +2712,5 @@ La richiesta diretta autorizza l’installazione personale durante questa conseg
 ## Test finali 09 e mandato di merge — 20/10/2026
 
 Floriano dichiara che il punto 08 funziona sulla 8082 e lo chiude; richiede espressamente `09_TEST_Riutilizzabile.txt`, ricompilazione della 8082 e merge diretto se tutti i controlli passano. Main remoto è ancora la base `f668b7e`; nessuna integrazione funzionale esterna. Tutte le UAT 01–08 sono approvate. Certificazione in corso: [Campagna-BUG-Test-Finali-20261020.md](Campagna-BUG-Test-Finali-20261020.md). Il mandato corrente copre il merge Git; non attiva il rilascio Hetzner del distinto prompt 10.
+
+Primo ciclo 09: statico e API CI PASS; API locale completa con originali FSE+ 2.103 PASS/2 skip AGEA. Adeguati due spec browser rimasti al vecchio flusso (contesto/tessera, messaggio di revoca e token fixture); ripetizione locale 13 PASS/2 skip di matrice. Codice applicativo e UAT conservati; nessun merge con gate rossi. Evidenze e prosecuzione nel rapporto finale collegato.

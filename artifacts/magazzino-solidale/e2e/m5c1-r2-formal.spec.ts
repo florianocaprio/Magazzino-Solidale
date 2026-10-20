@@ -443,13 +443,13 @@ test("R2-02: presa in carico, Bolla aperta, P1/P2 persistenti e volontario con e
       await page.evaluate(() =>
         window.dispatchEvent(new Event("visibilitychange")),
       );
-      // M6.7 rejects missing territory before linked-document lookup. Require
+      // BUG01 rejects an unassigned Area before linked-document lookup. Require
       // that exact denial and no protected payload, not an arbitrary 403.
       const revokedRead = await revoked;
       expect(revokedRead.status()).toBe(403);
       const revokedBody = await revokedRead.json();
       expect(revokedBody.error).toBe(
-        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+        "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
       );
       expect(Object.keys(revokedBody).sort()).toEqual([
         "code",
@@ -489,7 +489,7 @@ test("R2-03: Centro gestisce Enti, Magazzino cerca e crea Bolla ma non modifica 
   viewport,
 }) => {
   const suffix = randomUUID().replaceAll("-", "").slice(0, 8);
-  const token = `Q${suffix.slice(0, 2)}`;
+  const token = `Q${suffix}`;
   const names = ["Alfa", "Beta", "Gamma", "Delta", "Epsilon", "Zeta"].map(
     (name) => `${token} ${name} ${suffix}`,
   );

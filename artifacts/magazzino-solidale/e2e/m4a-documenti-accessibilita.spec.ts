@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { bolle } from "../src/lib/i18n/namespaces/bolle";
-import { login } from "./helpers";
+import { login, selectOption } from "./helpers";
 
 const languages = ["it", "es", "en", "fr", "de", "ar"] as const;
 const supportedProjects = new Set([
@@ -63,7 +63,65 @@ test("M4A: sei lingue, RTL, viewport tablet, tastiera/tocco e inserimento manual
   const manualBarcode = create.getByPlaceholder(
     /scansiona o digita il codice/i,
   );
-  await manualBarcode.fill("DEMO-BEN-001");
+  await expect(manualBarcode).toBeDisabled();
+  const beneficiariesResponse = await page.request.get(
+    "/api/beneficiari?search=DEMO-BEN-001",
+  );
+  expect(beneficiariesResponse.status()).toBe(200);
+  const beneficiaries = (await beneficiariesResponse.json()) as Array<{
+    id: number;
+    codice: string;
+  }>;
+  const beneficiary = beneficiaries.find(
+    (item) => item.codice === "DEMO-BEN-001",
+  );
+  expect(beneficiary).toBeTruthy();
+  const detailResponse = await page.request.get(
+    `/api/beneficiari/${beneficiary!.id}`,
+  );
+  expect(detailResponse.status()).toBe(200);
+  const detail = (await detailResponse.json()) as {
+    areaOperativaId: number;
+    centroAscoltoId: number;
+  };
+  const [areasResponse, centresResponse] = await Promise.all([
+    page.request.get("/api/aree-operative"),
+    page.request.get("/api/centri-ascolto"),
+  ]);
+  expect(areasResponse.status()).toBe(200);
+  expect(centresResponse.status()).toBe(200);
+  const areas = (await areasResponse.json()) as Array<{
+    id: number;
+    nome: string;
+  }>;
+  const centres = (await centresResponse.json()) as Array<{
+    id: number;
+    nome: string;
+    areaOperativaId: number;
+  }>;
+  const area = areas.find((item) => item.id === detail.areaOperativaId)!;
+  const centre = centres.find((item) => item.id === detail.centroAscoltoId)!;
+  expect(centre.areaOperativaId).toBe(area.id);
+  await selectOption(
+    page,
+    create.getByRole("combobox", { name: "Area destinatario" }),
+    area.nome,
+  );
+  await expect(manualBarcode).toBeDisabled();
+  await selectOption(
+    page,
+    create.getByRole("combobox", { name: /centro di ascolto/i }),
+    centre.nome,
+  );
+  await expect(manualBarcode).toBeEnabled();
+  const cardResponse = await page.request.post(
+    `/api/beneficiari/${beneficiary!.id}/tessera-documento`,
+    { data: {} },
+  );
+  expect(cardResponse.status()).toBe(200);
+  const card = (await cardResponse.json()) as { codice: string };
+  expect(card.codice.length).toBeGreaterThan(0);
+  await manualBarcode.fill(card.codice);
   await manualBarcode.press("Enter");
   await expect(create).toContainText("Demo 001 Beneficiario");
   await expect
