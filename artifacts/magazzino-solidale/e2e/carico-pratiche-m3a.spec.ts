@@ -586,7 +586,8 @@ test.describe("M3A — pratica di carico persistente", () => {
       ),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Magazzino", exact: true }).click();
+    const warehouseGroup = page.getByRole("button", { name: "Magazzino", exact: true });
+    if (await warehouseGroup.getAttribute("aria-expanded") === "false") await warehouseGroup.click();
     await page.getByRole("link", { name: "Giacenze", exact: true }).click();
     const unsavedDialog = page.getByRole("alertdialog", {
       name: /modifiche non salvate/i,

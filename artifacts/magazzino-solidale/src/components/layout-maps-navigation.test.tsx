@@ -11,18 +11,23 @@ const mocks = vi.hoisted(() => ({
   permissions: new Set<string>(),
   mapsLayerCount: 0,
   capabilitiesHook: vi.fn(),
+  pendingMaps: false,
+  mapsError: false,
+  loggedIn: true,
+  dir: "ltr",
+  disabledModules: new Set<string>(),
 }));
 
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
-    user: {
+    user: mocks.loggedIn ? {
       id: mocks.userId,
       isAdmin: mocks.isAdmin,
       isSuperAdmin: mocks.isSuperAdmin,
       nome: "Utente",
       cognome: "Test",
       ruoloNome: "Ruolo test",
-    },
+    } : null,
     hasArea: (area: string) => mocks.isAdmin || mocks.areas.has(area),
     hasPermission: (permission: string) =>
       mocks.isAdmin || mocks.permissions.has(permission),
@@ -32,7 +37,7 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/use-moduli", () => ({
   useConfigurazioneAmbienteFlags: () => ({
-    isModuloAttivo: () => true,
+    isModuloAttivo: (code: string) => !mocks.disabledModules.has(code),
   }),
 }));
 
@@ -45,7 +50,9 @@ vi.mock("@workspace/api-client-react", () => ({
   useGetMapsCapabilities: (options: unknown) => {
     mocks.capabilitiesHook(options);
     return {
-      data: {
+      isError: mocks.mapsError,
+      isPending: mocks.pendingMaps,
+      data: mocks.pendingMaps ? undefined : {
         layers: Array.from({ length: mocks.mapsLayerCount }, (_, id) => ({
           id,
         })),
@@ -69,7 +76,7 @@ const translations: Record<string, string> = {
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) => translations[key] ?? key,
-    i18n: { language: "it", changeLanguage: vi.fn() },
+    i18n: { language: "it", changeLanguage: vi.fn(), dir: () => mocks.dir },
   }),
 }));
 
@@ -160,6 +167,11 @@ describe("Sidebar - Mappa Operativa", () => {
     mocks.areas = new Set();
     mocks.permissions = new Set();
     mocks.mapsLayerCount = 0;
+    mocks.pendingMaps = false;
+    mocks.mapsError = false;
+    mocks.loggedIn = true;
+    mocks.dir = "ltr";
+    mocks.disabledModules = new Set();
     mocks.capabilitiesHook.mockClear();
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -182,7 +194,100 @@ describe("Sidebar - Mappa Operativa", () => {
     );
   };
 
-  it("all'accesso lascia chiusi tutti i gruppi, anche quello della pagina corrente", async () => {
+  const trigger = (label: string) => sidebarGroup(label)!.querySelector<HTMLButtonElement>('[data-slot="sidebar-group-label"]')!;
+
+  it("separa corrente e aperto nelle quattro combinazioni, senza duplicare aria-current", async () => {
+    mocks.isAdmin = true;
+    mocks.location = "/volontari";
+    await renderLayout();
+    expect(trigger("Logistica").getAttribute("data-current")).toBe("true");
+    expect(trigger("Logistica").getAttribute("aria-expanded")).toBe("true");
+    expect(trigger("Generale").getAttribute("data-current")).toBe("false");
+    expect(trigger("Generale").getAttribute("aria-expanded")).toBe("false");
+    await expandGroup("Generale");
+    await act(async () => trigger("Logistica").click());
+    expect(trigger("Logistica").getAttribute("data-current")).toBe("true");
+    expect(trigger("Logistica").getAttribute("aria-expanded")).toBe("false");
+    expect(trigger("Generale").getAttribute("aria-expanded")).toBe("true");
+    expect(trigger("Logistica").hasAttribute("aria-current")).toBe(false);
+    await expandGroup("Logistica");
+    expect(document.querySelectorAll('a[aria-current="page"]')).toHaveLength(1);
+    expect(document.querySelector('a[aria-current="page"]')?.getAttribute("href")).toBe("/volontari");
+    for (const group of document.querySelectorAll('[data-slot="sidebar-group-label"]')) {
+      expect(group.querySelectorAll('[data-nav-group-icon]')).toHaveLength(1);
+      expect(group.querySelector('[data-nav-group-icon]')?.getAttribute("aria-hidden")).toBe("true");
+    }
+  });
+
+  it("refresh dello stesso utente conserva le scelte; logout e rientro le azzerano", async () => {
+    mocks.isAdmin = true;
+    mocks.location = "/volontari";
+    await renderLayout();
+    await act(async () => trigger("Logistica").click());
+    await expandGroup("Generale");
+    await renderLayout();
+    expect(trigger("Logistica").getAttribute("aria-expanded")).toBe("false");
+    mocks.dir = "rtl";
+    await renderLayout();
+    expect(trigger("Generale").getAttribute("aria-expanded")).toBe("true");
+    mocks.loggedIn = false;
+    await renderLayout();
+    expect(document.querySelector('[data-slot="sidebar-group"]')).toBeNull();
+    mocks.loggedIn = true;
+    await renderLayout();
+    expect(trigger("Logistica").getAttribute("aria-expanded")).toBe("true");
+    expect(trigger("Generale").getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("Maps tardiva completa una sola inizializzazione", async () => {
+    mocks.isAdmin = true;
+    mocks.location = "/maps";
+    mocks.pendingMaps = true;
+    await renderLayout();
+    expect(trigger("Logistica").getAttribute("aria-expanded")).toBe("false");
+    mocks.pendingMaps = false;
+    mocks.mapsLayerCount = 1;
+    await renderLayout();
+    expect(trigger("Logistica").getAttribute("aria-expanded")).toBe("true");
+    expect(document.querySelector('a[aria-current="page"]')?.getAttribute("href")).toBe("/maps");
+    await act(async () => trigger("Logistica").click());
+    mocks.mapsLayerCount = 2;
+    await renderLayout();
+    expect(trigger("Logistica").getAttribute("aria-expanded")).toBe("false");
+    mocks.mapsError = true;
+    await renderLayout();
+    expect(document.querySelector('a[aria-current="page"]')).toBeNull();
+  });
+
+  it.each(["manuale", "navigazione"])("Maps tardiva rispetta %s", async (action) => {
+    mocks.isAdmin = true;
+    mocks.location = "/maps";
+    mocks.pendingMaps = true;
+    await renderLayout();
+    if (action === "manuale") await expandGroup("Generale");
+    else {
+      mocks.location = "/volontari";
+      await renderLayout();
+      mocks.location = "/maps";
+      await renderLayout();
+    }
+    mocks.pendingMaps = false;
+    mocks.mapsLayerCount = 1;
+    await renderLayout();
+    expect(trigger("Logistica").getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("modulo escluso non genera né link corrente né gruppo aperto", async () => {
+    mocks.isAdmin = true;
+    mocks.location = "/carico-merce";
+    mocks.disabledModules.add("LOTTI");
+    await renderLayout();
+    expect(document.querySelector('a[href="/carico-merce"]')).toBeNull();
+    expect(document.querySelector('a[aria-current="page"]')).toBeNull();
+    expect(trigger("nav.groups.magazzino").getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("all'accesso apre soltanto il gruppo della pagina corrente", async () => {
     mocks.isAdmin = true;
     mocks.location = "/volontari";
     await renderLayout();
@@ -191,13 +296,14 @@ describe("Sidebar - Mappa Operativa", () => {
     );
     expect(triggers.length).toBeGreaterThan(1);
     for (const trigger of triggers) {
-      expect(trigger.getAttribute("aria-expanded")).toBe("false");
+      expect(trigger.getAttribute("aria-expanded")).toBe(trigger.textContent?.includes("Logistica") ? "true" : "false");
     }
-    expect(groupLinks("Logistica")).toHaveLength(0);
+    expect(groupLinks("Logistica").length).toBeGreaterThan(0);
   });
 
   it("apre soltanto il gruppo richiesto, mantenendolo durante la navigazione", async () => {
     mocks.isAdmin = true;
+    mocks.location = "/senza-voce";
     await renderLayout();
     await expandGroup("Logistica");
     expect(groupLinks("Logistica").length).toBeGreaterThan(0);
