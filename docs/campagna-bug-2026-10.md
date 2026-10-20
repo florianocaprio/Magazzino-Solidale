@@ -1,11 +1,13 @@
 # Campagna dei 20 BUG di ottobre 2026
 
+Consegna 08 — BUG20: icone di gruppo, pagina corrente, apertura iniziale e scelte di sessione conservate su mobile/desktop. API e WEB ricompilati sulla 8082 al codice `fb2ba4b`, backup ripristinato di prova, 45 tabelle invariate. Ricevuta e criteri UX20-01–14: [BUG20-Sidebar-20261020.md](BUG20-Sidebar-20261020.md).
+
 Correttivo UAT del 20/10: menu esplicito delle politiche dentro Credito mensile suggerito, con scelta conservata per la persona anche dopo l’inserimento di nuove politiche. API e WEB ricompilati sulla 8082 al codice `291af99`; ledger 63/63 e 45 tabelle invariate dopo backup e ripristino di prova. Ricevuta: [Beneficiari-Scelta-Politica-20261020.md](Beneficiari-Scelta-Politica-20261020.md). Restano inclusi accettazione FSE+, territorio e servizi documentati in [Beneficiari-Servizi-FSE-20261020.md](Beneficiari-Servizi-FSE-20261020.md).
 
-20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Prompt 06 e 07 completati; correttivi FSE+ installati sulla 8082: codice `291af99`, ledger 63/63. Ultimo selettore politica da confermare con Floriano. Prompt 08 non avviato.**
+20 ottobre 2026, Europe/Rome. **Consegne 01–07 chiuse con OK di Floriano; 06 e 07 confermate esplicitamente dopo le prove sulla 8082. Consegna 08 completata e installata: codice `fb2ba4b`, ledger 63/63, UAT personale DA ESEGUIRE. La distinta `##test` finale e il merge non sono stati avviati.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
-Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
+Mandato iniziale di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
 Le correzioni iniziano dopo un distinto incarico per il prompt 01; `##test` e
 `##merge` sono fasi successive, attivate espressamente.
 
@@ -103,7 +105,7 @@ Nessuna decisione residua blocca l'avvio del prompt 01.
 
 ## Registro dei BUG
 
-I BUG dei blocchi A–C, incluso 21 e regressione 17, sono **CHIUSI CON OK UAT DI FLORIANO**. Il 20/10 Floriano conferma che il punto 04 funziona sulla 8082 e autorizza lo sviluppo 05 e la successiva ricompilazione/installazione personale. Le UAT successive restano DA ESEGUIRE.
+I BUG 01–19 e 21 sono **CHIUSI CON OK UAT DI FLORIANO**: dopo le precedenti accettazioni 01–05, Floriano conferma esplicitamente la chiusura dei punti 06 e 07 sulla 8082 e autorizza sviluppo e ricompilazione 08. Il BUG20 è installato e pronto per la UAT personale, ancora DA ESEGUIRE.
 I test automatici non sostituiscono la UAT personale. D03 mantiene il comportamento delle pratiche Aperte: salvataggi espliciti, errori sul form e protezione dall’abbandono.
 
 | BUG | Blocco | Prompt | Stato                     | Requisiti sospesi                                              | Commit           | Automatico                      | UAT         | Ultimo candidato verificato              |
@@ -111,23 +113,23 @@ I test automatici non sostituiscono la UAT personale. D03 mantiene il comportame
 | 01 | A | 01 | CHIUSO; UAT OK | Nessuno; D01 approvata | 7d70906 | PASS; 4 skip esterni dichiarati nel blocco precedente | OK Floriano 19/10 | 7d70906bdc130073a49ebc8760cc1c38fda8cbc6 |
 | 02  | B      | 02     | CHIUSO; UAT OK | Nessuno; D01 approvata                                         | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
 | 03  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
-| 04  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | DA ESEGUIRE | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
+| 04 | D | 05 | CHIUSO; UAT OK | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | OK Floriano 20/10 | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
 | 05 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 | 06 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 | 07 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 | 08 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 | 09 | C | 04 | CHIUSO; UAT OK | Nessuno; D02 confermata per BUG 07 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
-| 10  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | DA ESEGUIRE | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
-| 11  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | DA ESEGUIRE | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
-| 12  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; precisazione D03 applicata | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | DA ESEGUIRE | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
-| 13  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | DA ESEGUIRE | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
-| 14  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | DA ESEGUIRE | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
+| 10 | D | 05 | CHIUSO; UAT OK | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | OK Floriano 20/10 | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
+| 11 | D | 05 | CHIUSO; UAT OK | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | OK Floriano 20/10 | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
+| 12 | D | 05 | CHIUSO; UAT OK | Nessuno; precisazione D03 applicata | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | OK Floriano 20/10 | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
+| 13 | D | 05 | CHIUSO; UAT OK | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | OK Floriano 20/10 | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
+| 14 | D | 05 | CHIUSO; UAT OK | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | OK Floriano 20/10 | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
 | 15  | B      | 02     | CHIUSO; UAT OK | Nessuno                                                        | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS mirati; 4 skip esterni | OK Floriano 19/10 | 3c882b610be185ef5f62867ac562e8e7b322b08d |
-| 16  | D      | 05     | PRONTO PER UAT; INSTALLATO 8082 | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | DA ESEGUIRE | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
+| 16 | D | 05 | CHIUSO; UAT OK | Nessuno | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS mirati; 4 skip esterni | OK Floriano 20/10 | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 |
 | 17 | C | 03, 04 | CHIUSO; UAT OK | Nessuno; Enti e Fornitori locali/globali verificati | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; skip dichiarati nella ricevuta | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
-| 18 | E | 06, 07 | IMPLEMENTATO; CANDIDATO INSTALLATO | Nessuno; correttivo FSE+ e Fascicolo verificati, UAT personale pendente | fc377e3 | PASS; skip dichiarati nella ricevuta | DA CONFERMARE | fc377e3865ee1958b3d753a3b32db0901cd9d396 |
-| 19  | E      | 07     | DA SVILUPPARE             | Nessuno                                                        | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
-| 20  | F      | 08     | DA SVILUPPARE             | Nessuno; conservare UX20-01–14                                 | —                | NON ESEGUITO                    | DA ESEGUIRE | —                                        |
+| 18 | E | 06, 07 | CHIUSO; UAT OK | Nessuno; lotti e correttivi FSE+ accettati | 291af99 (include checkpoint 06/07 e correttivi) | PASS mirati; ricevute 06/07 e correttivi collegate | OK Floriano 20/10 | 291af99f3f40933d4fe7711c00d542a25875b04c |
+| 19 | E | 07 | CHIUSO; UAT OK | Nessuno; lotti e correttivi FSE+ accettati | 291af99 (include checkpoint 06/07 e correttivi) | PASS mirati; ricevute 06/07 e correttivi collegate | OK Floriano 20/10 | 291af99f3f40933d4fe7711c00d542a25875b04c |
+| 20 | F | 08 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; UX20-01–14 verificati automaticamente | fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80 | 822 UI; 97 API; 193 browser PASS + 12 skip di matrice; build/budget PASS | DA ESEGUIRE | fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80 |
 | 21 | C | 04 + addendum 2.2 | CHIUSO; UAT OK | Un solo ID con stati, territorio, tessera e Zona UDS | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 
 ## Otto consegne
@@ -143,10 +145,10 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | 02 | B: 02, 03, 15 | Funzionale | 3c882b610be185ef5f62867ac562e8e7b322b08d | PASS: 1.591 API + 4 skip esterni; 753 UI; 15 browser; build/budget | Installata, ledger 59/59 | CHIUSA; OK UAT Floriano 19/10 |
 | 03 | C: 17, prima parte | Tecnica | ef65e5e4b5a2d5251f6ed550c0a6d7b23bff8084 | PASS: 1.521 API + 4 skip; 756 UI; 9 browser + 36 skip di matrice; build/budget | Installata, asset HTTP verificati; ledger 60/60 | CHIUSO; OK Floriano; regressione integrata nel 04 |
 | 04 | C: 05–09, 21 e regressione 17 | Funzionale | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS; correttivo e ricevuta sotto | Installata; hash HTTP e ledger 61/61 verificati | OK UAT Floriano 20/10 |
-| 05       | D: 04, 10–14, 16              | Funzionale      | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS; 1.530 API, 782 UI, 2 browser mirati; skip dichiarati | Installata; hash HTTP JS/CSS e ledger 61/61 | UAT DA ESEGUIRE |
-| 06       | E: 18, modello e integrazioni | Tecnica isolata | —                                        | NON ESEGUITI                                                                  | Nessun aggiornamento previsto | UAT NON PREVISTA; BUG aperto                |
-| 07       | E: 18 UI, 19                  | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
-| 08       | F: 20 e gate finali           | Funzionale      | —                                        | NON ESEGUITI                                                                  | Non installata                | UAT DA ESEGUIRE                             |
+| 05 | D: 04, 10–14, 16 | Funzionale | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS; 1.530 API, 782 UI, 2 browser mirati; skip dichiarati | Installata; hash HTTP JS/CSS e ledger 61/61 | CHIUSA; OK UAT Floriano 20/10 |
+| 06 | E: 18, modello e integrazioni | Tecnica isolata | 410419d3d440e100d1377d420d6b6652be58cd62 | PASS checkpoint tecnico; integrato e accettato con 07 | Inclusa nella consegna 07 | CHIUSA con 07; OK Floriano 20/10 |
+| 07 | E: 18 UI, 19 | Funzionale | 291af99f3f40933d4fe7711c00d542a25875b04c | PASS mirati e correttivi FSE+; ricevute sotto e selettore politica collegate | Installata; ledger 63/63 | CHIUSA; OK UAT Floriano 20/10 |
+| 08 | F: 20; certificazione finale distinta | Funzionale | fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80 | 822 UI, 97 API, 193 browser PASS + 12 skip di matrice; build/budget 387,9/400 KiB | Installata; hash HTTP e ledger 63/63 | UAT DA ESEGUIRE; ##test finale non avviato |
 
 ## Verifiche iniziali e pubblicazione documentale
 
@@ -2698,3 +2700,11 @@ main/merge/produzione. Hook GitHub e ambienti di deploy verificati: 0/0.
 Storico privo di origine attestata conservato come sconosciuto; dati discordanti
 bloccati con conflitto esplicito. Nessun passaggio manuale tecnico richiesto,
 resta la validazione funzionale di Floriano prima di 08.
+
+## Consegna 08 — Sidebar, BUG20 — 20/10/2026
+
+Floriano chiude i punti 06 e 07 dopo la prova personale e richiede il prompt 08 con ricompilazione della 8082. Checkpoint `fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80`, installato e verificato dopo backup e ripristino isolato. Nessuna migration nuova; ledger 63/63 e 45 tabelle invariate. Dettagli, file modificati, criteri UX20-01–14, risultati e prova proposta: [BUG20-Sidebar-20261020.md](BUG20-Sidebar-20261020.md).
+
+PASS: install frozen, typecheck, 822 UI, 97 API core/Maps e 193 browser mirati; 12 skip sono duplicazioni di matrice previste (8 M3A, 4 Sidebar). Build API/WEB e budget 387,9/400 KiB PASS. Le anomalie preliminari e la ripetizione dopo ERR_NETWORK_CHANGED sono documentate nella ricevuta. Nessuna asserzione funzionale o soglia abbassata.
+
+La richiesta diretta autorizza l’installazione personale durante questa consegna. BUG20 resta in attesa della UAT di Floriano; non sono stati avviati il distinto ##test completo della campagna, ##merge o il deploy Hetzner.
