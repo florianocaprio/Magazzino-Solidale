@@ -16,4 +16,5 @@ export const BeneficiariFseImportDetailEsito = {
   invariato: "invariato",
   conflitto: "conflitto",
   errore: "errore",
+  saltato: "saltato",
 } as const;

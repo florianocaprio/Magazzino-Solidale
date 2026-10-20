@@ -77,6 +77,8 @@ export * from "./beneficiariBulkInput";
 export * from "./beneficiariExportInput";
 export * from "./beneficiariExportInputTipo";
 export * from "./beneficiariFseBadRequestResponse";
+export * from "./beneficiariFseComparisonField";
+export * from "./beneficiariFseComparisonFieldEsito";
 export * from "./beneficiariFseConflictResponse";
 export * from "./beneficiariFseDuplicateCandidate";
 export * from "./beneficiariFseError";

@@ -11829,7 +11829,7 @@ components:
       additionalProperties: false
       properties:
         numeroRiga: { type: integer, minimum: 2 }
-        azione: { type: string, enum: [crea, collega] }
+        azione: { type: string, enum: [crea, collega, salta] }
         beneficiarioId: { type: integer, minimum: 1 }
       required: [numeroRiga, azione]
     BeneficiariFseWorkbookImportUpload:
@@ -11853,11 +11853,26 @@ components:
           type: string
           description: Array JSON di BeneficiariFseImportResolution.
       required: [centroAscoltoId, dataRiferimento, file]
+    BeneficiariFseComparisonField:
+      type: object
+      properties:
+        campo: { type: string }
+        attuale: { type: [string, "null"] }
+        importato: { type: [string, "null"] }
+        esito: { type: string, enum: [conserva, aggiorna, solo_fse] }
+      required: [campo, attuale, importato, esito]
     BeneficiariFseDuplicateCandidate:
       type: object
       properties:
         id: { type: integer }
         codice: { type: string }
+        nome: { type: string }
+        cognome: { type: string }
+        dataNascita: { type: [string, "null"], format: date }
+        collegabile: { type: boolean }
+        confronto:
+          type: array
+          items: { $ref: "#/components/schemas/BeneficiariFseComparisonField" }
         centroAscoltoId: { type: [integer, "null"] }
       required: [id, codice, centroAscoltoId]
     BeneficiariFsePreviewRow:
@@ -11880,6 +11895,9 @@ components:
         errori: { type: array, items: { type: string } }
         warning: { type: array, items: { type: string } }
         beneficiarioId: { type: integer }
+        confronto:
+          type: array
+          items: { $ref: "#/components/schemas/BeneficiariFseComparisonField" }
         duplicati:
           type: array
           items:
@@ -11919,7 +11937,7 @@ components:
         esito:
           {
             type: string,
-            enum: [creato, collegato, aggiornato, invariato, conflitto, errore],
+            enum: [creato, collegato, aggiornato, invariato, conflitto, errore, saltato],
           }
         errori: { type: array, items: { type: string } }
       required: [numeroRiga, codiceFascicolo, esito, errori]
@@ -11933,6 +11951,7 @@ components:
         collegati: { type: integer }
         aggiornati: { type: integer }
         invariati: { type: integer }
+        saltati: { type: integer }
         conflitti: { type: integer }
         errori: { type: integer }
         dettagli:

@@ -16,6 +16,7 @@ export interface BeneficiariFseImportResult {
   collegati: number;
   aggiornati: number;
   invariati: number;
+  saltati?: number;
   conflitti: number;
   errori: number;
   dettagli: BeneficiariFseImportDetail[];

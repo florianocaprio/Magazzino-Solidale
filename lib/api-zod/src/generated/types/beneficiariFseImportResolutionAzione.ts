@@ -12,4 +12,5 @@ export type BeneficiariFseImportResolutionAzione =
 export const BeneficiariFseImportResolutionAzione = {
   crea: "crea",
   collega: "collega",
+  salta: "salta",
 } as const;

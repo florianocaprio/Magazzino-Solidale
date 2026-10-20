@@ -325,14 +325,11 @@ test.describe("M3B — Importa file FSE+ nella pratica", () => {
     await expect(
       page.getByText(product.nome, { exact: true }).first(),
     ).toBeVisible();
-    await selectOption(
-      page,
-      page.getByRole("combobox", {
-        name: new RegExp(`Associa a un prodotto esistente: ${product.nome}`),
-      }),
-      `${product.codice} — ${product.nome}`,
-    );
-    await page.getByRole("button", { name: "Associa", exact: true }).click();
+    const suggested = page.getByRole("button", {
+      name: `Associa a ${product.nome} · ${product.codice} · pz`, exact: true,
+    });
+    await expect(suggested).toBeVisible();
+    await suggested.click();
     await expect(
       page.getByText("Da verificare", { exact: true }),
     ).toBeVisible();

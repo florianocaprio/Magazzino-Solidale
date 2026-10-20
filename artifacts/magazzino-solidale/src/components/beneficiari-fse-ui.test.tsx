@@ -591,7 +591,10 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
           classificazione: "possibile_duplicato",
           errori: [],
           warning: ["Possibile duplicato"],
-          duplicati: [{ id: 9, codice: "BEN-9" }],
+          confronto: [{ campo: "nome", attuale: null, importato: "Test", esito: "conserva" }],
+          duplicati: [{ id: 9, codice: "BEN-9", nome: "Test", cognome: "Import", dataNascita: "1990-01-01",
+            confronto: [{ campo: "dataNascita", attuale: "1990-01-01", importato: null, esito: "conserva" },
+              { campo: "numeroComponenti", attuale: "2", importato: "3", esito: "aggiorna" }] }],
         },
       ],
     });
@@ -638,7 +641,14 @@ describe("Beneficiari 2.0 FSE+: UI", () => {
     expect(
       (button("Conferma importazione") as HTMLButtonElement).disabled,
     ).toBe(true);
-    await act(async () => button("Collega a BEN-9")?.click());
+    expect(document.body.textContent).toContain("Test Import · BEN-9");
+    expect(document.body.textContent).toContain("01/01/1990");
+    expect(document.body.textContent).toContain("Dati registrati");
+    expect(document.body.textContent).toContain("Dati nel file FSE+");
+    expect(document.body.textContent).toContain("Non presente nel file");
+    await act(async () => button("Salta questa riga")?.click());
+    expect((button("Conferma importazione") as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => button("Collega e aggiorna FSE+")?.click());
     expect(
       (button("Conferma importazione") as HTMLButtonElement).disabled,
     ).toBe(false);

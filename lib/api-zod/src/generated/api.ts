@@ -8900,11 +8900,35 @@ export const PreviewBeneficiariFseResponse = zod.object({
       errori: zod.array(zod.string()),
       warning: zod.array(zod.string()),
       beneficiarioId: zod.number().optional(),
+      confronto: zod
+        .array(
+          zod.object({
+            campo: zod.string(),
+            attuale: zod.string().nullable(),
+            importato: zod.string().nullable(),
+            esito: zod.enum(["conserva", "aggiorna", "solo_fse"]),
+          }),
+        )
+        .optional(),
       duplicati: zod
         .array(
           zod.object({
             id: zod.number(),
             codice: zod.string(),
+            nome: zod.string().optional(),
+            cognome: zod.string().optional(),
+            dataNascita: zod.coerce.date().nullish(),
+            collegabile: zod.boolean().optional(),
+            confronto: zod
+              .array(
+                zod.object({
+                  campo: zod.string(),
+                  attuale: zod.string().nullable(),
+                  importato: zod.string().nullable(),
+                  esito: zod.enum(["conserva", "aggiorna", "solo_fse"]),
+                }),
+              )
+              .optional(),
             centroAscoltoId: zod.number().nullable(),
           }),
         )
@@ -8950,6 +8974,7 @@ export const ImportBeneficiariFseResponse = zod.object({
   collegati: zod.number(),
   aggiornati: zod.number(),
   invariati: zod.number(),
+  saltati: zod.number().optional(),
   conflitti: zod.number(),
   errori: zod.number(),
   dettagli: zod.array(
@@ -8963,6 +8988,7 @@ export const ImportBeneficiariFseResponse = zod.object({
         "invariato",
         "conflitto",
         "errore",
+        "saltato",
       ]),
       errori: zod.array(zod.string()),
     }),

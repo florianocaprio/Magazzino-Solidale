@@ -68,7 +68,7 @@ type MultipartWorkbook = {
 
 type ImportResolution = {
   numeroRiga: number;
-  azione: "crea" | "collega";
+  azione: "crea" | "collega" | "salta";
   beneficiarioId?: number;
 };
 
@@ -297,7 +297,7 @@ function parseResolutions(value: unknown): {
     if (
       !Number.isSafeInteger(numeroRiga) ||
       numeroRiga < 2 ||
-      (azione !== "crea" && azione !== "collega") ||
+      (azione !== "crea" && azione !== "collega" && azione !== "salta") ||
       (azione === "collega" && (!Number.isSafeInteger(beneficiarioId) || beneficiarioId! <= 0)) ||
       map.has(numeroRiga)
     ) {
@@ -396,6 +396,88 @@ function samePersonName(
 ) {
   return beneficiary.nome.trim().toLocaleLowerCase("it-IT") === row.nome.toLocaleLowerCase("it-IT") &&
     beneficiary.cognome.trim().toLocaleLowerCase("it-IT") === row.cognome.toLocaleLowerCase("it-IT");
+}
+
+function conservativeImportChanges(
+  target: typeof beneficiariTable.$inferSelect,
+  row: FseBeneficiariRow,
+  nucleo: Array<typeof nucleoFamiliareTable.$inferSelect>,
+): Partial<typeof beneficiariTable.$inferInsert> {
+  const demografiaInterna = calcolaDemografiaNucleo(
+    target,
+    nucleo,
+    new Date(),
+    null,
+  );
+  const nucleoInternoAutorevole = demografiaInterna.dettaglioCompleto &&
+    (row.numeroComponenti <= 1 || nucleo.length > 0);
+  const changes: Partial<typeof beneficiariTable.$inferInsert> = {
+    numDisabili: row.disabili,
+    dataAggiornamento: new Date(),
+  };
+  if (!target.dataPresaInCarico) changes.dataPresaInCarico = row.dataPresaInCarico;
+  if (!nucleoInternoAutorevole) {
+    changes.numComponenti = row.numeroComponenti;
+    changes.numMinori = row.eta017;
+    changes.numAnziani = row.eta65Plus;
+  }
+  // Il canale interno è considerato non autorevole solo per una
+  // anagrafica provvisoria che non possiede una motivazione manuale.
+  if (
+    target.statoAnagrafica === "provvisoria" &&
+    !target.motivoConsegnaDomicilio
+  ) {
+    changes.consegnaDomicilio = mapFseActivityToDelivery(
+      row.tipologiaAttivita,
+    )!;
+  }
+  return changes;
+}
+
+async function importComparison(row: FseBeneficiariRow, target?: typeof beneficiariTable.$inferSelect) {
+  const [profile] = target ? await db.select().from(fseFascicoliSocialiTable)
+    .where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id)) : [];
+  const family = target ? await db.select().from(nucleoFamiliareTable)
+    .where(eq(nucleoFamiliareTable.beneficiarioId, target.id)) : [];
+  const demographic = target ? calcolaDemografiaNucleo(target, family, new Date(), snapshotFromProfile(profile)) : null;
+  const changes = target ? conservativeImportChanges(target, row, family) : {};
+  const registered: Record<string, string | number | null> = {
+    nome: target?.nome ?? null, cognome: target?.cognome ?? null,
+    dataNascita: target?.dataNascita ?? null, codiceFascicolo: profile?.codiceFascicolo ?? null,
+    dataPresaInCarico: target?.dataPresaInCarico ?? null,
+    numeroComponenti: target?.numComponenti ?? null,
+    tipologiaAttivita: target ? mapDeliveryToFseActivity(target.consegnaDomicilio) : null,
+    statoAttuale: target ? (target.attivo ? "Attivo" : "Disattivato") : null,
+    donne: demographic?.dettaglioCompleto ? demographic.donne : profile?.donneImportate ?? null,
+    uomini: demographic?.dettaglioCompleto ? demographic.uomini : profile?.uominiImportati ?? null,
+    eta017: target?.numMinori ?? null,
+    eta1829: demographic?.dettaglioCompleto ? demographic.eta1829 : profile?.eta1829Importata ?? null,
+    eta3064: demographic?.dettaglioCompleto ? demographic.eta3064 : profile?.eta3064Importata ?? null,
+    eta65Plus: target?.numAnziani ?? null,
+    origineStranieraMinoranze: profile?.origineStranieraMinoranze ?? null,
+    disabili: target?.numDisabili ?? null,
+    cittadiniPaesiTerzi: profile?.cittadiniPaesiTerzi ?? null,
+    senzaTettoEsclusioneAbitativa: profile?.senzaTettoEsclusioneAbitativa ?? null,
+  };
+  const columns: Record<string, string> = {
+    dataPresaInCarico: "dataPresaInCarico", numeroComponenti: "numComponenti",
+    eta017: "numMinori", eta65Plus: "numAnziani", disabili: "numDisabili",
+    tipologiaAttivita: "consegnaDomicilio",
+  };
+  const incoming: Record<string, string | number | null> = { nome: row.nome, cognome: row.cognome, dataNascita: null,
+    codiceFascicolo: row.codiceFascicolo, dataPresaInCarico: row.dataPresaInCarico,
+    numeroComponenti: row.numeroComponenti, tipologiaAttivita: row.tipologiaAttivita, statoAttuale: row.statoAttuale,
+    donne: row.donne, uomini: row.uomini, eta017: row.eta017, eta1829: row.eta1829, eta3064: row.eta3064,
+    eta65Plus: row.eta65Plus, origineStranieraMinoranze: row.origineStranieraMinoranze,
+    disabili: row.disabili, cittadiniPaesiTerzi: row.cittadiniPaesiTerzi,
+    senzaTettoEsclusioneAbitativa: row.senzaTettoEsclusioneAbitativa };
+  return Object.entries(incoming).map(([campo, value]) => ({ campo,
+    attuale: registered[campo] == null ? null : String(registered[campo]),
+    importato: value == null ? null : String(value),
+    esito: ["nome", "cognome", "dataNascita", "statoAttuale"].includes(campo) ||
+      (columns[campo] && !(columns[campo] in changes)) ? "conserva" :
+      campo === "codiceFascicolo" || columns[campo] ? "aggiorna" : "solo_fse",
+  }));
 }
 
 function previewItem(item: ReturnType<typeof validateFseRows>[number]) {
@@ -500,7 +582,8 @@ router.post(
           ...previewItem(item),
           warning,
           classificazione,
-          beneficiarioId: fascicolo.beneficiario.id,
+          beneficiarioId: territorial ? fascicolo.beneficiario.id : undefined,
+          confronto: await importComparison(item.row, territorial && await canAccessFseBeneficiario(fascicolo.beneficiario, req) ? fascicolo.beneficiario : undefined),
         });
         continue;
       }
@@ -515,11 +598,17 @@ router.post(
       result.push({
         ...previewItem(item),
         classificazione: suggestions.length ? "possibile_duplicato" : "nuovo",
-        duplicati: accessible.map((candidate) => ({
-          id: candidate.id,
-          codice: candidate.codice,
-          centroAscoltoId: candidate.centroAscoltoId,
-        })),
+        confronto: await importComparison(item.row),
+        duplicati: await Promise.all(accessible.map(async (candidate) => {
+          const [target] = await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, candidate.id));
+          if (!target || !await canAccessFseBeneficiario(target, req)) return null;
+          const [profile] = await db.select({ id: fseFascicoliSocialiTable.id }).from(fseFascicoliSocialiTable)
+            .where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id));
+          return { id: candidate.id, codice: candidate.codice, nome: candidate.nome,
+            cognome: candidate.cognome, dataNascita: candidate.dataNascita,
+            centroAscoltoId: candidate.centroAscoltoId, collegabile: !profile,
+            confronto: await importComparison(item.row!, target) };
+        })).then((candidates) => candidates.filter((candidate) => candidate != null)),
         warning: hasRemoteSimilarity
           ? [...item.warning, "È stata rilevata una somiglianza nominativa fuori dal Centro; i dati personali non sono esposti. Scegli esplicitamente Crea nuovo per procedere."]
           : item.warning,
@@ -656,6 +745,7 @@ router.post(
       conflitti: 0,
       errori: 0,
     };
+    let saltati = 0;
     const dettagli: Array<{
       numeroRiga: number;
       codiceFascicolo: string | null;
@@ -668,13 +758,18 @@ router.post(
     // before creating any beneficiaries; existing local candidates still require a choice.
     const candidatesBeforeImport = new Map<number, Awaited<ReturnType<typeof searchBeneficiariDuplicates>>>();
     for (const item of validations) {
-      if (item.row) candidatesBeforeImport.set(item.numeroRiga, await searchBeneficiariDuplicates({
+      if (item.row && parsedResolutions.map.get(item.numeroRiga)?.azione !== "salta") candidatesBeforeImport.set(item.numeroRiga, await searchBeneficiariDuplicates({
         areaOperativaId: scoped.centro.areaOperativaId,
         nome: item.row.nome, cognome: item.row.cognome,
       }));
     }
 
     for (const item of validations) {
+      if (parsedResolutions.map.get(item.numeroRiga)?.azione === "salta") {
+        saltati++;
+        dettagli.push({ numeroRiga: item.numeroRiga, codiceFascicolo: item.codiceFascicolo, esito: "saltato", errori: [] });
+        continue;
+      }
       if (!item.row) {
         totals.errori++;
         dettagli.push({
@@ -693,34 +788,7 @@ router.post(
           ) => {
             const nucleo = await tx.select().from(nucleoFamiliareTable)
               .where(eq(nucleoFamiliareTable.beneficiarioId, target.id));
-            const demografiaInterna = calcolaDemografiaNucleo(
-              target,
-              nucleo,
-              new Date(),
-              null,
-            );
-            const nucleoInternoAutorevole = demografiaInterna.dettaglioCompleto &&
-              (row.numeroComponenti <= 1 || nucleo.length > 0);
-            const changes: Partial<typeof beneficiariTable.$inferInsert> = {
-              numDisabili: row.disabili,
-              dataAggiornamento: new Date(),
-            };
-            if (!target.dataPresaInCarico) changes.dataPresaInCarico = row.dataPresaInCarico;
-            if (!nucleoInternoAutorevole) {
-              changes.numComponenti = row.numeroComponenti;
-              changes.numMinori = row.eta017;
-              changes.numAnziani = row.eta65Plus;
-            }
-            // Il canale interno è considerato non autorevole solo per una
-            // anagrafica provvisoria che non possiede una motivazione manuale.
-            if (
-              target.statoAnagrafica === "provvisoria" &&
-              !target.motivoConsegnaDomicilio
-            ) {
-              changes.consegnaDomicilio = mapFseActivityToDelivery(
-                row.tipologiaAttivita,
-              )!;
-            }
+            const changes = conservativeImportChanges(target, row, nucleo);
             await tx
               .update(beneficiariTable)
               .set(changes)
@@ -976,6 +1044,8 @@ router.post(
         hashContenutoNormalizzato: contentHash,
         dataRiferimento: dateRaw,
         ...totals,
+        saltati,
+        righeSaltate: dettagli.filter((detail) => detail.esito === "saltato").map((detail) => detail.numeroRiga),
       },
       utenteId: req.user?.id ?? null,
       ip: req.ip ?? req.socket.remoteAddress ?? null,
@@ -985,6 +1055,7 @@ router.post(
       stato,
       dataRiferimento: dateRaw,
       ...totals,
+      saltati,
       dettagli,
     });
   },

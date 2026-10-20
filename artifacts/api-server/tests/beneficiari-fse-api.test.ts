@@ -356,7 +356,7 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
     });
     expect(response.body.righe[0].classificazione).toBe("nuovo");
     expect(response.body).not.toHaveProperty("rawRows");
-    expect(JSON.stringify(response.body)).not.toContain(`Referente-${suffix}`);
+    expect(response.body.righe[0].confronto).toContainEqual({ campo: "nome", attuale: null, importato: `Referente-${suffix}-PREVIEW-1`, esito: "conserva" });
   });
 
   it("rifiuta lato server un workbook con foglio diverso da Table1", async () => {
@@ -690,6 +690,14 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       preview.body.righe[0].duplicati.map((item: { id: number }) => item.id),
     ).toContain(target.id);
 
+    const candidate = preview.body.righe[0].duplicati.find((item: { id: number }) => item.id === target.id);
+    expect(candidate).toMatchObject({ nome: target.nome, cognome: target.cognome, dataNascita: "1990-01-01", collegabile: true });
+    expect(candidate.confronto).toEqual(expect.arrayContaining([
+      { campo: "dataNascita", attuale: "1990-01-01", importato: null, esito: "conserva" },
+      { campo: "numeroComponenti", attuale: "1", importato: "5", esito: "aggiorna" },
+      { campo: "tipologiaAttivita", attuale: "Pacchi", importato: "Domiciliare", esito: "conserva" },
+    ]));
+
     const unresolved = await upload(app(), "/beneficiari/fse/import", centerA, [
       duplicateRow,
     ]);
@@ -748,6 +756,27 @@ describe("Beneficiari 2.0 FSE+: API, scope e persistenza", () => {
       donneImportate: 3,
       uominiImportati: 2,
     });
+  });
+
+  it("salta una riga senza toccare anagrafica o Fascicolo e consente il successivo collegamento esplicito", async () => {
+    const source = row("SKIP-REVIEW", { "Nome Referente fascicolo": "Scelta", "Cognome Referente fascicolo": `Saltata-${suffix}` });
+    const target = await insertBeneficiary({ nome: String(source["Nome Referente fascicolo"]), cognome: String(source["Cognome Referente fascicolo"]) });
+    const skipped = await upload(app(), "/beneficiari/fse/import", centerA, [source], { risoluzioni: [{ numeroRiga: 2, azione: "salta" }] });
+    expect(skipped.status).toBe(200);
+    expect(skipped.body).toMatchObject({ stato: "confermato", saltati: 1, creati: 0, collegati: 0, aggiornati: 0, errori: 0 });
+    expect(skipped.body.dettagli[0]).toMatchObject({ esito: "saltato", errori: [] });
+    expect((await db.select().from(beneficiariTable).where(eq(beneficiariTable.id, target.id)))[0]).toEqual(target);
+    expect(await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id))).toHaveLength(0);
+    const linked = await upload(app(), "/beneficiari/fse/import", centerA, [source], { risoluzioni: [{ numeroRiga: 2, azione: "collega", beneficiarioId: target.id }] });
+    expect(linked.body).toMatchObject({ collegati: 1, saltati: 0, errori: 0 });
+    const [before] = await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id));
+    const changedSource = { ...source, Disabili: 1 };
+    const existingPreview = await upload(app(), "/beneficiari/fse/preview", centerA, [changedSource]);
+    expect(existingPreview.body.righe[0]).toMatchObject({ classificazione: "da_aggiornare", beneficiarioId: target.id });
+    expect(existingPreview.body.righe[0].confronto).toContainEqual({ campo: "disabili", attuale: "0", importato: "1", esito: "aggiorna" });
+    const secondSkip = await upload(app(), "/beneficiari/fse/import", centerA, [changedSource], { risoluzioni: [{ numeroRiga: 2, azione: "salta" }] });
+    expect(secondSkip.body).toMatchObject({ saltati: 1, aggiornati: 0, errori: 0 });
+    expect((await db.select().from(fseFascicoliSocialiTable).where(eq(fseFascicoliSocialiTable.beneficiarioId, target.id)))[0]).toEqual(before);
   });
 
   it("non sovrascrive i conteggi di un nucleo interno anagraficamente completo", async () => {

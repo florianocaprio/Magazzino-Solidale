@@ -488,6 +488,7 @@ export type BeneficiariFseImportResolutionAzione =
 export const BeneficiariFseImportResolutionAzione = {
   crea: "crea",
   collega: "collega",
+  salta: "salta",
 } as const;
 
 export interface BeneficiariFseImportResolution {
@@ -514,9 +515,33 @@ export interface BeneficiariFseWorkbookImportUpload {
   risoluzioni?: string;
 }
 
+export type BeneficiariFseComparisonFieldEsito =
+  (typeof BeneficiariFseComparisonFieldEsito)[keyof typeof BeneficiariFseComparisonFieldEsito];
+
+export const BeneficiariFseComparisonFieldEsito = {
+  conserva: "conserva",
+  aggiorna: "aggiorna",
+  solo_fse: "solo_fse",
+} as const;
+
+export interface BeneficiariFseComparisonField {
+  campo: string;
+  /** @nullable */
+  attuale: string | null;
+  /** @nullable */
+  importato: string | null;
+  esito: BeneficiariFseComparisonFieldEsito;
+}
+
 export interface BeneficiariFseDuplicateCandidate {
   id: number;
   codice: string;
+  nome?: string;
+  cognome?: string;
+  /** @nullable */
+  dataNascita?: string | null;
+  collegabile?: boolean;
+  confronto?: BeneficiariFseComparisonField[];
   /** @nullable */
   centroAscoltoId: number | null;
 }
@@ -542,6 +567,7 @@ export interface BeneficiariFsePreviewRow {
   errori: string[];
   warning: string[];
   beneficiarioId?: number;
+  confronto?: BeneficiariFseComparisonField[];
   duplicati?: BeneficiariFseDuplicateCandidate[];
 }
 
@@ -568,6 +594,7 @@ export const BeneficiariFseImportDetailEsito = {
   invariato: "invariato",
   conflitto: "conflitto",
   errore: "errore",
+  saltato: "saltato",
 } as const;
 
 export interface BeneficiariFseImportDetail {
@@ -594,6 +621,7 @@ export interface BeneficiariFseImportResult {
   collegati: number;
   aggiornati: number;
   invariati: number;
+  saltati?: number;
   conflitti: number;
   errori: number;
   dettagli: BeneficiariFseImportDetail[];

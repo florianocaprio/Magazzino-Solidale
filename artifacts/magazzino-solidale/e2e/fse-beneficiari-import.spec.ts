@@ -105,8 +105,12 @@ test("FSE+ beneficiari: Area prima del Centro, allegato esplicito, import e Fasc
     .getByRole("option", { name: centres[0].nome, exact: true })
     .click();
   const fileChooser = page.waitForEvent("filechooser");
-  await dialog.getByRole("button", { name: "Seleziona file Fascicoli FSE+", exact: true }).click();
-  await (await fileChooser).setFiles({
+  await dialog
+    .getByRole("button", { name: "Seleziona file Fascicoli FSE+", exact: true })
+    .click();
+  await (
+    await fileChooser
+  ).setFiles({
     name: "ElencoFascicoliSociali-prova.xlsx",
     mimeType:
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -255,4 +259,129 @@ test("Fascicolo facoltativo inserito manualmente e modificato nell’anagrafica"
   await expect(
     page.getByText(`Fascicolo: MAN-EDIT-${suffix}`, { exact: true }),
   ).toBeVisible();
+});
+
+test("confronta il beneficiario registrato con il file e distingue collega, salta e crea", async ({
+  page,
+}, testInfo) => {
+  await login(page);
+  const suffix = `review-${Date.now()}-${testInfo.project.name}`;
+  const areaResponse = await page.request.post("/api/aree-operative", {
+    data: { nome: `Confronto ${suffix}` },
+  });
+  expect(areaResponse.status()).toBe(201);
+  const area = await areaResponse.json();
+  const centreResponse = await page.request.post("/api/centri-ascolto", {
+    data: { nome: `Centro ${suffix}`, areaOperativaId: area.id, attivo: true },
+  });
+  expect(centreResponse.status()).toBe(201);
+  const centre = await centreResponse.json();
+  const created = await page.request.post("/api/beneficiari", {
+    data: {
+      nome: "Persona",
+      cognome: `Sintetica ${suffix}`,
+      sesso: "F",
+      dataNascita: "1990-01-01",
+      areaProvenienza: "IT",
+      areaOperativaId: area.id,
+      centroAscoltoId: centre.id,
+    },
+  });
+  expect(created.status()).toBe(201);
+  const existing = await created.json();
+  const book = XLSX.read(workbook(suffix));
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(book.Sheets.Table1, {
+    header: 1,
+  });
+  const third = [...rows[1]];
+  third[2] = `FSE-3-${suffix}`;
+  rows.push(third);
+  book.Sheets.Table1 = XLSX.utils.aoa_to_sheet(rows);
+  await page.goto("/beneficiari");
+  await page.getByRole("button", { name: "Importa FSE+", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Importa FSE+" });
+  await selectOption(
+    page,
+    dialog.getByRole("combobox", { name: "Area Operativa FSE+" }),
+    area.nome,
+  );
+  await selectOption(
+    page,
+    dialog.getByRole("combobox", { name: "Centro di Ascolto FSE+" }),
+    centre.nome,
+  );
+  await dialog.getByLabel("File FSE+", { exact: true }).setInputFiles({
+    name: "ElencoFascicoliSociali-confronto.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: Buffer.from(XLSX.write(book, { type: "buffer", bookType: "xlsx" })),
+  });
+  await dialog.getByRole("button", { name: "Carica e analizza" }).click();
+  const first = dialog.locator('[data-fse-review-row="2"]');
+  await expect(
+    first.getByText(`Persona Sintetica ${suffix} · ${existing.codice}`, {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    first.getByText("Data di nascita: 01/01/1990", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    first.getByRole("columnheader", { name: "Dati registrati" }),
+  ).toBeVisible();
+  await expect(
+    first.getByRole("columnheader", { name: "Dati nel file FSE+" }),
+  ).toBeVisible();
+  await expect(
+    first.getByText("Non presente nel file", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Conferma importazione" }),
+  ).toBeDisabled();
+  expect(
+    await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
+  ).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: testInfo.outputPath("confronto-fse.png"), fullPage: true });
+  await first
+    .getByRole("button", { name: "Collega e aggiorna FSE+", exact: true })
+    .click();
+  await dialog
+    .locator('[data-fse-review-row="3"]')
+    .getByRole("button", { name: "Salta questa riga", exact: true })
+    .click();
+  await dialog
+    .locator('[data-fse-review-row="4"]')
+    .getByRole("button", { name: "Crea nuovo", exact: true })
+    .click();
+  const imported = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/beneficiari/fse/import") &&
+      r.request().method() === "POST",
+  );
+  await dialog.getByRole("button", { name: "Conferma importazione" }).click();
+  const response = await imported;
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toMatchObject({
+    creati: 1,
+    collegati: 1,
+    saltati: 1,
+    errori: 0,
+    conflitti: 0,
+  });
+  await expect(
+    dialog.getByText("Righe saltate: 1", { exact: true }),
+  ).toBeVisible();
+  const detail = await (
+    await page.request.get(`/api/beneficiari/${existing.id}`)
+  ).json();
+  expect(detail).toMatchObject({
+    dataNascita: "1990-01-01",
+    fascicolo: `FSE-1-${suffix}`,
+  });
+  const list = await (
+    await page.request.get(
+      `/api/beneficiari?areaOperativaId=${area.id}&centroAscoltoId=${centre.id}`,
+    )
+  ).json();
+  expect(list).toHaveLength(2);
 });

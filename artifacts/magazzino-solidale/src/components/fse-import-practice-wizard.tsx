@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { errorMessage } from "@/lib/api-error";
+import { suggestFseProducts } from "@/lib/fse-product-suggestions";
 import { useAuth } from "@/lib/auth";
 import { newCommandKey } from "@/lib/carico-merce";
 import {
@@ -861,7 +862,10 @@ export function FseImportPracticeWizard({
                         }
                         onClick={() => {
                           if (newProductFor !== description) {
-                            setNewProduct({ ...emptyProduct, name: description });
+                            setNewProduct({
+                              ...emptyProduct,
+                              name: description,
+                            });
                           }
                           setNewProductFor(description);
                         }}
@@ -871,6 +875,34 @@ export function FseImportPracticeWizard({
                       </Button>
                     )}
                   </div>
+                  {canManageMappings &&
+                    suggestFseProducts(description, products).length > 0 && (
+                      <div className="space-y-2 rounded-md bg-muted/40 p-3 md:col-span-3">
+                        <p className="text-sm text-muted-foreground">
+                          {t("blocco07.productSuggestions")}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {suggestFseProducts(description, products).map(
+                            (product) => (
+                              <Button
+                                key={product.id}
+                                variant="outline"
+                                disabled={pending}
+                                className="h-auto max-w-full whitespace-normal text-left"
+                                onClick={() =>
+                                  void confirmMapping(description, product.id)
+                                }
+                              >
+                                {t("blocco07.associateSuggested", {
+                                  name: product.nome,
+                                })}{" "}
+                                · {product.codice} · {product.unitaMisura}
+                              </Button>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    )}
                   {createdProducts.current[`${detail?.id}:${description}`] && (
                     <p role="status" className="md:col-span-3">
                       {t("caricoPratiche.fseSelectProduct")}: #

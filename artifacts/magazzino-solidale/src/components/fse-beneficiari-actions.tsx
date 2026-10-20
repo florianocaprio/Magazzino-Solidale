@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { FseBeneficiariComparison } from "./fse-beneficiari-comparison";
 import { useToast } from "@/hooks/use-toast";
 import { FileDown, Upload } from "lucide-react";
 import { todayEuropeRome } from "@/lib/europe-rome";
@@ -68,8 +69,14 @@ export const FSE_BENEFICIARI_HEADERS_UI = [
 ] as const;
 
 function apiErrorMessage(error: unknown, fallback: string): string {
-  const data = (error as { data?: { error?: string; errori?: string[] } })?.data;
-  return [...new Set([data?.error ?? (error instanceof Error ? error.message : fallback), ...(data?.errori ?? [])])].join(" ");
+  const data = (error as { data?: { error?: string; errori?: string[] } })
+    ?.data;
+  return [
+    ...new Set([
+      data?.error ?? (error instanceof Error ? error.message : fallback),
+      ...(data?.errori ?? []),
+    ]),
+  ].join(" ");
 }
 
 export function FseBeneficiariActions({
@@ -296,7 +303,13 @@ export function FseBeneficiariActions({
         !resolutions[row.numeroRiga],
     ) ?? false;
   const importBlocked = Boolean(
-    !preview || (preview.conteggi.conflitto ?? 0) > 0 || unresolvedDuplicates,
+    !preview ||
+    preview.righe.some(
+      (row) =>
+        row.classificazione === "conflitto" &&
+        resolutions[row.numeroRiga]?.azione !== "salta",
+    ) ||
+    unresolvedDuplicates,
   );
 
   return (
@@ -327,7 +340,7 @@ export function FseBeneficiariActions({
           if (!open && !busy) reset();
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogContent className="max-h-[90vh] min-w-0 max-w-3xl grid-cols-1 overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {mode === "import"
@@ -338,7 +351,7 @@ export function FseBeneficiariActions({
               {t("reporting.fse.scopeDescription")}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <Select
               value={areaId}
               disabled={lockedArea != null || busy}
@@ -418,7 +431,9 @@ export function FseBeneficiariActions({
                 <p className="text-sm text-muted-foreground">
                   {t("reporting.fse.referenceDateHistory")}
                 </p>
-                <p className="text-sm text-muted-foreground">{t("blocco07.beneficiaryHelp")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("blocco07.beneficiaryHelp")}
+                </p>
                 <div className="min-w-0 space-y-2 rounded-md border p-3">
                   <input
                     ref={fileInput}
@@ -533,70 +548,186 @@ export function FseBeneficiariActions({
                     </div>
                   ))}
                 {preview.righe
-                  .filter(
-                    (row) => row.classificazione === "possibile_duplicato",
+                  .filter((row) =>
+                    [
+                      "possibile_duplicato",
+                      "da_aggiornare",
+                      "invariato",
+                      "conflitto",
+                    ].includes(row.classificazione),
                   )
-                  .map((row) => (
-                    <div
-                      key={row.numeroRiga}
-                      className="rounded border border-amber-400/60 p-3 text-sm"
-                    >
-                      <div className="mb-2 font-medium">
-                        {t("reporting.fse.possibleExisting", {
-                          number: row.numeroRiga,
-                        })}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
+                  .map((row) => {
+                    const skipped =
+                      resolutions[row.numeroRiga]?.azione === "salta";
+                    const duplicate =
+                      row.classificazione === "possibile_duplicato";
+                    const incoming = (field: string) =>
+                      row.confronto?.find((item) => item.campo === field)
+                        ?.importato ?? "";
+                    return (
+                      <section
+                        key={row.numeroRiga}
+                        data-fse-review-row={row.numeroRiga}
+                        className="min-w-0 space-y-3 rounded-md border border-amber-400/60 p-3 text-sm"
+                      >
+                        <h3 className="font-medium">
+                          {t(
+                            duplicate
+                              ? "reporting.fse.possibleExisting"
+                              : "reporting.fse.row",
+                            { number: row.numeroRiga },
+                          )}
+                        </h3>
+                        <p className="break-words font-medium">
+                          {incoming("nome")} {incoming("cognome")} ·{" "}
+                          {row.codiceFascicolo}
+                        </p>
+                        {row.confronto &&
+                          (!duplicate || !row.duplicati?.length) && (
+                            <FseBeneficiariComparison
+                              fields={row.confronto}
+                              registered={
+                                !duplicate && row.beneficiarioId != null
+                              }
+                            />
+                          )}
                         {row.duplicati?.map((candidate) => (
-                          <Button
+                          <div
                             key={candidate.id}
+                            className="min-w-0 space-y-2 rounded-md border bg-background p-3"
+                          >
+                            <p className="break-words font-medium">
+                              {candidate.nome} {candidate.cognome} ·{" "}
+                              {candidate.codice}
+                            </p>
+                            <p>
+                              {t("blocco07.comparisonFields.dataNascita")}:{" "}
+                              {candidate.dataNascita
+                                ? candidate.dataNascita
+                                    .split("-")
+                                    .reverse()
+                                    .join("/")
+                                : t("blocco07.notRecorded")}
+                            </p>
+                            {candidate.confronto && (
+                              <details open={row.duplicati?.length === 1}>
+                                <summary className="cursor-pointer font-medium">
+                                  {t("blocco07.compareData")}
+                                </summary>
+                                <FseBeneficiariComparison
+                                  fields={candidate.confronto}
+                                />
+                              </details>
+                            )}
+                            {candidate.collegabile === false && (
+                              <p className="text-muted-foreground">
+                                {t("blocco07.alreadyLinked")}
+                              </p>
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={busy || candidate.collegabile === false}
+                              aria-pressed={
+                                resolutions[row.numeroRiga]?.azione ===
+                                  "collega" &&
+                                resolutions[row.numeroRiga]?.beneficiarioId ===
+                                  candidate.id
+                              }
+                              variant={
+                                resolutions[row.numeroRiga]?.azione ===
+                                  "collega" &&
+                                resolutions[row.numeroRiga]?.beneficiarioId ===
+                                  candidate.id
+                                  ? "default"
+                                  : "outline"
+                              }
+                              onClick={() =>
+                                setResolutions((current) => ({
+                                  ...current,
+                                  [row.numeroRiga]: {
+                                    numeroRiga: row.numeroRiga,
+                                    azione: "collega",
+                                    beneficiarioId: candidate.id,
+                                  },
+                                }))
+                              }
+                            >
+                              {t("blocco07.linkAndUpdate")}
+                            </Button>
+                          </div>
+                        ))}
+                        <p className="text-xs text-muted-foreground">
+                          {t("blocco07.mergeHelp")}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {duplicate && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={busy}
+                              aria-pressed={
+                                resolutions[row.numeroRiga]?.azione === "crea"
+                              }
+                              variant={
+                                resolutions[row.numeroRiga]?.azione === "crea"
+                                  ? "default"
+                                  : "outline"
+                              }
+                              onClick={() =>
+                                setResolutions((current) => ({
+                                  ...current,
+                                  [row.numeroRiga]: {
+                                    numeroRiga: row.numeroRiga,
+                                    azione: "crea",
+                                  },
+                                }))
+                              }
+                            >
+                              {t("reporting.fse.createNew")}
+                            </Button>
+                          )}
+                          {!duplicate &&
+                            row.classificazione !== "conflitto" && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={busy}
+                                aria-pressed={!skipped}
+                                variant={!skipped ? "default" : "outline"}
+                                onClick={() =>
+                                  setResolutions((current) => {
+                                    const next = { ...current };
+                                    delete next[row.numeroRiga];
+                                    return next;
+                                  })
+                                }
+                              >
+                                {t("blocco07.updateExisting")}
+                              </Button>
+                            )}
+                          <Button
                             type="button"
                             size="sm"
-                            variant={
-                              resolutions[row.numeroRiga]?.beneficiarioId ===
-                              candidate.id
-                                ? "default"
-                                : "outline"
-                            }
+                            disabled={busy}
+                            aria-pressed={skipped}
+                            variant={skipped ? "default" : "outline"}
                             onClick={() =>
                               setResolutions((current) => ({
                                 ...current,
                                 [row.numeroRiga]: {
                                   numeroRiga: row.numeroRiga,
-                                  azione: "collega",
-                                  beneficiarioId: candidate.id,
+                                  azione: "salta",
                                 },
                               }))
                             }
                           >
-                            {t("reporting.fse.linkTo", {
-                              code: candidate.codice,
-                            })}
+                            {t("blocco07.skipRow")}
                           </Button>
-                        ))}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={
-                            resolutions[row.numeroRiga]?.azione === "crea"
-                              ? "default"
-                              : "outline"
-                          }
-                          onClick={() =>
-                            setResolutions((current) => ({
-                              ...current,
-                              [row.numeroRiga]: {
-                                numeroRiga: row.numeroRiga,
-                                azione: "crea",
-                              },
-                            }))
-                          }
-                        >
-                          {t("reporting.fse.createNew")}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                        </div>
+                      </section>
+                    );
+                  })}
               </>
             )}
 
@@ -617,6 +748,11 @@ export function FseBeneficiariActions({
                     errori: importResult.errori,
                   })}
                 </div>
+                <p>
+                  {t("blocco07.skippedRows", {
+                    count: importResult.saltati ?? 0,
+                  })}
+                </p>
                 {importResult.dettagli
                   .filter((detail) => detail.errori.length)
                   .map((detail) => (
