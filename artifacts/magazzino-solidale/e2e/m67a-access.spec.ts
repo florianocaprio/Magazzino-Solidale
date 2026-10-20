@@ -5,6 +5,7 @@ import {
 } from "../../api-server/tests/helpers/m67a-mensa-fixture";
 import { pool } from "../../../lib/db/src/index";
 import { randomUUID } from "node:crypto";
+import { selectOption } from "./helpers";
 
 const externalRequests = new WeakMap<Page, string[]>();
 async function openSidebar(page: Page) {
@@ -73,7 +74,9 @@ for (const role of ["requester", "manager", "reporter", "mixed"] as const) {
         ),
       ).toBeVisible();
       await expect(
-        page.getByText("Richieste al Magazzino", { exact: true }),
+        page
+          .getByRole("main")
+          .getByText("Richieste al Magazzino", { exact: true }),
       ).toHaveCount(0);
       await page.goto("/m67a-unknown-route");
       await expect(
@@ -83,8 +86,15 @@ for (const role of ["requester", "manager", "reporter", "mixed"] as const) {
         }),
       ).toBeVisible();
     } else {
+      await selectOption(
+        page,
+        page.getByRole("combobox", { name: "Mensa", exact: true }),
+        f.canteens[0].nome,
+      );
       await expect(
-        page.getByText("Richieste al Magazzino", { exact: true }),
+        page
+          .getByRole("main")
+          .getByText("Richieste al Magazzino", { exact: true }),
       ).toBeVisible();
       const create = page.getByRole("button", {
         name: "Invia richiesta al Magazzino",
@@ -132,8 +142,13 @@ test("M67-03 warehouse page revalidates cached rows after same-session territory
     .getByRole("link", { name: "Rifornimenti", exact: true })
     .click();
   await expect(page).toHaveURL(/\/mensa\/trasferimenti$/);
+  await selectOption(
+    page,
+    page.getByRole("combobox", { name: "Mensa", exact: true }),
+    f.canteens[0].nome,
+  );
   await expect(
-    page.getByText("Richieste al Magazzino", { exact: true }),
+    page.getByRole("main").getByText("Richieste al Magazzino", { exact: true }),
   ).toBeVisible();
   await pool.query(
     "update utenti set area_operativa_id=null, centro_ascolto_id=null where id=$1",
@@ -159,7 +174,7 @@ test("M67-03 warehouse page revalidates cached rows after same-session territory
     .getByRole("link", { name: "Movimenti", exact: true })
     .click();
   expect((await (await deniedRead).json()).error).toBe(
-    "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+    "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
   );
   await expect(page).toHaveURL(/\/movimenti$/);
   await expect(
@@ -269,8 +284,13 @@ test("M67-10/12 receive-only navigation, exact request beyond page one, report r
   await expect(link).toBeVisible();
   await link.click();
   await expect(page).toHaveURL(/\/mensa\/trasferimenti$/);
+  await selectOption(
+    page,
+    page.getByRole("combobox", { name: "Mensa", exact: true }),
+    f.canteens[0].nome,
+  );
   await expect(
-    page.getByText("Richieste al Magazzino", { exact: true }),
+    page.getByRole("main").getByText("Richieste al Magazzino", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", {
@@ -351,20 +371,28 @@ test("M67-10/12 receive-only navigation, exact request beyond page one, report r
     `/api/utenti/${f.users.receiver.id}/mense/${f.canteens[0].id}`,
     { data: { attiva: false, motivo: "Revoca sintetica browser" } },
   );
-  expect(revoke.status(), await revoke.text()).toBe(200);
+  expect(revoke.status(), await revoke.text()).toBe(410);
+  await pool.query("update utenti set area_operativa_id=null where id=$1", [
+    f.users.receiver.id,
+  ]);
+  const deniedScope = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/mensa/mense" &&
+      response.status() === 403,
+  );
   await page
     .getByRole("group", { name: "Area Operativa", exact: true })
     .locator("..")
     .getByRole("button", { name: "Aggiorna", exact: true })
     .click();
+  expect((await (await deniedScope).json()).error).toBe(
+    "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
+  );
   await expect(
     page.getByRole("article", { name: target.codice, exact: true }),
   ).toHaveCount(0);
-  await expect(
-    page.getByText(
-      "Nessuna assegnazione Mensa valida: contatta l'amministratore.",
-      { exact: true },
-    ),
-  ).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText(
+    "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
+  );
   expect(errors).toEqual([]);
 });

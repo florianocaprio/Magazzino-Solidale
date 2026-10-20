@@ -105,18 +105,22 @@ test("R2-17: revoca durante pagina aperta, refresh e deep link non espongono ric
     const deniedDetail = await warehousePage.request.get(
       `/api/richieste-magazzino/${request.id}`,
     );
-    expect(deniedDetail.status()).toBe(404);
+    expect(deniedDetail.status()).toBe(403);
+    expect(await deniedDetail.json()).toMatchObject({
+      code: "RICHIESTE_MAGAZZINO_FORBIDDEN",
+      error: "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
+    });
     const deniedDocument = await warehousePage.request.get(
       `/api/bolle/${document.documentoId}`,
     );
-    // M6.7 rejects an unassigned warehouse actor before the linked-document
+    // BUG01 rejects an unassigned Area before the linked-document
     // lookup. Require that specific territorial denial, not an arbitrary 403.
     expect(deniedDocument.status()).toBe(403);
     const deniedBody = await deniedDocument.json();
     expect(deniedBody).toMatchObject({
-      code: `${document.documentoId}_FORBIDDEN`,
+      code: "BOLLE_FORBIDDEN",
       error:
-        "Assegnazione territoriale valida richiesta per consultare il Magazzino",
+        "Assegna un'Area Operativa all'utente prima di utilizzare le funzionalità.",
     });
     expect(Object.keys(deniedBody).sort()).toEqual([
       "code",
@@ -131,7 +135,7 @@ test("R2-17: revoca durante pagina aperta, refresh e deep link non espongono ric
     const refreshedDenial = warehousePage.waitForResponse(
       (r) =>
         new URL(r.url()).pathname ===
-          `/api/richieste-magazzino/${request.id}` && r.status() === 404,
+          `/api/richieste-magazzino/${request.id}` && r.status() === 403,
     );
     await warehousePage.reload();
     await refreshedDenial;
@@ -148,7 +152,7 @@ test("R2-17: revoca durante pagina aperta, refresh e deep link non espongono ric
     const directDenial = warehousePage.waitForResponse(
       (r) =>
         new URL(r.url()).pathname ===
-          `/api/richieste-magazzino/${request.id}` && r.status() === 404,
+          `/api/richieste-magazzino/${request.id}` && r.status() === 403,
     );
     await warehousePage.goto(`/richieste-magazzino?richiestaId=${request.id}`);
     await directDenial;

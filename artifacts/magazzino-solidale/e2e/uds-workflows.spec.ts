@@ -202,7 +202,9 @@ test("BUG21: scheda UDS provvisoria, ristampa stabile, PATCH minime e ritorno fi
   const row = page.getByRole("row").filter({ hasText: person.cognome });
   await expect(row).toContainText(zone.nome);
   await page.goto(`/beneficiari/${person.id}`);
-  await expect(page.getByTestId("beneficiario-mensa-card")).toBeVisible();
+  await expect(page.getByLabel("Stati dei servizi")).toBeVisible();
+  await expect(page.getByTestId("beneficiario-mensa-card")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /abilita all.emporio|abilita alla mensa/i })).toHaveCount(0);
 });
 
 test("codici beneficiari: configurazione Super Admin, progressivo e stampa senza sostituire la tessera", async ({ page }, info) => {
@@ -231,6 +233,10 @@ test("codici beneficiari: configurazione Super Admin, progressivo e stampa senza
     const person = await response.json();
     expect(person.codice).toBe("UAT-B-0042");
     await page.goto(`/beneficiari/${person.id}`);
+    await expect(page.getByLabel("Stati dei servizi")).toBeVisible();
+    await expect(page.getByRole("button", { name: /scarica tessera pdf/i })).toHaveCount(0);
+    await page.getByRole("button", { name: "Modifica anagrafica", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: /modifica anagrafica/i })).toBeVisible();
     const downloading = page.waitForEvent("download");
     await page.getByRole("button", { name: /scarica tessera pdf/i }).click();
     const download = await downloading;

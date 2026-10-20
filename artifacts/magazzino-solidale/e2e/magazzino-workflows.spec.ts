@@ -134,11 +134,19 @@ test.describe("workflow Magazzino reali", () => {
       "Magazzino Demo Principale",
     );
     await page
-      .getByRole("button", { name: "Salva bozza", exact: true })
+      .getByRole("button", { name: "Apertura Pratica", exact: true })
       .click();
-    await page.getByLabel("Cerca per nome o codice").fill(product.codice);
+    await page
+      .getByRole("button", { name: "Inserimento prodotti", exact: true })
+      .click();
+    await page
+      .getByLabel("Cerca per nome, codice o barcode")
+      .fill(product.codice);
     await page
       .getByRole("button", { name: new RegExp(product.codice) })
+      .click();
+    await page
+      .getByRole("button", { name: "Chiudi pannello", exact: true })
       .click();
     const row = page
       .locator('[data-testid^="carico-row-"]')
@@ -148,7 +156,9 @@ test.describe("workflow Magazzino reali", () => {
       exact: true,
     });
     await row.getByLabel(/Quantità/).fill("0");
-    await row.getByRole("button", { name: "Salva bozza", exact: true }).click();
+    await row
+      .getByRole("button", { name: "Inserisci Prodotto", exact: true })
+      .click();
     await expect(
       row.getByText("La quantità deve essere maggiore di zero.", {
         exact: true,
@@ -157,7 +167,9 @@ test.describe("workflow Magazzino reali", () => {
     await expect(register).toBeDisabled();
 
     await row.getByLabel(/Quantità/).fill("3");
-    await row.getByRole("button", { name: "Salva bozza", exact: true }).click();
+    await row
+      .getByRole("button", { name: "Inserisci Prodotto", exact: true })
+      .click();
     await expect(
       row.getByText("Per questo prodotto è obbligatorio il codice lotto.", {
         exact: true,
@@ -174,7 +186,9 @@ test.describe("workflow Magazzino reali", () => {
     await row
       .getByLabel("Scadenza effettiva")
       .fill(`${new Date().getUTCFullYear() + 2}-12-31`);
-    await row.getByRole("button", { name: "Salva bozza", exact: true }).click();
+    await row
+      .getByRole("button", { name: "Inserisci Prodotto", exact: true })
+      .click();
     await expect(row.getByRole("checkbox")).toBeChecked();
     await register.click();
     const createResponse = page.waitForResponse(
@@ -249,9 +263,17 @@ test.describe("workflow Magazzino reali", () => {
     await page.goto("/scarichi");
     await page.getByRole("button", { name: /^nuovo$/i }).click();
     const sheet = page.getByRole("dialog", { name: /nuovo scarico/i });
-    await expect(sheet.getByRole("combobox", { name: /magazzino/i })).toBeDisabled();
-    await selectOption(page, sheet.getByRole("combobox", { name: "Area", exact: true }), "Area Demo");
-    await expect(sheet.getByRole("combobox", { name: /centro/i })).toHaveCount(0);
+    await expect(
+      sheet.getByRole("combobox", { name: /magazzino/i }),
+    ).toBeDisabled();
+    await selectOption(
+      page,
+      sheet.getByRole("combobox", { name: "Area", exact: true }),
+      "Area Demo",
+    );
+    await expect(sheet.getByRole("combobox", { name: /centro/i })).toHaveCount(
+      0,
+    );
     await selectOption(
       page,
       sheet.getByRole("combobox", { name: /magazzino/i }),
@@ -285,7 +307,9 @@ test.describe("workflow Magazzino reali", () => {
       .click();
     const created = await createResponse;
     expect(created.status()).toBe(201);
-    expect(created.request().postDataJSON()).not.toHaveProperty("centroAscoltoId");
+    expect(created.request().postDataJSON()).not.toHaveProperty(
+      "centroAscoltoId",
+    );
     await expect(
       page.getByRole("dialog", { name: /bolla creata/i }),
     ).toBeVisible();
