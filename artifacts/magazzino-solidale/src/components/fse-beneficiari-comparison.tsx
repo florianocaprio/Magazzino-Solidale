@@ -59,7 +59,7 @@ export function FseBeneficiariComparison({
               <span
                 className={
                   registered && field.attuale !== field.importato
-                    ? "font-medium"
+                    ? "inline-block max-w-full rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-medium text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
                     : undefined
                 }
               >
