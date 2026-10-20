@@ -28,3 +28,9 @@ Evidenze locali private con prefisso `/private/tmp/bug09-`; CI pubblica soltanto
 - Modificati soltanto `artifacts/magazzino-solidale/e2e/m4a-documenti-accessibilita.spec.ts`, `artifacts/magazzino-solidale/e2e/m5c1-r2-formal.spec.ts` e documentazione. Nessun cambiamento al codice applicativo collaudato da Floriano, ai contratti, al DB o alle migration.
 
 Evidenze private aggiuntive: `/private/tmp/bug09-api-full`, `/private/tmp/bug09-ci-api`, `/private/tmp/bug09-fse-browser`, `/private/tmp/bug09-browser-fix2`, `/private/tmp/bug09-equivalence.json`, `/private/tmp/bug09-optional-evidence.json`. Il primo candidato e l’UAT sono equivalenti su 2.242 file fuori dalla documentazione (fingerprint `a2d113599315d20cc1754f90977f22a73a0226c8b6fbad77cd95322ce907cbd9`). I due adeguamenti successivi riguardano solo i test browser; la CI completa sul nuovo checkpoint resta obbligatoria prima del merge.
+
+### Contesto Interventi della fixture
+
+La partizione 1 del primo ciclo ha poi segnalato due casi ripetuti su cinque viewport: il test costruiva `centro=null` dal Centro dell’attore, che nel modello BUG01 è correttamente nullo. La fixture ora legge il Centro del beneficiario, ne verifica l’Area uguale a quella dell’attore e lo usa come filtro esplicito della pagina. Gli assert sulla conservazione di Area/Centro restano esatti; aggiunto il controllo che l’utente non sia vincolato a un Centro. Ripetizione integrale `m5c1-centro-richiesta.spec.ts`: **20 PASS / 0 SKIP**, evidenze `/private/tmp/bug09-browser-fix3`. Codice applicativo invariato.
+
+Il run intermedio [39457545664](https://github.com/florianocaprio/Magazzino-Solidale/actions/runs/39457545664), avviato su `e06c830`, è stato annullato perché nel frattempo era emerso questo ulteriore KO sul vecchio test: non è un PASS e verrà sostituito da un ciclo completo sul candidato aggiornato. Nessun controllo o protezione è stato disabilitato.
