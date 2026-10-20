@@ -54,3 +54,20 @@ Evidenze private: `/private/tmp/fse-review-api`, `/private/tmp/fse-review-browse
 - `lib/api-zod/src/generated/types/index.ts`
 - `docs/FSE-Confronto-Associazioni-20261020.md`: resoconto e ricevuta installazione.
 - `docs/campagna-bug-2026-10.md`: versione corrente della 8082.
+
+## Ricevuta della 8082
+
+Codice installato **`01d463f658888ab5b22098de9f168ccab92b836e`**, compilato da `git archive` del commit verificato. API e WEB realmente ricreati; PostgreSQL conserva container, avvio e volume.
+
+| Servizio | Immagine | Image ID |
+| --- | --- | --- |
+| /magazzino-api | `magazzino-bugfix-uat-api:sha-01d463f65888` | `sha256:80a21603d41dadb731ad0dfb33a2da607002bcb4f065635c92a72875d92affea` |
+| /magazzino-web | `magazzino-bugfix-uat-web:sha-01d463f65888` | `sha256:d330fbee6c3f4e4291b3b69cf6793f750fecf99a8fc69adb4771cf2655489bb8` |
+
+- Backup privato: `/Users/florianocaprio/Backups/Magazzino-Solidale/FSE-REVIEW-01d463f65888-2026-10-20T09-53-39-602Z`. Database e uploads, directory 0700 / file 0600; ripristino realmente provato su PostgreSQL isolato senza porte o volumi personali, replay migrazioni **62 → 62**. Override di rilascio e rollback conservati nel backup.
+- **43 tabelle: hash di tutte le colonne invariati** prima/dopo ripristino e installazione. Nessun import di prova sul database personale, nessuna nuova variazione dei Beneficiari al riavvio.
+- Ledger effettivo **62/62**, nessun pending, checksum difforme, file mancante o fuori ordine.
+- `/`, `/config.js`, `/api/healthz`, `/api/readyz`: **200**. `/api/utenti` anonimo: **401**.
+- Entry servita `/assets/index-DBucM36N.js`. Asset Carico Merce `carico-merce-DDQvv_ww.js` e Beneficiari verificati per SHA-256 contro l’immagine compilata, inclusa presenza dei testi di proposta prodotto, confronto, collegamento e riga saltata. Conservati i controlli su Enti/Fornitori globali e sulle funzioni dei Carichi già chiuse.
+- Build e budget PASS: Initial entry index-DBucM36N.js: 1392.3 KiB, 386.8 KiB gzip.
+- Ricaricare la pagina della 8082 per usare il nuovo JavaScript. Per i prodotti verificare le proposte nel passaggio Controlla e associa; per i beneficiari confrontare il candidato e selezionare Collega e aggiorna FSE+, Crea nuovo oppure Salta questa riga, quindi confermare l’importazione. UAT da confermare con Floriano; nessun prompt successivo avviato.
