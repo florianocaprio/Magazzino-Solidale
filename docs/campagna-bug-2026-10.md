@@ -4,7 +4,7 @@ Consegna 08 — BUG20: icone di gruppo, pagina corrente, apertura iniziale e sce
 
 Correttivo UAT del 20/10: menu esplicito delle politiche dentro Credito mensile suggerito, con scelta conservata per la persona anche dopo l’inserimento di nuove politiche. API e WEB ricompilati sulla 8082 al codice `291af99`; ledger 63/63 e 45 tabelle invariate dopo backup e ripristino di prova. Ricevuta: [Beneficiari-Scelta-Politica-20261020.md](Beneficiari-Scelta-Politica-20261020.md). Restano inclusi accettazione FSE+, territorio e servizi documentati in [Beneficiari-Servizi-FSE-20261020.md](Beneficiari-Servizi-FSE-20261020.md).
 
-20 ottobre 2026, Europe/Rome. **Consegne 01–07 chiuse con OK di Floriano; 06 e 07 confermate esplicitamente dopo le prove sulla 8082. Consegna 08 completata e installata: codice `fb2ba4b`, ledger 63/63, UAT personale DA ESEGUIRE. La distinta `##test` finale e il merge non sono stati avviati.**
+20 ottobre 2026, Europe/Rome. **Consegne 01–07 chiuse con OK di Floriano; 06 e 07 confermate esplicitamente dopo le prove sulla 8082. Consegna 08 chiusa con OK UAT esplicito di Floriano sulla 8082 (`fb2ba4b`, ledger 63/63). Test finali 09 avviati; merge in main autorizzato soltanto dopo esito positivo dei gate.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato iniziale di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
@@ -105,7 +105,7 @@ Nessuna decisione residua blocca l'avvio del prompt 01.
 
 ## Registro dei BUG
 
-I BUG 01–19 e 21 sono **CHIUSI CON OK UAT DI FLORIANO**: dopo le precedenti accettazioni 01–05, Floriano conferma esplicitamente la chiusura dei punti 06 e 07 sulla 8082 e autorizza sviluppo e ricompilazione 08. Il BUG20 è installato e pronto per la UAT personale, ancora DA ESEGUIRE.
+I BUG 01–19 e 21 sono **CHIUSI CON OK UAT DI FLORIANO**: dopo le precedenti accettazioni 01–05, Floriano conferma esplicitamente la chiusura dei punti 06 e 07 sulla 8082 e autorizza sviluppo e ricompilazione 08. Il BUG20 è CHIUSO CON OK UAT esplicito di Floriano sulla 8082; certificazione finale in corso.
 I test automatici non sostituiscono la UAT personale. D03 mantiene il comportamento delle pratiche Aperte: salvataggi espliciti, errori sul form e protezione dall’abbandono.
 
 | BUG | Blocco | Prompt | Stato                     | Requisiti sospesi                                              | Commit           | Automatico                      | UAT         | Ultimo candidato verificato              |
@@ -129,7 +129,7 @@ I test automatici non sostituiscono la UAT personale. D03 mantiene il comportame
 | 17 | C | 03, 04 | CHIUSO; UAT OK | Nessuno; Enti e Fornitori locali/globali verificati | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; skip dichiarati nella ricevuta | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 | 18 | E | 06, 07 | CHIUSO; UAT OK | Nessuno; lotti e correttivi FSE+ accettati | 291af99 (include checkpoint 06/07 e correttivi) | PASS mirati; ricevute 06/07 e correttivi collegate | OK Floriano 20/10 | 291af99f3f40933d4fe7711c00d542a25875b04c |
 | 19 | E | 07 | CHIUSO; UAT OK | Nessuno; lotti e correttivi FSE+ accettati | 291af99 (include checkpoint 06/07 e correttivi) | PASS mirati; ricevute 06/07 e correttivi collegate | OK Floriano 20/10 | 291af99f3f40933d4fe7711c00d542a25875b04c |
-| 20 | F | 08 | PRONTO PER UAT; INSTALLATO 8082 | Nessuno; UX20-01–14 verificati automaticamente | fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80 | 822 UI; 97 API; 193 browser PASS + 12 skip di matrice; build/budget PASS | DA ESEGUIRE | fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80 |
+| 20 | F | 08 | CHIUSO; UAT OK | Nessuno; UX20-01–14 verificati automaticamente | fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80 | 822 UI; 97 API; 193 browser PASS + 12 skip di matrice; build/budget PASS | OK Floriano 20/10 | fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80 |
 | 21 | C | 04 + addendum 2.2 | CHIUSO; UAT OK | Un solo ID con stati, territorio, tessera e Zona UDS | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 | PASS mirati; evidenze sotto | OK Floriano 20/10 | 6088327aed83cf7e17f627e3c99b3cdf3917c6e2 |
 
 ## Otto consegne
@@ -148,7 +148,7 @@ Floriano prima di avanzare; nessun OK precedente è trasferito a questa campagna
 | 05 | D: 04, 10–14, 16 | Funzionale | ad1b1900d95c642adff6f7d25db0f79d4dfa5f40 | PASS; 1.530 API, 782 UI, 2 browser mirati; skip dichiarati | Installata; hash HTTP JS/CSS e ledger 61/61 | CHIUSA; OK UAT Floriano 20/10 |
 | 06 | E: 18, modello e integrazioni | Tecnica isolata | 410419d3d440e100d1377d420d6b6652be58cd62 | PASS checkpoint tecnico; integrato e accettato con 07 | Inclusa nella consegna 07 | CHIUSA con 07; OK Floriano 20/10 |
 | 07 | E: 18 UI, 19 | Funzionale | 291af99f3f40933d4fe7711c00d542a25875b04c | PASS mirati e correttivi FSE+; ricevute sotto e selettore politica collegate | Installata; ledger 63/63 | CHIUSA; OK UAT Floriano 20/10 |
-| 08 | F: 20; certificazione finale distinta | Funzionale | fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80 | 822 UI, 97 API, 193 browser PASS + 12 skip di matrice; build/budget 387,9/400 KiB | Installata; hash HTTP e ledger 63/63 | UAT DA ESEGUIRE; ##test finale non avviato |
+| 08 | F: 20; certificazione finale distinta | Funzionale | fb2ba4b57c2ab01ea06b0546356cb824b6a8fb80 | 822 UI, 97 API, 193 browser PASS + 12 skip di matrice; build/budget 387,9/400 KiB | Installata; hash HTTP e ledger 63/63 | CHIUSA; OK UAT Floriano 20/10; gate finali in corso |
 
 ## Verifiche iniziali e pubblicazione documentale
 
@@ -2708,3 +2708,7 @@ Floriano chiude i punti 06 e 07 dopo la prova personale e richiede il prompt 08 
 PASS: install frozen, typecheck, 822 UI, 97 API core/Maps e 193 browser mirati; 12 skip sono duplicazioni di matrice previste (8 M3A, 4 Sidebar). Build API/WEB e budget 387,9/400 KiB PASS. Le anomalie preliminari e la ripetizione dopo ERR_NETWORK_CHANGED sono documentate nella ricevuta. Nessuna asserzione funzionale o soglia abbassata.
 
 La richiesta diretta autorizza l’installazione personale durante questa consegna. BUG20 resta in attesa della UAT di Floriano; non sono stati avviati il distinto ##test completo della campagna, ##merge o il deploy Hetzner.
+
+## Test finali 09 e mandato di merge — 20/10/2026
+
+Floriano dichiara che il punto 08 funziona sulla 8082 e lo chiude; richiede espressamente `09_TEST_Riutilizzabile.txt`, ricompilazione della 8082 e merge diretto se tutti i controlli passano. Main remoto è ancora la base `f668b7e`; nessuna integrazione funzionale esterna. Tutte le UAT 01–08 sono approvate. Certificazione in corso: [Campagna-BUG-Test-Finali-20261020.md](Campagna-BUG-Test-Finali-20261020.md). Il mandato corrente copre il merge Git; non attiva il rilascio Hetzner del distinto prompt 10.
