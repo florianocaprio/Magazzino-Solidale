@@ -1,8 +1,8 @@
 # Campagna dei 20 BUG di ottobre 2026
 
-Correttivo UAT Beneficiari del 20/10: import FSE+ già completo, Area prima del Centro, prima abilitazione Emporio con Credito, politica selezionabile e comandi servizi in Modifica anagrafica. API e WEB ricompilati sulla 8082 al codice `9622c7d`; ledger 63/63. Corretti 109 import provvisori, 3 Aree mancanti e 3 prime abilitazioni Credito; quote e saldi conservati. Backup ripristinato e 44 altre tabelle invariate. Ricevuta e file modificati: [Beneficiari-Servizi-FSE-20261020.md](Beneficiari-Servizi-FSE-20261020.md). Restano inclusi import selettivo, colori e limite Nginx già documentati.
+Correttivo UAT del 20/10: menu esplicito delle politiche dentro Credito mensile suggerito, con scelta conservata per la persona anche dopo l’inserimento di nuove politiche. API e WEB ricompilati sulla 8082 al codice `291af99`; ledger 63/63 e 45 tabelle invariate dopo backup e ripristino di prova. Ricevuta: [Beneficiari-Scelta-Politica-20261020.md](Beneficiari-Scelta-Politica-20261020.md). Restano inclusi accettazione FSE+, territorio e servizi documentati in [Beneficiari-Servizi-FSE-20261020.md](Beneficiari-Servizi-FSE-20261020.md).
 
-20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Prompt 06 e 07 completati; correttivi FSE+ installati sulla 8082: codice `9622c7d`, ledger 63/63. UAT BUG18 e correttivi FSE+ da confermare con Floriano. Prompt 08 non avviato.**
+20 ottobre 2026, Europe/Rome. **Consegne 01–05 chiuse con OK di Floriano. Prompt 06 e 07 completati; correttivi FSE+ installati sulla 8082: codice `291af99`, ledger 63/63. Ultimo selettore politica da confermare con Floriano. Prompt 08 non avviato.**
 
 Preparazione prompt 00 conclusa e pubblicata al checkpoint `cf0704b`.
 Mandato di Floriano: analizzare il piano ed eseguire soltanto `00_Prompt_Generale.txt`.
